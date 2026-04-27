@@ -228,7 +228,7 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
 
 const cp = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '80%', paddingBottom: 30, flex: 1 },
+  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '55%', paddingBottom: 30, flex: 1 },
   handle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   title:   { fontSize: 17, fontWeight: '700' },
