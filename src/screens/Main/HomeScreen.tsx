@@ -525,7 +525,7 @@ export const HomeScreen: React.FC = () => {
             </View>
           }
           renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 50).springify()}>
+            <Animated.View entering={FadeInDown.delay(Math.min(index * 15, 150)).springify()}>
               <PostCard
                 item={item}
                 colors={colors}
