@@ -93,15 +93,19 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
 
   // Recherche debounced
   useEffect(() => {
-    if (query.trim().length < 2) { setResults([]); return; }
-    setLoading(true);
+    const trimmed = query.trim();
+    if (trimmed.length < 2) { setResults([]); setLoading(false); return; }
     const t = setTimeout(async () => {
+      if (trimmed.length < 2) return;
+      setLoading(true);
       try {
-        const res = await apiClient.get<UserPublic[]>(Endpoints.messages.usersSearch, { params: { q: query } });
+        const res = await apiClient.get<UserPublic[]>(
+          `${Endpoints.messages.usersSearch}?q=${encodeURIComponent(trimmed)}`,
+        );
         setResults(res.data ?? []);
       } catch { setResults([]); }
       finally { setLoading(false); }
-    }, 300);
+    }, 350);
     return () => clearTimeout(t);
   }, [query]);
 
