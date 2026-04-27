@@ -75,36 +75,87 @@ interface ContactPickerProps {
 }
 
 const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onToggle, onClose, colors }) => {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<UserPublic[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [query, setQuery]         = useState('');
+  const [results, setResults]     = useState<UserPublic[]>([]);
+  const [suggestions, setSuggestions] = useState<UserPublic[]>([]);
+  const [loading, setLoading]     = useState(false);
+  const [loadingSugg, setLoadingSugg] = useState(false);
 
-  const search = useCallback(async (q: string) => {
-    if (q.trim().length < 2) { setResults([]); return; }
-    setLoading(true);
-    try {
-      const res = await apiClient.get<UserPublic[]>(Endpoints.messages.usersSearch, { params: { q } });
-      setResults(res.data ?? []);
-    } catch { setResults([]); }
-    finally { setLoading(false); }
-  }, []);
-
+  // Charger les suggestions dès l'ouverture
   useEffect(() => {
-    const t = setTimeout(() => search(query), 300);
+    if (!visible) { setQuery(''); setResults([]); return; }
+    setLoadingSugg(true);
+    apiClient.get<UserPublic[]>(Endpoints.users.suggestions)
+      .then(r => setSuggestions(r.data ?? []))
+      .catch(() => setSuggestions([]))
+      .finally(() => setLoadingSugg(false));
+  }, [visible]);
+
+  // Recherche debounced
+  useEffect(() => {
+    if (query.trim().length < 2) { setResults([]); return; }
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiClient.get<UserPublic[]>(Endpoints.messages.usersSearch, { params: { q: query } });
+        setResults(res.data ?? []);
+      } catch { setResults([]); }
+      finally { setLoading(false); }
+    }, 300);
     return () => clearTimeout(t);
   }, [query]);
 
   const isSelected = (u: UserPublic) => selected.some(s => s.id === u.id);
+  const displayList = query.trim().length >= 2 ? results : suggestions;
+  const isEmpty = displayList.length === 0 && !loading && !loadingSugg;
+
+  const renderUser = ({ item: u }: { item: UserPublic }) => {
+    const sel = isSelected(u);
+    return (
+      <TouchableOpacity
+        style={[cp.row, { borderBottomColor: colors.divider, backgroundColor: sel ? colors.primary + '12' : 'transparent' }]}
+        onPress={() => onToggle(u)}
+        activeOpacity={0.7}
+      >
+        {u.avatar_url ? (
+          <Image source={{ uri: u.avatar_url }} style={cp.avatar} />
+        ) : (
+          <View style={[cp.avatar, { backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>{getInitial(u.display_name ?? u.username)}</Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Text style={[cp.name, { color: colors.textPrimary }]} numberOfLines={1}>
+              {u.display_name ?? u.username}
+            </Text>
+            {u.is_verified && <VerifiedBadge size={13} />}
+          </View>
+          {u.username && (
+            <Text style={[cp.handle, { color: colors.textTertiary }]}>@{u.username}</Text>
+          )}
+        </View>
+        <View style={[cp.checkbox, {
+          backgroundColor: sel ? colors.primary : 'transparent',
+          borderColor: sel ? colors.primary : colors.border,
+        }]}>
+          {sel && <Icon name="check" size={12} color="#fff" />}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={[cp.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
         <View style={[cp.sheet, { backgroundColor: colors.surface }]}>
           <View style={cp.handle} />
           <View style={cp.header}>
             <Text style={[cp.title, { color: colors.textPrimary }]}>Inviter des contacts</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Icon name="check" size={22} color={colors.primary} />
+            <TouchableOpacity onPress={onClose} style={cp.doneBtn}>
+              <Text style={[cp.doneTxt, { color: colors.primary }]}>
+                {selected.length > 0 ? `Confirmer (${selected.length})` : 'Fermer'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -117,9 +168,14 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
               placeholderTextColor={colors.textTertiary}
               value={query}
               onChangeText={setQuery}
-              autoFocus
             />
-            {loading && <Icon name="loader" size={14} color={colors.textTertiary} />}
+            {(loading || loadingSugg) ? (
+              <Icon name="loader" size={14} color={colors.textTertiary} />
+            ) : query.length > 0 ? (
+              <TouchableOpacity onPress={() => setQuery('')}>
+                <Icon name="x" size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           {/* Selected chips */}
@@ -140,54 +196,25 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
             </ScrollView>
           )}
 
+          {/* Section label */}
+          <Text style={[cp.sectionLabel, { color: colors.textTertiary }]}>
+            {query.trim().length >= 2 ? 'Résultats' : 'Suggestions'}
+          </Text>
+
           {/* Results */}
           <FlatList
-            data={results}
+            data={displayList}
             keyExtractor={u => u.id}
             style={cp.list}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
-              query.length >= 2 && !loading ? (
-                <Text style={[cp.empty, { color: colors.textTertiary }]}>Aucun résultat</Text>
-              ) : query.length < 2 ? (
-                <Text style={[cp.empty, { color: colors.textTertiary }]}>Tapez au moins 2 caractères…</Text>
+              isEmpty ? (
+                <Text style={[cp.empty, { color: colors.textTertiary }]}>
+                  {query.trim().length >= 2 ? 'Aucun résultat' : 'Aucune suggestion disponible'}
+                </Text>
               ) : null
             }
-            renderItem={({ item: u }) => {
-              const sel = isSelected(u);
-              return (
-                <TouchableOpacity
-                  style={[cp.row, { borderBottomColor: colors.divider, backgroundColor: sel ? colors.primary + '10' : 'transparent' }]}
-                  onPress={() => onToggle(u)}
-                  activeOpacity={0.7}
-                >
-                  {u.avatar_url ? (
-                    <Image source={{ uri: u.avatar_url }} style={cp.avatar} />
-                  ) : (
-                    <View style={[cp.avatar, { backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>{getInitial(u.display_name ?? u.username)}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Text style={[cp.name, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {u.display_name ?? u.username}
-                      </Text>
-                      {u.is_verified && <VerifiedBadge size={13} />}
-                    </View>
-                    {u.username && (
-                      <Text style={[cp.handle, { color: colors.textTertiary }]}>@{u.username}</Text>
-                    )}
-                  </View>
-                  <View style={[cp.checkbox, {
-                    backgroundColor: sel ? colors.primary : 'transparent',
-                    borderColor: sel ? colors.primary : colors.border,
-                  }]}>
-                    {sel && <Icon name="check" size={12} color="#fff" />}
-                  </View>
-                </TouchableOpacity>
-              );
-            }}
+            renderItem={renderUser}
           />
         </View>
       </View>
@@ -197,22 +224,25 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
 
 const cp = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%', paddingBottom: 30 },
+  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%', paddingBottom: 30 },
   handle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   title:   { fontSize: 17, fontWeight: '700' },
+  doneBtn: { paddingVertical: 6, paddingHorizontal: 4 },
+  doneTxt: { fontSize: 15, fontWeight: '700' },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 15 },
   chips: { paddingHorizontal: 16, marginBottom: 8, flexGrow: 0 },
   chip:  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 8 },
   chipText: { fontSize: 13, fontWeight: '600' },
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 4 },
   list:  { flex: 1 },
   empty: { textAlign: 'center', marginTop: 30, fontSize: 14 },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  avatar: { width: 42, height: 42, borderRadius: 21 },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
   name:  { fontSize: 15, fontWeight: '600' },
   handle: { fontSize: 12, marginTop: 1 },
-  checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });
 
 // ── Screen ────────────────────────────────────────────────────────────────────
