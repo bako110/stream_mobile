@@ -837,7 +837,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </Animated.View>
 
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.88)']}
+          colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.95)']}
+          locations={[0, 0.5, 1]}
           style={s.bottomGradient}
           pointerEvents="none"
         />
@@ -1055,7 +1056,7 @@ const ActionBtn: React.FC<{ icon: string; label: string; color: string; onPress?
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '60%' },
+  bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '75%' },
 
   floatingHeader: {
     position: 'absolute', top: 0, left: 0, right: 0,
@@ -1088,14 +1089,14 @@ const s = StyleSheet.create({
     borderWidth: 2, borderColor: '#fff', overflow: 'hidden',
   },
   avatarText:  { color: '#fff', fontWeight: '800', fontSize: 14 },
-  authorName:  { color: '#fff', fontWeight: '700', fontSize: 14, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  caption:     { color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 18 },
+  authorName:  { color: '#fff', fontWeight: '800', fontSize: 15, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  caption:     { color: '#fff', fontSize: 13, lineHeight: 19, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
   tag:         { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   tagText:     { fontSize: 11, fontWeight: '600' },
 
   actions:      { position: 'absolute', right: 12, alignItems: 'center', gap: 20, zIndex: 3 },
   actionBtn:    { alignItems: 'center', gap: 4 },
-  actionLabel:  { fontSize: 12, fontWeight: '600', color: '#fff', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  actionLabel:  { fontSize: 12, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   addActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   muteBtn:      { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
 
