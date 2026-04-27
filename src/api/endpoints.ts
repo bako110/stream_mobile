@@ -40,6 +40,7 @@ export const Endpoints = {
     adminVerify: (id: string) => `${V1}/users/${id}/verify`,
     privacy:        `${V1}/users/me/privacy`,
     // Admin
+    matchContacts:  `${V1}/users/match-contacts`,
     list:           `${V1}/users`,
     changeRole:     (id: string) => `${V1}/users/${id}/role`,
     deactivate:     (id: string) => `${V1}/users/${id}/deactivate`,

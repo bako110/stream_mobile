@@ -5,8 +5,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, FlatList, TouchableOpacity, Image,
   TextInput, RefreshControl, StatusBar, ActivityIndicator,
-  Share, ScrollView,
+  Share, ScrollView, Alert, Platform,
 } from 'react-native';
+import Contacts from 'react-native-contacts';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { apiClient, Endpoints } from '../../api';
 import Animated, {
   FadeInDown, FadeIn,
   useSharedValue, useAnimatedStyle, withSpring, withSequence,
@@ -46,7 +49,7 @@ interface FeedItem {
   data: Concert | Event;
 }
 
-type FeedFilter = 'all' | 'concerts' | 'events';
+type FeedFilter = 'all' | 'concerts' | 'events' | 'contacts';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -80,6 +83,10 @@ function formatDate(iso: string, withTime = false): string {
   return new Date(iso).toLocaleDateString('fr-FR', opts);
 }
 
+function normalizePhone(phone: string): string {
+  return phone.replace(/[^\d+]/g, '');
+}
+
 // ── HomeScreen ─────────────────────────────────────────────────────────────────
 
 export const HomeScreen: React.FC = () => {
@@ -101,10 +108,12 @@ export const HomeScreen: React.FC = () => {
   const [currentUser,   setCurrentUser]   = useState<User | null>(null);
   const [liveConcerts,  setLiveConcerts]  = useState<Concert[]>([]);
   const [commentsSheet, setCommentsSheet] = useState<{ kind: FeedKind; id: string } | null>(null);
-  const [suggestions,   setSuggestions]   = useState<UserPublic[]>([]);
-  const [suggestLoading,setSuggestLoading]= useState(true);
+  const [suggestions,    setSuggestions]    = useState<UserPublic[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(true);
+  const [contactIds,     setContactIds]     = useState<string[]>([]);
+  const [contactsAsked,  setContactsAsked]  = useState(false);
 
-  const searchRef        = useRef<TextInput>(null);
+  const searchRef         = useRef<TextInput>(null);
   const locationLoadedRef = useRef(false);
 
   // ── Chargement user ──────────────────────────────────────────────────────────
@@ -130,6 +139,36 @@ export const HomeScreen: React.FC = () => {
 
   useEffect(() => { loadSuggestions(); }, []);
 
+  // ── Contacts ─────────────────────────────────────────────────────────────────
+
+  const loadContactIds = useCallback(async () => {
+    try {
+      const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
+      let status = await check(perm);
+      if (status === RESULTS.DENIED) {
+        status = await request(perm);
+      }
+      if (status !== RESULTS.GRANTED) return;
+
+      const contacts = await Contacts.getAll();
+      const phones: string[] = [];
+      for (const c of contacts) {
+        for (const p of c.phoneNumbers ?? []) {
+          if (p.number) phones.push(normalizePhone(p.number));
+        }
+      }
+      if (!phones.length) return;
+
+      const res = await apiClient.post<{ user_ids: string[] }>(
+        Endpoints.users.matchContacts,
+        { phones },
+      );
+      setContactIds(res.data.user_ids ?? []);
+    } catch (e) {
+      if (__DEV__) console.warn('[Contacts]', e);
+    }
+  }, []);
+
   // ── Chargement concerts LIVE ─────────────────────────────────────────────────
 
   const loadLive = useCallback(async () => {
@@ -149,8 +188,12 @@ export const HomeScreen: React.FC = () => {
         (f === 'all' || f === 'concerts')
           ? concertService.list({ limit: 20, lat: userLocation?.lat, lon: userLocation?.lon })
           : Promise.resolve([] as Concert[]),
-        (f === 'all' || f === 'events')
-          ? eventService.list({ limit: 20, status: 'published', noCache, lat: userLocation?.lat, lon: userLocation?.lon })
+        (f === 'all' || f === 'events' || f === 'contacts')
+          ? eventService.list({
+              limit: 20, status: 'published', noCache,
+              lat: userLocation?.lat, lon: userLocation?.lon,
+              ...(f === 'contacts' && contactIds.length ? { contact_ids: contactIds } : {}),
+            })
           : Promise.resolve([] as Event[]),
       ]);
 
@@ -273,17 +316,24 @@ export const HomeScreen: React.FC = () => {
         style={s.filtersRow}
         contentContainerStyle={s.filtersScroll}
       >
-        {(['all', 'concerts', 'events'] as FeedFilter[]).map(f => {
+        {(['all', 'concerts', 'events', 'contacts'] as FeedFilter[]).map(f => {
           const active = filter === f;
-          const label  = f === 'all' ? 'Tout' : f === 'concerts' ? 'Concerts' : 'Événements';
-          const icon   = f === 'all' ? 'grid' : f === 'concerts' ? 'music' : 'calendar';
+          const label  = f === 'all' ? 'Tout' : f === 'concerts' ? 'Concerts' : f === 'events' ? 'Événements' : 'Contacts';
+          const icon   = f === 'all' ? 'grid' : f === 'concerts' ? 'music' : f === 'events' ? 'calendar' : 'users';
           return (
             <TouchableOpacity
               key={f}
-              onPress={() => setFilter(f)}
+              onPress={() => {
+                if (f === 'contacts' && !contactsAsked) {
+                  setContactsAsked(true);
+                  loadContactIds().then(() => setFilter(f));
+                } else {
+                  setFilter(f);
+                }
+              }}
               style={[s.filterChip, {
-                backgroundColor: active ? colors.primary          : 'transparent',
-                borderColor:     active ? colors.primary          : colors.border,
+                backgroundColor: active ? colors.primary : 'transparent',
+                borderColor:     active ? colors.primary : colors.border,
               }]}
             >
               <Icon name={icon} size={13} color={active ? '#fff' : colors.textSecondary} />
