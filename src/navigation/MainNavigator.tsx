@@ -43,6 +43,7 @@ import { LiveViewerScreen }        from '../screens/Live/LiveViewerScreen';
 import { LiveListScreen }          from '../screens/Live/LiveListScreen';
 import { MyStoriesScreen }         from '../screens/Profile/MyStoriesScreen';
 import { FilmDetailScreen }        from '../screens/Detail/FilmDetailScreen';
+import { UserReelsScreen }         from '../screens/Main/UserReelsScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ export type MainStackParamList = {
   LiveViewer:        { concertId: string };
   Activity:          undefined;
   MyStories:         undefined;
+  UserReels:         { userId: string; initialReelId?: string };
 };
 
 type MainNav = NativeStackNavigationProp<MainStackParamList>;
@@ -397,6 +399,11 @@ export const MainNavigator: React.FC<Props> = ({ onLogout }) => {
         />
       )}
     </Stack.Screen>
+    <Stack.Screen
+      name="UserReels"
+      component={UserReelsScreen}
+      options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', headerShown: false }}
+    />
   </Stack.Navigator>
   </>
   );

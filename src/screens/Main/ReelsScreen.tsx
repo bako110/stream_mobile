@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
-  View, Text, StyleSheet, FlatList, ScrollView, Dimensions,
+  View, Text, StyleSheet, FlatList, Dimensions,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
   ViewToken, Share, Platform, Pressable, Alert, Modal, TextInput,
   KeyboardAvoidingView, Keyboard,
@@ -394,6 +394,7 @@ export const ReelsScreen: React.FC = () => {
             colors={colors}
             onAdd={() => nav.navigate('CreateReel')}
             onAuthorPress={userId => nav.navigate('UserProfile', { userId })}
+            onAuthorReels={(userId, reelId) => nav.navigate('UserReels', { userId, initialReelId: reelId })}
             onEnd={handleReelEnd}
           />
         )}
@@ -426,24 +427,25 @@ export const ReelsScreen: React.FC = () => {
 // ── ReelItem — un écran complet avec sa propre vidéo (architecture TikTok) ────
 
 interface ReelItemProps {
-  reel:          Reel;
-  isActive:      boolean;
-  index:         number;
-  muted:         boolean;
-  screenW:       number;
-  screenH:       number;
-  insetTop:      number;
-  insetBottom:   number;
-  colors:        any;
-  onToggleMute:  () => void;
-  onAdd?:        () => void;
-  onAuthorPress: (userId: string) => void;
-  onEnd:         (index: number) => void;
+  reel:           Reel;
+  isActive:       boolean;
+  index:          number;
+  muted:          boolean;
+  screenW:        number;
+  screenH:        number;
+  insetTop:       number;
+  insetBottom:    number;
+  colors:         any;
+  onToggleMute:   () => void;
+  onAdd?:         () => void;
+  onAuthorPress:  (userId: string) => void;
+  onAuthorReels:  (userId: string, reelId: string) => void;
+  onEnd:          (index: number) => void;
 }
 
 const ReelItem: React.FC<ReelItemProps> = memo(({
   reel, isActive, index, muted, screenW, screenH, insetTop, insetBottom,
-  colors, onToggleMute, onAdd, onAuthorPress, onEnd,
+  colors, onToggleMute, onAdd, onAuthorPress, onAuthorReels, onEnd,
 }) => {
   const [paused,       setPaused]       = useState(false);
   const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
@@ -455,31 +457,10 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
   const [sending,      setSending]      = useState(false);
   const [barFocused,   setBarFocused]   = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
-  // Reels du même auteur (swipe horizontal)
-  const [authorReels,     setAuthorReels]     = useState<Reel[]>([]);
-  const [authorReelIdx,   setAuthorReelIdx]   = useState(0);
-  const [showAuthorReels, setShowAuthorReels] = useState(false);
-  const [loadingAuthor,   setLoadingAuthor]   = useState(false);
-  const authorListRef = useRef<ScrollView>(null);
-
-  const openAuthorReels = useCallback(async (userId: string) => {
+  const openAuthorReels = useCallback((userId: string) => {
     if (!userId) return;
-    setLoadingAuthor(true);
-    setShowAuthorReels(true);
-    try {
-      const data = await userService.getUserReels(userId);
-      const list: Reel[] = Array.isArray(data) ? data.filter((r: Reel) => !!r.video_url) : [];
-      // Mettre le reel courant en premier
-      const curIdx = list.findIndex(r => r.id === reel.id);
-      if (curIdx > 0) {
-        const [cur] = list.splice(curIdx, 1);
-        list.unshift(cur);
-      }
-      setAuthorReels(list);
-      setAuthorReelIdx(0);
-    } catch { setAuthorReels([]); }
-    finally { setLoadingAuthor(false); }
-  }, [reel.id]);
+    onAuthorReels(userId, reel.id);
+  }, [reel.id, onAuthorReels]);
 
   const commentInputRef = useRef<TextInput>(null);
   const playIconTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -708,135 +689,7 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
         onCommentAdded={() => setCommentCount(v => v + 1)}
       />
 
-      {/* ── Reels de l'auteur — swipe horizontal TikTok ────────────────────── */}
-      <Modal
-        visible={showAuthorReels}
-        animationType="slide"
-        transparent={false}
-        statusBarTranslucent
-        onRequestClose={() => { setShowAuthorReels(false); setAuthorReels([]); }}
-      >
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          {/* Header */}
-          <View style={[s.authorModalHeader, { paddingTop: insetTop + 8 }]}>
-            <TouchableOpacity
-              onPress={() => { setShowAuthorReels(false); setAuthorReels([]); }}
-              style={s.iconBtn}
-            >
-              <Icon name="x" size={20} color="#fff" />
-            </TouchableOpacity>
-            <Text style={s.authorModalTitle}>
-              {reel.author ? getAuthorLabel(reel.author) : 'Reels'}
-              {authorReels.length > 0 && (
-                <Text style={{ fontSize: 12, fontWeight: '400', color: 'rgba(255,255,255,0.6)' }}>
-                  {'  '}{authorReelIdx + 1}/{authorReels.length}
-                </Text>
-              )}
-            </Text>
-            <TouchableOpacity
-              style={s.iconBtn}
-              onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}
-            >
-              <Icon name="user" size={18} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          {loadingAuthor ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <ActivityIndicator color="#fff" size="large" />
-            </View>
-          ) : authorReels.length === 0 ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              <Icon name="film" size={40} color="rgba(255,255,255,0.4)" />
-              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Aucun reel</Text>
-            </View>
-          ) : (
-            <ScrollView
-              ref={authorListRef as any}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              disableIntervalMomentum
-              contentOffset={{ x: authorReelIdx * screenW, y: 0 }}
-              onMomentumScrollEnd={e => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / screenW);
-                setAuthorReelIdx(idx);
-              }}
-              scrollEventThrottle={16}
-              style={{ flex: 1, width: screenW }}
-            >
-              {authorReels.map((ar, ai) => (
-                <AuthorReelSlide
-                  key={ar.id}
-                  reel={ar}
-                  isActive={ai === authorReelIdx && showAuthorReels}
-                  screenW={screenW}
-                  screenH={screenH}
-                  muted={muted}
-                  colors={colors}
-                  onToggleMute={onToggleMute}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      </Modal>
     </View>
-  );
-});
-
-// ── AuthorReelSlide — slide horizontal simple (vidéo + caption) ──────────────
-
-interface AuthorReelSlideProps {
-  reel: Reel; isActive: boolean;
-  screenW: number; screenH: number;
-  muted: boolean; colors: any;
-  onToggleMute: () => void;
-}
-
-const AuthorReelSlide: React.FC<AuthorReelSlideProps> = memo(({ reel, isActive, screenW, screenH, muted, onToggleMute }) => {
-  const [paused, setPaused] = useState(false);
-
-  const player = useVideoPlayer(reel.video_url ? { uri: reel.video_url } : { uri: 'about:blank' }, p => {
-    p.loop   = true;
-    p.muted  = muted;
-    p.volume = muted ? 0 : 1.0;
-  });
-
-  useEffect(() => {
-    if (isActive && !paused && reel.video_url) player.play();
-    else player.pause();
-  }, [isActive, paused]);
-
-  useEffect(() => {
-    player.muted  = muted;
-    player.volume = muted ? 0 : 1.0;
-  }, [muted]);
-
-  useEffect(() => {
-    if (!isActive) setPaused(false);
-  }, [isActive]);
-
-  useEffect(() => () => {
-    try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
-  }, []);
-
-  return (
-    <TouchableOpacity
-      activeOpacity={1}
-      style={{ width: screenW, height: screenH, backgroundColor: '#000' }}
-      onPress={() => setPaused(v => !v)}
-    >
-      <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} />
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={s.bottomGradient} pointerEvents="none" />
-      <View style={[s.authorSlideInfo]} pointerEvents="none">
-        {reel.caption ? <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text> : null}
-      </View>
-      <TouchableOpacity style={[s.muteBtn, s.authorSlideMute]} onPress={onToggleMute} activeOpacity={0.8}>
-        <Icon name={muted ? 'volume-x' : 'volume-2'} size={20} color="#fff" />
-      </TouchableOpacity>
-    </TouchableOpacity>
   );
 });
 
@@ -901,16 +754,6 @@ const s = StyleSheet.create({
   actionLabel:  { fontSize: 12, fontWeight: '600', color: '#fff', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   addActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   muteBtn:      { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-
-  authorModalHeader: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  authorModalTitle: { color: '#fff', fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
-  authorSlideInfo:  { position: 'absolute', bottom: 80, left: 16, right: 16, zIndex: 3 },
-  authorSlideMute:  { position: 'absolute', bottom: 24, right: 16, zIndex: 4 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 
