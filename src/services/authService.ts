@@ -100,6 +100,14 @@ export const authService = {
     return res.data;
   },
 
+  async forgotPassword(payload: { email?: string; phone?: string; username?: string }): Promise<void> {
+    await apiClient.post(Endpoints.auth.forgotPassword, payload);
+  },
+
+  async resetPassword(token: string, new_password: string): Promise<void> {
+    await apiClient.post(Endpoints.auth.resetPassword, { token, new_password });
+  },
+
   async qrGenerate(): Promise<{ token: string; expires_at: string; ttl_seconds: number }> {
     const res = await apiClient.post<{ token: string; expires_at: string; ttl_seconds: number }>(
       Endpoints.auth.qrGenerate,

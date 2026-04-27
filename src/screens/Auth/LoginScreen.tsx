@@ -9,7 +9,7 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { AppLogo, Button, Input, SocialAuthButton, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
+import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
 import { QRScannerScreen } from './QRScannerScreen';
@@ -20,9 +20,10 @@ interface Props {
   onLoginSuccess:      () => void;
   onGoRegister:        () => void;
   onGoForgotPassword?: () => void;
+  onGoSocialLogin?:    () => void;
 }
 
-export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword }) => {
+export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
@@ -109,17 +110,21 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             Connectez-vous à votre compte FoliX
           </Animated.Text>
 
-          {/* OAuth + QR */}
+          {/* QR Code — connexion rapide */}
           <Animated.View entering={FadeInDown.delay(280).springify()}>
-            <SocialAuthButton provider="google"   onPress={() => {}} />
-            <SocialAuthButton provider="facebook" onPress={() => {}} style={{ marginTop: 10 }} />
-            {/* Bouton Scanner QR */}
             <TouchableOpacity
               onPress={() => setShowScanner(true)}
               style={[styles.qrBtn, { borderColor: colors.primary + '50', backgroundColor: colors.primary + '0C' }]}
+              activeOpacity={0.75}
             >
-              <Icon name="maximize" size={16} color={colors.primary} />
-              <Text style={[styles.qrBtnText, { color: colors.primary }]}>Se connecter avec un QR code</Text>
+              <View style={[styles.qrIconWrap, { backgroundColor: colors.primary + '18' }]}>
+                <Icon name="maximize" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.qrBtnTitle, { color: colors.textPrimary }]}>Scanner un QR code</Text>
+                <Text style={[styles.qrBtnSub, { color: colors.textSecondary }]}>Connectez-vous depuis un autre appareil</Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
             </TouchableOpacity>
           </Animated.View>
 
@@ -221,6 +226,22 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
               <Text style={[styles.registerLink, { color: colors.primary }]}>S'inscrire</Text>
             </TouchableOpacity>
           </Animated.View>
+
+          {/* Lien réseaux sociaux */}
+          <Animated.View entering={FadeInUp.delay(620).duration(400)} style={styles.socialRow}>
+            <View style={[styles.socialDivider, { backgroundColor: colors.divider }]} />
+            <TouchableOpacity
+              onPress={onGoSocialLogin}
+              style={styles.socialLink}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="share-2" size={13} color={colors.textTertiary} />
+              <Text style={[styles.socialLinkText, { color: colors.textTertiary }]}>
+                Continuer avec un réseau social
+              </Text>
+              <Icon name="chevron-right" size={13} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -261,8 +282,15 @@ const styles = StyleSheet.create({
   switchLink:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   switchLinkText:{ fontSize: 13, fontWeight: '600' },
   qrBtn:         {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginTop: 10, paddingVertical: 13, borderRadius: 14, borderWidth: 1.2,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 14, paddingHorizontal: 16,
+    borderRadius: 16, borderWidth: 1.2,
   },
-  qrBtnText:     { fontSize: 14, fontWeight: '600' },
+  qrIconWrap:    { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  qrBtnTitle:    { fontSize: 14, fontWeight: '700' },
+  qrBtnSub:      { fontSize: 12, marginTop: 1 },
+  socialRow:     { alignItems: 'center', marginTop: 16, gap: 10 },
+  socialDivider: { height: 1, width: '100%' },
+  socialLink:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  socialLinkText:{ fontSize: 13, fontWeight: '500' },
 });

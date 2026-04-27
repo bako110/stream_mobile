@@ -18,6 +18,7 @@ import type { Concert } from '../../types/concert';
 import type { AppColors } from '../../theme/colors';
 import { profileStyles as s } from '../../styles/ProfileScreen.styles';
 import { QRCodeScreen } from '../Auth/QRCodeScreen';
+import { VerifiedBadge } from './SettingsScreen';
 
 interface Props {
   onLogout:         () => void;
@@ -134,7 +135,10 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               )}
             </View>
 
-            <Text style={[s.profileName, { color: colors.textPrimary }]}>{displayName}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+              <Text style={[s.profileName, { color: colors.textPrimary }]}>{displayName}</Text>
+              {user?.is_verified && <VerifiedBadge size={20} />}
+            </View>
             {user?.username && (
               <Text style={[s.profileHandle, { color: colors.primary }]}>@{user.username}</Text>
             )}

@@ -14,6 +14,7 @@ export const Endpoints = {
     oauthGoogle:    `${V1}/auth/oauth/google`,
     oauthFacebook:  `${V1}/auth/oauth/facebook`,
     forgotPassword: `${V1}/auth/forgot-password`,
+    resetPassword:  `${V1}/auth/reset-password`,
     qrGenerate:     `${V1}/auth/qr/generate`,
     qrVerify:       `${V1}/auth/qr/verify`,
     qrStatus:       (token: string) => `${V1}/auth/qr/status/${token}`,
@@ -34,6 +35,9 @@ export const Endpoints = {
     block:          (id: string) => `${V1}/users/${id}/block`,
     blocked:        `${V1}/users/me/blocked`,
     suggestions:    `${V1}/users/suggestions`,
+    verificationStatus:  `${V1}/users/me/verification`,
+    verifyRequest:       `${V1}/users/me/verify-request`,
+    adminVerify: (id: string) => `${V1}/users/${id}/verify`,
     privacy:        `${V1}/users/me/privacy`,
     // Admin
     list:           `${V1}/users`,
