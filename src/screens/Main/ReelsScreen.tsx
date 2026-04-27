@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
-  View, Text, StyleSheet, FlatList, Dimensions,
+  View, Text, StyleSheet, FlatList, Dimensions, ScrollView,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
-  ViewToken, Share, Platform, Pressable, Alert, Modal, TextInput,
+  ViewToken, Share, Platform, Alert, Modal, TextInput,
   KeyboardAvoidingView, Keyboard,
 } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue, useAnimatedStyle,
+  withSequence, withTiming, withSpring,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
@@ -79,8 +83,57 @@ export const ReelsScreen: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [screenFocused,setScreenFocused]= useState(true);
   const [muted,        setMuted]        = useState(true);
+  const [searchOpen,   setSearchOpen]   = useState(false);
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [searchResults,setSearchResults]= useState<Reel[]>([]);
+  const [searching,    setSearching]    = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
+  const searchTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toggleMute = useCallback(() => setMuted(v => !v), []);
+
+  const openSearch = useCallback(() => {
+    setSearchOpen(true);
+    setSearchQuery('');
+    setSearchResults([]);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    Keyboard.dismiss();
+  }, []);
+
+  const runSearch = useCallback(async (q: string) => {
+    if (!q.trim()) { setSearchResults([]); return; }
+    setSearching(true);
+    try {
+      const data = await reelService.getFeed({ page: 1, limit: 20, search: q.trim() });
+      setSearchResults(data.items.filter((r: Reel) => !!r.video_url));
+    } catch { setSearchResults([]); }
+    finally { setSearching(false); }
+  }, []);
+
+  const onSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => runSearch(text), 350);
+  }, [runSearch]);
+
+  const pickSearchResult = useCallback((r: Reel) => {
+    closeSearch();
+    const idx = reels.findIndex(x => x.id === r.id);
+    if (idx >= 0) {
+      setCurrentIndex(idx);
+      listRef.current?.scrollToIndex({ index: idx, animated: false });
+    } else {
+      setReels(prev => [r, ...prev.filter(x => x.id !== r.id)]);
+      setCurrentIndex(0);
+      listRef.current?.scrollToIndex({ index: 0, animated: false });
+    }
+  }, [reels, closeSearch]);
 
   const handleReelEnd = useCallback((_index: number) => {
     // scroll auto désactivé — l'utilisateur scrolle manuellement
@@ -372,9 +425,10 @@ export const ReelsScreen: React.FC = () => {
         decelerationRate="fast"
         disableIntervalMomentum
         getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
-        windowSize={3}
-        maxToRenderPerBatch={2}
-        removeClippedSubviews={Platform.OS === 'android'}
+        windowSize={5}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={false}
         initialNumToRender={2}
         onEndReached={loadMore}
         onEndReachedThreshold={3}
@@ -394,26 +448,157 @@ export const ReelsScreen: React.FC = () => {
             colors={colors}
             onAdd={() => nav.navigate('CreateReel')}
             onAuthorPress={userId => nav.navigate('UserProfile', { userId })}
-            onAuthorReels={(userId, reelId) => nav.navigate('UserReels', { userId, initialReelId: reelId })}
+            onAuthorReels={(_userId, _reelId) => {}}
             onEnd={handleReelEnd}
           />
         )}
       />
 
-      {/* Header flottant — par-dessus la FlatList */}
-      <View style={[s.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
+      {/* Header flottant */}
+      <View style={[s.floatingHeader, { top: insets.top + 6 }]} pointerEvents="box-none">
         <TouchableOpacity onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)} style={s.iconBtn}>
           <Icon name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={s.reelHeaderTitle}>Reels</Text>
-        <TouchableOpacity
-          onPress={() => setTab('mine')}
-          style={[s.myReelsBtn, { backgroundColor: colors.primary + '30', borderColor: colors.primary + '60' }]}
-        >
-          <Icon name="user" size={14} color="#fff" />
-          <Text style={s.myReelsBtnText}>Mes reels</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="box-none">
+          <TouchableOpacity onPress={openSearch} style={s.iconBtn}>
+            <Icon name="search" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setTab('mine')}
+            style={[s.myReelsBtn, { backgroundColor: colors.primary + '30', borderColor: colors.primary + '60' }]}
+          >
+            <Icon name="user" size={14} color="#fff" />
+            <Text style={s.myReelsBtnText}>Mes reels</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Overlay recherche */}
+      {searchOpen && (
+        <View style={[s.searchOverlay, { paddingTop: insets.top }]}>
+
+          {/* Barre de recherche */}
+          <View style={s.searchTopBar}>
+            <TouchableOpacity onPress={closeSearch} style={s.searchBackBtn}>
+              <Icon name="arrow-left" size={22} color="#fff" />
+            </TouchableOpacity>
+            <View style={s.searchInputWrap}>
+              <Icon name="search" size={15} color="rgba(255,255,255,0.4)" style={{ marginLeft: 12 }} />
+              <TextInput
+                ref={searchInputRef}
+                value={searchQuery}
+                onChangeText={onSearchChange}
+                placeholder="Rechercher des reels, auteurs..."
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                style={s.searchInput}
+                returnKeyType="search"
+                onSubmitEditing={() => runSearch(searchQuery)}
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => onSearchChange('')} style={s.searchClearBtn}>
+                  <Icon name="x" size={14} color="rgba(255,255,255,0.5)" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Contenu */}
+          {searching ? (
+            <View style={s.searchCenterState}>
+              <ActivityIndicator color="#fff" size="large" />
+              <Text style={s.searchStateText}>Recherche en cours…</Text>
+            </View>
+          ) : searchResults.length > 0 ? (
+            <FlatList
+              data={searchResults}
+              keyExtractor={r => r.id}
+              numColumns={2}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={s.searchGrid}
+              columnWrapperStyle={s.searchGridRow}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={s.searchCard}
+                  onPress={() => pickSearchResult(item)}
+                  activeOpacity={0.9}
+                >
+                  {/* Thumbnail */}
+                  {item.thumbnail_url
+                    ? <Image source={{ uri: item.thumbnail_url }} style={s.searchThumb} resizeMode="cover" />
+                    : <View style={s.searchThumbFallback}>
+                        <Icon name="film" size={32} color="rgba(255,255,255,0.15)" />
+                      </View>
+                  }
+
+                  {/* Gradient */}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.92)']}
+                    locations={[0.3, 0.6, 1]}
+                    style={s.searchCardGrad}
+                  />
+
+                  {/* Icône play */}
+                  <View style={s.searchPlayBadge}>
+                    <Icon name="play" size={10} color="#fff" />
+                  </View>
+
+                  {/* Vues en haut à droite */}
+                  <View style={s.searchViewBadge}>
+                    <Icon name="eye" size={10} color="#fff" />
+                    <Text style={s.searchBadgeText}>{formatCount(item.view_count)}</Text>
+                  </View>
+
+                  {/* Infos bas */}
+                  <View style={s.searchCardInfo}>
+                    {/* Avatar + nom */}
+                    <View style={s.searchCardAuthorRow}>
+                      {item.author?.avatar_url
+                        ? <Image source={{ uri: item.author.avatar_url }} style={s.searchAvatar} />
+                        : <View style={[s.searchAvatar, s.searchAvatarFallback]}>
+                            <Text style={s.searchAvatarText}>
+                              {(item.author?.display_name || item.author?.username || '?')[0].toUpperCase()}
+                            </Text>
+                          </View>
+                      }
+                      <Text style={s.searchCardAuthor} numberOfLines={1}>
+                        {item.author?.display_name || item.author?.username || ''}
+                      </Text>
+                    </View>
+                    {item.caption ? (
+                      <Text style={s.searchCardCaption} numberOfLines={2}>{item.caption}</Text>
+                    ) : null}
+                    {/* Likes */}
+                    <View style={s.searchCardStats}>
+                      <Icon name="heart" size={10} color="#E0389A" />
+                      <Text style={s.searchCardStat}>{formatCount(item.like_count)}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          ) : searchQuery.length > 0 ? (
+            <View style={s.searchCenterState}>
+              <View style={s.searchEmptyIcon}>
+                <Icon name="search" size={28} color="rgba(255,255,255,0.4)" />
+              </View>
+              <Text style={s.searchStateTitle}>Aucun résultat</Text>
+              <Text style={s.searchStateText}>Essaie un autre mot-clé ou nom d'auteur</Text>
+            </View>
+          ) : (
+            <View style={s.searchCenterState}>
+              <View style={s.searchEmptyIcon}>
+                <Icon name="trending-up" size={28} color="rgba(255,255,255,0.4)" />
+              </View>
+              <Text style={s.searchStateTitle}>Découvre des reels</Text>
+              <Text style={s.searchStateText}>Tape le nom d'un auteur ou un mot-clé</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {loadingMore && (
         <View style={s.loadMoreIndicator}>
@@ -424,28 +609,25 @@ export const ReelsScreen: React.FC = () => {
   );
 };
 
-// ── ReelItem — un écran complet avec sa propre vidéo (architecture TikTok) ────
+// ── VideoSlide — une slide dans le carousel horizontal de l'auteur ────────────
 
-interface ReelItemProps {
-  reel:           Reel;
-  isActive:       boolean;
-  index:          number;
-  muted:          boolean;
-  screenW:        number;
-  screenH:        number;
-  insetTop:       number;
-  insetBottom:    number;
-  colors:         any;
+interface VideoSlideProps {
+  reel:        Reel;
+  isActive:    boolean;
+  muted:       boolean;
+  screenW:     number;
+  screenH:     number;
+  insetBottom: number;
+  colors:      any;
   onToggleMute:   () => void;
   onAdd?:         () => void;
   onAuthorPress:  (userId: string) => void;
-  onAuthorReels:  (userId: string, reelId: string) => void;
-  onEnd:          (index: number) => void;
+  onEnd:          () => void;
 }
 
-const ReelItem: React.FC<ReelItemProps> = memo(({
-  reel, isActive, index, muted, screenW, screenH, insetTop, insetBottom,
-  colors, onToggleMute, onAdd, onAuthorPress, onAuthorReels, onEnd,
+const VideoSlide: React.FC<VideoSlideProps> = memo(({
+  reel, isActive, muted, screenW, screenH, insetBottom,
+  colors, onToggleMute, onAdd, onAuthorPress, onEnd,
 }) => {
   const [paused,       setPaused]       = useState(false);
   const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
@@ -456,69 +638,144 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
   const [commentText,  setCommentText]  = useState('');
   const [sending,      setSending]      = useState(false);
   const [barFocused,   setBarFocused]   = useState(false);
-  const [showPlayIcon, setShowPlayIcon] = useState(false);
-  const openAuthorReels = useCallback((userId: string) => {
-    if (!userId) return;
-    onAuthorReels(userId, reel.id);
-  }, [reel.id, onAuthorReels]);
 
-  const commentInputRef = useRef<TextInput>(null);
-  const playIconTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Reanimated shared values — animations 100% sur le thread UI, zéro setState
+  const playIconOpacity = useSharedValue(0);
+  const playIconScale   = useSharedValue(0.6);
+  const heartOpacity    = useSharedValue(0);
+  const heartScale      = useSharedValue(0);
+  const heartX          = useSharedValue(0);
+  const heartY          = useSharedValue(0);
 
-  // Player propre à cet item
-  const player = useVideoPlayer(reel.video_url ? { uri: reel.video_url } : { uri: 'about:blank' }, p => {
-    p.loop         = false;
-    p.muted        = muted;
-    p.volume       = muted ? 0 : 1.0;
-    p.mixAudioMode = 'mixWithOthers';
-  });
+  const playIconAnim = useAnimatedStyle(() => ({
+    position:       'absolute',
+    top:            0, left: 0, right: 0, bottom: 0,
+    alignItems:     'center',
+    justifyContent: 'center',
+    zIndex:         5,
+    opacity:        playIconOpacity.value,
+    transform:      [{ scale: playIconScale.value }],
+  }));
+  const heartAnim = useAnimatedStyle(() => ({
+    position:  'absolute',
+    opacity:   heartOpacity.value,
+    transform: [{ scale: heartScale.value }],
+    left:      heartX.value - 44,
+    top:       heartY.value - 44,
+    zIndex:    10,
+  }));
 
-  // Scroll au reel suivant quand la vidéo se termine
+  // Refs pour l'état pausé et liked accessibles dans les worklets RNGH
+  const pausedRef = useRef(false);
+  const likedRef  = useRef(reel.user_reaction === 'like');
+
+  const player = useVideoPlayer(
+    reel.video_url
+      ? {
+          uri: reel.video_url,
+          bufferConfig: {
+            // iOS — qualité maximale, pas de limite de bitrate
+            preferredPeakBitRate: 0,
+            preferredForwardBufferDurationMs: 8000,
+            // Android — buffer suffisant pour éviter les rebuffers
+            minBufferMs:                    3000,
+            maxBufferMs:                    15000,
+            bufferForPlaybackMs:            1000,
+            bufferForPlaybackAfterRebufferMs: 2000,
+          },
+        }
+      : { uri: 'about:blank' },
+    p => {
+      p.loop         = false;
+      p.muted        = muted;
+      p.volume       = muted ? 0 : 1.0;
+      p.mixAudioMode = 'mixWithOthers';
+    },
+  );
+
   useEffect(() => {
-    const sub = player.addEventListener('onEnd', () => {
-      if (isActive) onEnd(index);
-    });
+    const sub = player.addEventListener('onEnd', () => { if (isActive) onEnd(); });
     return () => sub.remove();
-  }, [isActive, index, onEnd]);
+  }, [isActive, onEnd]);
 
-  // Play/pause selon visibilité
   useEffect(() => {
-    if (isActive && !paused && reel.video_url) {
-      player.play();
-    } else {
-      player.pause();
-    }
+    if (isActive && !pausedRef.current && reel.video_url) player.play();
+    else player.pause();
   }, [isActive, paused]);
 
-  // Sync muted
   useEffect(() => {
     player.muted  = muted;
     player.volume = muted ? 0 : 1.0;
   }, [muted]);
 
-  // Reset pause quand on quitte cet item
   useEffect(() => {
     if (!isActive) {
+      pausedRef.current = false;
       setPaused(false);
     }
   }, [isActive]);
 
-  // Stopper + vider la source à l'unmount
-  useEffect(() => {
-    return () => {
-      try {
-        player.pause();
-        player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {});
-      } catch { /* ignore */ }
-    };
+  useEffect(() => () => {
+    try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); }
+    catch {}
   }, []);
 
-  const handleTap = () => {
-    setPaused(v => !v);
-    setShowPlayIcon(true);
-    if (playIconTimer.current) clearTimeout(playIconTimer.current);
-    playIconTimer.current = setTimeout(() => setShowPlayIcon(false), 700);
-  };
+  // Sync likedRef avec l'état React
+  useEffect(() => { likedRef.current = liked; }, [liked]);
+
+  const showPlayIconAnim = useCallback(() => {
+    playIconOpacity.value = 1;
+    playIconScale.value   = withSpring(1, { damping: 10, stiffness: 200 });
+    playIconOpacity.value = withSequence(
+      withTiming(1, { duration: 0 }),
+      withTiming(1, { duration: 500 }),
+      withTiming(0, { duration: 200 }),
+    );
+  }, []);
+
+  const doLike = useCallback((x: number, y: number) => {
+    // Déclenche le like seulement si pas déjà liké
+    if (!likedRef.current) {
+      likedRef.current = true;
+      setLiked(true);
+      setLikes(v => v + 1);
+      socialService.toggleReaction({ reaction_type: 'like' as ReactionType, reel_id: reel.id }).catch(() => {});
+    }
+    // Animation coeur sur le thread UI
+    heartX.value     = x;
+    heartY.value     = y;
+    heartScale.value = 0;
+    heartOpacity.value = withTiming(1, { duration: 50 });
+    heartScale.value   = withSpring(1.2, { damping: 6, stiffness: 180 });
+    heartOpacity.value = withSequence(
+      withTiming(1, { duration: 50 }),
+      withTiming(1, { duration: 500 }),
+      withTiming(0, { duration: 300 }),
+    );
+  }, [reel.id]);
+
+  const doPause = useCallback(() => {
+    const next = !pausedRef.current;
+    pausedRef.current = next;
+    setPaused(next);
+    showPlayIconAnim();
+  }, [showPlayIconAnim]);
+
+  // Gestes natifs RNGH — single tap = pause, double tap = like
+  const singleTap = Gesture.Tap()
+    .maxDuration(300)
+    .runOnJS(true)
+    .onEnd(doPause);
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDuration(300)
+    .runOnJS(true)
+    .onEnd(e => doLike(e.x, e.y));
+
+  // Exclusive : double-tap prioritaire, annule single-tap immédiatement
+  // Les gestes Tap ne captent pas les mouvements → scroll horizontal libre
+  const tapGesture = Gesture.Exclusive(doubleTap, singleTap);
 
   const handleLike = async () => {
     const wasLiked = liked;
@@ -537,7 +794,7 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
       await Share.share({ message: reel.caption ? `${reel.caption}\n${reel.video_url ?? ''}` : (reel.video_url ?? '') });
       await socialService.share({ platform: Platform.OS, reel_id: reel.id });
       setShareCount(v => v + 1);
-    } catch { /* cancelled */ }
+    } catch {}
   };
 
   const handleFocusBar = (focused: boolean) => {
@@ -554,141 +811,232 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
       setCommentText('');
       setCommentCount(v => v + 1);
       Keyboard.dismiss();
-    } catch { /* silent */ }
+    } catch {}
     finally { setSending(false); }
   };
 
-  const safeBottom = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
-  // hauteur barre commentaire ≈ 60px + padding 8 haut + 8 bas
+  const safeBottom   = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
   const COMMENT_BAR_H = 76;
 
   return (
-    <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
+    <GestureDetector gesture={tapGesture}>
+      <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
 
-      {/* ── Vidéo plein écran ──────────────────────────────────────────────── */}
-      <VideoView
-        player={player}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-        controls={false}
-      />
+        <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls={false} />
 
-      {/* ── Zone de tap ────────────────────────────────────────────────────── */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={handleTap} />
-
-      {/* ── Icône play/pause ───────────────────────────────────────────────── */}
-      {showPlayIcon && (
-        <Animated.View entering={FadeIn.duration(120)} style={s.playPauseOverlay} pointerEvents="none">
+        {/* Play/pause — thread UI, aucun setState */}
+        <Animated.View style={playIconAnim} pointerEvents="none">
           <View style={s.playPauseCircle}>
             <Icon name={paused ? 'play' : 'pause'} size={36} color="#fff" />
           </View>
         </Animated.View>
-      )}
 
-      {/* ── Gradient bas ───────────────────────────────────────────────────── */}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.88)']}
-        style={s.bottomGradient}
-        pointerEvents="none"
-      />
+        {/* Coeur double-tap — Reanimated pur */}
+        <Animated.View pointerEvents="none" style={heartAnim}>
+          <Icon name="heart" size={88} color="#E0389A" />
+        </Animated.View>
 
-      {/* ── Infos bas-gauche ───────────────────────────────────────────────── */}
-      <View
-        style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H }]}
-        pointerEvents="box-none"
-      >
-        <View style={s.authorRow}>
-          {/* Avatar → swipe reels auteur */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => reel.author?.id && openAuthorReels(reel.author.id)}
-          >
-            {reel.author?.avatar_url
-              ? <Image source={{ uri: reel.author.avatar_url }} style={s.avatar} />
-              : <View style={[s.avatar, { backgroundColor: colors.primary }]}>
-                  <Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text>
-                </View>
-            }
-          </TouchableOpacity>
-          {/* Nom → profil */}
-          <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
-            <Text style={s.authorName}>{getAuthorLabel(reel.author)}</Text>
-          </TouchableOpacity>
-          {reel.author?.is_verified && <VerifiedBadge size={14} />}
-        </View>
-        {reel.caption ? (
-          <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text>
-        ) : null}
-        {reel.ref_concert_id && (
-          <View style={[s.tag, { backgroundColor: colors.accentOrange + '30' }]}>
-            <Text style={[s.tagText, { color: colors.accentOrange }]}>Concert</Text>
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.88)']}
+          style={s.bottomGradient}
+          pointerEvents="none"
+        />
+
+        <View style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H }]} pointerEvents="box-none">
+          <View style={s.authorRow}>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
+              {reel.author?.avatar_url
+                ? <Image source={{ uri: reel.author.avatar_url }} style={s.avatar} />
+                : <View style={[s.avatar, { backgroundColor: colors.primary }]}>
+                    <Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text>
+                  </View>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
+              <Text style={s.authorName}>{getAuthorLabel(reel.author)}</Text>
+            </TouchableOpacity>
+            {reel.author?.is_verified && <VerifiedBadge size={14} />}
           </View>
-        )}
-      </View>
-
-      {/* ── Actions droite ─────────────────────────────────────────────────── */}
-      <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
-        <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
-          <Icon name={muted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
-        </TouchableOpacity>
-        <ActionBtn icon="heart"          label={formatCount(likes)}           color={liked ? '#E0389A' : '#fff'} onPress={handleLike} />
-        <ActionBtn icon="message-circle" label={formatCount(commentCount)}    color="#fff" onPress={() => setShowComments(true)} />
-        <ActionBtn icon="share-2"        label={formatCount(shareCount)}      color="#fff" onPress={handleShare} />
-        <ActionBtn icon="eye"            label={formatCount(reel.view_count)} color="#fff" />
-        {onAdd && (
-          <TouchableOpacity style={[s.addActionBtn, { backgroundColor: colors.primary }]} onPress={onAdd}>
-            <Icon name="plus" size={20} color="#fff" />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* ── Barre de commentaire style TikTok ──────────────────────────────── */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'position' : undefined}
-        style={[s.commentBarWrap, { bottom: safeBottom }]}
-        keyboardVerticalOffset={0}
-      >
-        <View style={[s.commentBar, {
-          backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.52)',
-          borderColor:     barFocused ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.18)',
-        }]}>
-          <TextInput
-            ref={commentInputRef}
-            value={commentText}
-            onChangeText={setCommentText}
-            placeholder="Ajouter un commentaire..."
-            placeholderTextColor="rgba(255,255,255,0.45)"
-            onFocus={() => handleFocusBar(true)}
-            onBlur={() => handleFocusBar(false)}
-            style={s.commentBarInput}
-            returnKeyType="send"
-            onSubmitEditing={handleSendComment}
-            maxLength={300}
-          />
-          <TouchableOpacity
-            onPress={handleSendComment}
-            disabled={!commentText.trim() || sending}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={[s.commentBarSend, {
-              backgroundColor: commentText.trim() ? colors.primary : 'rgba(255,255,255,0.15)',
-            }]}
-          >
-            {sending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Icon name="send" size={15} color={commentText.trim() ? '#fff' : 'rgba(255,255,255,0.5)'} />
-            }
-          </TouchableOpacity>
+          {reel.caption ? <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text> : null}
+          {reel.ref_concert_id && (
+            <View style={[s.tag, { backgroundColor: colors.accentOrange + '30' }]}>
+              <Text style={[s.tagText, { color: colors.accentOrange }]}>Concert</Text>
+            </View>
+          )}
         </View>
-      </KeyboardAvoidingView>
 
-      {/* ── Bottom sheet commentaires ───────────────────────────────────────── */}
-      <CommentsBottomSheet
-        visible={showComments}
-        onClose={() => setShowComments(false)}
-        reelId={reel.id}
-        onCommentAdded={() => setCommentCount(v => v + 1)}
+        <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
+          <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
+            <Icon name={muted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
+          </TouchableOpacity>
+          <ActionBtn icon="heart"          label={formatCount(likes)}           color={liked ? '#E0389A' : '#fff'} onPress={handleLike} />
+          <ActionBtn icon="message-circle" label={formatCount(commentCount)}    color="#fff" onPress={() => setShowComments(true)} />
+          <ActionBtn icon="share-2"        label={formatCount(shareCount)}      color="#fff" onPress={handleShare} />
+          <ActionBtn icon="eye"            label={formatCount(reel.view_count)} color="#fff" />
+          {onAdd && (
+            <TouchableOpacity style={[s.addActionBtn, { backgroundColor: colors.primary }]} onPress={onAdd}>
+              <Icon name="plus" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'position' : undefined}
+          style={[s.commentBarWrap, { bottom: safeBottom }]}
+          keyboardVerticalOffset={0}
+        >
+          <View style={[s.commentBar, {
+            backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.52)',
+            borderColor:     barFocused ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.18)',
+          }]}>
+            <TextInput
+              value={commentText}
+              onChangeText={setCommentText}
+              placeholder="Ajouter un commentaire..."
+              placeholderTextColor="rgba(255,255,255,0.45)"
+              onFocus={() => handleFocusBar(true)}
+              onBlur={() => handleFocusBar(false)}
+              style={s.commentBarInput}
+              returnKeyType="send"
+              onSubmitEditing={handleSendComment}
+              maxLength={300}
+            />
+            <TouchableOpacity
+              onPress={handleSendComment}
+              disabled={!commentText.trim() || sending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[s.commentBarSend, {
+                backgroundColor: commentText.trim() ? colors.primary : 'rgba(255,255,255,0.15)',
+              }]}
+            >
+              {sending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Icon name="send" size={15} color={commentText.trim() ? '#fff' : 'rgba(255,255,255,0.5)'} />
+              }
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+
+        <CommentsBottomSheet
+          visible={showComments}
+          onClose={() => setShowComments(false)}
+          reelId={reel.id}
+          onCommentAdded={() => setCommentCount(v => v + 1)}
+        />
+
+      </View>
+    </GestureDetector>
+  );
+});
+
+// ── ReelItem — row verticale = carousel horizontal des reels d'un auteur ──────
+
+interface ReelItemProps {
+  reel:           Reel;
+  isActive:       boolean;
+  index:          number;
+  muted:          boolean;
+  screenW:        number;
+  screenH:        number;
+  insetTop:       number;
+  insetBottom:    number;
+  colors:         any;
+  onToggleMute:   () => void;
+  onAdd?:         () => void;
+  onAuthorPress:  (userId: string) => void;
+  onAuthorReels?: (userId: string, reelId: string) => void;
+  onEnd:          (index: number) => void;
+}
+
+const ReelItem: React.FC<ReelItemProps> = memo(({
+  reel, isActive, index, muted, screenW, screenH, insetBottom,
+  colors, onToggleMute, onAdd, onAuthorPress, onEnd,
+}) => {
+  const [authorReels, setAuthorReels] = useState<Reel[]>([reel]);
+  const [hIdx,        setHIdx]        = useState(0);
+  const loadedRef  = useRef(false);
+  const hListRef   = useRef<FlatList>(null);
+
+  // Charger les reels de l'auteur dès que ce item devient actif
+  useEffect(() => {
+    if (!isActive || loadedRef.current || !reel.author?.id) return;
+    loadedRef.current = true;
+    userService.getUserReels(reel.author.id)
+      .then(data => {
+        const list     = (Array.isArray(data) ? data : []) as Reel[];
+        const filtered = list.filter(r => !!r.video_url);
+        if (filtered.length <= 1) return;
+        const idx = filtered.findIndex(r => r.id === reel.id);
+        if (idx > 0) { const [cur] = filtered.splice(idx, 1); filtered.unshift(cur); }
+        setAuthorReels(filtered);
+      })
+      .catch(() => {});
+  }, [isActive]);
+
+  // Reset au premier slide quand l'item n'est plus actif
+  useEffect(() => {
+    if (!isActive && hIdx !== 0) {
+      setHIdx(0);
+      hListRef.current?.scrollToIndex({ index: 0, animated: false });
+    }
+  }, [isActive]);
+
+  const onHScroll = useCallback((e: any) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / screenW);
+    setHIdx(i);
+  }, [screenW]);
+
+  const getItemLayout = useCallback(
+    (_: any, i: number) => ({ length: screenW, offset: screenW * i, index: i }),
+    [screenW],
+  );
+
+  return (
+    <View style={{ width: screenW, height: screenH }}>
+      <FlatList
+        ref={hListRef}
+        data={authorReels}
+        keyExtractor={r => r.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        disableIntervalMomentum
+        nestedScrollEnabled
+        bounces={false}
+        overScrollMode="never"
+        onMomentumScrollEnd={onHScroll}
+        getItemLayout={getItemLayout}
+        initialNumToRender={1}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        removeClippedSubviews={false}
+        style={{ width: screenW, height: screenH }}
+        renderItem={({ item: r, index: i }) => (
+          <VideoSlide
+            reel={r}
+            isActive={isActive && i === hIdx}
+            muted={muted}
+            screenW={screenW}
+            screenH={screenH}
+            insetBottom={insetBottom}
+            colors={colors}
+            onToggleMute={onToggleMute}
+            onAdd={i === 0 ? onAdd : undefined}
+            onAuthorPress={onAuthorPress}
+            onEnd={() => onEnd(index)}
+          />
+        )}
       />
 
+      {/* Indicateur de position horizontal */}
+      {authorReels.length > 1 && (
+        <View style={s.hDots} pointerEvents="none">
+          {authorReels.map((_, i) => (
+            <View key={i} style={[s.hDot, i === hIdx && s.hDotActive]} />
+          ))}
+        </View>
+      )}
     </View>
   );
 });
@@ -726,10 +1074,6 @@ const s = StyleSheet.create({
   },
   myReelsBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
-  playPauseOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center', zIndex: 5,
-  },
   playPauseCircle: {
     width: 64, height: 64, borderRadius: 32,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -791,6 +1135,21 @@ const s = StyleSheet.create({
     flexShrink:     0,
   },
 
+
+  // ── Indicateur horizontal ─────────────────────────────────────────────────
+  hDots: {
+    position: 'absolute', top: 12, left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5,
+    zIndex: 20,
+  },
+  hDot: {
+    width: 5, height: 5, borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  hDotActive: {
+    width: 16, backgroundColor: '#fff',
+  },
+
   // ── Mes reels ─────────────────────────────────────────────────────────────
   mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 48, paddingBottom: 14, paddingHorizontal: 16, gap: 12 },
   mineIconBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
@@ -817,4 +1176,103 @@ const s = StyleSheet.create({
   charCount:      { fontSize: 11, textAlign: 'right', marginTop: 4, marginBottom: 16 },
   editActions:    { flexDirection: 'row', gap: 12 },
   editBtn:        { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+
+  // ── Recherche ─────────────────────────────────────────────────────────────
+  searchOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#0a0a0a', zIndex: 50,
+  },
+  searchTopBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  searchBackBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  searchInputWrap: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderRadius: 22, height: 42,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  searchInput: {
+    flex: 1, fontSize: 14, color: '#fff',
+    paddingHorizontal: 10, paddingVertical: 0,
+  },
+  searchClearBtn: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginRight: 7,
+  },
+
+  searchGrid: { padding: 10, paddingBottom: 50 },
+  searchGridRow: { gap: 8, marginBottom: 8 },
+
+  searchCard: {
+    flex: 1, borderRadius: 14, overflow: 'hidden',
+    backgroundColor: '#161616',
+  },
+  searchThumb: {
+    width: '100%', aspectRatio: 9 / 16,
+  },
+  searchThumbFallback: {
+    width: '100%', aspectRatio: 9 / 16,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#1c1c1c',
+  },
+  searchCardGrad: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: '75%',
+  },
+  searchPlayBadge: {
+    position: 'absolute', top: 8, left: 8,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  searchViewBadge: {
+    position: 'absolute', top: 8, right: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8,
+  },
+  searchBadgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+
+  searchCardInfo: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: 9, gap: 4,
+  },
+  searchCardAuthorRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+  },
+  searchAvatar: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    overflow: 'hidden',
+  },
+  searchAvatarFallback: {
+    backgroundColor: '#333', alignItems: 'center', justifyContent: 'center',
+  },
+  searchAvatarText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  searchCardAuthor:  { color: '#fff', fontSize: 12, fontWeight: '700', flex: 1 },
+  searchCardCaption: {
+    color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 15,
+  },
+  searchCardStats: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  searchCardStat:  { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' },
+
+  searchCenterState: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 60,
+  },
+  searchEmptyIcon: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  searchStateTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  searchStateText:  { color: 'rgba(255,255,255,0.35)', fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
 });
