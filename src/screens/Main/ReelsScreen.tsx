@@ -823,17 +823,20 @@ const AuthorReelSlide: React.FC<AuthorReelSlideProps> = memo(({ reel, isActive, 
   }, []);
 
   return (
-    <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
+    <TouchableOpacity
+      activeOpacity={1}
+      style={{ width: screenW, height: screenH, backgroundColor: '#000' }}
+      onPress={() => setPaused(v => !v)}
+    >
       <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} />
-      <Pressable style={StyleSheet.absoluteFill} onPress={() => setPaused(v => !v)} />
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={s.bottomGradient} pointerEvents="none" />
-      <View style={[s.authorSlideInfo]}>
+      <View style={[s.authorSlideInfo]} pointerEvents="none">
         {reel.caption ? <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text> : null}
       </View>
       <TouchableOpacity style={[s.muteBtn, s.authorSlideMute]} onPress={onToggleMute} activeOpacity={0.8}>
         <Icon name={muted ? 'volume-x' : 'volume-2'} size={20} color="#fff" />
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 });
 
