@@ -90,6 +90,7 @@ export interface UserPublic {
   display_name: string | null;
   avatar_url: string | null;
   role: UserRole;
+  is_verified?: boolean;
   bio?: string | null;
   location?: string | null;
   website?: string | null;
