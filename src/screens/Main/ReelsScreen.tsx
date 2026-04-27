@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
-  View, Text, StyleSheet, FlatList, Dimensions,
+  View, Text, StyleSheet, FlatList, ScrollView, Dimensions,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
   ViewToken, Share, Platform, Pressable, Alert, Modal, TextInput,
   KeyboardAvoidingView, Keyboard,
@@ -460,7 +460,7 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
   const [authorReelIdx,   setAuthorReelIdx]   = useState(0);
   const [showAuthorReels, setShowAuthorReels] = useState(false);
   const [loadingAuthor,   setLoadingAuthor]   = useState(false);
-  const authorListRef = useRef<FlatList>(null);
+  const authorListRef = useRef<ScrollView>(null);
 
   const openAuthorReels = useCallback(async (userId: string) => {
     if (!userId) return;
@@ -727,6 +727,11 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
             </TouchableOpacity>
             <Text style={s.authorModalTitle}>
               {reel.author ? getAuthorLabel(reel.author) : 'Reels'}
+              {authorReels.length > 0 && (
+                <Text style={{ fontSize: 12, fontWeight: '400', color: 'rgba(255,255,255,0.6)' }}>
+                  {'  '}{authorReelIdx + 1}/{authorReels.length}
+                </Text>
+              )}
             </Text>
             <TouchableOpacity
               style={s.iconBtn}
@@ -746,22 +751,24 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
               <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Aucun reel</Text>
             </View>
           ) : (
-            <FlatList
-              ref={authorListRef}
-              data={authorReels}
-              keyExtractor={r => r.id}
+            <ScrollView
+              ref={authorListRef as any}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               decelerationRate="fast"
-              getItemLayout={(_, i) => ({ length: screenW, offset: screenW * i, index: i })}
-              initialScrollIndex={authorReelIdx}
+              disableIntervalMomentum
+              contentOffset={{ x: authorReelIdx * screenW, y: 0 }}
               onMomentumScrollEnd={e => {
                 const idx = Math.round(e.nativeEvent.contentOffset.x / screenW);
                 setAuthorReelIdx(idx);
               }}
-              renderItem={({ item: ar, index: ai }) => (
+              scrollEventThrottle={16}
+              style={{ flex: 1, width: screenW }}
+            >
+              {authorReels.map((ar, ai) => (
                 <AuthorReelSlide
+                  key={ar.id}
                   reel={ar}
                   isActive={ai === authorReelIdx && showAuthorReels}
                   screenW={screenW}
@@ -770,8 +777,8 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
                   colors={colors}
                   onToggleMute={onToggleMute}
                 />
-              )}
-            />
+              ))}
+            </ScrollView>
           )}
         </View>
       </Modal>
