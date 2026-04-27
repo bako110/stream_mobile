@@ -15,6 +15,7 @@ import { notificationService } from '../../services/notificationService';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import { useNavigation } from '@react-navigation/native';
+import { useUser } from '../../context/UserContext';
 import type { Subscription } from '../../types';
 import type { User } from '../../types/user';
 
@@ -109,22 +110,30 @@ const SubScreen: React.FC<{ title: string; onBack: () => void; children: React.R
 const VerificationSubScreen: React.FC<{ onBack: () => void; user: User | null }> = ({ onBack, user }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const { refreshUser } = useUser();
 
   const [status,   setStatus]   = useState<VerifStatus>((user?.verification_status as VerifStatus) ?? 'none');
   const [note,     setNote]     = useState('');
   const [loading,  setLoading]  = useState(false);
   const [fetching, setFetching] = useState(true);
 
+  const fetchStatus = async () => {
+    try {
+      const res = await apiClient.get<{ status: VerifStatus; is_verified: boolean }>(
+        Endpoints.users.verificationStatus,
+      );
+      setStatus(res.data.status);
+      if (res.data.is_verified || res.data.status === 'approved') {
+        await refreshUser();
+      }
+    } catch {}
+    finally { setFetching(false); }
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await apiClient.get<{ status: VerifStatus; note?: string }>(
-          Endpoints.users.verificationStatus,
-        );
-        setStatus(res.data.status);
-      } catch {}
-      finally { setFetching(false); }
-    })();
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 30_000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSubmit = async () => {
@@ -248,7 +257,6 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [unreadCount,  setUnreadCount]  = useState(0);
   const [loadingUser,  setLoadingUser]  = useState(true);
-  const [loggingOut,   setLoggingOut]   = useState(false);
   const [pushEnabled,  setPushEnabled]  = useState(true);
   const [autoPlay,     setAutoPlay]     = useState(true);
   const [hdStream,     setHdStream]     = useState(true);
@@ -274,10 +282,13 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   const handleLogout = () => {
     Alert.alert('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
       { text: 'Annuler', style: 'cancel' },
-      { text: 'Déconnecter', style: 'destructive', onPress: async () => {
-        setLoggingOut(true);
-        try { await authService.logout(); } catch {}
+      { text: 'Déconnecter', style: 'destructive', onPress: () => {
+        // _clearTokens en premier — synchrone et immédiat
+        authService._clearTokens();
+        // Puis on navigue vers auth
         onLogout?.();
+        // Nettoyage en arrière-plan (pas besoin d'attendre)
+        authService.logout().catch(() => {});
       }},
     ]);
   };
@@ -535,16 +546,10 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
         <TouchableOpacity
           style={[s.logoutBtn, { borderColor: '#EF4444', marginTop: 24 }]}
           onPress={handleLogout}
-          disabled={loggingOut}
           activeOpacity={0.75}
         >
-          {loggingOut
-            ? <ActivityIndicator color="#EF4444" size="small" />
-            : <>
-                <Icon name="log-out" size={18} color="#EF4444" />
-                <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 15 }}>Se déconnecter</Text>
-              </>
-          }
+          <Icon name="log-out" size={18} color="#EF4444" />
+          <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 15 }}>Se déconnecter</Text>
         </TouchableOpacity>
       </ScrollView>
 
