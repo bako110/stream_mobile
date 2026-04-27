@@ -82,12 +82,9 @@ export const ReelsScreen: React.FC = () => {
 
   const toggleMute = useCallback(() => setMuted(v => !v), []);
 
-  const handleReelEnd = useCallback((index: number) => {
-    const nextIndex = index + 1;
-    if (nextIndex < reels.length) {
-      listRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-    }
-  }, [reels.length]);
+  const handleReelEnd = useCallback((_index: number) => {
+    // scroll auto désactivé — l'utilisateur scrolle manuellement
+  }, []);
 
   // ── View tracking ─────────────────────────────────────────────────────────
   const sendViewForCurrent = useCallback(() => {
@@ -449,7 +446,6 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
   colors, onToggleMute, onAdd, onAuthorPress, onEnd,
 }) => {
   const [paused,       setPaused]       = useState(false);
-  const [progress,     setProgress]     = useState(0);
   const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
   const [likes,        setLikes]        = useState(reel.like_count);
   const [commentCount, setCommentCount] = useState(reel.comment_count);
@@ -459,6 +455,31 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
   const [sending,      setSending]      = useState(false);
   const [barFocused,   setBarFocused]   = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  // Reels du même auteur (swipe horizontal)
+  const [authorReels,     setAuthorReels]     = useState<Reel[]>([]);
+  const [authorReelIdx,   setAuthorReelIdx]   = useState(0);
+  const [showAuthorReels, setShowAuthorReels] = useState(false);
+  const [loadingAuthor,   setLoadingAuthor]   = useState(false);
+  const authorListRef = useRef<FlatList>(null);
+
+  const openAuthorReels = useCallback(async (userId: string) => {
+    if (!userId) return;
+    setLoadingAuthor(true);
+    setShowAuthorReels(true);
+    try {
+      const data = await userService.getUserReels(userId);
+      const list: Reel[] = Array.isArray(data) ? data.filter((r: Reel) => !!r.video_url) : [];
+      // Mettre le reel courant en premier
+      const curIdx = list.findIndex(r => r.id === reel.id);
+      if (curIdx > 0) {
+        const [cur] = list.splice(curIdx, 1);
+        list.unshift(cur);
+      }
+      setAuthorReels(list);
+      setAuthorReelIdx(0);
+    } catch { setAuthorReels([]); }
+    finally { setLoadingAuthor(false); }
+  }, [reel.id]);
 
   const commentInputRef = useRef<TextInput>(null);
   const playIconTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -494,21 +515,9 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
     player.volume = muted ? 0 : 1.0;
   }, [muted]);
 
-  // Barre de progression
-  useEffect(() => {
-    if (!isActive || paused) { return; }
-    const interval = setInterval(() => {
-      const dur = player.duration;
-      const cur = player.currentTime;
-      if (dur && dur > 0) setProgress(Math.min(cur / dur, 1));
-    }, 250);
-    return () => clearInterval(interval);
-  }, [isActive, paused]);
-
-  // Reset progression quand on quitte cet item
+  // Reset pause quand on quitte cet item
   useEffect(() => {
     if (!isActive) {
-      setProgress(0);
       setPaused(false);
     }
   }, [isActive]);
@@ -607,20 +616,25 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
         style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H }]}
         pointerEvents="box-none"
       >
-        <TouchableOpacity
-          style={s.authorRow}
-          activeOpacity={0.8}
-          onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}
-        >
-          {reel.author?.avatar_url
-            ? <Image source={{ uri: reel.author.avatar_url }} style={s.avatar} />
-            : <View style={[s.avatar, { backgroundColor: colors.primary }]}>
-                <Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text>
-              </View>
-          }
-          <Text style={s.authorName}>{getAuthorLabel(reel.author)}</Text>
+        <View style={s.authorRow}>
+          {/* Avatar → swipe reels auteur */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => reel.author?.id && openAuthorReels(reel.author.id)}
+          >
+            {reel.author?.avatar_url
+              ? <Image source={{ uri: reel.author.avatar_url }} style={s.avatar} />
+              : <View style={[s.avatar, { backgroundColor: colors.primary }]}>
+                  <Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text>
+                </View>
+            }
+          </TouchableOpacity>
+          {/* Nom → profil */}
+          <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
+            <Text style={s.authorName}>{getAuthorLabel(reel.author)}</Text>
+          </TouchableOpacity>
           {reel.author?.is_verified && <VerifiedBadge size={14} />}
-        </TouchableOpacity>
+        </View>
         {reel.caption ? (
           <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text>
         ) : null}
@@ -645,11 +659,6 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
             <Icon name="plus" size={20} color="#fff" />
           </TouchableOpacity>
         )}
-      </View>
-
-      {/* ── Barre de progression ───────────────────────────────────────────── */}
-      <View style={[s.progressTrack, { bottom: safeBottom + COMMENT_BAR_H - 3 }]} pointerEvents="none">
-        <View style={[s.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
       </View>
 
       {/* ── Barre de commentaire style TikTok ──────────────────────────────── */}
@@ -698,6 +707,125 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
         reelId={reel.id}
         onCommentAdded={() => setCommentCount(v => v + 1)}
       />
+
+      {/* ── Reels de l'auteur — swipe horizontal TikTok ────────────────────── */}
+      <Modal
+        visible={showAuthorReels}
+        animationType="slide"
+        transparent={false}
+        statusBarTranslucent
+        onRequestClose={() => { setShowAuthorReels(false); setAuthorReels([]); }}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          {/* Header */}
+          <View style={[s.authorModalHeader, { paddingTop: insetTop + 8 }]}>
+            <TouchableOpacity
+              onPress={() => { setShowAuthorReels(false); setAuthorReels([]); }}
+              style={s.iconBtn}
+            >
+              <Icon name="x" size={20} color="#fff" />
+            </TouchableOpacity>
+            <Text style={s.authorModalTitle}>
+              {reel.author ? getAuthorLabel(reel.author) : 'Reels'}
+            </Text>
+            <TouchableOpacity
+              style={s.iconBtn}
+              onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}
+            >
+              <Icon name="user" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {loadingAuthor ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color="#fff" size="large" />
+            </View>
+          ) : authorReels.length === 0 ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <Icon name="film" size={40} color="rgba(255,255,255,0.4)" />
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Aucun reel</Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={authorListRef}
+              data={authorReels}
+              keyExtractor={r => r.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              getItemLayout={(_, i) => ({ length: screenW, offset: screenW * i, index: i })}
+              initialScrollIndex={authorReelIdx}
+              onMomentumScrollEnd={e => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / screenW);
+                setAuthorReelIdx(idx);
+              }}
+              renderItem={({ item: ar, index: ai }) => (
+                <AuthorReelSlide
+                  reel={ar}
+                  isActive={ai === authorReelIdx && showAuthorReels}
+                  screenW={screenW}
+                  screenH={screenH}
+                  muted={muted}
+                  colors={colors}
+                  onToggleMute={onToggleMute}
+                />
+              )}
+            />
+          )}
+        </View>
+      </Modal>
+    </View>
+  );
+});
+
+// ── AuthorReelSlide — slide horizontal simple (vidéo + caption) ──────────────
+
+interface AuthorReelSlideProps {
+  reel: Reel; isActive: boolean;
+  screenW: number; screenH: number;
+  muted: boolean; colors: any;
+  onToggleMute: () => void;
+}
+
+const AuthorReelSlide: React.FC<AuthorReelSlideProps> = memo(({ reel, isActive, screenW, screenH, muted, onToggleMute }) => {
+  const [paused, setPaused] = useState(false);
+
+  const player = useVideoPlayer(reel.video_url ? { uri: reel.video_url } : { uri: 'about:blank' }, p => {
+    p.loop   = true;
+    p.muted  = muted;
+    p.volume = muted ? 0 : 1.0;
+  });
+
+  useEffect(() => {
+    if (isActive && !paused && reel.video_url) player.play();
+    else player.pause();
+  }, [isActive, paused]);
+
+  useEffect(() => {
+    player.muted  = muted;
+    player.volume = muted ? 0 : 1.0;
+  }, [muted]);
+
+  useEffect(() => {
+    if (!isActive) setPaused(false);
+  }, [isActive]);
+
+  useEffect(() => () => {
+    try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
+  }, []);
+
+  return (
+    <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
+      <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => setPaused(v => !v)} />
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={s.bottomGradient} pointerEvents="none" />
+      <View style={[s.authorSlideInfo]}>
+        {reel.caption ? <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text> : null}
+      </View>
+      <TouchableOpacity style={[s.muteBtn, s.authorSlideMute]} onPress={onToggleMute} activeOpacity={0.8}>
+        <Icon name={muted ? 'volume-x' : 'volume-2'} size={20} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 });
@@ -764,8 +892,15 @@ const s = StyleSheet.create({
   addActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   muteBtn:      { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
 
-  progressTrack: { position: 'absolute', left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.25)', zIndex: 6 },
-  progressFill:  { height: 3, backgroundColor: '#fff' },
+  authorModalHeader: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingBottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  authorModalTitle: { color: '#fff', fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
+  authorSlideInfo:  { position: 'absolute', bottom: 80, left: 16, right: 16, zIndex: 3 },
+  authorSlideMute:  { position: 'absolute', bottom: 24, right: 16, zIndex: 4 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 
