@@ -413,7 +413,7 @@ export const ReelsScreen: React.FC = () => {
 
   // ── Feed TikTok — chaque item a sa propre vidéo ───────────────────────────
   return (
-    <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#000' }}>
+    <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#000', overflow: 'hidden' }}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <FlatList
@@ -820,7 +820,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
   return (
     <GestureDetector gesture={tapGesture}>
-      <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
+      <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
 
         <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} />
 
@@ -993,7 +993,7 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
   );
 
   return (
-    <View style={{ width: screenW, height: screenH }}>
+    <View style={{ width: screenW, height: screenH, overflow: 'hidden' }}>
       <FlatList
         ref={hListRef}
         data={authorReels}
