@@ -822,7 +822,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     <GestureDetector gesture={tapGesture}>
       <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
 
-        <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls={false} />
+        <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} />
 
         {/* Play/pause — thread UI, aucun setState */}
         <Animated.View style={playIconAnim} pointerEvents="none">
