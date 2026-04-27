@@ -21,6 +21,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
+import { localCache } from '../../utils/storage';
 import { useWs } from '../../context/WebSocketContext';
 import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, VerifiedBadge } from '../../components/common';
 import {
@@ -112,7 +113,12 @@ export const HomeScreen: React.FC = () => {
   const [suggestLoading, setSuggestLoading] = useState(true);
   const [contactIds,     setContactIds]     = useState<string[]>([]);
   const [contactsReady,  setContactsReady]  = useState(false);
-  const contactsAskedRef = useRef(false);
+  const [page,           setPage]           = useState(1);
+  const [hasMore,        setHasMore]        = useState(true);
+  const [loadingMore,    setLoadingMore]    = useState(false);
+  const contactsAskedRef  = useRef(false);
+  const loadingMoreRef    = useRef(false);
+  const currentLoadRef    = useRef<number>(0); // anti-race: identifiant de la requête courante
 
   const searchRef         = useRef<TextInput>(null);
   const locationLoadedRef = useRef(false);
@@ -197,7 +203,19 @@ export const HomeScreen: React.FC = () => {
     return results;
   };
 
-  const load = useCallback(async (f: FeedFilter, noCache = false, ids?: string[]) => {
+  const load = useCallback(async (f: FeedFilter, opts: { noCache?: boolean; ids?: string[]; reset?: boolean } = {}) => {
+    const { noCache = false, ids, reset = true } = opts;
+    const loadId = ++currentLoadRef.current; // identifiant unique pour cette requête
+
+    if (reset) { setLoading(true); setPage(1); setHasMore(true); }
+
+    // Cache local MMKV — affiché immédiatement pendant le fetch réseau
+    const cacheKey = `home:${f}:p1`;
+    if (reset && !noCache) {
+      const cached = localCache.get<FeedItem[]>(cacheKey);
+      if (cached) { setItems(cached); setLoading(false); }
+    }
+
     try {
       const resolvedIds = ids ?? contactIds;
       const [concerts, events] = await Promise.all([
@@ -212,42 +230,84 @@ export const HomeScreen: React.FC = () => {
             })
           : Promise.resolve([] as Event[]),
       ]);
-      setItems(buildItems(concerts, events));
+
+      // Abandon si une requête plus récente a démarré (anti-race)
+      if (loadId !== currentLoadRef.current) return;
+
+      const built = buildItems(concerts, events);
+      setItems(built);
+      setHasMore(built.length >= 20);
+      // Sauvegarde en cache local (60s TTL)
+      if (!noCache) localCache.set(cacheKey, built, 60_000);
     } catch (err) {
+      if (loadId !== currentLoadRef.current) return;
       if (__DEV__) console.warn('[HomeScreen] load:', err);
-      setItems([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (loadId === currentLoadRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [userLocation, contactIds]);
 
+  // ── Pagination infinie ────────────────────────────────────────────────────────
+
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMore || loading) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const [concerts, events] = await Promise.all([
+        (filter === 'all' || filter === 'concerts')
+          ? concertService.list({ limit: 20, page: nextPage, lat: userLocation?.lat, lon: userLocation?.lon })
+          : Promise.resolve([] as Concert[]),
+        (filter === 'all' || filter === 'events' || filter === 'contacts')
+          ? eventService.list({
+              limit: 20, page: nextPage, status: 'published',
+              lat: userLocation?.lat, lon: userLocation?.lon,
+              ...(filter === 'contacts' && contactIds.length ? { contact_ids: contactIds } : {}),
+            })
+          : Promise.resolve([] as Event[]),
+      ]);
+      const newItems = buildItems(concerts, events);
+      if (!newItems.length) { setHasMore(false); return; }
+      setItems(prev => {
+        const ids = new Set(prev.map(i => i.id));
+        return [...prev, ...newItems.filter(i => !ids.has(i.id))];
+      });
+      setPage(nextPage);
+      setHasMore(newItems.length >= 20);
+    } catch {}
+    finally { setLoadingMore(false); loadingMoreRef.current = false; }
+  }, [page, hasMore, loading, filter, userLocation, contactIds]);
+
   // Charge le feed normal immédiatement, puis injecte les contacts en fond
   useEffect(() => {
-    setLoading(true);
-    load(filter);
+    load(filter, { reset: true });
 
-    // Chargement progressif des contacts en fond (sans bloquer le scroll)
+    // Contacts — une seule fois, en fond, sans bloquer
     if (!contactsAskedRef.current) {
       contactsAskedRef.current = true;
       loadContactIdsSilent().then(ids => {
         if (!ids.length) return;
         setContactIds(ids);
         setContactsReady(true);
-        // Si on est sur le filtre contacts, recharge silencieusement avec les vrais IDs
-        if (filter === 'contacts') load('contacts', false, ids);
-        // Sinon, boost silencieux : injecte les events contacts en tête du feed normal
-        else {
-          eventService.list({ limit: 10, status: 'published', contact_ids: ids }).then(contactEvents => {
-            if (!contactEvents.length) return;
-            setItems(prev => {
-              const existingIds = new Set(prev.map(i => i.id));
-              const newItems: FeedItem[] = contactEvents
-                .filter(e => !existingIds.has(e.id))
-                .map(e => ({ kind: 'event' as FeedKind, id: e.id, data: e }));
-              return [...newItems, ...prev];
-            });
-          }).catch(() => {});
+        if (filter === 'contacts') {
+          load('contacts', { ids, reset: true });
+        } else {
+          // Boost silencieux : injecte les events contacts en tête
+          eventService.list({ limit: 10, status: 'published', contact_ids: ids })
+            .then(contactEvents => {
+              if (!contactEvents.length) return;
+              setItems(prev => {
+                const existingIds = new Set(prev.map(i => i.id));
+                const boosted: FeedItem[] = contactEvents
+                  .filter(e => !existingIds.has(e.id))
+                  .map(e => ({ kind: 'event' as FeedKind, id: e.id, data: e }));
+                return [...boosted, ...prev];
+              });
+            }).catch(() => {});
         }
       });
     }
@@ -256,12 +316,12 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (userLocation && !locationLoadedRef.current) {
       locationLoadedRef.current = true;
-      load(filter);
+      load(filter, { reset: true });
     }
   }, [userLocation]);
 
   useFocusEffect(useCallback(() => {
-    load(filter, true);
+    load(filter, { noCache: true, reset: true });
     loadLive();
   }, [filter, load, loadLive]));
 
@@ -433,10 +493,17 @@ export const HomeScreen: React.FC = () => {
               />
             </View>
           }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={loadingMore ? (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.primary} size="small" />
+            </View>
+          ) : null}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); load(filter, true); loadLive(); }}
+              onRefresh={() => { setRefreshing(true); load(filter, { noCache: true, reset: true }); loadLive(); }}
               tintColor={colors.primary}
               colors={[colors.primary]}
             />
