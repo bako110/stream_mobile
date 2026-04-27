@@ -619,133 +619,114 @@ interface PlanningCardProps {
 const PlanningCard: React.FC<PlanningCardProps> = ({ item, colors, onPress, onDelete, onAccept, onDecline }) => {
   const isPersonal = item.type === 'personal';
   const isInvited  = item.type === 'invited';
-  const cfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.event;
+  const cfg    = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.event;
   const accent = isPersonal ? (item.color || cfg.color) : cfg.color;
-  const isOwn = item.type === 'my_concert' || item.type === 'my_event';
   const person = item.artist || item.organizer;
-  const inviteStatusCfg = item.invite_status ? INVITE_STATUS_CONFIG[item.invite_status] : null;
+  const invSt  = item.invite_status ? INVITE_STATUS_CONFIG[item.invite_status] : null;
+
+  const sub = isPersonal && item.description
+    ? item.description
+    : person
+      ? (person.display_name || person.username)
+      : item.venue || null;
 
   return (
-    <TouchableOpacity style={[s.card, { backgroundColor: colors.surfaceElevated }]} activeOpacity={0.85} onPress={onPress}>
-      {/* Left thumbnail */}
-      <View style={s.cardThumbWrap}>
-        {item.thumbnail_url ? (
-          <Image source={{ uri: item.thumbnail_url }} style={s.cardThumb} />
-        ) : (
-          <LinearGradient colors={[accent + 'CC', accent + '44']} style={s.cardThumb}>
-            <Icon name={cfg.icon} size={24} color="rgba(255,255,255,0.7)" />
-          </LinearGradient>
-        )}
+    <TouchableOpacity
+      style={[s.card, { backgroundColor: colors.surfaceElevated }]}
+      activeOpacity={0.82}
+      onPress={onPress}
+    >
+      {/* Barre colorée gauche */}
+      <View style={[s.cardBar, { backgroundColor: accent }]} />
+
+      {/* Icône type */}
+      <View style={[s.cardIcon, { backgroundColor: accent + '18' }]}>
+        <Icon name={cfg.icon} size={15} color={accent} />
       </View>
 
-      {/* Right info */}
-      <View style={s.cardBody}>
-        <View style={s.cardTopRow}>
-          <View style={[s.typePill, { backgroundColor: accent + '22' }]}>
-            <Icon name={cfg.icon} size={10} color={accent} />
-            <Text style={[s.typePillText, { color: accent }]}>{cfg.label.toUpperCase()}</Text>
-          </View>
+      {/* Contenu */}
+      <View style={s.cardContent}>
+        <View style={s.cardRow}>
+          <Text style={[s.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+            {item.title}
+          </Text>
           {item.status === 'live' && (
-            <View style={[s.livePill, { backgroundColor: colors.error }]}>
-              <Text style={s.livePillText}>LIVE</Text>
+            <View style={[s.liveDot, { backgroundColor: colors.error }]}>
+              <Text style={s.liveTxt}>LIVE</Text>
             </View>
           )}
-          {inviteStatusCfg && (
-            <View style={[s.typePill, { backgroundColor: inviteStatusCfg.color + '22' }]}>
-              <Icon name={inviteStatusCfg.icon} size={10} color={inviteStatusCfg.color} />
-              <Text style={[s.typePillText, { color: inviteStatusCfg.color }]}>{inviteStatusCfg.label.toUpperCase()}</Text>
+          {invSt && (
+            <View style={[s.statusDot, { backgroundColor: invSt.color + '22' }]}>
+              <Text style={[s.statusTxt, { color: invSt.color }]}>{invSt.label}</Text>
             </View>
           )}
         </View>
 
-        <Text style={[s.cardTitle, { color: colors.textPrimary }]} numberOfLines={2}>{item.title}</Text>
-
-        <View style={s.metaRow}>
-          <Icon name="clock" size={11} color={colors.textTertiary} />
-          <Text style={[s.metaText, { color: colors.textTertiary }]}>{formatTime(item.date)}</Text>
+        <View style={s.cardMeta}>
+          <Icon name="clock" size={10} color={colors.textTertiary} />
+          <Text style={[s.cardMetaTxt, { color: colors.textTertiary }]}>{formatTime(item.date)}</Text>
+          {!!item.venue && !isPersonal && (
+            <>
+              <Text style={[s.cardMetaDot, { color: colors.textTertiary }]}>·</Text>
+              <Icon name="map-pin" size={10} color={colors.textTertiary} />
+              <Text style={[s.cardMetaTxt, { color: colors.textTertiary }]} numberOfLines={1}>{item.venue}</Text>
+            </>
+          )}
+          {!!sub && (isPersonal || person) && (
+            <>
+              <Text style={[s.cardMetaDot, { color: colors.textTertiary }]}>·</Text>
+              <Text style={[s.cardMetaTxt, { color: colors.textTertiary }]} numberOfLines={1}>{sub}</Text>
+            </>
+          )}
         </View>
 
-        {!!item.venue && (
-          <View style={s.metaRow}>
-            <Icon name="map-pin" size={11} color={colors.textTertiary} />
-            <Text style={[s.metaText, { color: colors.textTertiary }]} numberOfLines={1}>{item.venue}</Text>
-          </View>
-        )}
-
-        {/* Message d'invitation */}
+        {/* Message invitation */}
         {isInvited && item.invite_message && (
-          <View style={[s.inviteMsgBox, { backgroundColor: colors.backgroundSecondary }]}>
-            <Icon name="message-circle" size={10} color={colors.textTertiary} />
-            <Text style={[s.inviteMsgText, { color: colors.textSecondary }]} numberOfLines={2}>{item.invite_message}</Text>
-          </View>
+          <Text style={[s.cardMsg, { color: colors.textTertiary }]} numberOfLines={1}>
+            "{item.invite_message}"
+          </Text>
         )}
 
-        {/* Organisateur / artiste */}
-        {isOwn ? (
-          <View style={[s.ownBadge, { backgroundColor: accent + '18' }]}>
-            <Icon name="user" size={10} color={accent} />
-            <Text style={[s.ownBadgeText, { color: accent }]}>Organisé par vous</Text>
-          </View>
-        ) : isPersonal && item.description ? (
-          <Text style={[s.descText, { color: colors.textTertiary }]} numberOfLines={1}>{item.description}</Text>
-        ) : person ? (
-          <View style={s.personRow}>
-            {person.avatar_url ? (
-              <Image source={{ uri: person.avatar_url }} style={s.personAvatar} />
-            ) : (
-              <View style={[s.personAvatarFallback, { backgroundColor: accent + '33' }]}>
-                <Text style={[s.personInitial, { color: accent }]}>{getInitial(person.display_name ?? person.username)}</Text>
-              </View>
-            )}
-            <Text style={[s.personName, { color: colors.textSecondary }]} numberOfLines={1}>
-              {person.display_name || person.username}
-            </Text>
-            {person.is_verified && <VerifiedBadge size={12} />}
-          </View>
-        ) : null}
-
-        {/* Invités sur entrée perso */}
+        {/* Invités (avatars) */}
         {isPersonal && item.invites && item.invites.length > 0 && (
-          <View style={s.inviteesRow}>
-            {item.invites.slice(0, 4).map(inv => (
-              <View key={inv.id} style={[s.inviteeAvatar, {
+          <View style={s.avatarRow}>
+            {item.invites.slice(0, 5).map(inv => (
+              <View key={inv.id} style={[s.invAvatar, {
                 backgroundColor: accent + '30',
-                borderColor: inv.status === 'accepted' ? '#36D9A0' : inv.status === 'declined' ? '#EF4444' : colors.surface,
+                borderColor: inv.status === 'accepted' ? '#36D9A0' : inv.status === 'declined' ? '#EF4444' : colors.backgroundSecondary,
               }]}>
-                {inv.invitee?.avatar_url ? (
-                  <Image source={{ uri: inv.invitee.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 11 }} />
-                ) : (
-                  <Text style={{ color: accent, fontSize: 9, fontWeight: '700' }}>{getInitial(inv.invitee?.display_name ?? inv.invitee?.username)}</Text>
-                )}
+                {inv.invitee?.avatar_url
+                  ? <Image source={{ uri: inv.invitee.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 8 }} />
+                  : <Text style={{ color: accent, fontSize: 8, fontWeight: '800' }}>{getInitial(inv.invitee?.display_name ?? inv.invitee?.username)}</Text>
+                }
               </View>
             ))}
-            {item.invites.length > 4 && (
-              <Text style={[s.inviteesMore, { color: colors.textTertiary }]}>+{item.invites.length - 4}</Text>
+            {item.invites.length > 5 && (
+              <Text style={[s.moreInv, { color: colors.textTertiary }]}>+{item.invites.length - 5}</Text>
             )}
           </View>
         )}
 
-        {/* Boutons réponse invitation */}
+        {/* Boutons accept/decline */}
         {isInvited && item.invite_status === 'pending' && onAccept && onDecline && (
-          <View style={s.inviteActions}>
-            <TouchableOpacity style={[s.acceptBtn, { backgroundColor: '#36D9A0' }]} onPress={onAccept} activeOpacity={0.8}>
-              <Icon name="check" size={13} color="#fff" />
-              <Text style={s.inviteActionText}>Accepter</Text>
+          <View style={s.invActions}>
+            <TouchableOpacity style={[s.btnAccept]} onPress={onAccept} activeOpacity={0.8}>
+              <Icon name="check" size={11} color="#fff" />
+              <Text style={s.btnAcceptTxt}>Accepter</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.declineBtn, { borderColor: '#EF4444' }]} onPress={onDecline} activeOpacity={0.8}>
-              <Icon name="x" size={13} color="#EF4444" />
-              <Text style={[s.inviteActionText, { color: '#EF4444' }]}>Refuser</Text>
+            <TouchableOpacity style={[s.btnDecline, { borderColor: accent + '60' }]} onPress={onDecline} activeOpacity={0.8}>
+              <Text style={[s.btnDeclineTxt, { color: colors.textSecondary }]}>Refuser</Text>
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Supprimer entrée perso */}
-        {isPersonal && onDelete && (
-          <TouchableOpacity onPress={onDelete} style={[s.deleteBtn, { backgroundColor: colors.error + '15' }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="trash-2" size={12} color={colors.error} />
-          </TouchableOpacity>
-        )}
       </View>
+
+      {/* Bouton supprimer */}
+      {isPersonal && onDelete && (
+        <TouchableOpacity onPress={onDelete} style={s.delBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Icon name="trash-2" size={13} color={colors.textTertiary} />
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 };
@@ -761,47 +742,35 @@ const s = StyleSheet.create({
   badge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 
-  dateHeader: { fontSize: 13, fontWeight: '700', textTransform: 'capitalize', letterSpacing: 0.3, marginTop: 20, marginBottom: 10 },
+  dateHeader: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 22, marginBottom: 8, opacity: 0.5 },
 
-  card: { flexDirection: 'row', borderRadius: BorderRadius.lg, overflow: 'hidden', marginBottom: 12 },
-  cardThumbWrap: { width: 100, height: 'auto' as any },
-  cardThumb: { width: '100%', height: '100%', minHeight: 110, resizeMode: 'cover', alignItems: 'center', justifyContent: 'center' },
-  cardBody: { flex: 1, padding: 10, justifyContent: 'center' },
+  // ── Card ──────────────────────────────────────────────────────────────────
+  card: { flexDirection: 'row', alignItems: 'stretch', borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
+  cardBar: { width: 4 },
+  cardIcon: { width: 40, alignItems: 'center', justifyContent: 'center' },
+  cardContent: { flex: 1, paddingVertical: 10, paddingRight: 36 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardTitle: { flex: 1, fontSize: 14, fontWeight: '700' },
+  liveDot: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
+  liveTxt: { fontSize: 8, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
+  statusDot: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  statusTxt: { fontSize: 9, fontWeight: '700' },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, flexWrap: 'wrap' },
+  cardMetaTxt: { fontSize: 11 },
+  cardMetaDot: { fontSize: 11, opacity: 0.4 },
+  cardMsg: { fontSize: 11, fontStyle: 'italic', marginTop: 3 },
 
-  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
-  typePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: BorderRadius.full },
-  typePillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-  livePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: BorderRadius.full },
-  livePillText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
+  invAvatar: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
+  moreInv: { fontSize: 9, fontWeight: '700' },
 
-  cardTitle: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  metaText: { fontSize: 11, flex: 1 },
+  invActions: { flexDirection: 'row', gap: 6, marginTop: 7 },
+  btnAccept: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#36D9A0', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  btnAcceptTxt: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  btnDecline: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  btnDeclineTxt: { fontSize: 11, fontWeight: '600' },
 
-  personRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  personAvatar: { width: 18, height: 18, borderRadius: 9 },
-  personAvatarFallback: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  personInitial: { fontSize: 9, fontWeight: '800' },
-  personName: { fontSize: 11, flex: 1 },
-
-  ownBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full, alignSelf: 'flex-start', marginTop: 6 },
-  ownBadgeText: { fontSize: 10, fontWeight: '700' },
-
-  descText: { fontSize: 11, marginTop: 3 },
-
-  inviteMsgBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 5, padding: 7, borderRadius: 8 },
-  inviteMsgText: { fontSize: 11, flex: 1, lineHeight: 15 },
-
-  inviteesRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
-  inviteeAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  inviteesMore: { fontSize: 10, fontWeight: '700' },
-
-  inviteActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  acceptBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.full },
-  declineBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.full, borderWidth: 1.5 },
-  inviteActionText: { fontSize: 12, fontWeight: '700', color: '#fff' },
-
-  deleteBtn: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  delBtn: { position: 'absolute', top: 10, right: 10 },
 
   fab: { position: 'absolute', bottom: 24, right: 20, borderRadius: BorderRadius.full, overflow: 'hidden', elevation: 8, shadowColor: '#7B3FF2', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10 },
   fabInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: Spacing[4], paddingVertical: 14 },
