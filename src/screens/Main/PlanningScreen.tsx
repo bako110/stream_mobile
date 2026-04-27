@@ -228,7 +228,7 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
 
 const cp = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '55%', paddingBottom: 30, flex: 1 },
+  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%', paddingBottom: 30 },
   handle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   title:   { fontSize: 17, fontWeight: '700' },
@@ -240,7 +240,7 @@ const cp = StyleSheet.create({
   chip:  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 8 },
   chipText: { fontSize: 13, fontWeight: '600' },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 4 },
-  list:  { flex: 1, minHeight: 200 },
+  list:  { flexGrow: 1, maxHeight: 320 },
   empty: { textAlign: 'center', marginTop: 30, fontSize: 14 },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   avatar: { width: 44, height: 44, borderRadius: 22 },
