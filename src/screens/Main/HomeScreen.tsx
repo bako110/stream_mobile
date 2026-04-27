@@ -111,7 +111,8 @@ export const HomeScreen: React.FC = () => {
   const [suggestions,    setSuggestions]    = useState<UserPublic[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(true);
   const [contactIds,     setContactIds]     = useState<string[]>([]);
-  const [contactsAsked,  setContactsAsked]  = useState(false);
+  const [contactsReady,  setContactsReady]  = useState(false);
+  const contactsAskedRef = useRef(false);
 
   const searchRef         = useRef<TextInput>(null);
   const locationLoadedRef = useRef(false);
@@ -139,16 +140,14 @@ export const HomeScreen: React.FC = () => {
 
   useEffect(() => { loadSuggestions(); }, []);
 
-  // ── Contacts ─────────────────────────────────────────────────────────────────
+  // ── Contacts — chargement silencieux en fond ──────────────────────────────────
 
-  const loadContactIds = useCallback(async () => {
+  const loadContactIdsSilent = useCallback(async (): Promise<string[]> => {
     try {
       const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
       let status = await check(perm);
-      if (status === RESULTS.DENIED) {
-        status = await request(perm);
-      }
-      if (status !== RESULTS.GRANTED) return;
+      if (status === RESULTS.DENIED) status = await request(perm);
+      if (status !== RESULTS.GRANTED) return [];
 
       const contacts = await Contacts.getAll();
       const phones: string[] = [];
@@ -157,15 +156,16 @@ export const HomeScreen: React.FC = () => {
           if (p.number) phones.push(normalizePhone(p.number));
         }
       }
-      if (!phones.length) return;
+      if (!phones.length) return [];
 
       const res = await apiClient.post<{ user_ids: string[] }>(
         Endpoints.users.matchContacts,
         { phones },
       );
-      setContactIds(res.data.user_ids ?? []);
+      return res.data.user_ids ?? [];
     } catch (e) {
       if (__DEV__) console.warn('[Contacts]', e);
+      return [];
     }
   }, []);
 
@@ -182,8 +182,24 @@ export const HomeScreen: React.FC = () => {
 
   // ── Chargement feed ──────────────────────────────────────────────────────────
 
-  const load = useCallback(async (f: FeedFilter, noCache = false) => {
+  const buildItems = (concerts: Concert[], events: Event[]): FeedItem[] => {
+    const results: FeedItem[] = [];
+    (Array.isArray(concerts) ? concerts : []).forEach(c => {
+      if (c.status === 'published' || c.status === 'live')
+        results.push({ kind: 'concert', id: c.id, data: c });
+    });
+    (Array.isArray(events) ? events : []).forEach(e =>
+      results.push({ kind: 'event', id: e.id, data: e }),
+    );
+    results.sort((a, b) =>
+      new Date((b.data as any).created_at).getTime() - new Date((a.data as any).created_at).getTime(),
+    );
+    return results;
+  };
+
+  const load = useCallback(async (f: FeedFilter, noCache = false, ids?: string[]) => {
     try {
+      const resolvedIds = ids ?? contactIds;
       const [concerts, events] = await Promise.all([
         (f === 'all' || f === 'concerts')
           ? concertService.list({ limit: 20, lat: userLocation?.lat, lon: userLocation?.lon })
@@ -192,26 +208,11 @@ export const HomeScreen: React.FC = () => {
           ? eventService.list({
               limit: 20, status: 'published', noCache,
               lat: userLocation?.lat, lon: userLocation?.lon,
-              ...(f === 'contacts' && contactIds.length ? { contact_ids: contactIds } : {}),
+              ...(f === 'contacts' && resolvedIds.length ? { contact_ids: resolvedIds } : {}),
             })
           : Promise.resolve([] as Event[]),
       ]);
-
-      const results: FeedItem[] = [];
-      (Array.isArray(concerts) ? concerts : []).forEach(c => {
-        if (c.status === 'published' || c.status === 'live') {
-          results.push({ kind: 'concert', id: c.id, data: c });
-        }
-      });
-      (Array.isArray(events) ? events : []).forEach(e => {
-        results.push({ kind: 'event', id: e.id, data: e });
-      });
-      results.sort((a, b) => {
-        const da = (a.data as any).created_at;
-        const db = (b.data as any).created_at;
-        return new Date(db).getTime() - new Date(da).getTime();
-      });
-      setItems(results);
+      setItems(buildItems(concerts, events));
     } catch (err) {
       if (__DEV__) console.warn('[HomeScreen] load:', err);
       setItems([]);
@@ -219,9 +220,38 @@ export const HomeScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userLocation]);
+  }, [userLocation, contactIds]);
 
-  useEffect(() => { setLoading(true); load(filter); }, [filter, load]);
+  // Charge le feed normal immédiatement, puis injecte les contacts en fond
+  useEffect(() => {
+    setLoading(true);
+    load(filter);
+
+    // Chargement progressif des contacts en fond (sans bloquer le scroll)
+    if (!contactsAskedRef.current) {
+      contactsAskedRef.current = true;
+      loadContactIdsSilent().then(ids => {
+        if (!ids.length) return;
+        setContactIds(ids);
+        setContactsReady(true);
+        // Si on est sur le filtre contacts, recharge silencieusement avec les vrais IDs
+        if (filter === 'contacts') load('contacts', false, ids);
+        // Sinon, boost silencieux : injecte les events contacts en tête du feed normal
+        else {
+          eventService.list({ limit: 10, status: 'published', contact_ids: ids }).then(contactEvents => {
+            if (!contactEvents.length) return;
+            setItems(prev => {
+              const existingIds = new Set(prev.map(i => i.id));
+              const newItems: FeedItem[] = contactEvents
+                .filter(e => !existingIds.has(e.id))
+                .map(e => ({ kind: 'event' as FeedKind, id: e.id, data: e }));
+              return [...newItems, ...prev];
+            });
+          }).catch(() => {});
+        }
+      });
+    }
+  }, [filter]);
 
   useEffect(() => {
     if (userLocation && !locationLoadedRef.current) {
@@ -323,14 +353,7 @@ export const HomeScreen: React.FC = () => {
           return (
             <TouchableOpacity
               key={f}
-              onPress={() => {
-                if (f === 'contacts' && !contactsAsked) {
-                  setContactsAsked(true);
-                  loadContactIds().then(() => setFilter(f));
-                } else {
-                  setFilter(f);
-                }
-              }}
+              onPress={() => setFilter(f)}
               style={[s.filterChip, {
                 backgroundColor: active ? colors.primary : 'transparent',
                 borderColor:     active ? colors.primary : colors.border,
@@ -340,6 +363,9 @@ export const HomeScreen: React.FC = () => {
               <Text style={[s.filterChipText, { color: active ? '#fff' : colors.textSecondary }]}>
                 {label}
               </Text>
+              {f === 'contacts' && contactsReady && !active && (
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginLeft: 2 }} />
+              )}
             </TouchableOpacity>
           );
         })}
