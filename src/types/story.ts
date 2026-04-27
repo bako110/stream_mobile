@@ -5,6 +5,7 @@ export interface StoryAuthor {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  is_verified?: boolean;
 }
 
 export interface Story {
