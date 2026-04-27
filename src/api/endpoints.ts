@@ -242,9 +242,11 @@ export const Endpoints = {
 
   // ── Planning (agenda perso) ───────────────────────────────────────────────
   planning: {
-    feed:    `${V1}/planning`,
-    entries: `${V1}/planning/entries`,
-    entry:   (id: string) => `${V1}/planning/entries/${id}`,
+    feed:          `${V1}/planning`,
+    entries:       `${V1}/planning/entries`,
+    entry:         (id: string) => `${V1}/planning/entries/${id}`,
+    invites:       `${V1}/planning/invites`,
+    respondInvite: (id: string) => `${V1}/planning/invites/${id}`,
   },
 
   // ── Activité sociale ──────────────────────────────────────────────────────
