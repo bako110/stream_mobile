@@ -940,6 +940,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           onClose={() => setShowComments(false)}
           reelId={reel.id}
           onCommentAdded={() => setCommentCount(v => v + 1)}
+          onCommentCountChange={delta => setCommentCount(v => v + delta)}
         />
 
       </View>

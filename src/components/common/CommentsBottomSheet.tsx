@@ -24,6 +24,7 @@ interface Props {
   concertId?: string;
   eventId?: string;
   onCommentAdded?: () => void;
+  onCommentCountChange?: (delta: number) => void;
 }
 
 interface CommentEx extends Comment {
@@ -230,7 +231,7 @@ const CommentRow: React.FC<RowProps> = ({
 // ─── CommentsBottomSheet ──────────────────────────────────────────────────────
 
 export const CommentsBottomSheet: React.FC<Props> = ({
-  visible, onClose, reelId, contentId, concertId, eventId, onCommentAdded,
+  visible, onClose, reelId, contentId, concertId, eventId, onCommentAdded, onCommentCountChange,
 }) => {
   const { theme }       = useTheme();
   const { colors }      = theme;
@@ -263,8 +264,8 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     switch (event.type) {
       case 'comment_added':
         setComments(prev => {
-          // Dédupliquer si ajout optimiste déjà présent
           if (prev.some(c => c.id === event.comment.id)) return prev;
+          onCommentCountChange?.(+1);
           return [{ ...event.comment, userReaction: null, replies: [], repliesLoaded: false, showReplies: false }, ...prev];
         });
         break;
@@ -279,14 +280,16 @@ export const CommentsBottomSheet: React.FC<Props> = ({
         break;
 
       case 'comment_deleted':
-        setComments(prev =>
-          prev.filter(c => c.id !== event.comment_id).map(c => ({
+        setComments(prev => {
+          const wasRoot = prev.some(c => c.id === event.comment_id);
+          if (wasRoot) onCommentCountChange?.(-1);
+          return prev.filter(c => c.id !== event.comment_id).map(c => ({
             ...c,
             replies: (c.replies ?? []).filter(r => r.id !== event.comment_id),
             reply_count: (c.replies ?? []).some(r => r.id === event.comment_id)
               ? (c.reply_count ?? 1) - 1 : c.reply_count,
-          }))
-        );
+          }));
+        });
         break;
 
       case 'reaction_updated':

@@ -115,6 +115,7 @@ export const FeedScreen: React.FC = () => {
   // Sheet commentaires
   const [commentItem,    setCommentItem]    = useState<FeedItem | null>(null);
   const [commentVisible, setCommentVisible] = useState(false);
+  const commentCountChangeRef = useRef<((delta: number) => void) | null>(null);
 
   // Recherche auto avec debounce 300ms
   const liveSearch = useCallback((query: string) => {
@@ -786,7 +787,7 @@ export const FeedScreen: React.FC = () => {
                       : (item.data as Concert).artist?.id;
                     if (authorId) handleToggleFollow(authorId);
                   }}
-                  onComment={() => openComments(item)}
+                  onComment={(onCountChange) => { commentCountChangeRef.current = onCountChange; openComments(item); }}
                   onPress={() => {
                     if (item.kind === 'concert') {
                       nav.navigate('ConcertDetail', { concertId: item.id });
@@ -813,6 +814,7 @@ export const FeedScreen: React.FC = () => {
         onClose={closeComments}
         eventId={commentItem?.kind === 'event'   ? commentItem.id : undefined}
         concertId={commentItem?.kind === 'concert' ? commentItem.id : undefined}
+        onCommentCountChange={delta => commentCountChangeRef.current?.(delta)}
       />
 
       {/* ── Menu Drawer ──────────────────────────────────────────────────── */}
@@ -1053,7 +1055,7 @@ interface FeedCardProps {
   isFollowing: boolean;
   isActive:  boolean;
   onToggleFollow: () => void;
-  onComment: () => void;
+  onComment: (onCountChange: (delta: number) => void) => void;
   onPress:   () => void;
   onAuthorPress: () => void;
 }
@@ -1211,7 +1213,6 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFoll
   const typeLabel = isEvent ? event.event_type?.toUpperCase() : 'CONCERT';
 
   // ── State social branché sur l'API ────────────────────────────────────────
-  const { addListener: addWsListener, removeListener: removeWsListener } = useWs();
   const [liked,        setLiked]        = useState(item.data?.user_reaction === 'like');
   const [likeCount,    setLikeCount]    = useState(item.data?.like_count ?? 0);
   const [commentCount, setCommentCount] = useState(item.data?.comment_count ?? 0);
@@ -1253,16 +1254,7 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFoll
     );
   };
 
-  // WS: incrémenter commentCount en temps réel
-  useEffect(() => {
-    const handler = (msg: any) => {
-      if (msg.type !== 'new_comment') return;
-      const key = isEvent ? 'event_id' : 'concert_id';
-      if (msg[key] === item.id) setCommentCount((c: number) => c + 1);
-    };
-    addWsListener(handler);
-    return () => removeWsListener(handler);
-  }, [item.id, isEvent, addWsListener, removeWsListener]);
+  // commentCount mis à jour via onCommentCountChange passé au CommentsBottomSheet
 
   // ── "Voir plus" description ───────────────────────────────────────────────
   const [descExpanded, setDescExpanded] = useState(false);
@@ -1550,7 +1542,7 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFoll
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={s.socialBtn} onPress={onComment} activeOpacity={0.8}>
+          <TouchableOpacity style={s.socialBtn} onPress={() => onComment(delta => setCommentCount(v => v + delta))} activeOpacity={0.8}>
             <Icon name="message-circle" size={18} color={colors.textTertiary} />
             <Text style={[s.socialBtnText, { color: colors.textTertiary }]}>
               {commentCount > 0 ? `${commentCount}` : 'Commenter'}
