@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
   ActivityIndicator, Platform, Alert, Share, StatusBar, Modal, Dimensions,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
@@ -49,9 +48,6 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
   const [commentsVisible,  setCommentsVisible]  = useState(false);
   const [imageFullscreen,  setImageFullscreen]  = useState(false);
 
-  const heartScale = useSharedValue(1);
-  const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
-
   const loadPost = useCallback(async () => {
     try {
       const res = await postService.getById(postId);
@@ -70,7 +66,6 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
   useEffect(() => { loadPost(); }, []);
 
   const handleLike = () => {
-    heartScale.value = withSequence(withSpring(1.4, { damping: 6 }), withSpring(1));
     const newLiked = !liked;
     setLiked(newLiked);
     setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1));
@@ -195,9 +190,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
           {/* ── Barre sociale ── */}
           <View style={[pd.socialBar, { borderColor: colors.divider }]}>
             <TouchableOpacity style={pd.socialBtn} onPress={handleLike} activeOpacity={0.7}>
-              <Animated.View style={heartStyle}>
-                <Icon name="heart" size={21} color={liked ? '#E0389A' : colors.textSecondary} />
-              </Animated.View>
+              <Icon name="heart" size={21} color={liked ? '#E0389A' : colors.textSecondary} />
               <Text style={[pd.socialBtnTxt, { color: liked ? '#E0389A' : colors.textSecondary }]}>J'aime</Text>
             </TouchableOpacity>
 
