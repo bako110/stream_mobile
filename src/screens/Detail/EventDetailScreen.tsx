@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, Image,
   FlatList, TextInput, ActivityIndicator,
   Share, Alert, KeyboardAvoidingView, Platform, Linking,
-  Modal, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBar,
+  Modal, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBar, InteractionManager,
 } from 'react-native';
 
 const { width: SW } = Dimensions.get('window');
@@ -14,7 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail } from '../../components/common';
 import { eventService, socialService, saveService, authService } from '../../services';
@@ -60,10 +60,20 @@ const formatDateShort = (iso: string) =>
 // ── VideoModal — player plein écran ouvert depuis le bouton vidéo ─────────────
 
 const VideoModal: React.FC<{ uri: string; onClose: () => void }> = ({ uri, onClose }) => {
+  const player = useVideoPlayer({ uri }, p => {
+    p.muted = false;
+    p.play();
+  });
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
-        <Video useTextureView={false} source={{ uri }} style={{ width: SW, height: SW * 0.62 }} resizeMode="contain" controls paused={false} muted={false} ignoreSilentSwitch="ignore" />
+        <VideoView
+          player={player}
+          style={{ width: SW, height: SW * 0.62 }}
+          resizeMode="contain"
+          controls
+        />
         <TouchableOpacity onPress={onClose}
           style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, right: 16,
             width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.6)',
@@ -216,7 +226,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     finally { setLoading(false); }
   }, [eventId]);
 
-  useEffect(() => { loadEvent(); }, [loadEvent]);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => { loadEvent(); });
+    return () => task.cancel();
+  }, [loadEvent]);
 
   const openComments = async () => {
     setShowComments(true);

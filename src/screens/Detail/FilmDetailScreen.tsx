@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, Dimensions, StatusBar, ActivityIndicator, Modal, Platform,
+  StyleSheet, Dimensions, StatusBar, ActivityIndicator, Modal, Platform, InteractionManager,
 } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
 import type { VideoMeta } from '../../types';
@@ -37,19 +37,20 @@ const VideoPlayer: React.FC<{
   title: string;
   onClose: () => void;
 }> = ({ url, title, onClose }) => {
+  const player = useVideoPlayer({ uri: url }, p => {
+    p.muted = false;
+    p.play();
+  });
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <StatusBar hidden />
       <View style={vp.container}>
-        <Video
-          source={{ uri: url }}
+        <VideoView
+          player={player}
           style={StyleSheet.absoluteFill}
           resizeMode="contain"
           controls
-          paused={false}
-          muted={false}
-          ignoreSilentSwitch="ignore"
-          useTextureView={false}
         />
         {/* Bouton fermer par-dessus les contrôles natifs */}
         <TouchableOpacity
@@ -130,13 +131,16 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const banner   = item.banner_url || item.thumbnail_url;
   const synopsis = item.synopsis || item.short_synopsis;
 
-  // Charger les vidéos du film
+  // Charger les vidéos du film après la transition
   useEffect(() => {
     if (isSerie) { setVideosLoading(false); return; }
-    contentService.getFilmVideos(item.id)
-      .then(v => setVideos(v))
-      .catch(() => setVideos([]))
-      .finally(() => setVideosLoading(false));
+    const task = InteractionManager.runAfterInteractions(() => {
+      contentService.getFilmVideos(item.id)
+        .then(v => setVideos(v))
+        .catch(() => setVideos([]))
+        .finally(() => setVideosLoading(false));
+    });
+    return () => task.cancel();
   }, [item.id, isSerie]);
 
   const defaultVideo = videos.find(v => v.is_default) ?? videos[0] ?? null;

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { Platform, PermissionsAndroid }   from 'react-native';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -101,7 +101,44 @@ type MainNav = NativeStackNavigationProp<MainStackParamList>;
 const Tab   = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
-// ── EventsScreen wrapper ──────────────────────────────────────────────────────
+// ── Wrappers stables (évite les render functions inline qui recréent le composant) ──
+
+const ConcertDetailWrapper: React.FC<any> = ({ navigation, route }) => (
+  <ConcertDetailScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />
+);
+const EventDetailWrapper: React.FC<any> = ({ navigation, route }) => (
+  <EventDetailScreen eventId={route.params.eventId} onBack={() => navigation.goBack()} />
+);
+const UserProfileWrapper: React.FC<any> = ({ navigation, route }) => (
+  <UserProfileScreen route={route} navigation={navigation} />
+);
+const EditProfileWrapper: React.FC<any> = ({ navigation }) => (
+  <EditProfileScreen navigation={navigation} />
+);
+const CreateReelWrapper: React.FC<any> = ({ navigation }) => (
+  <CreateReelScreen onBack={() => navigation.goBack()} />
+);
+const FilmDetailWrapper: React.FC<any> = ({ navigation, route }) => (
+  <FilmDetailScreen route={route} navigation={navigation} />
+);
+const LiveStreamWrapper: React.FC<any> = ({ navigation, route }) => (
+  <LiveStreamScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />
+);
+const LiveViewerWrapper: React.FC<any> = ({ navigation, route }) => (
+  <LiveViewerScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />
+);
+const CreateEventWrapper: React.FC<any> = ({ navigation, route }) => (
+  <CreateEventScreen eventId={route.params?.eventId} onBack={() => navigation.goBack()} />
+);
+const CreateConcertWrapper: React.FC<any> = ({ navigation, route }) => (
+  <CreateConcertScreen concertId={route.params?.concertId} onBack={() => navigation.goBack()} />
+);
+const ChangePasswordWrapper: React.FC<any> = ({ navigation }) => (
+  <ChangePasswordScreen navigation={navigation} />
+);
+const PrivacyWrapper: React.FC<any> = ({ navigation }) => (
+  <PrivacyScreen navigation={navigation} />
+);
 
 // ── ProfileScreen wrapper ─────────────────────────────────────────────────────
 
@@ -155,6 +192,9 @@ export const MainNavigator: React.FC<Props> = ({ onLogout }) => {
     }
   }, []);
 
+  // Wrapper mémoïsé pour Settings (besoin de onLogout)
+  const SettingsWrapper = useCallback(() => <SettingsScreen onLogout={onLogout} />, [onLogout]);
+
   return (
   <>
   <NotificationToast />
@@ -168,81 +208,41 @@ export const MainNavigator: React.FC<Props> = ({ onLogout }) => {
       component={FeedScreen}
       options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
     />
-
     <Stack.Screen
       name="CreateEvent"
+      component={CreateEventWrapper}
       options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-    >
-      {({ navigation, route }) => (
-        <CreateEventScreen
-          eventId={(route.params as any)?.eventId}
-          onBack={() => navigation.goBack()}
-        />
-      )}
-    </Stack.Screen>
-
+    />
     <Stack.Screen
       name="CreateConcert"
+      component={CreateConcertWrapper}
       options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-    >
-      {({ navigation, route }) => (
-        <CreateConcertScreen
-          concertId={(route.params as any)?.concertId}
-          onBack={() => navigation.goBack()}
-        />
-      )}
-    </Stack.Screen>
-
+    />
     <Stack.Screen
       name="ConcertDetail"
+      component={ConcertDetailWrapper}
       options={{ animation: 'slide_from_right' }}
-    >
-      {({ navigation, route }) => (
-        <ConcertDetailScreen
-          concertId={(route.params as { concertId: string }).concertId}
-          onBack={() => navigation.goBack()}
-        />
-      )}
-    </Stack.Screen>
-
+    />
     <Stack.Screen
       name="EventDetail"
+      component={EventDetailWrapper}
       options={{ animation: 'slide_from_right' }}
-    >
-      {({ navigation, route }) => (
-        <EventDetailScreen
-          eventId={(route.params as { eventId: string }).eventId}
-          onBack={() => navigation.goBack()}
-        />
-      )}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="UserProfile"
+      component={UserProfileWrapper}
       options={{ animation: 'slide_from_right' }}
-    >
-      {({ route, navigation }) => (
-        <UserProfileScreen
-          route={route as any}
-          navigation={navigation}
-        />
-      )}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="EditProfile"
+      component={EditProfileWrapper}
       options={{ animation: 'slide_from_right' }}
-    >
-      {({ navigation }) => (
-        <EditProfileScreen navigation={navigation} />
-      )}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="CreateReel"
+      component={CreateReelWrapper}
       options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-    >
-      {({ navigation }) => (
-        <CreateReelScreen onBack={() => navigation.goBack()} />
-      )}
-    </Stack.Screen>
+    />
 
     <Stack.Screen
       name="Messages"
@@ -256,15 +256,9 @@ export const MainNavigator: React.FC<Props> = ({ onLogout }) => {
     />
     <Stack.Screen
       name="FilmDetail"
+      component={FilmDetailWrapper}
       options={{ animation: 'slide_from_right' }}
-    >
-      {({ navigation, route }) => (
-        <FilmDetailScreen
-          route={route as any}
-          navigation={navigation}
-        />
-      )}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="Trending"
       component={TrendingScreen}
@@ -292,26 +286,19 @@ export const MainNavigator: React.FC<Props> = ({ onLogout }) => {
     />
     <Stack.Screen
       name="Settings"
+      component={SettingsWrapper}
       options={{ animation: 'slide_from_right' }}
-    >
-      {() => <SettingsScreen onLogout={onLogout} />}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="ChangePassword"
+      component={ChangePasswordWrapper}
       options={{ animation: 'slide_from_right' }}
-    >
-      {({ navigation: nav }) => (
-        <ChangePasswordScreen navigation={nav} />
-      )}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="Privacy"
+      component={PrivacyWrapper}
       options={{ animation: 'slide_from_right' }}
-    >
-      {({ navigation: nav }) => (
-        <PrivacyScreen navigation={nav} />
-      )}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="Chat"
       component={ChatScreen}
@@ -379,26 +366,14 @@ export const MainNavigator: React.FC<Props> = ({ onLogout }) => {
     />
     <Stack.Screen
       name="LiveStream"
+      component={LiveStreamWrapper}
       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-    >
-      {({ navigation, route }) => (
-        <LiveStreamScreen
-          concertId={(route.params as { concertId: string }).concertId}
-          onBack={() => navigation.goBack()}
-        />
-      )}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="LiveViewer"
+      component={LiveViewerWrapper}
       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-    >
-      {({ navigation, route }) => (
-        <LiveViewerScreen
-          concertId={(route.params as { concertId: string }).concertId}
-          onBack={() => navigation.goBack()}
-        />
-      )}
-    </Stack.Screen>
+    />
     <Stack.Screen
       name="UserReels"
       component={UserReelsScreen}

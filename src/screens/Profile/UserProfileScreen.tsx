@@ -10,6 +10,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, ActivityIndicator, Alert, FlatList, Dimensions,
+  InteractionManager,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -102,7 +103,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     finally { setLoading(false); }
   }, [userId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => { load(); });
+    return () => task.cancel();
+  }, [load]);
 
   const isMe = myId !== null && String(myId) === String(userId);
 
