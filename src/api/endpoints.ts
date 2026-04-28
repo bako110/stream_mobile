@@ -141,6 +141,9 @@ export const Endpoints = {
     comments:        `${V1}/social/comments`,
     commentById:     (id: string) => `${V1}/social/comments/${id}`,
     commentReplies:  (id: string) => `${V1}/social/comments/${id}/replies`,
+    // WebSocket commentaires
+    commentsWs: (targetType: string, targetId: string) =>
+      `/api/v1/social/comments/ws/${targetType}/${targetId}`,
     // Réactions
     toggleReaction:  `${V1}/social/reactions`,
     myReaction:      `${V1}/social/reactions/me`,

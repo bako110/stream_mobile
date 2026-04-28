@@ -7,6 +7,8 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
+import { useCommentsWebSocket } from '../../hooks/useCommentsWebSocket';
+import type { CommentWsEvent } from '../../hooks/useCommentsWebSocket';
 import { socialService } from '../../services';
 import { VerifiedBadge } from './VerifiedBadge';
 import type { Comment } from '../../types';
@@ -253,6 +255,58 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                      : eventId   ? { event_id:   eventId   }
                      : null;
 
+  const wsTargetType = reelId ? 'reel' : contentId ? 'content' : concertId ? 'concert' : eventId ? 'event' : null;
+  const wsTargetId   = reelId ?? contentId ?? concertId ?? eventId ?? null;
+
+  // Handler événements WebSocket
+  const handleWsEvent = useCallback((event: CommentWsEvent) => {
+    switch (event.type) {
+      case 'comment_added':
+        setComments(prev => {
+          // Dédupliquer si ajout optimiste déjà présent
+          if (prev.some(c => c.id === event.comment.id)) return prev;
+          return [{ ...event.comment, userReaction: null, replies: [], repliesLoaded: false, showReplies: false }, ...prev];
+        });
+        break;
+
+      case 'comment_updated':
+        setComments(prev => prev.map(c => {
+          if (c.id === event.comment_id) return { ...c, body: event.body, is_edited: event.is_edited };
+          return { ...c, replies: (c.replies ?? []).map(r =>
+            r.id === event.comment_id ? { ...r, body: event.body, is_edited: event.is_edited } : r
+          )};
+        }));
+        break;
+
+      case 'comment_deleted':
+        setComments(prev =>
+          prev.filter(c => c.id !== event.comment_id).map(c => ({
+            ...c,
+            replies: (c.replies ?? []).filter(r => r.id !== event.comment_id),
+            reply_count: (c.replies ?? []).some(r => r.id === event.comment_id)
+              ? (c.reply_count ?? 1) - 1 : c.reply_count,
+          }))
+        );
+        break;
+
+      case 'reaction_updated':
+        setComments(prev => prev.map(c => {
+          if (c.id === event.comment_id) return { ...c, like_count: event.like_count, dislike_count: event.dislike_count };
+          return { ...c, replies: (c.replies ?? []).map(r =>
+            r.id === event.comment_id ? { ...r, like_count: event.like_count, dislike_count: event.dislike_count } : r
+          )};
+        }));
+        break;
+    }
+  }, []);
+
+  useCommentsWebSocket({
+    targetType: wsTargetType as any,
+    targetId: wsTargetId,
+    enabled: visible,
+    onEvent: handleWsEvent,
+  });
+
   // Chargement commentaires racines
   const fetchComments = useCallback(async () => {
     if (!targetParams) return;
@@ -304,7 +358,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       const newComment = await socialService.createComment(payload);
 
       if (replyTo) {
-        // Ajouter la réponse dans les réponses du parent
+        // Ajout optimiste dans les réponses du parent (WS ne broadcast pas les réponses dans la room)
         setComments(prev => prev.map(c => {
           if (c.id !== replyTo.id) return c;
           return {
@@ -317,7 +371,11 @@ export const CommentsBottomSheet: React.FC<Props> = ({
         }));
         setReplyTo(null);
       } else {
-        setComments(prev => [{ ...newComment, userReaction: null, replies: [], repliesLoaded: false }, ...prev]);
+        // Ajout optimiste — le WS broadcast déduplication via comment.id
+        setComments(prev => {
+          if (prev.some(c => c.id === newComment.id)) return prev;
+          return [{ ...newComment, userReaction: null, replies: [], repliesLoaded: false }, ...prev];
+        });
         onCommentAdded?.();
       }
       setText('');
