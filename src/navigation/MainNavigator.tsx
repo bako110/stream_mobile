@@ -43,6 +43,9 @@ import { LiveViewerScreen }        from '../screens/Live/LiveViewerScreen';
 import { LiveListScreen }          from '../screens/Live/LiveListScreen';
 import { MyStoriesScreen }         from '../screens/Profile/MyStoriesScreen';
 import { FilmDetailScreen }        from '../screens/Detail/FilmDetailScreen';
+import { WatchHistoryScreen }      from '../screens/Main/WatchHistoryScreen';
+import { SerieEpisodesScreen }     from '../screens/Detail/SerieEpisodesScreen';
+import { VideoPlayerScreen }       from '../screens/Detail/VideoPlayerScreen';
 import { UserReelsScreen }         from '../screens/Main/UserReelsScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
 import { PostDetailScreen }  from '../screens/Detail/PostDetailScreen';
@@ -72,6 +75,9 @@ export type MainStackParamList = {
   Messages:      undefined;
   Films:         undefined;
   FilmDetail:    { item: any };
+  SerieEpisodes:  { item: any };
+  WatchHistory:   undefined;
+  VideoPlayer:    { url: string; title: string; videoId?: string; contentId?: string; episodeId?: string; contentType?: 'film' | 'serie_episode'; thumbnailUrl?: string; totalSeconds?: number };
   Trending:      undefined;
   Favorites:     undefined;
   Notifications: undefined;
@@ -275,6 +281,21 @@ export const MainNavigator: React.FC<Props> = ({ onLogout }) => {
       name="FilmDetail"
       component={FilmDetailWrapper}
       options={{ animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="SerieEpisodes"
+      component={SerieEpisodesScreen}
+      options={{ headerShown: false, animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="WatchHistory"
+      component={WatchHistoryScreen}
+      options={{ headerShown: false, animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="VideoPlayer"
+      component={VideoPlayerScreen}
+      options={{ headerShown: false, animation: 'fade', statusBarHidden: true }}
     />
     <Stack.Screen
       name="Trending"

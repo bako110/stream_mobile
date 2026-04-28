@@ -108,6 +108,8 @@ export const Endpoints = {
     stop:      (concertId: string) => `${V1}/stream/${concertId}/stop`,
     status:    (concertId: string) => `${V1}/stream/${concertId}/status`,
     analytics: (concertId: string) => `${V1}/stream/${concertId}/analytics`,
+    // VOD progress
+    progress:  (videoId: string) => `${V1}/stream/${videoId}/progress`,
   },
 
   // ── Events (prefix: /api/v1/events) ───────────────────────────────────────

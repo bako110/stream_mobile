@@ -48,9 +48,12 @@ export interface Episode {
   number: number;
   title: string;
   synopsis: string | null;
-  duration_min: number | null;
+  duration_sec: number | null;
   thumbnail_url: string | null;
-  is_premium: boolean;
+  video_url: string | null;
+  is_free: boolean;
+  is_published: boolean;
+  view_count: number;
   created_at: string;
 }
 

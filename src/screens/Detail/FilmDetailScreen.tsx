@@ -1,19 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, Dimensions, StatusBar, ActivityIndicator, Modal, Platform, InteractionManager,
+  StyleSheet, Dimensions, StatusBar, ActivityIndicator, InteractionManager,
 } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
 import type { VideoMeta } from '../../types';
 import type { FilmItem } from '../Main/FilmsScreen';
 
-const { width: SW, height: SH } = Dimensions.get('window');
+const { height: SH } = Dimensions.get('window');
 const BANNER_H = Math.round(SH * 0.5);
 const POSTER_W = 100;
 const POSTER_H = 150;
@@ -25,57 +24,9 @@ const LANG: Record<string, string> = {
 
 interface Props {
   route: { params: { item: FilmItem } };
-  navigation: { goBack: () => void };
+  navigation: { goBack: () => void; navigate: (screen: string, params: any) => void };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Video Player Modal — plein écran (react-native-video v7)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const VideoPlayer: React.FC<{
-  url: string;
-  title: string;
-  onClose: () => void;
-}> = ({ url, title, onClose }) => {
-  const player = useVideoPlayer({ uri: url }, p => {
-    p.muted = false;
-    p.play();
-  });
-
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <StatusBar hidden />
-      <View style={vp.container}>
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          resizeMode="contain"
-          controls
-        />
-        {/* Bouton fermer par-dessus les contrôles natifs */}
-        <TouchableOpacity
-          onPress={onClose}
-          style={[vp.closeBtn, { top: Platform.OS === 'ios' ? 52 : 36 }]}
-        >
-          <Icon name="x" size={20} color="#fff" />
-        </TouchableOpacity>
-        {/* Titre */}
-        <View style={[vp.titleBar, { top: Platform.OS === 'ios' ? 52 : 36 }]}>
-          <View style={{ width: 40 }} />
-          <Text style={vp.titleText} numberOfLines={1}>{title}</Text>
-          <View style={{ width: 40 }} />
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
-const vp = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  closeBtn:  { position: 'absolute', left: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
-  titleBar:  { position: 'absolute', left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  titleText: { flex: 1, color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center' },
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chip
@@ -122,10 +73,9 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors } = theme;
   const insets     = useSafeAreaInsets();
 
-  const [videos, setVideos]           = useState<VideoMeta[]>([]);
+  const [videos, setVideos]               = useState<VideoMeta[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
-  const [playingUrl, setPlayingUrl]   = useState<string | null>(null);
-  const [synExpand, setSynExpand]     = useState(false);
+  const [synExpand, setSynExpand]         = useState(false);
 
   const isSerie  = item.type === 'serie';
   const banner   = item.banner_url || item.thumbnail_url;
@@ -147,8 +97,10 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const hasVideo     = !!defaultVideo?.hls_url;
 
   const handleWatch = () => {
-    if (hasVideo) {
-      setPlayingUrl(defaultVideo!.hls_url!);
+    if (isSerie) {
+      navigation.navigate('SerieEpisodes', { item });
+    } else if (hasVideo) {
+      navigation.navigate('VideoPlayer', { url: defaultVideo!.hls_url!, title: item.title });
     }
   };
 
@@ -161,16 +113,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-      {/* Player modal */}
-      {playingUrl && (
-        <VideoPlayer
-          url={playingUrl}
-          title={item.title}
-          onClose={() => setPlayingUrl(null)}
-        />
-      )}
+      <StatusBar barStyle="light-content" translucent={false} backgroundColor={colors.background} />
 
       <ScrollView showsVerticalScrollIndicator={false} bounces>
 
