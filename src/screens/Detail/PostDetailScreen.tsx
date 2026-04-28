@@ -7,8 +7,10 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
+import { socialService } from '../../services/socialService';
 import { CommentsBottomSheet } from '../../components/common/CommentsBottomSheet';
 import type { Post } from '../../types/post';
+import type { Comment } from '../../types';
 
 interface Props {
   postId: string;
@@ -23,13 +25,21 @@ function fullDate(iso: string): string {
   });
 }
 
+function timeAgo(iso: string): string {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60)     return 'À l\'instant';
+  if (diff < 3600)   return `${Math.floor(diff / 60)} min`;
+  if (diff < 86400)  return `${Math.floor(diff / 3600)} h`;
+  return `${Math.floor(diff / 86400)} j`;
+}
+
 const ini = (name: string) =>
   name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '?';
 
-const Avatar: React.FC<{ uri?: string | null; initials: string; size: number; accent: string }> = ({ uri, initials, size, accent }) => {
-  if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+const SmallAvatar: React.FC<{ uri?: string | null; initials: string; size: number; accent: string }> = ({ uri, initials, size, accent }) => {
+  if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2, flexShrink: 0 }} />;
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: accent + '28', alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: accent + '28', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <Text style={{ color: accent, fontWeight: '800', fontSize: size * 0.38 }}>{initials}</Text>
     </View>
   );
@@ -40,13 +50,15 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
   const { colors }      = theme;
   const { currentUser } = useUser();
 
-  const [post,             setPost]             = useState<Post | null>(null);
-  const [loading,          setLoading]          = useState(true);
-  const [liked,            setLiked]            = useState(false);
-  const [likeCount,        setLikeCount]        = useState(0);
-  const [commentCount,     setCommentCount]     = useState(0);
-  const [commentsVisible,  setCommentsVisible]  = useState(false);
-  const [imageFullscreen,  setImageFullscreen]  = useState(false);
+  const [post,            setPost]            = useState<Post | null>(null);
+  const [loading,         setLoading]         = useState(true);
+  const [liked,           setLiked]           = useState(false);
+  const [likeCount,       setLikeCount]       = useState(0);
+  const [commentCount,    setCommentCount]    = useState(0);
+  const [commentsVisible, setCommentsVisible] = useState(false);
+  const [imageFullscreen, setImageFullscreen] = useState(false);
+  const [previewComments, setPreviewComments] = useState<Comment[]>([]);
+  const [previewLoading,  setPreviewLoading]  = useState(false);
 
   const loadPost = useCallback(async () => {
     try {
@@ -63,7 +75,16 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
     }
   }, [postId]);
 
-  useEffect(() => { loadPost(); }, []);
+  const loadPreviewComments = useCallback(async () => {
+    setPreviewLoading(true);
+    try {
+      const data = await socialService.getComments({ post_id: postId, limit: 3 } as any);
+      setPreviewComments(Array.isArray(data) ? data.slice(0, 3) : []);
+    } catch { setPreviewComments([]); }
+    finally { setPreviewLoading(false); }
+  }, [postId]);
+
+  useEffect(() => { loadPost(); loadPreviewComments(); }, []);
 
   const handleLike = () => {
     const newLiked = !liked;
@@ -79,6 +100,10 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
     try {
       await Share.share({ message: post?.body ? `${post.body}\n\nVia FoliX` : 'Via FoliX' });
     } catch { /* annulé */ }
+  };
+
+  const openComments = () => {
+    setCommentsVisible(true);
   };
 
   if (loading) {
@@ -103,6 +128,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
 
   const author = post.author;
   const name   = author?.display_name ?? author?.username ?? 'Utilisateur';
+  const myInitials = ini(currentUser?.display_name ?? currentUser?.username ?? '?');
 
   return (
     <View style={[pd.root, { backgroundColor: colors.background }]}>
@@ -119,16 +145,14 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+
+        {/* ── Post card ── */}
         <View style={{ backgroundColor: colors.surface }}>
 
-          {/* ── Auteur ── */}
-          <TouchableOpacity
-            style={pd.authorRow}
-            activeOpacity={0.8}
-            onPress={() => author?.id && onAuthorPress?.(author.id)}
-          >
-            <Avatar uri={author?.avatar_url} initials={ini(name)} size={46} accent={colors.primary} />
+          {/* Auteur */}
+          <TouchableOpacity style={pd.authorRow} activeOpacity={0.8} onPress={() => author?.id && onAuthorPress?.(author.id)}>
+            <SmallAvatar uri={author?.avatar_url} initials={ini(name)} size={46} accent={colors.primary} />
             <View style={{ flex: 1, marginLeft: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <Text style={[pd.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
@@ -149,26 +173,26 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
             </TouchableOpacity>
           </TouchableOpacity>
 
-          {/* ── Feeling ── */}
+          {/* Feeling */}
           {post.feeling ? (
             <Text style={[pd.feeling, { color: colors.textSecondary }]}>
               😊 se sent <Text style={{ fontWeight: '700' }}>{post.feeling}</Text>
             </Text>
           ) : null}
 
-          {/* ── Corps ── */}
+          {/* Corps */}
           {post.body ? (
             <Text style={[pd.body, { color: colors.textPrimary }]}>{post.body}</Text>
           ) : null}
 
-          {/* ── Image — tap → fullscreen ── */}
+          {/* Image → fullscreen au tap */}
           {post.image_url ? (
             <TouchableOpacity activeOpacity={0.95} onPress={() => setImageFullscreen(true)}>
               <Image source={{ uri: post.image_url }} style={pd.postImage} resizeMode="cover" />
             </TouchableOpacity>
           ) : null}
 
-          {/* ── Compteurs ── */}
+          {/* Compteurs */}
           {(likeCount > 0 || commentCount > 0) && (
             <View style={[pd.countsRow, { borderColor: colors.divider }]}>
               {likeCount > 0 && (
@@ -180,37 +204,97 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
                 </View>
               )}
               {commentCount > 0 && (
-                <Text style={{ fontSize: 14, color: colors.textSecondary, marginLeft: 'auto' }}>
-                  {commentCount} commentaire{commentCount > 1 ? 's' : ''}
-                </Text>
+                <TouchableOpacity style={{ marginLeft: 'auto' }} onPress={openComments}>
+                  <Text style={{ fontSize: 14, color: colors.textSecondary }}>
+                    {commentCount} commentaire{commentCount > 1 ? 's' : ''}
+                  </Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
 
-          {/* ── Barre sociale ── */}
+          {/* Barre sociale */}
           <View style={[pd.socialBar, { borderColor: colors.divider }]}>
             <TouchableOpacity style={pd.socialBtn} onPress={handleLike} activeOpacity={0.7}>
               <Icon name="heart" size={21} color={liked ? '#E0389A' : colors.textSecondary} />
               <Text style={[pd.socialBtnTxt, { color: liked ? '#E0389A' : colors.textSecondary }]}>J'aime</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={pd.socialBtn} onPress={() => setCommentsVisible(true)} activeOpacity={0.7}>
+            <TouchableOpacity style={pd.socialBtn} onPress={openComments} activeOpacity={0.7}>
               <Icon name="message-circle" size={21} color={colors.textSecondary} />
               <Text style={[pd.socialBtnTxt, { color: colors.textSecondary }]}>Commenter</Text>
             </TouchableOpacity>
-
             <TouchableOpacity style={pd.socialBtn} onPress={handleShare} activeOpacity={0.7}>
               <Icon name="share-2" size={21} color={colors.textSecondary} />
               <Text style={[pd.socialBtnTxt, { color: colors.textSecondary }]}>Partager</Text>
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ── Aperçu commentaires ── */}
+        <View style={{ backgroundColor: colors.surface, marginTop: 8 }}>
+
+          {/* Barre de saisie rapide — ouvre la sheet */}
+          <TouchableOpacity style={[pd.quickInput, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]} onPress={openComments} activeOpacity={0.7}>
+            <SmallAvatar uri={currentUser?.avatar_url} initials={myInitials} size={32} accent={colors.primary} />
+            <Text style={[pd.quickInputText, { color: colors.textTertiary }]}>Écrire un commentaire...</Text>
+          </TouchableOpacity>
+
+          {/* Commentaires preview */}
+          {previewLoading ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : previewComments.length === 0 ? (
+            <TouchableOpacity style={pd.emptyComments} onPress={openComments} activeOpacity={0.7}>
+              <Icon name="message-circle" size={32} color={colors.textTertiary} />
+              <Text style={{ color: colors.textTertiary, fontSize: 14, marginTop: 8 }}>Soyez le premier à commenter</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ paddingHorizontal: 14, paddingBottom: 8 }}>
+              {previewComments.map(comment => {
+                const ca   = comment.author as any;
+                const cName = ca?.display_name ?? ca?.username ?? 'Utilisateur';
+                return (
+                  <View key={comment.id} style={pd.previewRow}>
+                    <SmallAvatar uri={ca?.avatar_url} initials={ini(cName)} size={34} accent={colors.primary} />
+                    <View style={{ flex: 1 }}>
+                      <View style={[pd.bubble, { backgroundColor: colors.backgroundSecondary }]}>
+                        <Text style={[pd.bubbleAuthor, { color: colors.textPrimary }]}>{cName}</Text>
+                        <Text style={[pd.bubbleBody, { color: colors.textPrimary }]} numberOfLines={3}>{comment.body}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 12, marginTop: 4, paddingLeft: 4 }}>
+                        <Text style={{ fontSize: 11, color: colors.textTertiary }}>{timeAgo(comment.created_at)}</Text>
+                        <TouchableOpacity onPress={openComments}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textTertiary }}>J'aime</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={openComments}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textTertiary }}>Répondre</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+
+              {/* Voir tous les commentaires */}
+              {commentCount > 3 && (
+                <TouchableOpacity style={[pd.seeAllBtn, { borderTopColor: colors.divider }]} onPress={openComments} activeOpacity={0.7}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>
+                    Voir les {commentCount} commentaires
+                  </Text>
+                  <Icon name="chevron-right" size={16} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+
       </ScrollView>
 
-      {/* ── CommentsBottomSheet — même composant que ReelsScreen / FeedScreen ── */}
+      {/* ── CommentsBottomSheet ── */}
       <CommentsBottomSheet
         visible={commentsVisible}
-        onClose={() => setCommentsVisible(false)}
+        onClose={() => { setCommentsVisible(false); loadPreviewComments(); }}
         postId={postId}
         onCommentAdded={() => setCommentCount(v => v + 1)}
         onCommentCountChange={delta => setCommentCount(v => Math.max(0, v + delta))}
@@ -218,13 +302,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
 
       {/* ── Image fullscreen ── */}
       {post.image_url && (
-        <Modal
-          visible={imageFullscreen}
-          transparent
-          statusBarTranslucent
-          animationType="fade"
-          onRequestClose={() => setImageFullscreen(false)}
-        >
+        <Modal visible={imageFullscreen} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setImageFullscreen(false)}>
           <TouchableOpacity
             style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}
             activeOpacity={1}
@@ -235,10 +313,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
               style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height * 0.85 }}
               resizeMode="contain"
             />
-            <TouchableOpacity
-              style={{ position: 'absolute', top: 50, right: 16, padding: 8 }}
-              onPress={() => setImageFullscreen(false)}
-            >
+            <TouchableOpacity style={{ position: 'absolute', top: 50, right: 16, padding: 8 }} onPress={() => setImageFullscreen(false)}>
               <Icon name="x" size={28} color="#fff" />
             </TouchableOpacity>
           </TouchableOpacity>
@@ -249,18 +324,26 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
 };
 
 const pd = StyleSheet.create({
-  root:         { flex: 1, paddingTop: Platform.OS === 'ios' ? 44 : 0 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerTitle:  { fontSize: 17, fontWeight: '700' },
-  authorRow:    { flexDirection: 'row', alignItems: 'center', padding: 14 },
-  authorName:   { fontSize: 15, fontWeight: '700' },
-  date:         { fontSize: 12 },
-  feeling:      { paddingHorizontal: 14, paddingBottom: 6, fontSize: 14 },
-  body:         { paddingHorizontal: 14, paddingBottom: 12, fontSize: 16, lineHeight: 24 },
-  postImage:    { width: '100%', aspectRatio: 4 / 3 },
-  countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
-  likeIcon:     { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  socialBar:    { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth },
-  socialBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
-  socialBtnTxt: { fontSize: 14, fontWeight: '600' },
+  root:          { flex: 1, paddingTop: Platform.OS === 'ios' ? 44 : 0 },
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth },
+  headerTitle:   { fontSize: 17, fontWeight: '700' },
+  authorRow:     { flexDirection: 'row', alignItems: 'center', padding: 14 },
+  authorName:    { fontSize: 15, fontWeight: '700' },
+  date:          { fontSize: 12 },
+  feeling:       { paddingHorizontal: 14, paddingBottom: 6, fontSize: 14 },
+  body:          { paddingHorizontal: 14, paddingBottom: 12, fontSize: 16, lineHeight: 24 },
+  postImage:     { width: '100%', aspectRatio: 4 / 3 },
+  countsRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  likeIcon:      { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  socialBar:     { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth },
+  socialBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
+  socialBtnTxt:  { fontSize: 14, fontWeight: '600' },
+  quickInput:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 14, marginTop: 14, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 24, borderWidth: 1 },
+  quickInputText:{ flex: 1, fontSize: 14 },
+  emptyComments: { alignItems: 'center', paddingVertical: 32 },
+  previewRow:    { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  bubble:        { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
+  bubbleAuthor:  { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  bubbleBody:    { fontSize: 14, lineHeight: 20 },
+  seeAllBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 4 },
 });
