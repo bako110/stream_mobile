@@ -110,7 +110,7 @@ async function uploadAssets(assets: Asset[], folder: UploadFolder): Promise<Uplo
   for (const asset of assets) {
     if (!asset.uri) continue;
     const fileUri = await normalizeUri(asset.uri);
-    formData.append('files', {
+    formData.append('file', {
       uri:  fileUri,
       name: asset.fileName ?? `photo_${Date.now()}.jpg`,
       type: asset.type    ?? 'image/jpeg',
@@ -217,7 +217,7 @@ export async function uploadMessageImage(
 ): Promise<UploadedImage> {
   const fileUri = await normalizeUri(uri);
   const formData = new FormData();
-  formData.append('files', {
+  formData.append('file', {
     uri:  fileUri,
     name: fileName ?? `msg_img_${Date.now()}.jpg`,
     type: mimeType ?? 'image/jpeg',
