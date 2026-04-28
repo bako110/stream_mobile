@@ -94,6 +94,7 @@ export interface UserPublic {
   bio?: string | null;
   location?: string | null;
   website?: string | null;
+  is_online?: boolean | null;
 }
 
 export interface UserPublicProfile extends UserPublic {

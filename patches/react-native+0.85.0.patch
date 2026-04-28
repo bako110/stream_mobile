@@ -1,0 +1,20 @@
+diff --git a/node_modules/react-native/Libraries/Core/InitializeCore.js b/node_modules/react-native/Libraries/Core/InitializeCore.js
+index b141be7..11389e6 100644
+--- a/node_modules/react-native/Libraries/Core/InitializeCore.js
++++ b/node_modules/react-native/Libraries/Core/InitializeCore.js
+@@ -26,6 +26,15 @@
+ 
+ 'use strict';
+ 
++if (typeof global.DOMException === 'undefined') {
++  global.DOMException = class DOMException extends Error {
++    constructor(message, name) {
++      super(message);
++      this.name = name || 'DOMException';
++    }
++  };
++}
++
+ const start = Date.now();
+ 
+ require('../../src/private/setup/setUpDefaultReactNativeEnvironment').default();

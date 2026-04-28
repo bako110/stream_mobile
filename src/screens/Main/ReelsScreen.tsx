@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
-import { VideoView, useVideoPlayer } from 'react-native-video';
+import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -669,44 +669,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const pausedRef = useRef(false);
   const likedRef  = useRef(reel.user_reaction === 'like');
 
-  const player = useVideoPlayer(
-    reel.video_url
-      ? {
-          uri: reel.video_url,
-          bufferConfig: {
-            // iOS — qualité maximale, pas de limite de bitrate
-            preferredPeakBitRate: 0,
-            preferredForwardBufferDurationMs: 8000,
-            // Android — buffer suffisant pour éviter les rebuffers
-            minBufferMs:                    3000,
-            maxBufferMs:                    15000,
-            bufferForPlaybackMs:            1000,
-            bufferForPlaybackAfterRebufferMs: 2000,
-          },
-        }
-      : { uri: 'about:blank' },
-    p => {
-      p.loop         = false;
-      p.muted        = muted;
-      p.volume       = muted ? 0 : 1.0;
-      p.mixAudioMode = 'mixWithOthers';
-    },
-  );
-
-  useEffect(() => {
-    const sub = player.addEventListener('onEnd', () => { if (isActive) onEnd(); });
-    return () => sub.remove();
-  }, [isActive, onEnd]);
-
-  useEffect(() => {
-    if (isActive && !pausedRef.current && reel.video_url) player.play();
-    else player.pause();
-  }, [isActive, paused]);
-
-  useEffect(() => {
-    player.muted  = muted;
-    player.volume = muted ? 0 : 1.0;
-  }, [muted]);
+  const isPaused = !isActive || paused;
 
   useEffect(() => {
     if (!isActive) {
@@ -714,11 +677,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       setPaused(false);
     }
   }, [isActive]);
-
-  useEffect(() => () => {
-    try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); }
-    catch {}
-  }, []);
 
   // Sync likedRef avec l'état React
   useEffect(() => { likedRef.current = liked; }, [liked]);
@@ -822,7 +780,31 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     <GestureDetector gesture={tapGesture}>
       <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
 
-        <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} />
+        <View style={StyleSheet.absoluteFill} collapsable={false}>
+          <Video
+            source={reel.video_url ? { uri: reel.video_url } : undefined}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+            paused={isPaused}
+            muted={muted}
+            repeat={false}
+            playInBackground={false}
+            playWhenInactive={false}
+            ignoreSilentSwitch="ignore"
+            mixWithOthers="mix"
+            useTextureView={true}
+            bufferConfig={{
+              minBufferMs: 3000,
+              maxBufferMs: 15000,
+              bufferForPlaybackMs: 1000,
+              bufferForPlaybackAfterRebufferMs: 2000,
+            }}
+            onEnd={() => { if (isActive) onEnd(); }}
+            onError={(e) => console.warn('[Video] ERROR', JSON.stringify(e?.error ?? e))}
+            onLoad={(e) => console.log('[Video] LOADED', e?.naturalSize, e?.duration)}
+            onReadyForDisplay={() => console.log('[Video] READY')}
+          />
+        </View>
 
         {/* Play/pause — thread UI, aucun setState */}
         <Animated.View style={playIconAnim} pointerEvents="none">

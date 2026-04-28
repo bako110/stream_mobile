@@ -35,3 +35,4 @@ export { CommentsBottomSheet }  from './CommentsBottomSheet';
 export { NotificationToast }   from './NotificationToast';
 export { PeopleSuggestions }   from './PeopleSuggestions';
 export { VerifiedBadge, UserNameWithBadge } from './VerifiedBadge';
+export { AvatarWithBadge } from './AvatarWithBadge';

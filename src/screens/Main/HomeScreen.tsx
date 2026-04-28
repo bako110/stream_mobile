@@ -23,7 +23,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { localCache } from '../../utils/storage';
 import { useWs } from '../../context/WebSocketContext';
-import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, VerifiedBadge } from '../../components/common';
+import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, AvatarWithBadge } from '../../components/common';
 import {
   concertService, eventService, authService, searchService,
   socialService, saveService,
@@ -413,7 +413,21 @@ export const HomeScreen: React.FC = () => {
           return (
             <TouchableOpacity
               key={f}
-              onPress={() => setFilter(f)}
+              onPress={async () => {
+                if (f === 'contacts' && !contactsReady) {
+                  const ids = await loadContactIdsSilent();
+                  if (ids.length) {
+                    setContactIds(ids);
+                    setContactsReady(true);
+                    setFilter('contacts');
+                    load('contacts', { ids, reset: true });
+                  } else {
+                    setFilter('contacts');
+                  }
+                } else {
+                  setFilter(f);
+                }
+              }}
               style={[s.filterChip, {
                 backgroundColor: active ? colors.primary : 'transparent',
                 borderColor:     active ? colors.primary : colors.border,
@@ -907,25 +921,24 @@ const PostCard: React.FC<PostCardProps> = ({ item, colors, isDark, onPress, onCo
       {/* ── En-tête auteur ─────────────────────────────────────────────────── */}
       <View style={s.postHeader}>
         <TouchableOpacity
-          style={[s.postAvatar, { backgroundColor: accentColor + '28' }]}
           onPress={() => authorId && onAuthorPress(authorId)}
           activeOpacity={0.8}
         >
-          {authorAvatar ? (
-            <Image source={{ uri: authorAvatar }} style={{ width: '100%', height: '100%' }} />
-          ) : (
-            <Text style={[s.postAvatarText, { color: accentColor }]}>{initials}</Text>
-          )}
+          <AvatarWithBadge
+            avatarUrl={authorAvatar}
+            initials={initials}
+            size={44}
+            accentColor={accentColor}
+            isVerified={!!(isConcert ? concert?.artist?.is_verified : event?.organizer?.is_verified)}
+            isOnline={(isConcert ? (concert?.artist as any)?.is_online : (event?.organizer as any)?.is_online) ?? undefined}
+          />
         </TouchableOpacity>
 
         <View style={s.postMeta}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <Text style={[s.postAuthor, { color: colors.textPrimary }]} numberOfLines={1}>
+            <Text style={[s.postAuthor, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
               {authorName}
             </Text>
-            {(isConcert ? concert?.artist?.is_verified : event?.organizer?.is_verified) && (
-              <VerifiedBadge size={15} />
-            )}
           </View>
           <Text style={[s.postTime, { color: colors.textTertiary }]}>
             {timeAgo(createdAt)} · <Text style={{ color: accentColor }}>{typeLabel}</Text>

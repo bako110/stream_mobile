@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Platform } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, Theme } from '@react-navigation/native';
 import { SplashScreen }     from '../screens/Onboarding/SplashScreen';
 import { OnboardingScreen } from '../screens/Onboarding/OnboardingScreen';
@@ -12,6 +13,15 @@ import { STORAGE_KEYS }     from '../utils/constants';
 import { authService }      from '../services';
 import { useTheme }         from '../hooks/useTheme';
 import { setupFCM } from '../services/fcmService';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+
+async function requestContactsPermission() {
+  try {
+    const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
+    const status = await check(perm);
+    if (status === RESULTS.DENIED) await request(perm);
+  } catch {}
+}
 
 type AppState = 'splash' | 'onboarding' | 'auth' | 'main';
 
@@ -56,6 +66,7 @@ export const RootNavigator: React.FC = () => {
     } else if (token) {
       setAppState('main');
       setupFCM().catch(() => {});
+      requestContactsPermission();
     } else {
       setAppState('auth');
     }
@@ -69,6 +80,7 @@ export const RootNavigator: React.FC = () => {
   const handleAuthSuccess = () => {
     setAppState('main');
     setupFCM().catch(() => {});
+    requestContactsPermission();
   };
   const handleLogout = () => {
     setAppState('auth');

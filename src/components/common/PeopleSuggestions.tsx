@@ -1,12 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, Image, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/userService';
 import { VerifiedBadge } from './VerifiedBadge';
+import { AvatarWithBadge } from './AvatarWithBadge';
 import type { UserPublic } from '../../types';
 
 const PAGE_SIZE = 10;
@@ -110,13 +111,13 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => onUserPress(item.id)} activeOpacity={0.8} style={styles.avatarWrap}>
-                    {item.avatar_url ? (
-                      <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
-                    ) : (
-                      <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.avatarInitial}>{initials}</Text>
-                      </View>
-                    )}
+                    <AvatarWithBadge
+                      avatarUrl={item.avatar_url}
+                      initials={initials}
+                      size={64}
+                      accentColor={colors.primary}
+                      isOnline={item.is_online}
+                    />
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => onUserPress(item.id)} activeOpacity={0.8} style={{ alignItems: 'center' }}>

@@ -5,7 +5,7 @@ import {
   ScrollView, Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { VideoView, useVideoPlayer } from 'react-native-video';
+import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,31 +30,24 @@ interface SlideProps {
 const Slide: React.FC<SlideProps> = memo(({ reel, isActive, muted, onToggleMute }) => {
   const [paused, setPaused] = useState(false);
 
-  const player = useVideoPlayer(
-    reel.video_url ? { uri: reel.video_url } : { uri: 'about:blank' },
-    p => { p.loop = true; p.muted = muted; p.volume = muted ? 0 : 1; },
-  );
-
-  useEffect(() => {
-    if (isActive && !paused && reel.video_url) player.play();
-    else player.pause();
-  }, [isActive, paused]);
-
-  useEffect(() => {
-    player.muted  = muted;
-    player.volume = muted ? 0 : 1;
-  }, [muted]);
-
+  const isPaused = !isActive || paused;
   useEffect(() => { if (!isActive) setPaused(false); }, [isActive]);
-
-  useEffect(() => () => {
-    try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); }
-    catch {}
-  }, []);
 
   return (
     <View style={{ width: SW, height: SH, backgroundColor: '#000' }}>
-      <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} />
+      <Video
+        source={reel.video_url ? { uri: reel.video_url } : undefined}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        paused={isPaused}
+        muted={muted}
+        repeat
+        playInBackground={false}
+        playWhenInactive={false}
+        ignoreSilentSwitch="ignore"
+        useTextureView={false}
+        bufferConfig={{ minBufferMs: 3000, maxBufferMs: 15000, bufferForPlaybackMs: 1000, bufferForPlaybackAfterRebufferMs: 2000 }}
+      />
       {/* Tap pour pause — View sans pointerEvents="none" capte le tap mais laisse le scroll parent */}
       <TouchableOpacity
         activeOpacity={1}

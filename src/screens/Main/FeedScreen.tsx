@@ -10,7 +10,7 @@ import {
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
   Modal, Dimensions, TouchableWithoutFeedback,
 } from 'react-native';
-import { VideoView, useVideoPlayer } from 'react-native-video';
+import Video from 'react-native-video';
 import Animated, {
   FadeInDown, FadeInUp,
   useSharedValue, useAnimatedStyle,
@@ -22,7 +22,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, VerifiedBadge } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge } from '../../components/common';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService } from '../../services';
@@ -892,7 +892,11 @@ export const FeedScreen: React.FC = () => {
                       <Text style={[s.commentAuthor, { color: colors.textPrimary }]}>
                         {cmt.author?.display_name ?? cmt.author?.username ?? 'Utilisateur'}
                       </Text>
-                      {cmt.author?.is_verified && <VerifiedBadge size={12} />}
+                      {cmt.author?.is_verified && (
+                        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon name="check" size={7} color="#fff" />
+                        </View>
+                      )}
                     </View>
                     <Text style={[s.commentText, { color: colors.textSecondary }]}>{cmt.body}</Text>
                     <Text style={[s.commentDate, { color: colors.textTertiary }]}>
@@ -1014,49 +1018,13 @@ const ReelFeedCard: React.FC<{
     return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   };
 
-  const player = useVideoPlayer(
-    { uri: reel.video_url ?? '' },
-    p => {
-      p.loop          = true;
-      p.muted         = true;
-      p.volume        = 1.0;
-      p.mixAudioMode  = 'mixWithOthers';
-    }
-  );
+  const playing = isActive && !paused && !!reel.video_url;
+  const isVideoPaused = !playing;
 
-  // Play/pause selon visibilité + état
-  useEffect(() => {
-    if (!reel.video_url) return;
-    if (isActive && !paused) {
-      player.play();
-    } else {
-      player.pause();
-    }
-  }, [isActive, paused]);
-
-  // Sync muted + volume explicite pour garantir le son
-  useEffect(() => {
-    player.muted  = muted;
-    player.volume = muted ? 0 : 1.0;
-  }, [muted]);
-
-  // Barre de progression
-  useEffect(() => {
-    if (!isActive || paused) { return; }
-    const interval = setInterval(() => {
-      const dur = player.duration;
-      const cur = player.currentTime;
-      if (dur && dur > 0) setProgress(Math.min(cur / dur, 1));
-    }, 250);
-    return () => clearInterval(interval);
-  }, [isActive, paused]);
-
-  // Reset à l'inactivité
+  // Reset progression à l'inactivité
   useEffect(() => {
     if (!isActive) setProgress(0);
   }, [isActive]);
-
-  const playing = isActive && !paused && !!reel.video_url;
 
   return (
     <View style={[rs.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
@@ -1072,7 +1040,11 @@ const ReelFeedCard: React.FC<{
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Text style={[rs.authorName, { color: colors.textPrimary }]}>{name}</Text>
-            {author?.is_verified && <VerifiedBadge size={14} />}
+            {author?.is_verified && (
+              <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="check" size={9} color="#fff" />
+              </View>
+            )}
           </View>
           <Text style={[rs.time, { color: colors.textTertiary }]}>
             {timeAgo(reel.created_at)} · <Text style={{ color: colors.primary, fontWeight: '700' }}>Reels</Text>
@@ -1096,11 +1068,15 @@ const ReelFeedCard: React.FC<{
 
           {/* Lecteur vidéo — actif uniquement si isActive */}
           {isActive && reel.video_url ? (
-            <VideoView
-              player={player}
+            <Video
+              source={{ uri: reel.video_url }}
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
-              controls={false}
+              paused={isVideoPaused}
+              muted={muted}
+              repeat
+              ignoreSilentSwitch="ignore"
+              useTextureView={false}
             />
           ) : null}
 
@@ -1325,17 +1301,9 @@ const cm = StyleSheet.create({
 });
 
 // Monté uniquement quand la carte est visible — joue dès le mount, pause quand invisible
-const CardVideo: React.FC<{ uri: string; playing: boolean }> = ({ uri, playing }) => {
-  const player = useVideoPlayer({ uri }, p => {
-    p.loop  = true;
-    p.muted = true;
-    if (playing) p.play();
-  });
-  useEffect(() => {
-    try { playing ? player.play() : player.pause(); } catch { /**/ }
-  }, [playing]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />;
-};
+const CardVideo: React.FC<{ uri: string; playing: boolean }> = ({ uri, playing }) => (
+  <Video useTextureView={false} source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" paused={!playing} repeat muted ignoreSilentSwitch="ignore" />
+);
 
 const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFollowing, isActive, onToggleFollow, onComment, onPress, onAuthorPress }) => {
   const isEvent  = item.kind === 'event';
@@ -1480,24 +1448,19 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFoll
 
       {/* ── Header auteur ─────────────────────────────────────────────── */}
       <View style={s.cardHeader}>
-        <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }} activeOpacity={0.7} onPress={onAuthorPress}>
-          {authorAvatar ? (
-            <Image source={{ uri: authorAvatar }} style={s.cardAuthorAvatar} />
-          ) : (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              style={s.cardAuthorAvatar}
-            >
-              <Text style={s.cardAuthorAvatarText}>{authorInit}</Text>
-            </LinearGradient>
-          )}
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={[s.cardAuthorName, { color: colors.textPrimary }]} numberOfLines={1}>
-                {authorName}
-              </Text>
-              {author?.is_verified && <VerifiedBadge size={14} />}
-            </View>
+        <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={onAuthorPress}>
+          <AvatarWithBadge
+            avatarUrl={authorAvatar}
+            initials={authorInit}
+            size={40}
+            accentColor={colors.primary}
+            isVerified={!!author?.is_verified}
+            isOnline={(author as any)?.is_online ?? undefined}
+          />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[s.cardAuthorName, { color: colors.textPrimary }]} numberOfLines={1}>
+              {authorName}
+            </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Text style={[s.cardTimeAgo, { color: colors.textTertiary }]}>{timeAgo}</Text>
               <Text style={[s.cardTimeAgo, { color: colors.textTertiary }]}>·</Text>
@@ -1506,27 +1469,15 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFoll
           </View>
         </TouchableOpacity>
 
-        {/* Bouton Suivre */}
-        {showFollowBtn && (
+        {/* Bouton Suivre — masqué si déjà suivi */}
+        {showFollowBtn && !isFollowing && (
           <TouchableOpacity
-            style={[
-              s.followBtn,
-              {
-                backgroundColor: isFollowing ? 'transparent' : colors.primary,
-                borderColor: isFollowing ? colors.border : colors.primary,
-              },
-            ]}
+            style={[s.followBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
             onPress={onToggleFollow}
             activeOpacity={0.7}
           >
-            <Icon
-              name={isFollowing ? 'user-check' : 'user-plus'}
-              size={13}
-              color={isFollowing ? colors.textSecondary : '#fff'}
-            />
-            <Text style={[s.followBtnText, { color: isFollowing ? colors.textSecondary : '#fff' }]}>
-              {isFollowing ? 'Suivi' : 'Suivre'}
-            </Text>
+            <Icon name="user-plus" size={13} color="#fff" />
+            <Text style={[s.followBtnText, { color: '#fff' }]}>Suivre</Text>
           </TouchableOpacity>
         )}
 
