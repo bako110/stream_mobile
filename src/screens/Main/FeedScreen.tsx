@@ -10,7 +10,7 @@ import {
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
   Modal, Dimensions, TouchableWithoutFeedback,
 } from 'react-native';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
   FadeInDown, FadeInUp,
   useSharedValue, useAnimatedStyle,
@@ -22,7 +22,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet } from '../../components/common';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService } from '../../services';
@@ -33,7 +33,6 @@ import type { User } from '../../types/user';
 import type { SearchResults } from '../../types/search';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
-import type { Comment } from '../../types/reel';
 import type { AppColors } from '../../theme/colors';
 import { feedStyles as s } from '../../styles/FeedScreen.styles';
 
@@ -114,15 +113,8 @@ export const FeedScreen: React.FC = () => {
   }).current;
 
   // Sheet commentaires
-  const [commentItem, setCommentItem] = useState<FeedItem | null>(null);
-  const [comments,    setComments]    = useState<Comment[]>([]);
-  const [commentText, setCommentText] = useState('');
-  const [sendingCmt,  setSendingCmt]  = useState(false);
-
-  const sheetY = useSharedValue(1000);
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: sheetY.value }],
-  }));
+  const [commentItem,    setCommentItem]    = useState<FeedItem | null>(null);
+  const [commentVisible, setCommentVisible] = useState(false);
 
   // Recherche auto avec debounce 300ms
   const liveSearch = useCallback((query: string) => {
@@ -294,56 +286,14 @@ export const FeedScreen: React.FC = () => {
 
   // ── Comments sheet ─────────────────────────────────────────────────────────
 
-  const openComments = async (item: FeedItem) => {
+  const openComments = (item: FeedItem) => {
     setCommentItem(item);
-    setComments([]);
-    sheetY.value = withSpring(0, { damping: 20, stiffness: 200 });
-    try {
-      const params = item.kind === 'event'
-        ? { event_id:   item.id }
-        : { concert_id: item.id };
-      const data = await socialService.getComments(params);
-      setComments(data);
-    } catch { /* silencieux */ }
+    setCommentVisible(true);
   };
-
-  // ── WS listener for real-time comments ────────────────────────────────────
-  const commentItemRef = useRef<FeedItem | null>(null);
-  useEffect(() => { commentItemRef.current = commentItem; }, [commentItem]);
-
-  useEffect(() => {
-    const handler = (msg: any) => {
-      if (msg.type !== 'new_comment') return;
-      const ci = commentItemRef.current;
-      if (!ci) return;
-      const matches = (ci.kind === 'event' && msg.event_id === ci.id)
-        || (ci.kind === 'concert' && msg.concert_id === ci.id);
-      if (matches) {
-        setComments(prev => [msg.comment, ...prev]);
-      }
-    };
-    addListener(handler);
-    return () => removeListener(handler);
-  }, [addListener, removeListener]);
 
   const closeComments = () => {
-    sheetY.value = withSpring(1000, { damping: 20 }, () => {
-      runOnJS(setCommentItem)(null);
-    });
-    setCommentText('');
-  };
-
-  const sendComment = async () => {
-    const body = commentText.trim();
-    if (!body || !commentItem) return;
-    setSendingCmt(true);
-    try {
-      const key = commentItem.kind === 'event' ? 'event_id' : 'concert_id';
-      const newComment = await socialService.createComment({ body, [key]: commentItem.id });
-      setComments(prev => [newComment, ...prev]);
-      setCommentText('');
-    } catch { /* silencieux */ }
-    finally { setSendingCmt(false); }
+    setCommentVisible(false);
+    setCommentItem(null);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -857,84 +807,13 @@ export const FeedScreen: React.FC = () => {
         />
       )}
 
-      {/* ── Overlay + sheet commentaires ────────────────────────────────── */}
-      {commentItem && (
-        <>
-          <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={closeComments} />
-          <Animated.View style={[s.commentsSheet, { backgroundColor: colors.surface }, sheetStyle]}>
-            <View style={[s.commentsHandle, { backgroundColor: colors.border }]} />
-            <Text style={[s.commentsTitle, { color: colors.textPrimary }]}>Commentaires</Text>
-
-            <FlatList
-              data={comments}
-              keyExtractor={c => c.id}
-              style={{ maxHeight: 340 }}
-              ListEmptyComponent={
-                <View style={{ alignItems: 'center', padding: 24 }}>
-                  <Icon name="message-circle" size={36} color={colors.textTertiary} />
-                  <Text style={{ color: colors.textTertiary, marginTop: 8 }}>
-                    Soyez le premier à commenter
-                  </Text>
-                </View>
-              }
-              renderItem={({ item: cmt }) => (
-                <View style={[s.commentItem, { borderBottomColor: colors.divider }]}>
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    style={s.commentAvatar}
-                  >
-                    <Text style={s.commentAvatarText}>
-                      {getInitials(cmt.author?.display_name ?? cmt.author?.username)}
-                    </Text>
-                  </LinearGradient>
-                  <View style={s.commentBody}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={[s.commentAuthor, { color: colors.textPrimary }]}>
-                        {cmt.author?.display_name ?? cmt.author?.username ?? 'Utilisateur'}
-                      </Text>
-                      {cmt.author?.is_verified && (
-                        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon name="check" size={7} color="#fff" />
-                        </View>
-                      )}
-                    </View>
-                    <Text style={[s.commentText, { color: colors.textSecondary }]}>{cmt.body}</Text>
-                    <Text style={[s.commentDate, { color: colors.textTertiary }]}>
-                      {formatDate(cmt.created_at)}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            />
-
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
-              <View style={[s.commentInput, { borderTopColor: colors.divider }]}>
-                <TextInput
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  placeholder="Ajouter un commentaire..."
-                  placeholderTextColor={colors.textDisabled}
-                  style={[s.commentInputField, { backgroundColor: colors.inputBg, color: colors.textPrimary }]}
-                  returnKeyType="send"
-                  onSubmitEditing={sendComment}
-                />
-                <TouchableOpacity
-                  onPress={sendComment}
-                  disabled={sendingCmt || !commentText.trim()}
-                  style={[s.commentSendBtn, { backgroundColor: colors.primary }]}
-                >
-                  {sendingCmt
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <Icon name="send" size={15} color="#fff" />
-                  }
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </>
-      )}
+      {/* ── Sheet commentaires ──────────────────────────────────────────── */}
+      <CommentsBottomSheet
+        visible={commentVisible}
+        onClose={closeComments}
+        eventId={commentItem?.kind === 'event'   ? commentItem.id : undefined}
+        concertId={commentItem?.kind === 'concert' ? commentItem.id : undefined}
+      />
 
       {/* ── Menu Drawer ──────────────────────────────────────────────────── */}
       <Modal visible={menuOpen} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setMenuOpen(false)}>
@@ -1019,7 +898,17 @@ const ReelFeedCard: React.FC<{
   };
 
   const playing = isActive && !paused && !!reel.video_url;
-  const isVideoPaused = !playing;
+
+  const player = useVideoPlayer(
+    reel.video_url ? { uri: reel.video_url } : { uri: 'about:blank' },
+    p => { p.loop = true; p.muted = muted; p.volume = muted ? 0 : 1.0; },
+  );
+
+  useEffect(() => {
+    if (playing) player.play(); else player.pause();
+  }, [playing]);
+
+  useEffect(() => { player.muted = muted; player.volume = muted ? 0 : 1.0; }, [muted]);
 
   // Reset progression à l'inactivité
   useEffect(() => {
@@ -1068,16 +957,7 @@ const ReelFeedCard: React.FC<{
 
           {/* Lecteur vidéo — actif uniquement si isActive */}
           {isActive && reel.video_url ? (
-            <Video
-              source={{ uri: reel.video_url }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-              paused={isVideoPaused}
-              muted={muted}
-              repeat
-              ignoreSilentSwitch="ignore"
-              useTextureView={false}
-            />
+            <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />
           ) : null}
 
           {/* Gradient bas */}
@@ -1301,9 +1181,11 @@ const cm = StyleSheet.create({
 });
 
 // Monté uniquement quand la carte est visible — joue dès le mount, pause quand invisible
-const CardVideo: React.FC<{ uri: string; playing: boolean }> = ({ uri, playing }) => (
-  <Video useTextureView={false} source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" paused={!playing} repeat muted ignoreSilentSwitch="ignore" />
-);
+const CardVideo: React.FC<{ uri: string; playing: boolean }> = ({ uri, playing }) => {
+  const player = useVideoPlayer({ uri }, p => { p.loop = true; p.muted = true; });
+  useEffect(() => { if (playing) player.play(); else player.pause(); }, [playing]);
+  return <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />;
+};
 
 const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFollowing, isActive, onToggleFollow, onComment, onPress, onAuthorPress }) => {
   const isEvent  = item.kind === 'event';
@@ -1337,7 +1219,8 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFoll
   const [saved,        setSaved]        = useState(
     isEvent ? saveService.isEventSaved(item.id) : saveService.isConcertSaved(item.id),
   );
-  const [cardMenuOpen, setCardMenuOpen] = useState(false);
+  const [cardMenuOpen,   setCardMenuOpen]   = useState(false);
+  const [reportVisible,  setReportVisible]  = useState(false);
   const refType = isEvent ? 'event' : 'concert';
   const [hasReminder, setHasReminder] = useState(
     () => feedPreferenceService.hasReminder(item.id, refType)
@@ -1510,12 +1393,20 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFoll
           onSave={handleSave}
           onShare={handleShare}
           onFollow={onToggleFollow}
-          onReport={() => Alert.alert('Signalement', 'Merci, votre signalement a été envoyé.')}
+          onReport={() => { setCardMenuOpen(false); setReportVisible(true); }}
           onHide={handleHide}
           onRemind={handleRemind}
           hasReminder={hasReminder}
         />
       )}
+
+      {/* ── Modal signalement ───────────────────────────────────────── */}
+      <ReportModal
+        visible={reportVisible}
+        contentType={isEvent ? 'event' : 'concert'}
+        contentId={item.id}
+        onClose={() => setReportVisible(false)}
+      />
 
       {/* ── Titre + description ──────────────────────────────────────── */}
       <View style={s.cardBody}>

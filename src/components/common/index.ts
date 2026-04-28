@@ -36,3 +36,4 @@ export { NotificationToast }   from './NotificationToast';
 export { PeopleSuggestions }   from './PeopleSuggestions';
 export { VerifiedBadge, UserNameWithBadge } from './VerifiedBadge';
 export { AvatarWithBadge } from './AvatarWithBadge';
+export { ReportModal } from './ReportModal';

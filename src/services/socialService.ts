@@ -49,8 +49,8 @@ export const socialService = {
     return res.data;
   },
 
-  async updateComment(commentId: string, text: string): Promise<Comment> {
-    const res = await apiClient.put<Comment>(Endpoints.social.commentById(commentId), { text });
+  async updateComment(commentId: string, body: string): Promise<Comment> {
+    const res = await apiClient.put<Comment>(Endpoints.social.commentById(commentId), { body });
     return res.data;
   },
 

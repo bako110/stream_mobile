@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
-import { CommentsBottomSheet, SkeletonReels, VerifiedBadge } from '../../components/common';
+import { CommentsBottomSheet, SkeletonReels, VerifiedBadge, ReportModal } from '../../components/common';
 import type { Reel, ReactionType } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
@@ -79,7 +79,7 @@ export const ReelsScreen: React.FC = () => {
   const [hasMore,      setHasMore]      = useState(true);
   const [page,         setPage]         = useState(1);
   const [tab,          setTab]          = useState<'feed' | 'mine'>('feed');
-  const [, setMyId]    = useState<string | null>(null);
+  const [myId, setMyId] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [screenFocused,setScreenFocused]= useState(true);
   const [muted,        setMuted]        = useState(true);
@@ -446,6 +446,7 @@ export const ReelsScreen: React.FC = () => {
             insetTop={insets.top}
             insetBottom={insets.bottom}
             colors={colors}
+            currentUserId={myId ?? undefined}
             onAdd={() => nav.navigate('CreateReel')}
             onAuthorPress={userId => nav.navigate('UserProfile', { userId })}
             onAuthorReels={(_userId, _reelId) => {}}
@@ -619,6 +620,7 @@ interface VideoSlideProps {
   screenH:     number;
   insetBottom: number;
   colors:      any;
+  currentUserId?: string;
   onToggleMute:   () => void;
   onAdd?:         () => void;
   onAuthorPress:  (userId: string) => void;
@@ -627,17 +629,40 @@ interface VideoSlideProps {
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
   reel, isActive, muted, screenW, screenH, insetBottom,
-  colors, onToggleMute, onAdd, onAuthorPress, onEnd,
+  colors, currentUserId, onToggleMute, onAdd, onAuthorPress, onEnd,
 }) => {
-  const [paused,       setPaused]       = useState(false);
-  const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
-  const [likes,        setLikes]        = useState(reel.like_count);
-  const [commentCount, setCommentCount] = useState(reel.comment_count);
-  const [shareCount,   setShareCount]   = useState(reel.share_count);
-  const [showComments, setShowComments] = useState(false);
-  const [commentText,  setCommentText]  = useState('');
-  const [sending,      setSending]      = useState(false);
-  const [barFocused,   setBarFocused]   = useState(false);
+  const [paused,        setPaused]        = useState(false);
+  const [liked,         setLiked]         = useState(reel.user_reaction === 'like');
+  const [likes,         setLikes]         = useState(reel.like_count);
+  const [commentCount,  setCommentCount]  = useState(reel.comment_count);
+  const [shareCount,    setShareCount]    = useState(reel.share_count);
+  const [showComments,  setShowComments]  = useState(false);
+  const [commentText,   setCommentText]   = useState('');
+  const [sending,       setSending]       = useState(false);
+  const [barFocused,    setBarFocused]    = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+
+  const isOwnReel = currentUserId && reel.author?.id && currentUserId === String(reel.author.id);
+
+  const player = useVideoPlayer(
+    reel.video_url
+      ? {
+          uri: reel.video_url,
+          bufferConfig: {
+            minBufferMs: 3000,
+            maxBufferMs: 15000,
+            bufferForPlaybackMs: 1000,
+            bufferForPlaybackAfterRebufferMs: 2000,
+          },
+        }
+      : { uri: 'about:blank' },
+    p => {
+      p.loop         = false;
+      p.muted        = muted;
+      p.volume       = muted ? 0 : 1.0;
+      p.mixAudioMode = 'mixWithOthers';
+    },
+  );
 
   // Reanimated shared values — animations 100% sur le thread UI, zéro setState
   const playIconOpacity = useSharedValue(0);
@@ -669,7 +694,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const pausedRef = useRef(false);
   const likedRef  = useRef(reel.user_reaction === 'like');
 
-  const isPaused = !isActive || paused;
+  useEffect(() => {
+    const sub = player.addEventListener('onEnd', () => { if (isActive) onEnd(); });
+    return () => sub.remove();
+  }, [isActive, onEnd]);
+
+  useEffect(() => {
+    if (isActive && !pausedRef.current && reel.video_url) player.play();
+    else player.pause();
+  }, [isActive, paused]);
+
+  useEffect(() => {
+    player.muted  = muted;
+    player.volume = muted ? 0 : 1.0;
+  }, [muted]);
 
   useEffect(() => {
     if (!isActive) {
@@ -677,6 +715,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       setPaused(false);
     }
   }, [isActive]);
+
+  useEffect(() => () => {
+    try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); }
+    catch {}
+  }, []);
 
   // Sync likedRef avec l'état React
   useEffect(() => { likedRef.current = liked; }, [liked]);
@@ -780,31 +823,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     <GestureDetector gesture={tapGesture}>
       <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
 
-        <View style={StyleSheet.absoluteFill} collapsable={false}>
-          <Video
-            source={reel.video_url ? { uri: reel.video_url } : undefined}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-            paused={isPaused}
-            muted={muted}
-            repeat={false}
-            playInBackground={false}
-            playWhenInactive={false}
-            ignoreSilentSwitch="ignore"
-            mixWithOthers="mix"
-            useTextureView={true}
-            bufferConfig={{
-              minBufferMs: 3000,
-              maxBufferMs: 15000,
-              bufferForPlaybackMs: 1000,
-              bufferForPlaybackAfterRebufferMs: 2000,
-            }}
-            onEnd={() => { if (isActive) onEnd(); }}
-            onError={(e) => console.warn('[Video] ERROR', JSON.stringify(e?.error ?? e))}
-            onLoad={(e) => console.log('[Video] LOADED', e?.naturalSize, e?.duration)}
-            onReadyForDisplay={() => console.log('[Video] READY')}
-          />
-        </View>
+        <VideoView
+          player={player}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}
+          resizeMode="cover"
+          controls={false}
+          surfaceType="texture"
+        />
 
         {/* Play/pause — thread UI, aucun setState */}
         <Animated.View style={playIconAnim} pointerEvents="none">
@@ -856,12 +881,22 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           <ActionBtn icon="message-circle" label={formatCount(commentCount)}    color="#fff" onPress={() => setShowComments(true)} />
           <ActionBtn icon="share-2"        label={formatCount(shareCount)}      color="#fff" onPress={handleShare} />
           <ActionBtn icon="eye"            label={formatCount(reel.view_count)} color="#fff" />
+          {!isOwnReel && (
+            <ActionBtn icon="flag" label="" color="rgba(255,255,255,0.7)" onPress={() => setReportVisible(true)} />
+          )}
           {onAdd && (
             <TouchableOpacity style={[s.addActionBtn, { backgroundColor: colors.primary }]} onPress={onAdd}>
               <Icon name="plus" size={20} color="#fff" />
             </TouchableOpacity>
           )}
         </View>
+
+        <ReportModal
+          visible={reportVisible}
+          contentType="reel"
+          contentId={reel.id}
+          onClose={() => setReportVisible(false)}
+        />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'position' : undefined}
@@ -924,6 +959,7 @@ interface ReelItemProps {
   insetTop:       number;
   insetBottom:    number;
   colors:         any;
+  currentUserId?: string;
   onToggleMute:   () => void;
   onAdd?:         () => void;
   onAuthorPress:  (userId: string) => void;
@@ -933,7 +969,7 @@ interface ReelItemProps {
 
 const ReelItem: React.FC<ReelItemProps> = memo(({
   reel, isActive, index, muted, screenW, screenH, insetBottom,
-  colors, onToggleMute, onAdd, onAuthorPress, onEnd,
+  colors, currentUserId, onToggleMute, onAdd, onAuthorPress, onEnd,
 }) => {
   const [authorReels, setAuthorReels] = useState<Reel[]>([reel]);
   const [hIdx,        setHIdx]        = useState(0);
@@ -1004,6 +1040,7 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
             screenH={screenH}
             insetBottom={insetBottom}
             colors={colors}
+            currentUserId={currentUserId}
             onToggleMute={onToggleMute}
             onAdd={i === 0 ? onAdd : undefined}
             onAuthorPress={onAuthorPress}

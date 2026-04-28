@@ -38,6 +38,11 @@ const CFG: Record<string, { icon: string; grad: [string, string] }> = {
 };
 const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
 
+const USER_NOTIF_TYPES = new Set([
+  'follow', 'profile_view', 'story_view', 'mention', 'reaction', 'comment',
+  'subscription', 'reel_posted',
+]);
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
@@ -131,11 +136,18 @@ export const NotificationsScreen: React.FC = () => {
 
   const handlePress = useCallback((item: NotifItem) => {
     if (!item.is_read) markOneRead(item.id);
+
+    if (USER_NOTIF_TYPES.has(item.notification_type) && item.actor?.id) {
+      nav.navigate('UserProfile', { userId: item.actor.id });
+      return;
+    }
+
     if (!item.ref_id) return;
-    if (item.ref_type === 'concert')   nav.navigate('ConcertDetail',   { concertId: item.ref_id });
-    else if (item.ref_type === 'event') nav.navigate('EventDetail',     { eventId:   item.ref_id });
-    else if (item.ref_type === 'reel')  nav.navigate('Reels',           { initialReelId: item.ref_id });
-    else if (item.ref_type === 'community') nav.navigate('CommunityDetail', { communityId: item.ref_id });
+    if (item.ref_type === 'concert')       nav.navigate('ConcertDetail',   { concertId:     item.ref_id });
+    else if (item.ref_type === 'event')    nav.navigate('EventDetail',     { eventId:       item.ref_id });
+    else if (item.ref_type === 'reel')     nav.navigate('Reels',           { initialReelId: item.ref_id });
+    else if (item.ref_type === 'user')     nav.navigate('UserProfile',     { userId:        item.ref_id });
+    else if (item.ref_type === 'community') nav.navigate('CommunityDetail', { communityId:  item.ref_id });
   }, [nav, markOneRead]);
 
   const loadMore = useCallback(() => {

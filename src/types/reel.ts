@@ -45,6 +45,7 @@ export interface Comment {
   is_edited: boolean;
   like_count: number;
   dislike_count?: number;
+  reply_count?: number;
   parent_id: string | null;
   created_at: string;
   updated_at: string;
@@ -67,6 +68,7 @@ export interface CommentCreate {
   body: string;
   reel_id?: string;
   content_id?: string;
+  
   concert_id?: string;
   event_id?: string;
   parent_id?: string;
