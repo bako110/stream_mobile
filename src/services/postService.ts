@@ -5,7 +5,8 @@ import type { Post, PostCreate } from '../types/post';
 export const postService = {
   async getFeed(page = 1, limit = 20): Promise<Post[]> {
     const res = await apiClient.get<Post[]>(`${Endpoints.posts.feed}?page=${page}&limit=${limit}`);
-    return res.data;
+    if (__DEV__) console.log('[postService] getFeed result:', JSON.stringify(res.data).slice(0, 200));
+    return Array.isArray(res.data) ? res.data : [];
   },
 
   async getById(id: string): Promise<Post> {

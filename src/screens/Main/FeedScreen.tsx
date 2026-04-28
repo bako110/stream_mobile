@@ -281,12 +281,11 @@ export const FeedScreen: React.FC = () => {
 
   useEffect(() => { loadLive(); }, []);
 
-  // Focus : reprise vidéo + rechargement si on revient d'un modal (ex: CreatePost)
+  // Focus : reprise vidéo + rechargement au retour depuis CreatePost
   const didMountRef = useRef(false);
   useFocusEffect(useCallback(() => {
     setFeedFocused(true);
     if (didMountRef.current) {
-      // Retour depuis un écran modal — recharger le feed pour afficher le nouveau post
       load(filter);
     }
     didMountRef.current = true;
@@ -850,6 +849,7 @@ export const FeedScreen: React.FC = () => {
         onClose={closeComments}
         eventId={commentItem?.kind === 'event'   ? commentItem.id : undefined}
         concertId={commentItem?.kind === 'concert' ? commentItem.id : undefined}
+        postId={commentItem?.kind === 'post'     ? commentItem.id : undefined}
         onCommentCountChange={delta => commentCountChangeRef.current?.(delta)}
       />
 
