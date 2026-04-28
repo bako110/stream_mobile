@@ -4,7 +4,7 @@ import {
   StyleSheet, RefreshControl, Image,
 } from 'react-native';
 import Animated, {
-  FadeInDown, useAnimatedStyle, useSharedValue,
+  useAnimatedStyle, useSharedValue,
   withTiming, runOnJS, withSpring,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -135,6 +135,7 @@ export const NotificationsScreen: React.FC = () => {
   }, []);
 
   const handlePress = useCallback((item: NotifItem) => {
+    // Naviguer immédiatement, marquer lu en arrière-plan
     if (!item.is_read) markOneRead(item.id);
 
     if (USER_NOTIF_TYPES.has(item.notification_type) && item.actor?.id) {
@@ -143,10 +144,10 @@ export const NotificationsScreen: React.FC = () => {
     }
 
     if (!item.ref_id) return;
-    if (item.ref_type === 'concert')       nav.navigate('ConcertDetail',   { concertId:     item.ref_id });
-    else if (item.ref_type === 'event')    nav.navigate('EventDetail',     { eventId:       item.ref_id });
-    else if (item.ref_type === 'reel')     nav.navigate('Reels',           { initialReelId: item.ref_id });
-    else if (item.ref_type === 'user')     nav.navigate('UserProfile',     { userId:        item.ref_id });
+    if (item.ref_type === 'concert')        nav.navigate('ConcertDetail',   { concertId:    item.ref_id });
+    else if (item.ref_type === 'event')     nav.navigate('EventDetail',     { eventId:      item.ref_id });
+    else if (item.ref_type === 'reel')      nav.navigate('Reels',           { initialReelId: item.ref_id });
+    else if (item.ref_type === 'user')      nav.navigate('UserProfile',     { userId:        item.ref_id });
     else if (item.ref_type === 'community') nav.navigate('CommunityDetail', { communityId:  item.ref_id });
   }, [nav, markOneRead]);
 
@@ -257,7 +258,7 @@ interface CardProps {
 
 const SWIPE_THRESHOLD = -80;
 
-const NotifCard: React.FC<CardProps> = ({ item, index, colors, fontSize, onPress, onDelete, onMarkRead }) => {
+const NotifCard: React.FC<CardProps> = React.memo(({ item, index, colors, fontSize, onPress, onDelete, onMarkRead }) => {
   const cfg    = CFG[item.notification_type] ?? DEFAULT_CFG;
   const isRead = item.is_read;
 
@@ -365,7 +366,7 @@ const NotifCard: React.FC<CardProps> = ({ item, index, colors, fontSize, onPress
       </GestureDetector>
     </Animated.View>
   );
-};
+});
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
