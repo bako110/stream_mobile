@@ -68,9 +68,9 @@ export interface CommentCreate {
   body: string;
   reel_id?: string;
   content_id?: string;
-  
   concert_id?: string;
   event_id?: string;
+  post_id?: string;
   parent_id?: string;
 }
 

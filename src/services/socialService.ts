@@ -27,6 +27,7 @@ export const socialService = {
     content_id?: string;
     concert_id?: string;
     event_id?: string;
+    post_id?: string;
     page?: number;
     limit?: number;
   }): Promise<Comment[]> {

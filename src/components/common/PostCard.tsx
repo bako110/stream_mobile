@@ -30,15 +30,15 @@ function timeAgo(iso: string): string {
 export const PostCard: React.FC<PostCardProps> = ({
   post, colors, currentUserId, onPress, onAuthorPress, onDelete,
 }) => {
-  const author = post.author;
-  const name   = author?.display_name ?? author?.username ?? 'Utilisateur';
+  const author   = post.author;
+  const name     = author?.display_name ?? author?.username ?? 'Utilisateur';
   const initials = name[0]?.toUpperCase() ?? '?';
 
-  const [liked,        setLiked]        = useState(post.user_reaction === 'like');
-  const [likeCount,    setLikeCount]    = useState(post.like_count);
-  const [bodyExpanded, setBodyExpanded] = useState(false);
+  const [liked,         setLiked]         = useState(post.user_reaction === 'like');
+  const [likeCount,     setLikeCount]     = useState(post.like_count);
+  const [bodyExpanded,  setBodyExpanded]  = useState(false);
   const [bodyTruncated, setBodyTruncated] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen,      setMenuOpen]      = useState(false);
 
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
@@ -58,8 +58,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   const handleShare = async () => {
     try {
-      const msg = post.body ? `${post.body}\n\nVia FoliX` : 'Via FoliX';
-      await Share.share({ message: msg });
+      await Share.share({ message: post.body ? `${post.body}\n\nVia FoliX` : 'Via FoliX' });
     } catch { /* annulé */ }
   };
 
@@ -72,16 +71,19 @@ export const PostCard: React.FC<PostCardProps> = ({
           try {
             await postService.delete(post.id);
             onDelete?.(post.id);
-          } catch {
-            Alert.alert('Erreur', 'Impossible de supprimer.');
-          }
+          } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
         },
       },
     ]);
   };
 
   return (
-    <View style={[pc.card, { backgroundColor: colors.surface }]}>
+    // Toute la carte est cliquable → PostDetail
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={() => { if (menuOpen) { setMenuOpen(false); return; } onPress(); }}
+      style={[pc.card, { backgroundColor: colors.surface }]}
+    >
       {/* ── Header ── */}
       <View style={pc.header}>
         <TouchableOpacity
@@ -122,7 +124,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Inline mini menu */}
+      {/* Mini menu contextuel */}
       {menuOpen && (
         <View style={[pc.miniMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {isOwn ? (
@@ -139,64 +141,60 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       )}
 
-      {/* ── Feeling ── */}
+      {/* Feeling */}
       {post.feeling ? (
         <Text style={[pc.feeling, { color: colors.textSecondary }]}>
           se sent <Text style={{ fontWeight: '600' }}>{post.feeling}</Text>
         </Text>
       ) : null}
 
-      {/* ── Body (cliquable → PostDetail) ── */}
+      {/* Body */}
       {post.body ? (
-        <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
-          <View style={pc.bodyWrap}>
-            <Text
-              style={[pc.body, { color: colors.textPrimary }]}
-              numberOfLines={bodyExpanded ? undefined : 4}
-              onTextLayout={e => {
-                if (!bodyExpanded && e.nativeEvent.lines.length > 4) setBodyTruncated(true);
-              }}
-            >
-              {post.body}
-            </Text>
-            {bodyTruncated && !bodyExpanded && (
-              <TouchableOpacity onPress={e => { e.stopPropagation?.(); setBodyExpanded(true); }}>
-                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 2 }}>Lire la suite</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </TouchableOpacity>
-      ) : null}
-
-      {/* ── Image (cliquable → PostDetail) ── */}
-      {post.image_url ? (
-        <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
-          <Image source={{ uri: post.image_url }} style={pc.image} resizeMode="cover" />
-        </TouchableOpacity>
-      ) : null}
-
-      {/* ── Counts row ── */}
-      {(likeCount > 0 || post.comment_count > 0) && (
-        <TouchableOpacity activeOpacity={0.7} onPress={onPress}>
-          <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
-            {likeCount > 0 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="heart" size={10} color="#fff" />
-                </View>
-                <Text style={{ fontSize: 13, color: colors.textTertiary }}>{likeCount}</Text>
-              </View>
-            )}
-            {post.comment_count > 0 && (
-              <Text style={{ fontSize: 13, color: colors.textTertiary, marginLeft: 'auto' }}>
-                {post.comment_count} commentaire{post.comment_count > 1 ? 's' : ''}
+        <View style={pc.bodyWrap}>
+          <Text
+            style={[pc.body, { color: colors.textPrimary }]}
+            numberOfLines={bodyExpanded ? undefined : 4}
+            onTextLayout={e => {
+              if (!bodyExpanded && e.nativeEvent.lines.length > 4) setBodyTruncated(true);
+            }}
+          >
+            {post.body}
+          </Text>
+          {bodyTruncated && !bodyExpanded && (
+            <TouchableOpacity onPress={() => setBodyExpanded(true)}>
+              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 2 }}>
+                Lire la suite
               </Text>
-            )}
-          </View>
-        </TouchableOpacity>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : null}
+
+      {/* Image */}
+      {post.image_url ? (
+        <Image source={{ uri: post.image_url }} style={pc.image} resizeMode="cover" />
+      ) : null}
+
+      {/* Compteurs */}
+      {(likeCount > 0 || post.comment_count > 0) && (
+        <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
+          {likeCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="heart" size={10} color="#fff" />
+              </View>
+              <Text style={{ fontSize: 13, color: colors.textTertiary }}>{likeCount}</Text>
+            </View>
+          )}
+          {post.comment_count > 0 && (
+            <Text style={{ fontSize: 13, color: colors.textTertiary, marginLeft: 'auto' }}>
+              {post.comment_count} commentaire{post.comment_count > 1 ? 's' : ''}
+            </Text>
+          )}
+        </View>
       )}
 
-      {/* ── Social bar ── */}
+      {/* Barre sociale — stopPropagation pour ne pas déclencher onPress de la carte */}
       <View style={[pc.socialBar, { borderTopColor: colors.divider }]}>
         <TouchableOpacity style={pc.socialBtn} onPress={handleLike} activeOpacity={0.8}>
           <Animated.View style={heartStyle}>
@@ -221,24 +219,24 @@ export const PostCard: React.FC<PostCardProps> = ({
       </View>
 
       <View style={{ height: 8, backgroundColor: colors.backgroundSecondary }} />
-    </View>
+    </TouchableOpacity>
   );
 };
 
 const pc = StyleSheet.create({
-  card:        { backgroundColor: '#fff' },
-  header:      { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
-  avatar:      { width: 42, height: 42, borderRadius: 21, overflow: 'hidden' },
-  authorName:  { fontSize: 14, fontWeight: '700' },
-  time:        { fontSize: 12 },
-  feeling:     { paddingHorizontal: 14, paddingBottom: 6, fontSize: 13, fontStyle: 'italic' },
-  bodyWrap:    { paddingHorizontal: 14, paddingBottom: 10 },
-  body:        { fontSize: 15, lineHeight: 22 },
-  image:       { width: '100%', aspectRatio: 16 / 9 },
-  countsRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  socialBar:   { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth },
-  socialBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },
+  card:          { backgroundColor: '#fff' },
+  header:        { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
+  avatar:        { width: 42, height: 42, borderRadius: 21, overflow: 'hidden' },
+  authorName:    { fontSize: 14, fontWeight: '700' },
+  time:          { fontSize: 12 },
+  feeling:       { paddingHorizontal: 14, paddingBottom: 6, fontSize: 13, fontStyle: 'italic' },
+  bodyWrap:      { paddingHorizontal: 14, paddingBottom: 10 },
+  body:          { fontSize: 15, lineHeight: 22 },
+  image:         { width: '100%', aspectRatio: 16 / 9 },
+  countsRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  socialBar:     { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth },
+  socialBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },
   socialBtnText: { fontSize: 13, fontWeight: '600' },
-  miniMenu:    { position: 'absolute', top: 44, right: 12, zIndex: 10, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', minWidth: 140, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 5 },
-  miniMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  miniMenu:      { position: 'absolute', top: 44, right: 12, zIndex: 10, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', minWidth: 140, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 5 },
+  miniMenuItem:  { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
 });
