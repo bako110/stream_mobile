@@ -7,6 +7,8 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
+import { storage } from '../../utils/storage';
+import { STORAGE_KEYS } from '../../utils/constants';
 import { useCommentsWebSocket } from '../../hooks/useCommentsWebSocket';
 import type { CommentWsEvent } from '../../hooks/useCommentsWebSocket';
 import { socialService } from '../../services';
@@ -233,9 +235,24 @@ const CommentRow: React.FC<RowProps> = ({
 export const CommentsBottomSheet: React.FC<Props> = ({
   visible, onClose, reelId, contentId, concertId, eventId, onCommentAdded, onCommentCountChange,
 }) => {
-  const { theme }       = useTheme();
-  const { colors }      = theme;
-  const { currentUser } = useUser();
+  const { theme }                        = useTheme();
+  const { colors }                       = theme;
+  const { currentUser, refreshUser }     = useUser();
+
+  // Lire l'id depuis MMKV en premier (instantané), puis se syncer avec le context
+  const [myId, setMyId] = useState<string | null>(() =>
+    currentUser?.id
+      ? String(currentUser.id)
+      : storage.getItem(STORAGE_KEYS.LAST_USER_ID) ?? null
+  );
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      setMyId(String(currentUser.id));
+    } else if (!myId) {
+      refreshUser().then(u => { if (u?.id) setMyId(String(u.id)); }).catch(() => {});
+    }
+  }, [currentUser?.id]);
 
   const [comments,    setComments]    = useState<CommentEx[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -511,7 +528,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                 <CommentRow
                   item={item}
                   colors={colors}
-                  currentUserId={String(currentUser?.id ?? '')}
+                  currentUserId={myId ?? ''}
                   onReply={c => { setReplyTo(c); setEditingId(null); setTimeout(() => inputRef.current?.focus(), 100); }}
                   onToggleReplies={toggleReplies}
                   onLike={(c, type) => handleReaction(c, type)}

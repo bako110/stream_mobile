@@ -4,6 +4,8 @@
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authService } from '../services/authService';
+import { storage } from '../utils/storage';
+import { STORAGE_KEYS } from '../utils/constants';
 import type { User } from '../types/user';
 
 interface UserContextValue {
@@ -30,6 +32,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const me = await authService.getMe(true);
       setCurrentUser(me);
+      if (me?.id) storage.setItem(STORAGE_KEYS.LAST_USER_ID, String(me.id));
       return me;
     } catch {
       return null;
@@ -39,6 +42,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     authService.getMe().then(me => {
       setCurrentUser(me);
+      if (me?.id) storage.setItem(STORAGE_KEYS.LAST_USER_ID, String(me.id));
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
