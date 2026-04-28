@@ -25,6 +25,7 @@ interface Props {
   contentId?: string;
   concertId?: string;
   eventId?: string;
+  postId?: string;
   onCommentAdded?: () => void;
   onCommentCountChange?: (delta: number) => void;
 }
@@ -233,7 +234,7 @@ const CommentRow: React.FC<RowProps> = ({
 // ─── CommentsBottomSheet ──────────────────────────────────────────────────────
 
 export const CommentsBottomSheet: React.FC<Props> = ({
-  visible, onClose, reelId, contentId, concertId, eventId, onCommentAdded, onCommentCountChange,
+  visible, onClose, reelId, contentId, concertId, eventId, postId, onCommentAdded, onCommentCountChange,
 }) => {
   const { theme }                        = useTheme();
   const { colors }                       = theme;
@@ -271,10 +272,11 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                      : contentId ? { content_id: contentId }
                      : concertId ? { concert_id: concertId }
                      : eventId   ? { event_id:   eventId   }
+                     : postId    ? { post_id:    postId    }
                      : null;
 
-  const wsTargetType = reelId ? 'reel' : contentId ? 'content' : concertId ? 'concert' : eventId ? 'event' : null;
-  const wsTargetId   = reelId ?? contentId ?? concertId ?? eventId ?? null;
+  const wsTargetType = reelId ? 'reel' : contentId ? 'content' : concertId ? 'concert' : eventId ? 'event' : postId ? 'post' : null;
+  const wsTargetId   = reelId ?? contentId ?? concertId ?? eventId ?? postId ?? null;
 
   // Handler événements WebSocket
   const handleWsEvent = useCallback((event: CommentWsEvent) => {
@@ -336,7 +338,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       setComments(data.map(c => ({ ...c, userReaction: null, replies: [], repliesLoaded: false, showReplies: false })));
     } catch { setComments([]); }
     finally { setLoading(false); }
-  }, [reelId, contentId, concertId, eventId]);
+  }, [reelId, contentId, concertId, eventId, postId]);
 
   useEffect(() => {
     if (visible) { fetchComments(); }

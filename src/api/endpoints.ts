@@ -153,6 +153,15 @@ export const Endpoints = {
     shareCounts:     `${V1}/social/shares/counts`,
   },
 
+  // ── Posts (prefix: /api/v1/posts) ────────────────────────────────────────
+  posts: {
+    feed:    `${V1}/posts/feed`,
+    create:  `${V1}/posts`,
+    byId:    (id: string) => `${V1}/posts/${id}`,
+    react:   (id: string) => `${V1}/posts/${id}/react`,
+    update:  (id: string) => `${V1}/posts/${id}`,
+  },
+
   // ── Subscriptions (prefix: /api/v1) ───────────────────────────────────────
   subscriptions: {
     plans:      `${V1}/plans`,

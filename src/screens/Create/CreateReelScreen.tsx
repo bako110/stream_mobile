@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
@@ -51,6 +51,17 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   const isPublishing = step !== 'idle' && step !== 'done';
 
   const isVideoPaused = !videoLocalUri || videoPaused || isPublishing;
+
+  const videoPlayer = useVideoPlayer(
+    videoLocalUri ? { uri: videoLocalUri } : null,
+    p => { p.loop = true; p.muted = false; },
+  );
+
+  useEffect(() => {
+    if (!videoLocalUri) return;
+    if (isVideoPaused) { videoPlayer.pause(); }
+    else               { videoPlayer.play(); }
+  }, [isVideoPaused, videoLocalUri]);
 
   // Barre de progression animée
   const progressWidth = useSharedValue(0);
@@ -209,15 +220,10 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
                 activeOpacity={1}
               >
                 {videoLocalUri ? (
-                  <Video
-                    source={{ uri: videoLocalUri }}
+                  <VideoView
+                    player={videoPlayer}
                     style={StyleSheet.absoluteFill}
                     resizeMode="cover"
-                    paused={isVideoPaused}
-                    repeat
-                    muted={false}
-                    ignoreSilentSwitch="ignore"
-                    useTextureView={false}
                   />
                 ) : null}
 

@@ -5,7 +5,7 @@ import {
   TouchableWithoutFeedback, Alert, TextInput, Modal, Platform,
   FlatList, ActivityIndicator,
 } from 'react-native';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -47,6 +47,30 @@ interface Props {
   onNavigateToChat?:  (partnerId: string, partnerName: string, avatarUrl?: string) => void;
   onNavigateToCall?:  (partnerId: string, partnerName: string, callType: 'voice' | 'video') => void;
 }
+
+// ── Lecteur vidéo story (v7) ──────────────────────────────────────────────────
+
+const StoryVideoView: React.FC<{ uri: string; paused: boolean }> = ({ uri, paused }) => {
+  const player = useVideoPlayer({ uri }, p => {
+    p.loop = true;
+    p.muted = false;
+  });
+
+  useEffect(() => {
+    if (paused) { player.pause(); }
+    else        { player.play(); }
+  }, [paused]);
+
+  return (
+    <VideoView
+      player={player}
+      style={s.media}
+      resizeMode="cover"
+    />
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const StoryViewer: React.FC<Props> = ({
   groups, initialGroupIndex, initialStoryIndex, currentUserId,
@@ -230,7 +254,7 @@ export const StoryViewer: React.FC<Props> = ({
           <Image source={{ uri: story.media_url }} style={s.media} resizeMode="cover" />
         )}
         {story.media_type === 'video' && story.media_url && (
-          <Video useTextureView={false} source={{ uri: story.media_url }} style={s.media} resizeMode="cover" paused={paused} repeat muted={false} ignoreSilentSwitch="ignore" />
+          <StoryVideoView uri={story.media_url} paused={paused} />
         )}
         {story.media_type === 'audio' && (
           <LinearGradient colors={[story.background_color ?? '#FF9800', '#000']} style={s.media}>

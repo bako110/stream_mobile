@@ -22,10 +22,10 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, CreatePostBox, PostCard } from '../../components/common';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
-import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService } from '../../services';
+import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
 import { useWs } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -33,6 +33,7 @@ import type { User } from '../../types/user';
 import type { SearchResults } from '../../types/search';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
+import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
 import { feedStyles as s } from '../../styles/FeedScreen.styles';
 
@@ -43,7 +44,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 type FeedFilter = 'all' | 'events' | 'concerts';
 
 interface FeedItem {
-  kind:    'event' | 'concert' | 'reel';
+  kind:    'event' | 'concert' | 'reel' | 'post';
   id:      string;
   data:    any;
 }
@@ -204,9 +205,10 @@ export const FeedScreen: React.FC = () => {
   const load = useCallback(async (f: FeedFilter) => {
     try {
       if (f === 'all') {
-        const [feedResult, reelsResult] = await Promise.all([
+        const [feedResult, reelsResult, postsResult] = await Promise.all([
           searchService.getFeed(1, 50).catch(() => ({ items: [] })),
           reelService.getFeed().catch(() => ({ items: [], has_more: false, page: 1 })),
+          postService.getFeed(1, 30).catch(() => [] as Post[]),
         ]);
         const feedItems: FeedItem[] = (feedResult.items ?? [])
           .filter((item: any) => item.kind !== 'reel' && item.id)
@@ -218,9 +220,12 @@ export const FeedScreen: React.FC = () => {
         const reelItems: FeedItem[] = (reelsResult.items ?? [])
           .filter((r: any) => r.id)
           .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
+        const postItems: FeedItem[] = (Array.isArray(postsResult) ? postsResult : [])
+          .filter((p: Post) => p.id)
+          .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
         // Dédupliquer par clé composite avant shuffle
         const seen = new Set<string>();
-        const deduped = [...feedItems, ...reelItems].filter(item => {
+        const deduped = [...feedItems, ...reelItems, ...postItems].filter(item => {
           const key = `${item.kind}-${item.id}`;
           if (seen.has(key)) return false;
           seen.add(key);
@@ -284,6 +289,16 @@ export const FeedScreen: React.FC = () => {
       setActiveReelId(null);
     };
   }, []));
+
+  // ── Posts ──────────────────────────────────────────────────────────────────
+
+  const handlePostCreated = (post: Post) => {
+    setItems(prev => [{ kind: 'post', id: post.id, data: post }, ...prev]);
+  };
+
+  const handlePostDeleted = (postId: string) => {
+    setItems(prev => prev.filter(item => !(item.kind === 'post' && item.id === postId)));
+  };
 
   // ── Comments sheet ─────────────────────────────────────────────────────────
 
@@ -736,6 +751,13 @@ export const FeedScreen: React.FC = () => {
                 </ScrollView>
               </Animated.View>
 
+              {/* ── Créer un post ────────────────────────────────────── */}
+              <CreatePostBox
+                currentUser={currentUser}
+                colors={colors}
+                onPostCreated={handlePostCreated}
+              />
+
               {/* Suggestions d'amis */}
               <PeopleSuggestions
                 users={suggestions}
@@ -768,6 +790,18 @@ export const FeedScreen: React.FC = () => {
                   colors={colors}
                   isActive={activeReelId === item.id && feedFocused}
                   onPress={() => (nav as any).navigate('Reels', { initialReelId: item.data.id })}
+                />
+              ) : item.kind === 'post' ? (
+                <PostCard
+                  post={item.data as Post}
+                  colors={colors}
+                  currentUserId={currentUser?.id}
+                  onPress={() => (nav as any).navigate('PostDetail', { postId: item.id })}
+                  onAuthorPress={() => {
+                    const authorId = (item.data as Post).author?.id;
+                    if (authorId) (nav as any).navigate('UserProfile', { userId: authorId });
+                  }}
+                  onDelete={handlePostDeleted}
                 />
               ) : (
                 <FeedCard

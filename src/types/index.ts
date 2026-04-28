@@ -7,6 +7,7 @@ export * from './subscription';
 export * from './search';
 export * from './social';
 export * from './story';
+export * from './post';
 
 // ── Commun ─────────────────────────────────────────────────────────────────
 export interface PaginatedResponse<T> {

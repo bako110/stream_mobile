@@ -21,3 +21,4 @@ export type { CallRecord, CallDirection } from './callHistoryService';
 export { feedPreferenceService } from './feedPreferenceService';
 export { reportService } from './reportService';
 export type { ReportContentType, ReportReason, CreateReportPayload } from './reportService';
+export { postService } from './postService';

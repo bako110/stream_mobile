@@ -2,7 +2,7 @@ import React from 'react';
 import {
   View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert,
 } from 'react-native';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/Feather';
 import type { AppColors } from '../../theme/colors';
@@ -25,17 +25,19 @@ const VideoPreview: React.FC<{
   uploading: boolean;
   onRemove: () => void;
 }> = ({ uri, isLocal, uploading, onRemove }) => {
+  const player = useVideoPlayer({ uri }, p => {
+    p.loop = false;
+    p.muted = false;
+    p.play();
+  });
+
   return (
     <View style={styles.preview}>
-      <Video
-        source={{ uri }}
+      <VideoView
+        player={player}
         style={StyleSheet.absoluteFill}
         resizeMode="contain"
         controls
-        paused={false}
-        repeat={false}
-        useTextureView={false}
-        muted={false}
       />
       {uploading && (
         <View style={styles.uploadingOverlay}>

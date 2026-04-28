@@ -8,7 +8,7 @@ import Animated, {
   FadeIn, FadeOut, FadeInDown, FadeInRight,
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
 } from 'react-native-reanimated';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -131,6 +131,28 @@ const SuccessOverlay: React.FC<{ visible: boolean }> = ({ visible }) => {
         </LinearGradient>
       </Animated.View>
     </Animated.View>
+  );
+};
+
+// ── Lecteur vidéo story (v7) ──────────────────────────────────────────────────
+
+const StoryVideoPreview: React.FC<{ uri: string; active: boolean }> = ({ uri, active }) => {
+  const player = useVideoPlayer({ uri }, p => {
+    p.loop = true;
+    p.muted = false;
+  });
+
+  useEffect(() => {
+    if (active) { player.play(); }
+    else        { player.pause(); }
+  }, [active]);
+
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      resizeMode="cover"
+    />
   );
 };
 
@@ -556,7 +578,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             <Image source={{ uri: localUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           )}
           {mode === 'video' && localUri && (
-            <Video useTextureView={false} source={{ uri: localUri }} style={StyleSheet.absoluteFill} resizeMode="cover" paused={!videoActive} repeat muted={false} ignoreSilentSwitch="ignore" />
+            <StoryVideoPreview uri={localUri} active={videoActive} />
           )}
           {mode === 'audio' && (
             <LinearGradient colors={[bgColor, '#000']} style={StyleSheet.absoluteFill}>

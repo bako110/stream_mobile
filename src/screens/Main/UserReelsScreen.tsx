@@ -5,7 +5,7 @@ import {
   ScrollView, Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import Video from 'react-native-video';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,24 +30,30 @@ interface SlideProps {
 const Slide: React.FC<SlideProps> = memo(({ reel, isActive, muted, onToggleMute }) => {
   const [paused, setPaused] = useState(false);
 
-  const isPaused = !isActive || paused;
+  const player = useVideoPlayer(
+    reel.video_url ? { uri: reel.video_url } : { uri: 'about:blank' },
+    p => {
+      p.loop   = true;
+      p.muted  = muted;
+      p.volume = muted ? 0 : 1.0;
+    },
+  );
+
+  useEffect(() => {
+    if (isActive && !paused) player.play();
+    else player.pause();
+  }, [isActive, paused]);
+
+  useEffect(() => {
+    player.muted  = muted;
+    player.volume = muted ? 0 : 1.0;
+  }, [muted]);
+
   useEffect(() => { if (!isActive) setPaused(false); }, [isActive]);
 
   return (
     <View style={{ width: SW, height: SH, backgroundColor: '#000' }}>
-      <Video
-        source={reel.video_url ? { uri: reel.video_url } : undefined}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-        paused={isPaused}
-        muted={muted}
-        repeat
-        playInBackground={false}
-        playWhenInactive={false}
-        ignoreSilentSwitch="ignore"
-        useTextureView={false}
-        bufferConfig={{ minBufferMs: 3000, maxBufferMs: 15000, bufferForPlaybackMs: 1000, bufferForPlaybackAfterRebufferMs: 2000 }}
-      />
+      <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />
       {/* Tap pour pause — View sans pointerEvents="none" capte le tap mais laisse le scroll parent */}
       <TouchableOpacity
         activeOpacity={1}
