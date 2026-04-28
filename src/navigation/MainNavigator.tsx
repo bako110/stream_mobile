@@ -45,7 +45,8 @@ import { MyStoriesScreen }         from '../screens/Profile/MyStoriesScreen';
 import { FilmDetailScreen }        from '../screens/Detail/FilmDetailScreen';
 import { UserReelsScreen }         from '../screens/Main/UserReelsScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
-import { PostDetailScreen } from '../screens/Detail/PostDetailScreen';
+import { PostDetailScreen }  from '../screens/Detail/PostDetailScreen';
+import { CreatePostScreen }  from '../screens/Create/CreatePostScreen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ export type MainStackParamList = {
   MyStories:         undefined;
   UserReels:         { userId: string; initialReelId?: string };
   PostDetail:        { postId: string };
+  CreatePost:        undefined;
 };
 
 type MainNav = NativeStackNavigationProp<MainStackParamList>;
@@ -140,6 +142,12 @@ const ChangePasswordWrapper: React.FC<any> = ({ navigation }) => (
 );
 const PrivacyWrapper: React.FC<any> = ({ navigation }) => (
   <PrivacyScreen navigation={navigation} />
+);
+const CreatePostWrapper: React.FC<any> = ({ navigation }) => (
+  <CreatePostScreen
+    onBack={() => navigation.goBack()}
+    onPostCreated={() => navigation.goBack()}
+  />
 );
 const PostDetailWrapper: React.FC<any> = ({ navigation, route }) => (
   <PostDetailScreen
@@ -387,6 +395,11 @@ export const MainNavigator: React.FC<Props> = ({ onLogout }) => {
       name="UserReels"
       component={UserReelsScreen}
       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', headerShown: false }}
+    />
+    <Stack.Screen
+      name="CreatePost"
+      component={CreatePostWrapper}
+      options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
     />
     <Stack.Screen
       name="PostDetail"

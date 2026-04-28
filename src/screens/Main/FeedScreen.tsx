@@ -281,20 +281,22 @@ export const FeedScreen: React.FC = () => {
 
   useEffect(() => { loadLive(); }, []);
 
-  // Focus : gère uniquement pause/reprise vidéo, pas de rechargement
+  // Focus : reprise vidéo + rechargement si on revient d'un modal (ex: CreatePost)
+  const didMountRef = useRef(false);
   useFocusEffect(useCallback(() => {
     setFeedFocused(true);
+    if (didMountRef.current) {
+      // Retour depuis un écran modal — recharger le feed pour afficher le nouveau post
+      load(filter);
+    }
+    didMountRef.current = true;
     return () => {
       setFeedFocused(false);
       setActiveReelId(null);
     };
-  }, []));
+  }, [filter]));
 
   // ── Posts ──────────────────────────────────────────────────────────────────
-
-  const handlePostCreated = (post: Post) => {
-    setItems(prev => [{ kind: 'post', id: post.id, data: post }, ...prev]);
-  };
 
   const handlePostDeleted = (postId: string) => {
     setItems(prev => prev.filter(item => !(item.kind === 'post' && item.id === postId)));
@@ -755,7 +757,7 @@ export const FeedScreen: React.FC = () => {
               <CreatePostBox
                 currentUser={currentUser}
                 colors={colors}
-                onPostCreated={handlePostCreated}
+                onPress={() => (nav as any).navigate('CreatePost')}
               />
 
               {/* Suggestions d'amis */}
