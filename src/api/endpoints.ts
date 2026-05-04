@@ -79,7 +79,7 @@ export const Endpoints = {
   // ── Videos (prefix: /api/v1) ──────────────────────────────────────────────
   videos: {
     byContent: (contentId: string)  => `${V1}/content/${contentId}/videos`,
-    byEpisode: (episodeId: string)  => `${V1}/episodes/${episodeId}/video`,
+    byEpisode: (episodeId: string)  => `${V1}/episodes/${episodeId}/videos`,
     byId:      (id: string)         => `${V1}/videos/${id}`,
     uploadUrl: `${V1}/videos/upload-url`,
   },
@@ -214,7 +214,7 @@ export const Endpoints = {
 
   // ── Upload médias (Cloudinary) ────────────────────────────────────────────
   upload: {
-    images: (folder: 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages') =>
+    images: (folder: 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities') =>
       `${V1}/upload/images?folder=${folder}`,
     video: (folder: 'reels' | 'stories' | 'messages') =>
       `${V1}/upload/video?folder=${folder}`,

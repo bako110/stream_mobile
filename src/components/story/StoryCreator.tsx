@@ -15,6 +15,7 @@ import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useTheme } from '../../hooks/useTheme';
+import { SoundPicker } from './SoundPicker';
 import { storyService } from '../../services/storyService';
 import { apiClient, Endpoints } from '../../api';
 import type { StoryMediaType } from '../../types/story';
@@ -42,7 +43,7 @@ const FONT_STYLES: {
   { key: 'italic',    label: 'Italique',   fontFamily: 'serif',                fontWeight: 'normal', fontStyle: 'italic' },
 ];
 
-type StoryMode = 'text' | 'image' | 'video' | 'audio' | 'voice' | 'image_audio';
+type StoryMode = 'text' | 'image' | 'video' | 'voice';
 type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'preview';
 
 interface ModeOption {
@@ -59,9 +60,7 @@ const MODE_OPTIONS: ModeOption[] = [
   { key: 'text',        icon: 'format-text',          iconLib: 'material', label: 'Texte',        sub: 'Message sur fond coloré',      accent: '#7B3FF2', gradient: ['#7B3FF2', '#9B65F5'] },
   { key: 'image',       icon: 'image',                iconLib: 'feather',  label: 'Photo',        sub: 'Depuis la galerie ou caméra',   accent: '#2196F3', gradient: ['#1565C0', '#2196F3'] },
   { key: 'video',       icon: 'video',                iconLib: 'feather',  label: 'Video',        sub: 'Clip jusqu\'a 30 secondes',     accent: '#E91E63', gradient: ['#AD1457', '#E91E63'] },
-  { key: 'audio',       icon: 'music-note',           iconLib: 'material', label: 'Musique',      sub: 'Son + couleur de fond',         accent: '#FF9800', gradient: ['#E65100', '#FF9800'] },
   { key: 'voice',       icon: 'microphone',           iconLib: 'material', label: 'Vocal',        sub: 'Message vocal direct',          accent: '#00BCD4', gradient: ['#00838F', '#00BCD4'] },
-  { key: 'image_audio', icon: 'image-multiple',       iconLib: 'material', label: 'Photo + Son',  sub: 'Image avec ambiance sonore',    accent: '#4CAF50', gradient: ['#2E7D32', '#4CAF50'] },
 ];
 
 interface Props {
@@ -198,9 +197,10 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     if (step === 'preview') {
       if (mode === 'text')       { setStep('pick_mode'); setCaption(''); }
       else if (mode === 'voice') { setStep('record_voice'); setAudioUri(null); }
-      else if (mode === 'audio') { setStep('pick_audio'); setAudioUri(null); }
       else { setLocalUri(null); setAudioUri(null); setStep('pick_media'); }
-    } else if (['pick_media', 'record_voice', 'pick_audio'].includes(step)) {
+    } else if (step === 'pick_audio') {
+      setStep('preview'); setAudioUri(null);
+    } else if (['pick_media', 'record_voice'].includes(step)) {
       setStep('pick_mode'); setLocalUri(null); setAudioUri(null);
     } else {
       resetAndClose();
@@ -216,7 +216,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       });
       if (res.didCancel || !res.assets?.[0]?.uri) return;
       setLocalUri(res.assets[0].uri);
-      setStep(mode === 'image_audio' ? 'pick_audio' : 'preview');
+      setStep('preview');
     } catch (e: any) { Alert.alert('Erreur', e?.message); }
   };
 
@@ -288,7 +288,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   const uploadImage = async (uri: string) => {
     const fd = new FormData();
-    fd.append('files', { uri: await normalizeUri(uri), name: `s_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
+    fd.append('file', { uri: await normalizeUri(uri), name: `s_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
     const r = await apiClient.upload<{ uploaded: Array<{ url: string }> }>(Endpoints.upload.images('stories'), fd);
     const url = r.data?.uploaded?.[0]?.url;
     if (!url) throw new Error('URL image manquante');
@@ -302,8 +302,15 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   };
 
   const uploadAudio = async (uri: string) => {
+    const normalized = await normalizeUri(uri);
+    const ext = normalized.split('.').pop()?.toLowerCase() ?? 'mp4';
+    const mimeMap: Record<string, string> = {
+      mp3: 'audio/mpeg', m4a: 'audio/x-m4a', aac: 'audio/aac',
+      wav: 'audio/wav', ogg: 'audio/ogg', mp4: 'audio/mp4',
+    };
+    const type = mimeMap[ext] ?? 'audio/mp4';
     const fd = new FormData();
-    fd.append('file', { uri: await normalizeUri(uri), name: `s_${Date.now()}.mp4`, type: 'audio/mp4' } as any);
+    fd.append('file', { uri: normalized, name: `s_${Date.now()}.${ext}`, type } as any);
     return (await apiClient.upload<{ url: string }>(Endpoints.upload.audio('stories'), fd)).data?.url;
   };
 
@@ -320,12 +327,17 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       let background_color: string | undefined;
 
       switch (mode) {
-        case 'text':        media_type = 'text'; background_color = bgColor; break;
-        case 'image':       media_url = await uploadImage(localUri!); media_type = 'image'; thumbnail_url = media_url; break;
-        case 'video':       { const v = await uploadVideo(localUri!); media_url = v.url; media_type = 'video'; thumbnail_url = v.thumbnail_url; duration_sec = v.duration ? Math.min(Math.ceil(v.duration), 30) : 10; break; }
-        case 'audio':       audio_url = await uploadAudio(audioUri!); media_type = 'audio'; background_color = bgColor; duration_sec = 15; break;
-        case 'voice':       audio_url = await uploadAudio(audioUri!); media_type = 'voice'; background_color = '#1A237E'; duration_sec = 15; break;
-        case 'image_audio': media_url = await uploadImage(localUri!); audio_url = await uploadAudio(audioUri!); media_type = 'image'; thumbnail_url = media_url; duration_sec = 10; break;
+        case 'text':   media_type = 'text'; background_color = bgColor; break;
+        case 'image':  media_url = await uploadImage(localUri!); media_type = 'image'; thumbnail_url = media_url; break;
+        case 'video':  { const v = await uploadVideo(localUri!); media_url = v.url; media_type = 'video'; thumbnail_url = v.thumbnail_url; duration_sec = v.duration ? Math.min(Math.ceil(v.duration), 30) : 10; break; }
+        case 'voice':  audio_url = await uploadAudio(audioUri!); media_type = 'voice'; background_color = '#1A237E'; duration_sec = 15; break;
+      }
+
+      // Audio attaché à n'importe quel mode (sauf voice déjà géré)
+      if (audioUri && mode !== 'voice') {
+        audio_url = await uploadAudio(audioUri!);
+        if (mode === 'text') { media_type = 'audio'; background_color = background_color ?? bgColor; }
+        duration_sec = 15;
       }
 
       await storyService.create({
@@ -350,7 +362,6 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       setStep('preview');
       setTimeout(() => { setShowTextInput(true); inputRef.current?.focus(); }, 300);
     } else if (m === 'voice') { setStep('record_voice'); }
-    else if (m === 'audio')   { setStep('pick_audio'); }
     else                       { setStep('pick_media'); }
   };
 
@@ -463,7 +474,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                 gradient: ['#AD1457', '#E91E63'] as [string, string],
               },
             ].map((opt, i) => (
-              <Animated.View key={opt.source} entering={FadeInDown.delay(i * 90).springify()} style={{ flex: 1 }}>
+              <Animated.View key={opt.source} entering={FadeInDown.delay(i * 90).springify()}>
                 <TouchableOpacity
                   style={s.sourceCard}
                   onPress={() => mode === 'video' ? pickVideo(opt.source) : pickImage(opt.source)}
@@ -471,7 +482,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                 >
                   <LinearGradient colors={opt.gradient} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={s.sourceCardInner}>
                     <View style={s.sourceIconWrap}>
-                      <Icon name={opt.icon} size={34} color="#fff" />
+                      <Icon name={opt.icon} size={24} color="#fff" />
                     </View>
                     <Text style={s.sourceLabel}>{opt.label}</Text>
                     <Text style={s.sourceSub}>{opt.sub}</Text>
@@ -522,49 +533,14 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         </View>
       )}
 
-      {/* ══════════════ STEP 2c — Musique ═══════════════════════════════════ */}
+      {/* ══════════════ STEP 2c — Ajouter un son ════════════════════════════ */}
       {step === 'pick_audio' && (
-        <View style={[s.root, { backgroundColor: colors.background }]}>
-          <StatusBar barStyle="dark-content" />
-          <View style={[s.subHeader, { paddingTop: Platform.OS === 'android' ? 48 : 56, borderBottomColor: colors.border ?? '#eee' }]}>
-            <TouchableOpacity onPress={goBack} style={s.subHeaderBtn}>
-              <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={[s.subHeaderTitle, { color: colors.textPrimary }]}>
-              {mode === 'image_audio' ? 'Ajouter un son' : 'Choisir une musique'}
-            </Text>
-            <View style={{ width: 40 }} />
-          </View>
-
-          <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 28 }}>
-            <Animated.View entering={FadeInDown.delay(80).springify()}>
-              <TouchableOpacity style={s.audioPickCard} onPress={pickAudioFile} activeOpacity={0.8}>
-                <LinearGradient colors={['#E65100', '#FF9800']} style={s.audioPickInner}>
-                  <View style={s.sourceIconWrap}>
-                    <MaterialIcon name="music-note" size={34} color="#fff" />
-                  </View>
-                  <Text style={s.sourceLabel}>Parcourir les fichiers</Text>
-                  <Text style={s.sourceSub}>MP3, M4A, AAC, WAV</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
-
-            {mode === 'audio' && (
-              <Animated.View entering={FadeInDown.delay(200).springify()} style={{ marginTop: 28 }}>
-                <Text style={[s.sectionLabel, { color: colors.textSecondary }]}>Couleur de fond</Text>
-                <View style={s.colorGrid}>
-                  {TEXT_BG_COLORS.map(c => (
-                    <TouchableOpacity
-                      key={c}
-                      style={[s.colorDot, { backgroundColor: c }, bgColor === c && s.colorDotSelected]}
-                      onPress={() => setBgColor(c)}
-                    />
-                  ))}
-                </View>
-              </Animated.View>
-            )}
-          </View>
-        </View>
+        <SoundPicker
+          colors={colors}
+          onGoBack={goBack}
+          onSelectLocal={pickAudioFile}
+          onSelectOnline={(uri: string) => { setAudioUri(uri); setStep('preview'); }}
+        />
       )}
 
       {/* ══════════════ STEP 3 — Preview ════════════════════════════════════ */}
@@ -574,18 +550,11 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
           {/* Fond selon le mode */}
           {mode === 'text' && <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor }]} />}
-          {(mode === 'image' || mode === 'image_audio') && localUri && (
+          {(mode === 'image') && localUri && (
             <Image source={{ uri: localUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           )}
           {mode === 'video' && localUri && (
             <StoryVideoPreview uri={localUri} active={videoActive} />
-          )}
-          {mode === 'audio' && (
-            <LinearGradient colors={[bgColor, '#000']} style={StyleSheet.absoluteFill}>
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <MaterialIcon name="music-note-outline" size={120} color="rgba(255,255,255,0.12)" />
-              </View>
-            </LinearGradient>
           )}
           {mode === 'voice' && (
             <LinearGradient colors={['#0F0C29', '#302B63']} style={StyleSheet.absoluteFill}>
@@ -635,8 +604,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             </View>
           ) : null}
 
-          {/* Audio indicator */}
-          {(mode === 'audio' || mode === 'voice' || mode === 'image_audio') && audioUri && (
+          {/* Audio indicator — visible for any mode with attached sound */}
+          {audioUri && mode !== 'voice' && (
             <View style={s.audioBar}>
               <TouchableOpacity style={s.audioBarBtn} onPress={audioPlaying ? stopAudioPreview : playAudioPreview}>
                 <Icon name={audioPlaying ? 'pause' : 'play'} size={18} color="#fff" />
@@ -649,9 +618,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                   />
                 ))}
               </View>
-              <Text style={s.audioBarLabel}>
-                {mode === 'voice' ? 'Vocal' : mode === 'image_audio' ? 'Son' : 'Musique'}
-              </Text>
+              <Text style={s.audioBarLabel}>Son</Text>
             </View>
           )}
 
@@ -688,13 +655,25 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
           {/* Bottom bar */}
           <View style={s.bottomBar}>
-            <TouchableOpacity
-              style={s.addTextBtn}
-              onPress={() => { setShowTextInput(true); setTimeout(() => inputRef.current?.focus(), 150); }}
-            >
-              <Icon name="type" size={16} color="#fff" />
-              <Text style={s.addTextLabel}>Legende</Text>
-            </TouchableOpacity>
+            <View style={s.bottomActions}>
+              <TouchableOpacity
+                style={s.addTextBtn}
+                onPress={() => { setShowTextInput(true); setTimeout(() => inputRef.current?.focus(), 150); }}
+              >
+                <Icon name="type" size={16} color="#fff" />
+                <Text style={s.addTextLabel}>Legende</Text>
+              </TouchableOpacity>
+
+              {mode !== 'voice' && (
+                <TouchableOpacity
+                  style={[s.addTextBtn, audioUri && s.addTextBtnActive]}
+                  onPress={() => setStep('pick_audio')}
+                >
+                  <MaterialIcon name="music-note" size={16} color={audioUri ? '#7B3FF2' : '#fff'} />
+                  <Text style={[s.addTextLabel, audioUri && { color: '#7B3FF2' }]}>Son</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <TouchableOpacity
               style={[s.publishBtn, (mode === 'text' && !caption.trim()) && { opacity: 0.4 }]}
@@ -818,25 +797,26 @@ const s = StyleSheet.create({
 
   // ── Source picker ─────────────────────────────────────────────────────────────
   sourceGrid: {
-    flex: 1, flexDirection: 'row', gap: 12,
+    flexDirection: 'row', gap: 12,
     paddingHorizontal: 16, paddingTop: 20, paddingBottom: 28,
   },
   sourceCard: {
-    flex: 1, borderRadius: 20, overflow: 'hidden',
+    borderRadius: 20, overflow: 'hidden',
+    height: 160,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18, shadowRadius: 10, elevation: 7,
   },
   sourceCardInner: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 32, gap: 12,
+    paddingVertical: 14, gap: 8,
   },
   sourceIconWrap: {
-    width: 72, height: 72, borderRadius: 36,
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: 'rgba(255,255,255,0.22)',
     alignItems: 'center', justifyContent: 'center',
   },
-  sourceLabel: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  sourceSub:   { fontSize: 12, color: 'rgba(255,255,255,0.75)', textAlign: 'center', paddingHorizontal: 10 },
+  sourceLabel: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  sourceSub:   { fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: 'center', paddingHorizontal: 8 },
 
   // ── Audio pick ────────────────────────────────────────────────────────────────
   audioPickCard: {
@@ -940,10 +920,17 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20,
   },
+  bottomActions: {
+    flexDirection: 'row', gap: 8,
+  },
   addTextBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     paddingHorizontal: 16, paddingVertical: 11, borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  addTextBtnActive: {
+    backgroundColor: 'rgba(123,63,242,0.2)',
+    borderWidth: 1, borderColor: 'rgba(123,63,242,0.4)',
   },
   addTextLabel: { color: '#fff', fontSize: 13, fontWeight: '600' },
   publishBtn:   { borderRadius: 24, overflow: 'hidden' },
