@@ -42,12 +42,16 @@ export const TrendingScreen: React.FC = () => {
   useEffect(() => { load(); }, []);
 
   const handleContentPress = (item: any) => {
-    if (item.content_type === 'serie' || item.type === 'serie') nav.navigate('SerieEpisodes', { item });
-    else nav.navigate('FilmDetail', { item });
+    try {
+      if (item.content_type === 'serie') nav.navigate('SerieEpisodes', { item });
+      else nav.navigate('FilmDetail', { item });
+    } catch { /* navigation silencieuse */ }
   };
 
   const handleReelPress = (item: any) => {
-    nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: item.id } });
+    try {
+      nav.navigate('UserReels', { userId: item.user_id ?? item.author?.id ?? '', initialReelId: item.id });
+    } catch { /* navigation silencieuse */ }
   };
 
   const data = tab === 'content' ? trending : reels;
