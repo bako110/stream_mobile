@@ -47,7 +47,7 @@ export const TrendingScreen: React.FC = () => {
   };
 
   const handleReelPress = (item: any) => {
-    nav.navigate('Reels', { initialReelId: item.id });
+    nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: item.id } });
   };
 
   const data = tab === 'content' ? trending : reels;
@@ -81,47 +81,63 @@ export const TrendingScreen: React.FC = () => {
 
       {loading ? (
         <SkeletonTrending />
+      ) : tab === 'content' ? (
+        <FlatList
+          data={trending}
+          keyExtractor={i => i.id}
+          numColumns={2}
+          contentContainerStyle={{ padding: 16, gap: 12 }}
+          columnWrapperStyle={{ gap: 12 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />}
+          ListHeaderComponent={<HeroBanner count={trending.length} label="contenus" />}
+          ListEmptyComponent={<EmptyState colors={colors} />}
+          renderItem={({ item, index }) => (
+            <ContentCard item={item} index={index} colors={colors} onPress={() => handleContentPress(item)} />
+          )}
+        />
       ) : (
         <FlatList
-          data={data}
+          data={reels}
           keyExtractor={i => i.id}
-          numColumns={tab === 'content' ? 2 : 1}
-          key={tab}
           contentContainerStyle={{ padding: 16, gap: 12 }}
-          columnWrapperStyle={tab === 'content' ? { gap: 12 } : undefined}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />
-          }
-          ListHeaderComponent={
-            <Animated.View entering={FadeInDown.springify()} style={[s.heroBanner, { backgroundColor: colors.surface }]}>
-              <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.heroBannerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                <Icon name="trending-up" size={28} color="#fff" />
-                <View style={{ marginLeft: 12 }}>
-                  <Text style={s.heroTitle}>Top tendances</Text>
-                  <Text style={s.heroSub}>{data.length} {tab === 'reels' ? 'reels' : 'contenus'} populaires</Text>
-                </View>
-              </LinearGradient>
-            </Animated.View>
-          }
-          ListEmptyComponent={
-            <View style={s.empty}>
-              <View style={[s.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
-                <Icon name="trending-up" size={28} color={colors.textTertiary} />
-              </View>
-              <Text style={[s.emptyText, { color: colors.textSecondary }]}>Aucune tendance pour l'instant</Text>
-            </View>
-          }
-          renderItem={({ item, index }) =>
-            tab === 'content'
-              ? <ContentCard item={item} index={index} colors={colors} onPress={() => handleContentPress(item)} />
-              : <ReelRow item={item} index={index} colors={colors} onPress={() => handleReelPress(item)} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />}
+          ListHeaderComponent={<HeroBanner count={reels.length} label="reels" />}
+          ListEmptyComponent={<EmptyState colors={colors} />}
+          renderItem={({ item, index }) => (
+            <ReelRow item={item} index={index} colors={colors} onPress={() => handleReelPress(item)} />
+          )}
         />
       )}
     </View>
   );
 };
+
+// ── Hero banner ───────────────────────────────────────────────────────────────
+
+const HeroBanner: React.FC<{ count: number; label: string }> = ({ count, label }) => (
+  <Animated.View entering={FadeInDown.springify()} style={[s.heroBanner]}>
+    <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.heroBannerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+      <Icon name="trending-up" size={28} color="#fff" />
+      <View style={{ marginLeft: 12 }}>
+        <Text style={s.heroTitle}>Top tendances</Text>
+        <Text style={s.heroSub}>{count} {label} populaires</Text>
+      </View>
+    </LinearGradient>
+  </Animated.View>
+);
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+const EmptyState: React.FC<{ colors: any }> = ({ colors }) => (
+  <View style={s.empty}>
+    <View style={[s.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
+      <Icon name="trending-up" size={28} color={colors.textTertiary} />
+    </View>
+    <Text style={[s.emptyText, { color: colors.textSecondary }]}>Aucune tendance pour l'instant</Text>
+  </View>
+);
 
 // ── Content card (grille 2 colonnes) ─────────────────────────────────────────
 
