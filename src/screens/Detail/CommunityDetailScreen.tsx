@@ -45,6 +45,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [verifyLoading,  setVerifyLoading]  = useState(false);
   const [vrStatus,       setVrStatus]       = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [vrLoading,      setVrLoading]      = useState(false);
+  const [vrModalOpen,    setVrModalOpen]    = useState(false);
+  const [vrReason,       setVrReason]       = useState('');
 
   // Image viewer plein écran
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
@@ -302,23 +304,21 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     );
   }
 
-  async function handleRequestVerification() {
-    if (!community) return;
-    Alert.prompt(
-      'Demander la vérification',
-      'Expliquez brièvement pourquoi cette communauté mérite le badge officiel (optionnel)',
-      async (reason) => {
-        setVrLoading(true);
-        try {
-          await communityService.requestVerification(communityId, reason || undefined);
-          setVrStatus('pending');
-          Alert.alert('Demande envoyée', 'Les administrateurs de la plateforme vont examiner votre demande.');
-        } catch (e: any) {
-          Alert.alert('Erreur', e?.message ?? 'Impossible d\'envoyer la demande');
-        } finally { setVrLoading(false); }
-      },
-      'plain-text',
-    );
+  function handleRequestVerification() {
+    setVrReason('');
+    setVrModalOpen(true);
+  }
+
+  async function handleSubmitVerificationRequest() {
+    setVrLoading(true);
+    try {
+      await communityService.requestVerification(communityId, vrReason.trim() || undefined);
+      setVrStatus('pending');
+      setVrModalOpen(false);
+      Alert.alert('Demande envoyée ✓', 'Les administrateurs vont examiner votre demande.');
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? 'Impossible d\'envoyer la demande');
+    } finally { setVrLoading(false); }
   }
 
   async function handleToggleVerify() {
@@ -938,6 +938,78 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         </View>
       </Modal>
 
+      {/* ── Modal demande de vérification ── */}
+      <Modal
+        visible={vrModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !vrLoading && setVrModalOpen(false)}
+      >
+        <View style={s.modalRoot}>
+          <TouchableOpacity style={s.modalBg} activeOpacity={1} onPress={() => !vrLoading && setVrModalOpen(false)} />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalKav}>
+            <View style={[s.vrModalBox, { backgroundColor: colors.surface }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1D9BF020', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="shield" size={18} color="#1D9BF0" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.sheetTitle, { color: colors.textPrimary, textAlign: 'left', fontSize: 15 }]}>
+                    Demander la vérification
+                  </Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 1 }}>
+                    {community?.name}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setVrModalOpen(false)} disabled={vrLoading}>
+                  <Icon name="x" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[s.fieldLabel, { color: colors.textTertiary, marginBottom: 6 }]}>
+                POURQUOI CETTE COMMUNAUTÉ MÉRITE-T-ELLE CE BADGE ? (optionnel)
+              </Text>
+              <TextInput
+                style={[s.fieldInput, s.fieldMulti, {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.backgroundSecondary,
+                  borderRadius: 12, padding: 12,
+                  borderWidth: 1, borderColor: colors.divider,
+                }]}
+                placeholder="Ex : communauté active avec plus de 500 membres, contenu de qualité…"
+                placeholderTextColor={colors.textDisabled}
+                value={vrReason}
+                onChangeText={setVrReason}
+                multiline
+                maxLength={300}
+                autoFocus
+              />
+              <Text style={{ color: colors.textDisabled, fontSize: 11, textAlign: 'right', marginTop: 4 }}>
+                {vrReason.length}/300
+              </Text>
+
+              <TouchableOpacity
+                style={[s.actionBtn, {
+                  backgroundColor: '#1D9BF0', marginTop: 12,
+                  flex: 0, paddingVertical: 14,
+                }]}
+                onPress={handleSubmitVerificationRequest}
+                disabled={vrLoading}
+                activeOpacity={0.8}
+              >
+                {vrLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <>
+                      <Icon name="send" size={16} color="#fff" />
+                      <Text style={[s.actionText, { color: '#fff' }]}>Envoyer la demande</Text>
+                    </>
+                }
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
       {/* ── Panel Paramètres ── */}
       <Modal
         visible={settingsOpen}
@@ -1133,6 +1205,11 @@ const s = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Modal demande vérification
+  vrModalBox: {
+    marginHorizontal: 20, borderRadius: 20, padding: 20,
   },
 
   // Demande de vérification
