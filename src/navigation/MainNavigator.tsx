@@ -7,9 +7,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 import { FeedScreen as HomeScreen } from '../screens/Main/FeedScreen';
-import { PlanningScreen }           from '../screens/Main/PlanningScreen';
+import { CommunitiesScreen as CommunitiesTabScreen } from '../screens/Main/CommunitiesScreen';
 import { ReelsScreen }              from '../screens/Main/ReelsScreen';
 import { ProfileScreen }            from '../screens/Main/ProfileScreen';
+import { PlanningScreen }           from '../screens/Main/PlanningScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
 
 // ── Écrans stack ──────────────────────────────────────────────────────────────
@@ -63,14 +64,15 @@ import BoostScreen            from '../screens/Wallet/BoostScreen';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type MainTabParamList = {
-  Home:     undefined;
-  Planning: undefined;
-  Reels:    { initialReelId?: string } | undefined;
-  Profile:  undefined;
+  Home:        undefined;
+  Communities: undefined;
+  Reels:       { initialReelId?: string } | undefined;
+  Profile:     undefined;
 };
 
 export type MainStackParamList = {
   Tabs:            undefined;
+  Planning:        undefined;
   Feed:            undefined;
   CreateEvent:     { eventId?: string }  | undefined;
   CreateConcert:   { concertId?: string } | undefined;
@@ -157,9 +159,9 @@ const Tabs: React.FC<{ onLogout: () => void }> = ({ onLogout }) => (
     tabBar={props => <AppTabBar {...props} />}
     screenOptions={{ headerShown: false }}
   >
-    <Tab.Screen name="Home"     component={HomeScreen} />
-    <Tab.Screen name="Planning" component={PlanningScreen} />
-    <Tab.Screen name="Reels"    component={ReelsScreen} options={{ tabBarStyle: { display: 'none' } }} />
+    <Tab.Screen name="Home"        component={HomeScreen} />
+    <Tab.Screen name="Communities" component={CommunitiesTabScreen} />
+    <Tab.Screen name="Reels"       component={ReelsScreen} options={{ tabBarStyle: { display: 'none' } }} />
     <Tab.Screen name="Profile">
       {() => <ProfileTab onLogout={onLogout} />}
     </Tab.Screen>
@@ -217,6 +219,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CommunityChat"  component={CommunityChatScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Following"      component={FollowingScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Communities"    component={CommunitiesScreen}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Planning"       component={PlanningScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityDetail" component={CommunityDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Events"         component={EventsScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Concerts"       component={ConcertsScreen}        options={{ animation: 'slide_from_right' }} />

@@ -971,11 +971,12 @@ export const FeedScreen: React.FC = () => {
             <View style={mnu.grid}>
               {([
                 { icon: 'film',        label: 'Films & Séries', color: '#3B82F6', screen: 'Films'       },
-                { icon: 'play-circle', label: 'Reels',        color: '#FF7A2F', screen: 'Reels'       },
-                { icon: 'radio',       label: 'Live',         color: '#EF4444', screen: 'LiveList'    },
-                { icon: 'music',       label: 'Concerts',     color: '#7B3FF2', screen: 'Concerts'    },
-                { icon: 'calendar',    label: 'Événements',   color: '#E0389A', screen: 'Events'      },
-                { icon: 'trending-up', label: 'Tendances',    color: '#F59E0B', screen: 'Trending'    },
+                { icon: 'play-circle', label: 'Reels',         color: '#FF7A2F', screen: 'Reels'       },
+                { icon: 'radio',       label: 'Live',          color: '#EF4444', screen: 'LiveList'    },
+                { icon: 'music',       label: 'Concerts',      color: '#7B3FF2', screen: 'Concerts'    },
+                { icon: 'calendar',    label: 'Planning',      color: '#10B981', screen: 'Planning'    },
+                { icon: 'calendar',    label: 'Événements',    color: '#E0389A', screen: 'Events'      },
+                { icon: 'trending-up', label: 'Tendances',     color: '#F59E0B', screen: 'Trending'    },
               ] as const).map((item) => (
                 <TouchableOpacity
                   key={item.screen}

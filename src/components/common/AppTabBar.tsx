@@ -19,10 +19,10 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  { name: 'Home',     icon: 'home',        label: 'Accueil'  },
-  { name: 'Planning', icon: 'calendar',    label: 'Planning' },
-  { name: 'Reels',    icon: 'play-circle', label: 'Reels'    },
-  { name: 'Profile',  icon: 'user',        label: 'Profil'   },
+  { name: 'Home',        icon: 'home',        label: 'Accueil'     },
+  { name: 'Communities', icon: 'users',        label: 'Communautés' },
+  { name: 'Reels',       icon: 'play-circle', label: 'Reels'       },
+  { name: 'Profile',     icon: 'user',        label: 'Profil'      },
 ];
 
 export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
