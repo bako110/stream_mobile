@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, RefreshControl, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, RefreshControl, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonTrending } from '../../components/common';
 import { searchService } from '../../services';
@@ -10,6 +11,7 @@ export const TrendingScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors, fontSize } = theme;
 
+  const nav = useNavigation<any>();
   const [trending, setTrending] = useState<any[]>([]);
   const [reels,    setReels]    = useState<any[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -37,12 +39,18 @@ export const TrendingScreen: React.FC = () => {
       <AppHeader title="Tendances" variant="default" />
 
       <View style={[styles.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        {(['content', 'reels'] as const).map(t => (
-          <TouchableOpacity key={t} onPress={() => setTab(t)}
-            style={[styles.tab, tab === t && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}>
-            <Text style={{ fontSize: fontSize.sm, fontWeight: tab === t ? '700' : '400', color: tab === t ? colors.primary : colors.textSecondary }}>
-              {t === 'content' ? '🔥 Contenus' : '🎥 Reels'}
-            </Text>
+        {([
+          { key: 'content', icon: 'trending-up', label: 'Contenus' },
+          { key: 'reels',   icon: 'video',        label: 'Reels'    },
+        ] as const).map(t => (
+          <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
+            style={[styles.tab, tab === t.key && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name={t.icon} size={14} color={tab === t.key ? colors.primary : colors.textSecondary} />
+              <Text style={{ fontSize: fontSize.sm, fontWeight: tab === t.key ? '700' : '400', color: tab === t.key ? colors.primary : colors.textSecondary }}>
+                {t.label}
+              </Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -61,30 +69,54 @@ export const TrendingScreen: React.FC = () => {
               <Text style={{ color: colors.textTertiary, marginTop: 12 }}>Aucune tendance pour l'instant</Text>
             </View>
           }
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 40).springify()}>
-              <TouchableOpacity style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]} activeOpacity={0.8}>
-                <Text style={[styles.rank, { color: colors.primary }]}>#{index + 1}</Text>
-                {item.thumbnail_url ? (
-                  <Image source={{ uri: item.thumbnail_url }} style={styles.thumb} resizeMode="cover" />
-                ) : (
-                  <View style={[styles.thumb, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Icon name={tab === 'reels' ? 'video' : 'film'} size={20} color={colors.textTertiary} />
+          renderItem={({ item, index }) => {
+            const handlePress = () => {
+              if (tab === 'reels') return;
+              if (item.type === 'concert' || item.genre) nav.navigate('ConcertDetail', { concertId: item.id });
+              else if (item.event_type || item.type === 'event') nav.navigate('EventDetail', { eventId: item.id });
+              else if (item.series_id) nav.navigate('SerieEpisodes', { item });
+              else nav.navigate('FilmDetail', { item });
+            };
+            const iconName = tab === 'reels' ? 'video' : item.genre ? 'music' : item.event_type ? 'calendar' : 'film';
+            return (
+              <Animated.View entering={FadeInDown.delay(index * 40).springify()}>
+                <TouchableOpacity
+                  style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  activeOpacity={0.8}
+                  onPress={handlePress}
+                >
+                  <Text style={[styles.rank, { color: colors.primary }]}>#{index + 1}</Text>
+                  {item.thumbnail_url ? (
+                    <Image source={{ uri: item.thumbnail_url }} style={styles.thumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.thumb, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Icon name={iconName} size={20} color={colors.textTertiary} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.textPrimary }} numberOfLines={2}>
+                      {item.title ?? item.caption ?? 'Sans titre'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                      {!!item.view_count && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Icon name="eye" size={11} color={colors.textTertiary} />
+                          <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>{item.view_count}</Text>
+                        </View>
+                      )}
+                      {!!item.like_count && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Icon name="heart" size={11} color={colors.textTertiary} />
+                          <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>{item.like_count}</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                )}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.textPrimary }} numberOfLines={2}>
-                    {item.title ?? item.caption ?? 'Sans titre'}
-                  </Text>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: 3 }}>
-                    {item.view_count ? `${item.view_count} vues` : ''}
-                    {item.like_count ? `  ·  ${item.like_count} ❤️` : ''}
-                  </Text>
-                </View>
-                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-              </TouchableOpacity>
-            </Animated.View>
-          )}
+                  <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          }}
         />
       )}
     </View>
