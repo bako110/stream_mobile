@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
 import { CommentsBottomSheet, SkeletonReels, VerifiedBadge, ReportModal } from '../../components/common';
@@ -89,6 +90,7 @@ export const ReelsScreen: React.FC = () => {
   const [searching,    setSearching]    = useState(false);
   const searchInputRef = useRef<TextInput>(null);
   const searchTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef     = useRef(true);
 
   const toggleMute = useCallback(() => setMuted(v => !v), []);
 
@@ -111,9 +113,9 @@ export const ReelsScreen: React.FC = () => {
     setSearching(true);
     try {
       const data = await reelService.getFeed({ page: 1, limit: 20, search: q.trim() });
-      setSearchResults(data.items.filter((r: Reel) => !!r.video_url));
-    } catch { setSearchResults([]); }
-    finally { setSearching(false); }
+      if (mountedRef.current) setSearchResults(data.items.filter((r: Reel) => !!r.video_url));
+    } catch { if (mountedRef.current) setSearchResults([]); }
+    finally { if (mountedRef.current) setSearching(false); }
   }, []);
 
   const onSearchChange = useCallback((text: string) => {
@@ -151,18 +153,29 @@ export const ReelsScreen: React.FC = () => {
     }
   }, []);
 
-  const viewabilityConfig      = useRef({ viewAreaCoveragePercentThreshold: 80 }).current;
+  const viewabilityConfig      = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       sendViewForCurrent();
       if (viewableItems.length > 0 && viewableItems[0].item) {
-        currentReelRef.current = { id: viewableItems[0].item.id, startTime: Date.now() };
-        setCurrentIndex(viewableItems[0].index ?? 0);
+        const cur = viewableItems[0].item as Reel;
+        const idx = viewableItems[0].index ?? 0;
+        currentReelRef.current = { id: cur.id, startTime: Date.now() };
+        setCurrentIndex(idx);
+        // Prefetch thumbnails des 2 reels suivants
+        const nextReels = reelsRef.current.slice(idx + 1, idx + 3);
+        nextReels.forEach(r => {
+          if (r.thumbnail_url) Image.prefetch(r.thumbnail_url).catch(() => {});
+        });
       } else {
         currentReelRef.current = null;
       }
     },
   ).current;
+
+  // Ref stable pour accéder aux reels depuis le callback viewability (pas de closure)
+  const reelsRef = useRef<Reel[]>([]);
+  useEffect(() => { reelsRef.current = reels; }, [reels]);
 
   // ── Chargement initial ────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -176,12 +189,14 @@ export const ReelsScreen: React.FC = () => {
         authService.getMe(),
       ]);
       const filtered = data.items.filter((r: Reel) => !!r.video_url);
+      // shuffle inline — O(n) sur ~20 items, négligeable
       for (let i = filtered.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
       }
       setReels(filtered);
       setHasMore(data.has_more);
+      setMyId(String(me.id));
 
       if (params.initialReelId) {
         const idx = filtered.findIndex((r: Reel) => r.id === params.initialReelId);
@@ -192,7 +207,7 @@ export const ReelsScreen: React.FC = () => {
           }, 150);
         }
       }
-      setMyId(String(me.id));
+
       userService.getUserReels(String(me.id))
         .then(mine => setMyReels(Array.isArray(mine) ? mine : []))
         .catch(() => {});
@@ -212,15 +227,17 @@ export const ReelsScreen: React.FC = () => {
       const nextPage = page + 1;
       const data     = await reelService.getFeed({ page: nextPage });
       const newReels = data.items.filter((r: Reel) => !!r.video_url);
-      for (let i = newReels.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newReels[i], newReels[j]] = [newReels[j], newReels[i]];
-      }
       if (newReels.length > 0) {
-        setReels(prev => {
-          const ids = new Set(prev.map(r => r.id));
-          return [...prev, ...newReels.filter((r: Reel) => !ids.has(r.id))];
-        });
+        setTimeout(() => {
+          for (let i = newReels.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newReels[i], newReels[j]] = [newReels[j], newReels[i]];
+          }
+          setReels(prev => {
+            const ids = new Set(prev.map(r => r.id));
+            return [...prev, ...newReels.filter((r: Reel) => !ids.has(r.id))];
+          });
+        }, 0);
         setPage(nextPage);
         setHasMore(data.has_more);
       } else {
@@ -234,6 +251,14 @@ export const ReelsScreen: React.FC = () => {
   }, [page, hasMore, loadingMore]);
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, []);
 
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
@@ -423,15 +448,14 @@ export const ReelsScreen: React.FC = () => {
         pagingEnabled
         showsVerticalScrollIndicator={false}
         decelerationRate="fast"
-        disableIntervalMomentum
         getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
-        windowSize={5}
-        maxToRenderPerBatch={3}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={false}
-        initialNumToRender={2}
+        windowSize={3}
+        maxToRenderPerBatch={2}
+        updateCellsBatchingPeriod={100}
+        removeClippedSubviews={true}
+        initialNumToRender={1}
         onEndReached={loadMore}
-        onEndReachedThreshold={3}
+        onEndReachedThreshold={2}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         renderItem={({ item, index }) => (
@@ -601,6 +625,11 @@ export const ReelsScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Préchargeur — next 2 reels uniquement */}
+      {reels[currentIndex + 1]?.video_url && (
+        <VideoPreloader uri={reels[currentIndex + 1].video_url!} />
+      )}
+
       {loadingMore && (
         <View style={s.loadMoreIndicator}>
           <ActivityIndicator color="#fff" size="small" />
@@ -632,6 +661,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   colors, currentUserId, onToggleMute, onAdd, onAuthorPress, onEnd,
 }) => {
   const [paused,        setPaused]        = useState(false);
+  const [buffering,     setBuffering]     = useState(false);
   const [liked,         setLiked]         = useState(reel.user_reaction === 'like');
   const [likes,         setLikes]         = useState(reel.like_count);
   const [commentCount,  setCommentCount]  = useState(reel.comment_count);
@@ -641,6 +671,31 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [sending,       setSending]       = useState(false);
   const [barFocused,    setBarFocused]    = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
+  const [showGiftPicker, setShowGiftPicker] = useState(false);
+  const [refInfo,       setRefInfo]       = useState<{ label: string; kind: string; thumbnail: string | null; color: string } | null>(null);
+
+  // Charger les infos du contenu référencé (film/concert/event) si présent
+  useEffect(() => {
+    if (!isActive) return;
+    const fetchRef = async () => {
+      try {
+        if (reel.ref_concert_id) {
+          const res = await apiClient.get<any>(`/api/v1/concerts/${reel.ref_concert_id}`);
+          const d = res.data;
+          setRefInfo({ label: d.title ?? d.name ?? 'Concert', kind: 'Concert', thumbnail: d.thumbnail_url ?? d.poster_url ?? null, color: '#7B3FF2' });
+        } else if (reel.ref_event_id) {
+          const res = await apiClient.get<any>(`/api/v1/events/${reel.ref_event_id}`);
+          const d = res.data;
+          setRefInfo({ label: d.title ?? d.name ?? 'Événement', kind: 'Événement', thumbnail: d.thumbnail_url ?? d.cover_url ?? null, color: '#E0389A' });
+        } else if (reel.ref_content_id) {
+          const res = await apiClient.get<any>(`/api/v1/content/films/${reel.ref_content_id}`);
+          const d = res.data;
+          setRefInfo({ label: d.title ?? 'Film', kind: d.type === 'serie' ? 'Série' : 'Film', thumbnail: d.thumbnail_url ?? null, color: '#3B82F6' });
+        }
+      } catch { /* silencieux */ }
+    };
+    if (reel.ref_concert_id || reel.ref_event_id || reel.ref_content_id) fetchRef();
+  }, [isActive, reel.ref_concert_id, reel.ref_event_id, reel.ref_content_id]);
 
   const isOwnReel = currentUserId && reel.author?.id && currentUserId === String(reel.author.id);
 
@@ -649,18 +704,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       ? {
           uri: reel.video_url,
           bufferConfig: {
-            minBufferMs: 3000,
-            maxBufferMs: 15000,
-            bufferForPlaybackMs: 1000,
+            minBufferMs:                      2500,
+            maxBufferMs:                      15000,
+            bufferForPlaybackMs:              1000,
             bufferForPlaybackAfterRebufferMs: 2000,
           },
         }
       : { uri: 'about:blank' },
     p => {
-      p.loop         = false;
+      p.loop         = true;
       p.muted        = muted;
       p.volume       = muted ? 0 : 1.0;
       p.mixAudioMode = 'mixWithOthers';
+      // Démarre immédiatement si actif — pas d'attente du useEffect
+      if (isActive && reel.video_url) p.play();
     },
   );
 
@@ -695,8 +752,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const likedRef  = useRef(reel.user_reaction === 'like');
 
   useEffect(() => {
-    const sub = player.addEventListener('onEnd', () => { if (isActive) onEnd(); });
-    return () => sub.remove();
+    const subEnd    = player.addEventListener('onEnd',    () => { if (isActive) onEnd(); });
+    const subBuffer = player.addEventListener('onBuffer', (isBuffering: boolean) => setBuffering(isBuffering));
+    return () => { subEnd.remove(); subBuffer.remove(); };
   }, [isActive, onEnd]);
 
   useEffect(() => {
@@ -724,13 +782,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   // Sync likedRef avec l'état React
   useEffect(() => { likedRef.current = liked; }, [liked]);
 
+  // Prefetch thumbnail de la story suivante dès que ce reel devient actif
+  useEffect(() => {
+    if (isActive && reel.thumbnail_url) {
+      Image.prefetch(reel.thumbnail_url).catch(() => {});
+    }
+  }, [isActive]);
+
   const showPlayIconAnim = useCallback(() => {
     playIconOpacity.value = 1;
     playIconScale.value   = withSpring(1, { damping: 10, stiffness: 200 });
     playIconOpacity.value = withSequence(
       withTiming(1, { duration: 0 }),
-      withTiming(1, { duration: 500 }),
-      withTiming(0, { duration: 200 }),
+      withTiming(1, { duration: 300 }),
+      withTiming(0, { duration: 150 }),
     );
   }, []);
 
@@ -746,12 +811,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     heartX.value     = x;
     heartY.value     = y;
     heartScale.value = 0;
-    heartOpacity.value = withTiming(1, { duration: 50 });
-    heartScale.value   = withSpring(1.2, { damping: 6, stiffness: 180 });
+    heartOpacity.value = withTiming(1, { duration: 30 });
+    heartScale.value   = withSpring(1.2, { damping: 8, stiffness: 250 });
     heartOpacity.value = withSequence(
-      withTiming(1, { duration: 50 }),
-      withTiming(1, { duration: 500 }),
-      withTiming(0, { duration: 300 }),
+      withTiming(1, { duration: 30 }),
+      withTiming(1, { duration: 350 }),
+      withTiming(0, { duration: 200 }),
     );
   }, [reel.id]);
 
@@ -763,20 +828,30 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   }, [showPlayIconAnim]);
 
   // Gestes natifs RNGH — single tap = pause, double tap = like
+  // requireExternalGestureToFail non utilisé → le FlatList vertical reste prioritaire
   const singleTap = Gesture.Tap()
-    .maxDuration(300)
+    .maxDuration(250)
     .runOnJS(true)
     .onEnd(doPause);
 
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
-    .maxDuration(300)
+    .maxDuration(250)
     .runOnJS(true)
     .onEnd(e => doLike(e.x, e.y));
 
-  // Exclusive : double-tap prioritaire, annule single-tap immédiatement
-  // Les gestes Tap ne captent pas les mouvements → scroll horizontal libre
-  const tapGesture = Gesture.Exclusive(doubleTap, singleTap);
+  // Pan qui échoue dès que le mouvement vertical dépasse 10px
+  // → cède le contrôle à la FlatList verticale pour scroller entre reels
+  // → si horizontal → FlatList horizontale pour les slides du même auteur
+  const pan = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-10, 10])
+    .minDistance(10);
+
+  const tapGesture = Gesture.Simultaneous(
+    pan,
+    Gesture.Exclusive(doubleTap, singleTap),
+  );
 
   const handleLike = async () => {
     const wasLiked = liked;
@@ -823,6 +898,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     <GestureDetector gesture={tapGesture}>
       <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
 
+        {reel.thumbnail_url && (
+          <Image
+            source={{ uri: reel.thumbnail_url }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}
+            resizeMode="cover"
+          />
+        )}
+
         <VideoView
           player={player}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}
@@ -830,6 +913,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           controls={false}
           surfaceType="texture"
         />
+
+        {buffering && (
+          <View style={[s.bufferOverlay, { backgroundColor: 'transparent' }]} pointerEvents="none">
+            <ActivityIndicator size="large" color="rgba(255,255,255,0.7)" />
+          </View>
+        )}
 
         {/* Play/pause — thread UI, aucun setState */}
         <Animated.View style={playIconAnim} pointerEvents="none">
@@ -851,6 +940,27 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         />
 
         <View style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H }]} pointerEvents="box-none">
+
+          {/* Bandeau contenu référencé — style TikTok son */}
+          {refInfo && (
+            <View style={s.refBand}>
+              <View style={[s.refKindDot, { backgroundColor: refInfo.color }]} />
+              {refInfo.thumbnail ? (
+                <Image source={{ uri: refInfo.thumbnail }} style={s.refThumb} />
+              ) : (
+                <View style={[s.refThumb, { backgroundColor: refInfo.color + '40', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Icon name={refInfo.kind === 'Concert' ? 'music' : refInfo.kind === 'Événement' ? 'calendar' : 'film'} size={12} color="#fff" />
+                </View>
+              )}
+              <View style={{ flex: 1, overflow: 'hidden' }}>
+                <Text style={s.refKind}>{refInfo.kind}</Text>
+                <Text style={s.refLabel} numberOfLines={1}>{refInfo.label}</Text>
+              </View>
+              <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.5)" />
+            </View>
+          )}
+
+          {/* Auteur */}
           <View style={s.authorRow}>
             <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
               {reel.author?.avatar_url
@@ -865,12 +975,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             </TouchableOpacity>
             {reel.author?.is_verified && <VerifiedBadge size={14} />}
           </View>
+
+          {/* Caption */}
           {reel.caption ? <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text> : null}
-          {reel.ref_concert_id && (
-            <View style={[s.tag, { backgroundColor: colors.accentOrange + '30' }]}>
-              <Text style={[s.tagText, { color: colors.accentOrange }]}>Concert</Text>
-            </View>
-          )}
         </View>
 
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
@@ -881,6 +988,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           <ActionBtn icon="message-circle" label={formatCount(commentCount)}    color="#fff" onPress={() => setShowComments(true)} />
           <ActionBtn icon="share-2"        label={formatCount(shareCount)}      color="#fff" onPress={handleShare} />
           <ActionBtn icon="eye"            label={formatCount(reel.view_count)} color="#fff" />
+          {!isOwnReel && (
+            <ActionBtn icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)} />
+          )}
           {!isOwnReel && (
             <ActionBtn icon="flag" label="" color="rgba(255,255,255,0.7)" onPress={() => setReportVisible(true)} />
           )}
@@ -897,6 +1007,15 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           contentId={reel.id}
           onClose={() => setReportVisible(false)}
         />
+
+        {showGiftPicker && reel.author?.id && (
+          <GiftPickerModal
+            reelId={reel.id}
+            receiverId={String(reel.author.id)}
+            receiverName={reel.author.display_name ?? reel.author.username ?? 'Créateur'}
+            onClose={() => setShowGiftPicker(false)}
+          />
+        )}
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'position' : undefined}
@@ -948,6 +1067,27 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   );
 });
 
+// ── Préchargeur vidéo silencieux ──────────────────────────────────────────────
+
+const REEL_BUFFER = {
+  minBufferMs:                      500,
+  maxBufferMs:                      10000,
+  bufferForPlaybackMs:              200,
+  bufferForPlaybackAfterRebufferMs: 400,
+};
+
+const VideoPreloader: React.FC<{ uri: string }> = ({ uri }) => {
+  const player = useVideoPlayer(
+    { uri, bufferConfig: REEL_BUFFER },
+    p => { p.muted = true; p.volume = 0; },
+  );
+  useEffect(() => {
+    player.preload().catch(() => {});
+    return () => { try { player.pause(); } catch {} };
+  }, [uri]);
+  return null;
+};
+
 // ── ReelItem — row verticale = carousel horizontal des reels d'un auteur ──────
 
 interface ReelItemProps {
@@ -977,20 +1117,23 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
   const loadedRef  = useRef(false);
   const hListRef   = useRef<FlatList>(null);
 
-  // Charger les reels de l'auteur dès que ce item devient actif
+  // Charger les reels de l'auteur avec délai pour ne pas bloquer le scroll
   useEffect(() => {
     if (!isActive || loadedRef.current || !reel.author?.id) return;
-    loadedRef.current = true;
-    userService.getUserReels(reel.author.id)
-      .then(data => {
-        const list     = (Array.isArray(data) ? data : []) as Reel[];
-        const filtered = list.filter(r => !!r.video_url);
-        if (filtered.length <= 1) return;
-        const idx = filtered.findIndex(r => r.id === reel.id);
-        if (idx > 0) { const [cur] = filtered.splice(idx, 1); filtered.unshift(cur); }
-        setAuthorReels(filtered);
-      })
-      .catch(() => {});
+    const timer = setTimeout(() => {
+      loadedRef.current = true;
+      userService.getUserReels(reel.author!.id)
+        .then(data => {
+          const list     = (Array.isArray(data) ? data : []) as Reel[];
+          const filtered = list.filter(r => !!r.video_url);
+          if (filtered.length <= 1) return;
+          const idx = filtered.findIndex(r => r.id === reel.id);
+          if (idx > 0) { const [cur] = filtered.splice(idx, 1); filtered.unshift(cur); }
+          setAuthorReels(filtered);
+        })
+        .catch(() => {});
+    }, 600); // délai 600ms — laisse le scroll se stabiliser d'abord
+    return () => clearTimeout(timer);
   }, [isActive]);
 
   // Reset au premier slide quand l'item n'est plus actif
@@ -1011,44 +1154,61 @@ const ReelItem: React.FC<ReelItemProps> = memo(({
     [screenW],
   );
 
+  // Scroll horizontal manuel — seuil 25 px avant d'activer
+  // évite les glissements accidentels au simple touch
+  const translateX   = useSharedValue(0);
+  const startX       = useSharedValue(0);
+  const SWIPE_THRESH = screenW * 0.25; // 25 % de l'écran = intention claire
+
+  const hPan = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-15, 15])
+    .runOnJS(true)
+    .onStart(() => { startX.value = translateX.value; })
+    .onUpdate(e => {
+      const next = startX.value + e.translationX;
+      const min  = -(authorReels.length - 1) * screenW;
+      translateX.value = Math.max(min, Math.min(0, next));
+    })
+    .onEnd(e => {
+      const current = -Math.round(-translateX.value / screenW);
+      let target = current;
+      if (e.translationX < -SWIPE_THRESH && current < authorReels.length - 1) target = current + 1;
+      else if (e.translationX > SWIPE_THRESH && current > 0) target = current - 1;
+      translateX.value = withSpring(-target * screenW, { damping: 20, stiffness: 180, mass: 0.8 });
+      setHIdx(target);
+    });
+
   return (
     <View style={{ width: screenW, height: screenH, overflow: 'hidden' }}>
-      <FlatList
-        ref={hListRef}
-        data={authorReels}
-        keyExtractor={r => r.id}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        disableIntervalMomentum
-        nestedScrollEnabled
-        bounces={false}
-        overScrollMode="never"
-        onMomentumScrollEnd={onHScroll}
-        getItemLayout={getItemLayout}
-        initialNumToRender={1}
-        maxToRenderPerBatch={2}
-        windowSize={3}
-        removeClippedSubviews={false}
-        style={{ width: screenW, height: screenH }}
-        renderItem={({ item: r, index: i }) => (
-          <VideoSlide
-            reel={r}
-            isActive={isActive && i === hIdx}
-            muted={muted}
-            screenW={screenW}
-            screenH={screenH}
-            insetBottom={insetBottom}
-            colors={colors}
-            currentUserId={currentUserId}
-            onToggleMute={onToggleMute}
-            onAdd={i === 0 ? onAdd : undefined}
-            onAuthorPress={onAuthorPress}
-            onEnd={() => onEnd(index)}
-          />
-        )}
-      />
+      <GestureDetector gesture={hPan}>
+        <Animated.View
+          style={{
+            width: screenW * authorReels.length,
+            height: screenH,
+            flexDirection: 'row',
+            transform: [{ translateX }],
+          }}
+        >
+          {authorReels.map((r, i) => (
+            <VideoSlide
+              key={r.id}
+              reel={r}
+              isActive={isActive && i === hIdx}
+              muted={muted}
+              screenW={screenW}
+              screenH={screenH}
+              insetBottom={insetBottom}
+              colors={colors}
+              currentUserId={currentUserId}
+              onToggleMute={onToggleMute}
+              onAdd={i === 0 ? onAdd : undefined}
+              onAuthorPress={onAuthorPress}
+              onEnd={() => onEnd(index)}
+            />
+          ))}
+        </Animated.View>
+      </GestureDetector>
 
       {/* Indicateur de position horizontal */}
       {authorReels.length > 1 && (
@@ -1114,6 +1274,24 @@ const s = StyleSheet.create({
   tag:         { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   tagText:     { fontSize: 11, fontWeight: '600' },
 
+  // Stats row
+  statsRow:     { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  statChip:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  statChipText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+
+  // Bandeau contenu référencé
+  refBand: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    alignSelf: 'flex-start', maxWidth: '100%',
+  },
+  refKindDot:   { width: 7, height: 7, borderRadius: 4 },
+  refThumb:     { width: 32, height: 32, borderRadius: 8, overflow: 'hidden' },
+  refKind:      { color: 'rgba(255,255,255,0.55)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  refLabel:     { color: '#fff', fontSize: 12, fontWeight: '700' },
+
   actions:      { position: 'absolute', right: 12, alignItems: 'center', gap: 20, zIndex: 3 },
   actionBtn:    { alignItems: 'center', gap: 4 },
   actionLabel:  { fontSize: 12, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
@@ -1121,6 +1299,12 @@ const s = StyleSheet.create({
   muteBtn:      { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
+  bufferOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    zIndex: 6,
+  },
 
   // ── Barre commentaire TikTok ──────────────────────────────────────────────
   commentBarWrap: {

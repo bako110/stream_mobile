@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Alert,
+  StatusBar, ActivityIndicator, Alert, Image,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
@@ -39,10 +39,28 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
     return () => StatusBar.setHidden(false, 'none');
   }, []);
 
-  const player = useVideoPlayer({ uri: url }, p => {
-    p.muted = false;
-    p.play();
-  });
+  const [buffering, setBuffering] = useState(false);
+
+  const player = useVideoPlayer(
+    {
+      uri: url,
+      bufferConfig: {
+        minBufferMs:                      3000,
+        maxBufferMs:                      20000,
+        bufferForPlaybackMs:              1000,
+        bufferForPlaybackAfterRebufferMs: 2000,
+      },
+    },
+    p => {
+      p.muted = false;
+      p.play();
+    },
+  );
+
+  useEffect(() => {
+    const sub = player.addEventListener('onBuffer', (isBuffering: boolean) => setBuffering(isBuffering));
+    return () => sub.remove();
+  }, []);
 
   // Sauvegarde de la progression toutes les 15 secondes
   useEffect(() => {
@@ -98,12 +116,27 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
     <View style={s.container}>
       <StatusBar hidden />
 
+      {thumbnailUrl ? (
+        <Image
+          source={{ uri: thumbnailUrl }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: insets.bottom }}
+          resizeMode="cover"
+          blurRadius={8}
+        />
+      ) : null}
+
       <VideoView
         player={player}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: insets.bottom }}
         resizeMode="contain"
         controls
       />
+
+      {buffering && (
+        <View style={s.bufferOverlay} pointerEvents="none">
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      )}
 
       <View style={[s.topBar, { top: insets.top + 8 }]} pointerEvents="box-none">
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.closeBtn}>
@@ -138,4 +171,5 @@ const s = StyleSheet.create({
   downloadBtn:  { backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 24, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   row:          { flexDirection: 'row', alignItems: 'center', gap: 8 },
   downloadText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  bufferOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 5 },
 });

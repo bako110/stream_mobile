@@ -28,7 +28,6 @@ import Icon from 'react-native-vector-icons/Feather';
 import type { AppColors } from '../../theme/colors';
 import type { UploadFolder, UploadedImage } from '../../services/uploadService';
 import { API_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
-import { Endpoints } from '../../api';
 import { storage } from '../../utils/storage';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
@@ -75,7 +74,7 @@ export const ImagePickerSection: React.FC<ImagePickerSectionProps> = ({
     const remaining = maxImages - images.length;
 
     launchImageLibrary(
-      { mediaType: 'photo', selectionLimit: remaining, quality: 0.85 },
+      { mediaType: 'photo', selectionLimit: remaining, quality: 1 },
       async (response) => {
         pickingRef.current = false;
         if (response.didCancel || !response.assets?.length) return;
@@ -99,12 +98,12 @@ export const ImagePickerSection: React.FC<ImagePickerSectionProps> = ({
 
         // Upload toutes les images en une seule requête
         try {
-          const results = await uploadViaService(selected.filter(a => a.uri) as Asset[], folder);
+          const results = await uploadViaPresigned(selected.filter(a => a.uri) as Asset[], folder);
 
           // Supprimer les previews locales uploadées — elles seront affichées via `images`
           setLocals(prev => prev.filter(l => !newLocals.find(n => n.localUri === l.localUri)));
 
-          onImagesChange((prev: string[]) => [...prev, ...results.map(r => r.url)]);
+          onImagesChange((prev: string[]) => [...prev, ...results.map((r: UploadedImage) => r.url)]);
         } catch (err: any) {
           console.warn('[ImagePickerSection] upload failed:', err);
           Alert.alert('Upload échoué', err?.message ?? "Les images n'ont pas pu être envoyées. Vérifiez votre connexion.");
@@ -189,39 +188,48 @@ export const ImagePickerSection: React.FC<ImagePickerSectionProps> = ({
   );
 };
 
-// ── Upload helper ─────────────────────────────────────────────────────────────
+// ── Upload helper — presigned URL (mobile → R2 direct) ───────────────────────
 
-async function uploadViaService(assets: Asset[], folder: UploadFolder): Promise<UploadedImage[]> {
+async function uploadViaPresigned(assets: Asset[], folder: UploadFolder): Promise<UploadedImage[]> {
   const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  const endpoint = Endpoints.upload.images(folder);
-  const url = `${API_BASE_URL}${endpoint}`;
-  console.log('[uploadViaService] url:', url);
+  const presignedUrl = `${API_BASE_URL}/api/v1/upload/presigned`;
 
-  const files = assets
-    .filter(a => a.uri)
-    .map(a => ({
-      name: 'files',
-      filename: a.fileName ?? `photo_${Date.now()}.jpg`,
-      type: a.type ?? 'image/jpeg',
-      data: ReactNativeBlobUtil.wrap(a.uri!.replace('file://', '')) as any,
-    }));
+  return Promise.all(
+    assets.filter(a => a.uri).map(async (asset) => {
+      const contentType = asset.type ?? 'image/jpeg';
+      const filename = asset.fileName ?? `photo_${Date.now()}.jpg`;
 
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'Content-Type': 'multipart/form-data',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+      // 1. Obtenir la presigned URL depuis le backend
+      const presignRes = await ReactNativeBlobUtil.fetch(
+        'POST',
+        presignedUrl,
+        {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        JSON.stringify({ folder, filename, content_type: contentType }),
+      );
+      if (presignRes.respInfo.status >= 300) {
+        const err = presignRes.json();
+        throw new Error(err?.detail ?? `Presign error ${presignRes.respInfo.status}`);
+      }
+      const { upload_url, public_url } = presignRes.json();
 
-  const response = await ReactNativeBlobUtil.fetch('POST', url, headers, files);
-  const status = response.respInfo.status;
+      // 2. Upload direct vers R2 via PUT
+      const uploadRes = await ReactNativeBlobUtil.fetch(
+        'PUT',
+        upload_url,
+        { 'Content-Type': contentType },
+        ReactNativeBlobUtil.wrap(asset.uri!.replace('file://', '')) as any,
+      );
+      if (uploadRes.respInfo.status >= 300) {
+        throw new Error(`R2 upload error ${uploadRes.respInfo.status}`);
+      }
 
-  if (status < 200 || status >= 300) {
-    const err = response.json();
-    throw new Error(err?.detail ?? `Upload error ${status}`);
-  }
-
-  const json = response.json();
-  return (json.uploaded ?? []) as UploadedImage[];
+      return { url: public_url, public_id: public_url } as UploadedImage;
+    })
+  );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ import { notificationService } from '../../services/notificationService';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../../context/UserContext';
 import type { Subscription } from '../../types';
 import type { User } from '../../types/user';
@@ -23,7 +24,7 @@ import type { User } from '../../types/user';
 
 type Section =
   | 'abonnement' | 'apparence' | 'notifications' | 'lecture'
-  | 'compte' | 'contenu' | 'apropos' | 'danger' | 'verification';
+  | 'compte' | 'contenu' | 'apropos' | 'danger' | 'verification' | 'wallet';
 
 type VerifStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
@@ -89,9 +90,10 @@ const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const SubScreen: React.FC<{ title: string; onBack: () => void; children: React.ReactNode }> = ({ title, onBack, children }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   return (
-    <Animated.View entering={SlideInRight.duration(280)} style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, zIndex: 10 }]}>
-      <View style={[s.subHeader, { borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
+    <Animated.View entering={SlideInRight.duration(280)} style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, zIndex: 200 }]}>
+      <View style={[s.subHeader, { borderBottomColor: colors.divider, backgroundColor: colors.background, paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={onBack} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -105,43 +107,65 @@ const SubScreen: React.FC<{ title: string; onBack: () => void; children: React.R
   );
 };
 
-// ── VerificationSubScreen ─────────────────────────────────────────────────────
+// ── VerificationSubScreen — wizard 4 étapes ──────────────────────────────────
+
+type AccountType = 'artist' | 'creator' | 'public_figure' | 'brand' | 'journalist' | 'other';
+
+const ACCOUNT_TYPES: { key: AccountType; icon: string; label: string; sub: string }[] = [
+  { key: 'artist',        icon: 'music',      label: 'Artiste',              sub: 'Musicien, chanteur, groupe' },
+  { key: 'creator',       icon: 'video',      label: 'Créateur de contenu',  sub: 'YouTubeur, streamer, influenceur' },
+  { key: 'public_figure', icon: 'star',       label: 'Personnalité publique',sub: 'Athlète, acteur, personnalité TV' },
+  { key: 'brand',         icon: 'briefcase',  label: 'Marque / Entreprise',  sub: 'Organisation ou société officielle' },
+  { key: 'journalist',    icon: 'edit-2',     label: 'Journaliste / Média',  sub: 'Presse, radio, chaîne d\'info' },
+  { key: 'other',         icon: 'user',       label: 'Autre',                sub: 'Autre catégorie notable' },
+];
+
+const BLUE = '#1D9BF0';
 
 const VerificationSubScreen: React.FC<{ onBack: () => void; user: User | null }> = ({ onBack, user }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const { refreshUser } = useUser();
 
-  const [status,   setStatus]   = useState<VerifStatus>((user?.verification_status as VerifStatus) ?? 'none');
-  const [note,     setNote]     = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [fetching, setFetching] = useState(true);
+  const [status,      setStatus]      = useState<VerifStatus>((user?.verification_status as VerifStatus) ?? 'none');
+  const [fetching,    setFetching]    = useState(true);
+  const [step,        setStep]        = useState(0); // 0=intro 1=type 2=info 3=confirm
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
+  const [fullName,    setFullName]    = useState(user?.display_name ?? '');
+  const [bio,         setBio]         = useState('');
+  const [links,       setLinks]       = useState('');
+  const [loading,     setLoading]     = useState(false);
+
+  const canGoStep2 = !!accountType;
+  const canGoStep3 = fullName.trim().length >= 2 && bio.trim().length >= 20;
 
   const fetchStatus = async () => {
     try {
-      const res = await apiClient.get<{ status: VerifStatus; is_verified: boolean }>(
-        Endpoints.users.verificationStatus,
-      );
+      const res = await apiClient.get<{ status: VerifStatus; is_verified: boolean }>(Endpoints.users.verificationStatus);
       setStatus(res.data.status);
-      if (res.data.is_verified || res.data.status === 'approved') {
-        await refreshUser();
-      }
+      if (res.data.is_verified || res.data.status === 'approved') await refreshUser();
     } catch {}
     finally { setFetching(false); }
   };
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 30_000);
-    return () => clearInterval(interval);
+    const t = setInterval(fetchStatus, 30_000);
+    return () => clearInterval(t);
   }, []);
 
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      await apiClient.post(Endpoints.users.verifyRequest, { note: note.trim() || undefined });
+      const note = [
+        `Type: ${accountType}`,
+        `Nom: ${fullName.trim()}`,
+        `Bio: ${bio.trim()}`,
+        links.trim() ? `Liens: ${links.trim()}` : '',
+      ].filter(Boolean).join('\n');
+      await apiClient.post(Endpoints.users.verifyRequest, { note });
       setStatus('pending');
-      Alert.alert('Demande envoyée', 'Votre demande est en cours d\'examen. Vous serez notifié du résultat.');
+      setStep(0);
     } catch (e: any) {
       Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible d\'envoyer la demande.');
     } finally {
@@ -149,94 +173,330 @@ const VerificationSubScreen: React.FC<{ onBack: () => void; user: User | null }>
     }
   };
 
-  const STATUS_CONFIG: Record<VerifStatus, { icon: string; color: string; title: string; sub: string }> = {
-    none:     { icon: 'shield',       color: colors.textTertiary, title: 'Non vérifié',           sub: 'Soumettez une demande pour obtenir le badge FoliX' },
-    pending:  { icon: 'clock',        color: '#F59E0B',           title: 'En cours d\'examen',    sub: 'Votre demande est en attente de validation par notre équipe' },
-    approved: { icon: 'check-circle', color: '#1D9BF0',           title: 'Compte vérifié',        sub: 'Votre compte est certifié FoliX' },
-    rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',       sub: 'Votre demande n\'a pas été approuvée. Vous pouvez en soumettre une nouvelle.' },
+  // ── Rendu statut déjà défini (pending / approved / rejected) ──────────────
+  const renderStatus = () => {
+    const CFG: Record<VerifStatus, { icon: string; color: string; title: string; sub: string }> = {
+      none:     { icon: 'shield',       color: colors.textTertiary, title: 'Non vérifié',         sub: '' },
+      pending:  { icon: 'clock',        color: '#F59E0B',           title: 'En cours d\'examen',  sub: 'Notre équipe examine votre dossier. Cela peut prendre quelques jours.' },
+      approved: { icon: 'check-circle', color: BLUE,                title: 'Compte vérifié ✓',    sub: 'Votre compte est certifié FoliX.' },
+      rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',     sub: user?.verification_note ?? 'Votre demande n\'a pas été approuvée. Vous pouvez en soumettre une nouvelle.' },
+    };
+    const cfg = CFG[status];
+    return (
+      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
+        <View style={[vs.statusCard, { backgroundColor: cfg.color + '12', borderColor: cfg.color + '40' }]}>
+          <Icon name={cfg.icon} size={40} color={cfg.color} />
+          <Text style={[vs.statusTitle, { color: cfg.color }]}>{cfg.title}</Text>
+          <Text style={[vs.statusSub, { color: colors.textSecondary }]}>{cfg.sub}</Text>
+          {status === 'approved' && (
+            <View style={[vs.badgeRow, { backgroundColor: colors.surface }]}>
+              <Text style={[vs.badgeName, { color: colors.textPrimary }]}>{user?.display_name ?? user?.username}</Text>
+              <VerifiedBadge size={18} />
+            </View>
+          )}
+        </View>
+
+        {status === 'approved' && (
+          <View style={[vs.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            {[
+              { icon: 'shield',      text: 'Badge bleu sur votre profil et vos contenus' },
+              { icon: 'trending-up', text: 'Priorité dans les recherches et suggestions' },
+              { icon: 'star',        text: 'Accès anticipé aux nouvelles fonctionnalités' },
+              { icon: 'users',       text: 'Confiance renforcée de votre communauté' },
+            ].map((it, i, arr) => (
+              <Row key={i} icon={it.icon} label={it.text} color={BLUE} last={i === arr.length - 1} />
+            ))}
+          </View>
+        )}
+
+        {status === 'rejected' && (
+          <TouchableOpacity
+            style={[vs.primaryBtn, { backgroundColor: BLUE }]}
+            onPress={() => setStep(1)}
+          >
+            <Icon name="refresh-cw" size={16} color="#fff" />
+            <Text style={vs.primaryBtnText}>Soumettre une nouvelle demande</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+    );
   };
 
-  const cfg = STATUS_CONFIG[status];
+  // ── Étape 0 : intro & critères ─────────────────────────────────────────────
+  const renderStep0 = () => (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
+      <View style={[vs.heroBadge, { backgroundColor: BLUE + '15' }]}>
+        <View style={vs.heroBadgeIcon}>
+          <Icon name="shield" size={32} color={BLUE} />
+          <View style={vs.heroBadgeCheck}>
+            <Icon name="check" size={9} color="#fff" />
+          </View>
+        </View>
+        <Text style={[vs.heroTitle, { color: colors.textPrimary }]}>Badge vérifié FoliX</Text>
+        <Text style={[vs.heroSub, { color: colors.textSecondary }]}>
+          Le badge bleu confirme que ce compte est le vrai compte d'une personnalité, créateur ou marque notable.
+        </Text>
+      </View>
+
+      <Text style={[vs.sectionLabel, { color: colors.textTertiary }]}>QUI PEUT ÊTRE VÉRIFIÉ ?</Text>
+      <View style={[vs.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+        {[
+          { icon: 'check', text: 'Artiste ou musicien avec audience active' },
+          { icon: 'check', text: 'Créateur de contenu avec présence notable' },
+          { icon: 'check', text: 'Personnalité publique, athlète ou acteur' },
+          { icon: 'check', text: 'Marque ou organisation officielle' },
+          { icon: 'check', text: 'Journaliste ou media reconnu' },
+        ].map((it, i, arr) => (
+          <View key={i} style={[vs.criteriaRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
+            <View style={[vs.criteriaCheck, { backgroundColor: '#22C55E20' }]}>
+              <Icon name={it.icon} size={12} color="#22C55E" />
+            </View>
+            <Text style={[vs.criteriaText, { color: colors.textPrimary }]}>{it.text}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Text style={[vs.sectionLabel, { color: colors.textTertiary }]}>CE QUE ÇA VOUS APPORTE</Text>
+      <View style={[vs.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+        {[
+          { icon: 'shield',      text: 'Badge bleu visible sur votre profil et contenus' },
+          { icon: 'trending-up', text: 'Meilleure visibilité dans les recherches' },
+          { icon: 'star',        text: 'Accès prioritaire aux nouvelles fonctionnalités' },
+          { icon: 'users',       text: 'Confiance accrue de votre communauté' },
+        ].map((it, i, arr) => (
+          <Row key={i} icon={it.icon} label={it.text} color={BLUE} last={i === arr.length - 1} />
+        ))}
+      </View>
+
+      <TouchableOpacity style={[vs.primaryBtn, { backgroundColor: BLUE }]} onPress={() => setStep(1)}>
+        <Text style={vs.primaryBtnText}>Faire une demande</Text>
+        <Icon name="arrow-right" size={16} color="#fff" />
+      </TouchableOpacity>
+    </ScrollView>
+  );
+
+  // ── Étape 1 : type de compte ───────────────────────────────────────────────
+  const renderStep1 = () => (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }} showsVerticalScrollIndicator={false}>
+      <Text style={[vs.stepTitle, { color: colors.textPrimary }]}>Quel type de compte ?</Text>
+      <Text style={[vs.stepSub, { color: colors.textSecondary }]}>
+        Choisissez la catégorie qui correspond le mieux à votre activité.
+      </Text>
+      <View style={{ gap: 10 }}>
+        {ACCOUNT_TYPES.map(t => {
+          const selected = accountType === t.key;
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[vs.typeCard, { backgroundColor: colors.surface, borderColor: selected ? BLUE : colors.divider, borderWidth: selected ? 2 : StyleSheet.hairlineWidth }]}
+              onPress={() => setAccountType(t.key)}
+              activeOpacity={0.75}
+            >
+              <View style={[vs.typeIcon, { backgroundColor: selected ? BLUE + '20' : colors.backgroundSecondary }]}>
+                <Icon name={t.icon} size={20} color={selected ? BLUE : colors.textSecondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[vs.typeLabel, { color: colors.textPrimary }]}>{t.label}</Text>
+                <Text style={[vs.typeSub, { color: colors.textTertiary }]}>{t.sub}</Text>
+              </View>
+              {selected && <Icon name="check-circle" size={20} color={BLUE} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <View style={vs.navRow}>
+        <TouchableOpacity style={[vs.secondaryBtn, { borderColor: colors.border }]} onPress={() => setStep(0)}>
+          <Icon name="arrow-left" size={16} color={colors.textSecondary} />
+          <Text style={[vs.secondaryBtnText, { color: colors.textSecondary }]}>Retour</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[vs.primaryBtn, { flex: 1, backgroundColor: canGoStep2 ? BLUE : colors.border }]}
+          onPress={() => canGoStep2 && setStep(2)}
+          disabled={!canGoStep2}
+        >
+          <Text style={vs.primaryBtnText}>Continuer</Text>
+          <Icon name="arrow-right" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+
+  // ── Étape 2 : informations ─────────────────────────────────────────────────
+  const renderStep2 = () => (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <Text style={[vs.stepTitle, { color: colors.textPrimary }]}>Vos informations</Text>
+      <Text style={[vs.stepSub, { color: colors.textSecondary }]}>
+        Ces informations aident notre équipe à vérifier votre identité et votre notoriété.
+      </Text>
+
+      <View style={{ gap: 12 }}>
+        <View>
+          <Text style={[vs.fieldLabel, { color: colors.textTertiary }]}>NOM COMPLET OU NOM DE SCÈNE *</Text>
+          <TextInput
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="Ex : Sah Douss, DJ Krys…"
+            placeholderTextColor={colors.textDisabled}
+            style={[vs.input, { borderColor: fullName.trim().length >= 2 ? BLUE : colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]}
+          />
+        </View>
+
+        <View>
+          <Text style={[vs.fieldLabel, { color: colors.textTertiary }]}>POURQUOI MÉRITEZ-VOUS LE BADGE ? *</Text>
+          <TextInput
+            value={bio}
+            onChangeText={setBio}
+            placeholder="Ex : Artiste avec 50 000 écoutes sur Spotify, présence sur 3 plateformes…"
+            placeholderTextColor={colors.textDisabled}
+            multiline
+            numberOfLines={4}
+            style={[vs.input, vs.inputMulti, { borderColor: bio.trim().length >= 20 ? BLUE : colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]}
+          />
+          <Text style={[vs.charHint, { color: bio.trim().length >= 20 ? '#22C55E' : colors.textDisabled }]}>
+            {bio.trim().length} / 20 min
+          </Text>
+        </View>
+
+        <View>
+          <Text style={[vs.fieldLabel, { color: colors.textTertiary }]}>LIENS (optionnel)</Text>
+          <TextInput
+            value={links}
+            onChangeText={setLinks}
+            placeholder="Instagram, Spotify, site web…"
+            placeholderTextColor={colors.textDisabled}
+            style={[vs.input, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]}
+          />
+          <Text style={[vs.charHint, { color: colors.textDisabled }]}>Séparez les liens par une virgule</Text>
+        </View>
+      </View>
+
+      <View style={vs.navRow}>
+        <TouchableOpacity style={[vs.secondaryBtn, { borderColor: colors.border }]} onPress={() => setStep(1)}>
+          <Icon name="arrow-left" size={16} color={colors.textSecondary} />
+          <Text style={[vs.secondaryBtnText, { color: colors.textSecondary }]}>Retour</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[vs.primaryBtn, { flex: 1, backgroundColor: canGoStep3 ? BLUE : colors.border }]}
+          onPress={() => canGoStep3 && setStep(3)}
+          disabled={!canGoStep3}
+        >
+          <Text style={vs.primaryBtnText}>Continuer</Text>
+          <Icon name="arrow-right" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+
+  // ── Étape 3 : récapitulatif & envoi ───────────────────────────────────────
+  const renderStep3 = () => {
+    const typeInfo = ACCOUNT_TYPES.find(t => t.key === accountType)!;
+    return (
+      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
+        <Text style={[vs.stepTitle, { color: colors.textPrimary }]}>Vérifiez votre demande</Text>
+        <Text style={[vs.stepSub, { color: colors.textSecondary }]}>
+          Relisez votre dossier avant de l'envoyer. Notre équipe répond sous 3 à 7 jours.
+        </Text>
+
+        <View style={[vs.summaryCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <View style={vs.summaryRow}>
+            <Text style={[vs.summaryLabel, { color: colors.textTertiary }]}>Type de compte</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name={typeInfo.icon} size={14} color={BLUE} />
+              <Text style={[vs.summaryValue, { color: colors.textPrimary }]}>{typeInfo.label}</Text>
+            </View>
+          </View>
+          <View style={[vs.summaryDivider, { backgroundColor: colors.divider }]} />
+          <View style={vs.summaryRow}>
+            <Text style={[vs.summaryLabel, { color: colors.textTertiary }]}>Nom</Text>
+            <Text style={[vs.summaryValue, { color: colors.textPrimary }]}>{fullName.trim()}</Text>
+          </View>
+          <View style={[vs.summaryDivider, { backgroundColor: colors.divider }]} />
+          <View style={[vs.summaryRow, { alignItems: 'flex-start' }]}>
+            <Text style={[vs.summaryLabel, { color: colors.textTertiary }]}>Justification</Text>
+            <Text style={[vs.summaryValue, { color: colors.textPrimary, flex: 1, textAlign: 'right', lineHeight: 20 }]}>{bio.trim()}</Text>
+          </View>
+          {links.trim() ? (
+            <>
+              <View style={[vs.summaryDivider, { backgroundColor: colors.divider }]} />
+              <View style={[vs.summaryRow, { alignItems: 'flex-start' }]}>
+                <Text style={[vs.summaryLabel, { color: colors.textTertiary }]}>Liens</Text>
+                <Text style={[vs.summaryValue, { color: BLUE, flex: 1, textAlign: 'right' }]}>{links.trim()}</Text>
+              </View>
+            </>
+          ) : null}
+        </View>
+
+        <View style={[vs.notice, { backgroundColor: '#F59E0B12', borderColor: '#F59E0B40' }]}>
+          <Icon name="info" size={14} color="#F59E0B" />
+          <Text style={[vs.noticeText, { color: colors.textSecondary }]}>
+            Fournir de fausses informations entraîne le rejet définitif de votre demande.
+          </Text>
+        </View>
+
+        <View style={vs.navRow}>
+          <TouchableOpacity style={[vs.secondaryBtn, { borderColor: colors.border }]} onPress={() => setStep(2)}>
+            <Icon name="arrow-left" size={16} color={colors.textSecondary} />
+            <Text style={[vs.secondaryBtnText, { color: colors.textSecondary }]}>Modifier</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[vs.primaryBtn, { flex: 1, backgroundColor: BLUE, opacity: loading ? 0.7 : 1 }]}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <>
+                  <Icon name="send" size={15} color="#fff" />
+                  <Text style={vs.primaryBtnText}>Envoyer la demande</Text>
+                </>
+            }
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  // ── Barre de progression ───────────────────────────────────────────────────
+  const showWizard = (status === 'none' || status === 'rejected') && step > 0;
+  const STEPS = ['Type', 'Infos', 'Envoi'];
 
   return (
     <SubScreen title="Vérification FoliX" onBack={onBack}>
       {fetching ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={BLUE} style={{ marginTop: 40 }} />
       ) : (
         <>
-          {/* Statut actuel */}
-          <View style={[s.verifCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
-            <View style={[s.verifIconWrap, { backgroundColor: cfg.color + '18' }]}>
-              <Icon name={cfg.icon} size={28} color={cfg.color} />
-              {status === 'approved' && (
-                <View style={s.verifCheckOverlay}>
-                  <Icon name="check" size={10} color="#fff" />
-                </View>
-              )}
+          {showWizard && (
+            <View style={[vs.progressBar, { backgroundColor: colors.backgroundSecondary }]}>
+              {STEPS.map((label, i) => {
+                const done    = step > i + 1;
+                const current = step === i + 1;
+                return (
+                  <React.Fragment key={label}>
+                    <View style={vs.progressStep}>
+                      <View style={[vs.progressDot, { backgroundColor: done || current ? BLUE : colors.border }]}>
+                        {done
+                          ? <Icon name="check" size={10} color="#fff" />
+                          : <Text style={[vs.progressNum, { color: current ? '#fff' : colors.textTertiary }]}>{i + 1}</Text>
+                        }
+                      </View>
+                      <Text style={[vs.progressLabel, { color: current ? BLUE : colors.textTertiary }]}>{label}</Text>
+                    </View>
+                    {i < STEPS.length - 1 && (
+                      <View style={[vs.progressLine, { backgroundColor: done ? BLUE : colors.border }]} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </View>
-            <Text style={[s.verifTitle, { color: cfg.color }]}>{cfg.title}</Text>
-            <Text style={[s.verifSub, { color: colors.textSecondary }]}>{cfg.sub}</Text>
-
-            {status === 'approved' && (
-              <View style={s.badgePreview}>
-                <Text style={[s.badgePreviewText, { color: colors.textPrimary }]}>
-                  {user?.display_name ?? user?.username}
-                </Text>
-                <VerifiedBadge size={18} />
-              </View>
-            )}
-          </View>
-
-          {/* Ce que ça apporte */}
-          <Text style={[s.sectionLabel, { color: colors.textTertiary, marginTop: 24, marginBottom: 10 }]}>
-            AVANTAGES DE LA VÉRIFICATION
-          </Text>
-          <Card>
-            {[
-              { icon: 'shield',      text: 'Badge bleu visible sur votre profil et vos contenus' },
-              { icon: 'trending-up', text: 'Meilleure visibilité dans les recherches et suggestions' },
-              { icon: 'star',        text: 'Accès prioritaire aux nouvelles fonctionnalités' },
-              { icon: 'users',       text: 'Confiance accrue de votre communauté' },
-            ].map((item, i) => (
-              <Row key={i} icon={item.icon} label={item.text} color="#1D9BF0" last={i === 3} />
-            ))}
-          </Card>
-
-          {/* Formulaire de demande */}
-          {(status === 'none' || status === 'rejected') && (
-            <>
-              <Text style={[s.sectionLabel, { color: colors.textTertiary, marginTop: 24, marginBottom: 10 }]}>
-                SOUMETTRE UNE DEMANDE
-              </Text>
-              <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.divider, padding: 14, gap: 14 }]}>
-                <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 19 }}>
-                  Expliquez brièvement pourquoi vous méritez le badge FoliX (artiste, créateur, personnalité publique…).
-                </Text>
-                <TextInput
-                  value={note}
-                  onChangeText={setNote}
-                  placeholder="Ex : Artiste avec 10k abonnés sur Instagram, lien : instagram.com/..."
-                  placeholderTextColor={colors.textTertiary}
-                  multiline
-                  numberOfLines={4}
-                  style={[s.verifInput, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]}
-                />
-                <TouchableOpacity
-                  style={[s.verifBtn, { backgroundColor: '#1D9BF0', opacity: loading ? 0.7 : 1 }]}
-                  onPress={handleSubmit}
-                  disabled={loading}
-                >
-                  {loading
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <>
-                        <Icon name="send" size={15} color="#fff" />
-                        <Text style={s.verifBtnText}>Envoyer la demande</Text>
-                      </>
-                  }
-                </TouchableOpacity>
-              </View>
-            </>
           )}
+
+          {status === 'pending' || status === 'approved' ? renderStatus() :
+            step === 0 ? renderStep0() :
+            step === 1 ? renderStep1() :
+            step === 2 ? renderStep2() :
+            renderStep3()
+          }
         </>
       )}
     </SubScreen>
@@ -347,6 +607,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   };
 
   const SECTIONS: { key: Section; icon: string; label: string; color: string; sub?: string; badge?: React.ReactNode }[] = [
+    { key: 'wallet',        icon: 'dollar-sign',   label: 'Wallet & Monétisation', color: '#FFD700' },
     { key: 'abonnement',    icon: 'star',         label: 'Abonnement',        color: planColor,  sub: planLabel },
     { key: 'verification',  icon: 'shield',        label: 'Vérification FoliX', color: '#1D9BF0',  sub: verifSub[verifStatus],
       badge: user?.is_verified ? <VerifiedBadge size={18} /> : undefined },
@@ -363,6 +624,18 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
 
   const renderSub = () => {
     switch (activeSection) {
+      case 'wallet':
+        return (
+          <SubScreen title="Wallet & Monétisation" onBack={() => setActiveSection(null)}>
+            <Card>
+              <Row icon="dollar-sign" label="Mon Wallet"           color="#FFD700" onPress={() => { setActiveSection(null); nav.navigate('Wallet'); }} />
+              <Row icon="shopping-bag" label="Acheter des coins"   color="#FF8C00" onPress={() => { setActiveSection(null); nav.navigate('BuyCoins'); }} />
+              <Row icon="bar-chart-2" label="Dashboard Créateur"   color="#7B3FF2" onPress={() => { setActiveSection(null); nav.navigate('CreatorDashboard'); }} />
+              <Row icon="credit-card" label="Retirer mes gains"    color="#10B981" onPress={() => { setActiveSection(null); nav.navigate('Withdraw'); }} last />
+            </Card>
+          </SubScreen>
+        );
+
       case 'verification':
         return <VerificationSubScreen onBack={() => setActiveSection(null)} user={user} />;
 
@@ -595,7 +868,7 @@ const s = StyleSheet.create({
   },
   subHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 56, paddingBottom: 14,
+    paddingHorizontal: 16, paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: { width: 40, alignItems: 'flex-start' },
@@ -634,4 +907,70 @@ const s = StyleSheet.create({
     gap: 8, borderRadius: 12, paddingVertical: 13,
   },
   verifBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+});
+
+// ── Styles wizard vérification ────────────────────────────────────────────────
+const vs = StyleSheet.create({
+  // Status card
+  statusCard:    { borderRadius: 18, borderWidth: 1, padding: 24, alignItems: 'center', gap: 10 },
+  statusTitle:   { fontSize: 20, fontWeight: '800', textAlign: 'center' },
+  statusSub:     { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  badgeRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginTop: 4 },
+  badgeName:     { fontSize: 14, fontWeight: '700' },
+  card:          { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+
+  // Hero intro
+  heroBadge:     { borderRadius: 20, padding: 24, alignItems: 'center', gap: 12 },
+  heroBadgeIcon: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1D9BF020', alignItems: 'center', justifyContent: 'center' },
+  heroBadgeCheck:{ position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  heroTitle:     { fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  heroSub:       { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  sectionLabel:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 2 },
+
+  // Critères
+  criteriaRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
+  criteriaCheck: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  criteriaText:  { fontSize: 14, lineHeight: 20, flex: 1 },
+
+  // Boutons
+  primaryBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 15 },
+  primaryBtnText:{ color: '#fff', fontSize: 15, fontWeight: '700' },
+  secondaryBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 18, borderWidth: 1 },
+  secondaryBtnText: { fontSize: 15, fontWeight: '600' },
+  navRow:        { flexDirection: 'row', gap: 10, marginTop: 4 },
+
+  // Progress bar
+  progressBar:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 14 },
+  progressStep:  { alignItems: 'center', gap: 4 },
+  progressDot:   { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  progressNum:   { fontSize: 12, fontWeight: '700' },
+  progressLabel: { fontSize: 10, fontWeight: '600' },
+  progressLine:  { flex: 1, height: 2, marginBottom: 14 },
+
+  // Step titles
+  stepTitle:     { fontSize: 20, fontWeight: '800' },
+  stepSub:       { fontSize: 13, lineHeight: 20 },
+
+  // Type cards
+  typeCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14 },
+  typeIcon:      { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  typeLabel:     { fontSize: 15, fontWeight: '700' },
+  typeSub:       { fontSize: 12, marginTop: 2 },
+
+  // Form fields
+  fieldLabel:    { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: 6 },
+  input:         { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
+  inputMulti:    { minHeight: 100, textAlignVertical: 'top', paddingTop: 12 },
+  charHint:      { fontSize: 11, marginTop: 4, textAlign: 'right' },
+
+  // Summary
+  summaryCard:   { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  summaryRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  summaryDivider:{ height: StyleSheet.hairlineWidth },
+  summaryLabel:  { fontSize: 13 },
+  summaryValue:  { fontSize: 14, fontWeight: '600', maxWidth: '60%', textAlign: 'right' },
+
+  // Notice
+  notice:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, borderWidth: 1, padding: 12 },
+  noticeText:    { fontSize: 12, lineHeight: 18, flex: 1 },
 });

@@ -19,6 +19,9 @@ import { SoundPicker } from './SoundPicker';
 import { storyService } from '../../services/storyService';
 import { apiClient, Endpoints } from '../../api';
 import type { StoryMediaType } from '../../types/story';
+import { compressVideo, cleanupTempVideos } from '../../services/videoCompressService';
+import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
+import { VideoTrimmer } from './VideoTrimmer';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -59,7 +62,7 @@ interface ModeOption {
 const MODE_OPTIONS: ModeOption[] = [
   { key: 'text',        icon: 'format-text',          iconLib: 'material', label: 'Texte',        sub: 'Message sur fond coloré',      accent: '#7B3FF2', gradient: ['#7B3FF2', '#9B65F5'] },
   { key: 'image',       icon: 'image',                iconLib: 'feather',  label: 'Photo',        sub: 'Depuis la galerie ou caméra',   accent: '#2196F3', gradient: ['#1565C0', '#2196F3'] },
-  { key: 'video',       icon: 'video',                iconLib: 'feather',  label: 'Video',        sub: 'Clip jusqu\'a 30 secondes',     accent: '#E91E63', gradient: ['#AD1457', '#E91E63'] },
+  { key: 'video',       icon: 'video',                iconLib: 'feather',  label: 'Video',        sub: 'Clip jusqu\'a 60 secondes',     accent: '#E91E63', gradient: ['#AD1457', '#E91E63'] },
   { key: 'voice',       icon: 'microphone',           iconLib: 'material', label: 'Vocal',        sub: 'Message vocal direct',          accent: '#00BCD4', gradient: ['#00838F', '#00BCD4'] },
 ];
 
@@ -169,6 +172,11 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [bgColor,       setBgColor]       = useState(TEXT_BG_COLORS[0]);
   const [fontStyleKey,  setFontStyleKey]  = useState('classic');
   const [uploading,     setUploading]     = useState(false);
+  const [uploadStep,    setUploadStep]    = useState('');
+  const [uploadPct,     setUploadPct]     = useState(0);
+  const [showTrimmer,   setShowTrimmer]   = useState(false);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const tempFilesRef = useRef<string[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [recording,     setRecording]     = useState(false);
   const [recordTime,    setRecordTime]    = useState('00:00');
@@ -188,6 +196,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setCaption(''); setBgColor(TEXT_BG_COLORS[0]); setFontStyleKey('classic');
     setShowTextInput(false); setUploading(false); setRecording(false);
     setRecordTime('00:00'); setShowSuccess(false);
+    setShowTrimmer(false); setVideoDuration(0);
     stopAudioPreview();
     onClose();
   };
@@ -223,11 +232,19 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const pickVideo = async (source: 'gallery' | 'camera') => {
     try {
       const res = await (source === 'camera' ? launchCamera : launchImageLibrary)({
-        mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any, durationLimit: 30,
+        mediaType: 'video', selectionLimit: 1, videoQuality: 'high' as any,
       });
       if (res.didCancel || !res.assets?.[0]?.uri) return;
-      setLocalUri(await normalizeUri(res.assets[0].uri));
-      setStep('preview');
+      const asset    = res.assets[0];
+      const uri      = await normalizeUri(asset.uri!);
+      const duration = (asset.duration ?? 0) / 1000; // ms → s
+      setLocalUri(uri);
+      setVideoDuration(duration);
+      if (duration > 60) {
+        setShowTrimmer(true); // affiche le trimmer
+      } else {
+        setStep('preview');
+      }
     } catch (e: any) { Alert.alert('Erreur', e?.message); }
   };
 
@@ -286,38 +303,47 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   // ── Upload ────────────────────────────────────────────────────────────────
 
-  const uploadImage = async (uri: string) => {
-    const fd = new FormData();
-    fd.append('file', { uri: await normalizeUri(uri), name: `s_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
-    const r = await apiClient.upload<{ uploaded: Array<{ url: string }> }>(Endpoints.upload.images('stories'), fd);
-    const url = r.data?.uploaded?.[0]?.url;
-    if (!url) throw new Error('URL image manquante');
-    return url;
-  };
-
-  const uploadVideo = async (uri: string) => {
-    const fd = new FormData();
-    fd.append('file', { uri: await normalizeUri(uri), name: `s_${Date.now()}.mp4`, type: 'video/mp4' } as any);
-    return (await apiClient.upload<{ url: string; thumbnail_url?: string; duration?: number }>(Endpoints.upload.video('stories'), fd)).data;
-  };
-
-  const uploadAudio = async (uri: string) => {
+  const doUploadImage = async (uri: string) => {
+    setUploadStep('Upload image…'); setUploadPct(30);
     const normalized = await normalizeUri(uri);
-    const ext = normalized.split('.').pop()?.toLowerCase() ?? 'mp4';
+    const result = await uploadImageFromUri(normalized, 'stories', `s_${Date.now()}.jpg`, 'image/jpeg');
+    setUploadPct(100);
+    return result.url;
+  };
+
+  const doUploadVideo = async (uri: string) => {
+    // Étape 1 — compression
+    setUploadStep('Compression…'); setUploadPct(0);
+    const compressed = await compressVideo(uri, {
+      maxDurationSec: 60,
+      crf: 23,
+      onProgress: p => setUploadPct(Math.round(p * 0.6)),
+    });
+    tempFilesRef.current.push(compressed.uri);
+
+    // Étape 2 — upload direct R2
+    setUploadStep('Upload…'); setUploadPct(60);
+    const result = await uploadVideoFromUri(compressed.uri, 'stories', `s_${Date.now()}.mp4`, 'video/mp4');
+    setUploadPct(100);
+    return { url: result.url, duration: compressed.durationSec };
+  };
+
+  const doUploadAudio = async (uri: string) => {
+    const ext = uri.split('.').pop()?.toLowerCase() ?? 'mp4';
     const mimeMap: Record<string, string> = {
       mp3: 'audio/mpeg', m4a: 'audio/x-m4a', aac: 'audio/aac',
       wav: 'audio/wav', ogg: 'audio/ogg', mp4: 'audio/mp4',
     };
-    const type = mimeMap[ext] ?? 'audio/mp4';
-    const fd = new FormData();
-    fd.append('file', { uri: normalized, name: `s_${Date.now()}.${ext}`, type } as any);
-    return (await apiClient.upload<{ url: string }>(Endpoints.upload.audio('stories'), fd)).data?.url;
+    const mimeType = mimeMap[ext] ?? 'audio/mp4';
+    const result = await uploadAudioFile(uri, `s_${Date.now()}.${ext}`, mimeType, 'stories');
+    return result.url;
   };
 
   // ── Publish ───────────────────────────────────────────────────────────────
 
   const handlePublish = async () => {
     setUploading(true);
+    setUploadPct(0);
     try {
       let media_url: string | undefined;
       let media_type: StoryMediaType = 'image';
@@ -327,15 +353,31 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       let background_color: string | undefined;
 
       switch (mode) {
-        case 'text':   media_type = 'text'; background_color = bgColor; break;
-        case 'image':  media_url = await uploadImage(localUri!); media_type = 'image'; thumbnail_url = media_url; break;
-        case 'video':  { const v = await uploadVideo(localUri!); media_url = v.url; media_type = 'video'; thumbnail_url = v.thumbnail_url; duration_sec = v.duration ? Math.min(Math.ceil(v.duration), 30) : 10; break; }
-        case 'voice':  audio_url = await uploadAudio(audioUri!); media_type = 'voice'; background_color = '#1A237E'; duration_sec = 15; break;
+        case 'text':
+          media_type = 'text'; background_color = bgColor;
+          break;
+        case 'image':
+          media_url = await doUploadImage(localUri!);
+          media_type = 'image'; thumbnail_url = media_url;
+          break;
+        case 'video': {
+          const v = await doUploadVideo(localUri!);
+          media_url = v.url; media_type = 'video';
+          duration_sec = Math.min(Math.ceil(v.duration), 60);
+          break;
+        }
+        case 'voice': {
+          const au = audioUri!;
+          setUploadStep('Upload vocal…'); setUploadPct(20);
+          audio_url = (au.startsWith('http') ? au : await doUploadAudio(au));
+          media_type = 'voice'; background_color = '#1A237E'; duration_sec = 15;
+          break;
+        }
       }
 
-      // Audio attaché à n'importe quel mode (sauf voice déjà géré)
       if (audioUri && mode !== 'voice') {
-        audio_url = await uploadAudio(audioUri!);
+        setUploadStep('Upload son…'); setUploadPct(80);
+        audio_url = audioUri.startsWith('http') ? audioUri : await doUploadAudio(audioUri);
         if (mode === 'text') { media_type = 'audio'; background_color = background_color ?? bgColor; }
         duration_sec = 15;
       }
@@ -347,10 +389,15 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         font_style: mode === 'text' ? fontStyleKey : undefined,
       });
 
+      await cleanupTempVideos(tempFilesRef.current);
+      tempFilesRef.current = [];
+
       setUploading(false);
       setShowSuccess(true);
       setTimeout(() => { onCreated(); resetAndClose(); }, 2400);
     } catch (e: any) {
+      await cleanupTempVideos(tempFilesRef.current);
+      tempFilesRef.current = [];
       setUploading(false);
       Alert.alert('Erreur', e?.message ?? 'Impossible de publier');
     }
@@ -543,8 +590,27 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         />
       )}
 
+      {/* ══════════════ TRIMMER — si vidéo > 60s ════════════════════════════ */}
+      {showTrimmer && localUri && (
+        <VideoTrimmer
+          uri={localUri}
+          duration={videoDuration}
+          onConfirm={(trimmedUri) => {
+            setLocalUri(trimmedUri);
+            tempFilesRef.current.push(trimmedUri);
+            setShowTrimmer(false);
+            setStep('preview');
+          }}
+          onCancel={() => {
+            setShowTrimmer(false);
+            setLocalUri(null);
+            setStep('pick_media');
+          }}
+        />
+      )}
+
       {/* ══════════════ STEP 3 — Preview ════════════════════════════════════ */}
-      {step === 'preview' && (
+      {!showTrimmer && step === 'preview' && (
         <View style={s.previewRoot}>
           <StatusBar hidden />
 
@@ -686,13 +752,22 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={s.publishBtnInner}
               >
-                {uploading
-                  ? <ActivityIndicator size={16} color="#fff" />
-                  : <>
-                      <Text style={s.publishLabel}>Publier</Text>
-                      <Icon name="send" size={13} color="#fff" />
-                    </>
-                }
+                {uploading ? (
+                  <View style={{ alignItems: 'center', minWidth: 120 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <ActivityIndicator size={14} color="#fff" />
+                      <Text style={[s.publishLabel, { fontSize: 12 }]}>{uploadStep}</Text>
+                    </View>
+                    <View style={{ width: 120, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }}>
+                      <View style={{ width: `${uploadPct}%` as any, height: 3, backgroundColor: '#fff', borderRadius: 2 }} />
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={s.publishLabel}>Publier</Text>
+                    <Icon name="send" size={13} color="#fff" />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>

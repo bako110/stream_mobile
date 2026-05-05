@@ -53,6 +53,9 @@ const Slide: React.FC<SlideProps> = memo(({ reel, isActive, muted, onToggleMute 
 
   return (
     <View style={{ width: SW, height: SH, backgroundColor: '#000' }}>
+      {reel.thumbnail_url && (
+        <Image source={{ uri: reel.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      )}
       <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />
       {/* Tap pour pause — View sans pointerEvents="none" capte le tap mais laisse le scroll parent */}
       <TouchableOpacity
