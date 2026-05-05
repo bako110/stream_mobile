@@ -15,7 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
-import type { CommunityData, CommunityMemberData, BlockedMemberData } from '../../services/communityService';
+import type { CommunityData, CommunityMemberData, BlockedMemberData, VerificationRequest } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -41,6 +41,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [myRole,         setMyRole]         = useState<string | null>(null);
   const [actionLoading,  setActionLoading]  = useState(false);
   const [blockedMembers, setBlockedMembers] = useState<BlockedMemberData[]>([]);
+  const [isGlobalAdmin,  setIsGlobalAdmin]  = useState(false);
+  const [verifyLoading,  setVerifyLoading]  = useState(false);
+  const [vrStatus,       setVrStatus]       = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [vrLoading,      setVrLoading]      = useState(false);
 
   // Image viewer plein écran
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
@@ -83,9 +87,17 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       const uid = String(me.id);
       setMyId(uid);
       setMyRole(role);
+      const globalAdmin = (me as any).role === 'admin';
+      setIsGlobalAdmin(globalAdmin);
       setIsMember(membersList.some((m: CommunityMemberData) => m.user_id === uid));
       if (role === 'admin' || role === 'moderator') {
         communityService.getBlockedMembers(communityId).then(setBlockedMembers).catch(() => {});
+      }
+      // Charger le statut de la demande de vérification (admin communauté ou admin plateforme)
+      if (role === 'admin' || globalAdmin) {
+        communityService.getVerificationRequest(communityId)
+          .then(vr => setVrStatus(vr ? (vr.status as any) : 'none'))
+          .catch(() => {});
       }
     } catch {}
     finally { setLoading(false); }
@@ -284,6 +296,53 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               await apiClient.delete(`/api/v1/communities/${communityId}`);
               nav.goBack();
             } catch { Alert.alert('Erreur', 'Impossible de supprimer'); }
+          },
+        },
+      ],
+    );
+  }
+
+  async function handleRequestVerification() {
+    if (!community) return;
+    Alert.prompt(
+      'Demander la vérification',
+      'Expliquez brièvement pourquoi cette communauté mérite le badge officiel (optionnel)',
+      async (reason) => {
+        setVrLoading(true);
+        try {
+          await communityService.requestVerification(communityId, reason || undefined);
+          setVrStatus('pending');
+          Alert.alert('Demande envoyée', 'Les administrateurs de la plateforme vont examiner votre demande.');
+        } catch (e: any) {
+          Alert.alert('Erreur', e?.message ?? 'Impossible d\'envoyer la demande');
+        } finally { setVrLoading(false); }
+      },
+      'plain-text',
+    );
+  }
+
+  async function handleToggleVerify() {
+    if (!community) return;
+    const willVerify = !community.is_verified;
+    Alert.alert(
+      willVerify ? 'Vérifier la communauté' : 'Retirer la vérification',
+      willVerify
+        ? `Ajouter le badge de vérification officiel à "${community.name}" ?`
+        : `Retirer le badge de vérification de "${community.name}" ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: willVerify ? 'Vérifier' : 'Retirer',
+          onPress: async () => {
+            setVerifyLoading(true);
+            try {
+              const updated = willVerify
+                ? await communityService.verify(communityId)
+                : await communityService.unverify(communityId);
+              setCommunity(updated);
+            } catch (e: any) {
+              Alert.alert('Erreur', e?.message ?? 'Impossible de modifier la vérification');
+            } finally { setVerifyLoading(false); }
           },
         },
       ],
@@ -674,7 +733,14 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             </View>
 
             <View style={s.infoSection}>
-              <Text style={[s.name, { color: colors.textPrimary }]}>{community.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={[s.name, { color: colors.textPrimary }]}>{community.name}</Text>
+                {community.is_verified && (
+                  <View style={s.verifiedBadge}>
+                    <Icon name="check" size={11} color="#fff" />
+                  </View>
+                )}
+              </View>
               {community.description ? (
                 <Text style={[s.desc, { color: colors.textSecondary }]}>{community.description}</Text>
               ) : null}
@@ -734,6 +800,77 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   </TouchableOpacity>
                 )}
               </View>
+
+              {isGlobalAdmin && (
+                <TouchableOpacity
+                  style={[s.vrBtn, { backgroundColor: '#7B3FF215', borderColor: '#7B3FF240', marginBottom: 8 }]}
+                  onPress={() => nav.navigate('AdminVerification' as any)}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="list" size={15} color="#7B3FF2" />
+                  <Text style={[s.vrBtnText, { color: '#7B3FF2' }]}>Gérer les demandes de vérification</Text>
+                </TouchableOpacity>
+              )}
+
+              {isGlobalAdmin && (
+                <TouchableOpacity
+                  style={[s.verifyBtn, {
+                    backgroundColor: community.is_verified ? '#EF444415' : '#1D9BF015',
+                    borderColor: community.is_verified ? '#EF444440' : '#1D9BF040',
+                  }]}
+                  onPress={handleToggleVerify}
+                  disabled={verifyLoading}
+                  activeOpacity={0.7}
+                >
+                  {verifyLoading ? (
+                    <ActivityIndicator size="small" color={community.is_verified ? '#EF4444' : '#1D9BF0'} />
+                  ) : (
+                    <>
+                      <View style={[s.verifiedBadge, { backgroundColor: community.is_verified ? '#EF4444' : '#1D9BF0' }]}>
+                        <Icon name="check" size={11} color="#fff" />
+                      </View>
+                      <Text style={[s.verifyBtnText, { color: community.is_verified ? '#EF4444' : '#1D9BF0' }]}>
+                        {community.is_verified ? 'Retirer la vérification' : 'Vérifier la communauté'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {/* Bouton demande vérification — admin communauté seulement, si pas encore vérifié */}
+              {isAdmin && !isGlobalAdmin && !community.is_verified && (
+                <TouchableOpacity
+                  style={[s.vrBtn, {
+                    backgroundColor: vrStatus === 'pending'  ? '#F59E0B15' :
+                                     vrStatus === 'rejected' ? '#EF444415' : '#1D9BF015',
+                    borderColor:     vrStatus === 'pending'  ? '#F59E0B40' :
+                                     vrStatus === 'rejected' ? '#EF444440' : '#1D9BF040',
+                  }]}
+                  onPress={vrStatus === 'none' || vrStatus === 'rejected' ? handleRequestVerification : undefined}
+                  disabled={vrLoading || vrStatus === 'pending'}
+                  activeOpacity={vrStatus === 'pending' ? 1 : 0.7}
+                >
+                  {vrLoading ? (
+                    <ActivityIndicator size="small" color="#1D9BF0" />
+                  ) : (
+                    <>
+                      <Icon
+                        name={vrStatus === 'pending' ? 'clock' : vrStatus === 'rejected' ? 'x-circle' : 'shield'}
+                        size={15}
+                        color={vrStatus === 'pending' ? '#F59E0B' : vrStatus === 'rejected' ? '#EF4444' : '#1D9BF0'}
+                      />
+                      <Text style={[s.vrBtnText, {
+                        color: vrStatus === 'pending'  ? '#F59E0B' :
+                               vrStatus === 'rejected' ? '#EF4444' : '#1D9BF0',
+                      }]}>
+                        {vrStatus === 'pending'  ? 'Demande en cours d\'examen…' :
+                         vrStatus === 'rejected' ? 'Refusée — Renvoyer une demande' :
+                         'Demander la vérification officielle'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
 
               <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>MEMBRES ({members.length})</Text>
             </View>
@@ -997,6 +1134,27 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center', justifyContent: 'center',
   },
+
+  // Demande de vérification
+  vrBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 10, borderRadius: 12, borderWidth: 1,
+    marginBottom: 12,
+  },
+  vrBtnText: { fontSize: 13, fontWeight: '600' },
+
+  // Verification badge (admin plateforme)
+  verifiedBadge: {
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: '#1D9BF0',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  verifyBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 10, borderRadius: 12, borderWidth: 1,
+    marginBottom: 16,
+  },
+  verifyBtnText: { fontSize: 13, fontWeight: '700' },
 
   // Sécurité
   secSection: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },

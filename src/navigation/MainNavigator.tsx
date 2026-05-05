@@ -46,7 +46,8 @@ import { EventDetailScreen }     from '../screens/Detail/EventDetailScreen';
 import { FilmDetailScreen }      from '../screens/Detail/FilmDetailScreen';
 import { SerieEpisodesScreen }   from '../screens/Detail/SerieEpisodesScreen';
 import { VideoPlayerScreen }     from '../screens/Detail/VideoPlayerScreen';
-import { CommunityDetailScreen } from '../screens/Detail/CommunityDetailScreen';
+import { CommunityDetailScreen }   from '../screens/Detail/CommunityDetailScreen';
+import { AdminVerificationScreen } from '../screens/Detail/AdminVerificationScreen';
 import { PostDetailScreen }      from '../screens/Detail/PostDetailScreen';
 import { UserProfileScreen }     from '../screens/Profile/UserProfileScreen';
 import { EditProfileScreen }     from '../screens/Profile/EditProfileScreen';
@@ -118,7 +119,8 @@ export type MainStackParamList = {
   CreatorDashboard: undefined;
   Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
-  Boost:           undefined;
+  Boost:                undefined;
+  AdminVerification:    undefined;
 };
 
 type MainNav = NativeStackNavigationProp<MainStackParamList>;
@@ -236,7 +238,8 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CreatorDashboard" component={CreatorDashboardScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Withdraw"       component={WithdrawScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="Boost"          component={BoostScreen}           options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Boost"             component={BoostScreen}             options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="AdminVerification" component={AdminVerificationScreen}  options={{ animation: 'slide_from_right' }} />
       </Stack.Navigator>
     </>
   );
