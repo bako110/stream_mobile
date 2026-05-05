@@ -5,6 +5,7 @@ import {
   ActivityIndicator, Image, Alert, Modal, Pressable,
   ScrollView, Dimensions, Animated,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
@@ -77,7 +78,8 @@ export const CommunityChatScreen: React.FC = () => {
   const [menuMsg,        setMenuMsg]        = useState<CommunityMessage | null>(null);
   const [pinnedMsgs,     setPinnedMsgs]     = useState<CommunityMessage[]>([]);
   const [showPinned,     setShowPinned]     = useState(false);
-  const [communityTitle, setCommunityTitle] = useState(communityName);
+  const [communityTitle,    setCommunityTitle]    = useState(communityName);
+  const [communityVerified, setCommunityVerified] = useState(false);
   const [typingUsers,    setTypingUsers]    = useState<TypingUser[]>([]);
   const [imgViewerList,  setImgViewerList]  = useState<string[]>([]);
   const [imgViewerIdx,   setImgViewerIdx]   = useState(0);
@@ -150,6 +152,8 @@ export const CommunityChatScreen: React.FC = () => {
         setTypingUsers(p => p.filter(u => u.user_id !== payload.user_id));
       } else if (payload.type === 'community_updated') {
         setCommunityTitle(payload.name);
+      } else if (payload.type === 'community_verified') {
+        setCommunityVerified(payload.is_verified);
       } else if (payload.type === 'community_deleted') {
         Alert.alert('Communauté supprimée', 'Cette communauté a été supprimée.', [{ text: 'OK', onPress: () => nav.goBack() }]);
       }
@@ -188,6 +192,7 @@ export const CommunityChatScreen: React.FC = () => {
       setMyId(String(u.id));
       communityService.getMyRole(communityId).then(setMyRole).catch(() => {});
     }).catch(() => {});
+    communityService.getById(communityId).then(c => setCommunityVerified(c.is_verified)).catch(() => {});
     loadMessages(1, false, 'discussion');
     loadPinned();
   }, [communityId]);
@@ -676,38 +681,74 @@ export const CommunityChatScreen: React.FC = () => {
       <StatusBar barStyle="light-content" backgroundColor={colors.surface} />
 
       {/* ── Header ── */}
-      <View style={[S.header, { backgroundColor: colors.surface, paddingTop: STATUS_H + 6, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={S.headerBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <LinearGradient
+        colors={[colors.surface, colors.surface]}
+        style={[S.header, { paddingTop: STATUS_H + 8, borderBottomColor: colors.divider }]}
+      >
+        <TouchableOpacity onPress={() => nav.goBack()} style={S.headerBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={[S.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{communityTitle}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
-            <View style={[S.onlineDot, { backgroundColor: isConnected ? '#22C55E' : '#94A3B8' }]} />
+
+        <TouchableOpacity
+          style={{ flex: 1, marginLeft: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          onPress={() => nav.navigate('CommunityDetail', { communityId })}
+          activeOpacity={0.7}
+        >
+          {/* Avatar communauté */}
+          <View style={S.headerAvatar}>
+            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>
+                {(communityTitle || '?')[0].toUpperCase()}
+              </Text>
+            </LinearGradient>
+            {/* Dot connecté */}
+            <View style={[S.headerAvatarDot, { backgroundColor: isConnected ? '#22C55E' : '#94A3B8' }]} />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={[S.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{communityTitle}</Text>
+              {communityVerified && (
+                <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="check" size={9} color="#fff" />
+                </View>
+              )}
+            </View>
             <Text style={[S.headerSub, { color: colors.textTertiary }]}>
-              {isConnected ? (onlineCount > 0 ? `${onlineCount} en ligne` : 'En ligne') : 'Connexion…'}
+              {isConnected ? (onlineCount > 0 ? `${onlineCount} membres en ligne` : 'En ligne') : 'Connexion…'}
             </Text>
           </View>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 4 }}>
+        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', gap: 2 }}>
           {pinnedMsgs.length > 0 && (
             <TouchableOpacity onPress={() => setShowPinned(true)} style={S.headerBtn}>
-              <Icon name="bookmark" size={18} color="#F59E0B" />
+              <View style={[S.headerBtnInner, { backgroundColor: '#F59E0B18' }]}>
+                <Icon name="bookmark" size={16} color="#F59E0B" />
+              </View>
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => nav.navigate('CommunityDetail', { communityId })} style={S.headerBtn}>
-            <Icon name="info" size={20} color={colors.textTertiary} />
+            <View style={[S.headerBtnInner, { backgroundColor: colors.backgroundSecondary }]}>
+              <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
+            </View>
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* ── Onglets ── */}
       <View style={[S.tabBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         {TABS.map(tab => {
           const active = activeTab === tab.key;
           return (
-            <TouchableOpacity key={tab.key} style={[S.tabItem, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]} onPress={() => setActiveTab(tab.key)}>
-              <Icon name={tab.icon} size={13} color={active ? colors.primary : colors.textTertiary} />
+            <TouchableOpacity
+              key={tab.key}
+              style={[S.tabItem, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <View style={[S.tabIconWrap, active && { backgroundColor: colors.primary + '18' }]}>
+                <Icon name={tab.icon} size={13} color={active ? colors.primary : colors.textTertiary} />
+              </View>
               <Text style={[S.tabLabel, { color: active ? colors.primary : colors.textTertiary }]}>{tab.label}</Text>
             </TouchableOpacity>
           );
@@ -782,30 +823,41 @@ export const CommunityChatScreen: React.FC = () => {
 
             {/* Barre de saisie */}
             <View style={[S.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
-              <TouchableOpacity onPress={handlePickMedia} disabled={sending} style={S.inputIconBtn}>
-                <Icon name="image" size={21} color={colors.textTertiary} />
-              </TouchableOpacity>
-              {canAnnounce && (
-                <TouchableOpacity onPress={() => setPollModal(true)} disabled={sending} style={S.inputIconBtn}>
-                  <Icon name="bar-chart-2" size={21} color={colors.textTertiary} />
+              <View style={[S.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                <TouchableOpacity onPress={handlePickMedia} disabled={sending} style={S.inputIconBtn}>
+                  <Icon name="image" size={19} color={colors.textTertiary} />
                 </TouchableOpacity>
-              )}
-              <TextInput
-                ref={inputRef}
-                style={[S.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.border ?? colors.divider }]}
-                value={text}
-                onChangeText={handleTextChange}
-                placeholder={activeTab === 'announcements' ? 'Écrire une annonce…' : 'Message…'}
-                placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
-                multiline maxLength={2000}
-              />
-              <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }], opacity: sendBtnAnim }}>
+                {canAnnounce && (
+                  <TouchableOpacity onPress={() => setPollModal(true)} disabled={sending} style={S.inputIconBtn}>
+                    <Icon name="bar-chart-2" size={19} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+                <TextInput
+                  ref={inputRef}
+                  style={[S.input, { color: colors.textPrimary }]}
+                  value={text}
+                  onChangeText={handleTextChange}
+                  placeholder={activeTab === 'announcements' ? 'Écrire une annonce…' : 'Message…'}
+                  placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
+                  multiline maxLength={2000}
+                />
+              </View>
+              <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
                 <TouchableOpacity
-                  style={[S.sendBtn, { backgroundColor: text.trim() ? colors.primary : colors.backgroundSecondary }]}
+                  style={S.sendBtn}
                   onPress={handleSend}
                   disabled={!text.trim() || sending}
                 >
-                  {sending ? <ActivityIndicator size="small" color={text.trim() ? '#fff' : colors.textTertiary} /> : <Icon name={editingMsg ? 'check' : 'send'} size={17} color={text.trim() ? '#fff' : colors.textTertiary} />}
+                  <LinearGradient
+                    colors={text.trim() ? ['#7B3FF2', '#E0389A'] : [colors.backgroundSecondary, colors.backgroundSecondary]}
+                    style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  >
+                    {sending
+                      ? <ActivityIndicator size="small" color={text.trim() ? '#fff' : colors.textTertiary} />
+                      : <Icon name={editingMsg ? 'check' : 'send'} size={17} color={text.trim() ? '#fff' : colors.textTertiary} />
+                    }
+                  </LinearGradient>
                 </TouchableOpacity>
               </Animated.View>
             </View>
@@ -981,37 +1033,40 @@ const S = StyleSheet.create({
   root: { flex: 1 },
 
   // Header
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerBack: { padding: 6 },
-  headerTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.3 },
-  headerSub: { fontSize: 11 },
-  onlineDot: { width: 7, height: 7, borderRadius: 4 },
-  headerBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  headerBack: { padding: 6, marginRight: 2 },
+  headerAvatar: { width: 38, height: 38, borderRadius: 12, overflow: 'hidden', position: 'relative' },
+  headerAvatarDot: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#fff' },
+  headerTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
+  headerSub: { fontSize: 11, marginTop: 1 },
+  headerBtn: { padding: 4 },
+  headerBtnInner: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   // Tabs
   tabBar: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
-  tabItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10 },
+  tabItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 },
+  tabIconWrap: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   tabLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
 
   // Date separator
-  dateSepRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 14, paddingHorizontal: 4 },
+  dateSepRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, paddingHorizontal: 16 },
   dateSepLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  dateSepPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginHorizontal: 8 },
-  dateSepText: { fontSize: 11, fontWeight: '600' },
+  dateSepPill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginHorizontal: 10 },
+  dateSepText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
 
   // Message rows
   msgRow: { flexDirection: 'row', alignItems: 'flex-end' },
   msgRowMe: { justifyContent: 'flex-end' },
   msgRowOther: { justifyContent: 'flex-start' },
-  senderName: { fontSize: 12, fontWeight: '700' },
+  senderName: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
 
   // Bubble
-  bubble: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18, maxWidth: '100%' },
-  msgText: { fontSize: 15, lineHeight: 21 },
-  msgMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 4, gap: 2 },
+  bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, maxWidth: '100%' },
+  msgText: { fontSize: 15, lineHeight: 22 },
+  msgMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 5, gap: 3 },
   edited: { fontSize: 10, fontStyle: 'italic' },
   msgTime: { fontSize: 10 },
-  floatTime: { fontSize: 10, marginTop: 2 },
+  floatTime: { fontSize: 10, marginTop: 3 },
   pinnedRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
 
   // Reply
@@ -1071,10 +1126,11 @@ const S = StyleSheet.create({
   editBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: 2 },
 
   // Input bar
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 8, gap: 6, borderTopWidth: StyleSheet.hairlineWidth },
-  inputIconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  input: { flex: 1, borderRadius: 22, paddingHorizontal: 15, paddingVertical: 10, fontSize: 15, maxHeight: 120, borderWidth: StyleSheet.hairlineWidth },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  inputRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingVertical: 4, paddingHorizontal: 4 },
+  inputIconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
+  input: { flex: 1, paddingHorizontal: 8, paddingVertical: 8, fontSize: 15, maxHeight: 120 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden' },
 
   // Context menu
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },

@@ -348,7 +348,7 @@ export const FeedScreen: React.FC = () => {
 
   useEffect(() => {
     loadLive();
-    communityService.discover(1, 8).then(data => setTrendingComm(Array.isArray(data) ? data.slice(0, 5) : [])).catch(() => {});
+    communityService.list(1, 8).then(data => setTrendingComm(Array.isArray(data) ? data.slice(0, 5) : [])).catch(() => {});
   }, []);
 
   // Rafraîchissement temps réel : reload quand un autre utilisateur publie
