@@ -372,6 +372,16 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 <Icon name="message-circle" size={16} color={colors.textPrimary} />
               </TouchableOpacity>
               <TouchableOpacity
+                style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                onPress={() => navigation.navigate('Transfer', {
+                  recipientId:     profile!.id,
+                  recipientName:   profile!.display_name || profile!.username,
+                  recipientAvatar: profile!.avatar_url ?? undefined,
+                })}
+              >
+                <Text style={{ fontSize: 16 }}>🪙</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.msgBtn, {
                   backgroundColor: isBlocked ? '#FF3B3018' : colors.surfaceElevated,
                   borderColor: isBlocked ? '#FF3B30' : colors.border,

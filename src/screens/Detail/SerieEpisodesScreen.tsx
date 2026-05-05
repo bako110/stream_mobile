@@ -51,13 +51,20 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
     return h > 0 ? `${h}h ${m}min` : `${m} min`;
   };
 
-  const handlePlay = (ep: Episode) => {
-    if (ep.video_url) {
-      navigation.navigate('VideoPlayer', {
-        url: ep.video_url,
-        title: `${item.title} · E${ep.number} — ${ep.title}`,
-      });
-    }
+  const handlePlay = async (ep: Episode) => {
+    if (!ep.video_url) return;
+    const title = `${item.title} · E${ep.number} — ${ep.title}`;
+    const video = await contentService.getEpisodeVideo(ep.id).catch(() => null);
+    navigation.navigate('VideoPlayer', {
+      url:          ep.video_url,
+      title,
+      videoId:      video?.id ?? undefined,
+      contentId:    item.id,
+      episodeId:    ep.id,
+      contentType:  'serie_episode' as const,
+      thumbnailUrl: ep.thumbnail_url ?? undefined,
+      totalSeconds: ep.duration_sec  ?? video?.duration_sec ?? undefined,
+    });
   };
 
   return (

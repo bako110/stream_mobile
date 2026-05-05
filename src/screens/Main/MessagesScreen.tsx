@@ -2,7 +2,7 @@
  * MessagesScreen â€” Messagerie directe FoliX
  * ConnectÃ© Ã  l'API /api/v1/messages/conversations
  */
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Platform, StatusBar,
@@ -49,7 +49,7 @@ function accentFor(id: string): string {
   return ACCENT_COLORS[h % ACCENT_COLORS.length]!;
 }
 
-function formatLastSeen(iso?: string): string {
+function formatLastSeen(iso?: string | null): string {
   if (!iso) return 'Hors ligne';
   const d = new Date(iso);
   const now = new Date();
@@ -69,7 +69,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav               = useNavigation<any>();
-  const { clearUnreadMessages, addListener, removeListener, missedCallCount, clearMissedCalls } = useWs();
+  const { clearUnreadMessages, addListener, removeListener, missedCallCount, clearMissedCalls, sendMessage: sendWsMessage, isConnected } = useWs();
   const [activeTab,  setActiveTab]  = useState<'messages' | 'calls'>('messages');
   const [callHistory, setCallHistory] = useState<CallRecord[]>([]);
 
@@ -84,19 +84,76 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
     try {
       const data = await messageService.getConversations();
       setConversations(data);
+      return data;
     } catch {
       setConversations([]);
+      return [];
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); clearUnreadMessages(); }, []);
+  useEffect(() => { clearUnreadMessages(); }, []);
 
+  const isConnectedRef = useRef(isConnected);
+  useEffect(() => { isConnectedRef.current = isConnected; }, [isConnected]);
+
+  const lastLoadAt = useRef<number>(0);
+
+  const loadAndSubscribe = useCallback((showSkeleton = false) => {
+    if (showSkeleton) setLoading(true);
+    lastLoadAt.current = Date.now();
+    messageService.getConversations()
+      .then(data => {
+        setConversations(data);
+        if (!isConnectedRef.current) return;
+        data.forEach(c => {
+          if (c.partner_id) sendWsMessage({ type: 'subscribe_presence', user_id: c.partner_id });
+        });
+      })
+      .catch(() => {})
+      .finally(() => { setLoading(false); setRefreshing(false); });
+  }, [sendWsMessage]);
+
+  const isFirstLoad = useRef(true);
   useFocusEffect(useCallback(() => {
     setCallHistory(callHistoryService.getAll());
-  }, []));
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      loadAndSubscribe(true);
+    } else {
+      // Re-focus : recharge seulement si > 30s depuis le dernier chargement
+      if (Date.now() - lastLoadAt.current > 30_000) {
+        loadAndSubscribe(false);
+      } else {
+        // Données fraîches — juste re-souscrire présence sans recharger
+        if (isConnectedRef.current) {
+          setConversations(prev => {
+            prev.forEach(c => {
+              if (c.partner_id) sendWsMessage({ type: 'subscribe_presence', user_id: c.partner_id });
+            });
+            return prev;
+          });
+        }
+      }
+    }
+  }, [loadAndSubscribe, sendWsMessage]));
+
+  // Reconnexion WS : re-souscrire présence sans recharger si données récentes
+  useEffect(() => {
+    if (!isConnected) return;
+    if (Date.now() - lastLoadAt.current > 30_000) {
+      loadAndSubscribe(false);
+    } else {
+      setConversations(prev => {
+        prev.forEach(c => {
+          if (c.partner_id) sendWsMessage({ type: 'subscribe_presence', user_id: c.partner_id });
+        });
+        return prev;
+      });
+    }
+  }, [isConnected, loadAndSubscribe, sendWsMessage]);
 
   // Real-time updates via WS
   useEffect(() => {
@@ -107,7 +164,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
         setConversations(prev => {
           const realPartner = prev.find(c => c.partner_id === senderId) ? senderId
             : prev.find(c => c.partner_id === receiverId) ? receiverId
-            : senderId; // default to sender for new conversations
+            : senderId;
 
           const existing = prev.find(c => c.partner_id === realPartner);
           if (existing) {
@@ -120,12 +177,17 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
             const target = updated.find(c => c.partner_id === realPartner)!;
             return [target, ...updated.filter(c => c.partner_id !== realPartner)];
           }
-          // New conversation — reload from API
           load();
           return prev;
         });
+      } else if (payload.type === 'presence') {
+        setConversations(prev => prev.map(c =>
+          c.partner_id === payload.user_id
+            ? { ...c, partner: c.partner ? { ...c.partner, is_online: payload.is_online === true, last_seen_at: payload.last_seen_at ?? c.partner.last_seen_at } : c.partner }
+            : c,
+        ));
       } else if (payload.type === 'message_deleted') {
-        load(); // Reload to get updated last_message
+        load();
       }
     };
     addListener(handler);
@@ -246,11 +308,12 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
           <FlatList
             data={filtered}
             keyExtractor={c => c.partner_id}
+            extraData={filtered}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={() => { setRefreshing(true); load(); }}
+                onRefresh={() => { setRefreshing(true); loadAndSubscribe(false); }}
                 tintColor={colors.primary}
               />
             }

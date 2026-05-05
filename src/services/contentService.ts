@@ -66,4 +66,15 @@ export const contentService = {
     const res = await apiClient.get<VideoMeta[]>(Endpoints.videos.byContent(contentId));
     return res.data;
   },
+
+  // ── Vidéo épisode ─────────────────────────────────────────────────────────
+  async getEpisodeVideo(episodeId: string): Promise<VideoMeta | null> {
+    try {
+      const res = await apiClient.get<VideoMeta[]>(Endpoints.videos.byEpisode(episodeId));
+      const list = Array.isArray(res.data) ? res.data : [];
+      return list.find(v => v.is_default) ?? list[0] ?? null;
+    } catch {
+      return null;
+    }
+  },
 };

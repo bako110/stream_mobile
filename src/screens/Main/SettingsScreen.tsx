@@ -628,10 +628,12 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
         return (
           <SubScreen title="Wallet & Monétisation" onBack={() => setActiveSection(null)}>
             <Card>
-              <Row icon="dollar-sign" label="Mon Wallet"           color="#FFD700" onPress={() => { setActiveSection(null); nav.navigate('Wallet'); }} />
-              <Row icon="shopping-bag" label="Acheter des coins"   color="#FF8C00" onPress={() => { setActiveSection(null); nav.navigate('BuyCoins'); }} />
-              <Row icon="bar-chart-2" label="Dashboard Créateur"   color="#7B3FF2" onPress={() => { setActiveSection(null); nav.navigate('CreatorDashboard'); }} />
-              <Row icon="credit-card" label="Retirer mes gains"    color="#10B981" onPress={() => { setActiveSection(null); nav.navigate('Withdraw'); }} last />
+              <Row icon="dollar-sign"  label="Mon Wallet"              color="#FFD700" onPress={() => { setActiveSection(null); nav.navigate('Wallet'); }} />
+              <Row icon="shopping-bag" label="Acheter des coins"        color="#FF8C00" onPress={() => { setActiveSection(null); nav.navigate('BuyCoins'); }} />
+              <Row icon="zap"          label="Booster mon compte"       color="#E0389A" value="Abonnés, vues, portée…" onPress={() => { setActiveSection(null); nav.navigate('Boost'); }} />
+              <Row icon="bar-chart-2"  label="Dashboard Créateur"       color="#7B3FF2" onPress={() => { setActiveSection(null); nav.navigate('CreatorDashboard'); }} />
+              <Row icon="send"         label="Transférer des coins"     color="#9B65F5" onPress={() => { setActiveSection(null); nav.navigate('Transfer'); }} />
+              <Row icon="credit-card"  label="Retirer mes gains"        color="#10B981" onPress={() => { setActiveSection(null); nav.navigate('Withdraw'); }} last />
             </Card>
           </SubScreen>
         );
@@ -703,6 +705,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
               <Row icon="shield"   label="Confidentialité"         color="#3B82F6" onPress={() => { setActiveSection(null); nav.navigate('Privacy'); }} />
               <Row icon="slash"    label="Utilisateurs bloqués"    color="#EF4444" onPress={() => { setActiveSection(null); nav.navigate('BlockedUsers'); }} />
               <Row icon="users"    label="Abonnements / Abonnés"   color="#10B981" onPress={() => { setActiveSection(null); nav.navigate('Following'); }} />
+              <Row icon="zap"      label="Booster mon compte"      color="#E0389A" value="Gagne des abonnés et des vues" onPress={() => { setActiveSection(null); nav.navigate('Boost'); }} />
               <Row icon="download" label="Télécharger mes données" color="#6366F1" onPress={() => Alert.alert('Bientôt disponible', 'Export de données disponible prochainement.')} last />
             </Card>
           </SubScreen>

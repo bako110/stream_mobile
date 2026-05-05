@@ -2,7 +2,7 @@
  * UserContext — état global de l'utilisateur connecté
  * Permet de propager les changements (avatar, nom, etc.) partout dans l'app.
  */
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { authService } from '../services/authService';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
@@ -46,8 +46,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
+  const value = useMemo(
+    () => ({ currentUser, loading, refreshUser, setCurrentUser }),
+    [currentUser, loading, refreshUser],
+  );
+
   return (
-    <UserContext.Provider value={{ currentUser, loading, refreshUser, setCurrentUser }}>
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   );

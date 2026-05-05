@@ -1,114 +1,105 @@
-import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
+import { Video, createVideoThumbnail, getVideoMetaData } from 'react-native-compressor';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { Platform } from 'react-native';
 
 const CACHE = ReactNativeBlobUtil.fs.dirs.CacheDir;
 
 export interface CompressOptions {
-  maxDurationSec?: number; // coupe à cette durée (défaut 60s)
-  crf?: number;            // qualité H.264 (18=excellent, 23=pro, 28=bon) — défaut 23
+  maxDurationSec?: number;
+  crf?: number;
   onProgress?: (pct: number) => void;
 }
 
 export interface CompressResult {
-  uri:         string;  // file:// path
-  durationSec: number;
-  segments:    string[]; // si coupé en segments
+  uri:          string;
+  thumbnailUri: string | null; // file:// path du thumbnail généré
+  durationSec:  number;
+  segments:     string[];
+  isTempFile:   boolean;
 }
 
-/**
- * Compresse une vidéo en H.264 CRF et la coupe à maxDurationSec.
- * Retourne le path file:// du fichier compressé.
- */
+/** Copie un content:// Android vers le cache (react-native-compressor en a besoin) */
+async function toFileUri(uri: string): Promise<{ fileUri: string; isCopy: boolean }> {
+  if (Platform.OS === 'android' && uri.startsWith('content://')) {
+    const dest = `${CACHE}/upload_${Date.now()}.mp4`;
+    try {
+      await ReactNativeBlobUtil.fs.cp(uri, dest);
+    } catch {
+      const data = await ReactNativeBlobUtil.fs.readFile(uri, 'base64');
+      await ReactNativeBlobUtil.fs.writeFile(dest, data, 'base64');
+    }
+    return { fileUri: `file://${dest}`, isCopy: true };
+  }
+  const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+  return { fileUri, isCopy: false };
+}
+
 export async function compressVideo(
   inputUri: string,
   opts: CompressOptions = {},
 ): Promise<CompressResult> {
-  const { maxDurationSec = 60, crf = 23, onProgress } = opts;
-  const input = inputUri.startsWith('file://') ? inputUri.slice(7) : inputUri;
-  const outName = `cv_${Date.now()}.mp4`;
-  const output  = `${CACHE}/${outName}`;
+  const { onProgress } = opts;
 
-  // Durée réelle via ffprobe
-  const duration = await probeDuration(input);
+  const { fileUri, isCopy } = await toFileUri(inputUri);
 
-  // Construit la commande FFmpeg
-  // -t coupe à maxDurationSec, -crf 23 = qualité pro, -preset fast = rapide
-  // -vf scale=-2:720 = max 720p (préserve ratio), -movflags +faststart = streaming
-  const durationArg = duration > maxDurationSec ? `-t ${maxDurationSec}` : '';
-  const cmd = `-y -i "${input}" ${durationArg} -c:v libx264 -crf ${crf} -preset fast -vf "scale='min(1280,iw)':-2" -c:a aac -b:a 128k -movflags +faststart "${output}"`;
+  const compressed = await Video.compress(
+    fileUri,
+    {
+      compressionMethod: 'auto',
+      maxSize: 1280,
+      minimumFileSizeForCompress: 10,
+    },
+    (progress) => {
+      onProgress?.(10 + Math.round(progress * 80));
+    },
+  );
 
-  onProgress?.(5);
-
-  const session = await FFmpegKit.execute(cmd);
-  const rc      = await session.getReturnCode();
-
-  if (!ReturnCode.isSuccess(rc)) {
-    const logs = await session.getAllLogsAsString();
-    throw new Error(`FFmpeg error: ${logs?.slice(-300)}`);
+  // Si on a fait une copie temporaire de l'original, on la supprime maintenant
+  if (isCopy) {
+    const copyPath = fileUri.startsWith('file://') ? fileUri.slice(7) : fileUri;
+    ReactNativeBlobUtil.fs.unlink(copyPath).catch(() => {});
   }
 
-  onProgress?.(95);
+  onProgress?.(90);
 
-  const finalDuration = Math.min(duration, maxDurationSec);
+  // Génère le thumbnail depuis la vidéo compressée
+  let thumbnailUri: string | null = null;
+  try {
+    const thumb = await createVideoThumbnail(compressed);
+    thumbnailUri = thumb.path.startsWith('file://') ? thumb.path : `file://${thumb.path}`;
+  } catch {}
+
+  // Durée réelle via metadata
+  let durationSec = 60;
+  try {
+    const meta = await getVideoMetaData(compressed);
+    if (meta.duration) durationSec = Math.round(meta.duration);
+  } catch {}
+
   return {
-    uri:         `file://${output}`,
-    durationSec: finalDuration,
-    segments:    [`file://${output}`],
+    uri:          compressed,
+    thumbnailUri,
+    durationSec,
+    segments:     [compressed],
+    isTempFile:   compressed !== fileUri,
   };
 }
 
-/**
- * Coupe une vidéo longue en segments de segmentSec secondes.
- * Utile pour WhatsApp-style multi-segment.
- */
 export async function splitVideo(
   inputUri: string,
-  segmentSec = 60,
-  crf = 23,
+  _segmentSec = 60,
+  _crf = 23,
   onProgress?: (pct: number) => void,
 ): Promise<string[]> {
-  const input    = inputUri.startsWith('file://') ? inputUri.slice(7) : inputUri;
-  const duration = await probeDuration(input);
-  const count    = Math.ceil(duration / segmentSec);
-  const segments: string[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const start   = i * segmentSec;
-    const outPath = `${CACHE}/seg_${Date.now()}_${i}.mp4`;
-    const cmd     = `-y -ss ${start} -t ${segmentSec} -i "${input}" -c:v libx264 -crf ${crf} -preset fast -vf "scale='min(1280,iw)':-2" -c:a aac -b:a 128k -movflags +faststart "${outPath}"`;
-
-    const session = await FFmpegKit.execute(cmd);
-    const rc      = await session.getReturnCode();
-    if (!ReturnCode.isSuccess(rc)) {
-      const logs = await session.getAllLogsAsString();
-      throw new Error(`FFmpeg segment ${i} error: ${logs?.slice(-200)}`);
-    }
-
-    segments.push(`file://${outPath}`);
-    onProgress?.(Math.round(((i + 1) / count) * 100));
-  }
-
-  return segments;
+  const { uri } = await compressVideo(inputUri, { onProgress });
+  return [uri];
 }
 
-async function probeDuration(filePath: string): Promise<number> {
-  try {
-    const session = await FFmpegKit.execute(`-i "${filePath}" -f null -`);
-    const logs    = await session.getAllLogsAsString() ?? '';
-    const match   = logs.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/);
-    if (match) {
-      return parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3]);
-    }
-  } catch {}
-  return 60;
-}
-
-/** Supprime les fichiers temporaires générés */
 export async function cleanupTempVideos(uris: string[]): Promise<void> {
   await Promise.allSettled(
     uris.map(uri => {
       const path = uri.startsWith('file://') ? uri.slice(7) : uri;
       return ReactNativeBlobUtil.fs.unlink(path).catch(() => {});
-    })
+    }),
   );
 }

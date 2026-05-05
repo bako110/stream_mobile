@@ -34,6 +34,12 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
     try {
       const data = await storyService.getFeed();
       setGroups(data);
+      // Précharger les médias des 5 premiers groupes en arrière-plan
+      data.slice(0, 5).forEach(g => {
+        g.stories.slice(0, 2).forEach(st => {
+          if (st.media_url) Image.prefetch(st.media_url).catch(() => {});
+        });
+      });
     } catch (e) {
       __DEV__ && console.error('[StoryBar] getFeed error:', e);
     } finally { setLoading(false); }
@@ -42,7 +48,9 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    const onWs = (payload: any) => { if (payload.type === 'new_story') load(); };
+    const onWs = (payload: any) => {
+      if (payload.type === 'new_story' || payload.type === 'story_added') load();
+    };
     addListener(onWs);
     return () => removeListener(onWs);
   }, [addListener, removeListener, load]);

@@ -8,7 +8,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
-  Modal, Dimensions, TouchableWithoutFeedback,
+  Modal, Dimensions,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
@@ -44,7 +44,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 type FeedFilter = 'all' | 'events' | 'concerts';
 
 interface FeedItem {
-  kind:    'event' | 'concert' | 'reel' | 'post';
+  kind:    'event' | 'concert' | 'reel' | 'post' | 'suggestions';
   id:      string;
   data:    any;
 }
@@ -73,13 +73,57 @@ function getInitials(name?: string | null): string {
   return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 }
 
+// ── Styles badges (déclarés ici pour être disponibles avant FeedHeaderBadges) ─
+const badgeS = StyleSheet.create({
+  badge: {
+    position: 'absolute', top: -4, right: -4,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#FF3B30',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+});
+
+// ── Badges isolés — ne re-rendent que le FeedScreen quand les unread changent ─
+
+const FeedHeaderBadges: React.FC<{ onMessages: () => void; onNotifs: () => void; onMenu: () => void; colors: AppColors }> = React.memo(
+  ({ onMessages, onNotifs, onMenu, colors }) => {
+    const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
+    const totalNotifs = unreadNotifications + unreadActivity;
+    return (
+      <>
+        <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={onMessages}>
+          <Icon name="send" size={20} color={colors.textPrimary} />
+          {unreadMessages > 0 && (
+            <View style={badgeS.badge}>
+              <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={onNotifs}>
+          <Icon name="bell" size={20} color={colors.textPrimary} />
+          {totalNotifs > 0 && (
+            <View style={badgeS.badge}>
+              <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={onMenu}>
+          <Icon name="menu" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
+      </>
+    );
+  },
+);
+
 // ── FeedScreen ────────────────────────────────────────────────────────────────
 
 export const FeedScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
-  const { addListener, removeListener, unreadMessages, unreadActivity, unreadNotifications } = useWs();
+  const { addListener, removeListener } = useWs();
   const { currentUser } = useUser();
 
   const [filter,     setFilter]     = useState<FeedFilter>('all');
@@ -98,9 +142,10 @@ export const FeedScreen: React.FC = () => {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reel actif dans le feed (autoplay)
-  const [activeReelId, setActiveReelId] = useState<string | null>(null);
-  const [activeCardId, setActiveCardId] = useState<string | null>(null);
-  const [feedFocused,  setFeedFocused]  = useState(true);
+  const [activeReelId,      setActiveReelId]      = useState<string | null>(null);
+  const [activeCardId,      setActiveCardId]       = useState<string | null>(null);
+  const [feedFocused,       setFeedFocused]        = useState(true);
+  const [feedScrollEnabled, setFeedScrollEnabled]  = useState(true);
 
   const feedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
@@ -154,18 +199,28 @@ export const FeedScreen: React.FC = () => {
     overflow: 'hidden',
   }));
 
-  // ── Suggestions ──────────────────────────────────────────────────────────
-  const [suggestions,    setSuggestions]    = useState<UserPublic[]>([]);
+  // ── Suggestions — pool de 30, on pioche 10 au hasard à chaque inject ────────
+  const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(true);
 
   const loadSuggestions = useCallback(async () => {
-    setSuggestLoading(true);
     try {
-      const data = await userService.getSuggestions(10);
-      setSuggestions(Array.isArray(data) ? data : []);
-    } catch { setSuggestions([]); }
+      const data = await userService.getSuggestions(30);
+      setSuggestPool(Array.isArray(data) ? data : []);
+    } catch { setSuggestPool([]); }
     finally { setSuggestLoading(false); }
   }, []);
+
+  // Pioche 10 au hasard dans le pool
+  const pickSuggestions = useCallback((): UserPublic[] => {
+    if (suggestPool.length <= 10) return suggestPool;
+    const shuffled = [...suggestPool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, 10);
+  }, [suggestPool]);
 
   useEffect(() => { loadSuggestions(); }, []);
 
@@ -210,6 +265,11 @@ export const FeedScreen: React.FC = () => {
           reelService.getFeed().catch(() => ({ items: [], has_more: false, page: 1 })),
           postService.getFeed(1, 30).catch(() => [] as Post[]),
         ]);
+        if (__DEV__) {
+          console.log('[Feed] feedResult:', JSON.stringify(feedResult).slice(0, 300));
+          console.log('[Feed] reelsResult:', JSON.stringify(reelsResult).slice(0, 300));
+          console.log('[Feed] postsResult:', JSON.stringify(postsResult).slice(0, 300));
+        }
         const feedItems: FeedItem[] = (feedResult.items ?? [])
           .filter((item: any) => item.kind !== 'reel' && item.id)
           .map((item: any) => ({
@@ -237,7 +297,11 @@ export const FeedScreen: React.FC = () => {
           [deduped[i], deduped[j]] = [deduped[j], deduped[i]];
         }
         // Filtrer les contenus masqués ("Pas intéressé")
-        setItems(feedPreferenceService.filterFeed(deduped));
+        const filtered = feedPreferenceService.filterFeed(deduped);
+        // Injecter les suggestions à une position aléatoire entre 5 et 15
+        const pos = Math.floor(Math.random() * 11) + 5;
+        filtered.splice(Math.min(pos, filtered.length), 0, { kind: 'suggestions', id: '__suggestions__', data: null });
+        setItems(filtered);
       } else {
         // Filtre spécifique — fallback sur les services classiques
         const results: FeedItem[] = [];
@@ -281,6 +345,15 @@ export const FeedScreen: React.FC = () => {
 
   useEffect(() => { loadLive(); }, []);
 
+  // Rafraîchissement temps réel : reload quand un autre utilisateur publie
+  useEffect(() => {
+    const handler = (payload: { type: string }) => {
+      if (payload.type === 'feed_updated') load(filter);
+    };
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [filter, load, addListener, removeListener]);
+
   // Focus : reprise vidéo + rechargement au retour depuis CreatePost
   const didMountRef = useRef(false);
   useFocusEffect(useCallback(() => {
@@ -297,21 +370,85 @@ export const FeedScreen: React.FC = () => {
 
   // ── Posts ──────────────────────────────────────────────────────────────────
 
-  const handlePostDeleted = (postId: string) => {
+  const handlePostDeleted = useCallback((postId: string) => {
     setItems(prev => prev.filter(item => !(item.kind === 'post' && item.id === postId)));
-  };
+  }, []);
 
   // ── Comments sheet ─────────────────────────────────────────────────────────
 
-  const openComments = (item: FeedItem) => {
+  const openComments = useCallback((item: FeedItem) => {
     setCommentItem(item);
     setCommentVisible(true);
-  };
+  }, []);
 
-  const closeComments = () => {
+  const goToMessages = useCallback(() => nav.navigate('Messages' as any), [nav]);
+  const goToNotifs   = useCallback(() => nav.navigate('Notifications' as any), [nav]);
+  const openMenu     = useCallback(() => setMenuOpen(true), []);
+
+  const closeComments = useCallback(() => {
     setCommentVisible(false);
     setCommentItem(null);
-  };
+  }, []);
+
+  // ── renderItem stable ──────────────────────────────────────────────────────
+
+  const renderItem = useCallback(({ item }: { item: FeedItem }) => {
+    if (item.kind === 'suggestions') {
+      return (
+        <PeopleSuggestions
+          users={pickSuggestions()}
+          loading={suggestLoading}
+          onUserPress={id => nav.navigate('UserProfile', { userId: id })}
+          onRefresh={loadSuggestions}
+        />
+      );
+    }
+    if (item.kind === 'reel') {
+      return (
+        <ReelFeedCard
+          reel={item.data}
+          colors={colors}
+          isActive={activeReelId === item.id && feedFocused}
+          onPress={() => (nav as any).navigate('Reels', { initialReelId: item.data.id })}
+          onScrollLock={setFeedScrollEnabled}
+        />
+      );
+    }
+    if (item.kind === 'post') {
+      return (
+        <PostCard
+          post={item.data as Post}
+          colors={colors}
+          currentUserId={currentUser?.id}
+          onPress={() => (nav as any).navigate('PostDetail', { postId: item.id })}
+          onAuthorPress={() => {
+            const authorId = (item.data as Post).author?.id;
+            if (authorId) (nav as any).navigate('UserProfile', { userId: authorId });
+          }}
+          onDelete={handlePostDeleted}
+        />
+      );
+    }
+    const aid = item.kind === 'event'
+      ? (item.data as Event).organizer?.id
+      : (item.data as Concert).artist?.id;
+    return (
+      <FeedCard
+        item={item}
+        colors={colors}
+        currentUserId={currentUser?.id}
+        isActive={activeCardId === item.id && feedFocused}
+        isFollowing={!!aid && followingSet.has(aid)}
+        onToggleFollow={() => { if (aid) handleToggleFollow(aid); }}
+        onComment={(onCountChange) => { commentCountChangeRef.current = onCountChange; openComments(item); }}
+        onPress={() => {
+          if (item.kind === 'concert') nav.navigate('ConcertDetail', { concertId: item.id });
+          else nav.navigate('EventDetail', { eventId: item.id });
+        }}
+        onAuthorPress={() => { if (aid) (nav as any).navigate('UserProfile', { userId: aid }); }}
+      />
+    );
+  }, [colors, activeReelId, activeCardId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickSuggestions, suggestLoading, loadSuggestions]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -401,31 +538,12 @@ export const FeedScreen: React.FC = () => {
             </TouchableOpacity>
             {!searchOpen && (
               <>
-                <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={() => nav.navigate('Messages')}>
-                  <Icon name="send" size={20} color={colors.textPrimary} />
-                  {unreadMessages > 0 && (
-                    <View style={badgeS.badge}>
-                      <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={() => nav.navigate('Notifications')}>
-                  <Icon name="bell" size={20} color={colors.textPrimary} />
-                  {(unreadNotifications + unreadActivity) > 0 && (
-                    <View style={badgeS.badge}>
-                      <Text style={badgeS.badgeText}>
-                        {(unreadNotifications + unreadActivity) > 99 ? '99+' : (unreadNotifications + unreadActivity)}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={() => setMenuOpen(true)}>
-                  <Icon name="menu" size={20} color={colors.textPrimary} />
-                </TouchableOpacity>
+                <FeedHeaderBadges
+                  onMessages={goToMessages}
+                  onNotifs={goToNotifs}
+                  onMenu={openMenu}
+                  colors={colors}
+                />
               </>
             )}
           </View>
@@ -639,6 +757,7 @@ export const FeedScreen: React.FC = () => {
           keyExtractor={item => `${item.kind}-${item.id}`}
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
+          scrollEnabled={feedScrollEnabled}
           onViewableItemsChanged={onFeedViewableChanged}
           viewabilityConfig={feedViewabilityConfig}
           ListHeaderComponent={
@@ -759,13 +878,6 @@ export const FeedScreen: React.FC = () => {
                 onPress={() => (nav as any).navigate('CreatePost')}
               />
 
-              {/* Suggestions d'amis */}
-              <PeopleSuggestions
-                users={suggestions}
-                loading={suggestLoading}
-                onUserPress={id => nav.navigate('UserProfile', { userId: id })}
-                onRefresh={loadSuggestions}
-              />
             </>
           }
           refreshControl={
@@ -783,63 +895,11 @@ export const FeedScreen: React.FC = () => {
               </Text>
             </View>
           }
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 70).springify()}>
-              {item.kind === 'reel' ? (
-                <ReelFeedCard
-                  reel={item.data}
-                  colors={colors}
-                  isActive={activeReelId === item.id && feedFocused}
-                  onPress={() => (nav as any).navigate('Reels', { initialReelId: item.data.id })}
-                />
-              ) : item.kind === 'post' ? (
-                <PostCard
-                  post={item.data as Post}
-                  colors={colors}
-                  currentUserId={currentUser?.id}
-                  onPress={() => (nav as any).navigate('PostDetail', { postId: item.id })}
-                  onAuthorPress={() => {
-                    const authorId = (item.data as Post).author?.id;
-                    if (authorId) (nav as any).navigate('UserProfile', { userId: authorId });
-                  }}
-                  onDelete={handlePostDeleted}
-                />
-              ) : (
-                <FeedCard
-                  item={item}
-                  colors={colors}
-                  currentUserId={currentUser?.id}
-                  isActive={activeCardId === item.id && feedFocused}
-                  isFollowing={(() => {
-                    const aid = item.kind === 'event'
-                      ? (item.data as Event).organizer?.id
-                      : (item.data as Concert).artist?.id;
-                    return !!aid && followingSet.has(aid);
-                  })()}
-                  onToggleFollow={() => {
-                    const authorId = item.kind === 'event'
-                      ? (item.data as Event).organizer?.id
-                      : (item.data as Concert).artist?.id;
-                    if (authorId) handleToggleFollow(authorId);
-                  }}
-                  onComment={(onCountChange) => { commentCountChangeRef.current = onCountChange; openComments(item); }}
-                  onPress={() => {
-                    if (item.kind === 'concert') {
-                      nav.navigate('ConcertDetail', { concertId: item.id });
-                    } else {
-                      nav.navigate('EventDetail', { eventId: item.id });
-                    }
-                  }}
-                  onAuthorPress={() => {
-                    const authorId = item.kind === 'event'
-                      ? (item.data as Event).organizer?.id
-                      : (item.data as Concert).artist?.id;
-                    if (authorId) (nav as any).navigate('UserProfile', { userId: authorId });
-                  }}
-                />
-              )}
-            </Animated.View>
-          )}
+          renderItem={renderItem}
+          removeClippedSubviews
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          initialNumToRender={5}
         />
       )}
 
@@ -853,58 +913,123 @@ export const FeedScreen: React.FC = () => {
         onCommentCountChange={delta => commentCountChangeRef.current?.(delta)}
       />
 
-      {/* ── Menu Drawer ──────────────────────────────────────────────────── */}
-      <Modal visible={menuOpen} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setMenuOpen(false)}>
-        <View style={{ flex: 1 }}>
-          <TouchableWithoutFeedback onPress={() => setMenuOpen(false)}>
-            <View style={s.menuOverlay} />
-          </TouchableWithoutFeedback>
+      {/* ── Menu Explorer (style TikTok/Facebook) ───────────────────────── */}
+      <Modal visible={menuOpen} animationType="slide" transparent={false} statusBarTranslucent onRequestClose={() => setMenuOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
 
-          <View style={[s.menuDrawer, { backgroundColor: colors.surface }]}>
-          {/* Header du drawer */}
-          <View style={[s.menuHeader, { borderBottomColor: colors.divider }]}>
-            <Text style={[s.menuTitle, { color: colors.textPrimary }]}>Explorer</Text>
-            <TouchableOpacity onPress={() => setMenuOpen(false)} style={s.menuCloseBtn}>
-              <Icon name="x" size={20} color={colors.textSecondary} />
+          {/* Header */}
+          <View style={[mnu.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: 52 }]}>
+            <Text style={[mnu.headerTitle, { color: colors.textPrimary }]}>Explorer</Text>
+            <TouchableOpacity onPress={() => setMenuOpen(false)} style={mnu.closeBtn}>
+              <Icon name="x" size={22} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
-          {/* Catégories */}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {([
-            { icon: 'activity',       label: 'Activité',           color: '#E0389A', screen: 'Activity'      },
-            { icon: 'film',           label: 'Films & Séries',     color: '#3B82F6', screen: 'Films'         },
-            { icon: 'music',          label: 'Concerts',           color: '#7B3FF2', screen: 'Concerts'      },
-            { icon: 'calendar',       label: 'Événements',         color: '#E0389A', screen: 'Events'        },
-            { icon: 'users',          label: 'Communautés',        color: '#36D9A0', screen: 'Communities'   },
-            { icon: 'user-plus',      label: 'Amis',               color: '#10B981', screen: 'Following'     },
-            { icon: 'play-circle',    label: 'Reels',              color: '#FF7A2F', screen: 'Reels'         },
-            { icon: 'radio',          label: 'Live',               color: '#EF4444', screen: 'LiveList'      },
-            { icon: 'trending-up',    label: 'Tendances',          color: '#F59E0B', screen: 'Trending'      },
-            { icon: 'star',           label: 'Favoris',            color: '#EAB308', screen: 'Favorites'     },
-            { icon: 'message-circle', label: 'Messages',           color: '#06B6D4', screen: 'Messages'      },
-            { icon: 'bell',           label: 'Notifications',      color: '#EC4899', screen: 'Notifications' },
-            { icon: 'award',          label: 'Abonnements',        color: '#14B8A6', screen: 'Subscriptions' },
-            { icon: 'settings',       label: 'Paramètres',         color: '#6B7280', screen: 'Settings'      },
-          ] as const).map((item, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[s.menuItem, { borderBottomColor: colors.divider }]}
-              activeOpacity={0.7}
-              onPress={() => {
-                setMenuOpen(false);
-                (nav as any).navigate(item.screen);
-              }}
-            >
-              <View style={[s.menuItemIcon, { backgroundColor: item.color + '18' }]}>
-                <Icon name={item.icon} size={18} color={item.color} />
-              </View>
-              <Text style={[s.menuItemLabel, { color: colors.textPrimary }]}>{item.label}</Text>
-              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          ))}
+
+            {/* Profil rapide */}
+            {currentUser && (
+              <TouchableOpacity
+                style={[mnu.profileCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                activeOpacity={0.8}
+                onPress={() => { setMenuOpen(false); nav.navigate('EditProfile' as any); }}
+              >
+                {currentUser.avatar_url ? (
+                  <Image source={{ uri: currentUser.avatar_url }} style={mnu.profileAvatar} />
+                ) : (
+                  <View style={[mnu.profileAvatar, { backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ fontSize: 22, fontWeight: '800', color: colors.primary }}>
+                      {(currentUser.display_name ?? currentUser.username ?? '?')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={[mnu.profileName, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {currentUser.display_name ?? currentUser.username}
+                  </Text>
+                  <Text style={[mnu.profileSub, { color: colors.textTertiary }]}>
+                    Voir mon profil
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+
+            {/* Grille — Découvrir */}
+            <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>DÉCOUVRIR</Text>
+            <View style={mnu.grid}>
+              {([
+                { icon: 'film',        label: 'Films & Séries', color: '#3B82F6', screen: 'Films'       },
+                { icon: 'play-circle', label: 'Reels',        color: '#FF7A2F', screen: 'Reels'       },
+                { icon: 'radio',       label: 'Live',         color: '#EF4444', screen: 'LiveList'    },
+                { icon: 'music',       label: 'Concerts',     color: '#7B3FF2', screen: 'Concerts'    },
+                { icon: 'calendar',    label: 'Événements',   color: '#E0389A', screen: 'Events'      },
+                { icon: 'trending-up', label: 'Tendances',    color: '#F59E0B', screen: 'Trending'    },
+              ] as const).map((item) => (
+                <TouchableOpacity
+                  key={item.screen}
+                  style={[mnu.gridItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  activeOpacity={0.75}
+                  onPress={() => { setMenuOpen(false); (nav as any).navigate(item.screen); }}
+                >
+                  <View style={[mnu.gridIcon, { backgroundColor: item.color + '20' }]}>
+                    <Icon name={item.icon} size={24} color={item.color} />
+                  </View>
+                  <Text style={[mnu.gridLabel, { color: colors.textPrimary }]}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Liste — Social */}
+            <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>SOCIAL</Text>
+            {([
+              { icon: 'users',          label: 'Communautés',   sub: 'Rejoins des groupes',        color: '#36D9A0', screen: 'Communities'   },
+              { icon: 'user-plus',      label: 'Amis',          sub: 'Abonnements & abonnés',      color: '#10B981', screen: 'Following'      },
+              { icon: 'activity',       label: 'Activité',      sub: 'Tes interactions récentes',  color: '#E0389A', screen: 'Activity'       },
+              { icon: 'clock',          label: 'Historique',    sub: 'Vidéos regardées',           color: '#6366F1', screen: 'WatchHistory'   },
+              { icon: 'star',           label: 'Favoris',       sub: 'Contenus sauvegardés',       color: '#EAB308', screen: 'Favorites'      },
+            ] as const).map((item) => (
+              <TouchableOpacity
+                key={item.screen}
+                style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                activeOpacity={0.75}
+                onPress={() => { setMenuOpen(false); (nav as any).navigate(item.screen); }}
+              >
+                <View style={[mnu.listIcon, { backgroundColor: item.color + '18' }]}>
+                  <Icon name={item.icon} size={20} color={item.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>{item.label}</Text>
+                  <Text style={[mnu.listSub, { color: colors.textTertiary }]}>{item.sub}</Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+
+            {/* Liste — Compte */}
+            <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>COMPTE</Text>
+            {([
+              { icon: 'award',    label: 'Abonnements', sub: 'Gérer ton abonnement', color: '#14B8A6', screen: 'Subscriptions' },
+              { icon: 'settings', label: 'Paramètres',  sub: 'Confidentialité, sécurité', color: '#6B7280', screen: 'Settings'      },
+            ] as const).map((item) => (
+              <TouchableOpacity
+                key={item.screen}
+                style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                activeOpacity={0.75}
+                onPress={() => { setMenuOpen(false); (nav as any).navigate(item.screen); }}
+              >
+                <View style={[mnu.listIcon, { backgroundColor: item.color + '18' }]}>
+                  <Icon name={item.icon} size={20} color={item.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>{item.label}</Text>
+                  <Text style={[mnu.listSub, { color: colors.textTertiary }]}>{item.sub}</Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+
           </ScrollView>
-        </View>
         </View>
       </Modal>
     </View>
@@ -918,7 +1043,8 @@ const ReelFeedCard: React.FC<{
   colors: AppColors;
   isActive: boolean;
   onPress: () => void;
-}> = ({ reel, colors, isActive, onPress }) => {
+  onScrollLock?: (enabled: boolean) => void;
+}> = React.memo(({ reel, colors, isActive, onPress, onScrollLock }) => {
   const author   = reel.author;
   const name     = author?.display_name ?? author?.username ?? 'Utilisateur';
   const initials = name[0]?.toUpperCase() ?? '?';
@@ -986,8 +1112,25 @@ const ReelFeedCard: React.FC<{
       ) : null}
 
       {/* ── Zone vidéo ── */}
-      <TouchableOpacity activeOpacity={1} onPress={() => { if (isActive) setPaused(v => !v); else onPress(); }}>
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onPress}
+        onPressIn={() => onScrollLock?.(false)}
+        onPressOut={() => onScrollLock?.(true)}
+      >
         <View style={rs.thumbWrap}>
+          {/* Fond par défaut quand pas de thumbnail */}
+          {!reel.thumbnail_url && !playing ? (
+            <LinearGradient
+              colors={['#1a1a2e', '#16213e', '#0f3460']}
+              style={StyleSheet.absoluteFill}
+            >
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Icon name="film" size={36} color="rgba(255,255,255,0.3)" />
+              </View>
+            </LinearGradient>
+          ) : null}
+
           {/* Thumbnail affiché tant que non actif ou en chargement */}
           {reel.thumbnail_url && !playing ? (
             <Image source={{ uri: reel.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -1042,15 +1185,9 @@ const ReelFeedCard: React.FC<{
           )}
         </View>
       </TouchableOpacity>
-
-      {/* ── Bouton "Voir le reel" ── */}
-      <TouchableOpacity style={[rs.watchRow, { borderTopColor: colors.border }]} onPress={onPress} activeOpacity={0.7}>
-        <Icon name="play-circle" size={15} color={colors.primary} />
-        <Text style={[rs.watchBtn, { color: colors.primary }]}>Voir le reel</Text>
-      </TouchableOpacity>
     </View>
   );
-};
+});
 
 const rs = StyleSheet.create({
   card:        { marginHorizontal: 12, marginBottom: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
@@ -1061,7 +1198,7 @@ const rs = StyleSheet.create({
   reelBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   reelBadgeText: { fontSize: 10, fontWeight: '700' },
   caption:     { paddingHorizontal: 12, paddingBottom: 8, fontSize: 14, lineHeight: 20 },
-  thumbWrap:    { width: '100%', aspectRatio: 4 / 3, position: 'relative', overflow: 'hidden' },
+  thumbWrap:    { width: '100%', aspectRatio: 1 / 0.88, position: 'relative', overflow: 'hidden' },
   thumb:        { width: '100%', height: '100%' },
   thumbGradient:{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
   playOverlay:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
@@ -1075,11 +1212,9 @@ const rs = StyleSheet.create({
   actionText:   { fontSize: 13, fontWeight: '600' },
   stat:         { flexDirection: 'row', alignItems: 'center', gap: 5 },
   statText:     { fontSize: 13, fontWeight: '500' },
-  watchBtn:     { fontSize: 13, fontWeight: '700' },
-  watchRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   muteBtn:      { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-  progressTrack:{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
-  progressFill: { height: 3, backgroundColor: '#fff' },
+  progressTrack:   { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
+  progressFill:    { height: 3, backgroundColor: '#fff' },
 });
 
 // ── FeedCard ──────────────────────────────────────────────────────────────────
@@ -1225,7 +1360,7 @@ const CardVideo: React.FC<{ uri: string; playing: boolean }> = ({ uri, playing }
   return <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />;
 };
 
-const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFollowing, isActive, onToggleFollow, onComment, onPress, onAuthorPress }) => {
+const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, isActive, onToggleFollow, onComment, onPress, onAuthorPress }) => {
   const isEvent  = item.kind === 'event';
   const isConcert = item.kind === 'concert';
   const event    = isEvent  ? (item.data as any) : null;
@@ -1603,17 +1738,25 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, colors, currentUserId, isFoll
       <View style={{ height: 8, backgroundColor: colors.backgroundSecondary }} />
     </View>
   );
-};
+});
 
-const badgeS = StyleSheet.create({
-  badge: {
-    position: 'absolute', top: -4, right: -4,
-    minWidth: 18, height: 18, borderRadius: 9,
-    backgroundColor: '#FF3B30',
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#fff', fontSize: 10, fontWeight: '700',
-  },
+const { width: SW, height: SH } = Dimensions.get('window');
+
+const mnu = StyleSheet.create({
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  headerTitle:   { fontSize: 22, fontWeight: '800' },
+  closeBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+  profileCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, margin: 16, borderRadius: 16, padding: 14, borderWidth: StyleSheet.hairlineWidth },
+  profileAvatar: { width: 52, height: 52, borderRadius: 26 },
+  profileName:   { fontSize: 16, fontWeight: '700' },
+  profileSub:    { fontSize: 13, marginTop: 2 },
+  sectionTitle:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10 },
+  grid:          { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 10 },
+  gridItem:      { width: (SW - 44) / 3, borderRadius: 14, padding: 14, alignItems: 'center', gap: 10, borderWidth: StyleSheet.hairlineWidth },
+  gridIcon:      { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  gridLabel:     { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  listItem:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginBottom: 8, borderRadius: 14, padding: 14, borderWidth: StyleSheet.hairlineWidth },
+  listIcon:      { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  listLabel:     { fontSize: 15, fontWeight: '700' },
+  listSub:       { fontSize: 12, marginTop: 2 },
 });

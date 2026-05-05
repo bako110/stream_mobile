@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Alert, Platform, StatusBar,
@@ -24,13 +24,14 @@ const VIDEO_H = Math.round(SCREEN_W * 9 / 16);
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-type PublishStep = 'idle' | 'uploading' | 'creating' | 'done';
+type PublishStep = 'idle' | 'compressing' | 'uploading' | 'creating' | 'done';
 
 const STEP_LABELS: Record<PublishStep, string> = {
-  idle:      '',
-  uploading: 'Envoi de la vidéo…',
-  creating:  'Finalisation…',
-  done:      'Reel publié ! 🎉',
+  idle:        '',
+  compressing: 'Compression…',
+  uploading:   'Envoi de la vidéo…',
+  creating:    'Finalisation…',
+  done:        'Reel publié ! 🎉',
 };
 
 interface Props {
@@ -45,7 +46,6 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   const [caption,       setCaption]       = useState('');
   const [videoLocalUri, setVideoLocalUri] = useState<string | null>(null);
   const [step,          setStep]          = useState<PublishStep>('idle');
-  const [uploadPct,     setUploadPct]     = useState(0);
   const [videoPaused,   setVideoPaused]   = useState(false);
 
   const isPublishing = step !== 'idle' && step !== 'done';
@@ -53,7 +53,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   const isVideoPaused = !videoLocalUri || videoPaused || isPublishing;
 
   const videoPlayer = useVideoPlayer(
-    videoLocalUri ? { uri: videoLocalUri } : null,
+    videoLocalUri ? { uri: videoLocalUri } : { uri: 'about:blank' },
     p => { p.loop = true; p.muted = false; },
   );
 
@@ -82,22 +82,6 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   }, [isPublishing]);
   const dotStyle = useAnimatedStyle(() => ({ opacity: dotOpacity.value }));
 
-  // Simuler la progression upload (en attendant un vrai callback)
-  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startFakeProgress = (from: number, to: number) => {
-    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    progressWidth.value = from;
-    progressTimerRef.current = setInterval(() => {
-      progressWidth.value = withTiming(
-        Math.min(progressWidth.value + (to - from) / 30, to),
-        { duration: 200 },
-      );
-    }, 200);
-  };
-  const stopFakeProgress = () => {
-    if (progressTimerRef.current) { clearInterval(progressTimerRef.current); progressTimerRef.current = null; }
-  };
-
   const handlePickVideo = () => {
     launchImageLibrary({ mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any }, res => {
       if (res.didCancel) return;
@@ -121,19 +105,25 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   const handlePublish = async () => {
     if (!videoLocalUri) return;
     try {
-      // ── Étape 1 : upload ──────────────────────────────────────────────────
-      setStep('uploading');
-      setUploadPct(0);
-      startFakeProgress(0, 80);
+      // ── Étape 1 : compression (0→80%) ────────────────────────────────────
+      setStep('compressing');
+      progressWidth.value = 0;
 
-      const uploaded = await uploadVideoFromUri(videoLocalUri, 'reels');
+      const uploaded = await uploadVideoFromUri(
+        videoLocalUri,
+        'reels',
+        undefined,
+        undefined,
+        (pct) => {
+          // pct 10→90 pendant compression, on mappe sur 0→80 dans la barre
+          progressWidth.value = withTiming(pct * 0.88, { duration: 150 });
+          if (pct >= 90) setStep('uploading');
+        },
+      );
 
-      stopFakeProgress();
-      progressWidth.value = withTiming(88, { duration: 200 });
-
-      // ── Étape 2 : création ────────────────────────────────────────────────
+      // ── Étape 2 : création backend (88→96%) ──────────────────────────────
       setStep('creating');
-      startFakeProgress(88, 96);
+      progressWidth.value = withTiming(92, { duration: 200 });
 
       await reelService.create({
         video_url:     uploaded.url,
@@ -142,10 +132,9 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
         duration_sec:  uploaded.duration ? Math.round(uploaded.duration) : undefined,
       });
 
-      stopFakeProgress();
       progressWidth.value = withTiming(100, { duration: 300 });
 
-      // ── Étape 3 : done — redirection auto 1.2s ────────────────────────────
+      // ── Étape 3 : done ────────────────────────────────────────────────────
       setStep('done');
       videoPlayer.pause();
       videoPlayer.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {});
@@ -156,7 +145,6 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
       }, 1200);
 
     } catch (err: any) {
-      stopFakeProgress();
       progressWidth.value = withTiming(0, { duration: 200 });
       setStep('idle');
       Alert.alert('Erreur', err?.message ?? 'Impossible de publier le reel.');

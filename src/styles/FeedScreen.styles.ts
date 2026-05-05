@@ -4,8 +4,8 @@ import { TAB_BAR_HEIGHT } from './layout';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// Hauteur banner responsive : ~42% de la largeur écran (ratio 16:7 environ)
-export const BANNER_H = Math.round(SCREEN_W * 0.52);
+// Hauteur banner responsive : ratio ~4:3 comme Facebook pour bien voir les images
+export const BANNER_H = Math.round(SCREEN_W * 0.88);
 
 export const feedStyles = StyleSheet.create({
   root:   { flex: 1 },

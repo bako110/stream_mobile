@@ -8,7 +8,7 @@
  *  - 30s timeout  → if pending call still not answered → marks as missed
  */
 import React, {
-  createContext, useContext, useEffect, useRef, useCallback, useState,
+  createContext, useContext, useEffect, useRef, useCallback, useState, useMemo,
 } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { API_BASE_URL, STORAGE_KEYS } from '../utils/constants';
@@ -17,7 +17,17 @@ import { authService } from '../services/authService';
 import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { callHistoryService } from '../services/callHistoryService';
-import { navigate } from '../navigation/navigationRef';
+import {
+  createWsEventHandler,
+  type NewFollowerPayload,
+  type CoinTransferPayload,
+  type GiftReceivedPayload,
+  type StoryAddedPayload,
+  type CommentOnContentPayload,
+  type ReactionOnContentPayload,
+  type PresencePayload,
+  type ConcertLivePayload,
+} from '../services/wsEventHandler';
 
 export type WsPayload = { [key: string]: any; type: string };
 type WsListener = (payload: WsPayload) => void;
@@ -68,6 +78,15 @@ interface WebSocketContextValue {
   isOutgoingCall:      (partnerId: string) => boolean;
   // Buffer: events arrivés avant que CallScreen soit monté
   drainCallBuffer:     (partnerId: string) => WsPayload[];
+  // Events temps-réel enrichis
+  lastNewFollower:          NewFollowerPayload | null;
+  lastCoinTransfer:         CoinTransferPayload | null;
+  lastGiftReceived:         GiftReceivedPayload | null;
+  lastStoryAdded:           StoryAddedPayload | null;
+  lastCommentOnContent:     CommentOnContentPayload | null;
+  lastReactionOnContent:    ReactionOnContentPayload | null;
+  lastPresenceUpdate:       PresencePayload | null;
+  lastConcertLive:          ConcertLivePayload | null;
 }
 
 const Ctx = createContext<WebSocketContextValue>({
@@ -91,6 +110,14 @@ const Ctx = createContext<WebSocketContextValue>({
   markCallEnded:            () => {},
   isOutgoingCall:           () => false,
   drainCallBuffer:          () => [],
+  lastNewFollower:          null,
+  lastCoinTransfer:         null,
+  lastGiftReceived:         null,
+  lastStoryAdded:           null,
+  lastCommentOnContent:     null,
+  lastReactionOnContent:    null,
+  lastPresenceUpdate:       null,
+  lastConcertLive:          null,
 });
 
 const WS_BASE        = API_BASE_URL.replace(/^http/, 'ws');
@@ -123,9 +150,35 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [missedCallCount,     setMissedCallCount]     = useState(0);
 
+  // États des événements enrichis
+  const [lastNewFollower,       setLastNewFollower]       = useState<NewFollowerPayload | null>(null);
+  const [lastCoinTransfer,      setLastCoinTransfer]      = useState<CoinTransferPayload | null>(null);
+  const [lastGiftReceived,      setLastGiftReceived]      = useState<GiftReceivedPayload | null>(null);
+  const [lastStoryAdded,        setLastStoryAdded]        = useState<StoryAddedPayload | null>(null);
+  const [lastCommentOnContent,  setLastCommentOnContent]  = useState<CommentOnContentPayload | null>(null);
+  const [lastReactionOnContent, setLastReactionOnContent] = useState<ReactionOnContentPayload | null>(null);
+  const [lastPresenceUpdate,    setLastPresenceUpdate]    = useState<PresencePayload | null>(null);
+  const [lastConcertLive,       setLastConcertLive]       = useState<ConcertLivePayload | null>(null);
+
   const addListener    = useCallback((fn: WsListener) => { listeners.current.add(fn); }, []);
   const removeListener = useCallback((fn: WsListener) => { listeners.current.delete(fn); }, []);
   const setActiveChat  = useCallback((id: string | null) => { activeChatRef.current = id; }, []);
+
+  // Handler centralisé — recréé quand les setters changent (stable car useState)
+  const wsEventHandlerRef = useRef(createWsEventHandler({
+    onFeedUpdated:        () => { /* géré par FeedScreen via addListener */ },
+    onStoryAdded:         (d) => { if (isMounted.current) setLastStoryAdded(d); },
+    onCommentOnContent:   (d) => { if (isMounted.current) { setLastCommentOnContent(d); setUnreadActivity(n => n + 1); } },
+    onReactionOnContent:  (d) => { if (isMounted.current) { setLastReactionOnContent(d); setUnreadActivity(n => n + 1); } },
+    onNewFollower:        (d) => { if (isMounted.current) { setLastNewFollower(d); setUnreadActivity(n => n + 1); } },
+    onCoinTransferReceived: (d) => { if (isMounted.current) { setLastCoinTransfer(d); setUnreadNotifications(n => n + 1); } },
+    onGiftReceived:       (d) => { if (isMounted.current) { setLastGiftReceived(d); setUnreadNotifications(n => n + 1); } },
+    onPresence:           (d) => { if (isMounted.current) setLastPresenceUpdate(d); },
+    onConcertLive:        (d) => { if (isMounted.current) setLastConcertLive(d); },
+    onConcertEnded:       ()  => { /* le feed se recharge via onFeedUpdated */ },
+    onActivity:           ()  => { if (isMounted.current) setUnreadActivity(n => n + 1); },
+    onNotification:       ()  => { if (isMounted.current) setUnreadNotifications(n => n + 1); },
+  }));
 
   // CallScreen appelle drainCallBuffer au montage pour récupérer les events reçus avant lui
   const drainCallBuffer = useCallback((partnerId: string): WsPayload[] => {
@@ -340,6 +393,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } else {
           listeners.current.forEach(fn => { try { fn(payload); } catch {} });
         }
+
+        // ── Handler centralisé événements enrichis ─────────────────────────
+        if (isMounted.current) {
+          wsEventHandlerRef.current(payload);
+        }
       } catch {}
     };
 
@@ -409,32 +467,47 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [registerPendingCall]);
 
-  return (
-    <Ctx.Provider value={{
-      sendMessage,
-      isConnected,
-      addListener,
-      removeListener,
-      unreadMessages,
-      unreadActivity,
-      unreadNotifications,
-      refreshUnread,
-      clearUnreadMessages,
-      clearUnreadActivity,
-      clearUnreadNotifications,
-      setActiveChat,
-      missedCallCount,
-      clearMissedCalls,
-      notifyCallConnected,
-      notifyCallEnded,
-      markCallAccepted,
-      markCallEnded,
-      isOutgoingCall,
-      drainCallBuffer,
-    }}>
-      {children}
-    </Ctx.Provider>
-  );
+  const value = useMemo(() => ({
+    sendMessage,
+    isConnected,
+    addListener,
+    removeListener,
+    unreadMessages,
+    unreadActivity,
+    unreadNotifications,
+    refreshUnread,
+    clearUnreadMessages,
+    clearUnreadActivity,
+    clearUnreadNotifications,
+    setActiveChat,
+    missedCallCount,
+    clearMissedCalls,
+    notifyCallConnected,
+    notifyCallEnded,
+    markCallAccepted,
+    markCallEnded,
+    isOutgoingCall,
+    drainCallBuffer,
+    lastNewFollower,
+    lastCoinTransfer,
+    lastGiftReceived,
+    lastStoryAdded,
+    lastCommentOnContent,
+    lastReactionOnContent,
+    lastPresenceUpdate,
+    lastConcertLive,
+  }), [
+    sendMessage, isConnected, addListener, removeListener,
+    unreadMessages, unreadActivity, unreadNotifications,
+    refreshUnread, clearUnreadMessages, clearUnreadActivity, clearUnreadNotifications,
+    setActiveChat, missedCallCount, clearMissedCalls,
+    notifyCallConnected, notifyCallEnded, markCallAccepted, markCallEnded,
+    isOutgoingCall, drainCallBuffer,
+    lastNewFollower, lastCoinTransfer, lastGiftReceived, lastStoryAdded,
+    lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate, lastConcertLive,
+  ]);
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
 
 export function useWs() {

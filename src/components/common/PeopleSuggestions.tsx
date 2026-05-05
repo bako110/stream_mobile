@@ -1,42 +1,40 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ScrollView,
+  ActivityIndicator, Image, Dimensions, ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/userService';
 import { VerifiedBadge } from './VerifiedBadge';
-import { AvatarWithBadge } from './AvatarWithBadge';
 import type { UserPublic } from '../../types';
 
-const PAGE_SIZE = 10;
+const { width: SW } = Dimensions.get('window');
+// Carte large et visible — environ 45% de l'écran
+const CARD_W    = SW * 0.45;
+const COVER_H   = CARD_W * 0.5;
+const AVATAR_SZ = CARD_W * 0.4;
 
 interface Props {
-  users:        UserPublic[];
-  loading:      boolean;
-  onUserPress:  (userId: string) => void;
-  onRefresh:    () => void;
+  users:       UserPublic[];
+  loading:     boolean;
+  onUserPress: (userId: string) => void;
+  onRefresh:   () => void;
 }
 
-interface ItemState {
-  [id: string]: 'idle' | 'loading' | 'dismissed';
-}
+type ItemState = Record<string, 'idle' | 'loading' | 'followed' | 'dismissed'>;
 
 export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress, onRefresh }) => {
   const { theme } = useTheme();
   const { colors } = theme;
-  const [itemState, setItemState]       = useState<ItemState>({});
-  const [extraUsers, setExtraUsers]     = useState<UserPublic[]>([]);
-  const [loadingMore, setLoadingMore]   = useState(false);
-  const [hasMore, setHasMore]           = useState(true);
-  const [page, setPage]                 = useState(1);
+  const [itemState, setItemState] = useState<ItemState>({});
 
   const handleFollow = async (userId: string) => {
     setItemState(s => ({ ...s, [userId]: 'loading' }));
     try {
       await userService.follow(userId);
-      setItemState(s => ({ ...s, [userId]: 'dismissed' }));
+      setItemState(s => ({ ...s, [userId]: 'followed' }));
     } catch {
       setItemState(s => ({ ...s, [userId]: 'idle' }));
     }
@@ -46,179 +44,154 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
     setItemState(s => ({ ...s, [userId]: 'dismissed' }));
   };
 
-  const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    try {
-      const offset = page * PAGE_SIZE;
-      const next = await userService.getSuggestions(PAGE_SIZE, offset);
-      if (next.length < PAGE_SIZE) setHasMore(false);
-      if (next.length > 0) {
-        setExtraUsers(prev => {
-          const existingIds = new Set([...users, ...prev].map(u => u.id));
-          return [...prev, ...next.filter(u => !existingIds.has(u.id))];
-        });
-        setPage(p => p + 1);
-      } else {
-        setHasMore(false);
-      }
-    } catch {
-      // silencieux
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loadingMore, hasMore, page, users]);
+  const visible = users.filter(u => itemState[u.id] !== 'dismissed');
 
-  const allUsers = [...users, ...extraUsers];
-  const visible  = allUsers.filter(u => itemState[u.id] !== 'dismissed');
+  if (!loading && visible.length === 0) return null;
 
-  if (!loading && visible.length === 0 && !hasMore) return null;
+  const skeletons = [0, 1, 2, 3];
 
   return (
-    <View style={[styles.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider }]}>
+    <View style={[st.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
+
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Vous connaissez peut-être...</Text>
-        <TouchableOpacity onPress={onRefresh} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="refresh-cw" size={15} color={loading ? colors.textDisabled : colors.textTertiary} />
+      <View style={st.header}>
+        <Text style={[st.title, { color: colors.textPrimary }]}>Vous connaissez peut-être...</Text>
+        <TouchableOpacity onPress={onRefresh} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={[st.seeAll, { color: colors.primary }]}>Actualiser</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.list}>
-        {loading ? (
-          [0, 1, 2].map(i => (
-            <View key={i} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.divider }, i > 0 && { marginLeft: 10 }]}>
-              <View style={[styles.avatar, { backgroundColor: colors.surfaceElevated }]} />
-              <View style={{ width: 80, height: 10, borderRadius: 5, backgroundColor: colors.surfaceElevated, marginTop: 10 }} />
-              <View style={{ width: 56, height: 8, borderRadius: 4, backgroundColor: colors.surfaceElevated, marginTop: 5 }} />
-              <View style={[styles.followBtnSkeleton, { backgroundColor: colors.surfaceElevated }]} />
-            </View>
-          ))
-        ) : (
-          <>
-            {visible.map((item, idx) => {
+      {/* Scroll horizontal */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={st.list}
+      >
+        {loading
+          ? skeletons.map(i => (
+              <View key={i} style={[st.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                {/* Cover skeleton */}
+                <View style={[st.cover, { backgroundColor: colors.surfaceElevated }]} />
+                {/* Avatar skeleton */}
+                <View style={[st.avatarWrap, { borderColor: colors.background, backgroundColor: colors.surfaceElevated, marginTop: -(AVATAR_SZ / 2) }]} />
+                <View style={st.cardBody}>
+                  <View style={{ height: 13, width: '65%', borderRadius: 6, backgroundColor: colors.surfaceElevated, marginTop: AVATAR_SZ / 2 + 10 }} />
+                  <View style={{ height: 10, width: '45%', borderRadius: 5, backgroundColor: colors.surfaceElevated, marginTop: 7 }} />
+                  <View style={[st.btnSkeleton, { backgroundColor: colors.surfaceElevated }]} />
+                </View>
+              </View>
+            ))
+          : visible.map(item => {
               const name     = item.display_name ?? item.username ?? 'Utilisateur';
               const initials = name[0]?.toUpperCase() ?? '?';
               const state    = itemState[item.id] ?? 'idle';
+              const followed = state === 'followed';
 
               return (
-                <View
-                  key={item.id}
-                  style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.divider }, idx > 0 && { marginLeft: 10 }]}
-                >
-                  <TouchableOpacity style={styles.dismissBtn} onPress={() => handleDismiss(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Icon name="x" size={13} color={colors.textTertiary} />
+                <View key={item.id} style={[st.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+
+                  {/* Bouton X */}
+                  <TouchableOpacity
+                    style={[st.closeBtn, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+                    onPress={() => handleDismiss(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Icon name="x" size={11} color="#fff" />
                   </TouchableOpacity>
 
-                  <TouchableOpacity onPress={() => onUserPress(item.id)} activeOpacity={0.8} style={styles.avatarWrap}>
-                    <AvatarWithBadge
-                      avatarUrl={item.avatar_url}
-                      initials={initials}
-                      size={64}
-                      accentColor={colors.primary}
-                      isOnline={item.is_online}
+                  {/* Cover gradient */}
+                  <TouchableOpacity activeOpacity={0.9} onPress={() => onUserPress(item.id)}>
+                    <LinearGradient
+                      colors={[colors.primary + 'DD', colors.primary + '44']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={st.cover}
                     />
                   </TouchableOpacity>
 
-                  <TouchableOpacity onPress={() => onUserPress(item.id)} activeOpacity={0.8} style={{ alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={[styles.name, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
-                      {item.is_verified && <VerifiedBadge size={13} />}
-                    </View>
-                    {item.username && (
-                      <Text style={[styles.handle, { color: colors.textTertiary }]} numberOfLines={1}>@{item.username}</Text>
+                  {/* Avatar chevauchant */}
+                  <TouchableOpacity
+                    style={[st.avatarWrap, { borderColor: colors.background, marginTop: -(AVATAR_SZ / 2) }]}
+                    onPress={() => onUserPress(item.id)}
+                    activeOpacity={0.9}
+                  >
+                    {item.avatar_url ? (
+                      <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
+                    ) : (
+                      <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={st.avatarImg}>
+                        <Text style={st.initial}>{initials}</Text>
+                      </LinearGradient>
                     )}
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.followBtn, { backgroundColor: colors.primary }]}
-                    onPress={() => handleFollow(item.id)}
-                    disabled={state === 'loading'}
-                    activeOpacity={0.8}
-                  >
-                    {state === 'loading' ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <Icon name="user-plus" size={13} color="#fff" />
-                        <Text style={styles.followText}>Suivre</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                  {/* Infos */}
+                  <View style={st.cardBody}>
+                    <TouchableOpacity onPress={() => onUserPress(item.id)} activeOpacity={0.8} style={{ alignItems: 'center', width: '100%' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                        <Text style={[st.name, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+                        {item.is_verified && <VerifiedBadge size={13} />}
+                      </View>
+                      {item.username && (
+                        <Text style={[st.handle, { color: colors.textTertiary }]} numberOfLines={1}>@{item.username}</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    {/* Bouton Suivre */}
+                    <TouchableOpacity
+                      style={[
+                        st.followBtn,
+                        followed
+                          ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border }
+                          : { backgroundColor: colors.primary },
+                      ]}
+                      onPress={() => !followed && handleFollow(item.id)}
+                      disabled={state === 'loading'}
+                      activeOpacity={0.8}
+                    >
+                      {state === 'loading' ? (
+                        <ActivityIndicator size="small" color={followed ? colors.primary : '#fff'} />
+                      ) : (
+                        <>
+                          <Icon
+                            name={followed ? 'user-check' : 'user-plus'}
+                            size={14}
+                            color={followed ? colors.textSecondary : '#fff'}
+                          />
+                          <Text style={[st.followText, { color: followed ? colors.textSecondary : '#fff' }]}>
+                            {followed ? 'Abonné' : 'Suivre'}
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
-            })}
-
-            {/* Bouton "Voir plus" */}
-            {hasMore && (
-              <View style={[styles.card, styles.loadMoreCard, { backgroundColor: colors.surface, borderColor: colors.divider, marginLeft: visible.length > 0 ? 10 : 0 }]}>
-                <TouchableOpacity
-                  style={[styles.loadMoreBtn, { borderColor: colors.primary }]}
-                  onPress={loadMore}
-                  disabled={loadingMore}
-                  activeOpacity={0.8}
-                >
-                  {loadingMore ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <>
-                      <Icon name="chevrons-right" size={18} color={colors.primary} />
-                      <Text style={[styles.loadMoreText, { color: colors.primary }]}>Voir plus</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
-        )}
+            })
+        }
       </ScrollView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  wrap: {
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    marginBottom: 8,
-  },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, marginBottom: 10,
-  },
-  title: { fontSize: 15, fontWeight: '700' },
-  list: { paddingHorizontal: 16, paddingBottom: 2 },
+const st = StyleSheet.create({
+  wrap:       { paddingVertical: 14, marginBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
+  title:      { fontSize: 16, fontWeight: '800' },
+  seeAll:     { fontSize: 13, fontWeight: '700' },
+  list:       { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
 
-  card: {
-    width: 150, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
-    padding: 12, alignItems: 'center', gap: 5, position: 'relative',
-  },
-  loadMoreCard: {
-    justifyContent: 'center',
-  },
-  dismissBtn: {
-    position: 'absolute', top: 8, right: 8,
-    width: 20, height: 20, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarWrap: { marginTop: 6 },
-  avatar: { width: 64, height: 64, borderRadius: 32 },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: '#fff', fontSize: 24, fontWeight: '800' },
-  name: { fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: 4, maxWidth: 120 },
-  handle: { fontSize: 11, textAlign: 'center', marginTop: 1, maxWidth: 120 },
-  followBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    marginTop: 4, minWidth: 88, justifyContent: 'center', minHeight: 32,
-  },
-  followBtnSkeleton: { width: 88, height: 32, borderRadius: 20, marginTop: 4 },
-  followText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  loadMoreBtn: {
-    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingHorizontal: 12, paddingVertical: 16,
-    borderRadius: 12, borderWidth: 1.5, width: 110,
-  },
-  loadMoreText: { fontWeight: '700', fontSize: 12 },
+  card:       { width: CARD_W, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  cover:      { width: '100%', height: COVER_H },
+  closeBtn:   { position: 'absolute', top: 8, right: 8, zIndex: 10, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+
+  avatarWrap: { width: AVATAR_SZ + 4, height: AVATAR_SZ + 4, borderRadius: (AVATAR_SZ + 4) / 2, borderWidth: 3, overflow: 'hidden', alignSelf: 'center' },
+  avatarImg:  { width: AVATAR_SZ, height: AVATAR_SZ, borderRadius: AVATAR_SZ / 2, alignItems: 'center', justifyContent: 'center' },
+  initial:    { color: '#fff', fontWeight: '800', fontSize: AVATAR_SZ * 0.38 },
+
+  cardBody:   { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, paddingTop: AVATAR_SZ / 2 + 8, gap: 4 },
+  name:       { fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  handle:     { fontSize: 11, textAlign: 'center' },
+
+  followBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, borderRadius: 8, paddingVertical: 10, width: '100%' },
+  btnSkeleton:{ height: 38, borderRadius: 8, width: '100%', marginTop: 8 },
+  followText: { fontSize: 14, fontWeight: '700' },
 });

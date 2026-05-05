@@ -39,9 +39,12 @@ interface CreatorProfile {
 
 interface CreatorStats {
   total_views: number;
-  total_gifts: number;
+  total_gifts_received: number;
+  total_coins_earned: number;
   coins_earned: number;
-  this_month_eur: number;
+  monthly_earnings_coins: number;
+  monthly_earnings_eur: number;
+  current_balance: number;
   available_balance: number;
 }
 
@@ -65,7 +68,7 @@ interface GiftReceived {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const coinsToEur = (coins: number) => ((coins / 100) * 0.5).toFixed(2);
+const coinsToEur = (coins: number | string) => ((parseFloat(String(coins ?? 0)) / 100) * 0.5).toFixed(2);
 const fmtNum = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : `${n}`;
 
@@ -272,12 +275,12 @@ const CreatorDashboardScreen: React.FC = () => {
             <View style={s.statsGrid}>
               <StatCard
                 icon="eye" label="Vues totales"
-                value={fmtNum(stats.total_views)}
+                value={fmtNum(stats.total_views ?? 0)}
                 color="#3B82F6" colors={colors}
               />
               <StatCard
                 icon="gift" label="Cadeaux reçus"
-                value={fmtNum(stats.total_gifts)}
+                value={fmtNum(stats.total_gifts_received ?? 0)}
                 color="#E85DAD" colors={colors}
               />
               <StatCard
@@ -288,7 +291,7 @@ const CreatorDashboardScreen: React.FC = () => {
               />
               <StatCard
                 icon="trending-up" label="Ce mois"
-                value={`${stats.this_month_eur.toFixed(2)} €`}
+                value={`${parseFloat(String(stats.monthly_earnings_eur ?? 0)).toFixed(2)} €`}
                 color="#3FEDB6" colors={colors}
               />
             </View>

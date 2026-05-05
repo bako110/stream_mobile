@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Animated, {
   useAnimatedStyle, useSharedValue,
-  withTiming, runOnJS, withSpring,
+  withTiming, runOnJS, withSpring, FadeInDown,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';

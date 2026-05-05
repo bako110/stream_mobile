@@ -249,6 +249,25 @@ export const Endpoints = {
     pay:     `${V1}/orange-money/pay`,
   },
 
+  // ── Wallet / Monétisation (prefix: /api/v1/wallet) ───────────────────────
+  wallet: {
+    balance:          `${V1}/wallet/me`,
+    transfer:         `${V1}/wallet/transfer`,
+    transactions:     `${V1}/wallet/transactions`,
+    purchase:         `${V1}/wallet/purchase`,
+    packages:         `${V1}/wallet/packages`,
+    sendGift:         `${V1}/wallet/gifts/send`,
+    giftTypes:        `${V1}/wallet/gifts`,
+    withdraw:         `${V1}/wallet/withdraw`,
+    withdrawHistory:  `${V1}/wallet/withdraw/history`,
+    creatorProfile:   `${V1}/wallet/creator/profile`,
+    creatorStats:     `${V1}/wallet/creator/stats`,
+    // Boost
+    boostsActive:     `${V1}/wallet/boosts/active`,
+    boostsHistory:    `${V1}/wallet/boosts/history`,
+    boostsPurchase:   `${V1}/wallet/boosts/purchase`,
+  },
+
   // ── Système ───────────────────────────────────────────────────────────────
   system: {
     health: '/health',

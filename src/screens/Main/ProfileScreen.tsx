@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
@@ -83,19 +83,20 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
 
   const isCreator = user?.role === 'artist' || user?.role === 'admin';
 
-  const publishedEvents   = myEvents.filter(e => e.status === 'published');
-  const publishedConcerts = myConcerts.filter(c => c.status === 'published');
-  const postsCount = publishedEvents.length + publishedConcerts.length;
+  const publishedEvents   = useMemo(() => myEvents.filter(e => e.status === 'published'),   [myEvents]);
+  const publishedConcerts = useMemo(() => myConcerts.filter(c => c.status === 'published'), [myConcerts]);
+  const postsCount        = publishedEvents.length + publishedConcerts.length;
 
-  // Publications récentes (mélange events + concerts, triés par date)
-  const recentPublished = [...publishedEvents.map(e => ({ kind: 'event' as const, data: e })),
-                           ...publishedConcerts.map(c => ({ kind: 'concert' as const, data: c }))]
-    .sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime())
-    .slice(0, 5);
+  const recentPublished = useMemo(() => [
+    ...publishedEvents.map(e => ({ kind: 'event' as const, data: e })),
+    ...publishedConcerts.map(c => ({ kind: 'concert' as const, data: c })),
+  ].sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime())
+   .slice(0, 5), [publishedEvents, publishedConcerts]);
 
-  const draftsList = draftsTab === 'events'
+  const draftsList = useMemo(() => draftsTab === 'events'
     ? myEvents.filter(e => e.status === 'draft')
-    : myConcerts.filter(c => c.status === 'draft');
+    : myConcerts.filter(c => c.status === 'draft'),
+  [draftsTab, myEvents, myConcerts]);
 
   const memberSince = user ? new Date(user.created_at).toLocaleDateString('fr-FR', {
     month: 'long', year: 'numeric',

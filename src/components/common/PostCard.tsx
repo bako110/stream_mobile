@@ -232,7 +232,7 @@ const pc = StyleSheet.create({
   feeling:       { paddingHorizontal: 14, paddingBottom: 6, fontSize: 13, fontStyle: 'italic' },
   bodyWrap:      { paddingHorizontal: 14, paddingBottom: 10 },
   body:          { fontSize: 15, lineHeight: 22 },
-  image:         { width: '100%', aspectRatio: 16 / 9 },
+  image:         { width: '100%', aspectRatio: 1 / 0.88 },
   countsRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   socialBar:     { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth },
   socialBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },

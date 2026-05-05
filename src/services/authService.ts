@@ -4,7 +4,7 @@ import { STORAGE_KEYS } from '../utils/constants';
 import { setAuthToken, setRefreshTokenFn, setOnUnauthorized } from '../api/client';
 import type {
   User, LoginRequest, RegisterRequest,
-  OAuthLoginRequest, AuthToken, PasswordChangeRequest,
+  AuthToken, PasswordChangeRequest,
 } from '../types';
 import { removeFCMToken } from './fcmService';
 
@@ -87,16 +87,16 @@ export const authService = {
   },
 
   async oauthGoogle(accessToken: string): Promise<AuthToken> {
-    const payload: OAuthLoginRequest = { access_token: accessToken };
-    const res = await apiClient.post<AuthToken>(Endpoints.auth.oauthGoogle, payload);
+    const res = await apiClient.post<AuthToken>(Endpoints.auth.oauthGoogle, { provider: 'google', access_token: accessToken });
     authService._saveTokens(res.data);
+    invalidateUserCache();
     return res.data;
   },
 
   async oauthFacebook(accessToken: string): Promise<AuthToken> {
-    const payload: OAuthLoginRequest = { access_token: accessToken };
-    const res = await apiClient.post<AuthToken>(Endpoints.auth.oauthFacebook, payload);
+    const res = await apiClient.post<AuthToken>(Endpoints.auth.oauthFacebook, { provider: 'facebook', access_token: accessToken });
     authService._saveTokens(res.data);
+    invalidateUserCache();
     return res.data;
   },
 

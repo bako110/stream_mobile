@@ -40,7 +40,8 @@ type PayoutMethod = 'stripe' | 'mobile_money';
 type WithdrawalStatus = 'pending' | 'completed' | 'rejected';
 
 interface WalletBalance {
-  coins: number;
+  coins_balance: number;
+  coins?: number;
 }
 
 interface Withdrawal {
@@ -158,7 +159,7 @@ const WithdrawScreen: React.FC = () => {
         apiClient.get<Withdrawal[]>(Endpoints.wallet.withdrawals),
       ]);
       if (balRes.status === 'fulfilled') {
-        const bal = balRes.value.data.coins;
+        const bal = balRes.value.data?.coins_balance ?? 0;
         setBalance(bal);
         const initAmount = Math.max(MIN_COINS, Math.min(MIN_COINS, bal));
         setAmount(initAmount);

@@ -1,18 +1,25 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
-  Platform, TouchableOpacity, StatusBar, TextInput,
+  Platform, TouchableOpacity, StatusBar, TextInput, ActivityIndicator,
 } from 'react-native';
 import Animated, {
   FadeInDown, FadeInUp,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
 import { QRScannerScreen } from './QRScannerScreen';
+
+GoogleSignin.configure({
+  webClientId: '862524928219-ojtrr3me5atb36mnd99fu71h37e94pte.apps.googleusercontent.com',
+  offlineAccess: false,
+});
 
 type LoginMethod = 'email' | 'phone';
 
@@ -43,6 +50,45 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
     setIdentifier('');
     setError('');
   };
+
+  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | null>(null);
+
+  const handleGoogleLogin = useCallback(async () => {
+    setSocialLoading('google');
+    setError('');
+    try {
+      await GoogleSignin.hasPlayServices();
+      // Force l'affichage du sélecteur de compte
+      await GoogleSignin.signOut();
+      const userInfo = await GoogleSignin.signIn();
+      const tokens = await GoogleSignin.getTokens();
+      await authService.oauthGoogle(tokens.accessToken);
+      onLoginSuccess();
+    } catch (e: any) {
+      if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
+        setError(e?.message ?? 'Erreur Google Sign-In');
+      }
+    } finally {
+      setSocialLoading(null);
+    }
+  }, [onLoginSuccess]);
+
+  const handleFacebookLogin = useCallback(async () => {
+    setSocialLoading('facebook');
+    setError('');
+    try {
+      const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+      if (result.isCancelled) { setSocialLoading(null); return; }
+      const data = await AccessToken.getCurrentAccessToken();
+      if (!data) throw new Error('Token Facebook manquant');
+      await authService.oauthFacebook(data.accessToken);
+      onLoginSuccess();
+    } catch (e: any) {
+      setError(e?.message ?? 'Erreur Facebook Login');
+    } finally {
+      setSocialLoading(null);
+    }
+  }, [onLoginSuccess]);
 
   const handleLogin = useCallback(async () => {
     if (!identifier.trim() || !password.trim()) {
@@ -227,20 +273,45 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Lien réseaux sociaux */}
-          <Animated.View entering={FadeInUp.delay(620).duration(400)} style={styles.socialRow}>
-            <View style={[styles.socialDivider, { backgroundColor: colors.divider }]} />
-            <TouchableOpacity
-              onPress={onGoSocialLogin}
-              style={styles.socialLink}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Icon name="share-2" size={13} color={colors.textTertiary} />
-              <Text style={[styles.socialLinkText, { color: colors.textTertiary }]}>
-                Continuer avec un réseau social
-              </Text>
-              <Icon name="chevron-right" size={13} color={colors.textTertiary} />
-            </TouchableOpacity>
+          {/* Boutons sociaux */}
+          <Animated.View entering={FadeInUp.delay(600).duration(400)} style={styles.socialRow}>
+            <View style={styles.socialDividerRow}>
+              <View style={[styles.socialDivider, { backgroundColor: colors.divider }]} />
+              <Text style={[styles.socialOrText, { color: colors.textTertiary }]}>ou continuer avec</Text>
+              <View style={[styles.socialDivider, { backgroundColor: colors.divider }]} />
+            </View>
+
+            <View style={styles.socialBtns}>
+              {/* Google */}
+              <TouchableOpacity
+                style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+                onPress={handleGoogleLogin}
+                disabled={!!socialLoading}
+                activeOpacity={0.75}
+              >
+                {socialLoading === 'google' ? (
+                  <ActivityIndicator size={18} color="#DB4437" />
+                ) : (
+                  <Text style={styles.googleIcon}>G</Text>
+                )}
+                <Text style={[styles.socialBtnText, { color: colors.textPrimary }]}>Google</Text>
+              </TouchableOpacity>
+
+              {/* Facebook */}
+              <TouchableOpacity
+                style={[styles.socialBtn, { backgroundColor: '#1877F2', borderColor: '#1877F2' }]}
+                onPress={handleFacebookLogin}
+                disabled={!!socialLoading}
+                activeOpacity={0.75}
+              >
+                {socialLoading === 'facebook' ? (
+                  <ActivityIndicator size={18} color="#fff" />
+                ) : (
+                  <Icon name="facebook" size={18} color="#fff" />
+                )}
+                <Text style={[styles.socialBtnText, { color: '#fff' }]}>Facebook</Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -289,8 +360,12 @@ const styles = StyleSheet.create({
   qrIconWrap:    { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   qrBtnTitle:    { fontSize: 14, fontWeight: '700' },
   qrBtnSub:      { fontSize: 12, marginTop: 1 },
-  socialRow:     { alignItems: 'center', marginTop: 16, gap: 10 },
-  socialDivider: { height: 1, width: '100%' },
-  socialLink:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
-  socialLinkText:{ fontSize: 13, fontWeight: '500' },
+  socialRow:        { marginTop: 20, gap: 16 },
+  socialDividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  socialDivider:    { flex: 1, height: 1 },
+  socialOrText:     { fontSize: 12, fontWeight: '500' },
+  socialBtns:       { flexDirection: 'row', gap: 12 },
+  socialBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 14, borderWidth: 1 },
+  socialBtnText:    { fontSize: 14, fontWeight: '700' },
+  googleIcon:       { fontSize: 16, fontWeight: '900', color: '#DB4437', fontFamily: 'serif' },
 });

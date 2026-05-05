@@ -22,12 +22,15 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
+import { useWsEvents } from '../../hooks/useWsEvents';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface WalletBalance {
-  coins: number;
+  coins_balance: number;
+  coins_earned: number;
+  coins_spent: number;
   total_earned: number;
   total_spent: number;
   pending_withdrawal: number;
@@ -142,7 +145,7 @@ const WalletScreen: React.FC = () => {
       ]);
       setBalance(balRes.data);
       setTransactions(txRes.data ?? []);
-      runCountUp(balRes.data.coins);
+      runCountUp(balRes.data?.coins_balance ?? 0);
     } catch (e: any) {
       setError(e?.message ?? 'Erreur de chargement');
     }
@@ -157,6 +160,12 @@ const WalletScreen: React.FC = () => {
     await fetchData();
     setRefreshing(false);
   }, [fetchData]);
+
+  // Rafraîchissement automatique quand on reçoit un transfert ou cadeau
+  useWsEvents({
+    onCoinTransferReceived: () => fetchData(),
+    onGiftReceived:         () => fetchData(),
+  });
 
   const s = styles(colors);
 
@@ -228,7 +237,7 @@ const WalletScreen: React.FC = () => {
       {/* Header */}
       <View style={s.header}>
         <Text style={s.headerTitle}>Mon Portefeuille</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('WalletHistory')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Withdraw')}>
           <Icon name="clock" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -250,16 +259,17 @@ const WalletScreen: React.FC = () => {
           <Text style={s.balanceSub}>coins</Text>
           <View style={s.eurRow}>
             <MaterialCommunityIcons name="currency-eur" size={14} color="rgba(255,255,255,0.75)" />
-            <Text style={s.eurText}>{coinsToEur(balance?.coins ?? 0)} EUR</Text>
+            <Text style={s.eurText}>{coinsToEur(balance?.coins_balance ?? 0)} EUR</Text>
           </View>
         </LinearGradient>
 
         {/* Quick actions */}
         <View style={s.actionsRow}>
           {[
-            { icon: 'shopping-cart', label: 'Acheter', color: '#3B82F6', screen: 'BuyCoins' },
-            { icon: 'gift',          label: 'Cadeau',  color: '#E85DAD', screen: 'GiftPicker' },
-            { icon: 'arrow-up-right',label: 'Retirer', color: '#3FEDB6', screen: 'Withdraw' },
+            { icon: 'shopping-cart', label: 'Acheter',   color: '#3B82F6', screen: 'BuyCoins' },
+            { icon: 'send',          label: 'Transférer', color: '#7B3FF2', screen: 'Transfer' },
+            { icon: 'bar-chart-2',   label: 'Créateur',  color: '#E85DAD', screen: 'CreatorDashboard' },
+            { icon: 'arrow-up-right',label: 'Retirer',   color: '#3FEDB6', screen: 'Withdraw' },
           ].map(a => (
             <TouchableOpacity
               key={a.screen}
@@ -277,9 +287,9 @@ const WalletScreen: React.FC = () => {
         {/* Stats */}
         <View style={s.statsRow}>
           {[
-            { label: 'Gagné',   value: balance?.total_earned ?? 0,        color: colors.success },
-            { label: 'Dépensé', value: balance?.total_spent ?? 0,         color: colors.error },
-            { label: 'Attente', value: balance?.pending_withdrawal ?? 0,  color: colors.warning },
+            { label: 'Gagné',   value: balance?.coins_earned ?? 0,   color: colors.success },
+            { label: 'Dépensé', value: balance?.coins_spent ?? 0,    color: colors.error },
+            { label: 'Attente', value: balance?.pending_withdrawal ?? 0, color: colors.warning },
           ].map(stat => (
             <View key={stat.label} style={s.statCard}>
               <Text style={[s.statValue, { color: stat.color }]}>{stat.value.toLocaleString('fr-FR')}</Text>

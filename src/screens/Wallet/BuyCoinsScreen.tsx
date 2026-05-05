@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -37,7 +38,8 @@ interface CoinPackage {
   name: string;
   coins: number;
   bonus: number;
-  price_eur: number;
+  bonus_coins: number;
+  price_eur: number | string;
   is_popular: boolean;
 }
 
@@ -98,7 +100,9 @@ const PackageCard: React.FC<{
   onSelect: () => void;
   colors: any;
 }> = ({ pkg, selected, onSelect, colors }) => {
-  const totalCoins = pkg.coins + pkg.bonus;
+  const bonusCoins = pkg.bonus_coins ?? pkg.bonus ?? 0;
+  const totalCoins = (pkg.coins ?? 0) + bonusCoins;
+  const priceEur   = parseFloat(String(pkg.price_eur ?? 0)).toFixed(2);
   const s = cardStyles(colors);
 
   return (
@@ -106,30 +110,30 @@ const PackageCard: React.FC<{
       {selected ? (
         <LinearGradient colors={['#9B65F5', '#E85DAD']} style={[s.card, s.cardSelected]}>
           {pkg.is_popular && <View style={s.popularBadge}><Text style={s.popularText}>POPULAIRE</Text></View>}
-          {pkg.bonus > 0 && (
+          {bonusCoins > 0 && (
             <View style={s.bonusBadge}>
-              <Text style={s.bonusText}>+{pkg.bonus} bonus</Text>
+              <Text style={s.bonusText}>+{bonusCoins} bonus</Text>
             </View>
           )}
           <MaterialCommunityIcons name="bitcoin" size={32} color="#FFD700" />
           <Text style={[s.pkgName, { color: '#FFF' }]}>{pkg.name}</Text>
           <Text style={[s.pkgCoins, { color: '#FFF' }]}>{totalCoins.toLocaleString('fr-FR')}</Text>
           <Text style={[s.pkgCoinsLabel, { color: 'rgba(255,255,255,0.75)' }]}>coins</Text>
-          <Text style={[s.pkgPrice, { color: '#FFF' }]}>{pkg.price_eur.toFixed(2)} €</Text>
+          <Text style={[s.pkgPrice, { color: '#FFF' }]}>{priceEur} €</Text>
         </LinearGradient>
       ) : (
         <View style={[s.card, pkg.is_popular && s.cardPopular]}>
           {pkg.is_popular && <View style={s.popularBadge}><Text style={s.popularText}>POPULAIRE</Text></View>}
-          {pkg.bonus > 0 && (
+          {bonusCoins > 0 && (
             <View style={s.bonusBadge}>
-              <Text style={s.bonusText}>+{pkg.bonus} bonus</Text>
+              <Text style={s.bonusText}>+{bonusCoins} bonus</Text>
             </View>
           )}
           <MaterialCommunityIcons name="bitcoin" size={32} color="#FFD700" />
           <Text style={s.pkgName}>{pkg.name}</Text>
           <Text style={s.pkgCoins}>{totalCoins.toLocaleString('fr-FR')}</Text>
           <Text style={s.pkgCoinsLabel}>coins</Text>
-          <Text style={s.pkgPrice}>{pkg.price_eur.toFixed(2)} €</Text>
+          <Text style={s.pkgPrice}>{priceEur} €</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -227,6 +231,12 @@ const BuyCoinsScreen: React.FC = () => {
   const [purchasing, setPurchasing] = useState(false);
   const [success, setSuccess]       = useState(false);
   const [successCoins, setSuccessCoins] = useState(0);
+  const [customEur, setCustomEur]   = useState('');
+  const [customMode, setCustomMode] = useState(false);
+
+  const EUR_TO_COINS = 200; // 1 EUR = 200 coins
+  const customCoins  = Math.floor(parseFloat(customEur || '0') * EUR_TO_COINS);
+  const customValid  = customCoins >= 100 && parseFloat(customEur || '0') >= 0.5;
 
   useEffect(() => {
     Promise.allSettled([
@@ -235,7 +245,7 @@ const BuyCoinsScreen: React.FC = () => {
     ]).then(([pkgRes, balRes]) => {
       if (pkgRes.status === 'fulfilled') setPackages(pkgRes.value.data ?? MOCK_PACKAGES);
       else setPackages(MOCK_PACKAGES);
-      if (balRes.status === 'fulfilled') setBalance(balRes.value.data.coins);
+      if (balRes.status === 'fulfilled') setBalance(balRes.value.data?.coins_balance ?? 0);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -251,7 +261,7 @@ const BuyCoinsScreen: React.FC = () => {
       // Simulate Stripe payment intent creation
       Alert.alert(
         'Paiement simulé',
-        `Stripe (sandbox) — ${selected.price_eur.toFixed(2)} €\nLe paiement sera traité en production.`,
+        `Stripe (sandbox) — ${parseFloat(String(selected.price_eur)).toFixed(2)} €\nLe paiement sera traité en production.`,
         [
           { text: 'Annuler', style: 'cancel', onPress: () => setPurchasing(false) },
           {
@@ -262,7 +272,7 @@ const BuyCoinsScreen: React.FC = () => {
                   stripe_payment_intent_id: `pi_mock_${Date.now()}`,
                 });
                 setModal(false);
-                setSuccessCoins(selected.coins + selected.bonus);
+                setSuccessCoins(selected.coins + (selected.bonus_coins ?? selected.bonus ?? 0));
                 setSuccess(true);
                 setBalance(prev => prev + selected.coins + selected.bonus);
               } catch (e: any) {
@@ -307,7 +317,74 @@ const BuyCoinsScreen: React.FC = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-        <Text style={s.subtitle}>Choisissez un pack de coins</Text>
+
+        {/* Saisie libre */}
+        <TouchableOpacity
+          style={[s.customToggle, { backgroundColor: colors.surface }]}
+          onPress={() => setCustomMode(m => !m)}
+          activeOpacity={0.8}
+        >
+          <Icon name="edit-2" size={15} color={colors.primary} />
+          <Text style={[s.customToggleText, { color: colors.textPrimary }]}>
+            {customMode ? 'Fermer le montant libre' : 'Saisir un montant libre'}
+          </Text>
+          <Icon name={customMode ? 'chevron-up' : 'chevron-down'} size={15} color={colors.textSecondary} />
+        </TouchableOpacity>
+
+        {customMode && (
+          <View style={[s.customBox, { backgroundColor: colors.surface }]}>
+            <Text style={[s.customLabel, { color: colors.textSecondary }]}>Montant en EUR</Text>
+            <View style={s.customInputRow}>
+              <Text style={s.customCurrency}>€</Text>
+              <TextInput
+                style={[s.customInput, { color: colors.textPrimary }]}
+                placeholder="0.00"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="decimal-pad"
+                value={customEur}
+                onChangeText={setCustomEur}
+              />
+            </View>
+            {customCoins > 0 && (
+              <Text style={s.customCoinsPreview}>
+                = {customCoins.toLocaleString('fr-FR')} 🪙
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[s.customBtn, !customValid && { opacity: 0.4 }]}
+              disabled={!customValid}
+              onPress={() => {
+                const fakePkg: CoinPackage = {
+                  id: 'custom',
+                  name: `${customCoins} coins`,
+                  coins: customCoins,
+                  bonus: 0,
+                  bonus_coins: 0,
+                  price_eur: parseFloat(customEur),
+                  is_popular: false,
+                };
+                setSelected(fakePkg);
+                setModal(true);
+              }}
+            >
+              <LinearGradient
+                colors={['#7B3FF2', '#E0389A']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={s.customBtnInner}
+              >
+                <Icon name="shopping-cart" size={15} color="#fff" />
+                <Text style={s.customBtnText}>
+                  Acheter {customCoins > 0 ? `${customCoins.toLocaleString('fr-FR')} 🪙` : ''}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <Text style={[s.customHint, { color: colors.textTertiary }]}>
+              Minimum 0.50 € · 1 EUR = {EUR_TO_COINS} coins
+            </Text>
+          </View>
+        )}
+
+        <Text style={s.subtitle}>Ou choisissez un pack</Text>
 
         {/* Grid 2 columns */}
         <View style={s.grid}>
@@ -346,13 +423,13 @@ const BuyCoinsScreen: React.FC = () => {
                 <View style={{ flex: 1 }}>
                   <Text style={s.modalPkgName}>{selected.name}</Text>
                   <Text style={s.modalPkgCoins}>
-                    {(selected.coins + selected.bonus).toLocaleString('fr-FR')} coins
-                    {selected.bonus > 0 && (
-                      <Text style={{ color: colors.success }}> (+{selected.bonus} bonus)</Text>
+                    {(selected.coins + (selected.bonus_coins ?? selected.bonus ?? 0)).toLocaleString('fr-FR')} coins
+                    {(selected.bonus_coins ?? selected.bonus ?? 0) > 0 && (
+                      <Text style={{ color: colors.success }}> (+{selected.bonus_coins ?? selected.bonus} bonus)</Text>
                     )}
                   </Text>
                 </View>
-                <Text style={s.modalPrice}>{selected.price_eur.toFixed(2)} €</Text>
+                <Text style={s.modalPrice}>{parseFloat(String(selected.price_eur)).toFixed(2)} €</Text>
               </View>
             )}
 
@@ -375,7 +452,7 @@ const BuyCoinsScreen: React.FC = () => {
               >
                 {purchasing
                   ? <ActivityIndicator color="#FFF" />
-                  : <Text style={s.confirmText}>Payer {selected?.price_eur.toFixed(2)} €</Text>
+                  : <Text style={s.confirmText}>Payer {parseFloat(String(selected?.price_eur ?? 0)).toFixed(2)} €</Text>
                 }
               </LinearGradient>
             </TouchableOpacity>
@@ -572,6 +649,81 @@ const styles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     fontWeight: '500',
+  },
+  // Custom amount
+  customToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  customToggleText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  customBox: {
+    borderRadius: 16,
+    padding: 18,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  customLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  customInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  customCurrency: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  customInput: {
+    flex: 1,
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  customCoinsPreview: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFD700',
+    textAlign: 'center',
+  },
+  customBtn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  customBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+  },
+  customBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  customHint: {
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
 

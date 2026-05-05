@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
@@ -42,8 +41,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         translucent
       />
 
-      <Animated.View
-        entering={FadeInDown.duration(350)}
+      <View
         style={[
           styles.container,
           {
@@ -118,7 +116,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             )}
           </View>
         </View>
-      </Animated.View>
+      </View>
     </>
   );
 };

@@ -100,7 +100,15 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (isSerie) {
       navigation.navigate('SerieEpisodes', { item });
     } else if (hasVideo) {
-      navigation.navigate('VideoPlayer', { url: defaultVideo!.hls_url!, title: item.title });
+      navigation.navigate('VideoPlayer', {
+        url:         defaultVideo!.hls_url!,
+        title:       item.title,
+        videoId:     defaultVideo!.id,
+        contentId:   item.id,
+        contentType: 'film' as const,
+        thumbnailUrl: item.thumbnail_url ?? undefined,
+        totalSeconds: defaultVideo!.duration_sec ?? undefined,
+      });
     }
   };
 

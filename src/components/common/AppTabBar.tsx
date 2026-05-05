@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import Animated, {
   useAnimatedStyle, withSpring, useSharedValue,
@@ -29,26 +29,14 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const { theme } = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
-  const { unreadActivity, unreadNotifications, unreadMessages, missedCallCount } = useWs();
-
-  // Badge par onglet
-  const badges: Record<string, number> = {
-    Home:     0,
-    Planning: 0,
-    Reels:    0,
-    Profile:  missedCallCount,
-  };
+  const { missedCallCount } = useWs();
 
   const focusedRoute = state.routes[state.index];
   const focusedOptions = descriptors[focusedRoute.key]?.options as any;
   const hideTabBar = focusedOptions?.tabBarStyle?.display === 'none' || focusedOptions?.tabBarVisible === false;
 
-  if (hideTabBar) {
-    return null;
-  }
+  if (hideTabBar) return null;
 
-  // Sur Android avec navigation 3-boutons, insets.bottom peut être 0
-  // On garantit un minimum de padding pour ne pas chevaucher les boutons système
   const bottomPad = Platform.OS === 'android'
     ? Math.max(insets.bottom, 12)
     : insets.bottom;
@@ -59,7 +47,6 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
       styles.container,
       { backgroundColor: colors.surface, borderTopColor: colors.divider, height: barHeight, paddingBottom: bottomPad },
     ]}>
-      {/* Ligne dégradée en haut de la bar */}
       <LinearGradient
         colors={[colors.primary + '30', colors.gradientEnd + '15', 'transparent']}
         start={{ x: 0, y: 0 }}
@@ -71,28 +58,19 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
       {TABS.map((tab) => {
         const route     = state.routes.find(r => r.name === tab.name);
         const isFocused = !!route && state.routes[state.index]?.name === tab.name;
-
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route?.key,
-            canPreventDefault: true,
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(tab.name);
-          }
-        };
+        const badge     = tab.name === 'Profile' ? missedCallCount : 0;
 
         return (
           <TabItem
             key={tab.name}
             config={tab}
+            routeKey={route?.key}
             isFocused={isFocused}
-            onPress={onPress}
+            navigation={navigation}
             activeColor={colors.primary}
             inactiveColor={colors.textTertiary}
             gradientColors={[colors.gradientStart, colors.gradientEnd]}
-            badge={badges[tab.name] ?? 0}
+            badge={badge}
           />
         );
       })}
@@ -102,29 +80,29 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
 
 interface TabItemProps {
   config:         TabConfig;
+  routeKey:       string | undefined;
   isFocused:      boolean;
-  onPress:        () => void;
+  navigation:     BottomTabBarProps['navigation'];
   activeColor:    string;
   inactiveColor:  string;
   gradientColors: [string, string];
   badge?:         number;
 }
 
-const TabItem: React.FC<TabItemProps> = ({
-  config, isFocused, onPress,
+const TabItem: React.FC<TabItemProps> = memo(({
+  config, routeKey, isFocused, navigation,
   activeColor, inactiveColor, gradientColors, badge,
 }) => {
   const progress = useSharedValue(isFocused ? 1 : 0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     progress.value = withSpring(isFocused ? 1 : 0, { damping: 15, stiffness: 180 });
   }, [isFocused]);
 
   const iconStyle = useAnimatedStyle(() => ({
     transform: [
-      { scale:     interpolate(progress.value, [0, 1], [1, 1.15]) },
-      { translateY: interpolate(progress.value, [0, 1], [0, -3]) },
+      { scale:      interpolate(progress.value, [0, 1], [1, 1.15]) },
+      { translateY: interpolate(progress.value, [0, 1], [0, -3])   },
     ],
   }));
 
@@ -133,9 +111,19 @@ const TabItem: React.FC<TabItemProps> = ({
     transform: [{ scaleX: interpolate(progress.value, [0, 1], [0.4, 1]) }],
   }));
 
+  const onPress = useCallback(() => {
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: routeKey,
+      canPreventDefault: true,
+    });
+    if (!isFocused && !event.defaultPrevented) {
+      navigation.navigate(config.name);
+    }
+  }, [isFocused, routeKey, config.name, navigation]);
+
   return (
     <TouchableOpacity onPress={onPress} style={styles.tab} activeOpacity={0.75}>
-      {/* Pill indicateur actif */}
       <Animated.View style={[styles.pill, pillStyle]}>
         <LinearGradient
           colors={gradientColors}
@@ -154,17 +142,13 @@ const TabItem: React.FC<TabItemProps> = ({
         )}
       </Animated.View>
 
-      <Text style={[
-        styles.label,
-        { color: isFocused ? activeColor : inactiveColor },
-      ]}>
+      <Text style={[styles.label, { color: isFocused ? activeColor : inactiveColor }]}>
         {config.label}
       </Text>
     </TouchableOpacity>
   );
-};
+});
 
-// Structure uniquement — couleurs injectées depuis le thème
 const styles = StyleSheet.create({
   container: {
     flexDirection:  'row',

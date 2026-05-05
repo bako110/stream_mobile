@@ -3,7 +3,7 @@ import {
   View, Text, Image, TouchableOpacity, Dimensions,
   StatusBar, StyleSheet, Animated, PanResponder,
   TouchableWithoutFeedback, Alert, TextInput, Modal, Platform,
-  FlatList, ActivityIndicator,
+  FlatList, ActivityIndicator, Easing,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
@@ -48,25 +48,203 @@ interface Props {
   onNavigateToCall?:  (partnerId: string, partnerName: string, callType: 'voice' | 'video') => void;
 }
 
-// ── Lecteur vidéo story (v7) ──────────────────────────────────────────────────
+// ── Lecteur vidéo story ───────────────────────────────────────────────────────
+
+const BUFFER_CFG = {
+  minBufferMs:                      2000,
+  maxBufferMs:                      15000,
+  bufferForPlaybackMs:              800,
+  bufferForPlaybackAfterRebufferMs: 1500,
+};
 
 const StoryVideoView: React.FC<{ uri: string; paused: boolean }> = ({ uri, paused }) => {
-  const player = useVideoPlayer({ uri }, p => {
-    p.loop = true;
-    p.muted = false;
-  });
+  const [buffering, setBuffering] = useState(false);
+
+  const player = useVideoPlayer(
+    { uri, bufferConfig: BUFFER_CFG },
+    p => {
+      p.loop   = false;
+      p.muted  = false;
+      // Démarre immédiatement à la création du player
+      if (!paused) p.play();
+    },
+  );
 
   useEffect(() => {
-    if (paused) { player.pause(); }
-    else        { player.play(); }
+    if (paused) player.pause();
+    else        player.play();
   }, [paused]);
 
+  // Détecte les stalls via onBuffer
+  useEffect(() => {
+    const sub = player.addEventListener('onBuffer', (isBuffering: boolean) => setBuffering(isBuffering));
+    return () => sub.remove();
+  }, []);
+
   return (
-    <VideoView
-      player={player}
-      style={s.media}
-      resizeMode="cover"
-    />
+    <View style={s.media}>
+      <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      {buffering && (
+        <View style={s.bufferOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      )}
+    </View>
+  );
+};
+
+// ── Préchargeur silencieux — instancie un player et appelle preload() ─────────
+// Rendu invisible, libéré au unmount automatiquement par react-native-video
+
+const VideoPreloader: React.FC<{ uri: string }> = ({ uri }) => {
+  const player = useVideoPlayer(
+    { uri, bufferConfig: BUFFER_CFG },
+    p => { p.muted = true; p.volume = 0; },
+  );
+  useEffect(() => {
+    player.preload().catch(() => {});
+    return () => { try { player.pause(); } catch {} };
+  }, [uri]);
+  return null;
+};
+
+// ── Music Player Widget animé ────────────────────────────────────────────────
+
+const BAR_COUNT = 20;
+
+const MusicWidget: React.FC<{ audioUrl: string; accent: string; playing: boolean; mediaType: string }> = ({
+  audioUrl, accent, playing, mediaType,
+}) => {
+  const vinylSpin  = useRef(new Animated.Value(0)).current;
+  const spinAnim   = useRef<Animated.CompositeAnimation | null>(null);
+  const barAnims   = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(Math.random()))).current;
+  const barLoops   = useRef<Animated.CompositeAnimation[]>([]);
+  const glowAnim   = useRef(new Animated.Value(0)).current;
+
+  // Nom du track extrait de l'URL
+  const trackName = (() => {
+    try {
+      const seg = audioUrl.split('/').pop()?.split('?')[0] ?? '';
+      const clean = decodeURIComponent(seg).replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+      return clean.length > 30 ? clean.slice(0, 30) + '…' : clean || 'Musique';
+    } catch { return 'Musique'; }
+  })();
+
+  const startSpin = useCallback(() => {
+    spinAnim.current?.stop();
+    spinAnim.current = Animated.loop(
+      Animated.timing(vinylSpin, { toValue: 1, duration: 3200, easing: Easing.linear, useNativeDriver: true }),
+    );
+    spinAnim.current.start();
+  }, []);
+
+  const stopSpin = useCallback(() => {
+    spinAnim.current?.stop();
+  }, []);
+
+  const startBars = useCallback(() => {
+    barLoops.current.forEach(l => l.stop());
+    barLoops.current = barAnims.map((anim, i) => {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, { toValue: 0.15 + Math.random() * 0.85, duration: 180 + i * 22, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          Animated.timing(anim, { toValue: 0.05 + Math.random() * 0.5,  duration: 180 + i * 18, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        ]),
+      );
+      loop.start();
+      return loop;
+    });
+  }, []);
+
+  const stopBars = useCallback(() => {
+    barLoops.current.forEach(l => l.stop());
+    barAnims.forEach(a => Animated.timing(a, { toValue: 0.12, duration: 300, useNativeDriver: false }).start());
+  }, []);
+
+  const startGlow = useCallback(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        Animated.timing(glowAnim, { toValue: 0.3, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+      ]),
+    ).start();
+  }, []);
+
+  useEffect(() => {
+    if (playing) { startSpin(); startBars(); startGlow(); }
+    else { stopSpin(); stopBars(); }
+  }, [playing]);
+
+  useEffect(() => () => { stopSpin(); stopBars(); }, []);
+
+  const spinDeg = vinylSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
+
+  const isVoice = mediaType === 'voice';
+
+  return (
+    <View style={mw.container} pointerEvents="none">
+      {/* Glow de fond */}
+      <Animated.View style={[mw.glow, { backgroundColor: accent, opacity: glowOpacity }]} />
+
+      {/* Vinyle / micro */}
+      <View style={mw.vinylWrap}>
+        <Animated.View style={[mw.vinyl, { transform: [{ rotate: spinDeg }] }]}>
+          <LinearGradient
+            colors={['#1a1a2e', '#16213E', '#0F3460', '#1a1a2e']}
+            style={mw.vinylInner}
+          />
+          {/* Sillons */}
+          {[28, 22, 16].map(r => (
+            <View key={r} style={[mw.groove, { width: r * 2, height: r * 2, borderRadius: r, borderColor: 'rgba(255,255,255,0.06)' }]} />
+          ))}
+          {/* Centre coloré */}
+          <View style={[mw.vinylCenter, { backgroundColor: accent }]}>
+            <MaterialIcon name={isVoice ? 'microphone' : 'music-note'} size={11} color="#fff" />
+          </View>
+        </Animated.View>
+        {/* Bras de lecture */}
+        {!isVoice && (
+          <View style={mw.tonearm}>
+            <View style={[mw.tonearmLine, { backgroundColor: 'rgba(255,255,255,0.5)' }]} />
+            <View style={[mw.tonearmHead, { backgroundColor: accent }]} />
+          </View>
+        )}
+      </View>
+
+      {/* Infos + barres */}
+      <View style={mw.info}>
+        <View style={mw.labelRow}>
+          <MaterialIcon name={isVoice ? 'microphone-variant' : 'music-circle'} size={12} color={accent} />
+          <Text style={[mw.typeLabel, { color: accent }]}>{isVoice ? 'Vocal' : 'Musique'}</Text>
+          {playing && (
+            <View style={[mw.liveChip, { backgroundColor: accent + '25', borderColor: accent + '60' }]}>
+              <View style={[mw.liveDot, { backgroundColor: accent }]} />
+              <Text style={[mw.liveText, { color: accent }]}>EN COURS</Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={mw.trackName} numberOfLines={1}>{trackName}</Text>
+
+        {/* Barres d'onde */}
+        <View style={mw.waveRow}>
+          {barAnims.map((anim, i) => (
+            <Animated.View
+              key={i}
+              style={[
+                mw.bar,
+                {
+                  backgroundColor: accent,
+                  height: anim.interpolate({ inputRange: [0, 1], outputRange: [3, 22] }),
+                  opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
+                },
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
   );
 };
 
@@ -100,6 +278,26 @@ export const StoryViewer: React.FC<Props> = ({
 
   // ── Video ──────────────────────────────────────────────────────────────────
 
+
+  // ── Prefetch des médias suivants (WhatsApp-style) ─────────────────────────
+
+  useEffect(() => {
+    // Collecte les 3 prochains médias (stories suivantes + groupe suivant)
+    const nextUrls: string[] = [];
+    const curStories = groups[groupIdx]?.stories ?? [];
+
+    // Stories suivantes dans le groupe courant
+    for (let i = storyIdx + 1; i < Math.min(storyIdx + 3, curStories.length); i++) {
+      const url = curStories[i]?.media_url;
+      if (url) nextUrls.push(url);
+    }
+    // Première story du groupe suivant
+    const nextGroup = groups[groupIdx + 1];
+    if (nextGroup?.stories[0]?.media_url) nextUrls.push(nextGroup.stories[0].media_url);
+
+    // Prefetch en arrière-plan — silencieux
+    nextUrls.forEach(url => Image.prefetch(url).catch(() => {}));
+  }, [storyIdx, groupIdx]);
 
   // ── Mark viewed ────────────────────────────────────────────────────────────
 
@@ -229,7 +427,7 @@ export const StoryViewer: React.FC<Props> = ({
 
   const closeViewers = () => { setViewersOpen(false); setPaused(false); };
 
-  if (!group || !story) return null;
+  if (!group || !story || !group.user) return null;
 
   const author = group.user;
   const timeAgo = (() => {
@@ -246,6 +444,14 @@ export const StoryViewer: React.FC<Props> = ({
       <Animated.View style={[s.root, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
         <StatusBar hidden translucent backgroundColor="transparent" />
 
+        {/* ── Préchargeurs vidéo invisibles — story suivante + 1ère du groupe suivant */}
+        {group.stories[storyIdx + 1]?.media_type === 'video' && group.stories[storyIdx + 1]?.media_url && (
+          <VideoPreloader key={group.stories[storyIdx + 1].id} uri={group.stories[storyIdx + 1].media_url!} />
+        )}
+        {groups[groupIdx + 1]?.stories[0]?.media_type === 'video' && groups[groupIdx + 1]?.stories[0]?.media_url && (
+          <VideoPreloader key={groups[groupIdx + 1].stories[0].id} uri={groups[groupIdx + 1].stories[0].media_url!} />
+        )}
+
         {/* ── Media ─────────────────────────────────────────────────────── */}
         {story.media_type === 'text' && (
           <View style={[s.media, { backgroundColor: story.background_color ?? '#7B3FF2' }]} />
@@ -254,7 +460,7 @@ export const StoryViewer: React.FC<Props> = ({
           <Image source={{ uri: story.media_url }} style={s.media} resizeMode="cover" />
         )}
         {story.media_type === 'video' && story.media_url && (
-          <StoryVideoView uri={story.media_url} paused={paused} />
+          <StoryVideoView key={story.id} uri={story.media_url} paused={paused} />
         )}
         {story.media_type === 'audio' && (
           <LinearGradient colors={[story.background_color ?? '#FF9800', '#000']} style={s.media}>
@@ -339,14 +545,14 @@ export const StoryViewer: React.FC<Props> = ({
           </View>
         ) : null}
 
-        {/* ── Audio badge ────────────────────────────────────────────────── */}
+        {/* ── Music widget ───────────────────────────────────────────────── */}
         {story.audio_url && (
-          <View style={[s.audioBadge, { borderColor: accent }]}>
-            <MaterialIcon name={story.media_type === 'voice' ? 'microphone' : 'music-note'} size={13} color={accent} />
-            <Text style={[s.audioBadgeText, { color: accent }]}>
-              {story.media_type === 'voice' ? 'Vocal' : 'Son'}
-            </Text>
-          </View>
+          <MusicWidget
+            audioUrl={story.audio_url}
+            accent={accent}
+            playing={!paused}
+            mediaType={story.media_type}
+          />
         )}
 
         {/* ── Tap zones ─────────────────────────────────────────────────── */}
@@ -498,6 +704,12 @@ const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: '#000' },
   media:  { width: W, height: H },
   mediaCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  bufferOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    zIndex: 20,
+  },
 
   gradTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 200 },
   gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 220 },
@@ -555,16 +767,6 @@ const s = StyleSheet.create({
     color: '#fff', fontSize: 15, fontWeight: '500', textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
-
-  // ── Audio badge ───────────────────────────────────────────────────────────────
-  audioBadge: {
-    position: 'absolute', top: '48%', alignSelf: 'center',
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderWidth: 1,
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-  },
-  audioBadgeText: { fontSize: 12, fontWeight: '700' },
 
   // ── Tap zones ─────────────────────────────────────────────────────────────────
   tapZones: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', zIndex: 5 },
@@ -650,4 +852,142 @@ const s = StyleSheet.create({
   editCancelText: { color: 'rgba(255,255,255,0.6)', fontWeight: '600' },
   editSaveGrad:   { borderRadius: 12, overflow: 'hidden', paddingHorizontal: 22, paddingVertical: 12 },
   editSaveText:   { color: '#fff', fontWeight: '800' },
+});
+
+// ── MusicWidget styles ──────────────────────────────────────────────────────
+const mw = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 110,
+    left: 16,
+    right: 16,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  glow: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    top: -10,
+    alignSelf: 'center',
+  },
+  vinylWrap: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  vinyl: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  vinylInner: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 38,
+  },
+  groove: {
+    position: 'absolute',
+    borderWidth: 1,
+  },
+  vinylCenter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  tonearm: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    width: 28,
+    height: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    transform: [{ rotate: '-30deg' }],
+  },
+  tonearmLine: {
+    width: 2,
+    height: 36,
+    borderRadius: 1,
+  },
+  tonearmHead: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: -2,
+  },
+  info: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    width: '100%',
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  typeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  liveChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginLeft: 4,
+  },
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  liveText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  trackName: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+    maxWidth: W - 80,
+  },
+  waveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 24,
+    marginTop: 2,
+  },
+  bar: {
+    width: 3,
+    borderRadius: 2,
+    opacity: 0.85,
+  },
 });

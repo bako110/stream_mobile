@@ -28,6 +28,7 @@ class ApiError extends Error {
 let authToken: string | null = null;
 let _refreshTokenFn: (() => Promise<string>) | null = null;
 let _onUnauthorized: (() => void) | null = null;
+let _refreshPromise: Promise<string> | null = null;
 
 export const setAuthToken = (token: string | null) => {
   authToken = token;
@@ -68,11 +69,25 @@ async function request<T>(
       signal,
     });
 
-    const json = response.status === 204 ? null : await response.json();
+    let json: any = null;
+    if (response.status !== 204) {
+      const text = await response.text();
+      try {
+        json = JSON.parse(text);
+      } catch {
+        // Réponse non-JSON (HTML nginx, texte erreur serveur)
+        if (!response.ok) {
+          throw new ApiError(response.status, `Erreur serveur (${response.status})`, text);
+        }
+      }
+    }
 
     if (response.status === 401 && !_retry && _refreshTokenFn) {
       try {
-        const newToken = await _refreshTokenFn();
+        if (!_refreshPromise) {
+          _refreshPromise = _refreshTokenFn().finally(() => { _refreshPromise = null; });
+        }
+        const newToken = await _refreshPromise;
         setAuthToken(newToken);
         return request<T>(endpoint, options, true);
       } catch {
@@ -83,7 +98,11 @@ async function request<T>(
 
     if (!response.ok) {
       if (response.status === 401) _onUnauthorized?.();
-      throw new ApiError(response.status, json?.message ?? 'Request failed', json);
+      throw new ApiError(
+        response.status,
+        json?.detail ?? json?.message ?? `Erreur ${response.status}`,
+        json,
+      );
     }
 
     return { data: json?.data ?? json, status: response.status, message: json?.message };

@@ -2,6 +2,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import type { ImageLibraryOptions, Asset } from 'react-native-image-picker';
 import { Platform } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { Image as CompressorImage } from 'react-native-compressor';
 import { API_BASE_URL, STORAGE_KEYS } from '../utils/constants';
 import { storage } from '../utils/storage';
 import { compressVideo, cleanupTempVideos } from './videoCompressService';
@@ -96,10 +97,26 @@ async function putToR2(uploadUrl: string, filePath: string, contentType: string)
 
 // ── Images ────────────────────────────────────────────────────────────────────
 
+async function compressAndNormalizeImage(uri: string): Promise<string> {
+  const normalized = await normalizeUri(uri);
+  try {
+    return await CompressorImage.compress(normalized, {
+      compressionMethod: 'auto',
+      maxWidth:  1280,
+      maxHeight: 1280,
+      quality:   0.8,
+      output:    'jpg',
+      returnableOutputType: 'uri',
+    });
+  } catch {
+    return normalized;
+  }
+}
+
 async function uploadAsset(asset: Asset, folder: string): Promise<UploadedImage> {
-  const uri         = await normalizeUri(asset.uri!);
-  const contentType = asset.type ?? 'image/jpeg';
-  const filename    = asset.fileName ?? `photo_${Date.now()}.jpg`;
+  const uri         = await compressAndNormalizeImage(asset.uri!);
+  const contentType = 'image/jpeg';
+  const filename    = `photo_${Date.now()}.jpg`;
   const { upload_url, public_url } = await getPresignedUrl(folder, filename, contentType);
   await putToR2(upload_url, uri, contentType);
   return { url: public_url, public_id: public_url };
@@ -130,18 +147,17 @@ export async function uploadImageFromUri(
   uri: string,
   folder: UploadFolder,
   fileName?: string,
-  mimeType?: string,
 ): Promise<UploadedImage> {
-  const normalized  = await normalizeUri(uri);
-  const contentType = mimeType ?? 'image/jpeg';
+  const compressed  = await compressAndNormalizeImage(uri);
+  const contentType = 'image/jpeg';
   const filename    = fileName ?? `photo_${Date.now()}.jpg`;
   const { upload_url, public_url } = await getPresignedUrl(folder, filename, contentType);
-  await putToR2(upload_url, normalized, contentType);
+  await putToR2(upload_url, compressed, contentType);
   return { url: public_url, public_id: public_url };
 }
 
-export async function uploadMessageImage(uri: string, fileName?: string, mimeType?: string): Promise<UploadedImage> {
-  return uploadImageFromUri(uri, 'messages', fileName, mimeType);
+export async function uploadMessageImage(uri: string, fileName?: string): Promise<UploadedImage> {
+  return uploadImageFromUri(uri, 'messages', fileName);
 }
 
 export async function deleteUploadedImage(_publicId: string): Promise<void> {
@@ -157,17 +173,40 @@ export async function uploadVideoFromUri(
   mimeType?: string,
   onProgress?: (pct: number) => void,
 ): Promise<UploadedVideo> {
-  // Compression H.264 CRF 23 avant upload
-  const compressed = await compressVideo(uri, { crf: 23, onProgress });
-  const tempUri    = compressed.uri;
+  const compressed = await compressVideo(uri, { onProgress });
 
   const contentType = mimeType ?? 'video/mp4';
   const filename    = fileName ?? `video_${Date.now()}.mp4`;
   const { upload_url, public_url } = await getPresignedUrl(folder, filename, contentType);
-  await putToR2(upload_url, tempUri, contentType);
+  await putToR2(upload_url, compressed.uri, contentType);
 
-  await cleanupTempVideos([tempUri]);
-  return { url: public_url, public_id: public_url, duration: compressed.durationSec };
+  // Upload du thumbnail si généré
+  let thumbnailPublicUrl: string | undefined;
+  if (compressed.thumbnailUri) {
+    try {
+      const thumbFilename = `thumb_${Date.now()}.jpg`;
+      const { upload_url: thumbUploadUrl, public_url: thumbPublicUrl } =
+        await getPresignedUrl(folder, thumbFilename, 'image/jpeg');
+      await putToR2(thumbUploadUrl, compressed.thumbnailUri, 'image/jpeg');
+      thumbnailPublicUrl = thumbPublicUrl;
+      // Nettoyage thumbnail temp
+      const thumbPath = compressed.thumbnailUri.startsWith('file://')
+        ? compressed.thumbnailUri.slice(7)
+        : compressed.thumbnailUri;
+      ReactNativeBlobUtil.fs.unlink(thumbPath).catch(() => {});
+    } catch {}
+  }
+
+  if (compressed.isTempFile) {
+    await cleanupTempVideos([compressed.uri]);
+  }
+
+  return {
+    url:           public_url,
+    public_id:     public_url,
+    duration:      compressed.durationSec,
+    thumbnail_url: thumbnailPublicUrl,
+  };
 }
 
 export async function pickAndUploadVideo(folder: VideoFolder = 'reels'): Promise<{ video: UploadedVideo; localUri: string } | null> {

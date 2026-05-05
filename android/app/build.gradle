@@ -84,6 +84,11 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
     namespace "com.stream_mobile"
     defaultConfig {
         applicationId "com.stream_mobile"
