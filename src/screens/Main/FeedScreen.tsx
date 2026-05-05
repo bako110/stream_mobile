@@ -26,6 +26,8 @@ import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, Avata
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
+import { communityService } from '../../services/communityService';
+import type { CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -131,7 +133,8 @@ export const FeedScreen: React.FC = () => {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen,   setMenuOpen]   = useState(false);
-  const [liveConcerts, setLiveConcerts] = useState<Concert[]>([]);
+  const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
+  const [trendingComm,    setTrendingComm]    = useState<CommunityData[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searching, setSearching] = useState(false);
@@ -343,7 +346,10 @@ export const FeedScreen: React.FC = () => {
     } catch { /* silencieux */ }
   }, []);
 
-  useEffect(() => { loadLive(); }, []);
+  useEffect(() => {
+    loadLive();
+    communityService.discover(1, 8).then(data => setTrendingComm(Array.isArray(data) ? data.slice(0, 5) : [])).catch(() => {});
+  }, []);
 
   // Rafraîchissement temps réel : reload quand un autre utilisateur publie
   useEffect(() => {
@@ -838,6 +844,108 @@ export const FeedScreen: React.FC = () => {
                     })}
                   </ScrollView>
                 </View>
+              )}
+
+              {/* ── Communautés tendance ─────────────────────────────── */}
+              {trendingComm.length > 0 && (
+                <Animated.View entering={FadeInDown.delay(40).springify()} style={{ marginBottom: 4 }}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10, marginTop: 8 }}
+                    activeOpacity={0.7}
+                    onPress={() => nav.navigate('Communities' as any)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#7B3FF220', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="users" size={14} color="#7B3FF2" />
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.textPrimary }}>Communautés</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Voir tout</Text>
+                      <Icon name="chevron-right" size={14} color={colors.primary} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+                    {trendingComm.map(comm => {
+                      const initials = (comm.name || '?')[0].toUpperCase();
+                      const gradients = [
+                        ['#7B3FF2', '#E0389A'], ['#3B82F6', '#06B6D4'],
+                        ['#10B981', '#36D9A0'], ['#F59E0B', '#EF4444'],
+                        ['#8B5CF6', '#EC4899'],
+                      ];
+                      const grad = gradients[comm.name.charCodeAt(0) % gradients.length];
+                      return (
+                        <TouchableOpacity
+                          key={comm.id}
+                          style={{
+                            width: 130, borderRadius: 16, overflow: 'hidden',
+                            backgroundColor: colors.surface,
+                            borderWidth: 1, borderColor: colors.divider,
+                          }}
+                          activeOpacity={0.85}
+                          onPress={() => nav.navigate('CommunityDetail' as any, { communityId: comm.id })}
+                        >
+                          {/* Banner */}
+                          <View style={{ height: 56 }}>
+                            {comm.banner_url
+                              ? <Image source={{ uri: comm.banner_url }} style={{ width: '100%', height: '100%' }} />
+                              : <LinearGradient colors={grad} style={{ flex: 1 }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+                            }
+                            {comm.is_verified && (
+                              <View style={{ position: 'absolute', top: 6, right: 6, width: 16, height: 16, borderRadius: 8, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
+                                <Icon name="check" size={9} color="#fff" />
+                              </View>
+                            )}
+                          </View>
+
+                          {/* Avatar flottant */}
+                          <View style={{ marginTop: -16, paddingHorizontal: 10 }}>
+                            <View style={{ width: 32, height: 32, borderRadius: 10, borderWidth: 2, borderColor: colors.surface, overflow: 'hidden' }}>
+                              {comm.avatar_url
+                                ? <Image source={{ uri: comm.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                                : <LinearGradient colors={grad} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{initials}</Text>
+                                  </LinearGradient>
+                              }
+                            </View>
+                          </View>
+
+                          {/* Infos */}
+                          <View style={{ padding: 8, paddingTop: 4 }}>
+                            <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 12 }} numberOfLines={1}>
+                              {comm.name}
+                            </Text>
+                            <Text style={{ color: colors.textTertiary, fontSize: 10, marginTop: 2 }}>
+                              {comm.members_count >= 1000
+                                ? `${(comm.members_count / 1000).toFixed(1)}k membres`
+                                : `${comm.members_count} membres`}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    {/* Carte "Voir tout" */}
+                    <TouchableOpacity
+                      style={{
+                        width: 80, borderRadius: 16, overflow: 'hidden',
+                        backgroundColor: colors.backgroundSecondary,
+                        borderWidth: 1, borderColor: colors.divider,
+                        alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}
+                      activeOpacity={0.85}
+                      onPress={() => nav.navigate('Communities' as any)}
+                    >
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="arrow-right" size={16} color={colors.primary} />
+                      </View>
+                      <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>
+                        Voir{'\n'}tout
+                      </Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </Animated.View>
               )}
 
               {/* ── Filtres ──────────────────────────────────────────── */}
