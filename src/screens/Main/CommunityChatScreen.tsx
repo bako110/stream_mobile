@@ -504,9 +504,13 @@ export const CommunityChatScreen: React.FC = () => {
 
   // ── Rendu Annonce ────────────────────────────────────────────────────────────
   const renderAnnouncement = (msg: CommunityMessage, showDate: boolean) => (
-    <View style={{ transform: [{ scaleY: -1 }] }}>
-      {showDate && <View style={styles.dateSep}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
-      <TouchableOpacity activeOpacity={0.85} onLongPress={() => setMenuMsg(msg)} delayLongPress={400}>
+    <>
+      {showDate && (
+        <View style={[styles.dateSep, styles.flip]}>
+          <Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text>
+        </View>
+      )}
+      <TouchableOpacity activeOpacity={0.85} onLongPress={() => setMenuMsg(msg)} delayLongPress={400} style={styles.flip}>
         <View style={[styles.announcementBubble, { backgroundColor: '#F59E0B0F', borderColor: '#F59E0B50' }]}>
           <View style={styles.announcementHeader}>
             <View style={[styles.announcementIconBg, { backgroundColor: '#F59E0B22' }]}>
@@ -514,7 +518,7 @@ export const CommunityChatScreen: React.FC = () => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.announcementLabel, { color: '#F59E0B' }]}>Annonce</Text>
-              <Text style={[{ fontSize: 11, color: colors.textTertiary }]}>
+              <Text style={{ fontSize: 11, color: colors.textTertiary }}>
                 {msg.sender_display_name || msg.sender_username} · {formatTime(msg.created_at)}
               </Text>
             </View>
@@ -524,16 +528,19 @@ export const CommunityChatScreen: React.FC = () => {
           {renderReactions(msg)}
         </View>
       </TouchableOpacity>
-    </View>
+    </>
   );
 
   // ── Rendu Sondage ─────────────────────────────────────────────────────────────
   const renderPollMessage = (msg: CommunityMessage, showDate: boolean) => (
-    <View style={{ transform: [{ scaleY: -1 }] }}>
-      {showDate && <View style={styles.dateSep}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
-      <TouchableOpacity activeOpacity={0.9} onLongPress={() => setMenuMsg(msg)} delayLongPress={400}>
+    <>
+      {showDate && (
+        <View style={[styles.dateSep, styles.flip]}>
+          <Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text>
+        </View>
+      )}
+      <TouchableOpacity activeOpacity={0.9} onLongPress={() => setMenuMsg(msg)} delayLongPress={400} style={styles.flip}>
         <View style={[styles.pollMessageCard, { backgroundColor: colors.surfaceElevated ?? colors.backgroundSecondary, borderColor: colors.divider }]}>
-          {/* En-tête */}
           <View style={styles.pollMsgHeader}>
             <View style={[styles.pollMsgIconBg, { backgroundColor: colors.primary + '22' }]}>
               <Icon name="bar-chart-2" size={14} color={colors.primary} />
@@ -546,12 +553,11 @@ export const CommunityChatScreen: React.FC = () => {
             </View>
             {msg.is_pinned && <Icon name="bookmark" size={13} color="#F59E0B" />}
           </View>
-          {/* Contenu du sondage */}
           {renderPoll(msg)}
           {renderReactions(msg)}
         </View>
       </TouchableOpacity>
-    </View>
+    </>
   );
 
   // ── Rendu Média ───────────────────────────────────────────────────────────────
@@ -559,7 +565,11 @@ export const CommunityChatScreen: React.FC = () => {
     const isMe = msg.sender_id === myId;
     return (
       <>
-        {showDate && <View style={[styles.dateSep, { transform: [{ scaleY: -1 }] }]}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
+        {showDate && (
+          <View style={[styles.dateSep, styles.flip]}>
+            <Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text>
+          </View>
+        )}
         <TouchableOpacity
           activeOpacity={0.85}
           onLongPress={() => setMenuMsg(msg)}
@@ -573,7 +583,6 @@ export const CommunityChatScreen: React.FC = () => {
                 {msg.sender_display_name || msg.sender_username}
               </Text>
             )}
-            {/* Grille d'images sans bulle colorée */}
             <View style={[styles.mediaMsgWrap, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
               {renderMediaGrid(msg.media_urls)}
               {msg.content ? (
@@ -599,7 +608,11 @@ export const CommunityChatScreen: React.FC = () => {
     const isMe = msg.sender_id === myId;
     return (
       <>
-        {showDate && <View style={[styles.dateSep, { transform: [{ scaleY: -1 }] }]}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
+        {showDate && (
+          <View style={[styles.dateSep, styles.flip]}>
+            <Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text>
+          </View>
+        )}
         <TouchableOpacity
           activeOpacity={0.85}
           onLongPress={() => setMenuMsg(msg)}
@@ -732,10 +745,14 @@ export const CommunityChatScreen: React.FC = () => {
               onEndReached={loadMore}
               onEndReachedThreshold={0.3}
               ListEmptyComponent={
-                <View style={[styles.emptyTab, { transform: [{ scaleY: -1 }] }]}>
-                  <Icon name="message-circle" size={48} color={colors.textTertiary} />
-                  <Text style={{ color: colors.textTertiary, marginTop: 12 }}>
-                    {activeTab === 'announcements' ? 'Aucune annonce' : activeTab === 'polls' ? 'Aucun sondage' : 'Aucun message — soyez le premier !'}
+                <View style={[styles.emptyTab, styles.flip]}>
+                  <Icon
+                    name={activeTab === 'announcements' ? 'bell' : activeTab === 'polls' ? 'bar-chart-2' : 'message-circle'}
+                    size={48}
+                    color={colors.textTertiary}
+                  />
+                  <Text style={{ color: colors.textTertiary, marginTop: 12, textAlign: 'center' }}>
+                    {activeTab === 'announcements' ? 'Aucune annonce' : activeTab === 'polls' ? 'Aucun sondage' : 'Aucun message\nSoyez le premier !'}
                   </Text>
                 </View>
               }
@@ -985,6 +1002,7 @@ export const CommunityChatScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  flip: { transform: [{ scaleY: -1 }] },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 16, fontWeight: '700' },
@@ -996,7 +1014,7 @@ const styles = StyleSheet.create({
 
   emptyTab: { alignItems: 'center', paddingTop: 80 },
 
-  dateSep: { alignItems: 'center', marginVertical: 10, transform: [{ scaleY: -1 }] },
+  dateSep: { alignItems: 'center', marginVertical: 10 },
   dateText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
 
   // Annonce
