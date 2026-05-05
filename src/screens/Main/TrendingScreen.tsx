@@ -1,21 +1,30 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, RefreshControl, StyleSheet } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import {
+  View, Text, FlatList, TouchableOpacity, Image,
+  RefreshControl, StyleSheet, Dimensions,
+} from 'react-native';
+import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonTrending } from '../../components/common';
 import { searchService } from '../../services';
 
+const { width: W } = Dimensions.get('window');
+const CARD_W = (W - 48) / 2;
+
+type Tab = 'content' | 'reels';
+
 export const TrendingScreen: React.FC = () => {
   const { theme } = useTheme();
-  const { colors, fontSize } = theme;
-
+  const { colors } = theme;
   const nav = useNavigation<any>();
-  const [trending, setTrending] = useState<any[]>([]);
-  const [reels,    setReels]    = useState<any[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [tab,      setTab]      = useState<'content' | 'reels'>('content');
+
+  const [trending,   setTrending]   = useState<any[]>([]);
+  const [reels,      setReels]      = useState<any[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [tab,        setTab]        = useState<Tab>('content');
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
@@ -32,27 +41,39 @@ export const TrendingScreen: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
+  const handlePress = (item: any) => {
+    if (tab === 'reels') return;
+    if (item.content_type === 'serie' || item.series_id) nav.navigate('SerieEpisodes', { item });
+    else nav.navigate('FilmDetail', { item });
+  };
+
   const data = tab === 'content' ? trending : reels;
+
+  const TABS: { key: Tab; icon: string; label: string }[] = [
+    { key: 'content', icon: 'trending-up', label: 'Contenus' },
+    { key: 'reels',   icon: 'video',       label: 'Reels'    },
+  ];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <AppHeader title="Tendances" variant="default" />
 
-      <View style={[styles.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        {([
-          { key: 'content', icon: 'trending-up', label: 'Contenus' },
-          { key: 'reels',   icon: 'video',        label: 'Reels'    },
-        ] as const).map(t => (
-          <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-            style={[styles.tab, tab === t.key && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Icon name={t.icon} size={14} color={tab === t.key ? colors.primary : colors.textSecondary} />
-              <Text style={{ fontSize: fontSize.sm, fontWeight: tab === t.key ? '700' : '400', color: tab === t.key ? colors.primary : colors.textSecondary }}>
-                {t.label}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+      {/* Tabs */}
+      <View style={[s.tabBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        {TABS.map(t => {
+          const active = tab === t.key;
+          return (
+            <TouchableOpacity key={t.key} style={s.tabBtn} onPress={() => setTab(t.key)} activeOpacity={0.7}>
+              <View style={[s.tabInner, active && { backgroundColor: colors.primary + '15', borderRadius: 20 }]}>
+                <Icon name={t.icon} size={15} color={active ? colors.primary : colors.textSecondary} />
+                <Text style={[s.tabText, { color: active ? colors.primary : colors.textSecondary, fontWeight: active ? '700' : '500' }]}>
+                  {t.label}
+                </Text>
+              </View>
+              {active && <View style={[s.tabUnderline, { backgroundColor: colors.primary }]} />}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {loading ? (
@@ -61,73 +82,182 @@ export const TrendingScreen: React.FC = () => {
         <FlatList
           data={data}
           keyExtractor={i => i.id}
+          numColumns={tab === 'content' ? 2 : 1}
+          key={tab}
           contentContainerStyle={{ padding: 16, gap: 12 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />}
+          columnWrapperStyle={tab === 'content' ? { gap: 12 } : undefined}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />
+          }
+          ListHeaderComponent={
+            <Animated.View entering={FadeInDown.springify()} style={[s.heroBanner, { backgroundColor: colors.surface }]}>
+              <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.heroBannerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <Icon name="trending-up" size={28} color="#fff" />
+                <View style={{ marginLeft: 12 }}>
+                  <Text style={s.heroTitle}>Top tendances</Text>
+                  <Text style={s.heroSub}>{data.length} {tab === 'reels' ? 'reels' : 'contenus'} populaires</Text>
+                </View>
+              </LinearGradient>
+            </Animated.View>
+          }
           ListEmptyComponent={
-            <View style={styles.center}>
-              <Icon name="trending-up" size={44} color={colors.textTertiary} />
-              <Text style={{ color: colors.textTertiary, marginTop: 12 }}>Aucune tendance pour l'instant</Text>
+            <View style={s.empty}>
+              <View style={[s.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
+                <Icon name="trending-up" size={28} color={colors.textTertiary} />
+              </View>
+              <Text style={[s.emptyText, { color: colors.textSecondary }]}>Aucune tendance pour l'instant</Text>
             </View>
           }
-          renderItem={({ item, index }) => {
-            const handlePress = () => {
-              if (tab === 'reels') return;
-              if (item.type === 'concert' || item.genre) nav.navigate('ConcertDetail', { concertId: item.id });
-              else if (item.event_type || item.type === 'event') nav.navigate('EventDetail', { eventId: item.id });
-              else if (item.series_id) nav.navigate('SerieEpisodes', { item });
-              else nav.navigate('FilmDetail', { item });
-            };
-            const iconName = tab === 'reels' ? 'video' : item.genre ? 'music' : item.event_type ? 'calendar' : 'film';
-            return (
-              <Animated.View entering={FadeInDown.delay(index * 40).springify()}>
-                <TouchableOpacity
-                  style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  activeOpacity={0.8}
-                  onPress={handlePress}
-                >
-                  <Text style={[styles.rank, { color: colors.primary }]}>#{index + 1}</Text>
-                  {item.thumbnail_url ? (
-                    <Image source={{ uri: item.thumbnail_url }} style={styles.thumb} resizeMode="cover" />
-                  ) : (
-                    <View style={[styles.thumb, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Icon name={iconName} size={20} color={colors.textTertiary} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.textPrimary }} numberOfLines={2}>
-                      {item.title ?? item.caption ?? 'Sans titre'}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
-                      {!!item.view_count && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <Icon name="eye" size={11} color={colors.textTertiary} />
-                          <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>{item.view_count}</Text>
-                        </View>
-                      )}
-                      {!!item.like_count && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <Icon name="heart" size={11} color={colors.textTertiary} />
-                          <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>{item.like_count}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                  <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          }}
+          renderItem={({ item, index }) =>
+            tab === 'content'
+              ? <ContentCard item={item} index={index} colors={colors} onPress={() => handlePress(item)} />
+              : <ReelRow item={item} index={index} colors={colors} />
+          }
         />
       )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  tabs:  { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
-  tab:   { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  center:{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  row:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 14, borderWidth: 1 },
-  rank:  { fontSize: 18, fontWeight: '900', width: 32, textAlign: 'center' },
-  thumb: { width: 54, height: 54, borderRadius: 10 },
+// ── Content card (grille 2 colonnes) ─────────────────────────────────────────
+
+const ContentCard: React.FC<{ item: any; index: number; colors: any; onPress: () => void }> = ({ item, index, colors, onPress }) => {
+  const GRADS: [string, string][] = [
+    ['#7B3FF2', '#E0389A'], ['#0EA5E9', '#6366F1'],
+    ['#10B981', '#0EA5E9'], ['#F59E0B', '#EF4444'],
+    ['#EC4899', '#8B5CF6'], ['#14B8A6', '#3B82F6'],
+  ];
+  const grad = GRADS[index % GRADS.length];
+  const fmtViews = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
+
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 50).springify()} style={{ width: CARD_W }}>
+      <TouchableOpacity style={[s.contentCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onPress} activeOpacity={0.85}>
+        {/* Rank badge */}
+        <View style={[s.rankBadge, { backgroundColor: index < 3 ? '#F59E0B' : colors.primary }]}>
+          <Text style={s.rankText}>#{index + 1}</Text>
+        </View>
+
+        {/* Thumbnail */}
+        <View style={s.contentThumb}>
+          {item.thumbnail_url ? (
+            <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <LinearGradient colors={grad} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="film" size={30} color="rgba(255,255,255,0.7)" />
+              </View>
+            </LinearGradient>
+          )}
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={s.contentThumbGrad} />
+        </View>
+
+        {/* Infos */}
+        <View style={s.contentBody}>
+          <Text style={[s.contentTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+            {item.title ?? 'Sans titre'}
+          </Text>
+          {!!item.view_count && (
+            <View style={s.statRow}>
+              <Icon name="eye" size={11} color={colors.textTertiary} />
+              <Text style={[s.statText, { color: colors.textTertiary }]}>{fmtViews(item.view_count)}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// ── Reel row (liste) ──────────────────────────────────────────────────────────
+
+const ReelRow: React.FC<{ item: any; index: number; colors: any }> = ({ item, index, colors }) => {
+  const fmtViews = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
+
+  return (
+    <Animated.View entering={FadeInRight.delay(index * 40).springify()}>
+      <View style={[s.reelRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {/* Rank */}
+        <View style={[s.reelRank, { backgroundColor: index < 3 ? '#F59E0B18' : colors.backgroundSecondary }]}>
+          <Text style={[s.reelRankText, { color: index < 3 ? '#F59E0B' : colors.textTertiary }]}>#{index + 1}</Text>
+        </View>
+
+        {/* Thumbnail */}
+        <View style={s.reelThumb}>
+          {item.thumbnail_url ? (
+            <Image source={{ uri: item.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          ) : (
+            <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundSecondary }]}>
+              <Icon name="video" size={20} color={colors.textTertiary} />
+            </View>
+          )}
+          <View style={[s.reelPlayIcon, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
+            <Icon name="play" size={12} color="#fff" />
+          </View>
+        </View>
+
+        {/* Info */}
+        <View style={{ flex: 1 }}>
+          <Text style={[s.reelCaption, { color: colors.textPrimary }]} numberOfLines={2}>
+            {item.caption ?? 'Reel'}
+          </Text>
+          <View style={s.reelStats}>
+            {!!item.view_count && (
+              <View style={s.statRow}>
+                <Icon name="eye" size={11} color={colors.textTertiary} />
+                <Text style={[s.statText, { color: colors.textTertiary }]}>{fmtViews(item.view_count)}</Text>
+              </View>
+            )}
+            {!!item.like_count && (
+              <View style={s.statRow}>
+                <Icon name="heart" size={11} color={colors.textTertiary} />
+                <Text style={[s.statText, { color: colors.textTertiary }]}>{fmtViews(item.like_count)}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <Icon name="chevron-right" size={16} color={colors.textDisabled} />
+      </View>
+    </Animated.View>
+  );
+};
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  tabBar:       { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
+  tabBtn:       { flex: 1, alignItems: 'center', paddingVertical: 10 },
+  tabInner:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6 },
+  tabText:      { fontSize: 13 },
+  tabUnderline: { position: 'absolute', bottom: 0, left: '15%', right: '15%', height: 2, borderRadius: 2 },
+
+  heroBanner:   { borderRadius: 16, overflow: 'hidden', marginBottom: 4 },
+  heroBannerGrad: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 18 },
+  heroTitle:    { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  heroSub:      { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 },
+
+  empty:        { alignItems: 'center', paddingTop: 80, gap: 12 },
+  emptyIcon:    { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  emptyText:    { fontSize: 15, fontWeight: '500' },
+
+  contentCard:  { borderRadius: 14, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
+  rankBadge:    { position: 'absolute', top: 8, left: 8, zIndex: 2, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  rankText:     { color: '#fff', fontSize: 11, fontWeight: '800' },
+  contentThumb: { width: '100%', height: 130, position: 'relative', overflow: 'hidden' },
+  contentThumbGrad: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 50 },
+  contentBody:  { padding: 10 },
+  contentTitle: { fontSize: 13, fontWeight: '700', lineHeight: 17 },
+
+  reelRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
+  reelRank:     { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  reelRankText: { fontSize: 12, fontWeight: '800' },
+  reelThumb:    { width: 56, height: 56, borderRadius: 10, overflow: 'hidden', position: 'relative' },
+  reelPlayIcon: { position: 'absolute', bottom: 4, right: 4, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  reelCaption:  { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  reelStats:    { flexDirection: 'row', gap: 10, marginTop: 4 },
+
+  statRow:      { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
+  statText:     { fontSize: 11 },
 });
