@@ -108,11 +108,64 @@ export interface CommunityWsCommunityDeleted {
   community_id: string;
 }
 
+export interface CommunityWsAnnouncement {
+  type: 'community_announcement';
+  id: string; community_id: string; sender_id: string;
+  sender_username: string | null; sender_display_name: string | null;
+  sender_avatar_url: string | null; message_type: string;
+  content: string | null; media_urls: string[];
+  reply_to: null; reply_to_id: null;
+  is_pinned: boolean; reactions: []; poll: null;
+  created_at: string; edited_at: string | null;
+}
+
+export interface CommunityWsPollCreated {
+  type: 'community_poll_created';
+  id: string; community_id: string; sender_id: string;
+  sender_username: string | null; sender_display_name: string | null;
+  sender_avatar_url: string | null; message_type: string;
+  content: string | null; media_urls: string[];
+  reply_to: null; reply_to_id: null;
+  is_pinned: boolean; reactions: []; poll: unknown;
+  created_at: string; edited_at: string | null;
+}
+
+export interface CommunityWsMessagePinned {
+  type: 'community_message_pinned' | 'community_message_unpinned';
+  id: string; community_id: string; sender_id: string;
+  sender_username: string | null; sender_display_name: string | null;
+  sender_avatar_url: string | null; message_type: string;
+  content: string | null; media_urls: string[];
+  reply_to: null; reply_to_id: string | null;
+  is_pinned: boolean; reactions: unknown[]; poll: unknown;
+  created_at: string; edited_at: string | null;
+}
+
+export interface CommunityWsReaction {
+  type: 'community_message_reaction';
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  action: 'added' | 'removed';
+  reactions: { emoji: string; count: number; user_ids: string[] }[];
+}
+
+export interface CommunityWsPollUpdated {
+  type: 'community_poll_updated';
+  poll_id: string;
+  results: unknown;
+}
+
 export type CommunityWsPayload =
   | CommunityWsMessage
   | CommunityWsMessageSent
   | CommunityWsMessageEdited
   | CommunityWsMessageDeleted
+  | CommunityWsAnnouncement
+  | CommunityWsPollCreated
+  | CommunityWsMessagePinned
+  | CommunityWsReaction
+  | CommunityWsPollUpdated
   | CommunityWsTyping
   | CommunityWsOnlineCount
   | CommunityWsMemberJoined

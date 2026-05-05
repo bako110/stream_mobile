@@ -46,6 +46,8 @@ export interface BlockedMemberData {
   reason: string | null;
 }
 
+export type CommunityMessageType = 'text' | 'image' | 'media' | 'announcement' | 'poll' | 'event';
+
 export interface CommunityMessageData {
   id: string;
   community_id: string;
@@ -53,7 +55,7 @@ export interface CommunityMessageData {
   sender_username: string | null;
   sender_display_name: string | null;
   sender_avatar_url: string | null;
-  message_type: string;
+  message_type: CommunityMessageType;
   content: string | null;
   media_urls: string[];
   reply_to_id: string | null;
@@ -62,7 +64,7 @@ export interface CommunityMessageData {
     sender_display_name: string | null;
     sender_username: string | null;
     content: string | null;
-    message_type: string;
+    message_type: CommunityMessageType;
   } | null;
   is_pinned: boolean;
   reactions: { emoji: string; count: number; user_ids: string[] }[];

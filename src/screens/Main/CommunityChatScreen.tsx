@@ -275,7 +275,7 @@ export const CommunityChatScreen: React.FC = () => {
 
   // ── Envoyer image ───────────────────────────────────────────────────────────
   const handlePickMedia = () => {
-    launchImageLibrary({ mediaType: 'photo', selectionLimit: 4, quality: 0.85 }, async (resp) => {
+    launchImageLibrary({ mediaType: 'photo', selectionLimit: 4, quality: 0.8 }, async (resp) => {
       if (resp.didCancel || !resp.assets?.length) return;
       setSending(true);
       try {
