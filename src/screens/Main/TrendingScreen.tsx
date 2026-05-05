@@ -41,10 +41,13 @@ export const TrendingScreen: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  const handlePress = (item: any) => {
-    if (tab === 'reels') return;
-    if (item.content_type === 'serie' || item.series_id) nav.navigate('SerieEpisodes', { item });
+  const handleContentPress = (item: any) => {
+    if (item.content_type === 'serie' || item.type === 'serie') nav.navigate('SerieEpisodes', { item });
     else nav.navigate('FilmDetail', { item });
+  };
+
+  const handleReelPress = (item: any) => {
+    nav.navigate('Reels', { initialReelId: item.id });
   };
 
   const data = tab === 'content' ? trending : reels;
@@ -111,8 +114,8 @@ export const TrendingScreen: React.FC = () => {
           }
           renderItem={({ item, index }) =>
             tab === 'content'
-              ? <ContentCard item={item} index={index} colors={colors} onPress={() => handlePress(item)} />
-              : <ReelRow item={item} index={index} colors={colors} />
+              ? <ContentCard item={item} index={index} colors={colors} onPress={() => handleContentPress(item)} />
+              : <ReelRow item={item} index={index} colors={colors} onPress={() => handleReelPress(item)} />
           }
         />
       )}
@@ -172,12 +175,12 @@ const ContentCard: React.FC<{ item: any; index: number; colors: any; onPress: ()
 
 // ── Reel row (liste) ──────────────────────────────────────────────────────────
 
-const ReelRow: React.FC<{ item: any; index: number; colors: any }> = ({ item, index, colors }) => {
+const ReelRow: React.FC<{ item: any; index: number; colors: any; onPress: () => void }> = ({ item, index, colors, onPress }) => {
   const fmtViews = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
 
   return (
     <Animated.View entering={FadeInRight.delay(index * 40).springify()}>
-      <View style={[s.reelRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={[s.reelRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {/* Rank */}
         <View style={[s.reelRank, { backgroundColor: index < 3 ? '#F59E0B18' : colors.backgroundSecondary }]}>
           <Text style={[s.reelRankText, { color: index < 3 ? '#F59E0B' : colors.textTertiary }]}>#{index + 1}</Text>
@@ -188,12 +191,16 @@ const ReelRow: React.FC<{ item: any; index: number; colors: any }> = ({ item, in
           {item.thumbnail_url ? (
             <Image source={{ uri: item.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
           ) : (
-            <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundSecondary }]}>
-              <Icon name="video" size={20} color={colors.textTertiary} />
-            </View>
+            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="video" size={20} color="rgba(255,255,255,0.8)" />
+            </LinearGradient>
           )}
-          <View style={[s.reelPlayIcon, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
-            <Icon name="play" size={12} color="#fff" />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.5)']}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={s.reelPlayIcon}>
+            <Icon name="play" size={11} color="#fff" />
           </View>
         </View>
 
@@ -219,7 +226,7 @@ const ReelRow: React.FC<{ item: any; index: number; colors: any }> = ({ item, in
         </View>
 
         <Icon name="chevron-right" size={16} color={colors.textDisabled} />
-      </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 };
@@ -254,7 +261,7 @@ const s = StyleSheet.create({
   reelRank:     { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   reelRankText: { fontSize: 12, fontWeight: '800' },
   reelThumb:    { width: 56, height: 56, borderRadius: 10, overflow: 'hidden', position: 'relative' },
-  reelPlayIcon: { position: 'absolute', bottom: 4, right: 4, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  reelPlayIcon: { position: 'absolute', bottom: 0, left: 0, right: 0, top: 0, alignItems: 'center', justifyContent: 'center' },
   reelCaption:  { fontSize: 13, fontWeight: '600', lineHeight: 18 },
   reelStats:    { flexDirection: 'row', gap: 10, marginTop: 4 },
 
