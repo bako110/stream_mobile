@@ -16,6 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '../../hooks/useTheme';
+import { useUser } from '../../context/UserContext';
 import { SkeletonUserProfile, VerifiedBadge } from '../../components/common';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
@@ -36,6 +37,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const { userId } = route.params;
+  const { currentUser } = useUser();
 
   const [profile, setProfile]   = useState<UserPublicProfile | null>(null);
   const [loading, setLoading]   = useState(true);
@@ -56,8 +58,12 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const load = useCallback(async () => {
     try {
+      const meId = currentUser ? String(currentUser.id) : null;
+      const isOwnProfile = meId !== null && meId === String(userId);
+
       const [p, me] = await Promise.allSettled([
-        userService.getPublicProfile(userId),
+        // Ne pas appeler getPublicProfile sur son propre profil → évite la notif de visite
+        isOwnProfile ? Promise.reject(new Error('own')) : userService.getPublicProfile(userId),
         authService.getMe(),
       ]);
       if (p.status === 'fulfilled') {
