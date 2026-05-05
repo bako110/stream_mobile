@@ -1069,7 +1069,7 @@ export const FeedScreen: React.FC = () => {
       {/* ── FAB Créer un post ──────────────────────────────────────────── */}
       {!searchOpen && !searchResults && (
         <TouchableOpacity
-          style={{ position: 'absolute', bottom: 90, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
+          style={{ position: 'absolute', bottom: 60, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
           onPress={() => (nav as any).navigate('CreatePost')}
           activeOpacity={0.85}
         >
