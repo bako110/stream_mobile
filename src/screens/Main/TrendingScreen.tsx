@@ -42,10 +42,11 @@ export const TrendingScreen: React.FC = () => {
   useEffect(() => { load(); }, []);
 
   const handleContentPress = (item: any) => {
-    try {
-      if (item.content_type === 'serie') nav.navigate('SerieEpisodes', { item });
-      else nav.navigate('FilmDetail', { item });
-    } catch { /* navigation silencieuse */ }
+    if (item.type === 'serie' || item.content_type === 'serie') {
+      nav.navigate('SerieEpisodes', { item });
+    } else {
+      nav.navigate('FilmDetail', { item });
+    }
   };
 
   const handleReelPress = (item: any) => {
