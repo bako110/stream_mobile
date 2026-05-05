@@ -12,6 +12,7 @@ import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { StoryGroup, StoryViewerUser } from '../../types/story';
 import { storyService } from '../../services/storyService';
 import { saveService } from '../../services/saveService';
+import { useWs } from '../../context/WebSocketContext';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -65,7 +66,7 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean }> = ({ uri, pause
     p => {
       p.loop   = false;
       p.muted  = false;
-      // Démarre immédiatement à la création du player
+      p.volume = 1.0;
       if (!paused) p.play();
     },
   );
@@ -254,6 +255,8 @@ export const StoryViewer: React.FC<Props> = ({
   groups, initialGroupIndex, initialStoryIndex, currentUserId,
   onClose, onNavigateToChat, onNavigateToCall,
 }) => {
+  const { addListener, removeListener } = useWs();
+
   const [groupIdx,    setGroupIdx]    = useState(initialGroupIndex);
   const [storyIdx,    setStoryIdx]    = useState(initialStoryIndex ?? 0);
   const [paused,      setPaused]      = useState(false);
@@ -263,7 +266,15 @@ export const StoryViewer: React.FC<Props> = ({
   const [viewersOpen,    setViewersOpen]    = useState(false);
   const [viewers,        setViewers]        = useState<StoryViewerUser[]>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved,       setSaved]       = useState(false);
+  const [liked,       setLiked]       = useState(false);
+  const [likeCount,   setLikeCount]   = useState(0);
+  const [likeToast,   setLikeToast]   = useState<{ name: string; avatar: string | null } | null>(null);
+
+  // Cœur flottant style WhatsApp
+  const heartAnim   = useRef(new Animated.Value(0)).current;
+  const heartScale  = useRef(new Animated.Value(0)).current;
+  const lastTapRef  = useRef(0);
 
 
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -317,6 +328,54 @@ export const StoryViewer: React.FC<Props> = ({
     else       { saveService.saveStory(story);      setSaved(true); }
   }, [story, saved]);
 
+  // ── Like state — reset à chaque story ────────────────────────────────────
+
+  useEffect(() => {
+    setLiked(story?.liked_by_me ?? false);
+    setLikeCount(story?.like_count ?? 0);
+  }, [story?.id]);
+
+  // ── WS : écoute story_liked (propriétaire reçoit la notif) ───────────────
+
+  useEffect(() => {
+    const handler = (payload: any) => {
+      if (payload.type !== 'story_liked') return;
+      if (payload.story_id === story?.id) {
+        setLikeCount(payload.like_count ?? 0);
+        setLikeToast({ name: payload.liker_display_name ?? payload.liker_username ?? 'Quelqu\'un', avatar: payload.liker_avatar ?? null });
+        setTimeout(() => setLikeToast(null), 3000);
+      }
+    };
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [story?.id, addListener, removeListener]);
+
+  // ── Double-tap like ───────────────────────────────────────────────────────
+
+  const showHeartAnim = useCallback(() => {
+    heartScale.setValue(0);
+    heartAnim.setValue(0);
+    Animated.parallel([
+      Animated.spring(heartScale, { toValue: 1, friction: 4, tension: 80, useNativeDriver: true }),
+      Animated.sequence([
+        Animated.delay(600),
+        Animated.timing(heartAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [heartAnim, heartScale]);
+
+  const handleLikeBtn = useCallback(() => {
+    if (!story || isOwn) return;
+    const newLiked = !liked;
+    setLiked(newLiked);
+    setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1));
+    if (newLiked) showHeartAnim();
+    storyService.like(story.id).catch(() => {
+      setLiked(!newLiked);
+      setLikeCount(c => newLiked ? Math.max(0, c - 1) : c + 1);
+    });
+  }, [story, liked, isOwn, showHeartAnim]);
+
   // ── Audio ──────────────────────────────────────────────────────────────────
 
   const stopAudio = useCallback(async () => {
@@ -367,6 +426,30 @@ export const StoryViewer: React.FC<Props> = ({
       setStoryIdx(groups[groupIdx - 1].stories.length - 1);
     }
   }, [storyIdx, groupIdx, groups]);
+
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTapRight = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      if (tapTimerRef.current) { clearTimeout(tapTimerRef.current); tapTimerRef.current = null; }
+      if (!isOwn && story && !liked) {
+        setLiked(true);
+        setLikeCount(c => c + 1);
+        showHeartAnim();
+        storyService.like(story.id).catch(() => {
+          setLiked(false);
+          setLikeCount(c => Math.max(0, c - 1));
+        });
+      }
+    } else {
+      tapTimerRef.current = setTimeout(() => {
+        tapTimerRef.current = null;
+        goNext();
+      }, 280);
+    }
+    lastTapRef.current = now;
+  }, [story, liked, isOwn, showHeartAnim, goNext]);
 
   // ── Swipe down to close ────────────────────────────────────────────────────
 
@@ -555,22 +638,75 @@ export const StoryViewer: React.FC<Props> = ({
           />
         )}
 
-        {/* ── Tap zones ─────────────────────────────────────────────────── */}
+        {/* ── Tap zones (double-tap = like) ─────────────────────────────── */}
         <View style={s.tapZones} pointerEvents="box-none">
           <TouchableWithoutFeedback onPress={goPrev} onLongPress={() => setPaused(true)} onPressOut={() => setPaused(false)}>
             <View style={s.tapLeft} />
           </TouchableWithoutFeedback>
-          <TouchableWithoutFeedback onPress={goNext} onLongPress={() => setPaused(true)} onPressOut={() => setPaused(false)}>
+          <TouchableWithoutFeedback
+            onPress={handleTapRight}
+            onLongPress={() => setPaused(true)}
+            onPressOut={() => setPaused(false)}
+          >
             <View style={s.tapRight} />
           </TouchableWithoutFeedback>
         </View>
 
-        {/* ── Bouton vues (propre story) ─────────────────────────────────── */}
-        {isOwn && (
-          <TouchableOpacity style={s.viewsBtn} onPress={openViewers} activeOpacity={0.8}>
-            <Icon name="eye" size={14} color="#fff" />
-            <Text style={s.viewsBtnText}>{story.view_count ?? 0} vue{(story.view_count ?? 0) !== 1 ? 's' : ''}</Text>
-          </TouchableOpacity>
+        {/* ── Cœur flottant (double-tap) ────────────────────────────────── */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            s.floatingHeart,
+            {
+              opacity: heartAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1, 0] }),
+              transform: [
+                { scale: heartScale },
+                { translateY: heartAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) },
+              ],
+            },
+          ]}
+        >
+          <Text style={{ fontSize: 72 }}>❤️</Text>
+        </Animated.View>
+
+        {/* ── Bouton like (story des autres) + bouton vues (propre story) ── */}
+        <View style={s.bottomBar}>
+          {isOwn ? (
+            <TouchableOpacity style={s.viewsBtn} onPress={openViewers} activeOpacity={0.8}>
+              <Icon name="eye" size={14} color="#fff" />
+              <Text style={s.viewsBtnText}>{story.view_count ?? 0} vue{(story.view_count ?? 0) !== 1 ? 's' : ''}</Text>
+              {likeCount > 0 && (
+                <>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', marginHorizontal: 4 }}>·</Text>
+                  <Icon name="heart" size={14} color="#E0389A" />
+                  <Text style={s.viewsBtnText}>{likeCount}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={s.likeBtn} onPress={handleLikeBtn} activeOpacity={0.8}>
+              <Icon name="heart" size={22} color={liked ? '#E0389A' : '#fff'} />
+              {likeCount > 0 && (
+                <Text style={[s.likeBtnText, { color: liked ? '#E0389A' : '#fff' }]}>{likeCount}</Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Toast like reçu (propriétaire) ───────────────────────────── */}
+        {likeToast && (
+          <View style={s.likeToast} pointerEvents="none">
+            {likeToast.avatar ? (
+              <Image source={{ uri: likeToast.avatar }} style={s.likeToastAvatar} />
+            ) : (
+              <View style={[s.likeToastAvatar, { backgroundColor: accent, alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{likeToast.name[0].toUpperCase()}</Text>
+              </View>
+            )}
+            <Text style={s.likeToastText}>
+              <Text style={{ fontWeight: '800' }}>{likeToast.name}</Text> a aimé ta story ❤️
+            </Text>
+          </View>
         )}
 
         {/* ── Panel vues ────────────────────────────────────────────────── */}
@@ -773,15 +909,43 @@ const s = StyleSheet.create({
   tapLeft:  { flex: 1 },
   tapRight: { flex: 2 },
 
-  // ── Views button ──────────────────────────────────────────────────────────────
+  // ── Bottom bar (like / views) ─────────────────────────────────────────────────
+  bottomBar: {
+    position: 'absolute', bottom: 30, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', zIndex: 8,
+  },
   viewsBtn: {
-    position: 'absolute', bottom: 30, left: 16,
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(0,0,0,0.5)',
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    zIndex: 8,
   },
   viewsBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  likeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 16, paddingVertical: 9, borderRadius: 24,
+  },
+  likeBtnText: { fontSize: 13, fontWeight: '800' },
+
+  // ── Floating heart ────────────────────────────────────────────────────────────
+  floatingHeart: {
+    position: 'absolute',
+    bottom: H * 0.3,
+    alignSelf: 'center',
+    zIndex: 30,
+  },
+
+  // ── Like toast ────────────────────────────────────────────────────────────────
+  likeToast: {
+    position: 'absolute', top: Platform.OS === 'android' ? 110 : 120,
+    left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16,
+    zIndex: 40,
+  },
+  likeToastAvatar: { width: 32, height: 32, borderRadius: 16 },
+  likeToastText:   { color: '#fff', fontSize: 13, flex: 1 },
 
   // ── Sheets ────────────────────────────────────────────────────────────────────
   sheetOverlay: {

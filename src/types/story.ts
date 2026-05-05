@@ -17,6 +17,8 @@ export interface Story {
   caption: string | null;
   duration_sec: number;
   view_count: number;
+  like_count: number;
+  liked_by_me: boolean;
   is_active: boolean;
   expires_at: string;
   created_at: string;

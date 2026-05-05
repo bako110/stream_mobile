@@ -80,6 +80,15 @@ export const storyService = {
     return res.data;
   },
 
+  // ── Like / unlike ─────────────────────────────────────────────────────────
+
+  async like(storyId: string): Promise<{ action: 'added' | 'removed'; like_count: number }> {
+    const res = await apiClient.post<{ action: 'added' | 'removed'; like_count: number }>(
+      Endpoints.stories.like(storyId),
+    );
+    return res.data;
+  },
+
   // ── Supprimer ─────────────────────────────────────────────────────────────
 
   async delete(storyId: string): Promise<void> {
