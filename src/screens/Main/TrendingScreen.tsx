@@ -50,8 +50,10 @@ export const TrendingScreen: React.FC = () => {
 
   const handleReelPress = (item: any) => {
     try {
-      nav.navigate('UserReels', { userId: item.user_id ?? item.author?.id ?? '', initialReelId: item.id });
-    } catch { /* navigation silencieuse */ }
+      nav.getParent()?.navigate('Reels', { initialReelId: item.id });
+    } catch {
+      nav.navigate('UserReels', { userId: item.user_id ?? '', initialReelId: item.id });
+    }
   };
 
   const data = tab === 'content' ? trending : reels;
