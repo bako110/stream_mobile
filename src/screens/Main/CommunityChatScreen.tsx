@@ -636,6 +636,7 @@ export const CommunityChatScreen: React.FC = () => {
     const size = (W - 4) / 3;
     return (
       <FlatList
+        key="media-grid"
         data={all}
         numColumns={3}
         keyExtractor={(_, i) => String(i)}
@@ -722,6 +723,7 @@ export const CommunityChatScreen: React.FC = () => {
         ) : activeTab === 'media' ? renderMediaTab() : (
           <>
             <FlatList
+              key={`chat-${activeTab}`}
               ref={listRef}
               data={messages}
               keyExtractor={m => m.id}
@@ -733,6 +735,9 @@ export const CommunityChatScreen: React.FC = () => {
               ListHeaderComponent={loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 8 }} /> : null}
               ListEmptyComponent={<EmptyState />}
               onLayout={() => listRef.current?.scrollToEnd({ animated: false })}
+              removeClippedSubviews
+              maxToRenderPerBatch={15}
+              windowSize={10}
             />
 
             {/* Typing */}
