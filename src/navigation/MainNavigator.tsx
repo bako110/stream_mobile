@@ -111,7 +111,7 @@ export type MainStackParamList = {
   LiveViewer:      { concertId: string };
   Activity:        undefined;
   MyStories:       undefined;
-  UserReels:       { userId: string; initialReelId?: string };
+  UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
   PostDetail:      { postId: string };
   CreatePost:      undefined;
   Wallet:          undefined;

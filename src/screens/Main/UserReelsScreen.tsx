@@ -96,30 +96,41 @@ export const UserReelsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
 
-  const { userId, initialReelId } = route.params as { userId: string; initialReelId?: string };
+  const { userId, initialReelId, initialReels } = route.params as {
+    userId: string;
+    initialReelId?: string;
+    initialReels?: Reel[];
+  };
 
-  const [reels,   setReels]   = useState<Reel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const buildList = (data: Reel[]) => {
+    const list = data.filter((r: Reel) => !!r.video_url);
+    if (initialReelId) {
+      const idx = list.findIndex(r => r.id === initialReelId);
+      if (idx > 0) { const [cur] = list.splice(idx, 1); list.unshift(cur); }
+    }
+    return list;
+  };
+
+  const [reels,   setReels]   = useState<Reel[]>(() =>
+    initialReels ? buildList([...initialReels]) : []
+  );
+  const [loading, setLoading] = useState(!initialReels || initialReels.length === 0);
   const [curIdx,  setCurIdx]  = useState(0);
   const [muted,   setMuted]   = useState(true);
   const scrollRef = useRef<ScrollView>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!userId) return;
     try {
       const data = await userService.getUserReels(userId) as Reel[];
-      const list: Reel[] = Array.isArray(data) ? data.filter((r: Reel) => !!r.video_url) : [];
-      // Mettre le reel initial en premier
-      if (initialReelId) {
-        const idx = list.findIndex(r => r.id === initialReelId);
-        if (idx > 0) { const [cur] = list.splice(idx, 1); list.unshift(cur); }
-      }
-      setReels(list);
-    } catch { setReels([]); }
+      setReels(buildList(Array.isArray(data) ? data : []));
+    } catch { /* silencieux */ }
     finally { setLoading(false); }
   }, [userId, initialReelId]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!initialReels || initialReels.length === 0) load();
+  }, []);
 
   const onScroll = useCallback((e: any) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
