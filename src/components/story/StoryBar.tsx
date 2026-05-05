@@ -129,9 +129,11 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
 
           {/* ── Stories des autres ── */}
           {otherGroups.map((group, i) => {
-            const idx  = myGroup ? i + 1 : i;
-            const user = group.user;
-            const name = user.display_name ?? user.username;
+            const idx       = myGroup ? i + 1 : i;
+            const user      = group.user;
+            const name      = user.display_name ?? user.username;
+            const firstStory = group.stories[0];
+            const thumb     = firstStory?.thumbnail_url ?? firstStory?.media_url ?? null;
             return (
               <Animated.View key={group.user.id} entering={FadeInRight.delay(i * 50).duration(300)}>
                 <TouchableOpacity style={s.item} activeOpacity={0.8} onPress={() => openViewer(idx)}>
@@ -139,24 +141,34 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                     {group.has_unseen ? (
                       <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.ring}>
                         <View style={s.avatarInner}>
-                          {user.avatar_url
-                            ? <Image source={{ uri: user.avatar_url }} style={s.avatar} />
-                            : <View style={[s.avatarFallback, { backgroundColor: '#302B63' }]}>
-                                <Text style={s.avatarInitial}>{name[0]?.toUpperCase()}</Text>
-                              </View>
+                          {thumb
+                            ? <Image source={{ uri: thumb }} style={s.avatar} resizeMode="cover" />
+                            : user.avatar_url
+                              ? <Image source={{ uri: user.avatar_url }} style={s.avatar} />
+                              : <View style={[s.avatarFallback, { backgroundColor: '#302B63' }]}>
+                                  <Text style={s.avatarInitial}>{name[0]?.toUpperCase()}</Text>
+                                </View>
                           }
                         </View>
                       </LinearGradient>
                     ) : (
                       <View style={[s.ring, s.ringEmpty, { borderColor: colors.border ?? '#ddd' }]}>
                         <View style={s.avatarInner}>
-                          {user.avatar_url
-                            ? <Image source={{ uri: user.avatar_url }} style={[s.avatar, s.avatarSeen]} />
-                            : <View style={[s.avatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]}>
-                                <Text style={[s.avatarInitial, { color: colors.textSecondary, opacity: 0.6 }]}>{name[0]?.toUpperCase()}</Text>
-                              </View>
+                          {thumb
+                            ? <Image source={{ uri: thumb }} style={[s.avatar, s.avatarSeen]} resizeMode="cover" />
+                            : user.avatar_url
+                              ? <Image source={{ uri: user.avatar_url }} style={[s.avatar, s.avatarSeen]} />
+                              : <View style={[s.avatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]}>
+                                  <Text style={[s.avatarInitial, { color: colors.textSecondary, opacity: 0.6 }]}>{name[0]?.toUpperCase()}</Text>
+                                </View>
                           }
                         </View>
+                      </View>
+                    )}
+                    {/* Avatar en overlay en bas à gauche */}
+                    {thumb && user.avatar_url && (
+                      <View style={s.avatarOverlay}>
+                        <Image source={{ uri: user.avatar_url }} style={s.avatarOverlayImg} />
                       </View>
                     )}
                     {/* Nombre de stories si > 1 */}
@@ -284,6 +296,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 3,
   },
   countText: { color: '#fff', fontSize: 8, fontWeight: '800' },
+
+  // ── Avatar overlay (sur thumbnail) ───────────────────────────────────────────
+  avatarOverlay:    { position: 'absolute', bottom: 0, left: 0, width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: '#fff', overflow: 'hidden' },
+  avatarOverlayImg: { width: '100%', height: '100%' },
 
   // ── Separateur ───────────────────────────────────────────────────────────────
   sep: { width: 1, height: 40, borderRadius: 1, marginHorizontal: 4 },

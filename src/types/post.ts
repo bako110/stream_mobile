@@ -11,6 +11,7 @@ export interface Post {
   user_id: string;
   body?: string | null;
   image_url?: string | null;
+  image_urls?: string[] | null;
   feeling?: string | null;
   like_count: number;
   comment_count: number;
@@ -24,5 +25,6 @@ export interface Post {
 export interface PostCreate {
   body?: string;
   image_url?: string;
+  image_urls?: string[];
   feeling?: string;
 }

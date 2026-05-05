@@ -321,11 +321,22 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     });
     tempFilesRef.current.push(compressed.uri);
 
-    // Étape 2 — upload direct R2
+    // Étape 2 — upload vidéo
     setUploadStep('Upload…'); setUploadPct(60);
     const result = await uploadVideoFromUri(compressed.uri, 'stories', `s_${Date.now()}.mp4`, 'video/mp4');
+
+    // Étape 3 — upload thumbnail si disponible
+    let thumbnailUrl: string | undefined;
+    if (compressed.thumbnailUri) {
+      try {
+        setUploadStep('Thumbnail…'); setUploadPct(90);
+        const thumbResult = await uploadImageFromUri(compressed.thumbnailUri, 'stories', `st_${Date.now()}.jpg`, 'image/jpeg');
+        thumbnailUrl = thumbResult.url;
+      } catch { /* thumbnail optionnel */ }
+    }
+
     setUploadPct(100);
-    return { url: result.url, duration: compressed.durationSec };
+    return { url: result.url, duration: compressed.durationSec, thumbnailUrl };
   };
 
   const doUploadAudio = async (uri: string) => {
@@ -364,6 +375,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           const v = await doUploadVideo(localUri!);
           media_url = v.url; media_type = 'video';
           duration_sec = Math.min(Math.ceil(v.duration), 60);
+          thumbnail_url = v.thumbnailUrl;
           break;
         }
         case 'voice': {

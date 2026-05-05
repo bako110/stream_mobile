@@ -21,6 +21,19 @@ export interface CommunityWsMessage {
   edited_at: string | null;
 }
 
+export interface CommunityWsMessageSent {
+  type: 'community_message_sent';
+  id: string;
+  community_id: string;
+  sender_id: string;
+  sender_username: string | null;
+  sender_display_name: string | null;
+  sender_avatar_url: string | null;
+  content: string;
+  created_at: string;
+  edited_at: string | null;
+}
+
 export interface CommunityWsMessageEdited {
   type: 'community_message_edited';
   id: string;
@@ -40,10 +53,74 @@ export interface CommunityWsMessageDeleted {
   community_id: string;
 }
 
+export interface CommunityWsTyping {
+  type: 'typing';
+  user_id: string;
+  username?: string | null;
+  display_name?: string | null;
+  is_typing: boolean;
+}
+
+export interface CommunityWsOnlineCount {
+  type: 'online_count';
+  count: number;
+}
+
+export interface CommunityWsMemberJoined {
+  type: 'community_member_joined';
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  online_count: number;
+}
+
+export interface CommunityWsMemberLeft {
+  type: 'community_member_left';
+  user_id: string;
+  username: string | null;
+}
+
+export interface CommunityWsMemberKicked {
+  type: 'community_member_kicked';
+  user_id: string;
+  kicked_by: string;
+}
+
+export interface CommunityWsMemberRoleChanged {
+  type: 'community_member_role_changed';
+  user_id: string;
+  role: string;
+}
+
+export interface CommunityWsCommunityUpdated {
+  type: 'community_updated';
+  id: string;
+  name: string;
+  description: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  is_private: boolean;
+}
+
+export interface CommunityWsCommunityDeleted {
+  type: 'community_deleted';
+  community_id: string;
+}
+
 export type CommunityWsPayload =
   | CommunityWsMessage
+  | CommunityWsMessageSent
   | CommunityWsMessageEdited
   | CommunityWsMessageDeleted
+  | CommunityWsTyping
+  | CommunityWsOnlineCount
+  | CommunityWsMemberJoined
+  | CommunityWsMemberLeft
+  | CommunityWsMemberKicked
+  | CommunityWsMemberRoleChanged
+  | CommunityWsCommunityUpdated
+  | CommunityWsCommunityDeleted
   | { type: 'pong' }
   | { type: 'error'; detail: string };
 
@@ -64,6 +141,7 @@ export function useCommunityWebSocket(
   const isMounted    = useRef(true);
 
   const [isConnected, setIsConnected] = useState(false);
+  const [onlineCount, setOnlineCount] = useState(0);
 
   useEffect(() => { onMessageRef.current = onMessage; }, [onMessage]);
 
@@ -87,7 +165,6 @@ export function useCommunityWebSocket(
       retryCount.current = 0;
       setIsConnected(true);
 
-      // Keepalive ping toutes les 25s
       stopPing();
       pingTimer.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -99,7 +176,16 @@ export function useCommunityWebSocket(
     ws.onmessage = (event) => {
       try {
         const payload: CommunityWsPayload = JSON.parse(event.data as string);
-        if (isMounted.current) onMessageRef.current(payload);
+        if (!isMounted.current) return;
+        // Handle online_count internally so screen doesn't need to
+        if (payload.type === 'online_count') {
+          setOnlineCount(payload.count);
+          return;
+        }
+        if (payload.type === 'community_member_joined') {
+          setOnlineCount(payload.online_count);
+        }
+        onMessageRef.current(payload);
       } catch {
         // ignorer les messages malformés
       }
@@ -114,7 +200,6 @@ export function useCommunityWebSocket(
       stopPing();
 
       if (event.code === 4001) {
-        // Token invalide → tenter refresh
         authService.refresh()
           .then(() => { if (isMounted.current) connect(); })
           .catch(() => {});
@@ -146,5 +231,11 @@ export function useCommunityWebSocket(
     }
   }, []);
 
-  return { sendWsMessage, isConnected };
+  const sendTyping = useCallback((isTyping: boolean) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: isTyping ? 'typing_start' : 'typing_stop' }));
+    }
+  }, []);
+
+  return { sendWsMessage, sendTyping, isConnected, onlineCount };
 }

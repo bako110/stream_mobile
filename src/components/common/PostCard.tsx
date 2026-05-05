@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, Image, StyleSheet, Share, Alert,
+  Modal, TextInput, KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withSequence,
@@ -9,6 +10,80 @@ import Icon from 'react-native-vector-icons/Feather';
 import type { AppColors } from '../../theme/colors';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const GRID_H  = SCREEN_W * 0.55;
+const HALF_H  = GRID_H / 2 - 1;
+
+interface ImageGridProps {
+  urls: string[];
+  onPressImage?: (index: number) => void;
+}
+
+const ImageGrid: React.FC<ImageGridProps> = ({ urls, onPressImage }) => {
+  const n = urls.length;
+  if (n === 0) return null;
+
+  if (n === 1) {
+    return (
+      <TouchableOpacity activeOpacity={0.95} onPress={() => onPressImage?.(0)}>
+        <Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 4 / 3 }} resizeMode="cover" />
+      </TouchableOpacity>
+    );
+  }
+
+  if (n === 2) {
+    return (
+      <View style={{ flexDirection: 'row', height: GRID_H }}>
+        {urls.map((uri, i) => (
+          <TouchableOpacity key={i} activeOpacity={0.95} style={{ flex: 1, marginLeft: i === 1 ? 2 : 0 }} onPress={() => onPressImage?.(i)}>
+            <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  }
+
+  if (n === 3) {
+    return (
+      <View style={{ flexDirection: 'row', height: GRID_H }}>
+        <TouchableOpacity activeOpacity={0.95} style={{ flex: 1 }} onPress={() => onPressImage?.(0)}>
+          <Image source={{ uri: urls[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        </TouchableOpacity>
+        <View style={{ flex: 1, marginLeft: 2 }}>
+          {[1, 2].map(i => (
+            <TouchableOpacity key={i} activeOpacity={0.95} style={{ flex: 1, marginTop: i === 2 ? 2 : 0 }} onPress={() => onPressImage?.(i)}>
+              <Image source={{ uri: urls[i] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  // 4+
+  const shown = urls.slice(0, 4);
+  const extra = n - 4;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', height: GRID_H }}>
+      {shown.map((uri, i) => (
+        <TouchableOpacity
+          key={i}
+          activeOpacity={0.95}
+          style={{ width: SCREEN_W / 2 - 1, height: HALF_H, marginLeft: i % 2 === 1 ? 2 : 0, marginTop: i >= 2 ? 2 : 0 }}
+          onPress={() => onPressImage?.(i)}
+        >
+          <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          {i === 3 && extra > 0 && (
+            <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>+{extra}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+};
 
 interface PostCardProps {
   post: Post;
@@ -38,6 +113,9 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [likeCount,     setLikeCount]     = useState(post.like_count);
   const [bodyExpanded,  setBodyExpanded]  = useState(false);
   const [bodyTruncated, setBodyTruncated] = useState(false);
+  const [editOpen,      setEditOpen]      = useState(false);
+  const [editBody,      setEditBody]      = useState(post.body ?? '');
+  const [editSaving,    setEditSaving]    = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
 
   const heartScale = useSharedValue(1);
@@ -75,6 +153,17 @@ export const PostCard: React.FC<PostCardProps> = ({
         },
       },
     ]);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editBody.trim()) return;
+    setEditSaving(true);
+    try {
+      await postService.update(post.id, { body: editBody.trim() });
+      post.body = editBody.trim();
+      setEditOpen(false);
+    } catch { Alert.alert('Erreur', 'Impossible de modifier.'); }
+    finally { setEditSaving(false); }
   };
 
   return (
@@ -128,10 +217,17 @@ export const PostCard: React.FC<PostCardProps> = ({
       {menuOpen && (
         <View style={[pc.miniMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {isOwn ? (
-            <TouchableOpacity style={pc.miniMenuItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
-              <Icon name="trash-2" size={15} color="#EF4444" />
-              <Text style={{ fontSize: 14, color: '#EF4444' }}>Supprimer</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity style={pc.miniMenuItem} onPress={() => { setMenuOpen(false); setEditOpen(true); }}>
+                <Icon name="edit-2" size={15} color={colors.textSecondary} />
+                <Text style={{ fontSize: 14, color: colors.textSecondary }}>Modifier</Text>
+              </TouchableOpacity>
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
+              <TouchableOpacity style={pc.miniMenuItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
+                <Icon name="trash-2" size={15} color="#EF4444" />
+                <Text style={{ fontSize: 14, color: '#EF4444' }}>Supprimer</Text>
+              </TouchableOpacity>
+            </>
           ) : (
             <TouchableOpacity style={pc.miniMenuItem} onPress={() => setMenuOpen(false)}>
               <Icon name="flag" size={15} color={colors.textSecondary} />
@@ -170,10 +266,13 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       ) : null}
 
-      {/* Image */}
-      {post.image_url ? (
-        <Image source={{ uri: post.image_url }} style={pc.image} resizeMode="cover" />
-      ) : null}
+      {/* Images */}
+      {(post.image_urls && post.image_urls.length > 0)
+        ? <ImageGrid urls={post.image_urls} />
+        : post.image_url
+          ? <Image source={{ uri: post.image_url }} style={pc.image} resizeMode="cover" />
+          : null
+      }
 
       {/* Compteurs */}
       {(likeCount > 0 || post.comment_count > 0) && (
@@ -219,6 +318,39 @@ export const PostCard: React.FC<PostCardProps> = ({
       </View>
 
       <View style={{ height: 8, backgroundColor: colors.backgroundSecondary }} />
+
+      {/* Modal édition */}
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 20, gap: 14 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary }}>Modifier le post</Text>
+            <TextInput
+              value={editBody}
+              onChangeText={setEditBody}
+              multiline
+              autoFocus
+              style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 10, padding: 12, fontSize: 15, color: colors.textPrimary, minHeight: 100, textAlignVertical: 'top' }}
+              placeholderTextColor={colors.textTertiary}
+              placeholder="Écris quelque chose..."
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 13, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
+                onPress={() => setEditOpen(false)}
+              >
+                <Text style={{ fontWeight: '600', color: colors.textSecondary }}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 13, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', opacity: editSaving ? 0.6 : 1 }}
+                onPress={handleSaveEdit}
+                disabled={editSaving}
+              >
+                <Text style={{ fontWeight: '700', color: '#fff' }}>{editSaving ? 'Envoi...' : 'Enregistrer'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </TouchableOpacity>
   );
 };

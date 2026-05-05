@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Image, Modal,
   StyleSheet, ActivityIndicator, Alert, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, Switch,
+  StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -40,6 +41,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [myRole,         setMyRole]         = useState<string | null>(null);
   const [actionLoading,  setActionLoading]  = useState(false);
   const [blockedMembers, setBlockedMembers] = useState<BlockedMemberData[]>([]);
+
+  // Image viewer plein écran
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
   // Panel settings
   const [settingsOpen,  setSettingsOpen]  = useState(false);
@@ -643,19 +647,29 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           <View>
             {/* Bannière */}
             <View style={s.bannerArea}>
-              {community.banner_url ? (
-                <Image source={{ uri: community.banner_url }} style={s.banner} />
-              ) : (
-                <LinearGradient colors={['#7B3FF2', '#9B65F5', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.banner} />
-              )}
-              <View style={[s.avatarWrap, { borderColor: colors.background }]}>
-                {community.avatar_url ? (
-                  <Image source={{ uri: community.avatar_url }} style={s.bigAvatar} />
+              <TouchableOpacity
+                activeOpacity={community.banner_url ? 0.85 : 1}
+                onPress={() => community.banner_url && setViewerUrl(community.banner_url)}
+              >
+                {community.banner_url ? (
+                  <Image source={{ uri: community.banner_url }} style={s.banner} />
                 ) : (
-                  <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.bigAvatar}>
-                    <Icon name="users" size={36} color="#fff" />
-                  </LinearGradient>
+                  <LinearGradient colors={['#7B3FF2', '#9B65F5', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.banner} />
                 )}
+              </TouchableOpacity>
+              <View style={[s.avatarWrap, { borderColor: colors.background }]}>
+                <TouchableOpacity
+                  activeOpacity={community.avatar_url ? 0.85 : 1}
+                  onPress={() => community.avatar_url && setViewerUrl(community.avatar_url)}
+                >
+                  {community.avatar_url ? (
+                    <Image source={{ uri: community.avatar_url }} style={s.bigAvatar} />
+                  ) : (
+                    <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.bigAvatar}>
+                      <Icon name="users" size={36} color="#fff" />
+                    </LinearGradient>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -757,6 +771,35 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           </TouchableOpacity>
         )}
       />
+
+      {/* ── Viewer image plein écran ── */}
+      <Modal
+        visible={!!viewerUrl}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setViewerUrl(null)}
+      >
+        <View style={s.imgViewer}>
+          <StatusBar hidden />
+          <TouchableOpacity
+            style={s.imgViewerClose}
+            onPress={() => setViewerUrl(null)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <View style={s.imgViewerCloseInner}>
+              <Icon name="x" size={22} color="#fff" />
+            </View>
+          </TouchableOpacity>
+          {viewerUrl && (
+            <Image
+              source={{ uri: viewerUrl }}
+              style={s.imgViewerImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
 
       {/* ── Panel Paramètres ── */}
       <Modal
@@ -937,6 +980,23 @@ const s = StyleSheet.create({
   },
   memberSearchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
   memberCount: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, paddingHorizontal: 16, paddingVertical: 8 },
+
+  // Image viewer plein écran
+  imgViewer: {
+    flex: 1, backgroundColor: '#000',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  imgViewerImage: {
+    width: '100%', height: '100%',
+  },
+  imgViewerClose: {
+    position: 'absolute', top: 52, right: 20, zIndex: 10,
+  },
+  imgViewerCloseInner: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // Sécurité
   secSection: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },

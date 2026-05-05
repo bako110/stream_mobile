@@ -903,6 +903,17 @@ export const FeedScreen: React.FC = () => {
         />
       )}
 
+      {/* ── FAB Créer un post ──────────────────────────────────────────── */}
+      {!searchOpen && !searchResults && (
+        <TouchableOpacity
+          style={{ position: 'absolute', bottom: 90, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
+          onPress={() => (nav as any).navigate('CreatePost')}
+          activeOpacity={0.85}
+        >
+          <Icon name="edit-2" size={22} color="#fff" />
+        </TouchableOpacity>
+      )}
+
       {/* ── Sheet commentaires ──────────────────────────────────────────── */}
       <CommentsBottomSheet
         visible={commentVisible}
@@ -1190,7 +1201,7 @@ const ReelFeedCard: React.FC<{
 });
 
 const rs = StyleSheet.create({
-  card:        { marginHorizontal: 12, marginBottom: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  card:        { marginHorizontal: 0, marginBottom: 12, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   header:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
   avatar:      { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
   authorName:  { fontSize: 14, fontWeight: '700' },

@@ -9,7 +9,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, Alert, FlatList, Dimensions,
+  StyleSheet, ActivityIndicator, Alert, FlatList, Dimensions, Modal, StatusBar,
   InteractionManager,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -45,6 +45,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const [myId, setMyId] = useState<string | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
   // Content tabs
   const [activeTab, setActiveTab] = useState<ContentTab>('publications');
@@ -209,14 +210,20 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* ── Banner ──────────────────────────────────────────────────── */}
         <View style={styles.bannerWrap}>
-          {profile.banner_url ? (
-            <Image source={{ uri: profile.banner_url }} style={styles.banner} />
-          ) : (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              style={styles.banner}
-            />
-          )}
+          <TouchableOpacity
+            activeOpacity={profile.banner_url ? 0.85 : 1}
+            onPress={() => profile.banner_url && setViewerUrl(profile.banner_url)}
+            style={{ flex: 1 }}
+          >
+            {profile.banner_url ? (
+              <Image source={{ uri: profile.banner_url }} style={styles.banner} />
+            ) : (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                style={styles.banner}
+              />
+            )}
+          </TouchableOpacity>
           <View style={styles.headerOverlay}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
               <Icon name="arrow-left" size={22} color="#fff" />
@@ -228,15 +235,20 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* ── Avatar ──────────────────────────────────────────────────── */}
         <View style={styles.avatarSection}>
-          <View style={[styles.avatarRing, { borderColor: colors.background }]}>
-            {profile.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
-                <Text style={styles.avatarInitial}>{initials}</Text>
-              </View>
-            )}
-          </View>
+          <TouchableOpacity
+            activeOpacity={profile.avatar_url ? 0.85 : 1}
+            onPress={() => profile.avatar_url && setViewerUrl(profile.avatar_url)}
+          >
+            <View style={[styles.avatarRing, { borderColor: colors.background }]}>
+              {profile.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.avatarInitial}>{initials}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
           {profile.is_verified && (
             <View style={[styles.verifiedBadge, { backgroundColor: colors.primary }]}>
               <Icon name="check" size={10} color="#fff" />
@@ -472,7 +484,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     >
                       {/* Thumbnail */}
                       {thumbUrl ? (
-                        <Image source={{ uri: thumbUrl }} style={styles.pubThumb} />
+                        <TouchableOpacity onPress={() => setViewerUrl(thumbUrl)} activeOpacity={0.85}>
+                          <Image source={{ uri: thumbUrl }} style={styles.pubThumb} />
+                        </TouchableOpacity>
                       ) : (
                         <LinearGradient
                           colors={[accent + 'AA', accent + '55']}
@@ -533,7 +547,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     onPress={() => navigation.navigate('Tabs', { screen: 'Reels', params: { initialReelId: reel.id } } as any)}
                   >
                     {reel.thumbnail_url ? (
-                      <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} />
+                      <TouchableOpacity onPress={() => setViewerUrl(reel.thumbnail_url)} activeOpacity={0.85}>
+                        <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} />
+                      </TouchableOpacity>
                     ) : (
                       <LinearGradient
                         colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
@@ -641,6 +657,35 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         ) : null}
       </ScrollView>
+
+      {/* ── Image viewer plein écran ───────────────────────────────── */}
+      <Modal
+        visible={!!viewerUrl}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setViewerUrl(null)}
+      >
+        <View style={styles.imgViewer}>
+          <StatusBar hidden />
+          <TouchableOpacity
+            style={styles.imgViewerClose}
+            onPress={() => setViewerUrl(null)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <View style={styles.imgViewerCloseInner}>
+              <Icon name="x" size={22} color="#fff" />
+            </View>
+          </TouchableOpacity>
+          {viewerUrl && (
+            <Image
+              source={{ uri: viewerUrl }}
+              style={styles.imgViewerImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
 
       {/* ── Followers/Following list modal ─────────────────────────── */}
       {showList && (
@@ -818,6 +863,21 @@ const styles = StyleSheet.create({
     padding: 12, borderRadius: 10, marginTop: 4,
   },
   privacyNoteText: { fontSize: 12, flex: 1, lineHeight: 16 },
+
+  // Image viewer plein écran
+  imgViewer: {
+    flex: 1, backgroundColor: '#000',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  imgViewerImage: { width: '100%', height: '100%' },
+  imgViewerClose: {
+    position: 'absolute', top: 52, right: 20, zIndex: 10,
+  },
+  imgViewerCloseInner: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // Followers/Following modal
   listOverlay: {

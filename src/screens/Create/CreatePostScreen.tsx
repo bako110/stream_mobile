@@ -2,14 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
   ActivityIndicator, StyleSheet, Alert, ScrollView,
-  KeyboardAvoidingView, Platform, StatusBar,
+  KeyboardAvoidingView, Platform, StatusBar, Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
-import { uploadMessageImage } from '../../services/uploadService';
+import { uploadImageFromUri } from '../../services/uploadService';
+
+const { width: W } = Dimensions.get('window');
+const MAX_IMAGES = 6;
 
 const FEELINGS = [
   '😊 Content', '😢 Triste', '😂 Heureux', '🔥 Motivé',
@@ -26,42 +30,63 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const { theme }       = useTheme();
   const { colors }      = theme;
   const { currentUser } = useUser();
+  const insets          = useSafeAreaInsets();
 
-  const [body,          setBody]          = useState('');
-  const [feeling,       setFeeling]       = useState<string | undefined>();
-  const [localImageUri, setLocalImageUri] = useState<string | undefined>();
-  const [showFeelings,  setShowFeelings]  = useState(false);
-  const [posting,       setPosting]       = useState(false);
+  const [body,         setBody]         = useState('');
+  const [feeling,      setFeeling]      = useState<string | undefined>();
+  const [localUris,    setLocalUris]    = useState<string[]>([]);
+  const [showFeelings, setShowFeelings] = useState(false);
+  const [posting,      setPosting]      = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 200);
-  }, []);
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 200); }, []);
 
   const displayName = currentUser?.display_name ?? currentUser?.first_name ?? currentUser?.username ?? '';
   const initials    = displayName ? displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '?';
-  const canPost     = body.trim().length > 0 || !!localImageUri;
+  const canPost     = body.trim().length > 0 || localUris.length > 0;
 
-  const handlePickImage = () => {
-    launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.85 as any }, res => {
-      if (res.didCancel || res.errorCode) return;
-      const uri = res.assets?.[0]?.uri;
-      if (uri) setLocalImageUri(uri);
-    });
+  const handlePickImages = () => {
+    const remaining = MAX_IMAGES - localUris.length;
+    if (remaining <= 0) {
+      Alert.alert('Maximum', `Tu peux ajouter jusqu'à ${MAX_IMAGES} images.`);
+      return;
+    }
+    launchImageLibrary(
+      { mediaType: 'photo', selectionLimit: remaining, quality: 0.85 as any },
+      res => {
+        if (res.didCancel || res.errorCode) return;
+        const uris = (res.assets ?? []).map(a => a.uri).filter(Boolean) as string[];
+        setLocalUris(prev => [...prev, ...uris].slice(0, MAX_IMAGES));
+      },
+    );
+  };
+
+  const removeImage = (idx: number) => {
+    setLocalUris(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handlePost = async () => {
     if (!canPost) return;
     setPosting(true);
     try {
-      let imageUrl: string | undefined;
-      if (localImageUri) {
-        const uploaded = await uploadMessageImage(localImageUri);
-        imageUrl = uploaded?.url;
+      let image_url: string | undefined;
+      let image_urls: string[] | undefined;
+
+      if (localUris.length === 1) {
+        const r = await uploadImageFromUri(localUris[0], 'posts', `p_${Date.now()}.jpg`, 'image/jpeg');
+        image_url = r.url;
+      } else if (localUris.length > 1) {
+        const results = await Promise.all(
+          localUris.map((uri, i) => uploadImageFromUri(uri, 'posts', `p_${Date.now()}_${i}.jpg`, 'image/jpeg'))
+        );
+        image_urls = results.map(r => r.url);
+        image_url  = image_urls[0];
       }
+
       await postService.create({
         body: body.trim() || undefined,
-        image_url: imageUrl,
+        image_url,
+        image_urls,
         feeling,
       });
       onPostCreated();
@@ -72,21 +97,96 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
     }
   };
 
+  // Grille d'aperçu selon nombre d'images
+  const renderImageGrid = () => {
+    if (localUris.length === 0) return null;
+    const n = localUris.length;
+
+    if (n === 1) {
+      return (
+        <View style={s.gridSingle}>
+          <Image source={{ uri: localUris[0] }} style={s.imgSingle} resizeMode="cover" />
+          <TouchableOpacity style={s.removeBtn} onPress={() => removeImage(0)}>
+            <Icon name="x" size={14} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (n === 2) {
+      return (
+        <View style={s.gridRow}>
+          {localUris.map((uri, i) => (
+            <View key={i} style={[s.gridHalf, { marginLeft: i === 1 ? 2 : 0 }]}>
+              <Image source={{ uri }} style={s.imgFill} resizeMode="cover" />
+              <TouchableOpacity style={s.removeBtn} onPress={() => removeImage(i)}>
+                <Icon name="x" size={14} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    if (n === 3) {
+      return (
+        <View style={s.gridRow}>
+          <View style={s.gridHalf}>
+            <Image source={{ uri: localUris[0] }} style={s.imgFill} resizeMode="cover" />
+            <TouchableOpacity style={s.removeBtn} onPress={() => removeImage(0)}>
+              <Icon name="x" size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <View style={[s.gridHalf, { marginLeft: 2 }]}>
+            {[1, 2].map(i => (
+              <View key={i} style={[s.gridQuarter, { marginTop: i === 2 ? 2 : 0 }]}>
+                <Image source={{ uri: localUris[i] }} style={s.imgFill} resizeMode="cover" />
+                <TouchableOpacity style={s.removeBtn} onPress={() => removeImage(i)}>
+                  <Icon name="x" size={14} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    // 4+
+    const shown = localUris.slice(0, 4);
+    const extra = n - 4;
+    return (
+      <View style={s.gridFour}>
+        {shown.map((uri, i) => (
+          <View key={i} style={[s.gridQuarterFour, { marginLeft: i % 2 === 1 ? 2 : 0, marginTop: i >= 2 ? 2 : 0 }]}>
+            <Image source={{ uri }} style={s.imgFill} resizeMode="cover" />
+            {i === 3 && extra > 0 ? (
+              <View style={s.extraOverlay}>
+                <Text style={s.extraText}>+{extra}</Text>
+              </View>
+            ) : (
+              <TouchableOpacity style={s.removeBtn} onPress={() => removeImage(i)}>
+                <Icon name="x" size={14} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <KeyboardAvoidingView
-      style={[s.root, { backgroundColor: colors.background }]}
+      style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* ── Header ── */}
+      {/* Header */}
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Icon name="x" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Créer un post</Text>
-
         <TouchableOpacity
           style={[s.publishBtn, { backgroundColor: canPost ? colors.primary : colors.primary + '44' }]}
           onPress={handlePost}
@@ -100,8 +200,9 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         </TouchableOpacity>
       </View>
 
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
-        {/* ── Auteur ── */}
+      <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+
+        {/* Auteur */}
         <View style={[s.authorRow, { backgroundColor: colors.surface }]}>
           {currentUser?.avatar_url ? (
             <Image source={{ uri: currentUser.avatar_url }} style={s.avatar} />
@@ -123,7 +224,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           </View>
         </View>
 
-        {/* ── Zone de texte ── */}
+        {/* Zone de texte */}
         <View style={[s.inputWrap, { backgroundColor: colors.surface }]}>
           <TextInput
             ref={inputRef}
@@ -134,21 +235,23 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             maxLength={2000}
             value={body}
             onChangeText={setBody}
-            autoFocus={false}
           />
         </View>
 
-        {/* ── Aperçu image ── */}
-        {localImageUri && (
-          <View style={s.imageWrap}>
-            <Image source={{ uri: localImageUri }} style={s.imagePreview} resizeMode="cover" />
-            <TouchableOpacity style={s.imageRemoveBtn} onPress={() => setLocalImageUri(undefined)}>
-              <Icon name="x-circle" size={26} color="#fff" />
-            </TouchableOpacity>
+        {/* Grille images */}
+        {localUris.length > 0 && (
+          <View style={s.gridWrap}>
+            {renderImageGrid()}
+            {localUris.length < MAX_IMAGES && (
+              <TouchableOpacity style={[s.addMoreBtn, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]} onPress={handlePickImages}>
+                <Icon name="plus" size={20} color={colors.textTertiary} />
+                <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>Ajouter</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
-        {/* ── Sélecteur de feelings ── */}
+        {/* Feelings */}
         {showFeelings && (
           <View style={[s.feelingsWrap, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
             <Text style={[s.feelingsTitle, { color: colors.textSecondary }]}>Comment te sens-tu ?</Text>
@@ -156,18 +259,13 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
               {FEELINGS.map(f => (
                 <TouchableOpacity
                   key={f}
-                  style={[
-                    s.feelingChip,
-                    {
-                      backgroundColor: feeling === f ? colors.primary + '22' : colors.backgroundSecondary,
-                      borderColor:     feeling === f ? colors.primary         : colors.border,
-                    },
-                  ]}
+                  style={[s.feelingChip, {
+                    backgroundColor: feeling === f ? colors.primary + '22' : colors.backgroundSecondary,
+                    borderColor:     feeling === f ? colors.primary : colors.border,
+                  }]}
                   onPress={() => { setFeeling(feeling === f ? undefined : f); setShowFeelings(false); }}
                 >
-                  <Text style={{ fontSize: 13, color: feeling === f ? colors.primary : colors.textPrimary }}>
-                    {f}
-                  </Text>
+                  <Text style={{ fontSize: 13, color: feeling === f ? colors.primary : colors.textPrimary }}>{f}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -175,12 +273,17 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         )}
       </ScrollView>
 
-      {/* ── Barre d'actions ── */}
-      <View style={[s.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+      {/* Barre d'actions */}
+      <View style={[s.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: insets.bottom || 8 }]}>
         <Text style={[s.actionLabel, { color: colors.textSecondary }]}>Ajouter à votre post</Text>
         <View style={s.actionBtns}>
-          <TouchableOpacity style={s.actionBtn} onPress={handlePickImage}>
+          <TouchableOpacity style={s.actionBtn} onPress={handlePickImages}>
             <Icon name="image" size={22} color="#4CAF50" />
+            {localUris.length > 0 && (
+              <View style={[s.actionBadge, { backgroundColor: colors.primary }]}>
+                <Text style={s.actionBadgeText}>{localUris.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.actionBtn, showFeelings && { backgroundColor: colors.primary + '18', borderRadius: 20 }]}
@@ -194,8 +297,11 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   );
 };
 
+const GRID_H  = (W * 0.55);
+const HALF_H  = GRID_H / 2 - 1;
+
 const s = StyleSheet.create({
-  root:           { flex: 1, paddingTop: Platform.OS === 'ios' ? 44 : 0 },
+  root:           { flex: 1 },
   header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle:    { fontSize: 17, fontWeight: '700' },
   publishBtn:     { paddingHorizontal: 18, paddingVertical: 7, borderRadius: 20 },
@@ -205,17 +311,32 @@ const s = StyleSheet.create({
   authorName:     { fontSize: 15, fontWeight: '700' },
   audienceRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   audience:       { fontSize: 12, marginTop: 2 },
-  inputWrap:      { paddingHorizontal: 14, paddingBottom: 12, minHeight: 120 },
-  input:          { fontSize: 18, lineHeight: 26, textAlignVertical: 'top' },
-  imageWrap:      { marginHorizontal: 14, marginBottom: 12, borderRadius: 12, overflow: 'hidden' },
-  imagePreview:   { width: '100%', aspectRatio: 4 / 3 },
-  imageRemoveBtn: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 15 },
+  inputWrap:      { paddingHorizontal: 14, paddingBottom: 12, flex: 1, minHeight: 120 },
+  input:          { fontSize: 18, lineHeight: 26, textAlignVertical: 'top', flex: 1 },
+
+  // Grille
+  gridWrap:         { marginHorizontal: 14, marginBottom: 12 },
+  gridSingle:       { borderRadius: 12, overflow: 'hidden', height: GRID_H },
+  imgSingle:        { width: '100%', height: '100%' },
+  gridRow:          { flexDirection: 'row', height: GRID_H, borderRadius: 12, overflow: 'hidden' },
+  gridHalf:         { flex: 1, overflow: 'hidden' },
+  gridQuarter:      { flex: 1, overflow: 'hidden' },
+  gridFour:         { flexDirection: 'row', flexWrap: 'wrap', height: GRID_H, borderRadius: 12, overflow: 'hidden' },
+  gridQuarterFour:  { width: (W - 28) / 2 - 1, height: HALF_H, overflow: 'hidden' },
+  imgFill:          { width: '100%', height: '100%' },
+  removeBtn:        { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  extraOverlay:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  extraText:        { color: '#fff', fontSize: 22, fontWeight: '800' },
+  addMoreBtn:       { marginTop: 8, height: 48, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+
   feelingsWrap:   { padding: 14, borderTopWidth: StyleSheet.hairlineWidth },
   feelingsTitle:  { fontSize: 13, fontWeight: '600', marginBottom: 10 },
   feelingsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   feelingChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  actionBar:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  actionBar:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   actionLabel:    { fontSize: 14, fontWeight: '600' },
   actionBtns:     { flexDirection: 'row', gap: 8 },
   actionBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  actionBadge:    { position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  actionBadgeText:{ color: '#fff', fontSize: 9, fontWeight: '800' },
 });

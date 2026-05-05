@@ -19,6 +19,11 @@ export const postService = {
     return res.data;
   },
 
+  async update(id: string, data: { body?: string; feeling?: string }): Promise<Post> {
+    const res = await apiClient.put<Post>(Endpoints.posts.update(id), data);
+    return res.data;
+  },
+
   async delete(id: string): Promise<void> {
     await apiClient.delete(Endpoints.posts.byId(id));
   },

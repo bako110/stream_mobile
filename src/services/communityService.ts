@@ -53,7 +53,20 @@ export interface CommunityMessageData {
   sender_username: string | null;
   sender_display_name: string | null;
   sender_avatar_url: string | null;
-  content: string;
+  message_type: string;
+  content: string | null;
+  media_urls: string[];
+  reply_to_id: string | null;
+  reply_to: {
+    id: string; sender_id: string;
+    sender_display_name: string | null;
+    sender_username: string | null;
+    content: string | null;
+    message_type: string;
+  } | null;
+  is_pinned: boolean;
+  reactions: { emoji: string; count: number; user_ids: string[] }[];
+  poll: unknown | null;
   created_at: string;
   edited_at: string | null;
 }
@@ -123,17 +136,23 @@ export const communityService = {
     return res.data;
   },
 
-  async sendMessage(id: string, content: string): Promise<CommunityMessageData> {
+  async sendMessage(id: string, content: string, message_type = 'text', media_urls?: string[], reply_to_id?: string): Promise<CommunityMessageData> {
     const res = await apiClient.post<CommunityMessageData>(
-      Endpoints.communities.messages(id), { content },
+      Endpoints.communities.messages(id),
+      { content: content || null, message_type, media_urls: media_urls ?? [], reply_to_id: reply_to_id ?? null },
     );
     return res.data;
   },
 
-  async getMessages(id: string, page = 1, limit = 30): Promise<CommunityMessageData[]> {
-    const res = await apiClient.get<CommunityMessageData[]>(
-      `${Endpoints.communities.messages(id)}?page=${page}&limit=${limit}`,
-    );
+  async getMessages(id: string, page = 1, limit = 30, message_type?: string): Promise<CommunityMessageData[]> {
+    let url = `${Endpoints.communities.messages(id)}?page=${page}&limit=${limit}`;
+    if (message_type) url += `&message_type=${message_type}`;
+    const res = await apiClient.get<CommunityMessageData[]>(url);
+    return res.data;
+  },
+
+  async getPinnedMessages(id: string): Promise<CommunityMessageData[]> {
+    const res = await apiClient.get<CommunityMessageData[]>(`${Endpoints.communities.messages(id)}/pinned`);
     return res.data;
   },
 
