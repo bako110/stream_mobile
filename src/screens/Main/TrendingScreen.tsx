@@ -89,6 +89,7 @@ export const TrendingScreen: React.FC = () => {
         <SkeletonTrending />
       ) : tab === 'content' ? (
         <FlatList
+          key="trending-content"
           data={trending}
           keyExtractor={i => i.id}
           numColumns={2}
@@ -104,6 +105,7 @@ export const TrendingScreen: React.FC = () => {
         />
       ) : (
         <FlatList
+          key="trending-reels"
           data={reels}
           keyExtractor={i => i.id}
           contentContainerStyle={{ padding: 16, gap: 12 }}
