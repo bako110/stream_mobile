@@ -34,15 +34,9 @@ interface PollData {
   ends_at: string | null; allow_multiple: boolean; ended: boolean;
 }
 
-interface CommunityMessage extends CommunityMessageData {
-  message_type: 'text' | 'image' | 'media' | 'announcement' | 'poll' | 'event';
-  media_urls: string[];
-  reply_to: { id: string; sender_id: string; sender_display_name: string | null; sender_username: string | null; content: string | null; message_type: string; } | null;
-  reply_to_id: string | null;
-  is_pinned: boolean;
-  reactions: ReactionSummary[];
+type CommunityMessage = Omit<CommunityMessageData, 'poll'> & {
   poll: PollData | null;
-}
+};
 
 type ChatTab = 'discussion' | 'announcements' | 'media' | 'polls';
 
@@ -252,7 +246,7 @@ export const CommunityChatScreen: React.FC = () => {
       } else {
         try {
           const updated = await communityService.editMessage(communityId, msgId, content);
-          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, ...updated } : m));
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: updated.content, edited_at: updated.edited_at } : m));
         } catch { setText(content); }
       }
       setSending(false);
@@ -487,58 +481,133 @@ export const CommunityChatScreen: React.FC = () => {
     );
   };
 
-  const renderMessage = ({ item: msg, index }: { item: CommunityMessage; index: number }) => {
+  const renderAvatarOrSpacer = (msg: CommunityMessage, showSender: boolean) => {
     const isMe = msg.sender_id === myId;
-    const prev = messages[index + 1];
-    const showSender = !isMe && (!prev || prev.sender_id !== msg.sender_id);
-    const showDate = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString();
-    const isAnnouncement = msg.message_type === 'announcement';
-    const isPoll = msg.message_type === 'poll';
-    const isMedia = msg.message_type === 'image' || msg.message_type === 'media';
-
-    if (isAnnouncement) {
+    if (isMe) return null;
+    if (showSender) {
       return (
-        <>
-          {showDate && <View style={styles.dateSep}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
-          <View style={[styles.announcementBubble, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B40' }]}>
-            <View style={styles.announcementHeader}>
-              <Icon name="bell" size={14} color="#F59E0B" />
-              <Text style={[styles.announcementLabel, { color: '#F59E0B' }]}>Annonce</Text>
-              <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatTime(msg.created_at)}</Text>
+        <TouchableOpacity onPress={() => nav.navigate('UserProfile', { userId: msg.sender_id })} style={styles.senderAvatarWrap}>
+          {msg.sender_avatar_url ? (
+            <Image source={{ uri: msg.sender_avatar_url }} style={styles.senderAvatar} />
+          ) : (
+            <View style={[styles.senderAvatar, { backgroundColor: colors.primary + '33', alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 10 }}>
+                {(msg.sender_display_name || msg.sender_username || '?')[0].toUpperCase()}
+              </Text>
             </View>
-            <Text style={[styles.msgText, { color: colors.textPrimary }]}>{msg.content}</Text>
-            {renderReactions(msg)}
-          </View>
-        </>
+          )}
+        </TouchableOpacity>
       );
     }
+    return <View style={{ width: 34 }} />;
+  };
 
+  // ── Rendu Annonce ────────────────────────────────────────────────────────────
+  const renderAnnouncement = (msg: CommunityMessage, showDate: boolean) => (
+    <View style={{ transform: [{ scaleY: -1 }] }}>
+      {showDate && <View style={styles.dateSep}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
+      <TouchableOpacity activeOpacity={0.85} onLongPress={() => setMenuMsg(msg)} delayLongPress={400}>
+        <View style={[styles.announcementBubble, { backgroundColor: '#F59E0B0F', borderColor: '#F59E0B50' }]}>
+          <View style={styles.announcementHeader}>
+            <View style={[styles.announcementIconBg, { backgroundColor: '#F59E0B22' }]}>
+              <Icon name="bell" size={13} color="#F59E0B" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.announcementLabel, { color: '#F59E0B' }]}>Annonce</Text>
+              <Text style={[{ fontSize: 11, color: colors.textTertiary }]}>
+                {msg.sender_display_name || msg.sender_username} · {formatTime(msg.created_at)}
+              </Text>
+            </View>
+            {msg.is_pinned && <Icon name="bookmark" size={13} color="#F59E0B" />}
+          </View>
+          <Text style={[styles.announcementText, { color: colors.textPrimary }]}>{msg.content}</Text>
+          {renderReactions(msg)}
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // ── Rendu Sondage ─────────────────────────────────────────────────────────────
+  const renderPollMessage = (msg: CommunityMessage, showDate: boolean) => (
+    <View style={{ transform: [{ scaleY: -1 }] }}>
+      {showDate && <View style={styles.dateSep}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
+      <TouchableOpacity activeOpacity={0.9} onLongPress={() => setMenuMsg(msg)} delayLongPress={400}>
+        <View style={[styles.pollMessageCard, { backgroundColor: colors.surfaceElevated ?? colors.backgroundSecondary, borderColor: colors.divider }]}>
+          {/* En-tête */}
+          <View style={styles.pollMsgHeader}>
+            <View style={[styles.pollMsgIconBg, { backgroundColor: colors.primary + '22' }]}>
+              <Icon name="bar-chart-2" size={14} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.pollMsgLabel, { color: colors.primary }]}>Sondage</Text>
+              <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+                {msg.sender_display_name || msg.sender_username} · {formatTime(msg.created_at)}
+              </Text>
+            </View>
+            {msg.is_pinned && <Icon name="bookmark" size={13} color="#F59E0B" />}
+          </View>
+          {/* Contenu du sondage */}
+          {renderPoll(msg)}
+          {renderReactions(msg)}
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // ── Rendu Média ───────────────────────────────────────────────────────────────
+  const renderMediaMessage = (msg: CommunityMessage, showDate: boolean, showSender: boolean) => {
+    const isMe = msg.sender_id === myId;
     return (
       <>
-        {showDate && <View style={styles.dateSep}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
+        {showDate && <View style={[styles.dateSep, { transform: [{ scaleY: -1 }] }]}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
         <TouchableOpacity
           activeOpacity={0.85}
           onLongPress={() => setMenuMsg(msg)}
           delayLongPress={400}
           style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}
         >
-          {!isMe && showSender && (
-            <TouchableOpacity onPress={() => nav.navigate('UserProfile', { userId: msg.sender_id })} style={styles.senderAvatarWrap}>
-              {msg.sender_avatar_url ? (
-                <Image source={{ uri: msg.sender_avatar_url }} style={styles.senderAvatar} />
-              ) : (
-                <View style={[styles.senderAvatar, { backgroundColor: colors.primary + '33', alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 10 }}>
-                    {(msg.sender_display_name || msg.sender_username || '?')[0].toUpperCase()}
-                  </Text>
+          {!isMe && renderAvatarOrSpacer(msg, showSender)}
+          <View style={{ maxWidth: '72%' }}>
+            {!isMe && showSender && (
+              <Text style={[styles.senderName, { color: colors.primary, marginLeft: 2, marginBottom: 2 }]}>
+                {msg.sender_display_name || msg.sender_username}
+              </Text>
+            )}
+            {/* Grille d'images sans bulle colorée */}
+            <View style={[styles.mediaMsgWrap, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+              {renderMediaGrid(msg.media_urls)}
+              {msg.content ? (
+                <View style={[styles.bubble, isMe
+                  ? { backgroundColor: colors.primary, borderBottomRightRadius: 4, marginTop: 3 }
+                  : { backgroundColor: colors.surfaceElevated ?? colors.backgroundSecondary, borderBottomLeftRadius: 4, marginTop: 3 }]}>
+                  <Text style={[styles.msgText, { color: isMe ? '#fff' : colors.textPrimary }]}>{msg.content}</Text>
                 </View>
-              )}
-            </TouchableOpacity>
-          )}
-          {!isMe && !showSender && <View style={{ width: 30 }} />}
+              ) : null}
+              <Text style={[styles.mediaTime, { color: colors.textTertiary, alignSelf: isMe ? 'flex-end' : 'flex-start' }]}>
+                {msg.is_pinned ? '📌 ' : ''}{formatTime(msg.created_at)}
+              </Text>
+            </View>
+            {renderReactions(msg)}
+          </View>
+        </TouchableOpacity>
+      </>
+    );
+  };
 
+  // ── Rendu Message texte ────────────────────────────────────────────────────────
+  const renderTextMessage = (msg: CommunityMessage, showDate: boolean, showSender: boolean) => {
+    const isMe = msg.sender_id === myId;
+    return (
+      <>
+        {showDate && <View style={[styles.dateSep, { transform: [{ scaleY: -1 }] }]}><Text style={[styles.dateText, { color: colors.textTertiary }]}>{formatDate(msg.created_at)}</Text></View>}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onLongPress={() => setMenuMsg(msg)}
+          delayLongPress={400}
+          style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}
+        >
+          {!isMe && renderAvatarOrSpacer(msg, showSender)}
           <View style={{ maxWidth: '78%' }}>
-            {/* Réponse parente */}
             {msg.reply_to && (
               <View style={[styles.replyPreview, { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : colors.backgroundSecondary, borderLeftColor: colors.primary }]}>
                 <Text style={[styles.replyName, { color: colors.primary }]}>{msg.reply_to.sender_display_name || msg.reply_to.sender_username}</Text>
@@ -547,7 +616,6 @@ export const CommunityChatScreen: React.FC = () => {
                 </Text>
               </View>
             )}
-
             <View style={[
               styles.bubble,
               isMe
@@ -560,13 +628,9 @@ export const CommunityChatScreen: React.FC = () => {
                 </Text>
               )}
               {msg.is_pinned && (
-                <View style={styles.pinnedTag}><Icon name="bookmark" size={10} color="#F59E0B" /><Text style={{ color: '#F59E0B', fontSize: 9, fontWeight: '700' }}>Épinglé</Text></View>
+                <View style={styles.pinnedTag}><Icon name="bookmark" size={10} color="#F59E0B" /><Text style={{ color: '#F59E0B', fontSize: 9, fontWeight: '700' }}> Épinglé</Text></View>
               )}
-              {isMedia ? renderMediaGrid(msg.media_urls) : null}
-              {isPoll ? renderPoll(msg) : null}
-              {msg.content ? (
-                <Text style={[styles.msgText, { color: isMe ? '#fff' : colors.textPrimary }]}>{msg.content}</Text>
-              ) : null}
+              <Text style={[styles.msgText, { color: isMe ? '#fff' : colors.textPrimary }]}>{msg.content}</Text>
               <View style={styles.msgMeta}>
                 {msg.edited_at && <Text style={[styles.editedLabel, { color: isMe ? 'rgba(255,255,255,0.5)' : colors.textTertiary }]}>modifié</Text>}
                 <Text style={[styles.msgTime, { color: isMe ? 'rgba(255,255,255,0.6)' : colors.textTertiary }]}>{formatTime(msg.created_at)}</Text>
@@ -577,6 +641,18 @@ export const CommunityChatScreen: React.FC = () => {
         </TouchableOpacity>
       </>
     );
+  };
+
+  const renderMessage = ({ item: msg, index }: { item: CommunityMessage; index: number }) => {
+    const prev = messages[index + 1];
+    const isMe = msg.sender_id === myId;
+    const showSender = !isMe && (!prev || prev.sender_id !== msg.sender_id);
+    const showDate = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString();
+
+    if (msg.message_type === 'announcement') return renderAnnouncement(msg, showDate);
+    if (msg.message_type === 'poll') return renderPollMessage(msg, showDate);
+    if (msg.message_type === 'image' || msg.message_type === 'media') return renderMediaMessage(msg, showDate, showSender);
+    return renderTextMessage(msg, showDate, showSender);
   };
 
   const renderMediaTab = () => {
@@ -924,9 +1000,21 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
 
   // Annonce
-  announcementBubble: { marginHorizontal: 12, marginBottom: 8, borderRadius: 12, padding: 12, borderWidth: 1, transform: [{ scaleY: -1 }] },
-  announcementHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  announcementLabel: { fontWeight: '700', fontSize: 12, flex: 1 },
+  announcementBubble: { marginHorizontal: 12, marginBottom: 8, borderRadius: 14, padding: 14, borderWidth: 1 },
+  announcementHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  announcementIconBg: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  announcementLabel: { fontWeight: '700', fontSize: 13 },
+  announcementText: { fontSize: 14, lineHeight: 21 },
+
+  // Sondage (message pleine largeur)
+  pollMessageCard: { marginHorizontal: 12, marginBottom: 8, borderRadius: 14, padding: 14, borderWidth: 1 },
+  pollMsgHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  pollMsgIconBg: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  pollMsgLabel: { fontWeight: '700', fontSize: 13 },
+
+  // Média (images sans bulle colorée)
+  mediaMsgWrap: { },
+  mediaTime: { fontSize: 10, marginTop: 3 },
 
   msgRow: { flexDirection: 'row', marginBottom: 4, maxWidth: '85%' },
   msgRowMe: { alignSelf: 'flex-end', transform: [{ scaleY: -1 }] },
