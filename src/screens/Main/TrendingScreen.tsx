@@ -50,15 +50,7 @@ export const TrendingScreen: React.FC = () => {
   };
 
   const handleReelPress = (item: any) => {
-    if (item.video_url) {
-      nav.navigate('VideoPlayer', {
-        url:         item.video_url,
-        title:       item.caption ?? 'Reel',
-        videoId:     item.id,
-        contentType: undefined,
-        thumbnailUrl: item.thumbnail_url ?? undefined,
-      });
-    } else if (item.user_id) {
+    if (item.user_id) {
       nav.navigate('UserReels', { userId: item.user_id, initialReelId: item.id });
     }
   };
