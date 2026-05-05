@@ -363,6 +363,7 @@ export const ReelsScreen: React.FC = () => {
           </View>
         ) : (
           <FlatList
+            key="mine-grid"
             data={myReels}
             keyExtractor={r => r.id}
             numColumns={2}
@@ -538,6 +539,7 @@ export const ReelsScreen: React.FC = () => {
             </View>
           ) : searchResults.length > 0 ? (
             <FlatList
+              key="search-grid"
               data={searchResults}
               keyExtractor={r => r.id}
               numColumns={2}
