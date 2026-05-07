@@ -31,13 +31,21 @@ type RouteT = RouteProp<MainStackParamList, 'SimpleLiveViewer'>;
 interface ChatMsg { id: string; user: string; avatar?: string | null; text: string; }
 
 // ── Vidéo remote ─────────────────────────────────────────────────────────────
+// Composant séparé avec l'identity du host pour que useParticipantTracks
+// soit réactif et re-rende automatiquement quand le track arrive.
+
+const HostVideoTrack: React.FC<{ identity: string }> = ({ identity }) => {
+  const tracks = useParticipantTracks([Track.Source.Camera], identity);
+  const track = tracks[0] ?? null;
+  if (!track) return null;
+  return <VideoTrack trackRef={track} style={StyleSheet.absoluteFill} objectFit="cover" />;
+};
 
 const RemoteVideo: React.FC = () => {
   const remotes = useRemoteParticipants();
   const host = remotes[0] ?? null;
-  const tracks = useParticipantTracks([Track.Source.Camera], host?.identity ?? '');
-  const track = tracks[0] ?? null;
-  if (!host || !track) {
+
+  if (!host) {
     return (
       <View style={[StyleSheet.absoluteFill, st.noVideo]}>
         <ActivityIndicator size="large" color="#F0365A" />
@@ -45,7 +53,14 @@ const RemoteVideo: React.FC = () => {
       </View>
     );
   }
-  return <VideoTrack trackRef={track} style={StyleSheet.absoluteFill} objectFit="cover" />;
+
+  return (
+    <>
+      {/* Fond sombre pendant que le track charge */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111' }]} />
+      <HostVideoTrack identity={host.identity} />
+    </>
+  );
 };
 
 // ── Page principale ────────────────────────────────────────────────────────────

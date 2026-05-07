@@ -7,12 +7,10 @@ import {
   Platform, PermissionsAndroid, Alert, ActivityIndicator,
 } from 'react-native';
 import {
-  useLiveKit,
   LiveKitRoom,
   useLocalParticipant,
+  useParticipantTracks,
   VideoTrack,
-  AudioTrack,
-  TrackReferenceOrPlaceholder,
 } from '@livekit/react-native';
 import { Track } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
@@ -28,6 +26,22 @@ interface Props {
 }
 
 // ── Inner component (inside LiveKitRoom) ─────────────────────────────────────
+// ── Aperçu caméra locale ─────────────────────────────────────────────────────
+
+const LocalCameraPreview: React.FC<{ mirror: boolean }> = ({ mirror }) => {
+  const { localParticipant } = useLocalParticipant();
+  const tracks = useParticipantTracks([Track.Source.Camera], localParticipant.identity);
+  const camTrack = tracks[0] ?? null;
+  if (!camTrack) {
+    return (
+      <View style={[styles.fullVideo, styles.noVideo]}>
+        <Icon name="video-off" size={48} color="#666" />
+      </View>
+    );
+  }
+  return <VideoTrack trackRef={camTrack} style={styles.fullVideo} mirror={mirror} />;
+};
+
 const StreamControls: React.FC<{
   concert: Concert | null;
   concertId: string;
@@ -43,9 +57,8 @@ const StreamControls: React.FC<{
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    // Enable camera + mic on mount
-    localParticipant.setCameraEnabled(true);
-    localParticipant.setMicrophoneEnabled(true);
+    localParticipant.setCameraEnabled(true).catch(() => {});
+    localParticipant.setMicrophoneEnabled(true).catch(() => {});
 
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
@@ -59,27 +72,26 @@ const StreamControls: React.FC<{
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollRef.current) clearInterval(pollRef.current);
-      localParticipant.setCameraEnabled(false);
-      localParticipant.setMicrophoneEnabled(false);
+      localParticipant.setCameraEnabled(false).catch(() => {});
+      localParticipant.setMicrophoneEnabled(false).catch(() => {});
     };
-  }, []);
+  }, [localParticipant, concertId]);
 
   const toggleMute = useCallback(() => {
     const next = !muted;
-    localParticipant.setMicrophoneEnabled(!next);
+    localParticipant.setMicrophoneEnabled(!next).catch(() => {});
     setMuted(next);
   }, [muted, localParticipant]);
 
   const toggleVideo = useCallback(() => {
     const next = !videoOff;
-    localParticipant.setCameraEnabled(!next);
+    localParticipant.setCameraEnabled(!next).catch(() => {});
     setVideoOff(next);
   }, [videoOff, localParticipant]);
 
   const flipCamera = useCallback(() => {
     const next = !cameraFront;
     setCameraFront(next);
-    // Switch facingMode via switchActiveDevice
     localParticipant.switchActiveDevice('videoinput', next ? 'user' : 'environment').catch(() => {});
   }, [cameraFront, localParticipant]);
 
@@ -99,20 +111,13 @@ const StreamControls: React.FC<{
       : `${m}:${String(s).padStart(2, '0')}`;
   };
 
-  // Get local camera track for preview
-  const cameraTrack = localParticipant.getTrackPublication(Track.Source.Camera);
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      {/* Local camera preview */}
-      {cameraTrack && !videoOff ? (
-        <VideoTrack
-          trackRef={{ participant: localParticipant, publication: cameraTrack, source: Track.Source.Camera } as TrackReferenceOrPlaceholder}
-          style={styles.fullVideo}
-          mirror={cameraFront}
-        />
+      {/* Aperçu caméra — composant réactif séparé */}
+      {!videoOff ? (
+        <LocalCameraPreview mirror={cameraFront} />
       ) : (
         <View style={[styles.fullVideo, styles.noVideo]}>
           <Icon name="video-off" size={48} color="#666" />

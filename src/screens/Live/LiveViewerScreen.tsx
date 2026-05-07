@@ -36,13 +36,19 @@ interface LiveChat {
 }
 
 // ── Video view inside the room ────────────────────────────────────────────────
+
+const ArtistTrack: React.FC<{ identity: string }> = ({ identity }) => {
+  const tracks = useParticipantTracks([Track.Source.Camera], identity);
+  const videoTrack = tracks[0] ?? null;
+  if (!videoTrack) return null;
+  return <VideoTrack trackRef={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" />;
+};
+
 const ArtistVideoView: React.FC = () => {
   const remoteParticipants = useRemoteParticipants();
   const artist = remoteParticipants[0] ?? null;
-  const tracks = useParticipantTracks([Track.Source.Camera], artist?.identity ?? '');
-  const videoTrack = tracks[0] ?? null;
 
-  if (!artist || !videoTrack) {
+  if (!artist) {
     return (
       <View style={styles.noVideoCenter}>
         <ActivityIndicator size="large" color="#E53E3E" />
@@ -52,7 +58,10 @@ const ArtistVideoView: React.FC = () => {
   }
 
   return (
-    <VideoTrack trackRef={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+    <>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111' }]} />
+      <ArtistTrack identity={artist.identity} />
+    </>
   );
 };
 

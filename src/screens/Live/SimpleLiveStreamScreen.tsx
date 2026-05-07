@@ -1,6 +1,6 @@
 /**
  * SimpleLiveStreamScreen — Host du live spontané via LiveKit.
- * Reçoit le token publisher depuis GoLiveScreen (déjà démarré).
+ * Reçoit le token publisher depuis GoLiveScreen (déjà démarré côté backend).
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
@@ -10,36 +10,56 @@ import {
 import {
   LiveKitRoom,
   useLocalParticipant,
+  useParticipantTracks,
   VideoTrack,
   useParticipants,
 } from '@livekit/react-native';
 import { Track } from 'livekit-client';
-import type { TrackReferenceOrPlaceholder } from '@livekit/react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, RouteProp } from '@react-navigation/native-stack';
 import { liveService } from '../../services/liveService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import { WS_BASE_URL } from '../../utils/constants';
-import { storage } from '../../utils/storage';
-import { STORAGE_KEYS } from '../../utils/constants';
 
-type Nav = NativeStackNavigationProp<MainStackParamList>;
+type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveStream'>;
 
-// ── Contrôles internes (contexte LK requis) ──────────────────────────────────
+// ── Aperçu caméra locale (interne, contexte LK requis) ───────────────────────
+
+const LocalCameraView: React.FC<{ mirror: boolean }> = ({ mirror }) => {
+  const { localParticipant } = useLocalParticipant();
+  // useParticipantTracks est réactif — re-rend dès que le track apparaît
+  const tracks = useParticipantTracks([Track.Source.Camera], localParticipant.identity);
+  const camTrack = tracks[0] ?? null;
+
+  if (!camTrack) {
+    return (
+      <View style={[StyleSheet.absoluteFill, st.noVideo]}>
+        <Icon name="video-off" size={48} color="#555" />
+        <Text style={st.noVideoText}>Activation de la caméra...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <VideoTrack trackRef={camTrack} style={StyleSheet.absoluteFill} mirror={mirror} />
+  );
+};
+
+// ── Contrôles (contexte LK requis) ───────────────────────────────────────────
 
 const StreamControls: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId, onEnd }) => {
   const { localParticipant } = useLocalParticipant();
   const participants = useParticipants();
-  const [muted,      setMuted]      = useState(false);
-  const [videoOff,   setVideoOff]   = useState(false);
-  const [camFront,   setCamFront]   = useState(true);
-  const [elapsed,    setElapsed]    = useState(0);
+  const [muted,    setMuted]    = useState(false);
+  const [videoOff, setVideoOff] = useState(false);
+  const [camFront, setCamFront] = useState(true);
+  const [elapsed,  setElapsed]  = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    // Activer cam + micro dès que le participant local est prêt
     localParticipant.setCameraEnabled(true).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     const start = Date.now();
@@ -49,7 +69,7 @@ const StreamControls: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveI
       localParticipant.setCameraEnabled(false).catch(() => {});
       localParticipant.setMicrophoneEnabled(false).catch(() => {});
     };
-  }, []);
+  }, [localParticipant]);
 
   const toggleMute = useCallback(() => {
     const next = !muted;
@@ -76,26 +96,16 @@ const StreamControls: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveI
     ]);
   }, [onEnd]);
 
-  const fmt = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${String(sec).padStart(2, '0')}`;
-  };
-
-  const camPub = localParticipant.getTrackPublication(Track.Source.Camera);
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   return (
     <View style={st.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      {camPub && !videoOff ? (
-        <VideoTrack
-          trackRef={{ participant: localParticipant, publication: camPub, source: Track.Source.Camera } as TrackReferenceOrPlaceholder}
-          style={st.fullVideo}
-          mirror={camFront}
-        />
-      ) : (
-        <View style={[st.fullVideo, st.noVideo]}>
+      {/* Aperçu caméra locale */}
+      {!videoOff && <LocalCameraView mirror={camFront} />}
+      {videoOff && (
+        <View style={[StyleSheet.absoluteFill, st.noVideo]}>
           <Icon name="video-off" size={48} color="#555" />
         </View>
       )}
@@ -172,8 +182,8 @@ export const SimpleLiveStreamScreen: React.FC = () => {
 
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  fullVideo: { ...StyleSheet.absoluteFillObject },
   noVideo: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
+  noVideoText: { color: '#888', marginTop: 12, fontSize: 13 },
   topOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0,
     paddingTop: Platform.OS === 'ios' ? 54 : 36,
