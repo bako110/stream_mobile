@@ -263,10 +263,12 @@ export const Endpoints = {
     withdrawHistory:  `${V1}/wallet/withdraw/history`,
     creatorProfile:   `${V1}/wallet/creator/profile`,
     creatorStats:     `${V1}/wallet/creator/stats`,
+    purchaseCustom:   `${V1}/wallet/purchase/custom`,
     // Boost
     boostsActive:     `${V1}/wallet/boosts/active`,
     boostsHistory:    `${V1}/wallet/boosts/history`,
     boostsPurchase:   `${V1}/wallet/boosts/purchase`,
+    boostCancel:      (id: string) => `${V1}/wallet/boosts/${id}`,
   },
 
   // ── Système ───────────────────────────────────────────────────────────────
