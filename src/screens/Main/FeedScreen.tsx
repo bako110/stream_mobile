@@ -535,6 +535,17 @@ export const FeedScreen: React.FC = () => {
 
           {/* Droite : icônes */}
           <View style={s.headerRight}>
+            {/* Bouton Go Live */}
+            {!searchOpen && (
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: '#F0365A' }}
+                onPress={() => nav.navigate('GoLive')}
+                activeOpacity={0.8}
+              >
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 }}>Live</Text>
+              </TouchableOpacity>
+            )}
             {/* Icône recherche — style Facebook */}
             <TouchableOpacity
               style={[s.iconBtn, { backgroundColor: searchOpen ? colors.primary + '22' : colors.backgroundSecondary }]}
@@ -575,185 +586,171 @@ export const FeedScreen: React.FC = () => {
 
       {searchResults ? (
         /* ── Résultats de recherche ─────────────────────────────────────── */
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
 
-          {/* Films */}
-          {(searchResults.films?.length ?? 0) > 0 && (
-            <View style={{ marginTop: 12 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>
-                🎬 Films ({searchResults.films.length})
-              </Text>
-              {searchResults.films.map((c: any) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
-                >
-                  {c.thumbnail_url ? (
-                    <Image source={{ uri: c.thumbnail_url }} style={{ width: 44, height: 44, borderRadius: 8 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name="film" size={18} color={colors.textTertiary} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textTertiary }}>{c.year ?? 'Film'}</Text>
+          {(() => {
+            const hasAny =
+              (searchResults.users?.length ?? 0) > 0 ||
+              (searchResults.films?.length ?? 0) > 0 ||
+              (searchResults.series?.length ?? 0) > 0 ||
+              (searchResults.concerts?.length ?? 0) > 0 ||
+              (searchResults.events?.length ?? 0) > 0 ||
+              (searchResults.reels?.length ?? 0) > 0;
+
+            if (!hasAny) return (
+              <View style={{ alignItems: 'center', paddingTop: 80, gap: 10 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="search" size={24} color={colors.textTertiary} />
+                </View>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textSecondary }}>Aucun résultat</Text>
+                <Text style={{ fontSize: 13, color: colors.textTertiary }}>pour "{searchQuery}"</Text>
+              </View>
+            );
+
+            const SectionHeader = ({ icon, label, count, accent }: { icon: string; label: string; count: number; accent: string }) => (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10 }}>
+                <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: accent }} />
+                <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: accent + '18', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={icon} size={14} color={accent} />
+                </View>
+                <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, letterSpacing: -0.2 }}>{label}</Text>
+                <View style={{ backgroundColor: accent + '18', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: accent }}>{count}</Text>
+                </View>
+              </View>
+            );
+
+            const Thumb = ({ uri, icon, accent }: { uri?: string | null; icon: string; accent: string }) =>
+              uri ? (
+                <Image source={{ uri }} style={{ width: 46, height: 46, borderRadius: 10 }} />
+              ) : (
+                <View style={{ width: 46, height: 46, borderRadius: 10, backgroundColor: accent + '18', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={icon} size={18} color={accent} />
+                </View>
+              );
+
+            const Row = ({ onPress, children }: { onPress?: () => void; children: React.ReactNode }) => (
+              <TouchableOpacity
+                onPress={onPress}
+                activeOpacity={0.7}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
+              >
+                {children}
+              </TouchableOpacity>
+            );
+
+            return (
+              <>
+                {/* Utilisateurs */}
+                {(searchResults.users?.length ?? 0) > 0 && (
+                  <View>
+                    <SectionHeader icon="user" label="Utilisateurs" count={searchResults.users!.length} accent="#7B3FF2" />
+                    {searchResults.users!.map((u: any) => (
+                      <Row key={u.id} onPress={() => (nav as any).navigate('UserProfile', { userId: u.id })}>
+                        {u.avatar_url ? (
+                          <Image source={{ uri: u.avatar_url }} style={{ width: 46, height: 46, borderRadius: 23 }} />
+                        ) : (
+                          <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#7B3FF2' + '20', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 17, fontWeight: '700', color: '#7B3FF2' }}>{((u.display_name ?? u.username) as string)[0].toUpperCase()}</Text>
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{u.display_name ?? u.username}</Text>
+                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }}>@{u.username}</Text>
+                        </View>
+                        <Icon name="chevron-right" size={16} color={colors.textDisabled} />
+                      </Row>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                )}
 
-          {/* Séries */}
-          {(searchResults.series?.length ?? 0) > 0 && (
-            <View style={{ marginTop: 16 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>
-                📺 Séries ({searchResults.series.length})
-              </Text>
-              {searchResults.series.map((c: any) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
-                >
-                  {c.thumbnail_url ? (
-                    <Image source={{ uri: c.thumbnail_url }} style={{ width: 44, height: 44, borderRadius: 8 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name="tv" size={18} color={colors.textTertiary} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textTertiary }}>Série · {c.year ?? ''}</Text>
+                {/* Concerts */}
+                {(searchResults.concerts?.length ?? 0) > 0 && (
+                  <View>
+                    <SectionHeader icon="music" label="Concerts" count={searchResults.concerts.length} accent="#E0389A" />
+                    {searchResults.concerts.map((c: any) => (
+                      <Row key={c.id} onPress={() => (nav as any).navigate('ConcertDetail', { concertId: c.id })}>
+                        <Thumb uri={c.thumbnail_url} icon="music" accent="#E0389A" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
+                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>{[c.genre, c.venue_city].filter(Boolean).join(' · ') || 'Concert'}</Text>
+                        </View>
+                        <Icon name="chevron-right" size={16} color={colors.textDisabled} />
+                      </Row>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                )}
 
-          {/* Concerts */}
-          {(searchResults.concerts?.length ?? 0) > 0 && (
-            <View style={{ marginTop: 16 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>
-                🎵 Concerts ({searchResults.concerts.length})
-              </Text>
-              {searchResults.concerts.map((c: any) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
-                  onPress={() => (nav as any).navigate('ConcertDetail', { concertId: c.id })}
-                >
-                  {c.thumbnail_url ? (
-                    <Image source={{ uri: c.thumbnail_url }} style={{ width: 44, height: 44, borderRadius: 8 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name="music" size={18} color={colors.textTertiary} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textTertiary }} numberOfLines={1}>{c.genre ?? 'Concert'} · {c.venue_city ?? ''}</Text>
+                {/* Événements */}
+                {(searchResults.events?.length ?? 0) > 0 && (
+                  <View>
+                    <SectionHeader icon="calendar" label="Événements" count={searchResults.events.length} accent="#0EA5E9" />
+                    {searchResults.events.map((e: any) => (
+                      <Row key={e.id} onPress={() => (nav as any).navigate('EventDetail', { eventId: e.id })}>
+                        <Thumb uri={e.thumbnail_url} icon="calendar" accent="#0EA5E9" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{e.title}</Text>
+                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>{[e.type ?? e.event_type, e.venue_city].filter(Boolean).join(' · ')}</Text>
+                        </View>
+                        <Icon name="chevron-right" size={16} color={colors.textDisabled} />
+                      </Row>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                )}
 
-          {/* Événements */}
-          {(searchResults.events?.length ?? 0) > 0 && (
-            <View style={{ marginTop: 16 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>
-                📅 Événements ({searchResults.events.length})
-              </Text>
-              {searchResults.events.map((e: any) => (
-                <TouchableOpacity
-                  key={e.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
-                  onPress={() => (nav as any).navigate('EventDetail', { eventId: e.id })}
-                >
-                  {e.thumbnail_url ? (
-                    <Image source={{ uri: e.thumbnail_url }} style={{ width: 44, height: 44, borderRadius: 8 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name="calendar" size={18} color={colors.textTertiary} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{e.title}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textTertiary }} numberOfLines={1}>{e.type ?? e.event_type} · {e.venue_city ?? ''}</Text>
+                {/* Reels */}
+                {(searchResults.reels?.length ?? 0) > 0 && (
+                  <View>
+                    <SectionHeader icon="video" label="Reels" count={searchResults.reels.length} accent="#10B981" />
+                    {searchResults.reels.map((r: any) => (
+                      <Row key={r.id}>
+                        <Thumb uri={r.thumbnail_url} icon="video" accent="#10B981" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={2}>{r.caption ?? 'Reel'}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <Icon name="eye" size={11} color={colors.textTertiary} />
+                            <Text style={{ fontSize: 12, color: colors.textTertiary }}>{r.view_count ?? 0} vues</Text>
+                          </View>
+                        </View>
+                      </Row>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                )}
 
-          {/* Reels */}
-          {(searchResults.reels?.length ?? 0) > 0 && (
-            <View style={{ marginTop: 16 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>
-                🎥 Reels ({searchResults.reels.length})
-              </Text>
-              {searchResults.reels.map((r: any) => (
-                <TouchableOpacity
-                  key={r.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
-                >
-                  {r.thumbnail_url ? (
-                    <Image source={{ uri: r.thumbnail_url }} style={{ width: 44, height: 44, borderRadius: 8 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name="video" size={18} color={colors.textTertiary} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={2}>{r.caption ?? 'Reel'}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textTertiary }}>{r.view_count ?? 0} vues</Text>
+                {/* Films */}
+                {(searchResults.films?.length ?? 0) > 0 && (
+                  <View>
+                    <SectionHeader icon="film" label="Films" count={searchResults.films.length} accent="#F59E0B" />
+                    {searchResults.films.map((c: any) => (
+                      <Row key={c.id}>
+                        <Thumb uri={c.thumbnail_url} icon="film" accent="#F59E0B" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
+                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }}>{c.year ?? 'Film'}</Text>
+                        </View>
+                      </Row>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                )}
 
-          {/* Utilisateurs */}
-          {(searchResults.users?.length ?? 0) > 0 && (
-            <View style={{ marginTop: 16 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>
-                👤 Utilisateurs ({searchResults.users!.length})
-              </Text>
-              {searchResults.users!.map((u: any) => (
-                <TouchableOpacity
-                  key={u.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
-                  onPress={() => (nav as any).navigate('UserProfile', { userId: u.id })}
-                >
-                  {u.avatar_url ? (
-                    <Image source={{ uri: u.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                  ) : (
-                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.primary }}>{((u.display_name ?? u.username) as string)[0].toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{u.display_name ?? u.username}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textTertiary }}>@{u.username}</Text>
+                {/* Séries */}
+                {(searchResults.series?.length ?? 0) > 0 && (
+                  <View>
+                    <SectionHeader icon="tv" label="Séries" count={searchResults.series.length} accent="#6366F1" />
+                    {searchResults.series.map((c: any) => (
+                      <Row key={c.id}>
+                        <Thumb uri={c.thumbnail_url} icon="tv" accent="#6366F1" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
+                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }}>Série{c.year ? ` · ${c.year}` : ''}</Text>
+                        </View>
+                      </Row>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Aucun résultat */}
-          {(searchResults.users?.length ?? 0) === 0 &&
-           (searchResults.films?.length ?? 0) === 0 &&
-           (searchResults.series?.length ?? 0) === 0 &&
-           (searchResults.concerts?.length ?? 0) === 0 &&
-           (searchResults.events?.length ?? 0) === 0 &&
-           (searchResults.reels?.length ?? 0) === 0 && (
-            <View style={{ alignItems: 'center', paddingTop: 60, gap: 8 }}>
-              <Icon name="search" size={40} color={colors.textTertiary} />
-              <Text style={{ fontSize: 15, color: colors.textSecondary }}>Aucun résultat pour "{searchQuery}"</Text>
-            </View>
-          )}
+                )}
+              </>
+            );
+          })()}
         </ScrollView>
       ) : loading ? (
         <SkeletonFeedScreen />
@@ -1135,8 +1132,8 @@ export const FeedScreen: React.FC = () => {
               {([
                 { icon: 'film',        label: 'Films & Séries', color: '#3B82F6', screen: 'Films'       },
                 { icon: 'play-circle', label: 'Reels',         color: '#FF7A2F', screen: 'Reels'       },
-                { icon: 'radio',       label: 'Live',          color: '#EF4444', screen: 'LiveList'    },
-                { icon: 'music',       label: 'Concerts',      color: '#7B3FF2', screen: 'Concerts'    },
+                { icon: 'radio',       label: 'Lives',         color: '#F0365A', screen: 'SimpleLiveList' },
+                { icon: 'music',       label: 'Concerts live', color: '#7B3FF2', screen: 'LiveList'    },
                 { icon: 'calendar',    label: 'Planning',      color: '#10B981', screen: 'Planning'    },
                 { icon: 'calendar',    label: 'Événements',    color: '#E0389A', screen: 'Events'      },
                 { icon: 'trending-up', label: 'Tendances',     color: '#F59E0B', screen: 'Trending'    },

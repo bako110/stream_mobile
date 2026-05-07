@@ -17,8 +17,11 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
-import { useWs } from '../../context/WebSocketContext';
 import { concertService } from '../../services';
+import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
+import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
+import { storage } from '../../utils/storage';
 import type { Concert } from '../../types';
 
 interface Props {
@@ -56,7 +59,6 @@ const ArtistVideoView: React.FC = () => {
 // ── Main component ────────────────────────────────────────────────────────────
 export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const nav = useNavigation();
-  const { sendMessage, addListener, removeListener } = useWs();
 
   const [concert, setConcert] = useState<Concert | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,9 +69,11 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [chatMessages, setChatMessages] = useState<LiveChat[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(true);
+  const [sending, setSending] = useState(false);
 
   const chatListRef = useRef<FlatList>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsRef       = useRef<WebSocket | null>(null);
 
   // Load concert + get viewer token
   useEffect(() => {
@@ -107,35 +111,47 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [token, concertId]);
 
-  // WS live chat
+  // WS chat dédié — réception uniquement via /social/comments/ws/concert/{id}
   useEffect(() => {
-    const handler = (payload: any) => {
-      if (payload.type === 'live_chat' && payload.concert_id === concertId) {
-        setChatMessages(prev => [...prev, {
-          id: `${Date.now()}-${Math.random()}`,
-          username: payload.username || 'Anonyme',
-          text: payload.text,
-        }]);
-        setTimeout(() => chatListRef.current?.scrollToEnd({ animated: true }), 100);
-      }
-      if (payload.type === 'concert_ended' && payload.concert_id === concertId) {
-        setStreamEnded(true);
-        setToken(null);
-      }
+    if (!token) return;
+    const accessToken = storage.getString(STORAGE_KEYS.ACCESS_TOKEN);
+    if (!accessToken) return;
+    const ws = new WebSocket(`${WS_BASE_URL}/api/v1/social/comments/ws/concert/${concertId}?token=${accessToken}`);
+    wsRef.current = ws;
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'comment_added' && d.comment) {
+          const c = d.comment;
+          setChatMessages(prev => [...prev, {
+            id: c.id ?? `${Date.now()}-${Math.random()}`,
+            username: c.author?.display_name ?? c.author?.username ?? 'Anonyme',
+            text: c.body,
+          }]);
+          setTimeout(() => chatListRef.current?.scrollToEnd({ animated: true }), 80);
+        }
+      } catch {}
     };
-    addListener(handler);
-    return () => removeListener(handler);
-  }, [concertId, addListener, removeListener]);
+    const ping = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
+    }, 25_000);
+    return () => { clearInterval(ping); ws.close(); };
+  }, [concertId, token]);
 
-  const handleSendChat = useCallback(() => {
+  const handleSendChat = useCallback(async () => {
     const text = chatInput.trim();
-    if (!text) return;
-    sendMessage({ type: 'live_chat', concert_id: concertId, text });
+    if (!text || sending) return;
     setChatInput('');
-  }, [chatInput, concertId, sendMessage]);
+    setSending(true);
+    try {
+      await apiClient.post(Endpoints.social.comments, { body: text, concert_id: concertId });
+    } catch {}
+    finally { setSending(false); }
+  }, [chatInput, concertId, sending]);
 
   const handleLeave = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
+    wsRef.current?.close();
     if (onBack) onBack();
     else nav.goBack();
   }, [nav, onBack]);

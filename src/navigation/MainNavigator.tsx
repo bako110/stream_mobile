@@ -52,9 +52,13 @@ import { PostDetailScreen }      from '../screens/Detail/PostDetailScreen';
 import { UserProfileScreen }     from '../screens/Profile/UserProfileScreen';
 import { EditProfileScreen }     from '../screens/Profile/EditProfileScreen';
 import { MyStoriesScreen }       from '../screens/Profile/MyStoriesScreen';
-import { LiveStreamScreen }      from '../screens/Live/LiveStreamScreen';
-import { LiveViewerScreen }      from '../screens/Live/LiveViewerScreen';
-import { LiveListScreen }        from '../screens/Live/LiveListScreen';
+import { LiveStreamScreen }        from '../screens/Live/LiveStreamScreen';
+import { LiveViewerScreen }        from '../screens/Live/LiveViewerScreen';
+import { LiveListScreen }          from '../screens/Live/LiveListScreen';
+import { SimpleLiveListScreen }    from '../screens/Live/SimpleLiveListScreen';
+import { GoLiveScreen }            from '../screens/Live/GoLiveScreen';
+import { SimpleLiveStreamScreen }  from '../screens/Live/SimpleLiveStreamScreen';
+import { SimpleLiveViewerScreen }  from '../screens/Live/SimpleLiveViewerScreen';
 import WalletScreen           from '../screens/Wallet/WalletScreen';
 import BuyCoinsScreen         from '../screens/Wallet/BuyCoinsScreen';
 import CreatorDashboardScreen from '../screens/Wallet/CreatorDashboardScreen';
@@ -107,9 +111,13 @@ export type MainStackParamList = {
   Events:          undefined;
   Concerts:        undefined;
   BlockedUsers:    undefined;
-  LiveList:        undefined;
-  LiveStream:      { concertId: string };
-  LiveViewer:      { concertId: string };
+  LiveList:          undefined;
+  LiveStream:        { concertId: string };
+  LiveViewer:        { concertId: string };
+  SimpleLiveList:    undefined;
+  GoLive:            undefined;
+  SimpleLiveStream:  { liveId: string; publisherToken: string; livekitUrl: string };
+  SimpleLiveViewer:  { liveId: string };
   Activity:        undefined;
   MyStories:       undefined;
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
@@ -228,7 +236,11 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Events"         component={EventsScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Concerts"       component={ConcertsScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="BlockedUsers"   component={BlockedUsersScreen}    options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="LiveList"       component={LiveListScreen}        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="LiveList"          component={LiveListScreen}          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SimpleLiveList"    component={SimpleLiveListScreen}    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="GoLive"            component={GoLiveScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="SimpleLiveStream"  component={SimpleLiveStreamScreen}  options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="SimpleLiveViewer"  component={SimpleLiveViewerScreen}  options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="MyStories"      component={MyStoriesScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="LiveStream"     component={LiveStreamWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="LiveViewer"     component={LiveViewerWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
