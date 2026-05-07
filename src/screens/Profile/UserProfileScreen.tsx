@@ -20,9 +20,12 @@ import { useUser } from '../../context/UserContext';
 import { SkeletonUserProfile, VerifiedBadge } from '../../components/common';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
+import { postService } from '../../services/postService';
+import { PostCard } from '../../components/common';
 import type { UserPublicProfile, UserPublic } from '../../types/user';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
+import type { Post } from '../../types/post';
 
 const { width: W } = Dimensions.get('window');
 
@@ -51,9 +54,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // Content tabs
   const [activeTab, setActiveTab] = useState<ContentTab>('publications');
-  const [userEvents, setUserEvents] = useState<Event[]>([]);
+  const [userEvents,   setUserEvents]   = useState<Event[]>([]);
   const [userConcerts, setUserConcerts] = useState<Concert[]>([]);
-  const [userReels, setUserReels] = useState<any[]>([]);
+  const [userReels,    setUserReels]    = useState<any[]>([]);
+  const [userPosts,    setUserPosts]    = useState<Post[]>([]);
   const [contentLoading, setContentLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -97,14 +101,16 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
       // Charger contenu de l'utilisateur
       setContentLoading(true);
-      const [evts, ccs, reels] = await Promise.allSettled([
+      const [evts, ccs, reels, posts] = await Promise.allSettled([
         userService.getUserEvents(userId),
         userService.getUserConcerts(userId),
         userService.getUserReels(userId),
+        postService.getByUser(userId),
       ]);
-      if (evts.status === 'fulfilled') setUserEvents(evts.value);
-      if (ccs.status === 'fulfilled') setUserConcerts(ccs.value);
-      if (reels.status === 'fulfilled') setUserReels(Array.isArray(reels.value) ? reels.value : []);
+      if (evts.status === 'fulfilled')   setUserEvents(evts.value);
+      if (ccs.status === 'fulfilled')    setUserConcerts(ccs.value);
+      if (reels.status === 'fulfilled')  setUserReels(Array.isArray(reels.value) ? reels.value : []);
+      if (posts.status === 'fulfilled')  setUserPosts(posts.value);
       setContentLoading(false);
     } catch (e) { console.warn('[UserProfile] load error:', e); }
     finally { setLoading(false); }
@@ -198,8 +204,11 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const displayName = profile.display_name ?? profile.username ?? 'Utilisateur';
   const initials = displayName[0]?.toUpperCase() ?? '?';
-  const publications = [...userEvents.map(e => ({ kind: 'event' as const, data: e })), ...userConcerts.map(c => ({ kind: 'concert' as const, data: c }))];
-  const totalPubs = publications.length;
+  const publications = [
+    ...userEvents.map(e => ({ kind: 'event' as const, data: e })),
+    ...userConcerts.map(c => ({ kind: 'concert' as const, data: c })),
+  ];
+  const totalPubs = publications.length + userPosts.length;
 
   // Profil privé : aucun champ personnel n'est retourné par le backend
   const isPrivateProfile = !isMe && !profile.is_followed &&
@@ -460,80 +469,99 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         ) : !isPrivateProfile && activeTab === 'publications' ? (
           <View style={styles.contentSection}>
-            {publications.length === 0 ? (
+            {totalPubs === 0 ? (
               <View style={styles.emptyContent}>
                 <Icon name="inbox" size={40} color={colors.textTertiary} />
                 <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Aucune publication</Text>
               </View>
             ) : (
-              publications.map((pub, idx) => {
-                const isEvent = pub.kind === 'event';
-                const item = pub.data as any;
-                const title = item.title;
-                const desc = item.description;
-                const thumbUrl = item.thumbnail_url ?? item.banner_url;
-                const date = isEvent ? item.starts_at : item.scheduled_at;
-                const city = item.venue_city;
-                const typeIcon = isEvent ? 'calendar' : 'music';
-                const typeLabel = isEvent ? 'Événement' : 'Concert';
-                const accent = isEvent ? '#E0389A' : '#7B3FF2';
-
-                return (
-                  <Animated.View key={`${pub.kind}-${item.id}`} entering={FadeInDown.delay(idx * 50).springify()}>
-                    <TouchableOpacity
-                      style={[styles.pubCard, { backgroundColor: colors.surfaceElevated }]}
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
-                        else navigation.navigate('ConcertDetail', { concertId: item.id });
+              <>
+                {/* ── Posts ── */}
+                {userPosts.map((post, idx) => (
+                  <Animated.View key={`post-${post.id}`} entering={FadeInDown.delay(idx * 40).springify()}>
+                    <PostCard
+                      post={post}
+                      colors={colors}
+                      currentUserId={myId ?? undefined}
+                      onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
+                      onAuthorPress={() => {
+                        const aid = post.author?.id;
+                        if (aid && aid !== userId) navigation.navigate('UserProfile', { userId: aid });
                       }}
-                    >
-                      {/* Thumbnail */}
-                      {thumbUrl ? (
-                        <TouchableOpacity onPress={() => setViewerUrl(thumbUrl)} activeOpacity={0.85}>
-                          <Image source={{ uri: thumbUrl }} style={styles.pubThumb} />
-                        </TouchableOpacity>
-                      ) : (
-                        <LinearGradient
-                          colors={[accent + 'AA', accent + '55']}
-                          style={[styles.pubThumb, { alignItems: 'center', justifyContent: 'center' }]}
-                        >
-                          <Icon name={typeIcon} size={28} color="rgba(255,255,255,0.6)" />
-                        </LinearGradient>
-                      )}
-                      {/* Body */}
-                      <View style={styles.pubBody}>
-                        <View style={[styles.pubTypeBadge, { backgroundColor: accent + '18' }]}>
-                          <Icon name={typeIcon} size={10} color={accent} />
-                          <Text style={[styles.pubTypeText, { color: accent }]}>{typeLabel}</Text>
-                        </View>
-                        <Text style={[styles.pubTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-                          {title}
-                        </Text>
-                        {desc ? (
-                          <Text style={[styles.pubDesc, { color: colors.textSecondary }]} numberOfLines={2}>
-                            {desc}
-                          </Text>
-                        ) : null}
-                        <View style={styles.pubMeta}>
-                          {date ? (
-                            <View style={styles.pubMetaItem}>
-                              <Icon name="calendar" size={11} color={colors.textTertiary} />
-                              <Text style={[styles.pubMetaText, { color: colors.textTertiary }]}>{formatDate(date)}</Text>
-                            </View>
-                          ) : null}
-                          {city ? (
-                            <View style={styles.pubMetaItem}>
-                              <Icon name="map-pin" size={11} color={colors.textTertiary} />
-                              <Text style={[styles.pubMetaText, { color: colors.textTertiary }]}>{city}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-                      </View>
-                    </TouchableOpacity>
+                    />
                   </Animated.View>
-                );
-              })
+                ))}
+
+                {/* ── Événements & Concerts ── */}
+                {publications.length > 0 && (
+                  <>
+                    {userPosts.length > 0 && (
+                      <View style={[styles.sectionDivider, { backgroundColor: colors.divider }]} />
+                    )}
+                    {publications.map((pub, idx) => {
+                      const isEvent = pub.kind === 'event';
+                      const item = pub.data as any;
+                      const thumbUrl = item.thumbnail_url ?? item.banner_url;
+                      const date = isEvent ? item.starts_at : item.scheduled_at;
+                      const city = item.venue_city;
+                      const typeIcon = isEvent ? 'calendar' : 'music';
+                      const typeLabel = isEvent ? 'Événement' : 'Concert';
+                      const accent = isEvent ? '#E0389A' : '#7B3FF2';
+                      return (
+                        <Animated.View key={`${pub.kind}-${item.id}`} entering={FadeInDown.delay((userPosts.length + idx) * 40).springify()}>
+                          <TouchableOpacity
+                            style={[styles.pubCard, { backgroundColor: colors.surfaceElevated }]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
+                              else navigation.navigate('ConcertDetail', { concertId: item.id });
+                            }}
+                          >
+                            {thumbUrl ? (
+                              <Image source={{ uri: thumbUrl }} style={styles.pubThumb} />
+                            ) : (
+                              <LinearGradient
+                                colors={[accent + 'AA', accent + '55']}
+                                style={[styles.pubThumb, { alignItems: 'center', justifyContent: 'center' }]}
+                              >
+                                <Icon name={typeIcon} size={28} color="rgba(255,255,255,0.6)" />
+                              </LinearGradient>
+                            )}
+                            <View style={styles.pubBody}>
+                              <View style={[styles.pubTypeBadge, { backgroundColor: accent + '18' }]}>
+                                <Icon name={typeIcon} size={10} color={accent} />
+                                <Text style={[styles.pubTypeText, { color: accent }]}>{typeLabel}</Text>
+                              </View>
+                              <Text style={[styles.pubTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+                                {item.title}
+                              </Text>
+                              {item.description ? (
+                                <Text style={[styles.pubDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+                                  {item.description}
+                                </Text>
+                              ) : null}
+                              <View style={styles.pubMeta}>
+                                {date ? (
+                                  <View style={styles.pubMetaItem}>
+                                    <Icon name="calendar" size={11} color={colors.textTertiary} />
+                                    <Text style={[styles.pubMetaText, { color: colors.textTertiary }]}>{formatDate(date)}</Text>
+                                  </View>
+                                ) : null}
+                                {city ? (
+                                  <View style={styles.pubMetaItem}>
+                                    <Icon name="map-pin" size={11} color={colors.textTertiary} />
+                                    <Text style={[styles.pubMetaText, { color: colors.textTertiary }]}>{city}</Text>
+                                  </View>
+                                ) : null}
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        </Animated.View>
+                      );
+                    })}
+                  </>
+                )}
+              </>
             )}
           </View>
         ) : !isPrivateProfile && activeTab === 'reels' ? (
@@ -862,6 +890,8 @@ const styles = StyleSheet.create({
   },
   privateTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
   privateSubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+
+  sectionDivider: { height: 8, marginVertical: 8 },
 
   // Note confidentialité dans About
   privacyNote: {

@@ -28,6 +28,11 @@ export const postService = {
     await apiClient.delete(Endpoints.posts.byId(id));
   },
 
+  async getByUser(userId: string, page = 1, limit = 20): Promise<Post[]> {
+    const res = await apiClient.get<Post[]>(`${Endpoints.posts.byUser(userId)}?page=${page}&limit=${limit}`);
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
   async react(id: string, type: 'like' | 'dislike'): Promise<{ action: string; reaction_type: string }> {
     const res = await apiClient.post<{ action: string; reaction_type: string }>(
       `${Endpoints.posts.react(id)}?reaction_type=${type}`

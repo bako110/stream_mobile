@@ -18,6 +18,7 @@ export const Endpoints = {
     qrGenerate:     `${V1}/auth/qr/generate`,
     qrVerify:       `${V1}/auth/qr/verify`,
     qrStatus:       (token: string) => `${V1}/auth/qr/status/${token}`,
+    webQrScan:      `${V1}/auth/web-qr/scan`,
   },
 
   // ── Users (prefix: /api/v1/users) ─────────────────────────────────────────
@@ -160,6 +161,7 @@ export const Endpoints = {
     feed:    `${V1}/posts/feed`,
     create:  `${V1}/posts`,
     byId:    (id: string) => `${V1}/posts/${id}`,
+    byUser:  (userId: string) => `${V1}/posts/user/${userId}`,
     react:   (id: string) => `${V1}/posts/${id}/react`,
     update:  (id: string) => `${V1}/posts/${id}`,
   },

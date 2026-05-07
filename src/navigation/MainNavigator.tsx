@@ -61,6 +61,7 @@ import CreatorDashboardScreen from '../screens/Wallet/CreatorDashboardScreen';
 import WithdrawScreen         from '../screens/Wallet/WithdrawScreen';
 import TransferScreen         from '../screens/Wallet/TransferScreen';
 import BoostScreen            from '../screens/Wallet/BoostScreen';
+import { WebQRScannerScreen } from '../screens/Auth/WebQRScannerScreen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ export type MainStackParamList = {
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
   Boost:                undefined;
   AdminVerification:    undefined;
+  WebQRScanner:         undefined;
 };
 
 type MainNav = NativeStackNavigationProp<MainStackParamList>;
@@ -138,7 +140,7 @@ const LiveViewerWrapper: React.FC<any>     = ({ navigation, route }) => <LiveVie
 const CreateEventWrapper: React.FC<any>    = ({ navigation, route }) => <CreateEventScreen eventId={route.params?.eventId} onBack={() => navigation.goBack()} />;
 const CreateConcertWrapper: React.FC<any>  = ({ navigation, route }) => <CreateConcertScreen concertId={route.params?.concertId} onBack={() => navigation.goBack()} />;
 const CreatePostWrapper: React.FC<any>     = ({ navigation }) => <CreatePostScreen onBack={() => navigation.goBack()} onPostCreated={() => navigation.goBack()} />;
-const PostDetailWrapper: React.FC<any>     = ({ navigation, route }) => <PostDetailScreen postId={route.params.postId} onBack={() => navigation.goBack()} onAuthorPress={(userId: string) => navigation.navigate('UserProfile', { userId })} />;
+const PostDetailWrapper: React.FC<any>     = ({ navigation, route }) => <PostDetailScreen postId={route.params.postId} onBack={() => navigation.goBack()} onAuthorPress={(userId: string) => navigation.navigate('UserProfile', { userId })} navigation={navigation} />;
 
 // ── ProfileScreen wrapper ─────────────────────────────────────────────────────
 
@@ -240,6 +242,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Boost"             component={BoostScreen}             options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="AdminVerification" component={AdminVerificationScreen}  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="WebQRScanner"      component={WebQRScannerScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       </Stack.Navigator>
     </>
   );

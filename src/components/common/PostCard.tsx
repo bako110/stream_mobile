@@ -10,6 +10,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import type { AppColors } from '../../theme/colors';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
+import { CommentsBottomSheet } from './CommentsBottomSheet';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GRID_H  = SCREEN_W * 0.55;
@@ -26,7 +27,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ urls, onPressImage }) => {
 
   if (n === 1) {
     return (
-      <TouchableOpacity activeOpacity={0.95} onPress={() => onPressImage?.(0)}>
+      <TouchableOpacity activeOpacity={0.92} onPress={() => onPressImage?.(0)}>
         <Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 4 / 3 }} resizeMode="cover" />
       </TouchableOpacity>
     );
@@ -36,7 +37,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ urls, onPressImage }) => {
     return (
       <View style={{ flexDirection: 'row', height: GRID_H }}>
         {urls.map((uri, i) => (
-          <TouchableOpacity key={i} activeOpacity={0.95} style={{ flex: 1, marginLeft: i === 1 ? 2 : 0 }} onPress={() => onPressImage?.(i)}>
+          <TouchableOpacity key={i} activeOpacity={0.92} style={{ flex: 1, marginLeft: i === 1 ? 2 : 0 }} onPress={() => onPressImage?.(i)}>
             <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
           </TouchableOpacity>
         ))}
@@ -47,12 +48,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ urls, onPressImage }) => {
   if (n === 3) {
     return (
       <View style={{ flexDirection: 'row', height: GRID_H }}>
-        <TouchableOpacity activeOpacity={0.95} style={{ flex: 1 }} onPress={() => onPressImage?.(0)}>
+        <TouchableOpacity activeOpacity={0.92} style={{ flex: 1 }} onPress={() => onPressImage?.(0)}>
           <Image source={{ uri: urls[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 2 }}>
           {[1, 2].map(i => (
-            <TouchableOpacity key={i} activeOpacity={0.95} style={{ flex: 1, marginTop: i === 2 ? 2 : 0 }} onPress={() => onPressImage?.(i)}>
+            <TouchableOpacity key={i} activeOpacity={0.92} style={{ flex: 1, marginTop: i === 2 ? 2 : 0 }} onPress={() => onPressImage?.(i)}>
               <Image source={{ uri: urls[i] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
             </TouchableOpacity>
           ))}
@@ -69,7 +70,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ urls, onPressImage }) => {
       {shown.map((uri, i) => (
         <TouchableOpacity
           key={i}
-          activeOpacity={0.95}
+          activeOpacity={0.92}
           style={{ width: SCREEN_W / 2 - 1, height: HALF_H, marginLeft: i % 2 === 1 ? 2 : 0, marginTop: i >= 2 ? 2 : 0 }}
           onPress={() => onPressImage?.(i)}
         >
@@ -109,14 +110,16 @@ export const PostCard: React.FC<PostCardProps> = ({
   const name     = author?.display_name ?? author?.username ?? 'Utilisateur';
   const initials = name[0]?.toUpperCase() ?? '?';
 
-  const [liked,         setLiked]         = useState(post.user_reaction === 'like');
-  const [likeCount,     setLikeCount]     = useState(post.like_count);
-  const [bodyExpanded,  setBodyExpanded]  = useState(false);
-  const [bodyTruncated, setBodyTruncated] = useState(false);
-  const [editOpen,      setEditOpen]      = useState(false);
-  const [editBody,      setEditBody]      = useState(post.body ?? '');
-  const [editSaving,    setEditSaving]    = useState(false);
-  const [menuOpen,      setMenuOpen]      = useState(false);
+  const [liked,          setLiked]          = useState(post.user_reaction === 'like');
+  const [likeCount,      setLikeCount]      = useState(post.like_count);
+  const [commentCount,   setCommentCount]   = useState(post.comment_count ?? 0);
+  const [bodyExpanded,   setBodyExpanded]   = useState(false);
+  const [bodyTruncated,  setBodyTruncated]  = useState(false);
+  const [editOpen,       setEditOpen]       = useState(false);
+  const [editBody,       setEditBody]       = useState(post.body ?? '');
+  const [editSaving,     setEditSaving]     = useState(false);
+  const [menuOpen,       setMenuOpen]       = useState(false);
+  const [commentsOpen,   setCommentsOpen]   = useState(false);
 
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
@@ -166,13 +169,15 @@ export const PostCard: React.FC<PostCardProps> = ({
     finally { setEditSaving(false); }
   };
 
+  const images = post.image_urls && post.image_urls.length > 0
+    ? post.image_urls
+    : post.image_url
+      ? [post.image_url]
+      : [];
+
   return (
-    // Toute la carte est cliquable → PostDetail
-    <TouchableOpacity
-      activeOpacity={1}
-      onPress={() => { if (menuOpen) { setMenuOpen(false); return; } onPress(); }}
-      style={[pc.card, { backgroundColor: colors.surface }]}
-    >
+    <View style={[pc.card, { backgroundColor: colors.surface }]}>
+
       {/* ── Header ── */}
       <View style={pc.header}>
         <TouchableOpacity
@@ -244,38 +249,37 @@ export const PostCard: React.FC<PostCardProps> = ({
         </Text>
       ) : null}
 
-      {/* Body */}
+      {/* Body — cliquable pour aller au détail */}
       {post.body ? (
-        <View style={pc.bodyWrap}>
-          <Text
-            style={[pc.body, { color: colors.textPrimary }]}
-            numberOfLines={bodyExpanded ? undefined : 4}
-            onTextLayout={e => {
-              if (!bodyExpanded && e.nativeEvent.lines.length > 4) setBodyTruncated(true);
-            }}
-          >
-            {post.body}
-          </Text>
-          {bodyTruncated && !bodyExpanded && (
-            <TouchableOpacity onPress={() => setBodyExpanded(true)}>
-              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 2 }}>
-                Lire la suite
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
+          <View style={pc.bodyWrap}>
+            <Text
+              style={[pc.body, { color: colors.textPrimary }]}
+              numberOfLines={bodyExpanded ? undefined : 4}
+              onTextLayout={e => {
+                if (!bodyExpanded && e.nativeEvent.lines.length > 4) setBodyTruncated(true);
+              }}
+            >
+              {post.body}
+            </Text>
+            {bodyTruncated && !bodyExpanded && (
+              <TouchableOpacity onPress={() => setBodyExpanded(true)}>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 2 }}>
+                  Lire la suite
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
       ) : null}
 
-      {/* Images */}
-      {(post.image_urls && post.image_urls.length > 0)
-        ? <ImageGrid urls={post.image_urls} />
-        : post.image_url
-          ? <Image source={{ uri: post.image_url }} style={pc.image} resizeMode="cover" />
-          : null
-      }
+      {/* Images — clic → PostDetail */}
+      {images.length > 0 && (
+        <ImageGrid urls={images} onPressImage={() => onPress()} />
+      )}
 
       {/* Compteurs */}
-      {(likeCount > 0 || post.comment_count > 0) && (
+      {(likeCount > 0 || commentCount > 0) && (
         <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -285,16 +289,19 @@ export const PostCard: React.FC<PostCardProps> = ({
               <Text style={{ fontSize: 13, color: colors.textTertiary }}>{likeCount}</Text>
             </View>
           )}
-          {post.comment_count > 0 && (
-            <Text style={{ fontSize: 13, color: colors.textTertiary, marginLeft: 'auto' }}>
-              {post.comment_count} commentaire{post.comment_count > 1 ? 's' : ''}
-            </Text>
+          {commentCount > 0 && (
+            <TouchableOpacity onPress={() => setCommentsOpen(true)} style={{ marginLeft: 'auto' as any }}>
+              <Text style={{ fontSize: 13, color: colors.textTertiary }}>
+                {commentCount} commentaire{commentCount > 1 ? 's' : ''}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       )}
 
-      {/* Barre sociale — stopPropagation pour ne pas déclencher onPress de la carte */}
+      {/* Barre sociale */}
       <View style={[pc.socialBar, { borderTopColor: colors.divider }]}>
+        {/* J'aime */}
         <TouchableOpacity style={pc.socialBtn} onPress={handleLike} activeOpacity={0.8}>
           <Animated.View style={heartStyle}>
             <Icon name="heart" size={18} color={liked ? '#E0389A' : colors.textTertiary} />
@@ -304,13 +311,15 @@ export const PostCard: React.FC<PostCardProps> = ({
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={pc.socialBtn} onPress={onPress} activeOpacity={0.8}>
+        {/* Commenter — ouvre le bottom sheet */}
+        <TouchableOpacity style={pc.socialBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
           <Icon name="message-circle" size={18} color={colors.textTertiary} />
           <Text style={[pc.socialBtnText, { color: colors.textTertiary }]}>
-            {post.comment_count > 0 ? String(post.comment_count) : 'Commenter'}
+            {commentCount > 0 ? String(commentCount) : 'Commenter'}
           </Text>
         </TouchableOpacity>
 
+        {/* Partager */}
         <TouchableOpacity style={pc.socialBtn} onPress={handleShare} activeOpacity={0.8}>
           <Icon name="share-2" size={18} color={colors.textTertiary} />
           <Text style={[pc.socialBtnText, { color: colors.textTertiary }]}>Partager</Text>
@@ -318,6 +327,14 @@ export const PostCard: React.FC<PostCardProps> = ({
       </View>
 
       <View style={{ height: 8, backgroundColor: colors.backgroundSecondary }} />
+
+      {/* Bottom sheet commentaires */}
+      <CommentsBottomSheet
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        postId={post.id}
+        onCommentCountChange={delta => setCommentCount(c => Math.max(0, c + delta))}
+      />
 
       {/* Modal édition */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
@@ -351,7 +368,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -364,7 +381,6 @@ const pc = StyleSheet.create({
   feeling:       { paddingHorizontal: 14, paddingBottom: 6, fontSize: 13, fontStyle: 'italic' },
   bodyWrap:      { paddingHorizontal: 14, paddingBottom: 10 },
   body:          { fontSize: 15, lineHeight: 22 },
-  image:         { width: '100%', aspectRatio: 1 / 0.88 },
   countsRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   socialBar:     { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth },
   socialBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },
