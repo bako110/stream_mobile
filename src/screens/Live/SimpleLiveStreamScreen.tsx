@@ -38,13 +38,23 @@ interface ChatMsg {
   isJoin?: boolean;
 }
 
-// ── Caméra locale (full-screen) ───────────────────────────────────────────────
+// ── Zone vidéo host : local en spotlight + viewers en vignettes ───────────────
 
-const LocalCameraView: React.FC<{ mirror: boolean }> = ({ mirror }) => {
+const HostMultiVideoView: React.FC<{ mirror: boolean }> = ({ mirror }) => {
   const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
-  const camTrack = allTracks.find(t => t.participant.isLocal) ?? null;
+  const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
-  if (!camTrack) {
+  const activeTracks = allTracks.filter(t => !t.publication?.isMuted);
+  const localTrack   = activeTracks.find(t => t.participant.isLocal) ?? null;
+
+  // Spotlight : local par défaut, un viewer si sélectionné
+  const spotlightTrack = activeTracks.find(t => t.participant.identity === spotlightId) ?? localTrack ?? activeTracks[0] ?? null;
+  const thumbnailTracks = activeTracks.filter(t => t !== spotlightTrack);
+
+  // PiP local visible quand un viewer est en spotlight
+  const showLocalPip = spotlightTrack && !spotlightTrack.participant.isLocal && localTrack;
+
+  if (!localTrack && activeTracks.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, st.noVideo]}>
         <ActivityIndicator size="large" color="#F0365A" />
@@ -52,7 +62,53 @@ const LocalCameraView: React.FC<{ mirror: boolean }> = ({ mirror }) => {
       </View>
     );
   }
-  return <VideoTrack trackRef={camTrack} style={StyleSheet.absoluteFill} mirror={mirror} />;
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      {/* Spotlight plein écran */}
+      {spotlightTrack && (
+        <VideoTrack
+          trackRef={spotlightTrack}
+          style={StyleSheet.absoluteFill}
+          mirror={spotlightTrack.participant.isLocal ? mirror : false}
+          objectFit="cover"
+        />
+      )}
+
+      {/* PiP du host quand un viewer est en spotlight */}
+      {showLocalPip && localTrack && (
+        <TouchableOpacity
+          style={mv.pip}
+          onPress={() => setSpotlightId(null)}
+          activeOpacity={0.85}
+        >
+          <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} mirror={mirror} objectFit="cover" />
+          <View style={mv.pipLabel}><Text style={mv.pipLabelText}>Toi</Text></View>
+        </TouchableOpacity>
+      )}
+
+      {/* Vignettes des viewers avec caméra active */}
+      {thumbnailTracks.length > 0 && (
+        <View style={mv.thumbnailsCol}>
+          {thumbnailTracks.map(t => (
+            <TouchableOpacity
+              key={t.participant.identity}
+              style={mv.thumbnail}
+              onPress={() => setSpotlightId(t.participant.identity)}
+              activeOpacity={0.8}
+            >
+              <VideoTrack trackRef={t} style={StyleSheet.absoluteFill} objectFit="cover" />
+              <View style={mv.thumbnailLabel}>
+                <Text style={mv.thumbnailLabelText} numberOfLines={1}>
+                  {t.participant.name || t.participant.identity}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
 };
 
 // ── Toast d'arrivée d'un viewer ───────────────────────────────────────────────
@@ -216,12 +272,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
     >
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      {/* Caméra full-screen */}
-      {!videoOff ? <LocalCameraView mirror={camFront} /> : (
-        <View style={[StyleSheet.absoluteFill, st.noVideo]}>
-          <Icon name="video-off" size={48} color="#555" />
-        </View>
-      )}
+      {/* Zone vidéo : host en spotlight + viewers en vignettes */}
+      <HostMultiVideoView mirror={camFront} />
 
       {/* ── TOP BAR ─────────────────────────────────────────────────── */}
       <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={st.topBar}>
@@ -457,4 +509,39 @@ const st = StyleSheet.create({
   sideBtn:      { alignItems: 'center', gap: 3 },
   sideBtnLabel: { color: '#fff', fontSize: 10 },
   endBtn:       { backgroundColor: '#F0365A', borderRadius: 24, padding: 11 },
+});
+
+// ── Styles HostMultiVideoView ─────────────────────────────────────────────────
+
+const mv = StyleSheet.create({
+  pip: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 180 : 160,
+    right: 12,
+    width: 80, height: 120,
+    borderRadius: 14, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)',
+    zIndex: 15,
+  },
+  pipLabel: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 3,
+  },
+  pipLabelText: { color: '#fff', fontSize: 9, textAlign: 'center' },
+
+  thumbnailsCol: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 180 : 160,
+    left: 12, zIndex: 15, gap: 8,
+  },
+  thumbnail: {
+    width: 80, height: 120,
+    borderRadius: 14, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)',
+  },
+  thumbnailLabel: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 3, paddingHorizontal: 4,
+  },
+  thumbnailLabelText: { color: '#fff', fontSize: 9 },
 });
