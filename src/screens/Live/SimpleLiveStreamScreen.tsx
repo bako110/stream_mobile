@@ -19,13 +19,16 @@ import { Track, RoomEvent, RemoteParticipant } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import type { NativeStackNavigationProp, RouteProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { liveService } from '../../services/liveService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
+import type { GiftNotif } from '../../components/wallet/LiveGiftOverlay';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveStream'>;
@@ -149,6 +152,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   const [chatInput,  setChatInput]  = useState('');
   const [sending,    setSending]    = useState(false);
   const [joinToasts, setJoinToasts] = useState<{ id: string; name: string }[]>([]);
+  const [giftNotifs, setGiftNotifs] = useState<GiftNotif[]>([]);
 
   const chatRef  = useRef<FlatList>(null);
   const wsRef    = useRef<WebSocket | null>(null);
@@ -212,6 +216,16 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
             text:   c.body,
           }]);
           setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+        }
+        if (d.type === 'gift_received' && d.gift) {
+          const gf = d.gift;
+          setGiftNotifs(prev => [...prev, {
+            id:         gf.id ?? String(Date.now()),
+            senderName: gf.sender?.display_name ?? gf.sender?.username ?? 'Quelqu\'un',
+            emoji:      gf.gift_type?.emoji ?? '🎁',
+            giftName:   gf.gift_type?.name ?? 'Cadeau',
+            coins:      gf.coins_spent ?? 0,
+          }]);
         }
       } catch {}
     };
@@ -393,6 +407,15 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           <Text style={st.sideBtnLabel}>Fin</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Cadeaux live — host reçoit, les viewers envoient */}
+      <LiveGiftOverlay
+        liveId={liveId}
+        receiverId={localParticipant.identity}
+        receiverName={localParticipant.name || 'Moi'}
+        incomingNotifs={giftNotifs}
+        onNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
+      />
     </KeyboardAvoidingView>
   );
 };

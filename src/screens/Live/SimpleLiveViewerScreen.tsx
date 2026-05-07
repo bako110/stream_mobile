@@ -30,6 +30,8 @@ import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
+import type { GiftNotif } from '../../components/wallet/LiveGiftOverlay';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveViewer'>;
@@ -136,7 +138,9 @@ const RoomContent: React.FC<{
   chatRef: React.RefObject<FlatList>;
   onSend: () => void;
   onLeave: () => void;
-}> = ({ live, liveId, viewerCount, messages, chatInput, setChatInput, sending, showChat, setShowChat, chatRef, onSend, onLeave }) => {
+  giftNotifs: GiftNotif[];
+  onGiftNotifShown: (id: string) => void;
+}> = ({ live, liveId, viewerCount, messages, chatInput, setChatInput, sending, showChat, setShowChat, chatRef, onSend, onLeave, giftNotifs, onGiftNotifShown }) => {
   const { localParticipant } = useLocalParticipant();
   const [camOn, setCamOn] = useState(false);
   const [micOn, setMicOn] = useState(false);
@@ -254,6 +258,15 @@ const RoomContent: React.FC<{
       <TouchableOpacity style={st.toggleChatBtn} onPress={() => setShowChat(!showChat)}>
         <Icon name="message-circle" size={20} color="#fff" />
       </TouchableOpacity>
+
+      {/* Cadeaux live */}
+      <LiveGiftOverlay
+        liveId={liveId}
+        receiverId={live?.user_id ?? ''}
+        receiverName={live?.user?.display_name ?? live?.user?.username ?? 'Host'}
+        incomingNotifs={giftNotifs}
+        onNotifShown={onGiftNotifShown}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -275,6 +288,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [chatInput,   setChatInput]   = useState('');
   const [sending,     setSending]     = useState(false);
   const [showChat,    setShowChat]    = useState(true);
+  const [giftNotifs,  setGiftNotifs]  = useState<GiftNotif[]>([]);
 
   const chatRef = useRef<FlatList>(null);
   const wsRef   = useRef<WebSocket | null>(null);
@@ -327,6 +341,16 @@ export const SimpleLiveViewerScreen: React.FC = () => {
             text:   c.body,
           }]);
           setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+        }
+        if (d.type === 'gift_received' && d.gift) {
+          const gf = d.gift;
+          setGiftNotifs(prev => [...prev, {
+            id:         gf.id ?? String(Date.now()),
+            senderName: gf.sender?.display_name ?? gf.sender?.username ?? 'Quelqu\'un',
+            emoji:      gf.gift_type?.emoji ?? '🎁',
+            giftName:   gf.gift_type?.name ?? 'Cadeau',
+            coins:      gf.coins_spent ?? 0,
+          }]);
         }
       } catch {}
     };
@@ -399,6 +423,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         chatRef={chatRef}
         onSend={sendChat}
         onLeave={handleLeave}
+        giftNotifs={giftNotifs}
+        onGiftNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
       />
     </LiveKitRoom>
   );
