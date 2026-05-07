@@ -16,7 +16,6 @@ import { Track } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { useTheme } from '../../hooks/useTheme';
 import { concertService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -121,7 +120,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   // WS chat dédié — réception uniquement via /social/comments/ws/concert/{id}
   useEffect(() => {
     if (!token) return;
-    const accessToken = storage.getString(STORAGE_KEYS.ACCESS_TOKEN);
+    const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken) return;
     const ws = new WebSocket(`${WS_BASE_URL}/api/v1/social/comments/ws/concert/${concertId}?token=${accessToken}`);
     wsRef.current = ws;

@@ -118,7 +118,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 
   // WS chat — réception uniquement
   useEffect(() => {
-    const accessToken = storage.getString(STORAGE_KEYS.ACCESS_TOKEN);
+    const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken || !token) return;
     const ws = new WebSocket(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}?token=${accessToken}`);
     wsRef.current = ws;

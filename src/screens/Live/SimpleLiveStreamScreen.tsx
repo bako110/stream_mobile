@@ -140,11 +140,15 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
 
   // WS — réception des commentaires (comment_added)
   useEffect(() => {
-    const accessToken = storage.getString(STORAGE_KEYS.ACCESS_TOKEN);
+    if (!liveId) return;
+    const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken) return;
-    const ws = new WebSocket(
-      `${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}?token=${accessToken}`
-    );
+    if (typeof WebSocket === 'undefined') return;
+    const url = `${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}?token=${accessToken}`;
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+    } catch { return; }
     wsRef.current = ws;
     ws.onmessage = (e) => {
       try {
@@ -164,7 +168,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
     const ping = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
     }, 25_000);
-    return () => { clearInterval(ping); ws.close(); };
+    return () => { clearInterval(ping); try { ws.close(); } catch {} };
   }, [liveId]);
 
   const sendChat = useCallback(async () => {
