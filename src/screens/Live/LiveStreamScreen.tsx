@@ -1,5 +1,5 @@
 /**
- * LiveStreamScreen — Diffusion live artiste via LiveKit SDK.
+ * LiveStreamScreen — Diffusion live concert artiste via LiveKit SDK.
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
@@ -9,14 +9,13 @@ import {
 import {
   LiveKitRoom,
   useLocalParticipant,
-  useParticipantTracks,
+  useTracks,
   VideoTrack,
 } from '@livekit/react-native';
 import { Track } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { useTheme } from '../../hooks/useTheme';
 import { concertService } from '../../services';
 import type { Concert } from '../../types';
 
@@ -25,22 +24,25 @@ interface Props {
   onBack?: () => void;
 }
 
-// ── Inner component (inside LiveKitRoom) ─────────────────────────────────────
-// ── Aperçu caméra locale ─────────────────────────────────────────────────────
+// ── Aperçu caméra locale ──────────────────────────────────────────────────────
+// Composant séparé pour que useTracks déclenche son propre re-render
+// dès que setCameraEnabled(true) publie le track local.
 
 const LocalCameraPreview: React.FC<{ mirror: boolean }> = ({ mirror }) => {
-  const { localParticipant } = useLocalParticipant();
-  const tracks = useParticipantTracks([Track.Source.Camera], localParticipant.identity);
-  const camTrack = tracks[0] ?? null;
+  const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  const camTrack = allTracks.find(t => t.participant.isLocal) ?? null;
+
   if (!camTrack) {
     return (
-      <View style={[styles.fullVideo, styles.noVideo]}>
+      <View style={[StyleSheet.absoluteFill, styles.noVideo]}>
         <Icon name="video-off" size={48} color="#666" />
       </View>
     );
   }
-  return <VideoTrack trackRef={camTrack} style={styles.fullVideo} mirror={mirror} />;
+  return <VideoTrack trackRef={camTrack} style={StyleSheet.absoluteFill} mirror={mirror} />;
 };
+
+// ── Contrôles live ─────────────────────────────────────────────────────────────
 
 const StreamControls: React.FC<{
   concert: Concert | null;
@@ -48,13 +50,13 @@ const StreamControls: React.FC<{
   onEnd: () => void;
 }> = ({ concert, concertId, onEnd }) => {
   const { localParticipant } = useLocalParticipant();
-  const [muted, setMuted] = useState(false);
-  const [videoOff, setVideoOff] = useState(false);
+  const [muted,       setMuted]       = useState(false);
+  const [videoOff,    setVideoOff]    = useState(false);
   const [cameraFront, setCameraFront] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed,     setElapsed]     = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     localParticipant.setCameraEnabled(true).catch(() => {});
@@ -67,11 +69,11 @@ const StreamControls: React.FC<{
         const s = await concertService.getStreamStatus(concertId);
         setViewerCount(s.current_viewers ?? 0);
       } catch {}
-    }, 10000);
+    }, 10_000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current)  clearInterval(pollRef.current);
       localParticipant.setCameraEnabled(false).catch(() => {});
       localParticipant.setMicrophoneEnabled(false).catch(() => {});
     };
@@ -89,10 +91,16 @@ const StreamControls: React.FC<{
     setVideoOff(next);
   }, [videoOff, localParticipant]);
 
-  const flipCamera = useCallback(() => {
+  // Flip caméra : setCameraEnabled(false) + republier avec facingMode inversé
+  const flipCamera = useCallback(async () => {
     const next = !cameraFront;
     setCameraFront(next);
-    localParticipant.switchActiveDevice('videoinput', next ? 'user' : 'environment').catch(() => {});
+    try {
+      await localParticipant.setCameraEnabled(false);
+      await localParticipant.setCameraEnabled(true, {
+        facingMode: next ? 'user' : 'environment',
+      });
+    } catch {}
   }, [cameraFront, localParticipant]);
 
   const handleEndLive = useCallback(() => {
@@ -115,11 +123,10 @@ const StreamControls: React.FC<{
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      {/* Aperçu caméra — composant réactif séparé */}
       {!videoOff ? (
         <LocalCameraPreview mirror={cameraFront} />
       ) : (
-        <View style={[styles.fullVideo, styles.noVideo]}>
+        <View style={[StyleSheet.absoluteFill, styles.noVideo]}>
           <Icon name="video-off" size={48} color="#666" />
         </View>
       )}
@@ -129,7 +136,6 @@ const StreamControls: React.FC<{
         <TouchableOpacity onPress={handleEndLive} style={styles.backBtn}>
           <Icon name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
-
         <View style={styles.topCenter}>
           <View style={styles.liveBadge}>
             <View style={styles.liveDot} />
@@ -137,14 +143,12 @@ const StreamControls: React.FC<{
           </View>
           <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
         </View>
-
         <View style={styles.viewerBadge}>
           <Icon name="eye" size={14} color="#fff" />
           <Text style={styles.viewerText}>{viewerCount}</Text>
         </View>
       </LinearGradient>
 
-      {/* Concert title */}
       {concert && (
         <View style={styles.titleBar}>
           <Text style={styles.concertTitle} numberOfLines={1}>{concert.title}</Text>
@@ -158,17 +162,14 @@ const StreamControls: React.FC<{
             <Icon name={muted ? 'mic-off' : 'mic'} size={22} color="#fff" />
             <Text style={styles.controlLabel}>{muted ? 'Unmute' : 'Mute'}</Text>
           </TouchableOpacity>
-
           <TouchableOpacity onPress={toggleVideo} style={styles.controlBtn}>
             <Icon name={videoOff ? 'video-off' : 'video'} size={22} color="#fff" />
             <Text style={styles.controlLabel}>{videoOff ? 'Cam On' : 'Cam Off'}</Text>
           </TouchableOpacity>
-
           <TouchableOpacity onPress={flipCamera} style={styles.controlBtn}>
             <Icon name="refresh-cw" size={22} color="#fff" />
             <Text style={styles.controlLabel}>Flip</Text>
           </TouchableOpacity>
-
           <TouchableOpacity onPress={handleEndLive} style={[styles.controlBtn, styles.endBtn]}>
             <Icon name="square" size={22} color="#fff" />
             <Text style={styles.controlLabel}>End</Text>
@@ -180,27 +181,23 @@ const StreamControls: React.FC<{
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
+
 export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const nav = useNavigation();
-  const [concert, setConcert] = useState<Concert | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [wsUrl, setWsUrl] = useState<string | null>(null);
+  const [concert,  setConcert]  = useState<Concert | null>(null);
+  const [token,    setToken]    = useState<string | null>(null);
+  const [wsUrl,    setWsUrl]    = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const [isLive, setIsLive] = useState(false);
+  const [isLive,   setIsLive]   = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const data = await concertService.getById(concertId);
         setConcert(data);
-        // Si le concert est déjà en live, récupérer un token publisher pour rejoindre
         if (data.status === 'live') {
-          try {
-            const result = await concertService.getStreamToken(concertId);
-            setToken(result.token);
-            setWsUrl(result.livekit_url);
-            setIsLive(true);
-          } catch {}
+          const result = await concertService.getStreamToken(concertId).catch(() => null);
+          if (result) { setToken(result.token); setWsUrl(result.livekit_url); setIsLive(true); }
         }
       } catch {}
     })();
@@ -231,8 +228,7 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
     try { await concertService.endLive(concertId); } catch {}
     setIsLive(false);
     setToken(null);
-    if (onBack) onBack();
-    else nav.goBack();
+    if (onBack) onBack(); else nav.goBack();
   }, [concertId, nav, onBack]);
 
   if (isLive && token && wsUrl) {
@@ -243,7 +239,6 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
     );
   }
 
-  // Pre-live screen
   return (
     <View style={[styles.container, styles.preLive]}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
@@ -273,19 +268,18 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  preLive: { justifyContent: 'center', alignItems: 'center', gap: 16, paddingHorizontal: 32 },
-  preTitle: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center', marginTop: 12 },
-  preSub: { color: '#999', fontSize: 15 },
+  preLive:   { justifyContent: 'center', alignItems: 'center', gap: 16, paddingHorizontal: 32 },
+  preTitle:  { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center', marginTop: 12 },
+  preSub:    { color: '#999', fontSize: 15 },
   goLiveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#E53E3E', borderRadius: 30,
     paddingVertical: 14, paddingHorizontal: 40, gap: 8, marginTop: 8,
   },
   goLiveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  disabledBtn: { opacity: 0.6 },
-  cancelBtn: { marginTop: 4 },
-  cancelText: { color: '#999', fontSize: 15 },
-  fullVideo: { ...StyleSheet.absoluteFillObject },
+  disabledBtn:   { opacity: 0.6 },
+  cancelBtn:     { marginTop: 4 },
+  cancelText:    { color: '#999', fontSize: 15 },
   noVideo: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
   topOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0,
@@ -294,15 +288,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     zIndex: 10,
   },
-  backBtn: { padding: 8 },
+  backBtn:   { padding: 8 },
   topCenter: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   liveBadge: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#E53E3E', borderRadius: 4,
     paddingHorizontal: 8, paddingVertical: 3,
   },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff', marginRight: 5 },
-  liveText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  liveDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff', marginRight: 5 },
+  liveText:  { color: '#fff', fontWeight: '700', fontSize: 12 },
   timerText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   viewerBadge: {
     flexDirection: 'row', alignItems: 'center',
@@ -311,7 +305,8 @@ const styles = StyleSheet.create({
   },
   viewerText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   titleBar: {
-    position: 'absolute', top: Platform.OS === 'ios' ? 100 : 80,
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 100 : 80,
     left: 16, right: 16, zIndex: 10,
   },
   concertTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
@@ -320,8 +315,8 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     paddingTop: 40, paddingHorizontal: 16, zIndex: 10,
   },
-  controls: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-  controlBtn: { alignItems: 'center', gap: 4 },
+  controls:     { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+  controlBtn:   { alignItems: 'center', gap: 4 },
   controlLabel: { color: '#fff', fontSize: 11 },
-  endBtn: { backgroundColor: '#E53E3E', borderRadius: 24, padding: 12 },
+  endBtn:       { backgroundColor: '#E53E3E', borderRadius: 24, padding: 12 },
 });

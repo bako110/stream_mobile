@@ -10,7 +10,7 @@ import {
   LiveKitRoom,
   useRemoteParticipants,
   VideoTrack,
-  useParticipantTracks,
+  useTracks,
 } from '@livekit/react-native';
 import { Track } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
@@ -34,33 +34,35 @@ interface ChatMsg { id: string; user: string; avatar?: string | null; text: stri
 // Composant séparé avec l'identity du host pour que useParticipantTracks
 // soit réactif et re-rende automatiquement quand le track arrive.
 
-const HostVideoTrack: React.FC<{ identity: string }> = ({ identity }) => {
-  const tracks = useParticipantTracks([Track.Source.Camera], identity);
-  const track = tracks[0] ?? null;
-  if (!track) return null;
-  return <VideoTrack trackRef={track} style={StyleSheet.absoluteFill} objectFit="cover" />;
-};
-
+// RemoteVideo — utilise useTracks (RoomContext) pour voir TOUS les tracks
+// remotes, puis filtre par source Camera. Re-render automatique quand le
+// host publie ou que son track devient subscribed.
 const RemoteVideo: React.FC = () => {
   const remotes = useRemoteParticipants();
-  const host = remotes[0] ?? null;
+  // useTracks sur Camera — inclut tous les participants remote (onlySubscribed: true par défaut)
+  const allCamTracks = useTracks([Track.Source.Camera]);
+  // Prend le premier track remote (celui du host)
+  const hostTrack = allCamTracks[0] ?? null;
 
-  if (!host) {
+  if (remotes.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, st.noVideo]}>
         <ActivityIndicator size="large" color="#F0365A" />
-        <Text style={st.noVideoText}>En attente du stream...</Text>
+        <Text style={st.noVideoText}>Connexion au live...</Text>
       </View>
     );
   }
 
-  return (
-    <>
-      {/* Fond sombre pendant que le track charge */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111' }]} />
-      <HostVideoTrack identity={host.identity} />
-    </>
-  );
+  if (!hostTrack) {
+    return (
+      <View style={[StyleSheet.absoluteFill, st.noVideo]}>
+        <ActivityIndicator size="large" color="#F0365A" />
+        <Text style={st.noVideoText}>En attente de la vidéo...</Text>
+      </View>
+    );
+  }
+
+  return <VideoTrack trackRef={hostTrack} style={StyleSheet.absoluteFill} objectFit="cover" />;
 };
 
 // ── Page principale ────────────────────────────────────────────────────────────

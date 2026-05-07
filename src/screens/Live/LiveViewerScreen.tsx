@@ -10,7 +10,7 @@ import {
   LiveKitRoom,
   useRemoteParticipants,
   VideoTrack,
-  useParticipantTracks,
+  useTracks,
 } from '@livekit/react-native';
 import { Track } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
@@ -37,18 +37,12 @@ interface LiveChat {
 
 // ── Video view inside the room ────────────────────────────────────────────────
 
-const ArtistTrack: React.FC<{ identity: string }> = ({ identity }) => {
-  const tracks = useParticipantTracks([Track.Source.Camera], identity);
-  const videoTrack = tracks[0] ?? null;
-  if (!videoTrack) return null;
-  return <VideoTrack trackRef={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" />;
-};
-
 const ArtistVideoView: React.FC = () => {
   const remoteParticipants = useRemoteParticipants();
-  const artist = remoteParticipants[0] ?? null;
+  const allCamTracks = useTracks([Track.Source.Camera]);
+  const artistTrack = allCamTracks[0] ?? null;
 
-  if (!artist) {
+  if (remoteParticipants.length === 0) {
     return (
       <View style={styles.noVideoCenter}>
         <ActivityIndicator size="large" color="#E53E3E" />
@@ -57,12 +51,16 @@ const ArtistVideoView: React.FC = () => {
     );
   }
 
-  return (
-    <>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111' }]} />
-      <ArtistTrack identity={artist.identity} />
-    </>
-  );
+  if (!artistTrack) {
+    return (
+      <View style={styles.noVideoCenter}>
+        <ActivityIndicator size="large" color="#E53E3E" />
+        <Text style={styles.connectingText}>En attente de la vidéo...</Text>
+      </View>
+    );
+  }
+
+  return <VideoTrack trackRef={artistTrack} style={StyleSheet.absoluteFill} objectFit="cover" />;
 };
 
 // ── Main component ────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import {
 import {
   LiveKitRoom,
   useLocalParticipant,
-  useParticipantTracks,
+  useTracks,
   VideoTrack,
   useParticipants,
 } from '@livekit/react-native';
@@ -25,13 +25,14 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveStream'>;
 
-// ── Aperçu caméra locale (interne, contexte LK requis) ───────────────────────
+// ── Aperçu caméra locale ──────────────────────────────────────────────────────
+// useTracks({ onlySubscribed: false }) inclut les tracks locaux non-subscribed.
+// Il re-render dès que setCameraEnabled(true) publie le track.
 
 const LocalCameraView: React.FC<{ mirror: boolean }> = ({ mirror }) => {
-  const { localParticipant } = useLocalParticipant();
-  // useParticipantTracks est réactif — re-rend dès que le track apparaît
-  const tracks = useParticipantTracks([Track.Source.Camera], localParticipant.identity);
-  const camTrack = tracks[0] ?? null;
+  const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  // Filtre uniquement le track local
+  const camTrack = allTracks.find(t => t.participant.isLocal) ?? null;
 
   if (!camTrack) {
     return (
@@ -83,10 +84,15 @@ const StreamControls: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveI
     setVideoOff(next);
   }, [videoOff, localParticipant]);
 
-  const flipCam = useCallback(() => {
+  const flipCam = useCallback(async () => {
     const next = !camFront;
     setCamFront(next);
-    localParticipant.switchActiveDevice('videoinput', next ? 'user' : 'environment').catch(() => {});
+    try {
+      await localParticipant.setCameraEnabled(false);
+      await localParticipant.setCameraEnabled(true, {
+        facingMode: next ? 'user' : 'environment',
+      });
+    } catch {}
   }, [camFront, localParticipant]);
 
   const askEnd = useCallback(() => {
