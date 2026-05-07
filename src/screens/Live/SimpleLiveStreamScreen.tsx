@@ -1,9 +1,5 @@
 /**
  * SimpleLiveStreamScreen — Host du live spontané, style TikTok Live.
- * - Caméra full-screen
- * - Viewers qui rejoignent : notification toast + avatars en haut
- * - Chat temps réel via WS (comment_added)
- * - Contrôles cam/mic/flip/end
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
@@ -14,11 +10,12 @@ import {
 import {
   LiveKitRoom,
   useLocalParticipant,
+  useParticipants,
+  useRoomContext,
   useTracks,
-  useRemoteParticipants,
   VideoTrack,
 } from '@livekit/react-native';
-import { Track } from 'livekit-client';
+import { Track, RoomEvent, RemoteParticipant } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -83,28 +80,33 @@ const JoinToast: React.FC<{ name: string }> = ({ name }) => {
 
 const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId, onEnd }) => {
   const { localParticipant } = useLocalParticipant();
-  const remoteParticipants   = useRemoteParticipants();
+  const room = useRoomContext();
+  // useParticipants retourne local + remotes — on filtre les remotes
+  const allParticipants = useParticipants();
+  const remoteParticipants = allParticipants.filter(p => !p.isLocal);
 
-  const [muted,     setMuted]     = useState(false);
-  const [videoOff,  setVideoOff]  = useState(false);
-  const [camFront,  setCamFront]  = useState(true);
-  const [elapsed,   setElapsed]   = useState(0);
-  const [messages,  setMessages]  = useState<ChatMsg[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [sending,   setSending]   = useState(false);
+  const [muted,      setMuted]      = useState(false);
+  const [videoOff,   setVideoOff]   = useState(false);
+  const [camFront,   setCamFront]   = useState(true);
+  const [elapsed,    setElapsed]    = useState(0);
+  const [messages,   setMessages]   = useState<ChatMsg[]>([]);
+  const [chatInput,  setChatInput]  = useState('');
+  const [sending,    setSending]    = useState(false);
   const [joinToasts, setJoinToasts] = useState<{ id: string; name: string }[]>([]);
 
   const chatRef  = useRef<FlatList>(null);
   const wsRef    = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const prevRemoteCount = useRef(0);
 
   // Activer cam + mic au démarrage
   useEffect(() => {
     localParticipant.setCameraEnabled(true).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     const start = Date.now();
-    timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    timerRef.current = setInterval(
+      () => setElapsed(Math.floor((Date.now() - start) / 1000)),
+      1000,
+    );
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       localParticipant.setCameraEnabled(false).catch(() => {});
@@ -112,43 +114,35 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
     };
   }, [localParticipant]);
 
-  // Détecter les nouveaux viewers qui arrivent
+  // Écouter RoomEvent.ParticipantConnected — fiable car événement natif LiveKit
   useEffect(() => {
-    const current = remoteParticipants.length;
-    if (current > prevRemoteCount.current) {
-      // Quelqu'un vient d'arriver
-      const newOnes = remoteParticipants.slice(prevRemoteCount.current);
-      newOnes.forEach(p => {
-        const name = p.name || p.identity || 'Quelqu\'un';
-        const toastId = `${p.identity}-${Date.now()}`;
-        setJoinToasts(prev => [...prev, { id: toastId, name }]);
-        // Message système dans le chat
-        setMessages(prev => [...prev.slice(-149), {
-          id: toastId,
-          user: '',
-          text: `${name} a rejoint le live`,
-          isJoin: true,
-        }]);
-        // Supprimer le toast après 3s
-        setTimeout(() => {
-          setJoinToasts(prev => prev.filter(t => t.id !== toastId));
-        }, 3000);
-      });
-    }
-    prevRemoteCount.current = current;
-  }, [remoteParticipants]);
+    if (!room) return;
+    const onJoin = (participant: RemoteParticipant) => {
+      const name = participant.name || participant.identity || 'Quelqu\'un';
+      const toastId = `${participant.identity}-${Date.now()}`;
+      setJoinToasts(prev => [...prev, { id: toastId, name }]);
+      setMessages(prev => [...prev.slice(-149), {
+        id: toastId,
+        user: '',
+        text: `${name} a rejoint le live`,
+        isJoin: true,
+      }]);
+      setTimeout(() => {
+        setJoinToasts(prev => prev.filter(t => t.id !== toastId));
+      }, 3000);
+    };
+    room.on(RoomEvent.ParticipantConnected, onJoin);
+    return () => { room.off(RoomEvent.ParticipantConnected, onJoin); };
+  }, [room]);
 
   // WS — réception des commentaires (comment_added)
   useEffect(() => {
     if (!liveId) return;
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken) return;
-    if (typeof WebSocket === 'undefined') return;
     const url = `${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}?token=${accessToken}`;
     let ws: WebSocket;
-    try {
-      ws = new WebSocket(url);
-    } catch { return; }
+    try { ws = new WebSocket(url); } catch { return; }
     wsRef.current = ws;
     ws.onmessage = (e) => {
       try {
@@ -230,28 +224,23 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
       )}
 
       {/* ── TOP BAR ─────────────────────────────────────────────────── */}
-      <LinearGradient
-        colors={['rgba(0,0,0,0.7)', 'transparent']}
-        style={st.topBar}
-      >
+      <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={st.topBar}>
         <TouchableOpacity onPress={askEnd} style={st.iconBtn}>
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
 
-        {/* LIVE badge + timer */}
         <View style={st.livePill}>
           <View style={st.liveDot} />
           <Text style={st.liveText}>LIVE</Text>
           <Text style={st.timerText}>{fmt(elapsed)}</Text>
         </View>
 
-        {/* Viewers */}
         <View style={st.viewerPill}>
           <Icon name="eye" size={13} color="#fff" />
           <Text style={st.viewerText}>{viewerCount}</Text>
         </View>
 
-        {/* Avatars des 5 derniers viewers */}
+        {/* Avatars des 5 premiers viewers */}
         <View style={st.viewerAvatars}>
           {remoteParticipants.slice(0, 5).map((p, i) => (
             <View
@@ -273,9 +262,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
 
       {/* ── TOASTS d'arrivée ────────────────────────────────────────── */}
       <View style={st.toastsContainer}>
-        {joinToasts.map(t => (
-          <JoinToast key={t.id} name={t.name} />
-        ))}
+        {joinToasts.map(t => <JoinToast key={t.id} name={t.name} />)}
       </View>
 
       {/* ── CHAT (bas gauche) ───────────────────────────────────────── */}
@@ -314,7 +301,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           contentContainerStyle={{ justifyContent: 'flex-end' }}
         />
 
-        {/* Input du host pour répondre dans le chat */}
         <View style={st.chatInputRow}>
           <TextInput
             value={chatInput}
@@ -389,11 +375,10 @@ export const SimpleLiveStreamScreen: React.FC = () => {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  noVideo:   { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
+  container:   { flex: 1, backgroundColor: '#000' },
+  noVideo:     { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
   noVideoText: { color: '#888', marginTop: 12, fontSize: 13 },
 
-  // Top bar
   topBar: {
     position: 'absolute', top: 0, left: 0, right: 0,
     paddingTop: Platform.OS === 'ios' ? 54 : 36,
@@ -414,7 +399,7 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12,
     paddingHorizontal: 8, paddingVertical: 4,
   },
-  viewerText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  viewerText:    { color: '#fff', fontSize: 12, fontWeight: '700' },
   viewerAvatars: { flexDirection: 'row', alignItems: 'center', marginLeft: 4 },
   viewerAvatar: {
     width: 26, height: 26, borderRadius: 13,
@@ -424,7 +409,6 @@ const st = StyleSheet.create({
   },
   viewerAvatarText: { color: '#fff', fontSize: 10, fontWeight: '800' },
 
-  // Toasts
   toastsContainer: {
     position: 'absolute', top: Platform.OS === 'ios' ? 110 : 90,
     left: 14, zIndex: 30, gap: 4,
@@ -436,47 +420,41 @@ const st = StyleSheet.create({
   },
   joinToastText: { color: '#fff', fontSize: 12 },
 
-  // Chat area (bas gauche)
   chatArea: {
     position: 'absolute', bottom: 0, left: 0,
-    right: 100, // laisse place aux contrôles droite
+    right: 100,
     paddingBottom: Platform.OS === 'ios' ? 36 : 20,
     paddingLeft: 12, zIndex: 20,
   },
   chatList: { maxHeight: 220, marginBottom: 6 },
   chatBubble: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
-    marginBottom: 5,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 5,
   },
-  chatAvatar: { width: 24, height: 24, borderRadius: 12, marginTop: 1 },
+  chatAvatar:         { width: 24, height: 24, borderRadius: 12, marginTop: 1 },
   chatAvatarFallback: { backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' },
-  chatAvatarText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  chatAvatarText:     { color: '#fff', fontSize: 10, fontWeight: '800' },
   chatBubbleInner: {
     backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12,
     paddingHorizontal: 8, paddingVertical: 4, maxWidth: 200,
   },
-  chatUser: { color: '#F0365A', fontSize: 11, fontWeight: '700' },
-  chatText: { color: '#fff', fontSize: 13 },
-  joinMsg:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  chatUser:    { color: '#F0365A', fontSize: 11, fontWeight: '700' },
+  chatText:    { color: '#fff', fontSize: 13 },
+  joinMsg:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
   joinMsgText: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
   chatInputRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 24,
-    paddingLeft: 12, paddingRight: 4, paddingVertical: 2,
-    marginRight: 4,
+    paddingLeft: 12, paddingRight: 4, paddingVertical: 2, marginRight: 4,
   },
   chatInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 7 },
   sendBtn:   { backgroundColor: '#F0365A', borderRadius: 20, padding: 7 },
 
-  // Contrôles droite (style TikTok vertical)
   sideControls: {
     position: 'absolute', right: 12,
     bottom: Platform.OS === 'ios' ? 80 : 60,
     alignItems: 'center', gap: 16, zIndex: 20,
   },
-  sideBtn: { alignItems: 'center', gap: 3 },
+  sideBtn:      { alignItems: 'center', gap: 3 },
   sideBtnLabel: { color: '#fff', fontSize: 10 },
-  endBtn: {
-    backgroundColor: '#F0365A', borderRadius: 24, padding: 11,
-  },
+  endBtn:       { backgroundColor: '#F0365A', borderRadius: 24, padding: 11 },
 });
