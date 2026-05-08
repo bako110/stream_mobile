@@ -26,6 +26,8 @@ import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, Avata
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
+import { liveService } from '../../services/liveService';
+import type { LiveStream } from '../../services/liveService';
 import { communityService } from '../../services/communityService';
 import type { CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
@@ -125,7 +127,7 @@ export const FeedScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
-  const { addListener, removeListener } = useWs();
+  const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated } = useWs();
   const { currentUser } = useUser();
 
   const [filter,     setFilter]     = useState<FeedFilter>('all');
@@ -134,6 +136,7 @@ export const FeedScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
+  const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
   const [trendingComm,    setTrendingComm]    = useState<CommunityData[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
@@ -338,11 +341,15 @@ export const FeedScreen: React.FC = () => {
   // Recharge quand le filtre change
   useEffect(() => { setLoading(true); load(filter); }, [filter]);
 
-  // Charger les concerts en direct (une seule fois au montage)
+  // Charger les lives en direct
   const loadLive = useCallback(async () => {
     try {
-      const live = await concertService.getLive();
-      setLiveConcerts(Array.isArray(live) ? live : []);
+      const [concerts, spont] = await Promise.all([
+        concertService.getLive(),
+        liveService.getLives(),
+      ]);
+      setLiveConcerts(Array.isArray(concerts) ? concerts : []);
+      setSpontLives(Array.isArray(spont) ? spont : []);
     } catch { /* silencieux */ }
   }, []);
 
@@ -350,6 +357,31 @@ export const FeedScreen: React.FC = () => {
     loadLive();
     communityService.list(1, 8).then(data => setTrendingComm(Array.isArray(data) ? data.slice(0, 5) : [])).catch(() => {});
   }, []);
+
+  // WS : nouveau live spontané démarré
+  useEffect(() => {
+    if (!lastLiveStarted) return;
+    setSpontLives(prev => {
+      if (prev.some(l => l.id === lastLiveStarted.live.id)) return prev;
+      return [lastLiveStarted.live as LiveStream, ...prev];
+    });
+  }, [lastLiveStarted]);
+
+  // WS : live spontané terminé
+  useEffect(() => {
+    if (!lastLiveEnded) return;
+    setSpontLives(prev => prev.filter(l => l.id !== lastLiveEnded));
+  }, [lastLiveEnded]);
+
+  // WS : viewers mis à jour
+  useEffect(() => {
+    if (!lastLiveViewersUpdated) return;
+    setSpontLives(prev => prev.map(l =>
+      l.id === lastLiveViewersUpdated.live_id
+        ? { ...l, current_viewers: lastLiveViewersUpdated.current_viewers }
+        : l
+    ));
+  }, [lastLiveViewersUpdated]);
 
   // Rafraîchissement temps réel : reload quand un autre utilisateur publie
   useEffect(() => {
@@ -834,6 +866,62 @@ export const FeedScreen: React.FC = () => {
                                 )}
                                 <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }} numberOfLines={1}>{name}</Text>
                               </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* ── Lives spontanés ─────────────────────────────────── */}
+              {spontLives.length > 0 && (
+                <View style={{ marginTop: 8, marginBottom: 4 }}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 }}
+                    activeOpacity={0.7}
+                    onPress={() => nav.navigate('SimpleLiveList' as any)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>En direct</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{spontLives.length}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Voir tout</Text>
+                      <Icon name="chevron-right" size={14} color={colors.primary} />
+                    </View>
+                  </TouchableOpacity>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+                    {spontLives.map(live => {
+                      const name = live.user?.display_name ?? live.user?.username ?? 'Utilisateur';
+                      const initial = name[0]?.toUpperCase() ?? '?';
+                      return (
+                        <TouchableOpacity
+                          key={live.id}
+                          style={{ width: 110, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
+                          activeOpacity={0.85}
+                          onPress={() => nav.navigate('SimpleLiveViewer' as any, { liveId: live.id })}
+                        >
+                          <View style={{ width: 110, height: 150, position: 'relative' }}>
+                            <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={{ width: 110, height: 150, alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 40, fontWeight: '900' }}>{initial}</Text>
+                            </LinearGradient>
+                            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
+                            <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
+                              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
+                            </View>
+                            <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                              <Icon name="eye" size={9} color="#fff" />
+                              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{live.current_viewers}</Text>
+                            </View>
+                            {live.user?.avatar_url && (
+                              <Image source={{ uri: live.user.avatar_url }} style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }} />
+                            )}
+                            <View style={{ position: 'absolute', bottom: 6, left: 4, right: 4, alignItems: 'center' }}>
+                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', textAlign: 'center' }} numberOfLines={1}>{name}</Text>
                             </View>
                           </View>
                         </TouchableOpacity>
