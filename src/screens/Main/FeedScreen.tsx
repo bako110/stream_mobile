@@ -45,7 +45,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 // ── Types locaux ──────────────────────────────────────────────────────────────
 
-type FeedFilter = 'all' | 'events' | 'concerts';
+type FeedFilter = 'all' | 'events' | 'concerts' | 'posts';
 
 interface FeedItem {
   kind:    'event' | 'concert' | 'reel' | 'post' | 'suggestions';
@@ -339,15 +339,21 @@ export const FeedScreen: React.FC = () => {
           const ccs = await concertService.list();
           ccs.forEach((c: Concert) => results.push({ kind: 'concert', id: c.id, data: c }));
         }
-        results.sort((a, b) => {
-          const dateA = a.kind === 'event'
-            ? (a.data as Event).starts_at
-            : (a.data as Concert).scheduled_at;
-          const dateB = b.kind === 'event'
-            ? (b.data as Event).starts_at
-            : (b.data as Concert).scheduled_at;
-          return new Date(dateB).getTime() - new Date(dateA).getTime();
-        });
+        if (f === 'posts') {
+          const posts = await postService.getFeed(1, 50).catch(() => [] as Post[]);
+          (Array.isArray(posts) ? posts : []).forEach((p: Post) => results.push({ kind: 'post', id: p.id, data: p }));
+        }
+        if (f !== 'posts') {
+          results.sort((a, b) => {
+            const dateA = a.kind === 'event'
+              ? (a.data as Event).starts_at
+              : (a.data as Concert).scheduled_at;
+            const dateB = b.kind === 'event'
+              ? (b.data as Event).starts_at
+              : (b.data as Concert).scheduled_at;
+            return new Date(dateB).getTime() - new Date(dateA).getTime();
+          });
+        }
         setItems(results);
       }
     } catch (err) {
@@ -687,6 +693,23 @@ export const FeedScreen: React.FC = () => {
                 >
                   <Icon name="music" size={13} color={filter === 'concerts' ? colors.primary : colors.textSecondary} />
                   <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'concerts' ? colors.primary : colors.textSecondary }}>Concerts</Text>
+                </TouchableOpacity>
+              )}
+
+              {(filterDropOpen || filter === 'posts') && (
+                <TouchableOpacity
+                  onPress={() => { setFilter('posts'); setFilterDropOpen(false); }}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 5,
+                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                    backgroundColor: filter === 'posts' ? colors.primary + '22' : colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: filter === 'posts' ? colors.primary : colors.border,
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Icon name="file-text" size={13} color={filter === 'posts' ? colors.primary : colors.textSecondary} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'posts' ? colors.primary : colors.textSecondary }}>Posts</Text>
                 </TouchableOpacity>
               )}
             </View>
