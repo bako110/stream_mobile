@@ -22,7 +22,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, CreatePostBox, PostCard } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard } from '../../components/common';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
@@ -134,7 +134,8 @@ export const FeedScreen: React.FC = () => {
   const [items,      setItems]      = useState<FeedItem[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [menuOpen,   setMenuOpen]   = useState(false);
+  const [menuOpen,      setMenuOpen]      = useState(false);
+  const [filterDropOpen, setFilterDropOpen] = useState(false);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
   const [trendingComm,    setTrendingComm]    = useState<CommunityData[]>([]);
@@ -614,6 +615,65 @@ export const FeedScreen: React.FC = () => {
             />
           </View>
         )}
+
+        {/* ── Filtres dans le header ─────────────────────────────────────── */}
+        {!searchOpen && (
+          <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {/* Bouton "Tout" avec dropdown */}
+              <TouchableOpacity
+                onPress={() => setFilterDropOpen(o => !o)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 5,
+                  paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                  backgroundColor: filter === 'all' ? colors.primary + '22' : colors.backgroundSecondary,
+                  borderWidth: 1,
+                  borderColor: filter === 'all' ? colors.primary : colors.border,
+                }}
+                activeOpacity={0.75}
+              >
+                <Icon name="grid" size={13} color={filter === 'all' ? colors.primary : colors.textSecondary} />
+                <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'all' ? colors.primary : colors.textSecondary }}>Tout</Text>
+                <Icon name={filterDropOpen ? 'chevron-up' : 'chevron-down'} size={12} color={filter === 'all' ? colors.primary : colors.textSecondary} />
+              </TouchableOpacity>
+
+              {/* Options visibles quand dropdown ouvert ou filtre actif */}
+              {(filterDropOpen || filter === 'events') && (
+                <TouchableOpacity
+                  onPress={() => { setFilter('events'); setFilterDropOpen(false); }}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 5,
+                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                    backgroundColor: filter === 'events' ? colors.primary + '22' : colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: filter === 'events' ? colors.primary : colors.border,
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Icon name="calendar" size={13} color={filter === 'events' ? colors.primary : colors.textSecondary} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'events' ? colors.primary : colors.textSecondary }}>Événements</Text>
+                </TouchableOpacity>
+              )}
+
+              {(filterDropOpen || filter === 'concerts') && (
+                <TouchableOpacity
+                  onPress={() => { setFilter('concerts'); setFilterDropOpen(false); }}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 5,
+                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                    backgroundColor: filter === 'concerts' ? colors.primary + '22' : colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: filter === 'concerts' ? colors.primary : colors.border,
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Icon name="music" size={13} color={filter === 'concerts' ? colors.primary : colors.textSecondary} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'concerts' ? colors.primary : colors.textSecondary }}>Concerts</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
       </View>
 
       {searchResults ? (
@@ -1088,43 +1148,6 @@ export const FeedScreen: React.FC = () => {
                 );
               })()}
 
-              {/* ── Filtres ──────────────────────────────────────────── */}
-              <Animated.View entering={FadeInDown.delay(60).springify()} style={s.filtersWrap}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>
-                  {([
-                    { key: 'all',      icon: 'grid',     label: 'Tout'       },
-                    { key: 'events',   icon: 'calendar', label: 'Événements' },
-                    { key: 'concerts', icon: 'music',    label: 'Concerts'   },
-                  ] as const).map(f => {
-                    const active = filter === f.key;
-                    return (
-                      <TouchableOpacity
-                        key={f.key}
-                        onPress={() => setFilter(f.key)}
-                        style={[
-                          s.filterPill,
-                          {
-                            backgroundColor: active ? colors.primary + '22' : colors.backgroundSecondary,
-                            borderColor:     active ? colors.primary         : colors.border,
-                          },
-                        ]}
-                      >
-                        <Icon name={f.icon} size={13} color={active ? colors.primary : colors.textSecondary} />
-                        <Text style={[s.filterText, { color: active ? colors.primary : colors.textSecondary }]}>
-                          {f.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </Animated.View>
-
-              {/* ── Créer un post ────────────────────────────────────── */}
-              <CreatePostBox
-                currentUser={currentUser}
-                colors={colors}
-                onPress={() => (nav as any).navigate('CreatePost')}
-              />
 
             </>
           }
