@@ -211,15 +211,19 @@ export const FeedScreen: React.FC = () => {
   const liveDotStyle = useAnimatedStyle(() => ({ opacity: liveDotOpacity.value }));
 
   useEffect(() => {
-    liveDotOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0, { duration: 600 }),
-        withTiming(1, { duration: 600 }),
-      ),
-      -1,
-      false,
-    );
-  }, []);
+    const blink = () => {
+      liveDotOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.1, { duration: 500 }),
+          withTiming(1,   { duration: 500 }),
+        ),
+        -1,
+        true,
+      );
+    };
+    const t = setTimeout(blink, 100);
+    return () => clearTimeout(t);
+  }, [liveDotOpacity]);
 
   // ── Suggestions — pool de 30, on pioche 10 au hasard à chaque inject ────────
   const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
@@ -586,7 +590,7 @@ export const FeedScreen: React.FC = () => {
             {/* Bouton Go Live — point clignotant */}
             {!searchOpen && (
               <TouchableOpacity
-                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 16, height: 16, borderRadius: 18, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' }}
                 onPress={() => nav.navigate('GoLive')}
                 activeOpacity={0.8}
               >
