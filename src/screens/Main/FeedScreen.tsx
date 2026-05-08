@@ -1189,7 +1189,7 @@ export const FeedScreen: React.FC = () => {
 
           {/* Options du menu FAB */}
           {fabOpen && (
-            <View style={{ position: 'absolute', bottom: 95, right: 18, alignItems: 'flex-end', gap: 10 }}>
+            <View style={{ position: 'absolute', bottom: 85, right: 18, alignItems: 'flex-end', gap: 10 }}>
               {([
                 { icon: 'film',     label: 'Reel',       color: '#E0389A', screen: 'CreateReel'    },
                 { icon: 'edit-2',   label: 'Post',       color: colors.primary, screen: 'CreatePost' },
@@ -1215,7 +1215,7 @@ export const FeedScreen: React.FC = () => {
 
           {/* Bouton FAB principal */}
           <TouchableOpacity
-            style={{ position: 'absolute', bottom: 35, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: fabOpen ? colors.textSecondary : colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
+            style={{ position: 'absolute', bottom: 25, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: fabOpen ? colors.textSecondary : colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
             onPress={() => setFabOpen(o => !o)}
             activeOpacity={0.85}
           >
