@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  View, Text, FlatList, TouchableOpacity, Image,
+  View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
   TextInput, RefreshControl, StatusBar, ActivityIndicator,
   Share, ScrollView, Alert, Platform,
 } from 'react-native';
@@ -28,6 +28,8 @@ import {
   concertService, eventService, authService, searchService,
   socialService, saveService,
 } from '../../services';
+import { liveService } from '../../services/liveService';
+import type { LiveStream } from '../../services/liveService';
 import { userService } from '../../services';
 import type { UserPublic } from '../../types';
 import type { Concert } from '../../types/concert';
@@ -108,6 +110,7 @@ export const HomeScreen: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [currentUser,   setCurrentUser]   = useState<User | null>(null);
   const [liveConcerts,  setLiveConcerts]  = useState<Concert[]>([]);
+  const [spontLives,    setSpontLives]    = useState<LiveStream[]>([]);
   const [commentsSheet, setCommentsSheet] = useState<{ kind: FeedKind; id: string } | null>(null);
   const [suggestions,    setSuggestions]    = useState<UserPublic[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(true);
@@ -179,12 +182,25 @@ export const HomeScreen: React.FC = () => {
 
   const loadLive = useCallback(async () => {
     try {
-      const live = await concertService.getLive();
-      setLiveConcerts(Array.isArray(live) ? live : []);
-    } catch { setLiveConcerts([]); }
+      const [concerts, spont] = await Promise.all([
+        concertService.getLive(),
+        liveService.getLives(),
+      ]);
+      setLiveConcerts(Array.isArray(concerts) ? concerts : []);
+      setSpontLives(Array.isArray(spont) ? spont : []);
+    } catch (e) {
+      if (__DEV__) console.warn('[HomeScreen] loadLive error:', e);
+      setLiveConcerts([]);
+      setSpontLives([]);
+    }
   }, []);
 
-  useEffect(() => { loadLive(); }, [loadLive]);
+  useEffect(() => {
+    loadLive();
+    // Rafraîchit les lives toutes les 30s pour détecter les nouveaux
+    const interval = setInterval(loadLive, 30_000);
+    return () => clearInterval(interval);
+  }, [loadLive]);
 
   // ── Chargement feed ──────────────────────────────────────────────────────────
 
@@ -356,7 +372,79 @@ export const HomeScreen: React.FC = () => {
 
   const ListHeader = useMemo(() => (
     <Animated.View entering={FadeInDown.delay(60).springify()}>
-      {/* Live banner */}
+
+      {/* ── Lives spontanés ─────────────────────────────────────────────── */}
+      {spontLives.length > 0 && (
+        <View style={s.spontSection}>
+          <View style={s.spontHeader}>
+            <View style={s.spontLiveDot} />
+            <Text style={[s.spontTitle, { color: colors.textPrimary }]}>En direct</Text>
+            <Text style={s.spontCount}>{spontLives.length} live{spontLives.length > 1 ? 's' : ''}</Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.spontScroll}
+          >
+            {spontLives.map(live => {
+              const name = live.user?.display_name || live.user?.username || 'Artiste';
+              const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+              return (
+                <TouchableOpacity
+                  key={live.id}
+                  style={s.spontCard}
+                  activeOpacity={0.88}
+                  onPress={() => nav.navigate('SimpleLiveViewer', { liveId: live.id })}
+                >
+                  {/* Thumbnail / fond */}
+                  <View style={s.spontThumb}>
+                    <LinearGradient
+                      colors={['#1a1a2e', '#2d1b3d']}
+                      style={StyleSheet.absoluteFill}
+                    />
+                    {/* Initiales en fond décoratif */}
+                    <Text style={s.spontBgInitials}>{initials}</Text>
+                    {/* Gradient bas */}
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.82)']}
+                      style={[StyleSheet.absoluteFill, { top: '40%' }]}
+                    />
+                    {/* Badge LIVE */}
+                    <View style={s.spontLivePill}>
+                      <View style={s.spontLiveDotSmall} />
+                      <Text style={s.spontLivePillText}>LIVE</Text>
+                    </View>
+                    {/* Viewers */}
+                    <View style={s.spontViewersChip}>
+                      <Icon name="eye" size={10} color="rgba(255,255,255,0.85)" />
+                      <Text style={s.spontViewersText}>{live.current_viewers}</Text>
+                    </View>
+                    {/* Infos bas */}
+                    <View style={s.spontCardBottom}>
+                      {/* Avatar */}
+                      <View style={s.spontAvatarSmall}>
+                        {live.user?.avatar_url ? (
+                          <Image source={{ uri: live.user.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                        ) : (
+                          <LinearGradient colors={['#F0365A', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={s.spontAvatarSmallText}>{initials[0]}</Text>
+                          </LinearGradient>
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.spontCardName} numberOfLines={1}>{name}</Text>
+                        <Text style={s.spontCardTitle} numberOfLines={1}>{live.title}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── Lives concerts programmés ────────────────────────────────────── */}
       {liveConcerts.length > 0 && (
         <View style={s.liveBanner}>
           <ScrollView
@@ -445,7 +533,7 @@ export const HomeScreen: React.FC = () => {
         })}
       </ScrollView>
     </Animated.View>
-  ), [colors, filter, liveConcerts]);
+  ), [colors, filter, liveConcerts, spontLives]);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
 
