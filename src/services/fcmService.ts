@@ -21,17 +21,20 @@ import { Endpoints } from '../api/endpoints';
 import { navigate } from '../navigation/navigationRef';
 
 // ── Channel IDs — incrémenter le suffixe pour forcer recréation si besoin ─────
-const CHANNEL_CALLS    = 'incoming_calls_v2';
-const CHANNEL_MESSAGES = 'messages_v2';
-const CHANNEL_NOTIFS   = 'notifications_v2';
+const CHANNEL_CALLS    = 'incoming_calls_v3';
+const CHANNEL_MESSAGES = 'messages_v3';
+const CHANNEL_NOTIFS   = 'notifications_v3';
 
 async function _createChannels(): Promise<void> {
   if (Platform.OS !== 'android') return;
 
-  // Supprimer les anciens canaux sans son
+  // Supprimer les anciens canaux
   await notifee.deleteChannel('incoming_calls').catch(() => {});
   await notifee.deleteChannel('messages').catch(() => {});
   await notifee.deleteChannel('notifications').catch(() => {});
+  await notifee.deleteChannel('incoming_calls_v2').catch(() => {});
+  await notifee.deleteChannel('messages_v2').catch(() => {});
+  await notifee.deleteChannel('notifications_v2').catch(() => {});
 
   await notifee.createChannel({
     id:               CHANNEL_CALLS,
@@ -243,11 +246,13 @@ export async function setupFCM(): Promise<void> {
 
   messaging().onTokenRefresh(_registerToken);
 
-  // Foreground FCM message → Notifee uniquement pour les appels entrants
-  // Messages et notifications génériques : gérés par le toast WebSocket (évite le double affichage)
+  // Foreground FCM message → Notifee pour appels + messages (son uniquement)
   messaging().onMessage(async (remoteMessage) => {
     const type = remoteMessage.data?.type as string | undefined;
     if (type === 'call_offer') {
+      await handleBackgroundFCM(remoteMessage);
+    } else if (type === 'message') {
+      // Afficher la notification avec son même en foreground
       await handleBackgroundFCM(remoteMessage);
     }
   });
