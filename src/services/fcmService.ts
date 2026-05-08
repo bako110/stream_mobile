@@ -7,7 +7,8 @@
  * Call setupFCM() once after login.
  * Call removeFCMToken() on logout.
  */
-import messaging, { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
+import messaging from '@react-native-firebase/messaging';
+import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import notifee, {
   AndroidImportance,
   AndroidVisibility,
@@ -229,9 +230,8 @@ export async function setupFCM(): Promise<void> {
 
   const authStatus = await messaging().requestPermission();
   console.log('[FCM] authStatus=', authStatus);
-  const enabled =
-    authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-    authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+  // 1 = AUTHORIZED, 2 = PROVISIONAL
+  const enabled = authStatus === 1 || authStatus === 2;
   if (!enabled) {
     console.log('[FCM] permission denied, push disabled');
     return;

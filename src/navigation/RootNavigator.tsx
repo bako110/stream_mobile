@@ -65,7 +65,7 @@ export const RootNavigator: React.FC = () => {
       setAppState('onboarding');
     } else if (token) {
       setAppState('main');
-      setupFCM().catch(() => {});
+      setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       requestContactsPermission();
     } else {
       setAppState('auth');
