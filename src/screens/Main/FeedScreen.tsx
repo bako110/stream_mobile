@@ -136,6 +136,7 @@ export const FeedScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [filterDropOpen, setFilterDropOpen] = useState(false);
+  const [fabOpen,        setFabOpen]        = useState(false);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
   const [trendingComm,    setTrendingComm]    = useState<CommunityData[]>([]);
@@ -1174,15 +1175,53 @@ export const FeedScreen: React.FC = () => {
         />
       )}
 
-      {/* ── FAB Créer un post ──────────────────────────────────────────── */}
+      {/* ── FAB Créer ──────────────────────────────────────────────────── */}
       {!searchOpen && !searchResults && (
-        <TouchableOpacity
-          style={{ position: 'absolute', bottom: 60, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
-          onPress={() => (nav as any).navigate('CreatePost')}
-          activeOpacity={0.85}
-        >
-          <Icon name="edit-2" size={22} color="#fff" />
-        </TouchableOpacity>
+        <>
+          {/* Overlay pour fermer le menu */}
+          {fabOpen && (
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              activeOpacity={1}
+              onPress={() => setFabOpen(false)}
+            />
+          )}
+
+          {/* Options du menu FAB */}
+          {fabOpen && (
+            <View style={{ position: 'absolute', bottom: 125, right: 18, alignItems: 'flex-end', gap: 10 }}>
+              {([
+                { icon: 'film',     label: 'Reel',       color: '#E0389A', screen: 'CreateReel'    },
+                { icon: 'edit-2',   label: 'Post',       color: colors.primary, screen: 'CreatePost' },
+                { icon: 'music',    label: 'Concert',    color: '#7B3FF2', screen: 'CreateConcert' },
+                { icon: 'calendar', label: 'Événement',  color: '#0EA5E9', screen: 'CreateEvent'   },
+              ] as const).map(item => (
+                <TouchableOpacity
+                  key={item.label}
+                  onPress={() => { setFabOpen(false); (nav as any).navigate(item.screen); }}
+                  activeOpacity={0.85}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                >
+                  <View style={{ backgroundColor: colors.surface, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>{item.label}</Text>
+                  </View>
+                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: item.color, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
+                    <Icon name={item.icon} size={18} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Bouton FAB principal */}
+          <TouchableOpacity
+            style={{ position: 'absolute', bottom: 65, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: fabOpen ? colors.textSecondary : colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
+            onPress={() => setFabOpen(o => !o)}
+            activeOpacity={0.85}
+          >
+            <Icon name={fabOpen ? 'x' : 'edit-2'} size={22} color="#fff" />
+          </TouchableOpacity>
+        </>
       )}
 
       {/* ── Sheet commentaires ──────────────────────────────────────────── */}
