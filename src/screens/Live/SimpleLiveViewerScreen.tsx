@@ -22,43 +22,61 @@ import { Track } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import type { NativeStackNavigationProp, RouteProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
+import { useWs } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif } from '../../components/wallet/LiveGiftOverlay';
+import type { LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
+import { LiveLikeButton } from '../../components/live/LiveLikeButton';
+import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveViewer'>;
 
 interface ChatMsg { id: string; user: string; avatar?: string | null; text: string; }
 
+// ── Avatar placeholder quand la caméra est off ────────────────────────────────
+
+const ParticipantAvatar: React.FC<{ name: string; size: number }> = ({ name, size }) => (
+  <View style={[mv.avatarBox, { width: size, height: size, borderRadius: size / 2 }]}>
+    <Text style={[mv.avatarText, { fontSize: size * 0.38 }]}>
+      {(name || '?')[0].toUpperCase()}
+    </Text>
+  </View>
+);
+
 // ── Zone vidéo multi-participants avec spotlight ───────────────────────────────
 
-const MultiVideoView: React.FC = () => {
-  // onlySubscribed: false pour inclure aussi le track local si le viewer publie
-  const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+const MultiVideoView: React.FC<{ onGift: (id: string, name: string) => void; onTap: () => void }> = ({ onGift, onTap }) => {
+  const allTracks  = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const participants = useParticipants();
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
-  // Tracks avec vidéo non-muté
-  const activeTracks = allTracks.filter(t => !t.publication?.isMuted);
+  // Tous les tracks (caméra on OU off)
+  const allCamTracks = allTracks;
+  const activeTracks = allCamTracks.filter(t => !t.publication?.isMuted);
 
-  // Spotlight par défaut : 1er participant remote (le host)
-  const defaultSpotlight = activeTracks.find(t => !t.participant.isLocal) ?? activeTracks[0] ?? null;
-  const spotlightTrack   = activeTracks.find(t => t.participant.identity === spotlightId) ?? defaultSpotlight;
-  const thumbnailTracks  = activeTracks.filter(t => t !== spotlightTrack);
+  // Spotlight par défaut : 1er remote
+  const defaultSpotlight = allCamTracks.find(t => !t.participant.isLocal) ?? allCamTracks[0] ?? null;
+  const spotlightTrack   = allCamTracks.find(t => t.participant.identity === spotlightId) ?? defaultSpotlight;
+  const thumbnailTracks  = allCamTracks.filter(t => t !== spotlightTrack);
   const localTrack       = activeTracks.find(t => t.participant.isLocal) ?? null;
+  const showLocalPip     = localTrack && spotlightTrack && !spotlightTrack.participant.isLocal;
 
-  // PiP local visible quand le viewer lui-même n'est pas en spotlight
-  const showLocalPip = localTrack && spotlightTrack && !spotlightTrack.participant.isLocal;
+  const spotlightName = spotlightTrack
+    ? (spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity))
+    : '';
+  const spotlightCamOn = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
 
-  if (activeTracks.length === 0) {
+  if (allCamTracks.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
         <ActivityIndicator size="large" color="#F0365A" />
@@ -70,52 +88,85 @@ const MultiVideoView: React.FC = () => {
   }
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      {/* Spotlight plein écran */}
+    <View
+      style={StyleSheet.absoluteFill}
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={onTap}
+    >
+      {/* Spotlight plein écran — vidéo ou avatar */}
       {spotlightTrack && (
-        <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+        spotlightCamOn
+          ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+          : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
+              <ParticipantAvatar name={spotlightName} size={100} />
+              <Text style={mv.spotlightNameBig}>{spotlightName}</Text>
+            </View>
       )}
 
-      {/* Nom du participant en spotlight */}
+      {/* Bouton cadeau sur le spotlight (non-local uniquement) */}
+      {spotlightTrack && !spotlightTrack.participant.isLocal && (
+        <TouchableOpacity
+          style={mv.spotlightGiftBtn}
+          onPress={() => onGift(spotlightTrack.participant.identity, spotlightName)}
+          activeOpacity={0.8}
+        >
+          <Text style={mv.spotlightGiftEmoji}>🎁</Text>
+          <Text style={mv.spotlightGiftLabel}>Cadeau</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Label nom spotlight */}
       {spotlightTrack && (
         <View style={mv.spotlightLabel}>
-          <Text style={mv.spotlightLabelText}>
-            {spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity)}
-          </Text>
+          <Text style={mv.spotlightLabelText}>{spotlightName}</Text>
         </View>
       )}
 
-      {/* PiP du viewer (lui-même) quand un autre est en spotlight */}
+      {/* PiP local */}
       {showLocalPip && localTrack && (
-        <TouchableOpacity
-          style={mv.pip}
-          onPress={() => setSpotlightId(localTrack.participant.identity)}
-          activeOpacity={0.85}
-        >
+        <TouchableOpacity style={mv.pip} onPress={() => setSpotlightId(localTrack.participant.identity)} activeOpacity={0.85}>
           <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
           <View style={mv.pipLabel}><Text style={mv.pipLabelText}>Toi</Text></View>
         </TouchableOpacity>
       )}
 
-      {/* Vignettes des autres participants */}
+      {/* Vignettes */}
       {thumbnailTracks.length > 0 && (
         <View style={mv.thumbnailsContainer}>
           <ScrollView showsVerticalScrollIndicator={false}>
-            {thumbnailTracks.map(t => (
-              <TouchableOpacity
-                key={t.participant.identity}
-                style={mv.thumbnail}
-                onPress={() => setSpotlightId(t.participant.identity)}
-                activeOpacity={0.8}
-              >
-                <VideoTrack trackRef={t} style={StyleSheet.absoluteFill} objectFit="cover" />
-                <View style={mv.thumbnailLabel}>
-                  <Text style={mv.thumbnailLabelText} numberOfLines={1}>
-                    {t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {thumbnailTracks.map(t => {
+              const camOn = !t.publication?.isMuted;
+              const tName = t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity);
+              const isLocal = t.participant.isLocal;
+              return (
+                <TouchableOpacity
+                  key={t.participant.identity}
+                  style={mv.thumbnail}
+                  onPress={() => setSpotlightId(t.participant.identity)}
+                  activeOpacity={0.8}
+                >
+                  {camOn
+                    ? <VideoTrack trackRef={t} style={StyleSheet.absoluteFill} objectFit="cover" />
+                    : <View style={[StyleSheet.absoluteFill, mv.thumbnailNoCam]}>
+                        <ParticipantAvatar name={tName} size={44} />
+                      </View>
+                  }
+                  <View style={mv.thumbnailLabel}>
+                    <Text style={mv.thumbnailLabelText} numberOfLines={1}>{tName}</Text>
+                  </View>
+                  {/* Bouton cadeau sur la vignette (non-local) */}
+                  {!isLocal && (
+                    <TouchableOpacity
+                      style={mv.thumbGiftBtn}
+                      onPress={() => onGift(t.participant.identity, tName)}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    >
+                      <Text style={mv.thumbGiftEmoji}>🎁</Text>
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -135,15 +186,22 @@ const RoomContent: React.FC<{
   sending: boolean;
   showChat: boolean;
   setShowChat: (v: boolean) => void;
-  chatRef: React.RefObject<FlatList>;
+  chatRef: React.RefObject<FlatList | null>;
   onSend: () => void;
   onLeave: () => void;
   giftNotifs: GiftNotif[];
   onGiftNotifShown: (id: string) => void;
-}> = ({ live, liveId, viewerCount, messages, chatInput, setChatInput, sending, showChat, setShowChat, chatRef, onSend, onLeave, giftNotifs, onGiftNotifShown }) => {
+  likeCount: number;
+  onLike: () => void;
+}> = ({ live, liveId, viewerCount, messages, chatInput, setChatInput, sending, showChat, setShowChat, chatRef, onSend, onLeave, giftNotifs, onGiftNotifShown, likeCount, onLike }) => {
   const { localParticipant } = useLocalParticipant();
   const [camOn, setCamOn] = useState(false);
   const [micOn, setMicOn] = useState(false);
+  const likeRef = useRef<LiveLikeButtonRef>(null);
+  const giftRef = useRef<LiveGiftOverlayRef>(null);
+
+  const hostId   = live?.user_id ?? '';
+  const hostName2 = live?.user?.display_name ?? live?.user?.username ?? 'Host';
 
   const hostName = live?.user?.display_name ?? live?.user?.username ?? 'Live';
 
@@ -168,8 +226,11 @@ const RoomContent: React.FC<{
     >
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      {/* Vidéo multi-participants */}
-      <MultiVideoView />
+      {/* Vidéo — tap n'importe où = like */}
+      <MultiVideoView
+        onGift={(id, name) => giftRef.current?.openGift(id, name)}
+        onTap={() => likeRef.current?.trigger()}
+      />
 
       {/* Top overlay */}
       <LinearGradient colors={['rgba(0,0,0,0.75)', 'transparent']} style={st.topOverlay}>
@@ -177,13 +238,15 @@ const RoomContent: React.FC<{
           <Icon name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <View style={st.topCenter}>
-          {live?.user?.avatar_url ? (
-            <Image source={{ uri: live.user.avatar_url }} style={st.hostAvatar} />
-          ) : (
-            <View style={[st.hostAvatar, st.hostAvatarFallback]}>
-              <Text style={st.hostAvatarText}>{hostName[0]?.toUpperCase()}</Text>
-            </View>
-          )}
+          <TouchableOpacity onPress={() => giftRef.current?.openGift(hostId, hostName2)} activeOpacity={0.8}>
+            {live?.user?.avatar_url ? (
+              <Image source={{ uri: live.user.avatar_url }} style={st.hostAvatar} />
+            ) : (
+              <View style={[st.hostAvatar, st.hostAvatarFallback]}>
+                <Text style={st.hostAvatarText}>{hostName[0]?.toUpperCase()}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <View style={st.liveBadgeRow}>
               <View style={st.liveBadge}>
@@ -261,12 +324,16 @@ const RoomContent: React.FC<{
 
       {/* Cadeaux live */}
       <LiveGiftOverlay
+        ref={giftRef}
         liveId={liveId}
-        receiverId={live?.user_id ?? ''}
-        receiverName={live?.user?.display_name ?? live?.user?.username ?? 'Host'}
         incomingNotifs={giftNotifs}
         onNotifShown={onGiftNotifShown}
       />
+
+      {/* Bouton like — haut droite */}
+      <View style={st.likeContainer}>
+        <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
+      </View>
     </KeyboardAvoidingView>
   );
 };
@@ -289,10 +356,13 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [sending,     setSending]     = useState(false);
   const [showChat,    setShowChat]    = useState(true);
   const [giftNotifs,  setGiftNotifs]  = useState<GiftNotif[]>([]);
+  const [likeCount,   setLikeCount]   = useState(0);
+  const likeThrottle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingLikes = useRef(0);
 
   const chatRef = useRef<FlatList>(null);
   const wsRef   = useRef<WebSocket | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { lastLiveEnded, lastLiveViewersUpdated } = useWs();
 
   useEffect(() => {
     (async () => {
@@ -309,17 +379,19 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     })();
   }, [liveId]);
 
+  // Live terminé via WS
   useEffect(() => {
-    if (!token) return;
-    pollRef.current = setInterval(async () => {
-      try {
-        const s = await liveService.getStatus(liveId);
-        setViewerCount(s.current_viewers ?? 0);
-        if (s.status === 'ended') { setEnded(true); setToken(null); }
-      } catch {}
-    }, 10_000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [token, liveId]);
+    if (!lastLiveEnded) return;
+    if (lastLiveEnded === liveId) { setEnded(true); setToken(null); }
+  }, [lastLiveEnded, liveId]);
+
+  // Viewers mis à jour via WS
+  useEffect(() => {
+    if (!lastLiveViewersUpdated) return;
+    if (lastLiveViewersUpdated.live_id === liveId) {
+      setViewerCount(lastLiveViewersUpdated.current_viewers);
+    }
+  }, [lastLiveViewersUpdated, liveId]);
 
   useEffect(() => {
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -372,10 +444,23 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   }, [chatInput, sending, liveId]);
 
   const handleLeave = useCallback(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
     try { wsRef.current?.close(); } catch {}
     nav.goBack();
   }, [nav]);
+
+  const handleLike = useCallback(() => {
+    pendingLikes.current += 1;
+    setLikeCount(c => c + 1);
+    if (likeThrottle.current) return;
+    likeThrottle.current = setTimeout(async () => {
+      const batch = pendingLikes.current;
+      pendingLikes.current = 0;
+      likeThrottle.current = null;
+      try {
+        await apiClient.post(`/api/v1/lives/${liveId}/like`, { count: batch });
+      } catch {}
+    }, 500);
+  }, [liveId]);
 
   if (loading) {
     return (
@@ -425,6 +510,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         onLeave={handleLeave}
         giftNotifs={giftNotifs}
         onGiftNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
+        likeCount={likeCount}
+        onLike={handleLike}
       />
     </LiveKitRoom>
   );
@@ -474,6 +561,28 @@ const mv = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 3, paddingHorizontal: 4,
   },
   thumbnailLabelText: { color: '#fff', fontSize: 9 },
+
+  noVideoBg: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
+  avatarBox: { backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontWeight: '800' },
+  spotlightNameBig: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 10 },
+  thumbnailNoCam: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' },
+
+  spotlightGiftBtn: {
+    position: 'absolute', bottom: 60, right: 14, zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 24,
+    paddingHorizontal: 14, paddingVertical: 8,
+    alignItems: 'center', borderWidth: 1, borderColor: '#FFD700',
+  },
+  spotlightGiftEmoji: { fontSize: 22 },
+  spotlightGiftLabel: { color: '#FFD700', fontSize: 10, fontWeight: '700', marginTop: 2 },
+
+  thumbGiftBtn: {
+    position: 'absolute', top: 4, right: 4, zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12,
+    padding: 3,
+  },
+  thumbGiftEmoji: { fontSize: 14 },
 });
 
 // ── Styles page ───────────────────────────────────────────────────────────────
@@ -491,9 +600,9 @@ const st = StyleSheet.create({
   },
   iconBtn:            { padding: 8, marginTop: 2 },
   topCenter:          { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  hostAvatar:         { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#F0365A' },
+  hostAvatar:         { width: 54, height: 54, borderRadius: 27, borderWidth: 2.5, borderColor: '#F0365A' },
   hostAvatarFallback: { backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' },
-  hostAvatarText:     { color: '#fff', fontWeight: '800', fontSize: 13 },
+  hostAvatarText:     { color: '#fff', fontWeight: '800', fontSize: 18 },
   liveBadgeRow:       { flexDirection: 'row', marginBottom: 2 },
   liveBadge: {
     flexDirection: 'row', alignItems: 'center',
@@ -564,4 +673,11 @@ const st = StyleSheet.create({
     borderRadius: 24, paddingHorizontal: 32, paddingVertical: 12,
   },
   endedBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  likeContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 58 : 40,
+    right: 14,
+    zIndex: 40,
+    alignItems: 'center',
+  },
 });
