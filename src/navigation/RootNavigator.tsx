@@ -65,6 +65,7 @@ export const RootNavigator: React.FC = () => {
       setAppState('onboarding');
     } else if (token) {
       setAppState('main');
+      console.log('[FCM] calling setupFCM from splash...');
       setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       requestContactsPermission();
     } else {
@@ -79,7 +80,8 @@ export const RootNavigator: React.FC = () => {
 
   const handleAuthSuccess = () => {
     setAppState('main');
-    setupFCM().catch(() => {});
+    console.log('[FCM] calling setupFCM from login...');
+    setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
     requestContactsPermission();
   };
   const handleLogout = () => {

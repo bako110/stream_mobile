@@ -39,7 +39,7 @@ async function _createChannels(): Promise<void> {
     importance:       AndroidImportance.HIGH,
     visibility:       AndroidVisibility.PUBLIC,
     vibration:        true,
-    vibrationPattern: [0, 500, 300, 500],
+    vibrationPattern: [500, 300, 500, 300],
     sound:            'default',
   });
   await notifee.createChannel({
@@ -48,7 +48,7 @@ async function _createChannels(): Promise<void> {
     importance:       AndroidImportance.HIGH,
     visibility:       AndroidVisibility.PRIVATE,
     vibration:        true,
-    vibrationPattern: [0, 300, 200, 300],
+    vibrationPattern: [300, 200, 300, 200],
     sound:            'default',
   });
   await notifee.createChannel({
@@ -57,7 +57,7 @@ async function _createChannels(): Promise<void> {
     importance:       AndroidImportance.HIGH,
     visibility:       AndroidVisibility.PRIVATE,
     vibration:        true,
-    vibrationPattern: [0, 250],
+    vibrationPattern: [250, 250],
     sound:            'default',
   });
 }
@@ -162,7 +162,7 @@ export async function handleBackgroundFCM(
         channelId:    CHANNEL_MESSAGES,
         importance:   AndroidImportance.HIGH,
         sound:        'default',
-        vibrationPattern: [0, 300, 200, 300],
+        vibrationPattern: [300, 200, 300, 200],
         pressAction:  { id: 'default', launchActivity: 'default' },
       },
       data: data as Record<string, string>,
@@ -178,7 +178,7 @@ export async function handleBackgroundFCM(
       channelId:    CHANNEL_NOTIFS,
       importance:   AndroidImportance.HIGH,
       sound:        'default',
-      vibrationPattern: [0, 250],
+      vibrationPattern: [250, 250],
       pressAction:  { id: 'default', launchActivity: 'default' },
     },
     data: data as Record<string, string>,
