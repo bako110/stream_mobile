@@ -209,7 +209,10 @@ async function _registerToken(token: string): Promise<void> {
     await apiClient.post(Endpoints.notifications.deviceToken, {
       token, platform: Platform.OS,
     });
-  } catch {}
+    console.log('[FCM] device token registered');
+  } catch (e: any) {
+    console.warn('[FCM] register token failed:', e?.status, e?.message);
+  }
 }
 
 async function _unregisterToken(token: string): Promise<void> {
@@ -225,12 +228,17 @@ export async function setupFCM(): Promise<void> {
   await _createChannels();
 
   const authStatus = await messaging().requestPermission();
+  console.log('[FCM] authStatus=', authStatus);
   const enabled =
     authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
     authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-  if (!enabled) return;
+  if (!enabled) {
+    console.log('[FCM] permission denied, push disabled');
+    return;
+  }
 
   const token = await messaging().getToken();
+  console.log('[FCM] token=', token ? token.slice(0, 30) + '...' : 'null');
   if (token) await _registerToken(token);
 
   messaging().onTokenRefresh(_registerToken);
