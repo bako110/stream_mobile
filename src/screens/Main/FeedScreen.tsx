@@ -14,7 +14,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
   FadeInDown, FadeInUp,
   useSharedValue, useAnimatedStyle,
-  withSpring, withSequence, withTiming,
+  withSpring, withSequence, withTiming, withRepeat,
   interpolate, runOnJS,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -146,6 +146,7 @@ export const FeedScreen: React.FC = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const searchBarWidth = useSharedValue(0);
   const searchBarOpacity = useSharedValue(0);
+  const liveDotOpacity = useSharedValue(1);
   const searchInputRef = useRef<any>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -206,6 +207,19 @@ export const FeedScreen: React.FC = () => {
     opacity: searchBarOpacity.value,
     overflow: 'hidden',
   }));
+
+  const liveDotStyle = useAnimatedStyle(() => ({ opacity: liveDotOpacity.value }));
+
+  useEffect(() => {
+    liveDotOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 600 }),
+        withTiming(1, { duration: 600 }),
+      ),
+      -1,
+      false,
+    );
+  }, []);
 
   // ── Suggestions — pool de 30, on pioche 10 au hasard à chaque inject ────────
   const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
@@ -569,15 +583,14 @@ export const FeedScreen: React.FC = () => {
 
           {/* Droite : icônes */}
           <View style={s.headerRight}>
-            {/* Bouton Go Live */}
+            {/* Bouton Go Live — point clignotant */}
             {!searchOpen && (
               <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: '#F0365A' }}
+                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' }}
                 onPress={() => nav.navigate('GoLive')}
                 activeOpacity={0.8}
               >
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 }}>Live</Text>
+                <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }, liveDotStyle]} />
               </TouchableOpacity>
             )}
             {/* Icône recherche — style Facebook */}
