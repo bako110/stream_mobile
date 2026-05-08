@@ -97,6 +97,7 @@ export const HomeScreen: React.FC = () => {
   const { colors } = theme;
   const nav = useNavigation<Nav>();
   const userLocation = useUserLocation();
+  const { lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated } = useWs();
 
   const [items,         setItems]         = useState<FeedItem[]>([]);
   const [filter,        setFilter]        = useState<FeedFilter>('all');
@@ -195,12 +196,33 @@ export const HomeScreen: React.FC = () => {
     }
   }, []);
 
+  // Chargement initial des lives
+  useEffect(() => { loadLive(); }, [loadLive]);
+
+  // Event WS : nouveau live démarré → l'ajouter directement
   useEffect(() => {
-    loadLive();
-    // Rafraîchit les lives toutes les 30s pour détecter les nouveaux
-    const interval = setInterval(loadLive, 30_000);
-    return () => clearInterval(interval);
-  }, [loadLive]);
+    if (!lastLiveStarted) return;
+    setSpontLives(prev => {
+      if (prev.some(l => l.id === lastLiveStarted.live.id)) return prev;
+      return [lastLiveStarted.live as LiveStream, ...prev];
+    });
+  }, [lastLiveStarted]);
+
+  // Event WS : live terminé → le retirer
+  useEffect(() => {
+    if (!lastLiveEnded) return;
+    setSpontLives(prev => prev.filter(l => l.id !== lastLiveEnded));
+  }, [lastLiveEnded]);
+
+  // Event WS : viewers mis à jour → mettre à jour le compteur
+  useEffect(() => {
+    if (!lastLiveViewersUpdated) return;
+    setSpontLives(prev => prev.map(l =>
+      l.id === lastLiveViewersUpdated.live_id
+        ? { ...l, current_viewers: lastLiveViewersUpdated.current_viewers }
+        : l
+    ));
+  }, [lastLiveViewersUpdated]);
 
   // ── Chargement feed ──────────────────────────────────────────────────────────
 

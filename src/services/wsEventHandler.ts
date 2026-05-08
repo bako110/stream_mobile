@@ -16,6 +16,33 @@ export interface ConcertLivePayload {
   artist_id: string;
 }
 
+export interface LiveStartedPayload {
+  live: {
+    id: string;
+    user_id: string;
+    title: string;
+    description?: string | null;
+    thumbnail_url?: string | null;
+    status: string;
+    current_viewers: number;
+    peak_viewers: number;
+    is_featured: boolean;
+    started_at: string;
+    ended_at?: string | null;
+    user?: {
+      id: string;
+      username?: string | null;
+      display_name?: string | null;
+      avatar_url?: string | null;
+    } | null;
+  };
+}
+
+export interface LiveViewersUpdatedPayload {
+  live_id: string;
+  current_viewers: number;
+}
+
 export interface WsEventCallbacks {
   // Feed
   onFeedUpdated?: (kind: 'post' | 'reel' | 'event' | 'concert') => void;
@@ -23,6 +50,11 @@ export interface WsEventCallbacks {
   // Live concert
   onConcertLive?: (d: ConcertLivePayload) => void;
   onConcertEnded?: (concert_id: string) => void;
+
+  // Lives spontanés
+  onLiveStarted?: (d: LiveStartedPayload) => void;
+  onLiveEnded?: (live_id: string) => void;
+  onLiveViewersUpdated?: (d: LiveViewersUpdatedPayload) => void;
 
   // Stories
   onStoryAdded?: (data: StoryAddedPayload) => void;
@@ -157,6 +189,18 @@ export function createWsEventHandler(callbacks: WsEventCallbacks) {
 
       case 'concert_ended':
         callbacks.onConcertEnded?.((payload as any).concert_id);
+        break;
+
+      case 'live_started':
+        callbacks.onLiveStarted?.(payload as unknown as LiveStartedPayload);
+        break;
+
+      case 'live_ended':
+        callbacks.onLiveEnded?.((payload as any).live_id);
+        break;
+
+      case 'live_viewers_updated':
+        callbacks.onLiveViewersUpdated?.(payload as unknown as LiveViewersUpdatedPayload);
         break;
 
       case 'presence':

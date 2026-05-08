@@ -27,6 +27,8 @@ import {
   type ReactionOnContentPayload,
   type PresencePayload,
   type ConcertLivePayload,
+  type LiveStartedPayload,
+  type LiveViewersUpdatedPayload,
 } from '../services/wsEventHandler';
 
 export type WsPayload = { [key: string]: any; type: string };
@@ -87,6 +89,9 @@ interface WebSocketContextValue {
   lastReactionOnContent:    ReactionOnContentPayload | null;
   lastPresenceUpdate:       PresencePayload | null;
   lastConcertLive:          ConcertLivePayload | null;
+  lastLiveStarted:          LiveStartedPayload | null;
+  lastLiveEnded:            string | null;
+  lastLiveViewersUpdated:   LiveViewersUpdatedPayload | null;
 }
 
 const Ctx = createContext<WebSocketContextValue>({
@@ -118,6 +123,9 @@ const Ctx = createContext<WebSocketContextValue>({
   lastReactionOnContent:    null,
   lastPresenceUpdate:       null,
   lastConcertLive:          null,
+  lastLiveStarted:          null,
+  lastLiveEnded:            null,
+  lastLiveViewersUpdated:   null,
 });
 
 const WS_BASE        = API_BASE_URL.replace(/^http/, 'ws');
@@ -157,8 +165,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [lastStoryAdded,        setLastStoryAdded]        = useState<StoryAddedPayload | null>(null);
   const [lastCommentOnContent,  setLastCommentOnContent]  = useState<CommentOnContentPayload | null>(null);
   const [lastReactionOnContent, setLastReactionOnContent] = useState<ReactionOnContentPayload | null>(null);
-  const [lastPresenceUpdate,    setLastPresenceUpdate]    = useState<PresencePayload | null>(null);
-  const [lastConcertLive,       setLastConcertLive]       = useState<ConcertLivePayload | null>(null);
+  const [lastPresenceUpdate,      setLastPresenceUpdate]      = useState<PresencePayload | null>(null);
+  const [lastConcertLive,         setLastConcertLive]         = useState<ConcertLivePayload | null>(null);
+  const [lastLiveStarted,         setLastLiveStarted]         = useState<LiveStartedPayload | null>(null);
+  const [lastLiveEnded,           setLastLiveEnded]           = useState<string | null>(null);
+  const [lastLiveViewersUpdated,  setLastLiveViewersUpdated]  = useState<LiveViewersUpdatedPayload | null>(null);
 
   const addListener    = useCallback((fn: WsListener) => { listeners.current.add(fn); }, []);
   const removeListener = useCallback((fn: WsListener) => { listeners.current.delete(fn); }, []);
@@ -176,6 +187,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     onPresence:           (d) => { if (isMounted.current) setLastPresenceUpdate(d); },
     onConcertLive:        (d) => { if (isMounted.current) setLastConcertLive(d); },
     onConcertEnded:       ()  => { /* le feed se recharge via onFeedUpdated */ },
+    onLiveStarted:        (d) => { if (isMounted.current) setLastLiveStarted(d); },
+    onLiveEnded:          (id) => { if (isMounted.current) setLastLiveEnded(id); },
+    onLiveViewersUpdated: (d) => { if (isMounted.current) setLastLiveViewersUpdated(d); },
     onActivity:           ()  => { if (isMounted.current) setUnreadActivity(n => n + 1); },
     onNotification:       ()  => { if (isMounted.current) setUnreadNotifications(n => n + 1); },
   }));
@@ -496,6 +510,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     lastReactionOnContent,
     lastPresenceUpdate,
     lastConcertLive,
+    lastLiveStarted,
+    lastLiveEnded,
+    lastLiveViewersUpdated,
   }), [
     sendMessage, isConnected, addListener, removeListener,
     unreadMessages, unreadActivity, unreadNotifications,
@@ -505,6 +522,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     isOutgoingCall, drainCallBuffer,
     lastNewFollower, lastCoinTransfer, lastGiftReceived, lastStoryAdded,
     lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate, lastConcertLive,
+    lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
