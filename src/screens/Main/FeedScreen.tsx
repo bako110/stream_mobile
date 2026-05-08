@@ -646,7 +646,15 @@ export const FeedScreen: React.FC = () => {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {/* Bouton "Tout" avec dropdown */}
               <TouchableOpacity
-                onPress={() => setFilterDropOpen(o => !o)}
+                onPress={() => {
+                  if (filter !== 'all') {
+                    setFilter('all');
+                    setFilterDropOpen(false);
+                    load('all');
+                  } else {
+                    setFilterDropOpen(o => !o);
+                  }
+                }}
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 5,
                   paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
