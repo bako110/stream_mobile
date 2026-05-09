@@ -17,6 +17,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail } from '../../components/common';
+import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, saveService, authService } from '../../services';
 import type { Event } from '../../types/event';
 import type { Comment } from '../../types/reel';
@@ -181,9 +182,9 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
 
   const [event,        setEvent]        = useState<Event | null>(null);
   const [loading,      setLoading]      = useState(true);
-  const [buyLoading,   setBuyLoading]   = useState(false);
   const [isOwner,      setIsOwner]      = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [myTicket,     setMyTicket]     = useState<any | null>(null);
   const [liked,        setLiked]        = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
   const [saved,        setSaved]        = useState(false);
@@ -196,6 +197,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const [reminded,       setReminded]       = useState(false);
   const [remindLoading,  setRemindLoading]  = useState(false);
   const [hidden,         setHidden]         = useState(false);
+  const [paySheetOpen,   setPaySheetOpen]   = useState(false);
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
@@ -214,7 +216,13 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         const user = await authService.getMe();
         setIsOwner(user?.id === data.organizer?.id);
         const tickets = await eventService.getMyTickets();
-        setIsRegistered(tickets.some((t: any) => t.event_id === eventId));
+        const found = tickets.find((t: any) => t.event_id === eventId) ?? null;
+        setIsRegistered(!!found);
+        if (found) {
+          // Utilise le ticket tel que retourné par l'API (avec access_code, status, etc.)
+          // On attache event si l'API ne l'a pas retourné
+          setMyTicket(found.event ? found : { ...found, event: data });
+        }
       } catch { /**/ }
       try {
         const counts = await socialService.getReactionCounts({ event_id: eventId });
@@ -295,32 +303,13 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     } catch { Alert.alert('Partage', 'Impossible d\'ouvrir cette application.'); }
   };
 
-  const handleBuyTicket = async () => {
+  const handleBuyTicket = () => {
     if (!event) return;
     if (event.access_type === 'invite_only') {
       Alert.alert('Accès sur invitation', 'Contactez l\'organisateur pour obtenir une invitation.');
       return;
     }
-    const isFreeEv = event.access_type === 'free';
-    Alert.alert(
-      isFreeEv ? 'S\'inscrire' : 'Acheter un billet',
-      isFreeEv ? `Confirmer votre inscription à\n${event.title} ?` : `${event.title}\nPrix : ${event.ticket_price ?? '—'} €`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Confirmer', onPress: async () => {
-          setBuyLoading(true);
-          try {
-            await eventService.buyTicket(eventId);
-            setIsRegistered(true);
-            Alert.alert(isFreeEv ? 'Inscription confirmée !' : 'Billet confirmé !', 'Retrouvez-le dans votre profil.');
-          } catch (e: any) {
-            const msg = e?.message ?? '';
-            if (msg.includes('déjà inscrit')) { setIsRegistered(true); Alert.alert('Déjà inscrit', 'Vous participez déjà.'); }
-            else Alert.alert('Erreur', msg || 'Impossible de finaliser l\'inscription.');
-          } finally { setBuyLoading(false); }
-        }},
-      ],
-    );
+    setPaySheetOpen(true);
   };
 
   const handleEdit   = () => nav.navigate('CreateEvent' as any, { eventId });
@@ -582,42 +571,82 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
         {isOwner ? (
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity onPress={handleEdit}
+            <TouchableOpacity
+              onPress={() => nav.navigate('Attendees' as any, { eventId, eventTitle: event.title })}
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 6, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary + '18' }}>
+                gap: 6, paddingVertical: 14, borderRadius: 14, backgroundColor: '#10B98118' }}>
+              <Icon name="users" size={16} color="#10B981" />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>
+                Inscrits {event.current_attendees > 0 ? `(${event.current_attendees})` : ''}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleEdit}
+              style={{ paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary + '18',
+                flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Icon name="edit-2" size={16} color={colors.primary} />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Modifier</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleDelete}
-              style={{ paddingHorizontal: 20, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.error + '18',
+              style={{ paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.error + '18',
                 flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Icon name="trash-2" size={16} color={colors.error} />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.error }}>Supprimer</Text>
             </TouchableOpacity>
           </View>
+        ) : isRegistered && myTicket ? (
+          /* Inscrit — bouton "Voir mon billet" */
+          <TouchableOpacity
+            onPress={() => nav.navigate('MyTicket' as any, { ticket: myTicket })}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['#10B981', '#059669']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 8, paddingVertical: 16, borderRadius: 14 }}>
+              <Icon name="credit-card" size={20} color="#fff" />
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Voir mon billet</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity onPress={isRegistered ? undefined : handleBuyTicket}
-            disabled={buyLoading || isRegistered} activeOpacity={isRegistered ? 1 : 0.85}>
+            disabled={isRegistered} activeOpacity={isRegistered ? 1 : 0.85}>
             <LinearGradient
               colors={isRegistered ? ['#555', '#444'] : [accent, accent + 'BB']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                 gap: 8, paddingVertical: 16, borderRadius: 14 }}>
-              {buyLoading ? <ActivityIndicator color="#fff" /> : (
-                <>
-                  <Icon name={isRegistered ? 'check' : isFree ? 'check-circle' : isInviteOnly ? 'lock' : 'tag'} size={20} color="#fff" />
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>
-                    {isRegistered ? 'Déjà inscrit' : isFree ? 'S\'inscrire gratuitement' : isInviteOnly ? 'Accès sur invitation' : 'Acheter un billet'}
-                  </Text>
-                  {!isRegistered && !isFree && !isInviteOnly && event.ticket_price != null && (
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' }}>{event.ticket_price} €</Text>
-                  )}
-                </>
+              <Icon name={isFree ? 'check-circle' : isInviteOnly ? 'lock' : 'tag'} size={20} color="#fff" />
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>
+                {isFree ? 'S\'inscrire gratuitement' : isInviteOnly ? 'Accès sur invitation' : 'Acheter un billet'}
+              </Text>
+              {!isFree && !isInviteOnly && event.ticket_price != null && (
+                <Text style={{ fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' }}>{event.ticket_price} €</Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
         )}
       </Animated.View>
+
+      {/* ── Sheet paiement billet ────────────────────────────────────── */}
+      {event && (
+        <TicketPaymentSheet
+          visible={paySheetOpen}
+          onClose={() => setPaySheetOpen(false)}
+          onSuccess={(ticket) => {
+            setIsRegistered(true);
+            if (ticket) {
+              const full = ticket.event ? ticket : { ...ticket, event };
+              setMyTicket(full);
+              nav.navigate('MyTicket' as any, { ticket: full });
+            }
+          }}
+          title={event.title}
+          accessType={event.access_type as any}
+          ticketPrice={event.ticket_price ?? null}
+          thumbnail={event.thumbnail_url ?? null}
+          kind="event"
+          onBuy={() => eventService.buyTicket(eventId)}
+        />
+      )}
 
       {/* ── Sheet commentaires ────────────────────────────────────────── */}
       {showComments && (
