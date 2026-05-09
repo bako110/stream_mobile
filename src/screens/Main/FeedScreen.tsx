@@ -48,7 +48,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 type FeedFilter = 'all' | 'events' | 'concerts' | 'posts';
 
 interface FeedItem {
-  kind:    'event' | 'concert' | 'reel' | 'post' | 'suggestions';
+  kind:    'event' | 'concert' | 'reel' | 'post' | 'suggestions' | 'communities';
   id:      string;
   data:    any;
 }
@@ -324,9 +324,12 @@ export const FeedScreen: React.FC = () => {
         }
         // Filtrer les contenus masqués ("Pas intéressé")
         const filtered = feedPreferenceService.filterFeed(deduped);
-        // Injecter les suggestions à une position aléatoire entre 5 et 15
+        // Injecter les suggestions entre pos 5 et 15
         const pos = Math.floor(Math.random() * 11) + 5;
         filtered.splice(Math.min(pos, filtered.length), 0, { kind: 'suggestions', id: '__suggestions__', data: null });
+        // Injecter les communautés entre pos 10 et 20 (après les suggestions)
+        const commPos = Math.floor(Math.random() * 11) + 10;
+        filtered.splice(Math.min(commPos, filtered.length), 0, { kind: 'communities', id: '__communities__', data: null });
         setItems(filtered);
       } else {
         // Filtre spécifique — fallback sur les services classiques
@@ -465,6 +468,100 @@ export const FeedScreen: React.FC = () => {
           onUserPress={id => nav.navigate('UserProfile', { userId: id })}
           onRefresh={loadSuggestions}
         />
+      );
+    }
+    if (item.kind === 'communities') {
+      if (!trendingComm.length) return null;
+      const COMM_GRADS: [string, string][] = [
+        ['#7B3FF2','#E0389A'],['#0EA5E9','#6366F1'],
+        ['#10B981','#0EA5E9'],['#F59E0B','#EF4444'],
+        ['#EC4899','#8B5CF6'],['#14B8A6','#3B82F6'],
+      ];
+      const gradFor = (name: string): [string, string] =>
+        COMM_GRADS[name.charCodeAt(0) % COMM_GRADS.length];
+      const fmtM = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+      return (
+        <Animated.View entering={FadeInDown.delay(40).springify()} style={{ marginTop: 6, marginBottom: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <LinearGradient colors={['#7B3FF2','#E0389A']} style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }} start={{x:0,y:0}} end={{x:1,y:1}}>
+                <Icon name="users" size={14} color="#fff" />
+              </LinearGradient>
+              <View>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.3 }}>Communautés</Text>
+                <Text style={{ fontSize: 11, color: colors.textTertiary }}>Rejoins des groupes actifs</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => nav.navigate('Communities' as any)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.primary + '15', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '700' }}>Voir tout</Text>
+              <Icon name="chevron-right" size={12} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 4 }}>
+            {trendingComm.map(comm => {
+              const grad = gradFor(comm.name);
+              const initial = (comm.name || '?')[0].toUpperCase();
+              return (
+                <TouchableOpacity
+                  key={comm.id}
+                  style={{ width: 148, borderRadius: 18, backgroundColor: colors.surface, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}
+                  activeOpacity={0.88}
+                  onPress={() => nav.navigate('CommunityDetail' as any, { communityId: comm.id })}
+                >
+                  <View style={{ height: 72, position: 'relative' }}>
+                    {comm.banner_url
+                      ? <Image source={{ uri: comm.banner_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      : <LinearGradient colors={grad} style={{ flex: 1 }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+                    }
+                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.45)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 36 }} pointerEvents="none" />
+                    <View style={{ position: 'absolute', bottom: 6, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <Icon name="users" size={9} color="rgba(255,255,255,0.9)" />
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{fmtM(comm.members_count ?? 0)}</Text>
+                    </View>
+                    <View style={{ position: 'absolute', top: 7, right: 7, flexDirection: 'row', gap: 4 }}>
+                      {comm.is_private && <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}><Icon name="lock" size={9} color="#fff" /></View>}
+                      {comm.is_verified && <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={10} color="#fff" /></View>}
+                    </View>
+                  </View>
+                  <View style={{ paddingHorizontal: 10, paddingBottom: 12 }}>
+                    <View style={{ marginTop: -14, marginBottom: 6 }}>
+                      <View style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 2.5, borderColor: colors.surface, overflow: 'hidden' }}>
+                        {comm.avatar_url
+                          ? <Image source={{ uri: comm.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                          : <LinearGradient colors={grad} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{initial}</Text></LinearGradient>
+                        }
+                      </View>
+                    </View>
+                    <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 13, letterSpacing: -0.2 }} numberOfLines={1}>{comm.name}</Text>
+                    {comm.description
+                      ? <Text style={{ color: colors.textTertiary, fontSize: 10, lineHeight: 13, marginTop: 2 }} numberOfLines={2}>{comm.description}</Text>
+                      : <Text style={{ color: colors.textDisabled, fontSize: 10, marginTop: 2, fontStyle: 'italic' }}>Communauté active</Text>
+                    }
+                    <TouchableOpacity style={{ marginTop: 8, borderRadius: 10, overflow: 'hidden' }} activeOpacity={0.85} onPress={() => nav.navigate('CommunityDetail' as any, { communityId: comm.id })}>
+                      <LinearGradient colors={grad} style={{ paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }} start={{x:0,y:0}} end={{x:1,y:0}}>
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Rejoindre</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={{ width: 90, borderRadius: 18, backgroundColor: colors.backgroundSecondary, borderWidth: 1.5, borderColor: colors.divider, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', paddingVertical: 20, gap: 8 }}
+              activeOpacity={0.85}
+              onPress={() => nav.navigate('Communities' as any)}
+            >
+              <LinearGradient colors={['#7B3FF2','#E0389A']} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }} start={{x:0,y:0}} end={{x:1,y:1}}>
+                <Icon name="compass" size={18} color="#fff" />
+              </LinearGradient>
+              <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 14 }}>Explorer{'\n'}tout</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
       );
     }
     if (item.kind === 'reel') {
@@ -1040,162 +1137,6 @@ export const FeedScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* ── Communautés tendance ─────────────────────────────── */}
-              {trendingComm.length > 0 && (() => {
-                const COMM_GRADS: [string,string][] = [
-                  ['#7B3FF2','#E0389A'],['#0EA5E9','#6366F1'],
-                  ['#10B981','#0EA5E9'],['#F59E0B','#EF4444'],
-                  ['#EC4899','#8B5CF6'],['#14B8A6','#3B82F6'],
-                ];
-                const gradFor = (name: string): [string,string] =>
-                  COMM_GRADS[name.charCodeAt(0) % COMM_GRADS.length];
-                const fmtM = (n: number) => n >= 1000 ? `${(n/1000).toFixed(1)}k` : String(n);
-                return (
-                  <Animated.View entering={FadeInDown.delay(40).springify()} style={{ marginTop: 6, marginBottom: 2 }}>
-                    {/* En-tête */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <LinearGradient colors={['#7B3FF2','#E0389A']} style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }} start={{x:0,y:0}} end={{x:1,y:1}}>
-                          <Icon name="users" size={14} color="#fff" />
-                        </LinearGradient>
-                        <View>
-                          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.3 }}>Communautés</Text>
-                          <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 0 }}>Rejoins des groupes actifs</Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => nav.navigate('Communities' as any)}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.primary + '15', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '700' }}>Voir tout</Text>
-                        <Icon name="chevron-right" size={12} color={colors.primary} />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Cards horizontales */}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 4 }}>
-                      {trendingComm.map((comm, idx) => {
-                        const grad = gradFor(comm.name);
-                        const initial = (comm.name || '?')[0].toUpperCase();
-                        return (
-                          <TouchableOpacity
-                            key={comm.id}
-                            style={{
-                              width: 148,
-                              borderRadius: 18,
-                              backgroundColor: colors.surface,
-                              overflow: 'hidden',
-                              shadowColor: '#000',
-                              shadowOpacity: 0.10,
-                              shadowRadius: 10,
-                              shadowOffset: { width: 0, height: 4 },
-                              elevation: 4,
-                            }}
-                            activeOpacity={0.88}
-                            onPress={() => nav.navigate('CommunityDetail' as any, { communityId: comm.id })}
-                          >
-                            {/* Bannière */}
-                            <View style={{ height: 72, position: 'relative' }}>
-                              {comm.banner_url
-                                ? <Image source={{ uri: comm.banner_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                : <LinearGradient colors={grad} style={{ flex: 1 }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
-                              }
-                              {/* Gradient overlay bas pour lisibilité */}
-                              <LinearGradient
-                                colors={['transparent', 'rgba(0,0,0,0.45)']}
-                                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 36 }}
-                                pointerEvents="none"
-                              />
-                              {/* Badge membres en bas gauche */}
-                              <View style={{ position: 'absolute', bottom: 6, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Icon name="users" size={9} color="rgba(255,255,255,0.9)" />
-                                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{fmtM(comm.members_count ?? 0)}</Text>
-                              </View>
-                              {/* Badge vérifié + privé */}
-                              <View style={{ position: 'absolute', top: 7, right: 7, flexDirection: 'row', gap: 4 }}>
-                                {comm.is_private && (
-                                  <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Icon name="lock" size={9} color="#fff" />
-                                  </View>
-                                )}
-                                {comm.is_verified && (
-                                  <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Icon name="check" size={10} color="#fff" />
-                                  </View>
-                                )}
-                              </View>
-                            </View>
-
-                            {/* Corps */}
-                            <View style={{ paddingHorizontal: 10, paddingBottom: 12 }}>
-                              {/* Avatar flottant */}
-                              <View style={{ marginTop: -14, marginBottom: 6 }}>
-                                <View style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 2.5, borderColor: colors.surface, overflow: 'hidden' }}>
-                                  {comm.avatar_url
-                                    ? <Image source={{ uri: comm.avatar_url }} style={{ width: '100%', height: '100%' }} />
-                                    : <LinearGradient colors={grad} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{initial}</Text>
-                                      </LinearGradient>
-                                  }
-                                </View>
-                              </View>
-
-                              {/* Nom */}
-                              <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 13, letterSpacing: -0.2 }} numberOfLines={1}>
-                                {comm.name}
-                              </Text>
-
-                              {/* Description */}
-                              {comm.description ? (
-                                <Text style={{ color: colors.textTertiary, fontSize: 10, lineHeight: 13, marginTop: 2 }} numberOfLines={2}>
-                                  {comm.description}
-                                </Text>
-                              ) : (
-                                <Text style={{ color: colors.textDisabled, fontSize: 10, marginTop: 2, fontStyle: 'italic' }}>
-                                  Communauté active
-                                </Text>
-                              )}
-
-                              {/* Bouton rejoindre */}
-                              <TouchableOpacity
-                                style={{ marginTop: 8, borderRadius: 10, overflow: 'hidden' }}
-                                activeOpacity={0.85}
-                                onPress={() => nav.navigate('CommunityDetail' as any, { communityId: comm.id })}
-                              >
-                                <LinearGradient colors={grad} style={{ paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }} start={{x:0,y:0}} end={{x:1,y:0}}>
-                                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Rejoindre</Text>
-                                </LinearGradient>
-                              </TouchableOpacity>
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-
-                      {/* Card "Explorer" */}
-                      <TouchableOpacity
-                        style={{
-                          width: 90, borderRadius: 18,
-                          backgroundColor: colors.backgroundSecondary,
-                          borderWidth: 1.5, borderColor: colors.divider,
-                          borderStyle: 'dashed',
-                          alignItems: 'center', justifyContent: 'center',
-                          paddingVertical: 20, gap: 8,
-                        }}
-                        activeOpacity={0.85}
-                        onPress={() => nav.navigate('Communities' as any)}
-                      >
-                        <LinearGradient colors={['#7B3FF2','#E0389A']} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }} start={{x:0,y:0}} end={{x:1,y:1}}>
-                          <Icon name="compass" size={18} color="#fff" />
-                        </LinearGradient>
-                        <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 14 }}>
-                          Explorer{'\n'}tout
-                        </Text>
-                      </TouchableOpacity>
-                    </ScrollView>
-                  </Animated.View>
-                );
-              })()}
 
 
             </>
