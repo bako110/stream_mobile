@@ -286,11 +286,14 @@ export const FeedScreen: React.FC = () => {
   const load = useCallback(async (f: FeedFilter) => {
     try {
       if (f === 'all') {
-        const [feedResult, reelsResult, postsResult] = await Promise.all([
+        const [feedResult, reelsResult, postsResult, commResult] = await Promise.all([
           searchService.getFeed(1, 50).catch(() => ({ items: [] })),
           reelService.getFeed().catch(() => ({ items: [], has_more: false, page: 1 })),
           postService.getFeed(1, 30).catch(() => [] as Post[]),
+          communityService.list(1, 8).catch(() => []),
         ]);
+        const commData = Array.isArray(commResult) ? commResult.slice(0, 5) : [];
+        setTrendingComm(commData);
         if (__DEV__) {
           console.log('[Feed] feedResult:', JSON.stringify(feedResult).slice(0, 300));
           console.log('[Feed] reelsResult:', JSON.stringify(reelsResult).slice(0, 300));
@@ -328,8 +331,10 @@ export const FeedScreen: React.FC = () => {
         const pos = Math.floor(Math.random() * 11) + 5;
         filtered.splice(Math.min(pos, filtered.length), 0, { kind: 'suggestions', id: '__suggestions__', data: null });
         // Injecter les communautés entre pos 10 et 20 (après les suggestions)
-        const commPos = Math.floor(Math.random() * 11) + 10;
-        filtered.splice(Math.min(commPos, filtered.length), 0, { kind: 'communities', id: '__communities__', data: null });
+        if (commData.length > 0) {
+          const commPos = Math.floor(Math.random() * 11) + 10;
+          filtered.splice(Math.min(commPos, filtered.length), 0, { kind: 'communities', id: '__communities__', data: commData });
+        }
         setItems(filtered);
       } else {
         // Filtre spécifique — fallback sur les services classiques
@@ -384,7 +389,6 @@ export const FeedScreen: React.FC = () => {
 
   useEffect(() => {
     loadLive();
-    communityService.list(1, 8).then(data => setTrendingComm(Array.isArray(data) ? data.slice(0, 5) : [])).catch(() => {});
   }, []);
 
   // WS : nouveau live spontané démarré
@@ -471,7 +475,8 @@ export const FeedScreen: React.FC = () => {
       );
     }
     if (item.kind === 'communities') {
-      if (!trendingComm.length) return null;
+      const comms: CommunityData[] = Array.isArray(item.data) ? item.data : [];
+      if (!comms.length) return null;
       const COMM_GRADS: [string, string][] = [
         ['#7B3FF2','#E0389A'],['#0EA5E9','#6366F1'],
         ['#10B981','#0EA5E9'],['#F59E0B','#EF4444'],
@@ -502,7 +507,7 @@ export const FeedScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 4 }}>
-            {trendingComm.map(comm => {
+            {comms.map(comm => {
               const grad = gradFor(comm.name);
               const initial = (comm.name || '?')[0].toUpperCase();
               return (
