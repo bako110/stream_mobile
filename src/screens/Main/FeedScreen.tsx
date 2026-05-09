@@ -516,9 +516,12 @@ export const FeedScreen: React.FC = () => {
         <View style={[cs.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
           {/* Header identique aux suggestions */}
           <View style={cs.header}>
-            <Text style={[cs.title, { color: colors.textPrimary }]}>Communautés</Text>
+            <View>
+              <Text style={[cs.title, { color: colors.textPrimary }]}>Ta tribu t'attend 🤝</Text>
+              <Text style={[cs.subtitle, { color: colors.textTertiary }]}>Des espaces faits pour toi, rejoins-les</Text>
+            </View>
             <TouchableOpacity onPress={() => nav.navigate('Communities' as any)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={[cs.seeAll, { color: colors.primary }]}>Voir tout</Text>
+              <Text style={[cs.seeAll, { color: colors.primary }]}>Explorer</Text>
             </TouchableOpacity>
           </View>
           {/* Scroll horizontal identique */}
@@ -567,7 +570,7 @@ export const FeedScreen: React.FC = () => {
                       onPress={() => nav.navigate('CommunityDetail' as any, { communityId: comm.id })}
                     >
                       <Icon name="users" size={14} color="#fff" />
-                      <Text style={cs.joinText}>Rejoindre</Text>
+                      <Text style={cs.joinText}>Nous rejoindre</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -1554,6 +1557,7 @@ const cs = StyleSheet.create({
   wrap:      { paddingVertical: 14, marginBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
   header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
   title:     { fontSize: 16, fontWeight: '800' },
+  subtitle:  { fontSize: 11, marginTop: 2 },
   seeAll:    { fontSize: 13, fontWeight: '700' },
   list:      { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
   card:      { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },

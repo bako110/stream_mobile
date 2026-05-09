@@ -55,9 +55,12 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
 
       {/* Header */}
       <View style={st.header}>
-        <Text style={[st.title, { color: colors.textPrimary }]}>Vous connaissez peut-être...</Text>
+        <View>
+          <Text style={[st.title, { color: colors.textPrimary }]}>Des gens qui te ressemblent ✨</Text>
+          <Text style={[st.subtitle, { color: colors.textTertiary }]}>Élargis ton cercle, un abonnement à la fois</Text>
+        </View>
         <TouchableOpacity onPress={onRefresh} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={[st.seeAll, { color: colors.primary }]}>Actualiser</Text>
+          <Text style={[st.seeAll, { color: colors.primary }]}>Rafraîchir</Text>
         </TouchableOpacity>
       </View>
 
@@ -157,7 +160,7 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                             color={followed ? colors.textSecondary : '#fff'}
                           />
                           <Text style={[st.followText, { color: followed ? colors.textSecondary : '#fff' }]}>
-                            {followed ? 'Abonné' : 'Suivre'}
+                            {followed ? 'Abonné ✓' : 'Suivre'}
                           </Text>
                         </>
                       )}
@@ -176,6 +179,7 @@ const st = StyleSheet.create({
   wrap:       { paddingVertical: 14, marginBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
   title:      { fontSize: 16, fontWeight: '800' },
+  subtitle:   { fontSize: 11, marginTop: 2 },
   seeAll:     { fontSize: 13, fontWeight: '700' },
   list:       { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
 
