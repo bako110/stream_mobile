@@ -332,15 +332,32 @@ export const FeedScreen: React.FC = () => {
         }
         // Filtrer les contenus masqués ("Pas intéressé")
         const filtered = feedPreferenceService.filterFeed(deduped);
-        // Injecter les suggestions entre pos 5 et 15
-        const pos = Math.floor(Math.random() * 11) + 5;
-        filtered.splice(Math.min(pos, filtered.length), 0, { kind: 'suggestions', id: '__suggestions__', data: null });
-        // Injecter les communautés après les suggestions (pos entre 8 et 18, clampé à la taille réelle)
-        if (commData.length > 0) {
-          const commPos = Math.min(Math.floor(Math.random() * 11) + 8, filtered.length);
-          filtered.splice(commPos, 0, { kind: 'communities', id: '__communities__', data: commData });
-        }
-        setItems(filtered);
+
+        // Injecter suggestions et communities à intervalles réguliers
+        // toutes les ~8 items pour suggestions, ~12 pour communities
+        const SUGGEST_EVERY = 8;
+        const COMM_EVERY    = 12;
+        const result: FeedItem[] = [];
+        let suggestCount = 0;
+        let commCount    = 0;
+
+        filtered.forEach((item, i) => {
+          result.push(item);
+
+          // Suggestions : première à pos 5, puis toutes les SUGGEST_EVERY
+          if (i === 4 || (i > 4 && (i - 4) % SUGGEST_EVERY === 0)) {
+            suggestCount += 1;
+            result.push({ kind: 'suggestions', id: `__suggestions__${suggestCount}`, data: null });
+          }
+
+          // Communities : première à pos 10, puis toutes les COMM_EVERY
+          if (commData.length > 0 && (i === 9 || (i > 9 && (i - 9) % COMM_EVERY === 0))) {
+            commCount += 1;
+            result.push({ kind: 'communities', id: `__communities__${commCount}`, data: commData });
+          }
+        });
+
+        setItems(result);
       } else {
         // Filtre spécifique — fallback sur les services classiques
         const results: FeedItem[] = [];
