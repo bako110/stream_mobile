@@ -37,14 +37,68 @@ export interface Event {
   organizer?: import('./user').User;
 }
 
+export type TicketStatus = 'valid' | 'used' | 'refunded' | 'expired';
+
 export interface EventTicket {
   id: string;
   user_id: string;
   event_id: string;
+  status: TicketStatus;
   price_paid: number;
-  is_used: boolean;
+  currency: string;
+  access_code: string;
+  used_at: string | null;
+  expires_at: string | null;
   created_at: string;
   event?: Event;
+  user?: import('./user').User;
+  // Alias de compatibilité avec les anciens composants
+  is_used?: boolean;
+}
+
+export interface EventAttendee {
+  ticket_id: string;
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  email?: string | null;
+  price_paid: number;
+  status: TicketStatus;
+  used_at: string | null;
+  registered_at: string;
+}
+
+/** Résultat complet renvoyé par le scan d'un QR billet */
+export interface TicketScanResult {
+  ticket_id: string;
+  access_code: string;
+  status: TicketStatus;
+  is_valid: boolean;
+  price_paid: number;
+  currency: string;
+  used_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  user: {
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified: boolean;
+  };
+  event: {
+    id: string;
+    title: string;
+    venue_name: string | null;
+    venue_address: string | null;
+    venue_city: string;
+    venue_country: string;
+    starts_at: string;
+    ends_at: string | null;
+    thumbnail_url: string | null;
+    organizer_id: string;
+  };
 }
 
 export interface EventCreate {

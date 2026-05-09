@@ -49,6 +49,9 @@ import { VideoPlayerScreen }     from '../screens/Detail/VideoPlayerScreen';
 import { CommunityDetailScreen }   from '../screens/Detail/CommunityDetailScreen';
 import { AdminVerificationScreen } from '../screens/Detail/AdminVerificationScreen';
 import { PostDetailScreen }      from '../screens/Detail/PostDetailScreen';
+import { MyTicketScreen }        from '../screens/Detail/MyTicketScreen';
+import { AttendeesScreen }       from '../screens/Detail/AttendeesScreen';
+import { TicketScannerScreen }   from '../screens/Detail/TicketScannerScreen';
 import { UserProfileScreen }     from '../screens/Profile/UserProfileScreen';
 import { EditProfileScreen }     from '../screens/Profile/EditProfileScreen';
 import { MyStoriesScreen }       from '../screens/Profile/MyStoriesScreen';
@@ -85,6 +88,9 @@ export type MainStackParamList = {
   CreateReel:      { reelPublished?: boolean } | undefined;
   ConcertDetail:   { concertId: string };
   EventDetail:     { eventId:   string };
+  MyTicket:        { ticket: any };
+  Attendees:       { eventId: string; eventTitle: string };
+  TicketScanner:   { eventId: string; eventTitle: string };
   UserProfile:     { userId:    string };
   EditProfile:     undefined;
   Messages:        undefined;
@@ -116,7 +122,7 @@ export type MainStackParamList = {
   LiveViewer:        { concertId: string };
   SimpleLiveList:    undefined;
   GoLive:            undefined;
-  SimpleLiveStream:  { liveId: string; publisherToken: string; livekitUrl: string };
+  SimpleLiveStream:  { liveId: string; publisherToken: string; livekitUrl: string; userId: string };
   SimpleLiveViewer:  { liveId: string };
   Activity:        undefined;
   MyStories:       undefined;
@@ -149,6 +155,16 @@ const CreateEventWrapper: React.FC<any>    = ({ navigation, route }) => <CreateE
 const CreateConcertWrapper: React.FC<any>  = ({ navigation, route }) => <CreateConcertScreen concertId={route.params?.concertId} onBack={() => navigation.goBack()} />;
 const CreatePostWrapper: React.FC<any>     = ({ navigation }) => <CreatePostScreen onBack={() => navigation.goBack()} onPostCreated={() => navigation.goBack()} />;
 const PostDetailWrapper: React.FC<any>     = ({ navigation, route }) => <PostDetailScreen postId={route.params.postId} onBack={() => navigation.goBack()} onAuthorPress={(userId: string) => navigation.navigate('UserProfile', { userId })} navigation={navigation} />;
+const MyTicketWrapper: React.FC<any>       = ({ navigation, route }) => <MyTicketScreen ticket={route.params.ticket} onBack={() => navigation.goBack()} />;
+const AttendeesWrapper: React.FC<any>      = ({ navigation, route }) => (
+  <AttendeesScreen
+    eventId={route.params.eventId}
+    eventTitle={route.params.eventTitle}
+    onBack={() => navigation.goBack()}
+    onScan={() => navigation.navigate('TicketScanner', { eventId: route.params.eventId, eventTitle: route.params.eventTitle })}
+  />
+);
+const TicketScannerWrapper: React.FC<any>  = ({ navigation, route }) => <TicketScannerScreen eventId={route.params.eventId} eventTitle={route.params.eventTitle} onBack={() => navigation.goBack()} />;
 
 // ── ProfileScreen wrapper ─────────────────────────────────────────────────────
 
@@ -199,7 +215,6 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
 
   return (
     <>
-      <NotificationToast />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs"           children={() => <Tabs onLogout={onLogout} />} />
         <Stack.Screen name="Feed"           component={FeedScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
@@ -247,6 +262,9 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="UserReels"      component={UserReelsScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreatePost"     component={CreatePostWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="PostDetail"     component={PostDetailWrapper}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="MyTicket"       component={MyTicketWrapper}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Attendees"      component={AttendeesWrapper}      options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="TicketScanner"  component={TicketScannerWrapper}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Wallet"         component={WalletScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="BuyCoins"       component={BuyCoinsScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreatorDashboard" component={CreatorDashboardScreen} options={{ animation: 'slide_from_right' }} />
@@ -256,6 +274,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="AdminVerification" component={AdminVerificationScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="WebQRScanner"      component={WebQRScannerScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       </Stack.Navigator>
+      <NotificationToast />
     </>
   );
 };

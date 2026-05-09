@@ -1,5 +1,5 @@
 import { apiClient, Endpoints } from '../api';
-import type { Event, EventTicket, EventCreate, EventUpdate } from '../types';
+import type { Event, EventTicket, EventAttendee, EventCreate, EventUpdate, TicketScanResult } from '../types';
 import { DEFAULT_PAGE_LIMIT } from '../utils/constants';
 
 export const eventService = {
@@ -72,6 +72,27 @@ export const eventService = {
 
   async getMyTickets(): Promise<EventTicket[]> {
     const res = await apiClient.get<EventTicket[]>(Endpoints.events.myTickets);
+    return res.data;
+  },
+
+  async getAttendees(eventId: string): Promise<EventAttendee[]> {
+    const res = await apiClient.get<EventAttendee[]>(Endpoints.events.attendees(eventId));
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
+  async getAttendeesCsvUrl(eventId: string): Promise<string> {
+    return Endpoints.events.attendeesCsv(eventId);
+  },
+
+  // ── Scan QR billet ────────────────────────────────────────────────────────
+
+  async scanTicket(eventId: string, accessCode: string): Promise<TicketScanResult> {
+    const res = await apiClient.get<TicketScanResult>(Endpoints.events.scanTicket(eventId, accessCode));
+    return res.data;
+  },
+
+  async validateTicketByQr(eventId: string, accessCode: string): Promise<TicketScanResult> {
+    const res = await apiClient.post<TicketScanResult>(Endpoints.events.validateByQr(eventId, accessCode));
     return res.data;
   },
 

@@ -126,6 +126,10 @@ export const Endpoints = {
     buyTicket:      (eventId: string)  => `${V1}/events/${eventId}/tickets`,
     myTickets:      `${V1}/events/tickets/me`,
     validateTicket: (ticketId: string) => `${V1}/events/tickets/${ticketId}/validate`,
+    attendees:      (eventId: string)  => `${V1}/events/${eventId}/attendees`,
+    attendeesCsv:   (eventId: string)  => `${V1}/events/${eventId}/attendees/export`,
+    scanTicket:     (eventId: string, accessCode: string) => `${V1}/events/${eventId}/scan/${accessCode}`,
+    validateByQr:   (eventId: string, accessCode: string) => `${V1}/events/${eventId}/scan/${accessCode}/validate`,
   },
 
   // ── Reels (prefix: /api/v1/reels) ─────────────────────────────────────────
