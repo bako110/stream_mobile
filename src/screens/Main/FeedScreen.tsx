@@ -292,8 +292,13 @@ export const FeedScreen: React.FC = () => {
           postService.getFeed(1, 30).catch(() => [] as Post[]),
           communityService.list(1, 8).catch(() => []),
         ]);
-        const commData = Array.isArray(commResult) ? commResult.slice(0, 5) : [];
+        const commData: CommunityData[] = Array.isArray(commResult)
+          ? commResult.slice(0, 5)
+          : Array.isArray((commResult as any)?.items)
+            ? (commResult as any).items.slice(0, 5)
+            : [];
         setTrendingComm(commData);
+        if (__DEV__) console.log('[Feed] commData:', commData.length, JSON.stringify(commData).slice(0, 200));
         if (__DEV__) {
           console.log('[Feed] feedResult:', JSON.stringify(feedResult).slice(0, 300));
           console.log('[Feed] reelsResult:', JSON.stringify(reelsResult).slice(0, 300));
@@ -330,10 +335,10 @@ export const FeedScreen: React.FC = () => {
         // Injecter les suggestions entre pos 5 et 15
         const pos = Math.floor(Math.random() * 11) + 5;
         filtered.splice(Math.min(pos, filtered.length), 0, { kind: 'suggestions', id: '__suggestions__', data: null });
-        // Injecter les communautés entre pos 10 et 20 (après les suggestions)
+        // Injecter les communautés après les suggestions (pos entre 8 et 18, clampé à la taille réelle)
         if (commData.length > 0) {
-          const commPos = Math.floor(Math.random() * 11) + 10;
-          filtered.splice(Math.min(commPos, filtered.length), 0, { kind: 'communities', id: '__communities__', data: commData });
+          const commPos = Math.min(Math.floor(Math.random() * 11) + 8, filtered.length);
+          filtered.splice(commPos, 0, { kind: 'communities', id: '__communities__', data: commData });
         }
         setItems(filtered);
       } else {
