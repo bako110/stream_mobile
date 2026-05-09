@@ -1388,13 +1388,10 @@ const ReelFeedCard: React.FC<{
     return () => sub.remove();
   }, [player]);
 
-  // aspectRatio du container selon le format détecté
-  // 9:16 portrait → 9/16 ≈ 0.5625 | 16:9 paysage → 16/9 ≈ 1.78 | inconnu → 1/0.88 (carré large)
-  const thumbAspectRatio = isPortrait === true
-    ? 9 / 16
-    : isPortrait === false
-      ? 16 / 9
-      : 1 / 0.88;
+  // 9:16 portrait → même hauteur que les autres cards (1/0.88), vidéo en cover centrée
+  // 16:9 paysage  → ratio natif 16/9, vidéo intacte
+  // inconnu       → fallback 1/0.88
+  const thumbAspectRatio = isPortrait === false ? 16 / 9 : 1 / 0.88;
 
   const timeAgo = (iso: string) => {
     const diff = (Date.now() - new Date(iso).getTime()) / 1000;
