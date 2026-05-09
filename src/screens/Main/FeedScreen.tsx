@@ -1419,9 +1419,41 @@ const ReelFeedCard: React.FC<{
   const name     = author?.display_name ?? author?.username ?? 'Utilisateur';
   const initials = name[0]?.toUpperCase() ?? '?';
 
-  const [muted,    setMuted]    = useState(true);
-  const [paused,   setPaused]   = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [muted,      setMuted]      = useState(true);
+  const [paused,     setPaused]     = useState(false);
+  const [progress,   setProgress]   = useState(0);
+  // null = pas encore détecté, true = portrait 9:16, false = paysage 16:9
+  const [isPortrait, setIsPortrait] = useState<boolean | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  // Détection du ratio depuis le thumbnail
+  useEffect(() => {
+    if (!reel.thumbnail_url) return;
+    Image.getSize(
+      reel.thumbnail_url,
+      (w, h) => { if (mountedRef.current) setIsPortrait(h >= w); },
+      () => { if (mountedRef.current) setIsPortrait(true); },
+    );
+  }, [reel.thumbnail_url]);
+
+  // Confirmation via les vraies dimensions de la vidéo
+  useEffect(() => {
+    const sub = player.addEventListener('onLoad', (data: any) => {
+      if (data?.width && data?.height && mountedRef.current) {
+        setIsPortrait(data.height >= data.width);
+      }
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  // aspectRatio du container selon le format détecté
+  // 9:16 portrait → 9/16 ≈ 0.5625 | 16:9 paysage → 16/9 ≈ 1.78 | inconnu → 1/0.88 (carré large)
+  const thumbAspectRatio = isPortrait === true
+    ? 9 / 16
+    : isPortrait === false
+      ? 16 / 9
+      : 1 / 0.88;
 
   const timeAgo = (iso: string) => {
     const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -1488,27 +1520,34 @@ const ReelFeedCard: React.FC<{
         onPressIn={() => onScrollLock?.(false)}
         onPressOut={() => onScrollLock?.(true)}
       >
-        <View style={rs.thumbWrap}>
-          {/* Fond par défaut quand pas de thumbnail */}
-          {!reel.thumbnail_url && !playing ? (
-            <LinearGradient
-              colors={['#1a1a2e', '#16213e', '#0f3460']}
+        <View style={[rs.thumbWrap, { aspectRatio: thumbAspectRatio, backgroundColor: '#000' }]}>
+          {/* Fond noir toujours présent pour les 16:9 */}
+
+          {/* Thumbnail — portrait en cover, paysage en contain */}
+          {reel.thumbnail_url && !playing ? (
+            <Image
+              source={{ uri: reel.thumbnail_url }}
               style={StyleSheet.absoluteFill}
-            >
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <Icon name="film" size={36} color="rgba(255,255,255,0.3)" />
-              </View>
-            </LinearGradient>
+              resizeMode={isPortrait === false ? 'contain' : 'cover'}
+            />
           ) : null}
 
-          {/* Thumbnail affiché tant que non actif ou en chargement */}
-          {reel.thumbnail_url && !playing ? (
-            <Image source={{ uri: reel.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          {/* Fallback sans thumbnail */}
+          {!reel.thumbnail_url && !playing ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="film" size={36} color="rgba(255,255,255,0.2)" />
+            </View>
           ) : null}
 
           {/* Lecteur vidéo — actif uniquement si isActive */}
           {isActive && reel.video_url ? (
-            <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />
+            <VideoView
+              player={player}
+              style={StyleSheet.absoluteFill}
+              resizeMode={isPortrait === false ? 'contain' : 'cover'}
+              controls={false}
+              surfaceType="texture"
+            />
           ) : null}
 
           {/* Gradient bas */}
@@ -1568,7 +1607,7 @@ const rs = StyleSheet.create({
   reelBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   reelBadgeText: { fontSize: 10, fontWeight: '700' },
   caption:     { paddingHorizontal: 12, paddingBottom: 8, fontSize: 14, lineHeight: 20 },
-  thumbWrap:    { width: '100%', aspectRatio: 1 / 0.88, position: 'relative', overflow: 'hidden' },
+  thumbWrap:    { width: '100%', position: 'relative', overflow: 'hidden' },
   thumb:        { width: '100%', height: '100%' },
   thumbGradient:{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
   playOverlay:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },

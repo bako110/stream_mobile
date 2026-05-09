@@ -757,7 +757,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [barFocused,     setBarFocused]     = useState(false);
   const [reportVisible,  setReportVisible]  = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
-  const [isPortrait,     setIsPortrait]     = useState(true);
+  // Ratio détecté depuis le thumbnail (disponible avant la vidéo)
+  // puis confirmé par onLoad de la vidéo
+  const [isPortrait, setIsPortrait] = useState<boolean | null>(null);
   const [refInfo, setRefInfo] = useState<{
     label: string; kind: string; thumbnail: string | null; color: string;
   } | null>(null);
@@ -792,6 +794,16 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Ratio depuis le thumbnail (détection rapide avant la vidéo) ─────────
+  useEffect(() => {
+    if (!reel.thumbnail_url) return;
+    Image.getSize(
+      reel.thumbnail_url,
+      (w, h) => { if (mountedRef.current && isPortrait === null) setIsPortrait(h >= w); },
+      () => { if (mountedRef.current && isPortrait === null) setIsPortrait(true); },
+    );
+  }, [reel.thumbnail_url]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Événements player ─────────────────────────────────────────────────────
   useEffect(() => {
     const subEnd    = player.addEventListener('onEnd', () => { if (isActive) onEnd(); });
@@ -799,6 +811,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       if (mountedRef.current) setBuffering(val);
     });
     const subLoad   = player.addEventListener('onLoad', (data: any) => {
+      // Confirmation finale via les vraies dimensions de la vidéo
       if (data?.width && data?.height && mountedRef.current) {
         setIsPortrait(data.height >= data.width);
       }
@@ -1014,12 +1027,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
 
-      {/* Thumbnail en arrière-plan (fallback pendant le chargement vidéo) */}
-      {reel.thumbnail_url && (
+      {/* Thumbnail en arrière-plan uniquement pour les vidéos portrait */}
+      {reel.thumbnail_url && isPortrait !== false && (
         <Image
           source={{ uri: reel.thumbnail_url }}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH, zIndex: -1 }}
-          resizeMode={isPortrait ? 'cover' : 'contain'}
+          resizeMode="cover"
         />
       )}
 
@@ -1027,7 +1040,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       <VideoView
         player={player}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}
-        resizeMode={isPortrait ? 'cover' : 'contain'}
+        resizeMode={isPortrait === false ? 'contain' : 'cover'}
         controls={false}
         surfaceType="texture"
       />
