@@ -13,75 +13,100 @@ import { postService } from '../../services/postService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const GRID_H  = SCREEN_W * 0.55;
-const HALF_H  = GRID_H / 2 - 1;
+const GAP    = 3;
+const RADIUS = 12;
+const GRID_H = SCREEN_W * 0.62;
+const HALF_H = (GRID_H - GAP) / 2;
 
 interface ImageGridProps {
   urls: string[];
   onPressImage?: (index: number) => void;
 }
 
+const ImgTile: React.FC<{
+  uri: string; style: any; radius?: { tl?: number; tr?: number; bl?: number; br?: number };
+  onPress?: () => void; overlay?: React.ReactNode;
+}> = ({ uri, style, radius = {}, onPress, overlay }) => {
+  const br = {
+    borderTopLeftRadius:     radius.tl ?? 0,
+    borderTopRightRadius:    radius.tr ?? 0,
+    borderBottomLeftRadius:  radius.bl ?? 0,
+    borderBottomRightRadius: radius.br ?? 0,
+  };
+  return (
+    <TouchableOpacity activeOpacity={0.88} onPress={onPress} style={[style, br, { overflow: 'hidden' }]}>
+      <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+      {overlay}
+    </TouchableOpacity>
+  );
+};
+
 const ImageGrid: React.FC<ImageGridProps> = ({ urls, onPressImage }) => {
   const n = urls.length;
   if (n === 0) return null;
 
+  // 1 image — pleine largeur, ratio 4:3, coins arrondis partout
   if (n === 1) {
     return (
-      <TouchableOpacity activeOpacity={0.92} onPress={() => onPressImage?.(0)}>
-        <Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 4 / 3 }} resizeMode="cover" />
-      </TouchableOpacity>
+      <ImgTile
+        uri={urls[0]}
+        style={{ width: '100%', aspectRatio: 4 / 3 }}
+        radius={{ tl: RADIUS, tr: RADIUS, bl: RADIUS, br: RADIUS }}
+        onPress={() => onPressImage?.(0)}
+      />
     );
   }
 
+  // 2 images — côte à côte, même hauteur, coins extérieurs arrondis
   if (n === 2) {
+    const W = (SCREEN_W - GAP) / 2;
     return (
-      <View style={{ flexDirection: 'row', height: GRID_H }}>
-        {urls.map((uri, i) => (
-          <TouchableOpacity key={i} activeOpacity={0.92} style={{ flex: 1, marginLeft: i === 1 ? 2 : 0 }} onPress={() => onPressImage?.(i)}>
-            <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-          </TouchableOpacity>
-        ))}
+      <View style={{ flexDirection: 'row', height: GRID_H, gap: GAP }}>
+        <ImgTile uri={urls[0]} style={{ width: W, height: GRID_H }} radius={{ tl: RADIUS, bl: RADIUS }} onPress={() => onPressImage?.(0)} />
+        <ImgTile uri={urls[1]} style={{ width: W, height: GRID_H }} radius={{ tr: RADIUS, br: RADIUS }} onPress={() => onPressImage?.(1)} />
       </View>
     );
   }
 
+  // 3 images — grande à gauche, 2 petites à droite empilées
   if (n === 3) {
+    const W = (SCREEN_W - GAP) / 2;
     return (
-      <View style={{ flexDirection: 'row', height: GRID_H }}>
-        <TouchableOpacity activeOpacity={0.92} style={{ flex: 1 }} onPress={() => onPressImage?.(0)}>
-          <Image source={{ uri: urls[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 2 }}>
-          {[1, 2].map(i => (
-            <TouchableOpacity key={i} activeOpacity={0.92} style={{ flex: 1, marginTop: i === 2 ? 2 : 0 }} onPress={() => onPressImage?.(i)}>
-              <Image source={{ uri: urls[i] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-            </TouchableOpacity>
-          ))}
+      <View style={{ flexDirection: 'row', height: GRID_H, gap: GAP }}>
+        <ImgTile uri={urls[0]} style={{ width: W, height: GRID_H }} radius={{ tl: RADIUS, bl: RADIUS }} onPress={() => onPressImage?.(0)} />
+        <View style={{ width: W, gap: GAP }}>
+          <ImgTile uri={urls[1]} style={{ height: HALF_H }} radius={{ tr: RADIUS }} onPress={() => onPressImage?.(1)} />
+          <ImgTile uri={urls[2]} style={{ height: HALF_H }} radius={{ br: RADIUS }} onPress={() => onPressImage?.(2)} />
         </View>
       </View>
     );
   }
 
-  // 4+
+  // 4+ images — grille 2×2, coins extérieurs arrondis, badge +N sur la dernière
   const shown = urls.slice(0, 4);
   const extra = n - 4;
+  const W = (SCREEN_W - GAP) / 2;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', height: GRID_H }}>
-      {shown.map((uri, i) => (
-        <TouchableOpacity
-          key={i}
-          activeOpacity={0.92}
-          style={{ width: SCREEN_W / 2 - 1, height: HALF_H, marginLeft: i % 2 === 1 ? 2 : 0, marginTop: i >= 2 ? 2 : 0 }}
-          onPress={() => onPressImage?.(i)}
-        >
-          <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-          {i === 3 && extra > 0 && (
-            <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>+{extra}</Text>
+    <View style={{ height: GRID_H, gap: GAP }}>
+      <View style={{ flexDirection: 'row', height: HALF_H, gap: GAP }}>
+        <ImgTile uri={shown[0]} style={{ width: W, height: HALF_H }} radius={{ tl: RADIUS }} onPress={() => onPressImage?.(0)} />
+        <ImgTile uri={shown[1]} style={{ width: W, height: HALF_H }} radius={{ tr: RADIUS }} onPress={() => onPressImage?.(1)} />
+      </View>
+      <View style={{ flexDirection: 'row', height: HALF_H, gap: GAP }}>
+        <ImgTile uri={shown[2]} style={{ width: W, height: HALF_H }} radius={{ bl: RADIUS }} onPress={() => onPressImage?.(2)} />
+        <ImgTile
+          uri={shown[3]}
+          style={{ width: W, height: HALF_H }}
+          radius={{ br: RADIUS }}
+          onPress={() => onPressImage?.(3)}
+          overlay={extra > 0 ? (
+            <View style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.52)', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -1 }}>+{extra}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', marginTop: 2 }}>photos</Text>
             </View>
-          )}
-        </TouchableOpacity>
-      ))}
+          ) : null}
+        />
+      </View>
     </View>
   );
 };
