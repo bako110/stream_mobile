@@ -17,6 +17,8 @@ import { authService } from '../services/authService';
 import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { callHistoryService } from '../services/callHistoryService';
+import { cancelCallNotification, showIncomingCallNotification } from '../services/fcmService';
+import { navigate } from '../navigation/navigationRef';
 import {
   createWsEventHandler,
   type NewFollowerPayload,
@@ -129,7 +131,6 @@ const Ctx = createContext<WebSocketContextValue>({
 });
 
 const WS_BASE        = API_BASE_URL.replace(/^http/, 'ws');
-const MAX_RETRIES    = 6;
 const INITIAL_DELAY  = 1_000;
 const PING_INTERVAL  = 25_000;
 const CALL_TIMEOUT   = 30_000;
@@ -281,6 +282,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const markCallAccepted = useCallback((partnerId: string) => {
     acceptedCalls.current.add(partnerId);
+    cancelCallNotification(partnerId).catch(() => {});
   }, []);
 
   const markCallEnded = useCallback((partnerId: string) => {
@@ -307,6 +309,14 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   // ── WebSocket connect ─────────────────────────────────────────────────────
+  // Toutes les callbacks appelées depuis onmessage/onclose sont dans des refs
+  // pour eviter de recréer connect() a chaque render et de boucler le useEffect.
+  const registerPendingCallRef  = useRef(registerPendingCall);
+  const finalisePendingCallRef  = useRef(finalisePendingCall);
+  const refreshUnreadRef        = useRef(refreshUnread);
+  useEffect(() => { registerPendingCallRef.current  = registerPendingCall;  }, [registerPendingCall]);
+  useEffect(() => { finalisePendingCallRef.current  = finalisePendingCall;  }, [finalisePendingCall]);
+  useEffect(() => { refreshUnreadRef.current        = refreshUnread;        }, [refreshUnread]);
 
   const connect = useCallback(() => {
     if (wsRef.current) {
@@ -329,7 +339,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         myIdRef.current = id;
         storage.setItem(STORAGE_KEYS.LAST_USER_ID, id);
       }).catch(() => {});
-      refreshUnread();
+      refreshUnreadRef.current();
       if (pingTimer.current) clearInterval(pingTimer.current);
       pingTimer.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
@@ -347,7 +357,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const fromActiveChat = activeChatRef.current && payload.sender_id === activeChatRef.current;
           if (!fromSelf && !fromActiveChat) {
             setUnreadMessages(prev => prev + 1);
-            // Marquer pour déclencher le toast dans NotificationToast
             payload._showToast = true;
           }
         }
@@ -360,16 +369,36 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                            || outgoingCallIds.current.has(payload.to);
           const alreadyLive = acceptedCalls.current.has(payload.from);
           if (!fromSelf && !alreadyLive) {
-            // Nouveau call_offer = nettoyer le buffer résiduel de ce partenaire
             callEventBuffer.current.delete(payload.from);
             __DEV__ && console.log('[WS] Incoming call from', payload.from_name ?? payload.from);
-            registerPendingCall(
+            registerPendingCallRef.current(
               payload.from,
               payload.from_name ?? 'Inconnu',
               payload.from_avatar ?? undefined,
               payload.call_type ?? 'voice',
               'incoming',
             );
+            const appState = AppState.currentState;
+            if (appState === 'active') {
+              navigate('Call', {
+                partnerId:     payload.from,
+                partnerName:   payload.from_name ?? 'Inconnu',
+                partnerAvatar: payload.from_avatar ?? null,
+                callType:      payload.call_type ?? 'voice',
+                isIncoming:    true,
+                offer:         payload.sdp ?? undefined,
+              });
+            } else {
+              if (payload.sdp) {
+                storage.setItem('pending_call_offer_sdp', JSON.stringify(payload.sdp));
+              }
+              showIncomingCallNotification(
+                payload.from,
+                payload.from_name ?? 'Appel',
+                payload.from_avatar ?? null,
+                payload.call_type === 'video' ? 'video' : 'voice',
+              ).catch(() => {});
+            }
           }
         }
 
@@ -386,8 +415,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }
         }
 
-        // ── Buffer les events call si CallScreen pas encore monté ────────────────
-        // call_offer exclu : l'offer SDP est déjà dans les route params (autoAccept)
+        // Annuler la notification Notifee si l'appel est raccroché avant réponse
+        if (payload.type === 'call_hangup' && isMounted.current) {
+          const fromId = payload.from ?? payload.sender_id;
+          if (fromId) cancelCallNotification(fromId).catch(() => {});
+        }
+
+        // ── Buffer les events call si CallScreen pas encore monté ─────────
         if ((payload.type === 'call_ice' || payload.type === 'call_answer' || payload.type === 'call_hangup') && isMounted.current) {
           const fromId = payload.from ?? payload.sender_id;
           if (fromId) {
@@ -408,7 +442,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           listeners.current.forEach(fn => { try { fn(payload); } catch {} });
         }
 
-        // ── Handler centralisé événements enrichis ─────────────────────────
         if (isMounted.current) {
           wsEventHandlerRef.current(payload);
         }
@@ -424,25 +457,35 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (pingTimer.current) { clearInterval(pingTimer.current); pingTimer.current = null; }
 
       if (event.code === 4001) {
+        // Token expire — refresh puis reconnexion
         authService.refresh()
           .then(() => { if (isMounted.current) connect(); })
-          .catch(() => {});
+          .catch(() => {
+            // Refresh impossible (session expirée) — on reessaie dans 30s
+            if (isMounted.current) {
+              retryTimer.current = setTimeout(connect, 30_000);
+            }
+          });
         return;
       }
-      if (retryCount.current < MAX_RETRIES) {
-        const delay = INITIAL_DELAY * Math.pow(2, retryCount.current);
-        retryCount.current++;
-        retryTimer.current = setTimeout(connect, delay);
-      }
+
+      // Backoff exponentiel — pas de limite : on reessaie indefiniment
+      // (le compteur sert juste a calculer le delai, plafonne a 64s)
+      const delay = INITIAL_DELAY * Math.pow(2, Math.min(retryCount.current, 6));
+      retryCount.current++;
+      retryTimer.current = setTimeout(connect, delay);
     };
-  }, [registerPendingCall, finalisePendingCall, refreshUnread]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // deps vides — tout passe par des refs, connect est stable
 
   useEffect(() => {
     isMounted.current = true;
     connect();
     const handleAppState = (next: AppStateStatus) => {
       if (next === 'active') {
+        // L'app revient au premier plan — forcer reconnexion si WS mort
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          if (retryTimer.current) clearTimeout(retryTimer.current);
           retryCount.current = 0;
           connect();
         }
@@ -456,7 +499,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (pingTimer.current)  clearInterval(pingTimer.current);
       wsRef.current?.close();
     };
-  }, [connect]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // deps vides — connect est maintenant stable
 
   const clearUnreadMessages      = useCallback(() => setUnreadMessages(0), []);
   const clearUnreadActivity      = useCallback(() => setUnreadActivity(0), []);
