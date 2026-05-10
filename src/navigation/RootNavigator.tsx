@@ -55,21 +55,41 @@ export const RootNavigator: React.FC = () => {
   const { isDark } = useTheme();
   const [appState, setAppState] = useState<AppState>('splash');
 
-  const handleSplashDone = () => {
+  const handleSplashDone = async () => {
     const onboardingDone = storage.getBoolean(STORAGE_KEYS.ONBOARDING_DONE);
-    const token          = authService.loadStoredToken(() => {
+    if (!onboardingDone) {
+      setAppState('onboarding');
+      return;
+    }
+
+    const token = authService.loadStoredToken(() => {
       authService._clearTokens();
       setAppState('auth');
     });
-    if (!onboardingDone) {
-      setAppState('onboarding');
-    } else if (token) {
+
+    if (!token) {
+      setAppState('auth');
+      return;
+    }
+
+    // Verifier que la session est toujours valide (token ou refresh token ok)
+    try {
+      await authService.getMe(true);
       setAppState('main');
-      console.log('[FCM] calling setupFCM from splash...');
       setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       requestContactsPermission();
-    } else {
-      setAppState('auth');
+    } catch {
+      // getMe a echoue — tenter le refresh
+      try {
+        await authService.refresh();
+        setAppState('main');
+        setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
+        requestContactsPermission();
+      } catch {
+        // Refresh aussi echoue — session completement expiree
+        authService._clearTokens();
+        setAppState('auth');
+      }
     }
   };
 
