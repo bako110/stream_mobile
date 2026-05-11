@@ -1781,6 +1781,12 @@ const rs = StyleSheet.create({
   playCircle:  { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)', paddingLeft: 4 },
 });
 
+const hk = StyleSheet.create({
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginBottom: 10, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, borderLeftWidth: 3 },
+  icon: { fontSize: 16 },
+  text: { flex: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+});
+
 // ── FeedCard ──────────────────────────────────────────────────────────────────
 
 interface FeedCardProps {
@@ -1946,6 +1952,114 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const accent   = isEvent ? (EVENT_COLORS[event.event_type] ?? colors.primary) : colors.primary;
   const cardIcon = isEvent ? (EVENT_ICONS[event.event_type]  ?? 'calendar') : 'music';
   const typeLabel = isEvent ? event.event_type?.toUpperCase() : 'CONCERT';
+
+  // ── Phrase d'accroche psychologique ──────────────────────────────────────
+  const hookPhrase = (() => {
+    const likes     = item.data?.like_count ?? 0;
+    const comments  = item.data?.comment_count ?? 0;
+    const daysUntil = date ? Math.ceil((new Date(date).getTime() - Date.now()) / 86400000) : null;
+    const eventType = isEvent ? event.event_type : 'concert';
+    const seed      = (item.id?.charCodeAt(0) ?? 0) + (item.id?.charCodeAt(2) ?? 0);
+    const pick      = (arr: { icon: string; text: string; color: string }[]) => arr[seed % arr.length];
+
+    // Urgence temporelle — priorité absolue
+    if (daysUntil !== null && daysUntil === 0)
+      return pick([
+        { icon: '⏳', text: 'C\'est aujourd\'hui — il est encore temps de rejoindre !',      color: '#FF3B30' },
+        { icon: '🚨', text: 'Dernier appel — ça commence aujourd\'hui, fonce !',              color: '#FF3B30' },
+      ]);
+    if (daysUntil !== null && daysUntil <= 2)
+      return pick([
+        { icon: '🔥', text: `Demain c\'est trop tard — il reste ${daysUntil} jour${daysUntil > 1 ? 's' : ''}`, color: '#FF7A2F' },
+        { icon: '⌛', text: 'Les places fondent — ne te retrouve pas à regarder les stories des autres', color: '#FF7A2F' },
+      ]);
+    if (daysUntil !== null && daysUntil <= 7)
+      return pick([
+        { icon: '📅', text: 'Cette semaine seulement — une occasion rare à ne pas laisser filer', color: '#F59E0B' },
+        { icon: '👀', text: 'Dans quelques jours c\'est déjà fini — tu y seras ?',             color: '#F59E0B' },
+      ]);
+
+    // Validation sociale forte
+    if (likes >= 500)
+      return { icon: '🤩', text: `${likes.toLocaleString('fr')} personnes adorent déjà — tu attends quoi ?`, color: '#E0389A' };
+    if (likes >= 100)
+      return { icon: '❤️', text: 'Des centaines de personnes ont validé cet event — c\'est bon signe', color: '#E0389A' };
+    if (comments >= 50)
+      return { icon: '💬', text: 'Tout le monde en parle — rejoins la conversation avant que ça soit fini', color: '#7B3FF2' };
+
+    // Gratuité
+    if (isFree)
+      return pick([
+        { icon: '🎁', text: 'C\'est entièrement gratuit — aucune raison de ne pas y aller',  color: '#10B981' },
+        { icon: '🆓', text: 'Zéro euro, 100% de bonne ambiance — c\'est cadeau',              color: '#10B981' },
+      ]);
+
+    // ── Par catégorie ────────────────────────────────────────────────────────
+
+    if (isConcert || eventType === 'concert')
+      return pick([
+        { icon: '🎶', text: 'La musique live crée des frissons qu\'aucun stream ne peut reproduire',    color: '#7B3FF2' },
+        { icon: '🎸', text: 'L\'ambiance d\'un concert en vrai, ça ne s\'explique pas — ça se ressent', color: '#FF7A2F' },
+        { icon: '🎤', text: 'Les artistes donnent tout sur scène — sois là pour le vivre',             color: '#E0389A' },
+        { icon: '🎵', text: 'Une nuit musicale dont tu vas parler pendant longtemps',                  color: '#7B3FF2' },
+        { icon: '🔊', text: 'Sentir les basses dans ta poitrine — ça vaut tous les Spotify du monde',  color: '#6366F1' },
+      ]);
+
+    if (eventType === 'festival')
+      return pick([
+        { icon: '🎪', text: 'Un festival, c\'est une autre vie pendant quelques heures — vis-la',      color: '#FF7A2F' },
+        { icon: '🌟', text: 'Les meilleurs souvenirs se créent dans des moments exactement comme ça',  color: '#F59E0B' },
+        { icon: '🎠', text: 'Tu raconteras encore cette soirée dans dix ans — sois-y',                 color: '#E0389A' },
+        { icon: '🌈', text: 'Un festival, c\'est la vie dans tout son éclat — ne rate pas ça',         color: '#FF7A2F' },
+      ]);
+
+    if (eventType === 'birthday')
+      return pick([
+        { icon: '🎂', text: 'Un anniversaire ça ne se fête qu\'une fois par an — rends ça inoubliable', color: '#E0389A' },
+        { icon: '🥂', text: 'Les meilleures soirées commencent exactement comme ça',                    color: '#7B3FF2' },
+        { icon: '🎉', text: 'La bonne humeur est contagieuse — et cette soirée en est pleine',          color: '#FF7A2F' },
+        { icon: '✨', text: 'Parce que certaines nuits méritent vraiment d\'être célébrées ensemble',   color: '#E0389A' },
+        { icon: '🎈', text: 'Il n\'y a pas d\'âge pour passer la meilleure soirée de l\'année',        color: '#F59E0B' },
+      ]);
+
+    if (eventType === 'sport')
+      return pick([
+        { icon: '⚡', text: 'L\'énergie d\'un stade en feu — ça te traverse de la tête aux pieds',      color: '#3B82F6' },
+        { icon: '🏆', text: 'Sois là quand ça se passe — pas en train de regarder les highlights',      color: '#F59E0B' },
+        { icon: '🔥', text: 'Le sport en vrai, c\'est 10× plus intense que sur un écran',               color: '#FF7A2F' },
+        { icon: '🏟️', text: 'Les cris, l\'adrénaline, l\'ambiance — aucune retransmission ne peut ça', color: '#3B82F6' },
+      ]);
+
+    if (eventType === 'conference')
+      return pick([
+        { icon: '💡', text: 'Une idée entendue ce soir peut changer toute ta trajectoire',              color: '#36D9A0' },
+        { icon: '🧠', text: 'Les personnes qui avancent dans la vie vont exactement à ce genre d\'event', color: '#6366F1' },
+        { icon: '🤝', text: 'Une rencontre ce soir peut valoir mieux que des mois d\'efforts solo',     color: '#36D9A0' },
+      ]);
+
+    if (eventType === 'theater')
+      return pick([
+        { icon: '🎭', text: 'Le théâtre en live, c\'est une émotion que personne ne peut te voler',     color: '#9B65F5' },
+        { icon: '🌙', text: 'Une histoire racontée en vrai touche là où les films ne vont pas',         color: '#6366F1' },
+        { icon: '✨', text: 'Certains spectacles restent gravés en toi pour toujours — celui-ci peut l\'être', color: '#9B65F5' },
+      ]);
+
+    if (eventType === 'exhibition')
+      return pick([
+        { icon: '🖼️', text: 'L\'art vu en vrai change ta façon de voir le monde — pour de bon',        color: '#36D9A0' },
+        { icon: '👁️', text: 'Certaines œuvres te parlent directement — tu en feras partie ?',          color: '#10B981' },
+      ]);
+
+    // Fallback
+    return pick([
+      { icon: '👀', text: 'Les gens qui y vont ne le regrettent jamais — et toi ?',                     color: '#7B3FF2' },
+      { icon: '✨', text: 'Certains moments ne se répètent pas — celui-ci en fait partie',              color: colors.primary },
+      { icon: '🚀', text: 'Tu mérites une vraie expérience, pas juste des photos sur ton écran',        color: '#FF7A2F' },
+      { icon: '💫', text: 'Rejoins les gens qui savent que la vraie vie se passe hors du canapé',       color: '#7B3FF2' },
+      { icon: '🎯', text: 'C\'est exactement le genre de soirée dont tu as besoin ce soir',             color: colors.primary },
+      { icon: '🌙', text: 'Les meilleures histoires commencent toujours par "allez, on y va !"',        color: '#6366F1' },
+    ]);
+  })();
 
   // ── State social branché sur l'API ────────────────────────────────────────
   const [liked,        setLiked]        = useState(item.data?.user_reaction === 'like');
@@ -2183,6 +2297,12 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           </View>
         ) : null}
       </View>
+
+      {/* ── Accroche psychologique ───────────────────────────────────── */}
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={[hk.wrap, { backgroundColor: hookPhrase.color + '15', borderLeftColor: hookPhrase.color }]}>
+        <Text style={hk.icon}>{hookPhrase.icon}</Text>
+        <Text style={[hk.text, { color: hookPhrase.color }]}>{hookPhrase.text}</Text>
+      </TouchableOpacity>
 
       {/* ── Banner : vidéo pub autoplay ou image ────────────────────── */}
       <TouchableOpacity onPress={onPress} activeOpacity={0.92}>
