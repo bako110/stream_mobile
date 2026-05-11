@@ -1396,11 +1396,11 @@ const ReelRowCard: React.FC<{
   colors: AppColors;
   onPressReel: (reelId: string) => void;
 }> = React.memo(({ reels, colors, onPressReel }) => {
-  const { width: SW } = Dimensions.get('window');
+  const { width: SW, height: SH } = Dimensions.get('window');
   const HERO_W  = SW - 32;
-  const HERO_H  = Math.round(HERO_W * 1.35); // ratio ~3:4, tall
-  const MINI_W  = 110;
-  const MINI_H  = Math.round(MINI_W * 1.55);
+  const HERO_H  = Math.round(SH * 0.62);   // 62% de la hauteur d'écran
+  const MINI_W  = Math.round(SW * 0.38);   // 38% de la largeur d'écran
+  const MINI_H  = Math.round(MINI_W * 1.6);
 
   const hero  = reels[0];
   const rest  = reels.slice(1);
