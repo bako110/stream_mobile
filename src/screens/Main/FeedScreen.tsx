@@ -1396,8 +1396,14 @@ const ReelRowCard: React.FC<{
   colors: AppColors;
   onPressReel: (reelId: string) => void;
 }> = React.memo(({ reels, colors, onPressReel }) => {
-  const THUMB_WIDTH  = 120;
-  const THUMB_HEIGHT = 200;
+  const { width: SW } = Dimensions.get('window');
+  const HERO_W  = SW - 32;
+  const HERO_H  = Math.round(HERO_W * 1.35); // ratio ~3:4, tall
+  const MINI_W  = 110;
+  const MINI_H  = Math.round(MINI_W * 1.55);
+
+  const hero  = reels[0];
+  const rest  = reels.slice(1);
 
   const timeAgo = (iso: string) => {
     const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -1406,116 +1412,159 @@ const ReelRowCard: React.FC<{
     return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   };
 
+  const ReelThumb = ({ reel, w, h, large = false }: { reel: any; w: number; h: number; large?: boolean }) => {
+    const author   = reel.author;
+    const name     = author?.display_name ?? author?.username ?? '';
+    const initials = name[0]?.toUpperCase() ?? '?';
+    return (
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={() => onPressReel(reel.id)}
+        style={[rrS.thumb, { width: w, height: h }]}
+      >
+        {reel.thumbnail_url ? (
+          <Image source={{ uri: reel.thumbnail_url }} style={[StyleSheet.absoluteFill, { borderRadius: large ? 18 : 14 }]} resizeMode="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: large ? 18 : 14 }]}>
+            <Icon name="film" size={large ? 48 : 28} color="rgba(255,255,255,0.18)" />
+          </View>
+        )}
+
+        {/* Dégradé bas */}
+        <LinearGradient
+          colors={['transparent', 'transparent', 'rgba(0,0,0,0.85)']}
+          style={[StyleSheet.absoluteFill, { borderRadius: large ? 18 : 14 }]}
+        />
+
+        {/* Badge REEL coin haut gauche */}
+        <View style={rrS.reelBadge}>
+          <Icon name="play" size={large ? 9 : 8} color="#fff" />
+          <Text style={[rrS.reelBadgeTxt, { fontSize: large ? 10 : 9 }]}>REEL</Text>
+        </View>
+
+        {/* Durée coin haut droit */}
+        {reel.duration_sec ? (
+          <View style={rrS.durationBadge}>
+            <Text style={rrS.durationTxt}>{reel.duration_sec}s</Text>
+          </View>
+        ) : null}
+
+        {/* Bouton play centre */}
+        <View style={rrS.playBtn} pointerEvents="none">
+          <View style={[rrS.playCircle, large && rrS.playCircleLarge]}>
+            <Icon name="play" size={large ? 28 : 16} color="#fff" />
+          </View>
+        </View>
+
+        {/* Infos bas */}
+        <View style={rrS.thumbBottom}>
+          <View style={rrS.thumbAuthor}>
+            {author?.avatar_url ? (
+              <Image source={{ uri: author.avatar_url }} style={[rrS.thumbAvatar, large && rrS.thumbAvatarLarge]} />
+            ) : (
+              <View style={[rrS.thumbAvatar, large && rrS.thumbAvatarLarge, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ color: '#fff', fontSize: large ? 12 : 9, fontWeight: '800' }}>{initials}</Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[rrS.thumbName, large && { fontSize: 14 }]} numberOfLines={1}>{name}</Text>
+              {reel.created_at ? <Text style={rrS.thumbTime}>{timeAgo(reel.created_at)}</Text> : null}
+            </View>
+          </View>
+          {large && reel.caption ? (
+            <Text style={rrS.heroCaption} numberOfLines={2}>{reel.caption}</Text>
+          ) : null}
+          <View style={rrS.thumbStats}>
+            <View style={rrS.statChip}>
+              <Icon name="eye" size={large ? 12 : 10} color="rgba(255,255,255,0.85)" />
+              <Text style={[rrS.thumbStatTxt, large && { fontSize: 12 }]}>{(reel.view_count ?? 0).toLocaleString()}</Text>
+            </View>
+            {(reel.like_count ?? 0) > 0 && (
+              <View style={rrS.statChip}>
+                <Icon name="heart" size={large ? 12 : 10} color="rgba(255,255,255,0.85)" />
+                <Text style={[rrS.thumbStatTxt, large && { fontSize: 12 }]}>{reel.like_count}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <View style={[rrS.wrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[rrS.wrap, { backgroundColor: colors.surface }]}>
       {/* En-tête */}
       <View style={rrS.header}>
-        <Icon name="film" size={15} color={colors.primary} />
-        <Text style={[rrS.title, { color: colors.textPrimary }]}>Reels pour toi</Text>
-        <Text style={[rrS.count, { color: colors.textSecondary }]}>{reels.length} vidéo{reels.length > 1 ? 's' : ''}</Text>
+        <View style={rrS.headerIcon}>
+          <Icon name="play-circle" size={18} color="#fff" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[rrS.title, { color: colors.textPrimary }]}>Reels pour toi</Text>
+          <Text style={[rrS.subtitle, { color: colors.textSecondary }]}>{reels.length} nouvelle{reels.length > 1 ? 's' : ''} vidéo{reels.length > 1 ? 's' : ''}</Text>
+        </View>
+        <TouchableOpacity style={[rrS.seeAllBtn, { borderColor: colors.primary + '55' }]} onPress={() => onPressReel(reels[0]?.id)}>
+          <Text style={[rrS.seeAllTxt, { color: colors.primary }]}>Voir tout</Text>
+          <Icon name="chevron-right" size={14} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
-      {/* Liste horizontale */}
-      <FlatList
-        data={reels}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(r) => r.id}
-        contentContainerStyle={rrS.list}
-        ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
-        renderItem={({ item: reel }) => {
-          const author   = reel.author;
-          const name     = author?.display_name ?? author?.username ?? '';
-          const initials = name[0]?.toUpperCase() ?? '?';
-          return (
-            <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={() => onPressReel(reel.id)}
-              style={[rrS.thumb, { width: THUMB_WIDTH, height: THUMB_HEIGHT }]}
-            >
-              {/* Thumbnail */}
-              {reel.thumbnail_url ? (
-                <Image
-                  source={{ uri: reel.thumbnail_url }}
-                  style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder]}>
-                  <Icon name="film" size={28} color="rgba(255,255,255,0.25)" />
-                </View>
-              )}
+      {/* Grande carte hero */}
+      {hero ? (
+        <View style={{ paddingHorizontal: 16, marginBottom: rest.length > 0 ? 10 : 0 }}>
+          <ReelThumb reel={hero} w={HERO_W} h={HERO_H} large />
+        </View>
+      ) : null}
 
-              {/* Dégradé */}
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.72)']}
-                style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
-              />
-
-              {/* Bouton play */}
-              <View style={rrS.playBtn} pointerEvents="none">
-                <Icon name="play" size={16} color="#fff" />
-              </View>
-
-              {/* Infos bas */}
-              <View style={rrS.thumbBottom}>
-                {/* Avatar + nom */}
-                <View style={rrS.thumbAuthor}>
-                  {author?.avatar_url ? (
-                    <Image source={{ uri: author.avatar_url }} style={rrS.thumbAvatar} />
-                  ) : (
-                    <View style={[rrS.thumbAvatar, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{initials}</Text>
-                    </View>
-                  )}
-                  <Text style={rrS.thumbName} numberOfLines={1}>{name}</Text>
-                </View>
-                {/* Caption */}
-                {reel.caption ? (
-                  <Text style={rrS.thumbCaption} numberOfLines={2}>{reel.caption}</Text>
-                ) : null}
-                {/* Stats */}
-                <View style={rrS.thumbStats}>
-                  <Icon name="eye" size={10} color="rgba(255,255,255,0.7)" />
-                  <Text style={rrS.thumbStatTxt}>{(reel.view_count ?? 0).toLocaleString()}</Text>
-                  {reel.created_at ? (
-                    <Text style={[rrS.thumbStatTxt, { marginLeft: 'auto' as any }]}>{timeAgo(reel.created_at)}</Text>
-                  ) : null}
-                </View>
-              </View>
-
-              {/* Durée coin haut droit */}
-              {reel.duration_sec ? (
-                <View style={rrS.durationBadge}>
-                  <Text style={rrS.durationTxt}>{reel.duration_sec}s</Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
-          );
-        }}
-      />
+      {/* Rangée secondaire scrollable */}
+      {rest.length > 0 ? (
+        <FlatList
+          data={rest}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(r) => r.id}
+          contentContainerStyle={rrS.miniList}
+          ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+          renderItem={({ item: reel }) => <ReelThumb reel={reel} w={MINI_W} h={MINI_H} />}
+        />
+      ) : null}
     </View>
   );
 });
 
 const rrS = StyleSheet.create({
-  wrap:         { marginBottom: 10, paddingTop: 14, paddingBottom: 14, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
-  header:       { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, marginBottom: 12 },
-  title:        { fontSize: 15, fontWeight: '800', flex: 1 },
-  count:        { fontSize: 12 },
-  list:         { paddingHorizontal: 16 },
-  thumb:        { borderRadius: 12, overflow: 'hidden', backgroundColor: '#111' },
-  thumbPlaceholder: { borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
-  playBtn:      { position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', paddingLeft: 2 },
-  thumbBottom:  { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8, gap: 3 },
-  thumbAuthor:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  thumbAvatar:  { width: 20, height: 20, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
-  thumbName:    { color: '#fff', fontSize: 11, fontWeight: '700', flex: 1 },
-  thumbCaption: { color: 'rgba(255,255,255,0.8)', fontSize: 10, lineHeight: 13 },
-  thumbStats:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  thumbStatTxt: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
-  durationBadge:{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  durationTxt:  { color: '#fff', fontSize: 9, fontWeight: '700' },
+  wrap:             { marginBottom: 10, paddingTop: 16, paddingBottom: 16, overflow: 'hidden' },
+  header:           { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginBottom: 14 },
+  headerIcon:       { width: 36, height: 36, borderRadius: 18, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  title:            { fontSize: 16, fontWeight: '800', lineHeight: 20 },
+  subtitle:         { fontSize: 12, marginTop: 1 },
+  seeAllBtn:        { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5 },
+  seeAllTxt:        { fontSize: 13, fontWeight: '700' },
+  miniList:         { paddingHorizontal: 16 },
+
+  thumb:            { borderRadius: 14, overflow: 'hidden', backgroundColor: '#111' },
+  thumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
+
+  reelBadge:        { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(123,63,242,0.85)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  reelBadgeTxt:     { color: '#fff', fontWeight: '800', letterSpacing: 0.5 },
+
+  durationBadge:    { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  durationTxt:      { color: '#fff', fontSize: 10, fontWeight: '700' },
+
+  playBtn:          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  playBtnLarge:     {},
+  playCircle:       { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', alignItems: 'center', justifyContent: 'center', paddingLeft: 3 },
+  playCircleLarge:  { width: 64, height: 64, borderRadius: 32 },
+
+  thumbBottom:      { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, gap: 6 },
+  thumbAuthor:      { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  thumbAvatar:      { width: 24, height: 24, borderRadius: 12, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' },
+  thumbAvatarLarge: { width: 34, height: 34, borderRadius: 17 },
+  thumbName:        { color: '#fff', fontSize: 12, fontWeight: '700' },
+  thumbTime:        { color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 1 },
+  heroCaption:      { color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 18 },
+  thumbStats:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statChip:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  thumbStatTxt:     { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '600' },
 });
 
 // ── ReelFeedCard — carte reel style Facebook dans le feed ────────────────────
