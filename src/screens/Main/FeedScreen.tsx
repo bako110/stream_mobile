@@ -48,7 +48,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 type FeedFilter = 'all' | 'events' | 'concerts' | 'posts';
 
 interface FeedItem {
-  kind:    'event' | 'concert' | 'reel' | 'post' | 'suggestions' | 'communities';
+  kind:    'event' | 'concert' | 'reel' | 'reel_row' | 'post' | 'suggestions' | 'communities';
   id:      string;
   data:    any;
 }
@@ -158,8 +158,7 @@ export const FeedScreen: React.FC = () => {
 
   const feedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    const reelItem = viewableItems.find(v => v.item?.kind === 'reel');
-    setActiveReelId(reelItem ? reelItem.item.id : null);
+    setActiveReelId(null); // reels gérés en rangée horizontale, pas d'autoplay individuel
     // Activer la vidéo pub de la première carte event/concert visible avec video_url
     const cardItem = viewableItems.find(v =>
       (v.item?.kind === 'event' || v.item?.kind === 'concert') && v.item?.data?.video_url,
@@ -333,16 +332,39 @@ export const FeedScreen: React.FC = () => {
         // Filtrer les contenus masqués ("Pas intéressé")
         const filtered = feedPreferenceService.filterFeed(deduped);
 
-        // Injecter suggestions et communities à intervalles réguliers
-        // toutes les ~8 items pour suggestions, ~12 pour communities
-        const SUGGEST_EVERY = 8;
-        const COMM_EVERY    = 12;
+        // Extraire tous les reels et ne garder que les non-reels dans le flux principal
+        const allReels   = filtered.filter(i => i.kind === 'reel');
+        const nonReels   = filtered.filter(i => i.kind !== 'reel');
+
+        // Découper les reels en blocs de 5 max pour les rangées horizontales
+        const REELS_PER_ROW = 5;
+        const reelRows: FeedItem[] = [];
+        for (let r = 0; r < allReels.length; r += REELS_PER_ROW) {
+          const chunk = allReels.slice(r, r + REELS_PER_ROW);
+          reelRows.push({
+            kind: 'reel_row',
+            id: `__reel_row__${r}`,
+            data: chunk.map(ri => ri.data),
+          });
+        }
+
+        // Injecter suggestions, communities et rangées de reels à intervalles réguliers
+        const SUGGEST_EVERY  = 8;
+        const COMM_EVERY     = 12;
+        const REEL_ROW_EVERY = 5; // une rangée de reels toutes les 5 cartes
         const result: FeedItem[] = [];
         let suggestCount = 0;
         let commCount    = 0;
+        let reelRowIdx   = 0;
 
-        filtered.forEach((item, i) => {
+        nonReels.forEach((item, i) => {
           result.push(item);
+
+          // Rangée de reels : première à pos 3, puis toutes les REEL_ROW_EVERY
+          if (reelRowIdx < reelRows.length && (i === 2 || (i > 2 && (i - 2) % REEL_ROW_EVERY === 0))) {
+            result.push(reelRows[reelRowIdx]);
+            reelRowIdx += 1;
+          }
 
           // Suggestions : première à pos 5, puis toutes les SUGGEST_EVERY
           if (i === 4 || (i > 4 && (i - 4) % SUGGEST_EVERY === 0)) {
@@ -356,6 +378,12 @@ export const FeedScreen: React.FC = () => {
             result.push({ kind: 'communities', id: `__communities__${commCount}`, data: commData });
           }
         });
+
+        // Ajouter les rangées de reels restantes à la fin
+        while (reelRowIdx < reelRows.length) {
+          result.push(reelRows[reelRowIdx]);
+          reelRowIdx += 1;
+        }
 
         setItems(result);
       } else {
@@ -580,14 +608,12 @@ export const FeedScreen: React.FC = () => {
         </View>
       );
     }
-    if (item.kind === 'reel') {
+    if (item.kind === 'reel_row') {
       return (
-        <ReelFeedCard
-          reel={item.data}
+        <ReelRowCard
+          reels={item.data}
           colors={colors}
-          isActive={activeReelId === item.id && feedFocused}
-          onPress={() => (nav as any).navigate('Reels', { initialReelId: item.data.id })}
-          onScrollLock={setFeedScrollEnabled}
+          onPressReel={(reelId) => (nav as any).navigate('Reels', { initialReelId: reelId })}
         />
       );
     }
@@ -625,7 +651,7 @@ export const FeedScreen: React.FC = () => {
         onAuthorPress={() => { if (aid) (nav as any).navigate('UserProfile', { userId: aid }); }}
       />
     );
-  }, [colors, activeReelId, activeCardId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickSuggestions, suggestLoading, loadSuggestions]);
+  }, [colors, activeCardId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickSuggestions, suggestLoading, loadSuggestions]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1363,6 +1389,135 @@ export const FeedScreen: React.FC = () => {
   );
 };
 
+// ── ReelRowCard — rangée horizontale de reels (style Facebook) ───────────────
+
+const ReelRowCard: React.FC<{
+  reels: any[];
+  colors: AppColors;
+  onPressReel: (reelId: string) => void;
+}> = React.memo(({ reels, colors, onPressReel }) => {
+  const THUMB_WIDTH  = 120;
+  const THUMB_HEIGHT = 200;
+
+  const timeAgo = (iso: string) => {
+    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 3600)  return `${Math.floor(diff / 60)} min`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
+    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  };
+
+  return (
+    <View style={[rrS.wrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {/* En-tête */}
+      <View style={rrS.header}>
+        <Icon name="film" size={15} color={colors.primary} />
+        <Text style={[rrS.title, { color: colors.textPrimary }]}>Reels pour toi</Text>
+        <Text style={[rrS.count, { color: colors.textSecondary }]}>{reels.length} vidéo{reels.length > 1 ? 's' : ''}</Text>
+      </View>
+
+      {/* Liste horizontale */}
+      <FlatList
+        data={reels}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(r) => r.id}
+        contentContainerStyle={rrS.list}
+        ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
+        renderItem={({ item: reel }) => {
+          const author   = reel.author;
+          const name     = author?.display_name ?? author?.username ?? '';
+          const initials = name[0]?.toUpperCase() ?? '?';
+          return (
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => onPressReel(reel.id)}
+              style={[rrS.thumb, { width: THUMB_WIDTH, height: THUMB_HEIGHT }]}
+            >
+              {/* Thumbnail */}
+              {reel.thumbnail_url ? (
+                <Image
+                  source={{ uri: reel.thumbnail_url }}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder]}>
+                  <Icon name="film" size={28} color="rgba(255,255,255,0.25)" />
+                </View>
+              )}
+
+              {/* Dégradé */}
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.72)']}
+                style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
+              />
+
+              {/* Bouton play */}
+              <View style={rrS.playBtn} pointerEvents="none">
+                <Icon name="play" size={16} color="#fff" />
+              </View>
+
+              {/* Infos bas */}
+              <View style={rrS.thumbBottom}>
+                {/* Avatar + nom */}
+                <View style={rrS.thumbAuthor}>
+                  {author?.avatar_url ? (
+                    <Image source={{ uri: author.avatar_url }} style={rrS.thumbAvatar} />
+                  ) : (
+                    <View style={[rrS.thumbAvatar, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{initials}</Text>
+                    </View>
+                  )}
+                  <Text style={rrS.thumbName} numberOfLines={1}>{name}</Text>
+                </View>
+                {/* Caption */}
+                {reel.caption ? (
+                  <Text style={rrS.thumbCaption} numberOfLines={2}>{reel.caption}</Text>
+                ) : null}
+                {/* Stats */}
+                <View style={rrS.thumbStats}>
+                  <Icon name="eye" size={10} color="rgba(255,255,255,0.7)" />
+                  <Text style={rrS.thumbStatTxt}>{(reel.view_count ?? 0).toLocaleString()}</Text>
+                  {reel.created_at ? (
+                    <Text style={[rrS.thumbStatTxt, { marginLeft: 'auto' as any }]}>{timeAgo(reel.created_at)}</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* Durée coin haut droit */}
+              {reel.duration_sec ? (
+                <View style={rrS.durationBadge}>
+                  <Text style={rrS.durationTxt}>{reel.duration_sec}s</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        }}
+      />
+    </View>
+  );
+});
+
+const rrS = StyleSheet.create({
+  wrap:         { marginBottom: 10, paddingTop: 14, paddingBottom: 14, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, marginBottom: 12 },
+  title:        { fontSize: 15, fontWeight: '800', flex: 1 },
+  count:        { fontSize: 12 },
+  list:         { paddingHorizontal: 16 },
+  thumb:        { borderRadius: 12, overflow: 'hidden', backgroundColor: '#111' },
+  thumbPlaceholder: { borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
+  playBtn:      { position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', paddingLeft: 2 },
+  thumbBottom:  { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8, gap: 3 },
+  thumbAuthor:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  thumbAvatar:  { width: 20, height: 20, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
+  thumbName:    { color: '#fff', fontSize: 11, fontWeight: '700', flex: 1 },
+  thumbCaption: { color: 'rgba(255,255,255,0.8)', fontSize: 10, lineHeight: 13 },
+  thumbStats:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  thumbStatTxt: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
+  durationBadge:{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  durationTxt:  { color: '#fff', fontSize: 9, fontWeight: '700' },
+});
+
 // ── ReelFeedCard — carte reel style Facebook dans le feed ────────────────────
 
 const ReelFeedCard: React.FC<{
@@ -1376,15 +1531,12 @@ const ReelFeedCard: React.FC<{
   const name     = author?.display_name ?? author?.username ?? 'Utilisateur';
   const initials = name[0]?.toUpperCase() ?? '?';
 
-  const [muted,      setMuted]      = useState(true);
-  const [paused,     setPaused]     = useState(false);
-  const [progress,   setProgress]   = useState(0);
   // null = pas encore détecté, true = portrait 9:16, false = paysage 16:9
   const [isPortrait, setIsPortrait] = useState<boolean | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Détection du ratio depuis le thumbnail
+  // Détection du ratio depuis le thumbnail uniquement
   useEffect(() => {
     if (!reel.thumbnail_url) return;
     Image.getSize(
@@ -1394,20 +1546,21 @@ const ReelFeedCard: React.FC<{
     );
   }, [reel.thumbnail_url]);
 
-  // Confirmation via les vraies dimensions de la vidéo
-  useEffect(() => {
-    const sub = player.addEventListener('onLoad', (data: any) => {
-      if (data?.width && data?.height && mountedRef.current) {
-        setIsPortrait(data.height >= data.width);
-      }
-    });
-    return () => sub.remove();
-  }, [player]);
-
-  // 9:16 portrait → même hauteur que les autres cards (1/0.88), vidéo en cover centrée
-  // 16:9 paysage  → ratio natif 16/9, vidéo intacte
-  // inconnu       → fallback 1/0.88
   const thumbAspectRatio = isPortrait === false ? 16 / 9 : 1 / 0.88;
+
+  // Animation pulse sur le bouton play (Reanimated)
+  const pulseAnim = useSharedValue(1);
+  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulseAnim.value }] }));
+  useEffect(() => {
+    pulseAnim.value = withRepeat(
+      withSequence(
+        withTiming(1.18, { duration: 700 }),
+        withTiming(1.0,  { duration: 700 }),
+      ),
+      -1,
+      false,
+    );
+  }, []);
 
   const timeAgo = (iso: string) => {
     const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -1417,138 +1570,112 @@ const ReelFeedCard: React.FC<{
     return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   };
 
-  const playing = isActive && !paused && !!reel.video_url;
-
-  const player = useVideoPlayer(
-    reel.video_url ? { uri: reel.video_url } : { uri: 'about:blank' },
-    p => { p.loop = true; p.muted = muted; p.volume = muted ? 0 : 1.0; },
-  );
-
-  useEffect(() => {
-    if (playing) player.play(); else player.pause();
-  }, [playing]);
-
-  useEffect(() => { player.muted = muted; player.volume = muted ? 0 : 1.0; }, [muted]);
-
-  // Reset progression à l'inactivité
-  useEffect(() => {
-    if (!isActive) setProgress(0);
-  }, [isActive]);
+  // Phrases d'accroche tournantes
+  const HOOKS = [
+    'La suite va te surprendre 👀',
+    'T\'as regardé jusqu\'au bout ? 🔥',
+    'Ce moment est trop fort 😱',
+    'Tout le monde en parle en ce moment',
+    'Tu ne vas pas le regretter ✨',
+    'Ce reel fait le buzz 🚀',
+  ];
+  const hookIdx = Math.abs(reel.id?.charCodeAt(0) ?? 0) % HOOKS.length;
+  const hookText = HOOKS[hookIdx];
 
   return (
-    <View style={[rs.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-      {/* ── Header auteur ── */}
-      <View style={rs.header}>
-        {author?.avatar_url ? (
-          <Image source={{ uri: author.avatar_url }} style={rs.avatar} />
+    <TouchableOpacity
+      activeOpacity={0.96}
+      onPress={onPress}
+      style={[rs.card, { backgroundColor: '#000' }]}
+    >
+      <View style={[rs.thumbWrap, { aspectRatio: thumbAspectRatio }]}>
+
+        {/* Thumbnail */}
+        {reel.thumbnail_url ? (
+          <Image
+            source={{ uri: reel.thumbnail_url }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={isPortrait === false ? 'contain' : 'cover'}
+          />
         ) : (
-          <View style={[rs.avatar, { backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 15 }}>{initials}</Text>
+          <View style={{ ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="film" size={40} color="rgba(255,255,255,0.18)" />
           </View>
         )}
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <Text style={[rs.authorName, { color: colors.textPrimary }]}>{name}</Text>
-            {author?.is_verified && (
-              <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="check" size={9} color="#fff" />
-              </View>
-            )}
-          </View>
-          <Text style={[rs.time, { color: colors.textTertiary }]}>
-            {timeAgo(reel.created_at)} · <Text style={{ color: colors.primary, fontWeight: '700' }}>Reels</Text>
-          </Text>
+
+        {/* Gradient haut → bas */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.35)', 'transparent', 'rgba(0,0,0,0.78)']}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* Badge REEL */}
+        <View style={rs.reelBadge}>
+          <Icon name="film" size={11} color="#fff" />
+          <Text style={rs.reelBadgeText}>REEL</Text>
         </View>
-        <Icon name="more-horizontal" size={20} color={colors.textTertiary} />
+
+        {/* Auteur en haut */}
+        <View style={rs.authorOverlay}>
+          {author?.avatar_url ? (
+            <Image source={{ uri: author.avatar_url }} style={rs.avatarSm} />
+          ) : (
+            <View style={[rs.avatarSm, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{initials}</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={rs.authorOverlayName} numberOfLines={1}>{name}</Text>
+              {author?.is_verified && (
+                <View style={{ width: 13, height: 13, borderRadius: 7, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="check" size={8} color="#fff" />
+                </View>
+              )}
+            </View>
+            <Text style={rs.authorOverlayTime}>{timeAgo(reel.created_at)}</Text>
+          </View>
+        </View>
+
+        {/* Bouton play animé au centre */}
+        <View style={rs.playCenter} pointerEvents="none">
+          <Animated.View style={[rs.playRipple, pulseStyle]} />
+          <View style={rs.playCircle}>
+            <Icon name="play" size={28} color="#fff" />
+          </View>
+        </View>
+
+        {/* Bas : accroche + caption + stats */}
+        <View style={rs.bottomOverlay}>
+          <View style={rs.hookWrap}>
+            <Text style={rs.hookText}>{hookText}</Text>
+          </View>
+          {reel.caption ? (
+            <Text style={rs.captionOverlay} numberOfLines={2}>{reel.caption}</Text>
+          ) : null}
+          <View style={rs.statsRow}>
+            <View style={rs.statItem}>
+              <Icon name="eye" size={13} color="rgba(255,255,255,0.85)" />
+              <Text style={rs.statTxt}>{(reel.view_count ?? 0).toLocaleString()}</Text>
+            </View>
+            <View style={rs.statItem}>
+              <Icon name="heart" size={13} color="rgba(255,255,255,0.85)" />
+              <Text style={rs.statTxt}>{reel.like_count ?? 0}</Text>
+            </View>
+            {reel.duration_sec ? (
+              <View style={rs.statItem}>
+                <Icon name="clock" size={13} color="rgba(255,255,255,0.85)" />
+                <Text style={rs.statTxt}>{reel.duration_sec}s</Text>
+              </View>
+            ) : null}
+            <View style={rs.ctaBtn}>
+              <Text style={rs.ctaTxt}>Voir le reel</Text>
+              <Icon name="arrow-right" size={13} color="#fff" />
+            </View>
+          </View>
+        </View>
       </View>
-
-      {/* ── Caption ── */}
-      {reel.caption ? (
-        <Text style={[rs.caption, { color: colors.textPrimary }]} numberOfLines={2}>{reel.caption}</Text>
-      ) : null}
-
-      {/* ── Zone vidéo ── */}
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onPress}
-        onPressIn={() => onScrollLock?.(false)}
-        onPressOut={() => onScrollLock?.(true)}
-      >
-        <View style={[rs.thumbWrap, { aspectRatio: thumbAspectRatio, backgroundColor: '#000' }]}>
-          {/* Fond noir toujours présent pour les 16:9 */}
-
-          {/* Thumbnail — portrait en cover, paysage en contain */}
-          {reel.thumbnail_url && !playing ? (
-            <Image
-              source={{ uri: reel.thumbnail_url }}
-              style={StyleSheet.absoluteFill}
-              resizeMode={isPortrait === false ? 'contain' : 'cover'}
-            />
-          ) : null}
-
-          {/* Fallback sans thumbnail */}
-          {!reel.thumbnail_url && !playing ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="film" size={36} color="rgba(255,255,255,0.2)" />
-            </View>
-          ) : null}
-
-          {/* Lecteur vidéo — actif uniquement si isActive */}
-          {isActive && reel.video_url ? (
-            <VideoView
-              player={player}
-              style={StyleSheet.absoluteFill}
-              resizeMode={isPortrait === false ? 'contain' : 'cover'}
-              controls={false}
-              surfaceType="texture"
-            />
-          ) : null}
-
-          {/* Gradient bas */}
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={rs.thumbGradient} />
-
-          {/* Icône pause/play sur tap */}
-          {!playing && (
-            <View style={rs.playOverlay} pointerEvents="none">
-              <View style={rs.playCircle}>
-                <Icon name={isActive && paused ? 'pause' : 'play'} size={26} color="#fff" />
-              </View>
-            </View>
-          )}
-
-          {/* Bouton mute — visible uniquement quand actif */}
-          {isActive && (
-            <TouchableOpacity
-              style={rs.muteBtn}
-              onPress={() => setMuted(v => !v)}
-              activeOpacity={0.8}
-            >
-              <Icon name={muted ? 'volume-x' : 'volume-2'} size={18} color="#fff" />
-            </TouchableOpacity>
-          )}
-
-          {/* Durée */}
-          {reel.duration_sec && !isActive ? (
-            <View style={rs.duration}>
-              <Text style={rs.durationText}>{reel.duration_sec}s</Text>
-            </View>
-          ) : null}
-
-          {/* Vues */}
-          <View style={rs.views}>
-            <Icon name="eye" size={12} color="#fff" />
-            <Text style={rs.viewsText}>{(reel.view_count ?? 0).toLocaleString()}</Text>
-          </View>
-
-          {/* Barre de progression */}
-          {isActive && (
-            <View style={rs.progressTrack} pointerEvents="none">
-              <View style={[rs.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -1572,31 +1699,37 @@ const cs = StyleSheet.create({
 });
 
 const rs = StyleSheet.create({
-  card:        { marginHorizontal: 0, marginBottom: 12, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  header:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
-  avatar:      { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
-  authorName:  { fontSize: 14, fontWeight: '700' },
-  time:        { fontSize: 12, marginTop: 1 },
-  reelBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  reelBadgeText: { fontSize: 10, fontWeight: '700' },
-  caption:     { paddingHorizontal: 12, paddingBottom: 8, fontSize: 14, lineHeight: 20 },
-  thumbWrap:    { width: '100%', position: 'relative', overflow: 'hidden' },
-  thumb:        { width: '100%', height: '100%' },
-  thumbGradient:{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
-  playOverlay:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  playCircle:   { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.9)' },
-  duration:     { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  durationText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  views:        { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  viewsText:    { color: '#fff', fontSize: 11, fontWeight: '600' },
-  footer:       { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth },
-  action:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },
-  actionText:   { fontSize: 13, fontWeight: '600' },
-  stat:         { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  statText:     { fontSize: 13, fontWeight: '500' },
-  muteBtn:      { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-  progressTrack:   { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
-  progressFill:    { height: 3, backgroundColor: '#fff' },
+  card:     { marginBottom: 10, overflow: 'hidden', borderRadius: 14 },
+  thumbWrap:{ width: '100%', overflow: 'hidden' },
+
+  // Badge REEL
+  reelBadge:     { position: 'absolute', top: 12, left: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  reelBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+
+  // Auteur en overlay haut
+  authorOverlay:     { position: 'absolute', top: 40, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  avatarSm:          { width: 32, height: 32, borderRadius: 16, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' },
+  authorOverlayName: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  authorOverlayTime: { color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 1 },
+  muteBtnOverlay:    { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+
+  // Bas overlay
+  bottomOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14, gap: 6 },
+  hookWrap:  { alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  hookText:  { color: '#fff', fontSize: 13, fontWeight: '700' },
+  captionOverlay: { color: 'rgba(255,255,255,0.9)', fontSize: 13, lineHeight: 18 },
+
+  // Stats + CTA
+  statsRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  statItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statTxt:   { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
+  ctaBtn:    { marginLeft: 'auto' as any, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  ctaTxt:    { color: '#fff', fontSize: 12, fontWeight: '700' },
+
+  // Bouton play animé
+  playCenter:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  playRipple:  { position: 'absolute', width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.15)' },
+  playCircle:  { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)', paddingLeft: 4 },
 });
 
 // ── FeedCard ──────────────────────────────────────────────────────────────────
@@ -2068,17 +2201,19 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
               <View style={[s.likeCountIcon, { backgroundColor: '#E0389A' }]}>
                 <Icon name="heart" size={10} color="#fff" />
               </View>
-              <Text style={[s.likeCountText, { color: colors.textTertiary }]}>{likeCount}</Text>
+              <Text style={[s.likeCountText, { color: colors.textTertiary }]}>
+                {likeCount.toLocaleString('fr')}
+              </Text>
             </View>
           )}
           {commentCount > 0 && (
             <Text style={[s.likeCountText, { color: colors.textTertiary }]}>
-              {commentCount} commentaire{commentCount > 1 ? 's' : ''}
+              {commentCount.toLocaleString('fr')} réaction{commentCount > 1 ? 's' : ''}
             </Text>
           )}
           {shareCount > 0 && (
-            <Text style={[s.likeCountText, { color: colors.textTertiary }]}>
-              {shareCount} partage{shareCount > 1 ? 's' : ''}
+            <Text style={[s.likeCountText, { color: colors.textTertiary, marginLeft: 'auto' as any }]}>
+              {shareCount} diffusion{shareCount > 1 ? 's' : ''}
             </Text>
           )}
         </View>
@@ -2086,35 +2221,32 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
       {/* ── Barre sociale ────────────────────────────────────────────── */}
       <View style={[s.socialBar, { borderTopColor: colors.divider, backgroundColor: colors.surface }]}>
-          <TouchableOpacity style={s.socialBtn} onPress={handleLike} activeOpacity={0.8}>
-            <Animated.View style={heartStyle}>
-              <Icon name="heart" size={18} color={liked ? '#E0389A' : colors.textTertiary} />
-            </Animated.View>
-            <Text style={[s.socialBtnText, { color: liked ? '#E0389A' : colors.textTertiary }]}>
-              {likeCount > 0 ? `${likeCount}` : 'J\'aime'}
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={s.socialBtn} onPress={handleLike} activeOpacity={0.8}>
+          <Animated.View style={heartStyle}>
+            <Icon name="heart" size={18} color={liked ? '#E0389A' : colors.textTertiary}
+              fill={liked ? '#E0389A' : 'none'} />
+          </Animated.View>
+          <Text style={[s.socialBtnText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
+            {liked ? 'Tu adores' : 'Adorer'}
+          </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity style={s.socialBtn} onPress={() => onComment(delta => setCommentCount(v => v + delta))} activeOpacity={0.8}>
-            <Icon name="message-circle" size={18} color={colors.textTertiary} />
-            <Text style={[s.socialBtnText, { color: colors.textTertiary }]}>
-              {commentCount > 0 ? `${commentCount}` : 'Commenter'}
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={s.socialBtn} onPress={() => onComment(delta => setCommentCount(v => v + delta))} activeOpacity={0.8}>
+          <Icon name="message-circle" size={18} color={colors.textTertiary} />
+          <Text style={[s.socialBtnText, { color: colors.textTertiary }]}>Reagir</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity style={s.socialBtn} onPress={handleShare} activeOpacity={0.8}>
-            <Icon name="share-2" size={18} color={colors.textTertiary} />
-            <Text style={[s.socialBtnText, { color: colors.textTertiary }]}>
-              {shareCount > 0 ? `${shareCount}` : 'Partager'}
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={s.socialBtn} onPress={handleShare} activeOpacity={0.8}>
+          <Icon name="share-2" size={18} color={colors.textTertiary} />
+          <Text style={[s.socialBtnText, { color: colors.textTertiary }]}>Diffuser</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity style={s.saveBtn} onPress={handleSave} activeOpacity={0.8}>
-            <Animated.View style={saveStyle}>
-              <Icon name="bookmark" size={18} color={saved ? colors.primary : colors.textTertiary} />
-            </Animated.View>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={s.saveBtn} onPress={handleSave} activeOpacity={0.8}>
+          <Animated.View style={saveStyle}>
+            <Icon name="bookmark" size={18} color={saved ? colors.primary : colors.textTertiary} />
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
 
       {/* ── Séparateur bas ────────────────────────────────────────────── */}
       <View style={{ height: 8, backgroundColor: colors.backgroundSecondary }} />
