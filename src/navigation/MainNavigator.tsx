@@ -47,8 +47,13 @@ import { FilmDetailScreen }      from '../screens/Detail/FilmDetailScreen';
 import { SerieEpisodesScreen }   from '../screens/Detail/SerieEpisodesScreen';
 import { VideoPlayerScreen }     from '../screens/Detail/VideoPlayerScreen';
 import { CommunityDetailScreen }   from '../screens/Detail/CommunityDetailScreen';
-import { AdminVerificationScreen } from '../screens/Detail/AdminVerificationScreen';
-import { PostDetailScreen }      from '../screens/Detail/PostDetailScreen';
+import { AdminVerificationScreen }        from '../screens/Detail/AdminVerificationScreen';
+import CommunityMembersScreen             from '../screens/Detail/CommunityMembersScreen';
+import { CommunityStatsScreen }           from '../screens/Detail/CommunityStatsScreen';
+import { CommunityEventsScreen }          from '../screens/Detail/CommunityEventsScreen';
+import { CommunityMemberProfileScreen }   from '../screens/Detail/CommunityMemberProfileScreen';
+import { CommunityLeaderboardScreen }     from '../screens/Detail/CommunityLeaderboardScreen';
+import { PostDetailScreen }               from '../screens/Detail/PostDetailScreen';
 import { MyTicketScreen }        from '../screens/Detail/MyTicketScreen';
 import { AttendeesScreen }       from '../screens/Detail/AttendeesScreen';
 import { TicketScannerScreen }   from '../screens/Detail/TicketScannerScreen';
@@ -111,10 +116,15 @@ export type MainStackParamList = {
   NewConversation: undefined;
   NewCall:         undefined;
   Following:       { userId?: string; tab?: 'followers' | 'following' } | undefined;
-  CommunityChat:   { communityId: string; communityName: string };
-  Communities:     undefined;
-  CommunityDetail: { communityId: string };
-  Events:          undefined;
+  CommunityChat:           { communityId: string; communityName: string };
+  Communities:             undefined;
+  CommunityDetail:         { communityId: string };
+  CommunityMembers:        { communityId: string; communityName: string };
+  CommunityStats:          { communityId: string; communityName: string };
+  CommunityEvents:         { communityId: string; communityName: string };
+  CommunityMemberProfile:  { communityId: string; communityName: string; memberId: string; memberName: string };
+  CommunityLeaderboard:    { communityId: string; communityName: string };
+  Events:                  undefined;
   Concerts:        undefined;
   BlockedUsers:    undefined;
   LiveList:          undefined;
@@ -271,7 +281,12 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Withdraw"       component={WithdrawScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Boost"             component={BoostScreen}             options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="AdminVerification" component={AdminVerificationScreen}  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="AdminVerification"       component={AdminVerificationScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityMembers"        component={CommunityMembersScreen}        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityStats"          component={CommunityStatsScreen}          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityEvents"         component={CommunityEventsScreen}         options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityMemberProfile"  component={CommunityMemberProfileScreen}  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityLeaderboard"    component={CommunityLeaderboardScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="WebQRScanner"      component={WebQRScannerScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       </Stack.Navigator>
       <NotificationToast />

@@ -17,6 +17,7 @@ import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
 import type { CommunityData, CommunityMemberData, BlockedMemberData, VerificationRequest } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { useWs } from '../../context/WebSocketContext';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 interface Props { route: { params: { communityId: string } }; }
@@ -37,8 +38,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [members,        setMembers]        = useState<CommunityMemberData[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [isMember,       setIsMember]       = useState(false);
+  const [joinStatus,     setJoinStatus]     = useState<'none' | 'pending' | 'member'>('none');
   const [myId,           setMyId]           = useState<string | null>(null);
   const [myRole,         setMyRole]         = useState<string | null>(null);
+  const [myCoins,        setMyCoins]        = useState<number | null>(null);
   const [actionLoading,  setActionLoading]  = useState(false);
   const [blockedMembers, setBlockedMembers] = useState<BlockedMemberData[]>([]);
   const [isGlobalAdmin,  setIsGlobalAdmin]  = useState(false);
@@ -76,6 +79,27 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const isMod    = myRole === 'moderator';
   const canBlock = isAdmin || isMod;
 
+  const { addListener, removeListener } = useWs();
+  // Ref pour accéder à load dans le listener sans créer de dépendance circulaire
+  const loadRef    = useRef<() => void>(() => {});
+  const communityRef = useRef<CommunityData | null>(null);
+
+  useEffect(() => { communityRef.current = community; }, [community]);
+
+  useEffect(() => {
+    const handler = (payload: { type: string; community_id?: string; community_name?: string }) => {
+      if (payload.type === 'community_join_approved' && payload.community_id === communityId) {
+        loadRef.current();
+        nav.replace('CommunityChat', {
+          communityId,
+          communityName: payload.community_name ?? communityRef.current?.name ?? '',
+        });
+      }
+    };
+    addListener(handler as any);
+    return () => removeListener(handler as any);
+  }, [addListener, removeListener, communityId, nav]);
+
   const load = useCallback(async () => {
     try {
       const [c, membersList, me, role] = await Promise.all([
@@ -91,7 +115,17 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       setMyRole(role);
       const globalAdmin = (me as any).role === 'admin';
       setIsGlobalAdmin(globalAdmin);
-      setIsMember(membersList.some((m: CommunityMemberData) => m.user_id === uid));
+      const memberFound = membersList.some((m: CommunityMemberData) => m.user_id === uid);
+      setIsMember(memberFound);
+      // join_status vient du backend via getById (inclut pending)
+      const js = (c as any).join_status ?? (memberFound ? 'member' : 'none');
+      setJoinStatus(js);
+      // Charger le solde coins si la communauté est payante et que l'user n'est pas encore membre
+      if ((c.entry_price_coins ?? 0) > 0 && js !== 'member') {
+        apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance)
+          .then(r => setMyCoins(r.data?.coins_balance ?? 0))
+          .catch(() => setMyCoins(null));
+      }
       if (role === 'admin' || role === 'moderator') {
         communityService.getBlockedMembers(communityId).then(setBlockedMembers).catch(() => {});
       }
@@ -105,6 +139,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     finally { setLoading(false); }
   }, [communityId]);
 
+  useEffect(() => { loadRef.current = load; }, [load]);
   useEffect(() => { load(); }, [load]);
 
   function openSettings() {
@@ -123,7 +158,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   async function pickImage(target: 'avatar' | 'banner') {
     if (pickingRef.current) return;
     pickingRef.current = true;
-    launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.85 }, (resp) => {
+    launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 1 }, (resp) => {
       pickingRef.current = false;
       if (resp.didCancel || resp.errorCode || !resp.assets?.length) return;
       const uri = resp.assets[0].uri ?? null;
@@ -263,10 +298,85 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   };
 
   const handleJoin = async () => {
-    setActionLoading(true);
-    try { await communityService.join(communityId); load(); }
-    catch { Alert.alert('Erreur', 'Impossible de rejoindre'); }
-    finally { setActionLoading(false); }
+    if (!community) return;
+    const price         = community.entry_price_coins ?? 0;
+    const needsApproval = community.is_private || community.requires_approval;
+    const priceLabel    = (n: number) => `${n} coin${n > 1 ? 's' : ''}`;
+
+    // Vérification solde côté client avant tout
+    if (price > 0 && myCoins !== null && myCoins < price) {
+      const manque = price - myCoins;
+      Alert.alert(
+        'Solde insuffisant',
+        `Vous avez ${myCoins} coin${myCoins > 1 ? 's' : ''} mais il en faut ${price}.\n\nIl vous manque ${priceLabel(manque)}. Rechargez votre wallet pour accéder à cette communauté.`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Recharger', onPress: () => nav.navigate('BuyCoins') },
+        ],
+      );
+      return;
+    }
+
+    const doJoin = async () => {
+      setActionLoading(true);
+      try {
+        const res = await communityService.join(communityId);
+        if (res.pending) {
+          setJoinStatus('pending');
+          Alert.alert(
+            'Demande envoyée',
+            needsApproval
+              ? `Votre demande pour rejoindre "${community.name}" est en cours d'examen par l'administrateur.\n\nVous serez automatiquement redirigé vers le chat dès qu'elle sera acceptée.`
+              : `Votre demande est en attente.`,
+          );
+          load();
+        } else if (res.joined) {
+          setJoinStatus('member');
+          load();
+          nav.replace('CommunityChat', { communityId, communityName: community.name });
+        }
+      } catch (e: any) {
+        const detail = (e?.response?.data?.detail ?? '').toLowerCase();
+        if (detail.includes('insufficient') || detail.includes('coins')) {
+          // Recharger le solde réel et afficher
+          const walletRes = await apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance).catch(() => null);
+          const realBalance = walletRes?.data?.coins_balance ?? 0;
+          setMyCoins(realBalance);
+          const manque = price - realBalance;
+          Alert.alert(
+            'Solde insuffisant',
+            `Votre solde actuel est de ${realBalance} coin${realBalance > 1 ? 's' : ''}. Il vous manque ${priceLabel(manque)}.`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Recharger', onPress: () => nav.navigate('BuyCoins') },
+            ],
+          );
+        } else if (detail.includes('blocked')) {
+          Alert.alert('Accès refusé', 'Vous avez été bloqué de cette communauté.');
+        } else {
+          Alert.alert('Erreur', 'Impossible de rejoindre cette communauté');
+        }
+      } finally { setActionLoading(false); }
+    };
+
+    if (price > 0) {
+      const soldeInfo = myCoins !== null
+        ? `\n\nVotre solde : ${myCoins} coin${myCoins > 1 ? 's' : ''}`
+        : '';
+      const approvalNote = needsApproval
+        ? '\nVotre demande sera examinée par l\'admin. Les coins sont remboursés en cas de refus.'
+        : '';
+      Alert.alert(
+        'Accès payant',
+        `Rejoindre "${community.name}" coûte ${priceLabel(price)}.${approvalNote}${soldeInfo}`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: `Payer ${priceLabel(price)}`, onPress: doJoin },
+        ],
+      );
+    } else {
+      doJoin();
+    }
   };
 
   const handleLeave = () => {
@@ -773,33 +883,130 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               </View>
 
               <View style={s.actionsRow}>
-                <TouchableOpacity
-                  style={[s.actionBtn, { backgroundColor: isMember ? colors.backgroundSecondary : '#7B3FF2', borderColor: isMember ? colors.divider : 'transparent', borderWidth: isMember ? 1 : 0 }]}
-                  onPress={isMember ? handleLeave : handleJoin}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? (
-                    <ActivityIndicator size="small" color={isMember ? colors.textPrimary : '#fff'} />
-                  ) : (
-                    <>
-                      <Icon name={isMember ? 'check' : 'user-plus'} size={16} color={isMember ? colors.textPrimary : '#fff'} />
-                      <Text style={[s.actionText, { color: isMember ? colors.textPrimary : '#fff' }]}>
-                        {isMember ? 'Membre' : 'Rejoindre'}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-
-                {isMember && (
+                {/* ── Bouton principal selon joinStatus ── */}
+                {joinStatus === 'member' ? (
+                  <>
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, borderWidth: 1 }]}
+                      onPress={handleLeave}
+                      disabled={actionLoading}
+                    >
+                      <Icon name="check" size={15} color={colors.textSecondary} />
+                      <Text style={[s.actionText, { color: colors.textSecondary }]}>Membre</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: '#7B3FF2', flex: 1 }]}
+                      onPress={() => nav.navigate('CommunityChat' as any, { communityId, communityName: community.name })}
+                    >
+                      <Icon name="message-circle" size={16} color="#fff" />
+                      <Text style={[s.actionText, { color: '#fff' }]}>Discussion</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : joinStatus === 'pending' ? (
                   <TouchableOpacity
-                    style={[s.actionBtn, { backgroundColor: '#7B3FF2', flex: 1 }]}
-                    onPress={() => nav.navigate('CommunityChat' as any, { communityId, communityName: community.name })}
+                    style={[s.actionBtn, { flex: 1, backgroundColor: '#F59E0B18', borderColor: '#F59E0B', borderWidth: 1.5 }]}
+                    onPress={() => {
+                      Alert.alert(
+                        'Demande en attente',
+                        'Votre demande d\'adhésion est en cours d\'examen par l\'administrateur. Vous serez automatiquement redirigé vers le chat dès qu\'elle sera acceptée.',
+                        [
+                          { text: 'Annuler la demande', style: 'destructive', onPress: async () => {
+                            try { await communityService.cancelJoinRequest(communityId); load(); }
+                            catch { Alert.alert('Erreur', 'Impossible d\'annuler la demande'); }
+                          }},
+                          { text: 'OK', style: 'cancel' },
+                        ],
+                      );
+                    }}
+                    disabled={actionLoading}
                   >
-                    <Icon name="message-circle" size={16} color="#fff" />
-                    <Text style={[s.actionText, { color: '#fff' }]}>Discussion</Text>
+                    <Icon name="clock" size={15} color="#F59E0B" />
+                    <Text style={[s.actionText, { color: '#F59E0B' }]}>En attente d'approbation</Text>
+                    <Icon name="x" size={13} color="#F59E0B80" />
+                  </TouchableOpacity>
+                ) : (
+                  /* joinStatus === 'none' */
+                  <TouchableOpacity
+                    style={[s.actionBtn, { flex: 1, backgroundColor: '#7B3FF2' }]}
+                    onPress={handleJoin}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Icon
+                          name={(community.is_private || community.requires_approval) ? 'send' : 'user-plus'}
+                          size={15} color="#fff"
+                        />
+                        <Text style={[s.actionText, { color: '#fff' }]}>
+                          {(community.is_private || community.requires_approval) ? 'Demander à rejoindre' : 'Rejoindre'}
+                        </Text>
+                        {(community.entry_price_coins ?? 0) > 0 && (
+                          <View style={s.coinPill}>
+                            <Text style={s.coinPillText}>{community.entry_price_coins}</Text>
+                            <Icon name="zap" size={10} color="#F59E0B" />
+                          </View>
+                        )}
+                      </>
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
+
+              {/* ── Infos accès payant + solde ── */}
+              {joinStatus === 'none' && (community.entry_price_coins ?? 0) > 0 && (() => {
+                const price     = community.entry_price_coins!;
+                const hasEnough = myCoins !== null && myCoins >= price;
+                const isLow     = myCoins !== null && myCoins < price;
+                return (
+                  <View style={[s.walletInfoBar, { borderColor: isLow ? '#EF444440' : '#F59E0B40', backgroundColor: isLow ? '#EF444408' : '#F59E0B08' }]}>
+                    <View style={s.walletInfoLeft}>
+                      <Icon name="zap" size={14} color={isLow ? '#EF4444' : '#F59E0B'} />
+                      <View>
+                        <Text style={[s.walletInfoTitle, { color: isLow ? '#EF4444' : '#F59E0B' }]}>
+                          {price} coin{price > 1 ? 's' : ''} requis pour accéder
+                        </Text>
+                        {myCoins !== null && (
+                          <Text style={[s.walletInfoSub, { color: isLow ? '#EF4444' : colors.textTertiary }]}>
+                            {isLow
+                              ? `Solde insuffisant — vous avez ${myCoins} coin${myCoins > 1 ? 's' : ''} (manque ${price - myCoins})`
+                              : `Votre solde : ${myCoins} coin${myCoins > 1 ? 's' : ''}`}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    {isLow && (
+                      <TouchableOpacity onPress={() => nav.navigate('BuyCoins')} style={s.walletRechargeBtn}>
+                        <Text style={s.walletRechargeTxt}>Recharger</Text>
+                      </TouchableOpacity>
+                    )}
+                    {hasEnough && (
+                      <Icon name="check-circle" size={16} color="#10B981" />
+                    )}
+                  </View>
+                );
+              })()}
+
+              {/* ── Message approbation / attente ── */}
+              {joinStatus === 'none' && (community.is_private || community.requires_approval) && (
+                <View style={s.infoBar}>
+                  <Icon name="lock" size={12} color={colors.textTertiary} />
+                  <Text style={[s.infoBarText, { color: colors.textTertiary }]}>
+                    {community.is_private
+                      ? 'Communauté privée — accès sur approbation de l\'admin'
+                      : 'Approbation requise — l\'admin examine chaque demande'}
+                  </Text>
+                </View>
+              )}
+              {joinStatus === 'pending' && (
+                <View style={[s.infoBar, { backgroundColor: '#F59E0B10', borderRadius: 8, paddingHorizontal: 10 }]}>
+                  <Icon name="info" size={12} color="#F59E0B" />
+                  <Text style={[s.infoBarText, { color: '#F59E0B' }]}>
+                    Appuyez sur le bouton pour annuler votre demande
+                  </Text>
+                </View>
+              )}
 
               {isGlobalAdmin && (
                 <TouchableOpacity
@@ -871,6 +1078,59 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   )}
                 </TouchableOpacity>
               )}
+
+              {/* ── Raccourcis navigation nouveaux screens ── */}
+              <View style={s.shortcutGrid}>
+                <TouchableOpacity
+                  style={[s.shortcut, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                  onPress={() => (nav as any).navigate('CommunityEvents', { communityId, communityName: community.name })}
+                  activeOpacity={0.75}
+                >
+                  <View style={[s.shortcutIcon, { backgroundColor: '#FF7A2F20' }]}>
+                    <Icon name="calendar" size={18} color="#FF7A2F" />
+                  </View>
+                  <Text style={[s.shortcutLabel, { color: colors.textPrimary }]}>Événements</Text>
+                  <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[s.shortcut, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                  onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name })}
+                  activeOpacity={0.75}
+                >
+                  <View style={[s.shortcutIcon, { backgroundColor: '#3B82F620' }]}>
+                    <Icon name="users" size={18} color="#3B82F6" />
+                  </View>
+                  <Text style={[s.shortcutLabel, { color: colors.textPrimary }]}>Annuaire</Text>
+                  <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[s.shortcut, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                  onPress={() => (nav as any).navigate('CommunityLeaderboard', { communityId, communityName: community.name })}
+                  activeOpacity={0.75}
+                >
+                  <View style={[s.shortcutIcon, { backgroundColor: '#F59E0B20' }]}>
+                    <Icon name="award" size={18} color="#F59E0B" />
+                  </View>
+                  <Text style={[s.shortcutLabel, { color: colors.textPrimary }]}>Classement</Text>
+                  <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                </TouchableOpacity>
+
+                {(isAdmin || isMod) && (
+                  <TouchableOpacity
+                    style={[s.shortcut, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                    onPress={() => (nav as any).navigate('CommunityStats', { communityId, communityName: community.name })}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[s.shortcutIcon, { backgroundColor: '#36D9A020' }]}>
+                      <Icon name="bar-chart-2" size={18} color="#36D9A0" />
+                    </View>
+                    <Text style={[s.shortcutLabel, { color: colors.textPrimary }]}>Statistiques</Text>
+                    <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+              </View>
 
               <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>MEMBRES ({members.length})</Text>
             </View>
@@ -1117,7 +1377,26 @@ const s = StyleSheet.create({
     gap: 8, paddingVertical: 12, borderRadius: 12,
   },
   actionText: { fontWeight: '700', fontSize: 14 },
+
+  coinPill: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.25)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  coinPillText: { color: '#F59E0B', fontWeight: '800', fontSize: 11 },
+
+  walletInfoBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8, gap: 10 },
+  walletInfoLeft: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  walletInfoTitle: { fontSize: 13, fontWeight: '700' },
+  walletInfoSub: { fontSize: 11, marginTop: 2, fontWeight: '500' },
+  walletRechargeBtn: { backgroundColor: '#EF444420', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  walletRechargeTxt: { color: '#EF4444', fontWeight: '700', fontSize: 12 },
+
+  infoBar: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 4, paddingVertical: 6, marginBottom: 4 },
+  infoBarText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '500' },
+
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: 24, marginBottom: 8 },
+
+  shortcutGrid:  { marginTop: 16, gap: 8 },
+  shortcut:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+  shortcutIcon:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  shortcutLabel: { flex: 1, fontSize: 14, fontWeight: '600' },
 
   memberRow: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
@@ -1130,7 +1409,7 @@ const s = StyleSheet.create({
 
   // Modal
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  modalBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  modalBg: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.6)' },
   modalKav: { width: '100%' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '94%', flex: 1 },
   dragBar: { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
