@@ -1397,10 +1397,10 @@ const ReelRowCard: React.FC<{
   onPressReel: (reelId: string) => void;
 }> = React.memo(({ reels, colors, onPressReel }) => {
   const { width: SW, height: SH } = Dimensions.get('window');
-  const HERO_W  = SW - 32;
-  const HERO_H  = Math.round(SH * 0.62);   // 62% de la hauteur d'écran
-  const MINI_W  = Math.round(SW * 0.38);   // 38% de la largeur d'écran
-  const MINI_H  = Math.round(MINI_W * 1.6);
+  const HERO_W  = SW - 24;
+  const HERO_H  = Math.round(SH * 0.78);
+  const MINI_W  = Math.round(SW * 0.48);
+  const MINI_H  = Math.round(MINI_W * 1.7);
 
   const hero  = reels[0];
   const rest  = reels.slice(1);
@@ -1510,7 +1510,7 @@ const ReelRowCard: React.FC<{
 
       {/* Grande carte hero */}
       {hero ? (
-        <View style={{ paddingHorizontal: 16, marginBottom: rest.length > 0 ? 10 : 0 }}>
+        <View style={{ paddingHorizontal: 12, marginBottom: rest.length > 0 ? 12 : 0 }}>
           <ReelThumb reel={hero} w={HERO_W} h={HERO_H} large />
         </View>
       ) : null}
