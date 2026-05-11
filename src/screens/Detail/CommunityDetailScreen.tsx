@@ -100,6 +100,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [editPrivate,     setEditPrivate]     = useState(false);
   const [editApproval,    setEditApproval]    = useState(false);
   const [editMembersOnly, setEditMembersOnly] = useState(false);
+  const [editEntryPrice,  setEditEntryPrice]  = useState('0');
 
   // Onglet Membres
   const [roleLoading,   setRoleLoading]   = useState<string | null>(null);
@@ -186,8 +187,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     setEditAvatar(null);
     setEditBanner(null);
     setEditPrivate(community.is_private);
-    setEditApproval(!!(community as any).requires_approval);
-    setEditMembersOnly(!!(community as any).members_only_chat);
+    setEditApproval(!!community.requires_approval);
+    setEditMembersOnly(!!community.members_only_chat);
+    setEditEntryPrice(String(community.entry_price_coins ?? 0));
     setSettingsTab('info');
     setSettingsOpen(true);
   }
@@ -237,15 +239,22 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
       } finally { setSaving(false); }
     } else if (settingsTab === 'security') {
+      const price = parseInt(editEntryPrice, 10);
+      if (isNaN(price) || price < 0) {
+        Alert.alert('Erreur', 'Le prix d\'entrée doit être un entier positif ou 0.');
+        return;
+      }
       setSaving(true);
       try {
         await apiClient.patch(`/api/v1/communities/${communityId}`, {
           is_private:        editPrivate,
           requires_approval: editApproval,
           members_only_chat: editMembersOnly,
+          entry_price_coins: price,
         });
         setSettingsOpen(false);
         load();
+        Alert.alert('Enregistré', 'Les paramètres ont été mis à jour.');
       } catch (e: any) {
         Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
       } finally { setSaving(false); }
@@ -556,8 +565,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   // ── Onglet Info (settings) ───────────────────────────────────────────────────
   const renderTabInfo = () => (
-    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
       <View style={s.sheetBody}>
+
         {/* Bannière */}
         <TouchableOpacity onPress={() => pickImage('banner')} activeOpacity={0.85}>
           <View style={[s.editBanner, { backgroundColor: colors.backgroundSecondary }]}>
@@ -609,30 +619,71 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               maxLength={60}
             />
           </View>
+          <Text style={[{ fontSize: 10, color: colors.textTertiary, textAlign: 'right', marginTop: 3 }]}>
+            {editName.length}/60
+          </Text>
         </View>
 
         {/* Description */}
-        <View style={{ marginTop: 14, marginBottom: 32 }}>
+        <View style={{ marginTop: 14 }}>
           <Text style={[s.fieldLabel, { color: colors.textTertiary }]}>DESCRIPTION</Text>
           <View style={[s.fieldBox, {
             borderColor: colors.divider,
             backgroundColor: colors.backgroundSecondary,
-            minHeight: 80,
+            minHeight: 88,
           }]}>
             <TextInput
               style={[s.fieldInput, { color: colors.textPrimary, textAlignVertical: 'top' }]}
               value={editDesc}
               onChangeText={setEditDesc}
-              placeholder="Description (optionnel)"
+              placeholder="Décrivez votre communauté (optionnel)"
               placeholderTextColor={colors.textTertiary}
               multiline
               maxLength={300}
             />
           </View>
-          <Text style={[{ fontSize: 10, color: colors.textTertiary, textAlign: 'right', marginTop: 4 }]}>
+          <Text style={[{ fontSize: 10, color: colors.textTertiary, textAlign: 'right', marginTop: 3 }]}>
             {editDesc.length}/300
           </Text>
         </View>
+
+        {/* Info résumée */}
+        <View style={[s.infoSummaryBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, marginTop: 18 }]}>
+          <View style={s.infoSummaryRow}>
+            <Icon name="users" size={14} color={colors.textTertiary} />
+            <Text style={[s.infoSummaryTxt, { color: colors.textSecondary }]}>
+              {community.members_count} membre{community.members_count !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          <View style={[s.infoSummarySep, { backgroundColor: colors.divider }]} />
+          <View style={s.infoSummaryRow}>
+            <Icon name={community.is_private ? 'lock' : 'globe'} size={14} color={colors.textTertiary} />
+            <Text style={[s.infoSummaryTxt, { color: colors.textSecondary }]}>
+              {community.is_private ? 'Privée' : 'Publique'}
+            </Text>
+          </View>
+          {(community.entry_price_coins ?? 0) > 0 && (
+            <>
+              <View style={[s.infoSummarySep, { backgroundColor: colors.divider }]} />
+              <View style={s.infoSummaryRow}>
+                <Icon name="zap" size={14} color="#F59E0B" />
+                <Text style={[s.infoSummaryTxt, { color: '#F59E0B' }]}>
+                  {community.entry_price_coins} coins requis
+                </Text>
+              </View>
+            </>
+          )}
+          {community.is_verified && (
+            <>
+              <View style={[s.infoSummarySep, { backgroundColor: colors.divider }]} />
+              <View style={s.infoSummaryRow}>
+                <Icon name="check-circle" size={14} color="#1D9BF0" />
+                <Text style={[s.infoSummaryTxt, { color: '#1D9BF0' }]}>Communauté vérifiée</Text>
+              </View>
+            </>
+          )}
+        </View>
+
       </View>
     </ScrollView>
   );
@@ -796,10 +847,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     </View>
   );
 
-  // ── Onglet Sécurité (settings) ───────────────────────────────────────────────
+  // ── Onglet Paramètres (settings) ─────────────────────────────────────────────
   const renderTabSecurity = () => (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
       <View style={s.sheetBody}>
+
+        {/* ── VISIBILITÉ ── */}
         <Text style={[s.secSection, { color: colors.textTertiary }]}>VISIBILITÉ</Text>
         <View style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
           <View style={[s.secIcon, { backgroundColor: editPrivate ? '#E0389A20' : '#3B82F620' }]}>
@@ -810,9 +863,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               {editPrivate ? 'Communauté privée' : 'Communauté publique'}
             </Text>
             <Text style={[s.secDesc, { color: colors.textTertiary }]}>
-              {editPrivate
-                ? 'Seuls les membres invités peuvent rejoindre'
-                : 'Tout le monde peut découvrir et rejoindre'}
+              {editPrivate ? 'Seuls les membres approuvés peuvent rejoindre' : 'Tout le monde peut découvrir et rejoindre'}
             </Text>
           </View>
           <Switch
@@ -823,6 +874,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           />
         </View>
 
+        {/* ── ADHÉSION ── */}
         <Text style={[s.secSection, { color: colors.textTertiary, marginTop: 20 }]}>ADHÉSION</Text>
         <View style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
           <View style={[s.secIcon, { backgroundColor: '#F59E0B20' }]}>
@@ -831,7 +883,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           <View style={{ flex: 1 }}>
             <Text style={[s.secLabel, { color: colors.textPrimary }]}>Approbation requise</Text>
             <Text style={[s.secDesc, { color: colors.textTertiary }]}>
-              Les nouvelles demandes nécessitent une approbation admin
+              Chaque demande doit être validée manuellement par l'admin
             </Text>
           </View>
           <Switch
@@ -842,6 +894,31 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           />
         </View>
 
+        {/* Prix d'entrée */}
+        <View style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, marginTop: 8 }]}>
+          <View style={[s.secIcon, { backgroundColor: '#F59E0B20' }]}>
+            <Icon name="zap" size={18} color="#F59E0B" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Prix d'entrée (coins)</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>
+              0 = gratuit — les membres paient ce montant pour rejoindre
+            </Text>
+          </View>
+          <View style={[s.priceInputWrap, { borderColor: colors.primary + '60', backgroundColor: colors.surface }]}>
+            <TextInput
+              style={[s.priceInput, { color: colors.textPrimary }]}
+              value={editEntryPrice}
+              onChangeText={v => setEditEntryPrice(v.replace(/[^0-9]/g, ''))}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="0"
+              placeholderTextColor={colors.textTertiary}
+            />
+          </View>
+        </View>
+
+        {/* ── CHAT ── */}
         <Text style={[s.secSection, { color: colors.textTertiary, marginTop: 20 }]}>CHAT</Text>
         <View style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
           <View style={[s.secIcon, { backgroundColor: '#7B3FF220' }]}>
@@ -861,7 +938,115 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           />
         </View>
 
+        {/* ── ACCÈS RAPIDE ── */}
+        <Text style={[s.secSection, { color: colors.textTertiary, marginTop: 20 }]}>ACCÈS RAPIDE</Text>
+
+        <TouchableOpacity
+          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSettingsOpen(false);
+            setTimeout(() => (nav as any).navigate('CommunityJoinRequests', { communityId, communityName: community?.name ?? '' }), 250);
+          }}
+        >
+          <View style={[s.secIcon, { backgroundColor: '#7B3FF220' }]}>
+            <Icon name="user-check" size={18} color="#7B3FF2" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Demandes d'adhésion</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>
+              {pendingCount > 0 ? `${pendingCount} demande${pendingCount > 1 ? 's' : ''} en attente` : 'Aucune demande en attente'}
+            </Text>
+          </View>
+          {pendingCount > 0 && (
+            <View style={[s.pendingBadge, { backgroundColor: '#7B3FF2', marginRight: 6 }]}>
+              <Text style={s.pendingBadgeTxt}>{pendingCount}</Text>
+            </View>
+          )}
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSettingsOpen(false);
+            setTimeout(() => (nav as any).navigate('CommunityStats', { communityId, communityName: community?.name ?? '' }), 250);
+          }}
+        >
+          <View style={[s.secIcon, { backgroundColor: '#36D9A020' }]}>
+            <Icon name="bar-chart-2" size={18} color="#36D9A0" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Statistiques</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>Activité, croissance et engagement</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSettingsOpen(false);
+            setTimeout(() => (nav as any).navigate('CommunityLeaderboard', { communityId, communityName: community?.name ?? '' }), 250);
+          }}
+        >
+          <View style={[s.secIcon, { backgroundColor: '#F59E0B20' }]}>
+            <Icon name="award" size={18} color="#F59E0B" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Classement</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>Voir le classement XP des membres</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSettingsOpen(false);
+            setTimeout(() => (nav as any).navigate('CommunityEvents', { communityId, communityName: community?.name ?? '' }), 250);
+          }}
+        >
+          <View style={[s.secIcon, { backgroundColor: '#FF7A2F20' }]}>
+            <Icon name="calendar" size={18} color="#FF7A2F" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Événements</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>Gérer les événements de la communauté</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        {/* ── ZONE DE DANGER ── */}
         <Text style={[s.secSection, { color: '#EF4444', marginTop: 28 }]}>ZONE DE DANGER</Text>
+
+        {isAdmin && (
+          <TouchableOpacity
+            onPress={() => {
+              setSettingsTab('members');
+              Alert.alert(
+                'Transférer l\'admin',
+                'Dans l\'onglet Membres, promouvez un membre au rôle Admin. Vous perdrez alors vos droits d\'administration.',
+                [{ text: 'Aller aux membres', onPress: () => setSettingsTab('members') }, { text: 'Annuler', style: 'cancel' }],
+              );
+            }}
+            style={[s.secRow, { backgroundColor: '#F59E0B08', borderColor: '#F59E0B30', marginBottom: 8 }]}
+            activeOpacity={0.7}
+          >
+            <View style={[s.secIcon, { backgroundColor: '#F59E0B20' }]}>
+              <Icon name="repeat" size={18} color="#F59E0B" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.secLabel, { color: '#F59E0B' }]}>Transférer l'admin</Text>
+              <Text style={[s.secDesc, { color: '#F59E0B99' }]}>Passer les droits admin à un autre membre</Text>
+            </View>
+            <Icon name="chevron-right" size={16} color="#F59E0B60" />
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           onPress={handleDeleteCommunity}
           style={[s.secRow, { backgroundColor: '#EF444410', borderColor: '#EF444430' }]}
@@ -872,12 +1057,11 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[s.secLabel, { color: '#EF4444' }]}>Supprimer la communauté</Text>
-            <Text style={[s.secDesc, { color: '#EF444499' }]}>
-              Action irréversible — toutes les données seront perdues
-            </Text>
+            <Text style={[s.secDesc, { color: '#EF444499' }]}>Action irréversible — toutes les données seront perdues</Text>
           </View>
           <Icon name="chevron-right" size={16} color="#EF444460" />
         </TouchableOpacity>
+
       </View>
     </ScrollView>
   );
@@ -1517,84 +1701,93 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         visible={settingsOpen}
         transparent
         animationType="slide"
+        statusBarTranslucent
         onRequestClose={() => !saving && setSettingsOpen(false)}
       >
-        <View style={s.modalRoot}>
-          <TouchableOpacity
-            style={s.modalBg}
-            activeOpacity={1}
-            onPress={() => !saving && setSettingsOpen(false)}
-          />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ width: '100%' }}
-          >
-            <View style={[s.settingsSheet, { backgroundColor: colors.background }]}>
-              {/* Handle */}
-              <View style={s.handleWrap}>
-                <View style={[s.handle, { backgroundColor: colors.divider }]} />
-              </View>
+        {/* fond semi-transparent cliquable */}
+        <TouchableOpacity
+          style={s.settingsOverlay}
+          activeOpacity={1}
+          onPress={() => !saving && setSettingsOpen(false)}
+        />
 
-              {/* Header settings */}
-              <View style={[s.settingsHeader, { borderBottomColor: colors.divider }]}>
-                <TouchableOpacity onPress={() => setSettingsOpen(false)} style={s.settingsNavBtn}>
-                  <Icon name="x" size={20} color={colors.textPrimary} />
+        {/* sheet ancrée en bas, par-dessus le fond */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={s.settingsKav}
+          pointerEvents="box-none"
+        >
+          <View style={[s.settingsSheet, { backgroundColor: colors.background }]}>
+            {/* Handle */}
+            <View style={s.handleWrap}>
+              <View style={[s.handle, { backgroundColor: colors.divider }]} />
+            </View>
+
+            {/* Header */}
+            <View style={[s.settingsHeader, { borderBottomColor: colors.divider }]}>
+              <TouchableOpacity onPress={() => setSettingsOpen(false)} style={s.settingsNavBtn}>
+                <Icon name="x" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={[s.settingsTitle, { color: colors.textPrimary }]}>
+                Gérer la communauté
+              </Text>
+              {settingsTab !== 'members' ? (
+                <TouchableOpacity
+                  onPress={handleSaveSettings}
+                  disabled={saving}
+                  style={[s.settingsNavBtn, { alignItems: 'flex-end' }]}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>
+                      Enregistrer
+                    </Text>
+                  )}
                 </TouchableOpacity>
-                <Text style={[s.settingsTitle, { color: colors.textPrimary }]}>
-                  Gérer la communauté
-                </Text>
-                {settingsTab !== 'members' ? (
+              ) : (
+                <View style={s.settingsNavBtn} />
+              )}
+            </View>
+
+            {/* Onglets */}
+            <View style={[s.tabBar, { borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
+              {(['info', 'members', 'security'] as SettingsTab[]).map(tab => {
+                const tabIcon =
+                  tab === 'info'    ? 'edit-2' :
+                  tab === 'members' ? 'users'  : 'shield';
+                const tabLabel =
+                  tab === 'info'    ? 'Infos'    :
+                  tab === 'members' ? 'Membres'  : 'Paramètres';
+                const active = settingsTab === tab;
+                return (
                   <TouchableOpacity
-                    onPress={handleSaveSettings}
-                    disabled={saving}
-                    style={[s.settingsNavBtn, { alignItems: 'flex-end' }]}
+                    key={tab}
+                    style={[s.tabBtn, active && { borderBottomWidth: 2.5, borderBottomColor: colors.primary }]}
+                    onPress={() => setSettingsTab(tab)}
                   >
-                    {saving ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>
-                        Enregistrer
-                      </Text>
+                    <Icon name={tabIcon} size={14} color={active ? colors.primary : colors.textTertiary} />
+                    <Text style={[s.tabLabel, { color: active ? colors.primary : colors.textTertiary }]}>
+                      {tabLabel}
+                    </Text>
+                    {tab === 'members' && pendingCount > 0 && (
+                      <View style={[s.tabBadge, { backgroundColor: '#7B3FF2' }]}>
+                        <Text style={s.tabBadgeTxt}>{pendingCount}</Text>
+                      </View>
                     )}
                   </TouchableOpacity>
-                ) : (
-                  <View style={s.settingsNavBtn} />
-                )}
-              </View>
-
-              {/* Onglets */}
-              <View style={[s.tabBar, { borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
-                {(['info', 'members', 'security'] as SettingsTab[]).map(tab => {
-                  const label  = tab === 'info' ? 'Info' : tab === 'members' ? 'Membres' : 'Sécurité';
-                  const icon   = tab === 'info' ? 'edit-2' : tab === 'members' ? 'users' : 'shield';
-                  const active = settingsTab === tab;
-                  return (
-                    <TouchableOpacity
-                      key={tab}
-                      style={[s.tabBtn, active && {
-                        borderBottomWidth: 2,
-                        borderBottomColor: colors.primary,
-                      }]}
-                      onPress={() => setSettingsTab(tab)}
-                    >
-                      <Icon name={icon} size={14} color={active ? colors.primary : colors.textTertiary} />
-                      <Text style={[s.tabLabel, { color: active ? colors.primary : colors.textTertiary }]}>
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Contenu */}
-              <View style={{ flex: 1 }}>
-                {settingsTab === 'info'     && renderTabInfo()}
-                {settingsTab === 'members'  && renderTabMembers()}
-                {settingsTab === 'security' && renderTabSecurity()}
-              </View>
+                );
+              })}
             </View>
-          </KeyboardAvoidingView>
-        </View>
+
+            {/* Contenu de l'onglet */}
+            <View style={{ flex: 1 }}>
+              {settingsTab === 'info'     && renderTabInfo()}
+              {settingsTab === 'members'  && renderTabMembers()}
+              {settingsTab === 'security' && renderTabSecurity()}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1960,6 +2153,37 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   roleBtnTxt: { fontSize: 10, fontWeight: '700' },
+
+  // Settings overlay + KAV
+  // Info summary
+  infoSummaryBox: {
+    borderRadius: 14, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 12,
+    flexDirection: 'row', flexWrap: 'wrap',
+    gap: 10, alignItems: 'center',
+  },
+  infoSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  infoSummaryTxt: { fontSize: 12, fontWeight: '500' },
+  infoSummarySep: { width: 1, height: 14, opacity: 0.5 },
+
+  settingsOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
+  settingsKav: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '94%' },
+
+  // Tab badge
+  tabBadge: {
+    minWidth: 16, height: 16, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4, marginLeft: 2,
+  },
+  tabBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: '800' },
+
+  // Prix d'entrée input
+  priceInputWrap: {
+    borderWidth: 1, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 5,
+    minWidth: 64, alignItems: 'center',
+  },
+  priceInput: { fontSize: 15, fontWeight: '700', textAlign: 'center', padding: 0 },
 
   // Sécurité
   secSection: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },

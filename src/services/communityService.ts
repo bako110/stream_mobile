@@ -10,6 +10,7 @@ export interface CommunityData {
   banner_url: string | null;
   is_private: boolean;
   requires_approval: boolean;
+  members_only_chat: boolean;
   entry_price_coins: number;
   is_verified: boolean;
   verified_at: string | null;
