@@ -372,15 +372,20 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         const res = await communityService.join(communityId);
         if (res.pending) {
           setJoinStatus('pending');
+          if (myCoins !== null) setMyCoins(prev => (prev ?? 0) - price);
+          const debitLine = price > 0
+            ? `\n\n${price} coin${price > 1 ? 's' : ''} ont été déduits de votre solde et enregistrés dans votre historique.`
+            : '';
           Alert.alert(
-            'Demande envoyée',
+            price > 0 ? 'Paiement effectué — Demande envoyée' : 'Demande envoyée',
             needsApproval
-              ? `Votre demande pour rejoindre "${community.name}" est en cours d'examen.\nVous serez redirigé automatiquement dès l'acceptation.`
-              : 'Votre demande est en attente.',
+              ? `Votre demande pour rejoindre "${community.name}" est en cours d'examen.${debitLine}\n\nVous serez redirigé automatiquement dès l'acceptation.`
+              : `Votre demande est en attente.${debitLine}`,
           );
           load();
         } else if (res.joined) {
           setJoinStatus('member');
+          if (price > 0 && myCoins !== null) setMyCoins(prev => (prev ?? 0) - price);
           load();
           nav.replace('CommunityChat', { communityId, communityName: community.name });
         }
