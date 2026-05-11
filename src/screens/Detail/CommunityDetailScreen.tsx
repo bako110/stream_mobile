@@ -87,7 +87,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab,  setSettingsTab]  = useState<SettingsTab>('info');
   const [saving,       setSaving]       = useState(false);
-  const pickingRef = useRef(false);
+  const pickingRef  = useRef(false);
+  const joiningRef  = useRef(false);
 
   // Onglet Info
   const [editName,   setEditName]   = useState('');
@@ -345,6 +346,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   const handleJoin = async () => {
     if (!community) return;
+    if (joiningRef.current || actionLoading || joinStatus !== 'none') return;
     const price         = community.entry_price_coins ?? 0;
     const needsApproval = community.is_private || community.requires_approval;
     const priceLabel    = (n: number) => `${n} coin${n > 1 ? 's' : ''}`;
@@ -363,6 +365,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     }
 
     const doJoin = async () => {
+      if (joiningRef.current) return;
+      joiningRef.current = true;
       setActionLoading(true);
       try {
         const res = await communityService.join(communityId);
@@ -399,7 +403,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         } else {
           Alert.alert('Erreur', 'Impossible de rejoindre cette communauté.');
         }
-      } finally { setActionLoading(false); }
+      } finally {
+        joiningRef.current = false;
+        setActionLoading(false);
+      }
     };
 
     if (price > 0) {
