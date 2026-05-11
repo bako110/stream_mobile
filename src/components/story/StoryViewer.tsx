@@ -313,7 +313,7 @@ export const StoryViewer: React.FC<Props> = ({
   // ── Mark viewed ────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (story && !story.viewed_by_me) storyService.markViewed(story.id);
+    if (story && !story.viewed_by_me && !isOwn) storyService.markViewed(story.id);
   }, [story?.id]);
 
   // ── Saved state ────────────────────────────────────────────────────────────

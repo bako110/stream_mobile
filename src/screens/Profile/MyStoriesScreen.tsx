@@ -4,6 +4,7 @@ import {
   StyleSheet, Alert, RefreshControl, Platform,
   FlatList, Modal,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -13,7 +14,7 @@ import { StoryViewer } from '../../components/story/StoryViewer';
 import { StoryCreator } from '../../components/story/StoryCreator';
 import { storyService } from '../../services/storyService';
 import { authService } from '../../services/authService';
-import type { Story, StoryGroup, StoryViewerUser } from '../../types/story';
+import type { Story, StoryGroup } from '../../types/story';
 
 interface Props { navigation: any }
 
@@ -28,101 +29,6 @@ function timeAgo(iso: string): string {
   if (hrs < 24)  return `il y a ${hrs} heure${hrs > 1 ? 's' : ''}`;
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
-
-// ── Viewers bottom sheet ──────────────────────────────────────────────────────
-
-interface ViewersSheetProps {
-  story: Story;
-  colors: any;
-  onClose: () => void;
-  onNavigate: (userId: string) => void;
-}
-
-const ViewersSheet: React.FC<ViewersSheetProps> = ({ story, colors, onClose, onNavigate }) => {
-  const [viewers, setViewers] = useState<StoryViewerUser[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    storyService.getViewers(story.id)
-      .then(setViewers)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [story.id]);
-
-  return (
-    <Modal transparent animationType="slide" onRequestClose={onClose}>
-      <View style={vs.overlay}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[vs.sheet, { backgroundColor: colors.surface }]}>
-          <View style={[vs.handle, { backgroundColor: colors.divider }]} />
-          <View style={[vs.header, { borderBottomColor: colors.divider }]}>
-            <Icon name="eye" size={18} color={colors.primary} />
-            <Text style={[vs.title, { color: colors.textPrimary }]}>
-              {story.view_count} {story.view_count === 1 ? 'vue' : 'vues'}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Icon name="x" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={loading ? [] : viewers}
-            keyExtractor={v => v.id}
-            contentContainerStyle={{ paddingBottom: 30 }}
-            ListEmptyComponent={
-              loading ? null : (
-                <View style={vs.empty}>
-                  <Icon name="eye-off" size={32} color={colors.textTertiary} />
-                  <Text style={[vs.emptyText, { color: colors.textTertiary }]}>
-                    Aucun spectateur pour l'instant
-                  </Text>
-                </View>
-              )
-            }
-            renderItem={({ item: v }) => {
-              const name = v.display_name || v.username || '?';
-              return (
-                <TouchableOpacity
-                  style={vs.row}
-                  onPress={() => { onClose(); onNavigate(v.id); }}
-                  activeOpacity={0.7}
-                >
-                  {v.avatar_url
-                    ? <Image source={{ uri: v.avatar_url }} style={vs.avatar} />
-                    : (
-                      <LinearGradient colors={['#7B3FF2', '#E0389A']} style={vs.avatarFallback}>
-                        <Text style={vs.avatarInitial}>{name[0].toUpperCase()}</Text>
-                      </LinearGradient>
-                    )
-                  }
-                  <View style={{ flex: 1 }}>
-                    <Text style={[vs.name, { color: colors.textPrimary }]}>{name}</Text>
-                    {v.username && <Text style={[vs.username, { color: colors.textTertiary }]}>@{v.username}</Text>}
-                  </View>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
-const vs = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '60%', paddingTop: 12 },
-  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  title: { flex: 1, fontSize: 17, fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12 },
-  avatar: { width: 42, height: 42, borderRadius: 21 },
-  avatarFallback: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  name: { fontSize: 14, fontWeight: '600' },
-  username: { fontSize: 12, marginTop: 1 },
-  empty: { alignItems: 'center', paddingVertical: 40, gap: 10 },
-  emptyText: { fontSize: 14 },
-});
 
 // ── Action Menu ───────────────────────────────────────────────────────────────
 
@@ -249,16 +155,16 @@ const row = StyleSheet.create({
 export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const nav = useNavigation<any>();
 
-  const [stories,      setStories]      = useState<Story[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [refreshing,   setRefreshing]   = useState(false);
-  const [viewerOpen,   setViewerOpen]   = useState(false);
-  const [viewerIndex,  setViewerIndex]  = useState(0);
-  const [menuStory,    setMenuStory]    = useState<Story | null>(null);
-  const [viewersStory, setViewersStory] = useState<Story | null>(null);
-  const [creatorOpen,  setCreatorOpen]  = useState(false);
-  const [myId,         setMyId]         = useState<string | undefined>(undefined);
+  const [stories,     setStories]     = useState<Story[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [viewerOpen,  setViewerOpen]  = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [menuStory,   setMenuStory]   = useState<Story | null>(null);
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const [myId,        setMyId]        = useState<string | undefined>(undefined);
 
   const load = useCallback(async (refresh = false) => {
     try {
@@ -386,18 +292,12 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
           story={menuStory}
           colors={colors}
           onClose={() => setMenuStory(null)}
-          onViewers={() => setViewersStory(menuStory)}
+          onViewers={() => {
+            const s = menuStory;
+            setMenuStory(null);
+            nav.navigate('StoryViewers', { storyId: s.id, viewCount: s.view_count, myId });
+          }}
           onDelete={() => handleDelete(menuStory)}
-        />
-      )}
-
-      {/* ── Viewers sheet ── */}
-      {viewersStory && (
-        <ViewersSheet
-          story={viewersStory}
-          colors={colors}
-          onClose={() => setViewersStory(null)}
-          onNavigate={userId => navigation.navigate('UserProfile', { userId })}
         />
       )}
 

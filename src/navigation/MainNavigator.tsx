@@ -62,6 +62,7 @@ import { TicketScannerScreen }   from '../screens/Detail/TicketScannerScreen';
 import { UserProfileScreen }     from '../screens/Profile/UserProfileScreen';
 import { EditProfileScreen }     from '../screens/Profile/EditProfileScreen';
 import { MyStoriesScreen }       from '../screens/Profile/MyStoriesScreen';
+import { StoryViewersScreen }    from '../screens/Profile/StoryViewersScreen';
 import { LiveStreamScreen }        from '../screens/Live/LiveStreamScreen';
 import { LiveViewerScreen }        from '../screens/Live/LiveViewerScreen';
 import { LiveListScreen }          from '../screens/Live/LiveListScreen';
@@ -78,6 +79,17 @@ import WithdrawScreen         from '../screens/Wallet/WithdrawScreen';
 import TransferScreen         from '../screens/Wallet/TransferScreen';
 import BoostScreen            from '../screens/Wallet/BoostScreen';
 import { WebQRScannerScreen } from '../screens/Auth/WebQRScannerScreen';
+import { SettingsWalletScreen }        from '../screens/Settings/SettingsWalletScreen';
+import { SettingsMonetisationScreen }  from '../screens/Settings/SettingsMonetisationScreen';
+import { SettingsAbonnementScreen }    from '../screens/Settings/SettingsAbonnementScreen';
+import { SettingsApparenceScreen }     from '../screens/Settings/SettingsApparenceScreen';
+import { SettingsNotificationsScreen } from '../screens/Settings/SettingsNotificationsScreen';
+import { SettingsLectureScreen }       from '../screens/Settings/SettingsLectureScreen';
+import { SettingsCompteScreen }        from '../screens/Settings/SettingsCompteScreen';
+import { SettingsContenuScreen }       from '../screens/Settings/SettingsContenuScreen';
+import { SettingsAProposScreen }       from '../screens/Settings/SettingsAProposScreen';
+import { SettingsDangerScreen }        from '../screens/Settings/SettingsDangerScreen';
+import { SettingsVerificationScreen }  from '../screens/Settings/SettingsVerificationScreen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -142,6 +154,7 @@ export type MainStackParamList = {
   SimpleLiveViewer:  { liveId: string };
   Activity:        undefined;
   MyStories:       undefined;
+  StoryViewers:    { storyId: string; viewCount: number; myId?: string };
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
   PostDetail:      { postId: string };
   CreatePost:      undefined;
@@ -153,8 +166,19 @@ export type MainStackParamList = {
   Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
   Boost:                undefined;
-  AdminVerification:    undefined;
-  WebQRScanner:         undefined;
+  AdminVerification:         undefined;
+  WebQRScanner:              undefined;
+  SettingsWallet:            undefined;
+  SettingsMonetisation:      undefined;
+  SettingsAbonnement:        undefined;
+  SettingsApparence:         undefined;
+  SettingsNotifications:     undefined;
+  SettingsLecture:           undefined;
+  SettingsCompte:            undefined;
+  SettingsContenu:           undefined;
+  SettingsAPropos:           undefined;
+  SettingsDanger:            undefined;
+  SettingsVerification:      { user?: any } | undefined;
 };
 
 type MainNav = NativeStackNavigationProp<MainStackParamList>;
@@ -275,6 +299,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="SimpleLiveStream"  component={SimpleLiveStreamScreen}  options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SimpleLiveViewer"  component={SimpleLiveViewerScreen}  options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="MyStories"      component={MyStoriesScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="StoryViewers"   component={StoryViewersScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="LiveStream"     component={LiveStreamWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="LiveViewer"     component={LiveViewerWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserReels"      component={UserReelsScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
@@ -299,7 +324,20 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CommunityLeaderboard"         component={CommunityLeaderboardScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityMemberCreatorStats"  component={CommunityMemberCreatorStatsScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityJoinRequests"   component={CommunityJoinRequestsScreen}   options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="WebQRScanner"      component={WebQRScannerScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="WebQRScanner"          component={WebQRScannerScreen}          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="SettingsWallet"        component={SettingsWalletScreen}        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsMonetisation"  component={SettingsMonetisationScreen}  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsAbonnement"    component={SettingsAbonnementScreen}    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsApparence"     component={SettingsApparenceScreen}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsNotifications" component={SettingsNotificationsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsLecture"       component={SettingsLectureScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsCompte"        component={SettingsCompteScreen}        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsContenu"       component={SettingsContenuScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsAPropos"       component={SettingsAProposScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsDanger"        options={{ animation: 'slide_from_right' }}>
+          {() => <SettingsDangerScreen onLogout={onLogout} />}
+        </Stack.Screen>
+        <Stack.Screen name="SettingsVerification"  component={SettingsVerificationScreen}  options={{ animation: 'slide_from_right' }} />
       </Stack.Navigator>
       <NotificationToast />
     </>
