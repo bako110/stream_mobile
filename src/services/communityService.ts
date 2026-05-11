@@ -256,20 +256,21 @@ export const communityService = {
   },
 
   async getJoinRequests(id: string): Promise<JoinRequest[]> {
-    const res = await apiClient.get<JoinRequest[]>(`${Endpoints.communities.byId(id)}/join-requests`);
+    const res = await apiClient.get<JoinRequest[]>(Endpoints.communities.joinRequests(id));
     return res.data;
   },
 
   async approveJoinRequest(communityId: string, requestId: string): Promise<{ approved: boolean }> {
     const res = await apiClient.post<{ approved: boolean }>(
-      `${Endpoints.communities.byId(communityId)}/join-requests/${requestId}/approve`,
+      Endpoints.communities.approveJoinRequest(communityId, requestId),
     );
     return res.data;
   },
 
-  async rejectJoinRequest(communityId: string, requestId: string): Promise<{ rejected: boolean }> {
+  async rejectJoinRequest(communityId: string, requestId: string, reason?: string): Promise<{ rejected: boolean }> {
     const res = await apiClient.post<{ rejected: boolean }>(
-      `${Endpoints.communities.byId(communityId)}/join-requests/${requestId}/reject`,
+      Endpoints.communities.rejectJoinRequest(communityId, requestId),
+      { reason: reason ?? null },
     );
     return res.data;
   },

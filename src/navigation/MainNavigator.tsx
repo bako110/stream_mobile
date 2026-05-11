@@ -53,6 +53,7 @@ import { CommunityStatsScreen }           from '../screens/Detail/CommunityStats
 import { CommunityEventsScreen }          from '../screens/Detail/CommunityEventsScreen';
 import { CommunityMemberProfileScreen }   from '../screens/Detail/CommunityMemberProfileScreen';
 import { CommunityLeaderboardScreen }     from '../screens/Detail/CommunityLeaderboardScreen';
+import { CommunityJoinRequestsScreen }   from '../screens/Detail/CommunityJoinRequestsScreen';
 import { PostDetailScreen }               from '../screens/Detail/PostDetailScreen';
 import { MyTicketScreen }        from '../screens/Detail/MyTicketScreen';
 import { AttendeesScreen }       from '../screens/Detail/AttendeesScreen';
@@ -123,7 +124,8 @@ export type MainStackParamList = {
   CommunityStats:          { communityId: string; communityName: string };
   CommunityEvents:         { communityId: string; communityName: string };
   CommunityMemberProfile:  { communityId: string; communityName: string; memberId: string; memberName: string };
-  CommunityLeaderboard:    { communityId: string; communityName: string };
+  CommunityLeaderboard:        { communityId: string; communityName: string };
+  CommunityJoinRequests:       { communityId: string; communityName: string };
   Events:                  undefined;
   Concerts:        undefined;
   BlockedUsers:    undefined;
@@ -287,6 +289,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CommunityEvents"         component={CommunityEventsScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityMemberProfile"  component={CommunityMemberProfileScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityLeaderboard"    component={CommunityLeaderboardScreen}    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityJoinRequests"   component={CommunityJoinRequestsScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="WebQRScanner"      component={WebQRScannerScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       </Stack.Navigator>
       <NotificationToast />
