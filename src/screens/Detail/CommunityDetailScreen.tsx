@@ -160,6 +160,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       }
       if (role === 'admin' || role === 'moderator') {
         communityService.getBlockedMembers(communityId).then(setBlockedMembers).catch(() => {});
+      }
+      if (role === 'admin' || role === 'moderator' || globalAdmin) {
         communityService.getJoinRequests(communityId)
           .then(reqs => setPendingCount(Array.isArray(reqs) ? reqs.length : 0))
           .catch(() => {});
@@ -1298,7 +1300,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                         <Icon name="chevron-right" size={13} color={colors.textTertiary} />
                       </TouchableOpacity>
                     )}
-                    {(isAdmin || isMod) && (
+                    {(isAdmin || isMod || isGlobalAdmin) && (
                       <TouchableOpacity
                         style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
                         onPress={() => (nav as any).navigate('CommunityJoinRequests', { communityId, communityName: community.name })}
