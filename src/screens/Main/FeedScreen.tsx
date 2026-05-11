@@ -1991,7 +1991,9 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
   // commentCount mis à jour via onCommentCountChange passé au CommentsBottomSheet
 
-  // ── "Voir plus" description ───────────────────────────────────────────────
+  // ── "Voir plus" titre + description ──────────────────────────────────────
+  const [titleExpanded, setTitleExpanded] = useState(false);
+  const [titleTruncated, setTitleTruncated] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [descTruncated, setDescTruncated] = useState(false);
 
@@ -2137,13 +2139,28 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
       {/* ── Titre + description ──────────────────────────────────────── */}
       <View style={s.cardBody}>
-        <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-          <Text style={[s.cardTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-            {title}
-          </Text>
-        </TouchableOpacity>
+        <Text
+          style={[s.cardTitle, { color: colors.textPrimary }]}
+          numberOfLines={titleExpanded ? undefined : 2}
+          onTextLayout={(e) => {
+            if (!titleExpanded && e.nativeEvent.lines.length > 2) setTitleTruncated(true);
+          }}
+          onPress={onPress}
+        >
+          {title}
+        </Text>
+        {titleTruncated && !titleExpanded && (
+          <TouchableOpacity onPress={() => setTitleExpanded(true)} activeOpacity={0.7}>
+            <Text style={[s.seeMoreText, { color: colors.primary }]}>Voir plus</Text>
+          </TouchableOpacity>
+        )}
+        {titleExpanded && (
+          <TouchableOpacity onPress={() => setTitleExpanded(false)} activeOpacity={0.7}>
+            <Text style={[s.seeMoreText, { color: colors.primary }]}>Voir moins</Text>
+          </TouchableOpacity>
+        )}
         {desc ? (
-          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+          <View style={{ marginTop: 4 }}>
             <Text
               style={[s.cardDesc, { color: colors.textSecondary }]}
               numberOfLines={descExpanded ? undefined : 3}
@@ -2155,7 +2172,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
             </Text>
             {descTruncated && !descExpanded && (
               <TouchableOpacity onPress={() => setDescExpanded(true)} activeOpacity={0.7}>
-                <Text style={[s.seeMoreText, { color: colors.primary }]}>Lire la suite</Text>
+                <Text style={[s.seeMoreText, { color: colors.primary }]}>Voir plus</Text>
               </TouchableOpacity>
             )}
             {descExpanded && (
@@ -2163,7 +2180,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
                 <Text style={[s.seeMoreText, { color: colors.primary }]}>Voir moins</Text>
               </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
         ) : null}
       </View>
 
