@@ -848,7 +848,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
       {/* ══════════════ STEP AUDIENCE ════════════════════════════════════════ */}
       {step === 'audience' && (
-        <View style={[s.root, { backgroundColor: colors.background }]}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, zIndex: 1 }]}>
           <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
           {/* Header */}
