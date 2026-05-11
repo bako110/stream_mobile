@@ -410,16 +410,22 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     };
 
     if (price > 0) {
-      const soldeInfo = myCoins !== null ? `\n\nVotre solde : ${myCoins} coin${myCoins !== 1 ? 's' : ''}` : '';
-      const approvalNote = needsApproval
-        ? '\nLes coins sont remboursés en cas de refus.'
+      const soldeApres = myCoins !== null ? myCoins - price : null;
+      const soldeInfo  = myCoins !== null
+        ? `\nVotre solde : ${myCoins} coin${myCoins !== 1 ? 's' : ''} → ${soldeApres} coin${(soldeApres ?? 0) !== 1 ? 's' : ''} après déduction.`
         : '';
+      const approvalNote = needsApproval
+        ? '\n\nCes coins seront remboursés automatiquement en cas de refus de votre demande.'
+        : '';
+      const debitNote = needsApproval
+        ? `${price} coin${price > 1 ? 's' : ''} seront immédiatement déduits de votre solde et consignés dans votre historique de transactions.`
+        : `${price} coin${price > 1 ? 's' : ''} seront déduits de votre solde.`;
       Alert.alert(
-        'Accès payant',
-        `Rejoindre "${community.name}" coûte ${priceLabel(price)}.${approvalNote}${soldeInfo}`,
+        `Adhésion payante — ${price} coins`,
+        `${debitNote}${soldeInfo}${approvalNote}`,
         [
-          { text: 'Annuler', style: 'cancel' },
-          { text: `Payer ${priceLabel(price)}`, onPress: doJoin },
+          { text: 'Annuler', style: 'cancel', onPress: () => { joiningRef.current = false; } },
+          { text: `Confirmer — ${priceLabel(price)}`, onPress: doJoin },
         ],
       );
     } else {

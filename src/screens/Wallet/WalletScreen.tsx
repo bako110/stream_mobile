@@ -38,7 +38,7 @@ interface WalletBalance {
 
 interface Transaction {
   id: string;
-  type: 'purchase' | 'gift_sent' | 'gift_received' | 'withdrawal' | 'bonus' | 'refund';
+  type: 'purchase' | 'gift_sent' | 'gift_received' | 'withdrawal' | 'bonus' | 'refund' | 'community_entry' | 'transfer_sent' | 'transfer_received';
   amount: number;
   description: string;
   created_at: string;
@@ -55,13 +55,16 @@ const formatDate = (iso: string) => {
 
 const txIcon = (type: Transaction['type']) => {
   switch (type) {
-    case 'purchase':       return { name: 'shopping-cart',    lib: 'feather',   color: '#3B82F6' };
-    case 'gift_sent':      return { name: 'gift',             lib: 'feather',   color: '#E85DAD' };
-    case 'gift_received':  return { name: 'gift',             lib: 'mci',       color: '#3FEDB6' };
-    case 'withdrawal':     return { name: 'arrow-up-right',   lib: 'feather',   color: '#FF8C4A' };
-    case 'bonus':          return { name: 'star',             lib: 'feather',   color: '#FFD700' };
-    case 'refund':         return { name: 'rotate-ccw',       lib: 'feather',   color: '#9B65F5' };
-    default:               return { name: 'circle',           lib: 'feather',   color: '#6B698A' };
+    case 'purchase':          return { name: 'shopping-cart',    lib: 'feather', color: '#3B82F6' };
+    case 'gift_sent':         return { name: 'gift',             lib: 'feather', color: '#E85DAD' };
+    case 'gift_received':     return { name: 'gift',             lib: 'mci',     color: '#3FEDB6' };
+    case 'withdrawal':        return { name: 'arrow-up-right',   lib: 'feather', color: '#FF8C4A' };
+    case 'bonus':             return { name: 'star',             lib: 'feather', color: '#FFD700' };
+    case 'refund':            return { name: 'rotate-ccw',       lib: 'feather', color: '#9B65F5' };
+    case 'community_entry':   return { name: 'users',            lib: 'feather', color: '#7B3FF2' };
+    case 'transfer_sent':     return { name: 'arrow-up-right',   lib: 'feather', color: '#EF4444' };
+    case 'transfer_received': return { name: 'arrow-down-left',  lib: 'feather', color: '#10B981' };
+    default:                  return { name: 'circle',           lib: 'feather', color: '#6B698A' };
   }
 };
 
@@ -172,7 +175,7 @@ const WalletScreen: React.FC = () => {
   // ── Render transaction item ──────────────────────────────────────────────
   const renderTx = (tx: Transaction) => {
     const icon = txIcon(tx.type);
-    const isCredit = ['gift_received', 'bonus', 'refund', 'purchase'].includes(tx.type);
+    const isCredit = ['gift_received', 'bonus', 'refund', 'purchase', 'transfer_received'].includes(tx.type);
     const sign = isCredit ? '+' : '-';
     const amtColor = isCredit ? colors.success : colors.error;
 
