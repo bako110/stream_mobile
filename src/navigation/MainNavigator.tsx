@@ -72,6 +72,7 @@ import { SimpleLiveViewerScreen }  from '../screens/Live/SimpleLiveViewerScreen'
 import WalletScreen           from '../screens/Wallet/WalletScreen';
 import BuyCoinsScreen         from '../screens/Wallet/BuyCoinsScreen';
 import CreatorDashboardScreen from '../screens/Wallet/CreatorDashboardScreen';
+import { MonetisationScreen }  from '../screens/Wallet/MonetisationScreen';
 import { CreatorStatsScreen }  from '../screens/Wallet/CreatorStatsScreen';
 import WithdrawScreen         from '../screens/Wallet/WithdrawScreen';
 import TransferScreen         from '../screens/Wallet/TransferScreen';
@@ -148,6 +149,7 @@ export type MainStackParamList = {
   BuyCoins:        undefined;
   CreatorDashboard: undefined;
   CreatorStats:     undefined;
+  Monetisation:     undefined;
   Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
   Boost:                undefined;
@@ -285,6 +287,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="BuyCoins"       component={BuyCoinsScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreatorDashboard" component={CreatorDashboardScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreatorStats"     component={CreatorStatsScreen}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Monetisation"    component={MonetisationScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Withdraw"       component={WithdrawScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Boost"             component={BoostScreen}             options={{ animation: 'slide_from_right' }} />

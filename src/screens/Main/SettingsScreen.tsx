@@ -24,7 +24,8 @@ import type { User } from '../../types/user';
 
 type Section =
   | 'abonnement' | 'apparence' | 'notifications' | 'lecture'
-  | 'compte' | 'contenu' | 'apropos' | 'danger' | 'verification' | 'wallet';
+  | 'compte' | 'contenu' | 'apropos' | 'danger' | 'verification'
+  | 'wallet' | 'monetisation';
 
 type VerifStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
@@ -607,7 +608,8 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   };
 
   const SECTIONS: { key: Section; icon: string; label: string; color: string; sub?: string; badge?: React.ReactNode }[] = [
-    { key: 'wallet',        icon: 'dollar-sign',   label: 'Wallet & Monétisation', color: '#FFD700' },
+    { key: 'wallet',       icon: 'dollar-sign',   label: 'Mon Wallet',         color: '#FFD700', sub: 'Solde, achats, transferts' },
+    { key: 'monetisation', icon: 'bar-chart-2',   label: 'Monétisation',       color: '#7B3FF2', sub: 'Dashboard, stats, revenus' },
     { key: 'abonnement',    icon: 'star',         label: 'Abonnement',        color: planColor,  sub: planLabel },
     { key: 'verification',  icon: 'shield',        label: 'Vérification FoliX', color: '#1D9BF0',  sub: verifSub[verifStatus],
       badge: user?.is_verified ? <VerifiedBadge size={18} /> : undefined },
@@ -626,15 +628,23 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
     switch (activeSection) {
       case 'wallet':
         return (
-          <SubScreen title="Wallet & Monétisation" onBack={() => setActiveSection(null)}>
+          <SubScreen title="Mon Wallet" onBack={() => setActiveSection(null)}>
             <Card>
-              <Row icon="dollar-sign"  label="Mon Wallet"              color="#FFD700" onPress={() => { setActiveSection(null); nav.navigate('Wallet'); }} />
-              <Row icon="shopping-bag" label="Acheter des coins"        color="#FF8C00" onPress={() => { setActiveSection(null); nav.navigate('BuyCoins'); }} />
-              <Row icon="zap"          label="Booster mon compte"       color="#E0389A" value="Abonnés, vues, portée…" onPress={() => { setActiveSection(null); nav.navigate('Boost'); }} />
-              <Row icon="bar-chart-2"  label="Dashboard Créateur"       color="#7B3FF2" onPress={() => { setActiveSection(null); nav.navigate('CreatorDashboard'); }} />
-              <Row icon="trending-up"  label="Mes statistiques"         color="#8B5CF6" value="Vues, likes, partages…" onPress={() => { setActiveSection(null); nav.navigate('CreatorStats'); }} />
-              <Row icon="send"         label="Transférer des coins"     color="#9B65F5" onPress={() => { setActiveSection(null); nav.navigate('Transfer'); }} />
-              <Row icon="credit-card"  label="Retirer mes gains"        color="#10B981" onPress={() => { setActiveSection(null); nav.navigate('Withdraw'); }} last />
+              <Row icon="dollar-sign"  label="Mon Wallet"           color="#FFD700" value="Voir mon solde et transactions"  onPress={() => { setActiveSection(null); nav.navigate('Wallet'); }} />
+              <Row icon="shopping-bag" label="Acheter des coins"    color="#FF8C00" value="Packs disponibles"               onPress={() => { setActiveSection(null); nav.navigate('BuyCoins'); }} />
+              <Row icon="send"         label="Transférer des coins" color="#9B65F5" value="Envoyer à un utilisateur"        onPress={() => { setActiveSection(null); nav.navigate('Transfer'); }} last />
+            </Card>
+          </SubScreen>
+        );
+
+      case 'monetisation':
+        return (
+          <SubScreen title="Monétisation" onBack={() => setActiveSection(null)}>
+            <Card>
+              <Row icon="bar-chart-2"  label="Dashboard Créateur"  color="#7B3FF2" value="Vues, cadeaux, revenus du mois"  onPress={() => { setActiveSection(null); nav.navigate('CreatorDashboard'); }} />
+              <Row icon="trending-up"  label="Mes statistiques"    color="#8B5CF6" value="Vues, likes, partages par contenu" onPress={() => { setActiveSection(null); nav.navigate('CreatorStats'); }} />
+              <Row icon="zap"          label="Booster mon compte"  color="#E0389A" value="Abonnés, vues, portée…"           onPress={() => { setActiveSection(null); nav.navigate('Boost'); }} />
+              <Row icon="credit-card"  label="Retirer mes gains"   color="#10B981" value="Virement bancaire ou Mobile Money" onPress={() => { setActiveSection(null); nav.navigate('Withdraw'); }} last />
             </Card>
           </SubScreen>
         );
