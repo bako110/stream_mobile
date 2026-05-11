@@ -70,6 +70,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [loading,        setLoading]        = useState(true);
   const [joinStatus,     setJoinStatus]     = useState<'none' | 'pending' | 'member'>('none');
   const [myId,           setMyId]           = useState<string | null>(null);
+  const [myName,         setMyName]         = useState<string>('');
   const [myRole,         setMyRole]         = useState<string | null>(null);
   const [myCoins,        setMyCoins]        = useState<number | null>(null);
   const [actionLoading,  setActionLoading]  = useState(false);
@@ -142,6 +143,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       setCommunity(c);
       const uid = String(me.id);
       setMyId(uid);
+      setMyName((me as any).display_name || (me as any).username || '');
       setMyRole(role);
       const globalAdmin = (me as any).role === 'admin';
       setIsGlobalAdmin(globalAdmin);
@@ -1007,7 +1009,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           activeOpacity={0.7}
           onPress={() => {
             setSettingsOpen(false);
-            setTimeout(() => (nav as any).navigate('CommunityEvents', { communityId, communityName: community?.name ?? '' }), 250);
+            setTimeout(() => (nav as any).navigate('CommunityEvents', { communityId, communityName: community?.name ?? '', myRole }), 250);
           }}
         >
           <View style={[s.secIcon, { backgroundColor: '#FF7A2F20' }]}>
@@ -1016,6 +1018,29 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           <View style={{ flex: 1 }}>
             <Text style={[s.secLabel, { color: colors.textPrimary }]}>Événements</Text>
             <Text style={[s.secDesc, { color: colors.textTertiary }]}>Gérer les événements de la communauté</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSettingsOpen(false);
+            setTimeout(() => (nav as any).navigate('CommunityMemberCreatorStats', {
+              communityId,
+              communityName: community?.name ?? '',
+              memberId: myId ?? '',
+              memberName: myName,
+            }), 250);
+          }}
+        >
+          <View style={[s.secIcon, { backgroundColor: '#8B5CF620' }]}>
+            <Icon name="trending-up" size={18} color="#8B5CF6" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Statistiques créateur</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>Vues, likes, réactions sur tout votre contenu</Text>
           </View>
           <Icon name="chevron-right" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
@@ -1455,7 +1480,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   <View style={s.navGrid}>
                     <TouchableOpacity
                       style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-                      onPress={() => (nav as any).navigate('CommunityEvents', { communityId, communityName: community.name })}
+                      onPress={() => (nav as any).navigate('CommunityEvents', { communityId, communityName: community.name, myRole })}
                       activeOpacity={0.75}
                     >
                       <View style={[s.navIcon, { backgroundColor: '#FF7A2F20' }]}>

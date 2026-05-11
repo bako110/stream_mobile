@@ -632,6 +632,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
               <Row icon="shopping-bag" label="Acheter des coins"        color="#FF8C00" onPress={() => { setActiveSection(null); nav.navigate('BuyCoins'); }} />
               <Row icon="zap"          label="Booster mon compte"       color="#E0389A" value="Abonnés, vues, portée…" onPress={() => { setActiveSection(null); nav.navigate('Boost'); }} />
               <Row icon="bar-chart-2"  label="Dashboard Créateur"       color="#7B3FF2" onPress={() => { setActiveSection(null); nav.navigate('CreatorDashboard'); }} />
+              <Row icon="trending-up"  label="Mes statistiques"         color="#8B5CF6" value="Vues, likes, partages…" onPress={() => { setActiveSection(null); nav.navigate('CreatorStats'); }} />
               <Row icon="send"         label="Transférer des coins"     color="#9B65F5" onPress={() => { setActiveSection(null); nav.navigate('Transfer'); }} />
               <Row icon="credit-card"  label="Retirer mes gains"        color="#10B981" onPress={() => { setActiveSection(null); nav.navigate('Withdraw'); }} last />
             </Card>
@@ -703,6 +704,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
               <Row icon="user"     label="Modifier le profil"      color="#7B3FF2" onPress={() => { setActiveSection(null); nav.navigate('EditProfile'); }} />
               <Row icon="lock"     label="Changer le mot de passe" color="#9B65F5" onPress={() => { setActiveSection(null); nav.navigate('ChangePassword'); }} />
               <Row icon="shield"   label="Confidentialité"         color="#3B82F6" onPress={() => { setActiveSection(null); nav.navigate('Privacy'); }} />
+              <Row icon="monitor"  label="Connecter le site web"   color="#7B3FF2" value="Scanner un QR" onPress={() => { setActiveSection(null); nav.navigate('WebQRScanner'); }} />
               <Row icon="slash"    label="Utilisateurs bloqués"    color="#EF4444" onPress={() => { setActiveSection(null); nav.navigate('BlockedUsers'); }} />
               <Row icon="users"    label="Abonnements / Abonnés"   color="#10B981" onPress={() => { setActiveSection(null); nav.navigate('Following'); }} />
               <Row icon="zap"      label="Booster mon compte"      color="#E0389A" value="Gagne des abonnés et des vues" onPress={() => { setActiveSection(null); nav.navigate('Boost'); }} />
@@ -818,9 +820,23 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
           ))}
         </View>
 
+        {/* Scanner QR web */}
+        <TouchableOpacity
+          style={[s.logoutBtn, { borderColor: '#7B3FF2', marginTop: 16 }]}
+          onPress={() => nav.navigate('WebQRScanner')}
+          activeOpacity={0.75}
+        >
+          <Icon name="monitor" size={18} color="#7B3FF2" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#7B3FF2', fontWeight: '700', fontSize: 15 }}>Connecter le site web</Text>
+            <Text style={{ color: '#7B3FF2', fontSize: 11, opacity: 0.7, marginTop: 1 }}>Scanner le QR code sur folix.com</Text>
+          </View>
+          <Icon name="camera" size={16} color="#7B3FF2" />
+        </TouchableOpacity>
+
         {/* Déconnexion */}
         <TouchableOpacity
-          style={[s.logoutBtn, { borderColor: '#EF4444', marginTop: 24 }]}
+          style={[s.logoutBtn, { borderColor: '#EF4444', marginTop: 10 }]}
           onPress={handleLogout}
           activeOpacity={0.75}
         >

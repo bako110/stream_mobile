@@ -216,6 +216,26 @@ export interface CommunityEvent {
   created_at: string | null;
 }
 
+export interface MemberCreatorStats {
+  reels_count: number;
+  reels_views: number;
+  reels_likes: number;
+  reels_comments: number;
+  reels_shares: number;
+  posts_count: number;
+  posts_likes: number;
+  posts_comments: number;
+  posts_shares: number;
+  stories_count: number;
+  stories_views: number;
+  stories_likes: number;
+  followers: number;
+  following: number;
+  total_coins_earned: number;
+  gifts_coins_earned: number;
+  community_coins_earned: number;
+}
+
 export const communityService = {
   async list(page = 1, limit = 20): Promise<CommunityData[]> {
     const res = await apiClient.get<CommunityData[]>(
@@ -431,6 +451,34 @@ export const communityService = {
     return res.data;
   },
 
+  async updateEvent(communityId: string, eventId: string, data: {
+    title: string;
+    description?: string;
+    location?: string;
+    cover_url?: string;
+    color?: string;
+    is_online?: boolean;
+    starts_at: string;
+    ends_at?: string;
+  }): Promise<CommunityEvent> {
+    const res = await apiClient.patch<CommunityEvent>(
+      `${Endpoints.communities.events(communityId)}/${eventId}`,
+      data,
+    );
+    return res.data;
+  },
+
+  async cancelEvent(communityId: string, eventId: string): Promise<CommunityEvent> {
+    const res = await apiClient.post<CommunityEvent>(
+      `${Endpoints.communities.events(communityId)}/${eventId}/cancel`,
+    );
+    return res.data;
+  },
+
+  async deleteEvent(communityId: string, eventId: string): Promise<void> {
+    await apiClient.delete(`${Endpoints.communities.events(communityId)}/${eventId}`);
+  },
+
   async listVerificationRequests(status?: string, page = 1): Promise<VerificationRequest[]> {
     let url = `/api/v1/communities/admin/verification-requests?page=${page}&limit=20`;
     if (status) url += `&status=${status}`;
@@ -442,6 +490,13 @@ export const communityService = {
     const res = await apiClient.post<VerificationRequest>(
       `/api/v1/communities/admin/verification-requests/${requestId}/approve`,
       { note: note ?? null },
+    );
+    return res.data;
+  },
+
+  async getMemberCreatorStats(communityId: string, userId: string): Promise<MemberCreatorStats> {
+    const res = await apiClient.get<MemberCreatorStats>(
+      `/api/v1/communities/${communityId}/members/${userId}/creator-stats`,
     );
     return res.data;
   },

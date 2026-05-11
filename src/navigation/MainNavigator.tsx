@@ -53,6 +53,7 @@ import { CommunityStatsScreen }           from '../screens/Detail/CommunityStats
 import { CommunityEventsScreen }          from '../screens/Detail/CommunityEventsScreen';
 import { CommunityMemberProfileScreen }   from '../screens/Detail/CommunityMemberProfileScreen';
 import { CommunityLeaderboardScreen }     from '../screens/Detail/CommunityLeaderboardScreen';
+import { CommunityMemberCreatorStatsScreen } from '../screens/Detail/CommunityMemberCreatorStatsScreen';
 import { CommunityJoinRequestsScreen }   from '../screens/Detail/CommunityJoinRequestsScreen';
 import { PostDetailScreen }               from '../screens/Detail/PostDetailScreen';
 import { MyTicketScreen }        from '../screens/Detail/MyTicketScreen';
@@ -71,6 +72,7 @@ import { SimpleLiveViewerScreen }  from '../screens/Live/SimpleLiveViewerScreen'
 import WalletScreen           from '../screens/Wallet/WalletScreen';
 import BuyCoinsScreen         from '../screens/Wallet/BuyCoinsScreen';
 import CreatorDashboardScreen from '../screens/Wallet/CreatorDashboardScreen';
+import { CreatorStatsScreen }  from '../screens/Wallet/CreatorStatsScreen';
 import WithdrawScreen         from '../screens/Wallet/WithdrawScreen';
 import TransferScreen         from '../screens/Wallet/TransferScreen';
 import BoostScreen            from '../screens/Wallet/BoostScreen';
@@ -122,9 +124,10 @@ export type MainStackParamList = {
   CommunityDetail:         { communityId: string };
   CommunityMembers:        { communityId: string; communityName: string };
   CommunityStats:          { communityId: string; communityName: string };
-  CommunityEvents:         { communityId: string; communityName: string };
+  CommunityEvents:         { communityId: string; communityName: string; myRole?: string | null };
   CommunityMemberProfile:  { communityId: string; communityName: string; memberId: string; memberName: string };
   CommunityLeaderboard:        { communityId: string; communityName: string };
+  CommunityMemberCreatorStats: { communityId: string; communityName: string; memberId: string; memberName: string };
   CommunityJoinRequests:       { communityId: string; communityName: string };
   Events:                  undefined;
   Concerts:        undefined;
@@ -144,6 +147,7 @@ export type MainStackParamList = {
   Wallet:          undefined;
   BuyCoins:        undefined;
   CreatorDashboard: undefined;
+  CreatorStats:     undefined;
   Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
   Boost:                undefined;
@@ -280,6 +284,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Wallet"         component={WalletScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="BuyCoins"       component={BuyCoinsScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreatorDashboard" component={CreatorDashboardScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CreatorStats"     component={CreatorStatsScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Withdraw"       component={WithdrawScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Boost"             component={BoostScreen}             options={{ animation: 'slide_from_right' }} />
@@ -288,7 +293,8 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CommunityStats"          component={CommunityStatsScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityEvents"         component={CommunityEventsScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityMemberProfile"  component={CommunityMemberProfileScreen}  options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="CommunityLeaderboard"    component={CommunityLeaderboardScreen}    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityLeaderboard"         component={CommunityLeaderboardScreen}         options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityMemberCreatorStats"  component={CommunityMemberCreatorStatsScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityJoinRequests"   component={CommunityJoinRequestsScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="WebQRScanner"      component={WebQRScannerScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       </Stack.Navigator>
