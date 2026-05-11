@@ -17,8 +17,10 @@ import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useTheme } from '../../hooks/useTheme';
 import { SoundPicker } from './SoundPicker';
 import { storyService } from '../../services/storyService';
+import { userService } from '../../services/userService';
+import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
-import type { StoryMediaType } from '../../types/story';
+import type { StoryMediaType, StoryAudienceType } from '../../types/story';
 import { compressVideo, cleanupTempVideos } from '../../services/videoCompressService';
 import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
 import { VideoTrimmer } from './VideoTrimmer';
@@ -47,7 +49,7 @@ const FONT_STYLES: {
 ];
 
 type StoryMode = 'text' | 'image' | 'video' | 'voice';
-type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'preview';
+type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'preview' | 'audience';
 
 interface ModeOption {
   key:       StoryMode;
@@ -184,6 +186,13 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [showSuccess,   setShowSuccess]   = useState(false);
   const inputRef = useRef<TextInput>(null);
 
+  // ── Audience ──────────────────────────────────────────────────────────────
+  const [audienceType,    setAudienceType]    = useState<StoryAudienceType>('everyone');
+  const [selectedUsers,   setSelectedUsers]   = useState<string[]>([]);  // user_ids
+  const [contacts,        setContacts]        = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [myId,            setMyId]            = useState<string | null>(null);
+
   const videoActive = mode === 'video' && !!localUri;
 
   const stopAudioPreview = async () => {
@@ -197,13 +206,16 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setShowTextInput(false); setUploading(false); setRecording(false);
     setRecordTime('00:00'); setShowSuccess(false);
     setShowTrimmer(false); setVideoDuration(0);
+    setAudienceType('everyone'); setSelectedUsers([]);
     stopAudioPreview();
     onClose();
   };
 
   const goBack = () => {
     stopAudioPreview();
-    if (step === 'preview') {
+    if (step === 'audience') {
+      setStep('preview');
+    } else if (step === 'preview') {
       if (mode === 'text')       { setStep('pick_mode'); setCaption(''); }
       else if (mode === 'voice') { setStep('record_voice'); setAudioUri(null); }
       else { setLocalUri(null); setAudioUri(null); setStep('pick_media'); }
@@ -214,6 +226,38 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     } else {
       resetAndClose();
     }
+  };
+
+  // Charger les contacts (followers + following) quand on ouvre l'audience picker
+  const openAudiencePicker = async () => {
+    setStep('audience');
+    if (contacts.length > 0) return; // déjà chargés
+    setContactsLoading(true);
+    try {
+      const me = await authService.getMe();
+      setMyId(String(me.id));
+      const [followers, following] = await Promise.all([
+        userService.getFollowers(String(me.id)),
+        userService.getFollowing(String(me.id)),
+      ]);
+      const seen = new Set<string>();
+      const merged: typeof contacts = [];
+      for (const u of [...followers, ...following]) {
+        const id = String(u.id);
+        if (!seen.has(id)) {
+          seen.add(id);
+          merged.push({ id, name: u.display_name || u.username || id, avatar_url: u.avatar_url ?? null });
+        }
+      }
+      setContacts(merged);
+    } catch {}
+    finally { setContactsLoading(false); }
+  };
+
+  const toggleUser = (id: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
   // ── Pickers ───────────────────────────────────────────────────────────────
@@ -399,6 +443,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         caption: caption.trim() || undefined,
         duration_sec, background_color, audio_url,
         font_style: mode === 'text' ? fontStyleKey : undefined,
+        audience_type: audienceType,
+        audience_user_ids: audienceType !== 'everyone' ? selectedUsers : [],
       });
 
       await cleanupTempVideos(tempFilesRef.current);
@@ -755,8 +801,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
             <TouchableOpacity
               style={[s.publishBtn, (mode === 'text' && !caption.trim()) && { opacity: 0.4 }]}
-              onPress={handlePublish}
-              disabled={uploading || (mode === 'text' && !caption.trim())}
+              onPress={openAudiencePicker}
+              disabled={mode === 'text' && !caption.trim()}
               activeOpacity={0.85}
             >
               <LinearGradient
@@ -764,22 +810,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={s.publishBtnInner}
               >
-                {uploading ? (
-                  <View style={{ alignItems: 'center', minWidth: 120 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <ActivityIndicator size={14} color="#fff" />
-                      <Text style={[s.publishLabel, { fontSize: 12 }]}>{uploadStep}</Text>
-                    </View>
-                    <View style={{ width: 120, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }}>
-                      <View style={{ width: `${uploadPct}%` as any, height: 3, backgroundColor: '#fff', borderRadius: 2 }} />
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    <Text style={s.publishLabel}>Publier</Text>
-                    <Icon name="send" size={13} color="#fff" />
-                  </>
-                )}
+                <Text style={s.publishLabel}>Suivant</Text>
+                <Icon name="chevron-right" size={15} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -811,6 +843,134 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           )}
 
           <SuccessOverlay visible={showSuccess} />
+        </View>
+      )}
+
+      {/* ══════════════ STEP AUDIENCE ════════════════════════════════════════ */}
+      {step === 'audience' && (
+        <View style={[s.root, { backgroundColor: colors.background }]}>
+          <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+
+          {/* Header */}
+          <View style={[aud.header, { paddingTop: Platform.OS === 'android' ? 48 : 56, borderBottomColor: colors.divider }]}>
+            <TouchableOpacity onPress={goBack} style={aud.backBtn}>
+              <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={[aud.title, { color: colors.textPrimary }]}>Qui peut voir ?</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+
+            {/* Trois options d'audience */}
+            <View style={{ padding: 16, gap: 10 }}>
+              {([
+                { key: 'everyone', icon: 'globe',  label: 'Tout le monde',     sub: 'Tous vos abonnés peuvent voir ce statut' },
+                { key: 'except',   icon: 'eye-off', label: 'Sauf...',           sub: 'Tout le monde sauf les personnes sélectionnées' },
+                { key: 'selected', icon: 'users',   label: 'Seulement...',      sub: 'Uniquement les personnes sélectionnées' },
+              ] as { key: StoryAudienceType; icon: string; label: string; sub: string }[]).map(opt => {
+                const active = audienceType === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[aud.optCard, { backgroundColor: colors.surface, borderColor: active ? colors.primary : colors.divider, borderWidth: active ? 2 : StyleSheet.hairlineWidth }]}
+                    onPress={() => { setAudienceType(opt.key); if (opt.key === 'everyone') setSelectedUsers([]); }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[aud.optIcon, { backgroundColor: active ? colors.primary + '20' : colors.backgroundSecondary }]}>
+                      <Icon name={opt.icon} size={20} color={active ? colors.primary : colors.textSecondary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[aud.optLabel, { color: colors.textPrimary }]}>{opt.label}</Text>
+                      <Text style={[aud.optSub, { color: colors.textTertiary }]}>{opt.sub}</Text>
+                    </View>
+                    {active && <Icon name="check-circle" size={20} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Liste des contacts si selected ou except */}
+            {audienceType !== 'everyone' && (
+              <View style={{ paddingHorizontal: 16 }}>
+                <Text style={[aud.contactsLabel, { color: colors.textTertiary }]}>
+                  {audienceType === 'except' ? 'SÉLECTIONNER LES PERSONNES À EXCLURE' : 'SÉLECTIONNER LES PERSONNES'}
+                  {selectedUsers.length > 0 && ` (${selectedUsers.length})`}
+                </Text>
+
+                {contactsLoading ? (
+                  <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} />
+                ) : contacts.length === 0 ? (
+                  <View style={aud.emptyContacts}>
+                    <Icon name="users" size={32} color={colors.textTertiary} />
+                    <Text style={[{ fontSize: 14, color: colors.textTertiary, textAlign: 'center' }]}>
+                      Aucun abonné trouvé
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[aud.contactsList, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                    {contacts.map((c, i) => {
+                      const checked = selectedUsers.includes(c.id);
+                      return (
+                        <TouchableOpacity
+                          key={c.id}
+                          style={[aud.contactRow, i < contacts.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}
+                          onPress={() => toggleUser(c.id)}
+                          activeOpacity={0.7}
+                        >
+                          {c.avatar_url ? (
+                            <Image source={{ uri: c.avatar_url }} style={aud.avatar} />
+                          ) : (
+                            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={aud.avatarFallback}>
+                              <Text style={aud.avatarInitial}>{(c.name[0] ?? '?').toUpperCase()}</Text>
+                            </LinearGradient>
+                          )}
+                          <Text style={[aud.contactName, { color: colors.textPrimary }]} numberOfLines={1}>{c.name}</Text>
+                          <View style={[aud.checkbox, { borderColor: checked ? colors.primary : colors.border, backgroundColor: checked ? colors.primary : 'transparent' }]}>
+                            {checked && <Icon name="check" size={13} color="#fff" />}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Bouton Publier final */}
+          <View style={[aud.footer, { borderTopColor: colors.divider, backgroundColor: colors.background }]}>
+            {audienceType !== 'everyone' && selectedUsers.length === 0 && (
+              <Text style={[aud.footerHint, { color: colors.textTertiary }]}>
+                Sélectionnez au moins une personne
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[aud.publishBtn, { opacity: (audienceType !== 'everyone' && selectedUsers.length === 0) ? 0.4 : 1 }]}
+              onPress={handlePublish}
+              disabled={uploading || (audienceType !== 'everyone' && selectedUsers.length === 0)}
+              activeOpacity={0.85}
+            >
+              <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={aud.publishBtnInner}>
+                {uploading ? (
+                  <View style={{ alignItems: 'center', minWidth: 140 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <ActivityIndicator size={14} color="#fff" />
+                      <Text style={[aud.publishLabel, { fontSize: 12 }]}>{uploadStep}</Text>
+                    </View>
+                    <View style={{ width: 140, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }}>
+                      <View style={{ width: `${uploadPct}%` as any, height: 3, backgroundColor: '#fff', borderRadius: 2 }} />
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Icon name="send" size={15} color="#fff" />
+                    <Text style={aud.publishLabel}>Publier</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </Modal>
@@ -1072,4 +1232,48 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
   },
   successBadgeText: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
+});
+
+// ── Styles audience picker ────────────────────────────────────────────────────
+
+const aud = StyleSheet.create({
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backBtn:  { width: 40, alignItems: 'flex-start' },
+  title:    { fontSize: 18, fontWeight: '700' },
+
+  optCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 14, padding: 14,
+  },
+  optIcon:  { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  optLabel: { fontSize: 15, fontWeight: '700' },
+  optSub:   { fontSize: 12, marginTop: 2 },
+
+  contactsLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7, marginBottom: 10, marginTop: 8 },
+  contactsList:  { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  contactRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  avatar:        { width: 42, height: 42, borderRadius: 21 },
+  avatarFallback:{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  contactName:   { flex: 1, fontSize: 14, fontWeight: '500' },
+  checkbox: {
+    width: 24, height: 24, borderRadius: 12, borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyContacts: { alignItems: 'center', paddingVertical: 40, gap: 10 },
+
+  footer: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: 16, borderTopWidth: StyleSheet.hairlineWidth, gap: 8,
+  },
+  footerHint:     { textAlign: 'center', fontSize: 12 },
+  publishBtn:     { borderRadius: 14, overflow: 'hidden' },
+  publishBtnInner:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
+  publishLabel:   { color: '#fff', fontSize: 15, fontWeight: '800' },
 });

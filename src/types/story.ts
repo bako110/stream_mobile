@@ -35,6 +35,8 @@ export interface StoryGroup {
   has_unseen: boolean;
 }
 
+export type StoryAudienceType = 'everyone' | 'selected' | 'except';
+
 export interface StoryCreate {
   media_url?: string;
   media_type: StoryMediaType;
@@ -44,6 +46,8 @@ export interface StoryCreate {
   background_color?: string;
   audio_url?: string;
   font_style?: string;
+  audience_type?: StoryAudienceType;
+  audience_user_ids?: string[];
 }
 
 export interface StoryUpdate {
