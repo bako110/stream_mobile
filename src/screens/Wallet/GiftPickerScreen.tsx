@@ -5,7 +5,7 @@
  * - Bouton "Envoyer" avec gradient
  * - Animation emoji volant après envoi
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,7 @@ import {
   ScrollView,
   Animated,
   ActivityIndicator,
-  Dimensions,
   StatusBar,
-  FlatList,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -26,7 +24,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface GiftType {
@@ -47,21 +44,6 @@ interface Props {
   };
 }
 
-// ── Mock gifts ─────────────────────────────────────────────────────────────
-const MOCK_GIFTS: GiftType[] = [
-  { id: '1', name: 'Rose',      emoji: '🌹', cost_coins: 10  },
-  { id: '2', name: 'Feu',       emoji: '🔥', cost_coins: 20  },
-  { id: '3', name: 'Coeur',     emoji: '❤️', cost_coins: 30  },
-  { id: '4', name: 'Étoile',    emoji: '⭐', cost_coins: 50  },
-  { id: '5', name: 'Couronne',  emoji: '👑', cost_coins: 100 },
-  { id: '6', name: 'Diamant',   emoji: '💎', cost_coins: 200 },
-  { id: '7', name: 'Licorne',   emoji: '🦄', cost_coins: 500 },
-  { id: '8', name: 'Avion',     emoji: '✈️', cost_coins: 50  },
-  { id: '9', name: 'Cadeau',    emoji: '🎁', cost_coins: 80  },
-  { id:'10', name: 'Trophée',   emoji: '🏆', cost_coins: 300 },
-  { id:'11', name: 'Galaxie',   emoji: '🌌', cost_coins: 1000},
-  { id:'12', name: 'Confetti',  emoji: '🎉', cost_coins: 25  },
-];
 
 // ── Flying emoji animation ─────────────────────────────────────────────────
 const FlyingEmoji: React.FC<{ emoji: string; onDone: () => void }> = ({ emoji, onDone }) => {
@@ -218,8 +200,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
       apiClient.get<GiftType[]>(Endpoints.wallet.giftTypes),
       apiClient.get<{ coins: number }>(Endpoints.wallet.balance),
     ]).then(([giftsRes, balRes]) => {
-      if (giftsRes.status === 'fulfilled') setGifts(giftsRes.value.data ?? MOCK_GIFTS);
-      else setGifts(MOCK_GIFTS);
+      if (giftsRes.status === 'fulfilled') setGifts(giftsRes.value.data ?? []);
       if (balRes.status === 'fulfilled') setBalance(balRes.value.data.coins);
     }).finally(() => setLoading(false));
   }, []);

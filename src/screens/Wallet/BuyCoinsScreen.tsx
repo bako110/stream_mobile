@@ -5,7 +5,7 @@
  * - Mock Stripe → POST /wallet/purchase
  * - Animation succès
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import {
   Animated,
   ActivityIndicator,
   StatusBar,
-  FlatList,
   Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -44,18 +43,9 @@ interface CoinPackage {
 }
 
 interface WalletBalance {
-  coins: number;
+  coins_balance: number;
 }
 
-// ── Mock packages (fallback si API non disponible) ──────────────────────────
-const MOCK_PACKAGES: CoinPackage[] = [
-  { id: '1', name: 'Starter',   coins: 100,  bonus: 0,   price_eur: 0.99,  is_popular: false },
-  { id: '2', name: 'Basic',     coins: 500,  bonus: 50,  price_eur: 4.49,  is_popular: false },
-  { id: '3', name: 'Popular',   coins: 1000, bonus: 150, price_eur: 7.99,  is_popular: true  },
-  { id: '4', name: 'Premium',   coins: 2500, bonus: 500, price_eur: 17.99, is_popular: false },
-  { id: '5', name: 'Pro',       coins: 5000, bonus: 1200,price_eur: 32.99, is_popular: false },
-  { id: '6', name: 'Ultimate',  coins:10000, bonus: 3000,price_eur: 59.99, is_popular: false },
-];
 
 // ── Success overlay ────────────────────────────────────────────────────────
 const SuccessOverlay: React.FC<{ visible: boolean; coins: number; onDone: () => void }> = ({
@@ -81,7 +71,7 @@ const SuccessOverlay: React.FC<{ visible: boolean; coins: number; onDone: () => 
   if (!visible) return null;
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFillObject, { opacity, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }]}>
       <Animated.View style={[{ transform: [{ scale }] }, { alignItems: 'center', gap: 12 }]}>
         <LinearGradient colors={['#9B65F5', '#E85DAD']} style={{ width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="check" size={44} color="#FFF" />
@@ -243,8 +233,7 @@ const BuyCoinsScreen: React.FC = () => {
       apiClient.get<CoinPackage[]>(Endpoints.wallet.packages),
       apiClient.get<WalletBalance>(Endpoints.wallet.balance),
     ]).then(([pkgRes, balRes]) => {
-      if (pkgRes.status === 'fulfilled') setPackages(pkgRes.value.data ?? MOCK_PACKAGES);
-      else setPackages(MOCK_PACKAGES);
+      if (pkgRes.status === 'fulfilled') setPackages(pkgRes.value.data ?? []);
       if (balRes.status === 'fulfilled') setBalance(balRes.value.data?.coins_balance ?? 0);
     }).finally(() => setLoading(false));
   }, []);
