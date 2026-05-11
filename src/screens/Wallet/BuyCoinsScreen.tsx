@@ -256,10 +256,17 @@ const BuyCoinsScreen: React.FC = () => {
           {
             text: 'Confirmer', onPress: async () => {
               try {
-                await apiClient.post(Endpoints.wallet.purchase, {
-                  package_id: selected.id,
-                  stripe_payment_intent_id: `pi_mock_${Date.now()}`,
-                });
+                if (selected.id === 'custom') {
+                  await apiClient.post(Endpoints.wallet.purchaseCustom, {
+                    amount_eur: parseFloat(String(selected.price_eur)),
+                    stripe_payment_intent_id: `pi_mock_${Date.now()}`,
+                  });
+                } else {
+                  await apiClient.post(Endpoints.wallet.purchase, {
+                    package_id: selected.id,
+                    stripe_payment_intent_id: `pi_mock_${Date.now()}`,
+                  });
+                }
                 setModal(false);
                 setSuccessCoins(selected.coins + (selected.bonus_coins ?? selected.bonus ?? 0));
                 setSuccess(true);
