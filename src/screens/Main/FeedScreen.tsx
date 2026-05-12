@@ -707,15 +707,40 @@ export const FeedScreen: React.FC = () => {
             )
           )}
 
-          {/* Centre : FoliX — position absolue, toujours centré */}
+          {/* Centre : FoliX logo — position absolue, toujours centré */}
           {!searchOpen && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ fontSize: 24, fontWeight: '900', letterSpacing: 0.5, color: colors.textPrimary, fontStyle: 'italic' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
+                {/* "Foli" — blanc en dark, dark navy en light */}
+                <Text style={{ fontSize: 26, fontWeight: '900', letterSpacing: -0.5, color: colors.textPrimary }}>
                   Foli
                 </Text>
-                <View style={{ backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 1 }}>
-                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: 1 }}>X</Text>
+                {/* "X" gradient — deux barres diagonales colorées */}
+                <View style={{ width: 22, height: 30, marginLeft: 1, overflow: 'hidden' }}>
+                  {/* Barre \ : jaune → orange */}
+                  <LinearGradient
+                    colors={['#FFE600', '#FF6B00']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{
+                      position: 'absolute', width: 10, height: 34,
+                      top: -2, left: 0,
+                      transform: [{ rotate: '35deg' }, { translateX: 2 }],
+                      borderRadius: 3,
+                    }}
+                  />
+                  {/* Barre / : cyan → rose */}
+                  <LinearGradient
+                    colors={['#00D9FF', '#FF4FD8']}
+                    start={{ x: 0, y: 1 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{
+                      position: 'absolute', width: 10, height: 34,
+                      top: -2, right: 0,
+                      transform: [{ rotate: '-35deg' }, { translateX: -2 }],
+                      borderRadius: 3,
+                    }}
+                  />
                 </View>
               </View>
             </View>
