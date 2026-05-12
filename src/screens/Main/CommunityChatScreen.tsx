@@ -168,6 +168,7 @@ export const CommunityChatScreen: React.FC = () => {
   const typingTimers   = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const typingDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendBtnAnim    = useRef(new Animated.Value(0)).current;
+  const activeTabRef   = useRef<ChatTab>('discussion');
 
   const isAdmin    = myRole === 'admin';
   const isMod      = myRole === 'moderator';
@@ -184,13 +185,26 @@ export const CommunityChatScreen: React.FC = () => {
     useCallback((payload: CommunityWsPayload) => {
       if (payload.type === 'community_message' || payload.type === 'community_message_sent' || payload.type === 'community_announcement') {
         const msg = payload as unknown as CommunityMessage;
-        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-        setTypingUsers(p => p.filter(u => u.user_id !== msg.sender_id));
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+        const tab = activeTabRef.current;
+        const isAnnouncement = msg.message_type === 'announcement';
+        // Annonce → visible seulement dans l'onglet announcements
+        // Message normal → visible seulement dans discussion (jamais dans announcements)
+        const belongs =
+          (tab === 'announcements' && isAnnouncement) ||
+          (tab === 'discussion' && !isAnnouncement && msg.message_type !== 'poll') ||
+          (tab === 'polls' && msg.message_type === 'poll') ||
+          (tab === 'media' && (msg.message_type === 'image' || msg.message_type === 'media'));
+        if (belongs) {
+          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+          setTypingUsers(p => p.filter(u => u.user_id !== msg.sender_id));
+          setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+        }
       } else if (payload.type === 'community_poll_created') {
         const msg = payload as unknown as CommunityMessage;
-        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+        if (activeTabRef.current === 'polls') {
+          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+          setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+        }
       } else if (payload.type === 'community_message_edited') {
         const e = payload as unknown as CommunityMessage;
         setMessages(prev => prev.map(m => m.id === e.id ? { ...m, content: e.content, edited_at: e.edited_at } : m));
@@ -251,8 +265,12 @@ export const CommunityChatScreen: React.FC = () => {
     const typeMap: Record<ChatTab, string | undefined> = {
       discussion: undefined, announcements: 'announcement', media: 'image', polls: 'poll',
     };
+    // Discussion exclut explicitement annonces et sondages
+    const excludeMap: Record<ChatTab, string | undefined> = {
+      discussion: 'announcement,poll', announcements: undefined, media: undefined, polls: undefined,
+    };
     try {
-      const msgs = await communityService.getMessages(communityId, p, 30, typeMap[tab]);
+      const msgs = await communityService.getMessages(communityId, p, 30, typeMap[tab], excludeMap[tab]);
       // API renvoie du plus récent au plus ancien — on inverse pour afficher chronologiquement
       const sorted = [...msgs].reverse() as CommunityMessage[];
       if (prepend) {
@@ -297,6 +315,7 @@ export const CommunityChatScreen: React.FC = () => {
   }, [communityId]);
 
   useEffect(() => {
+    activeTabRef.current = activeTab;
     setLoading(true); setMessages([]); setPage(1);
     loadMessages(1, false, activeTab);
   }, [activeTab]);

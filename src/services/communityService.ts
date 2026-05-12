@@ -388,9 +388,10 @@ export const communityService = {
     return res.data;
   },
 
-  async getMessages(id: string, page = 1, limit = 30, message_type?: string): Promise<CommunityMessageData[]> {
+  async getMessages(id: string, page = 1, limit = 30, message_type?: string, exclude?: string): Promise<CommunityMessageData[]> {
     let url = `${Endpoints.communities.messages(id)}?page=${page}&limit=${limit}`;
     if (message_type) url += `&message_type=${message_type}`;
+    if (exclude) url += `&exclude=${exclude}`;
     const res = await apiClient.get<CommunityMessageData[]>(url);
     return res.data;
   },
