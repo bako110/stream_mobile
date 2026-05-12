@@ -243,6 +243,25 @@ export async function uploadAudioFile(
   return { url: public_url, public_id: public_url };
 }
 
+export interface UploadedFile {
+  url:       string;
+  filename:  string;
+  size?:     number;
+  mime_type: string;
+}
+
+export async function uploadFileFromUri(
+  uri: string,
+  fileName: string,
+  mimeType = 'application/octet-stream',
+  folder = 'messages',
+): Promise<UploadedFile> {
+  const normalized = await normalizeUri(uri);
+  const { upload_url, public_url } = await getPresignedUrl(folder, fileName, mimeType);
+  await putToR2(upload_url, normalized, mimeType);
+  return { url: public_url, filename: fileName, mime_type: mimeType };
+}
+
 // ── Export ────────────────────────────────────────────────────────────────────
 
 export const uploadService = {

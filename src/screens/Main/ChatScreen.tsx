@@ -20,12 +20,11 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Geolocation from '@react-native-community/geolocation';
 import Slider from '@react-native-community/slider';
-import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useTheme } from '../../hooks/useTheme';
 import { Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
 import { authService } from '../../services/authService';
-import { uploadAudioFile, uploadMessageImage, uploadMessageVideo } from '../../services/uploadService';
+import { uploadAudioFile, uploadMessageImage, uploadMessageVideo, uploadFileFromUri } from '../../services/uploadService';
 import { useWs } from '../../context/WebSocketContext';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
@@ -489,22 +488,11 @@ export const ChatScreen: React.FC = () => {
     if (!filePreview || fileUploading) return;
     setFileUploading(true);
     try {
-      let fileUri = filePreview.uri;
-      if (Platform.OS === 'android' && filePreview.uri.startsWith('content://')) {
-        const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload_${Date.now()}.tmp`;
-        try { await ReactNativeBlobUtil.fs.cp(filePreview.uri, dest); }
-        catch {
-          const data = await ReactNativeBlobUtil.fs.readFile(filePreview.uri, 'base64');
-          await ReactNativeBlobUtil.fs.writeFile(dest, data, 'base64');
-        }
-        fileUri = `file://${dest}`;
-      }
-      const formData = new FormData();
-      formData.append('files', { uri: fileUri, name: filePreview.name, type: filePreview.mimeType ?? 'application/octet-stream' } as any);
-      const { apiClient: api, Endpoints: EP } = require('../../api');
-      const result = await api.upload(EP.upload.images('messages'), formData);
-      const uploaded = result.data?.uploaded?.[0];
-      if (!uploaded) throw new Error('Upload failed');
+      const uploaded = await uploadFileFromUri(
+        filePreview.uri,
+        filePreview.name,
+        filePreview.mimeType ?? 'application/octet-stream',
+      );
       const caption = fileCaption.trim();
       const msg = await messageService.sendMessage(
         partnerId, caption || filePreview.name, 'file', uploaded.url,

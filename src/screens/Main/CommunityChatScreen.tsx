@@ -20,7 +20,7 @@ import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Geolocation from '@react-native-community/geolocation';
-import { uploadMessageVideo, uploadAudioFile } from '../../services/uploadService';
+import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -549,17 +549,12 @@ export const CommunityChatScreen: React.FC = () => {
     if (!filePreview || fileUploading) return;
     setFileUploading(true);
     try {
-      const fd = new FormData();
-      fd.append('file', { uri: filePreview.uri, name: filePreview.name, type: filePreview.mimeType ?? 'application/octet-stream' } as any);
-      const res = await apiClient.upload<{ url: string; filename: string; size: number; mime_type: string }>(
-        Endpoints.upload.file('messages'), fd,
-      );
-      const { url, filename, size, mime_type } = res.data;
-      const metadata = { filename: filename ?? filePreview.name, size: size ?? filePreview.size ?? 0, mime_type: mime_type ?? filePreview.mimeType ?? '' };
+      const uploaded = await uploadFileFromUri(filePreview.uri, filePreview.name, filePreview.mimeType ?? 'application/octet-stream');
+      const metadata = { filename: uploaded.filename, size: filePreview.size ?? 0, mime_type: uploaded.mime_type };
       const reply_to_id = replyingTo?.id;
       setReplyingTo(null);
       const caption = fileCaption.trim();
-      const msg = await communityService.sendMessage(communityId, caption, 'file', [url], reply_to_id, metadata);
+      const msg = await communityService.sendMessage(communityId, caption, 'file', [uploaded.url], reply_to_id, metadata);
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
       setFilePreviewOpen(false);
