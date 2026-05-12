@@ -25,7 +25,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText } from '../../components/common';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
-import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
+import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
+import { favoriteService } from '../../services/favoriteService';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { communityService } from '../../services/communityService';
@@ -39,7 +40,7 @@ import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
-import { feedStyles as s } from '../../styles/FeedScreen.styles';
+import { feedStyles as s, fS } from '../../styles/FeedScreen.styles';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -91,35 +92,47 @@ const badgeS = StyleSheet.create({
 
 // ── Badges isolés — ne re-rendent que le FeedScreen quand les unread changent ─
 
-const FeedHeaderBadges: React.FC<{ onMessages: () => void; onNotifs: () => void; onMenu: () => void; colors: AppColors }> = React.memo(
-  ({ onMessages, onNotifs, onMenu, colors }) => {
-    const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
-    const totalNotifs = unreadNotifications + unreadActivity;
-    return (
-      <>
-        <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={onMessages}>
-          <Icon name="send" size={20} color={colors.textPrimary} />
-          {unreadMessages > 0 && (
-            <View style={badgeS.badge}>
-              <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={onNotifs}>
-          <Icon name="bell" size={20} color={colors.textPrimary} />
-          {totalNotifs > 0 && (
-            <View style={badgeS.badge}>
-              <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={onMenu}>
-          <Icon name="menu" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
-      </>
-    );
-  },
-);
+const FeedHeaderBadges: React.FC<{
+  onMessages: () => void;
+  onNotifs: () => void;
+  onMenu: () => void;
+  onFavorites: () => void;
+  onLive: () => void;
+  colors: AppColors;
+}> = React.memo(({ onMessages, onNotifs, onFavorites, onLive, colors }) => {
+  const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
+  const totalNotifs = unreadNotifications + unreadActivity;
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {/* Messages */}
+      <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onMessages} activeOpacity={0.8}>
+        <Icon name="send" size={18} color={colors.textPrimary} />
+        {unreadMessages > 0 && (
+          <View style={badgeS.badge}>
+            <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+      {/* Notifications */}
+      <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onNotifs} activeOpacity={0.8}>
+        <Icon name="bell" size={18} color={colors.textPrimary} />
+        {totalNotifs > 0 && (
+          <View style={badgeS.badge}>
+            <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+      {/* Favoris */}
+      <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onFavorites} activeOpacity={0.8}>
+        <Icon name="bookmark" size={18} color={colors.textPrimary} />
+      </TouchableOpacity>
+      {/* Live */}
+      <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: '#F0365A18' }]} onPress={onLive} activeOpacity={0.8}>
+        <Icon name="radio" size={18} color="#F0365A" />
+      </TouchableOpacity>
+    </View>
+  );
+});
 
 // ── FeedScreen ────────────────────────────────────────────────────────────────
 
@@ -730,19 +743,8 @@ export const FeedScreen: React.FC = () => {
             </Animated.View>
           )}
 
-          {/* Droite : icônes */}
+          {/* Droite : search + menu */}
           <View style={s.headerRight}>
-            {/* Bouton Go Live — point clignotant */}
-            {!searchOpen && (
-              <TouchableOpacity
-                style={{ width: 16, height: 16, borderRadius: 18, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' }}
-                onPress={() => nav.navigate('GoLive')}
-                activeOpacity={0.8}
-              >
-                <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }, liveDotStyle]} />
-              </TouchableOpacity>
-            )}
-            {/* Icône recherche — style Facebook */}
             <TouchableOpacity
               style={[s.iconBtn, { backgroundColor: searchOpen ? colors.primary + '22' : colors.backgroundSecondary }]}
               onPress={searchOpen ? closeSearch : openSearch}
@@ -750,21 +752,9 @@ export const FeedScreen: React.FC = () => {
               <Icon name={searchOpen ? 'x' : 'search'} size={20} color={searchOpen ? colors.primary : colors.textPrimary} />
             </TouchableOpacity>
             {!searchOpen && (
-              <>
-                <TouchableOpacity
-                  style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={() => nav.navigate('Favorites')}
-                  activeOpacity={0.7}
-                >
-                  <Icon name="bookmark" size={20} color={colors.textPrimary} />
-                </TouchableOpacity>
-                <FeedHeaderBadges
-                  onMessages={goToMessages}
-                  onNotifs={goToNotifs}
-                  onMenu={openMenu}
-                  colors={colors}
-                />
-              </>
+              <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={openMenu}>
+                <Icon name="menu" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -786,89 +776,63 @@ export const FeedScreen: React.FC = () => {
           </View>
         )}
 
-        {/* ── Filtres dans le header ─────────────────────────────────────── */}
+        {/* ── Barre filtres + actions ────────────────────────────────────── */}
         {!searchOpen && (
-          <View style={{ paddingTop: 8, paddingBottom: 4 }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
-              {/* Bouton "Tout" avec dropdown */}
-              <TouchableOpacity
-                onPress={() => {
-                  if (filter !== 'all') {
-                    setFilter('all');
-                    setFilterDropOpen(false);
-                    load('all');
-                  } else {
-                    setFilterDropOpen(o => !o);
-                  }
-                }}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 5,
-                  paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                  backgroundColor: filter === 'all' ? colors.primary + '22' : colors.backgroundSecondary,
-                  borderWidth: 1,
-                  borderColor: filter === 'all' ? colors.primary : colors.border,
-                }}
-                activeOpacity={0.75}
-              >
-                <Icon name="grid" size={13} color={filter === 'all' ? colors.primary : colors.textSecondary} />
-                <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'all' ? colors.primary : colors.textSecondary }}>Tout</Text>
-                <Icon name={filterDropOpen ? 'chevron-up' : 'chevron-down'} size={12} color={filter === 'all' ? colors.primary : colors.textSecondary} />
-              </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, gap: 6 }}>
 
-              {/* Options visibles quand dropdown ouvert ou filtre actif */}
-              {(filterDropOpen || filter === 'events') && (
-                <TouchableOpacity
-                  onPress={() => { setFilter('events'); setFilterDropOpen(false); }}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 5,
-                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                    backgroundColor: filter === 'events' ? colors.primary + '22' : colors.backgroundSecondary,
-                    borderWidth: 1,
-                    borderColor: filter === 'events' ? colors.primary : colors.border,
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Icon name="calendar" size={13} color={filter === 'events' ? colors.primary : colors.textSecondary} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'events' ? colors.primary : colors.textSecondary }}>Événements</Text>
-                </TouchableOpacity>
-              )}
+            {/* Bouton filtre — occupe son espace, ouvre dropdown */}
+            <TouchableOpacity
+              onPress={() => setFilterDropOpen(o => !o)}
+              style={[fS.filterIcon, {
+                backgroundColor: filterDropOpen || filter !== 'all' ? colors.primary + '22' : colors.backgroundSecondary,
+                borderColor: filterDropOpen || filter !== 'all' ? colors.primary : 'transparent',
+              }]}
+              activeOpacity={0.75}
+            >
+              <Icon name="sliders" size={17} color={filter !== 'all' || filterDropOpen ? colors.primary : colors.textSecondary} />
+              {filter !== 'all' && <View style={{ position: 'absolute', top: 4, right: 4, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />}
+            </TouchableOpacity>
 
-              {(filterDropOpen || filter === 'concerts') && (
-                <TouchableOpacity
-                  onPress={() => { setFilter('concerts'); setFilterDropOpen(false); }}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 5,
-                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                    backgroundColor: filter === 'concerts' ? colors.primary + '22' : colors.backgroundSecondary,
-                    borderWidth: 1,
-                    borderColor: filter === 'concerts' ? colors.primary : colors.border,
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Icon name="music" size={13} color={filter === 'concerts' ? colors.primary : colors.textSecondary} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'concerts' ? colors.primary : colors.textSecondary }}>Concerts</Text>
-                </TouchableOpacity>
-              )}
+            {/* Séparateur */}
+            <View style={{ width: 1, height: 22, backgroundColor: colors.divider }} />
 
-              {(filterDropOpen || filter === 'posts') && (
-                <TouchableOpacity
-                  onPress={() => { setFilter('posts'); setFilterDropOpen(false); }}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 5,
-                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                    backgroundColor: filter === 'posts' ? colors.primary + '22' : colors.backgroundSecondary,
-                    borderWidth: 1,
-                    borderColor: filter === 'posts' ? colors.primary : colors.border,
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Icon name="file-text" size={13} color={filter === 'posts' ? colors.primary : colors.textSecondary} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'posts' ? colors.primary : colors.textSecondary }}>Posts</Text>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
+            {/* Messages, Notifs, Favoris, Live — occupent toute la largeur restante */}
+            <FeedHeaderBadges
+              onMessages={goToMessages}
+              onNotifs={goToNotifs}
+              onMenu={openMenu}
+              onFavorites={() => nav.navigate('Favorites')}
+              onLive={() => nav.navigate('GoLive')}
+              colors={colors}
+            />
           </View>
         )}
+
+        {/* ── Dropdown vertical filtres ──────────────────────────────────── */}
+        {!searchOpen && filterDropOpen && (
+          <View style={[fS.dropdownWrap, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.textPrimary }]}>
+            {([
+              { key: 'all',      icon: 'grid',      label: 'Tout'        },
+              { key: 'events',   icon: 'calendar',  label: 'Événements'  },
+              { key: 'concerts', icon: 'music',     label: 'Concerts'    },
+              { key: 'posts',    icon: 'file-text', label: 'Posts'       },
+            ] as { key: FeedFilter; icon: string; label: string }[]).map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => { setFilter(opt.key); setFilterDropOpen(false); load(opt.key); }}
+                style={[fS.dropdownItem, filter === opt.key && { backgroundColor: colors.primary + '12' }]}
+                activeOpacity={0.75}
+              >
+                <View style={[fS.dropdownIconWrap, { backgroundColor: filter === opt.key ? colors.primary + '22' : colors.backgroundSecondary }]}>
+                  <Icon name={opt.icon} size={15} color={filter === opt.key ? colors.primary : colors.textSecondary} />
+                </View>
+                <Text style={[fS.dropdownLabel, { color: filter === opt.key ? colors.primary : colors.textPrimary }]}>{opt.label}</Text>
+                {filter === opt.key && <Icon name="check" size={14} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
       </View>
 
       {searchResults ? (
@@ -2078,9 +2042,11 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const [likeCount,    setLikeCount]    = useState(item.data?.like_count ?? 0);
   const [commentCount, setCommentCount] = useState(item.data?.comment_count ?? 0);
   const [shareCount,   setShareCount]   = useState(item.data?.share_count ?? 0);
-  const [saved,        setSaved]        = useState(
-    isEvent ? saveService.isEventSaved(item.id) : saveService.isConcertSaved(item.id),
-  );
+  const [saved,        setSaved]        = useState(false);
+  React.useEffect(() => {
+    favoriteService.check(isEvent ? 'event' : 'concert', item.id).then(setSaved).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
   const [cardMenuOpen,   setCardMenuOpen]   = useState(false);
   const [reportVisible,  setReportVisible]  = useState(false);
   const refType = isEvent ? 'event' : 'concert';
@@ -2143,9 +2109,15 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
     const newSaved = !saved;
     setSaved(newSaved);
     if (isEvent) {
-      newSaved ? saveService.saveEvent(item.data as Event) : saveService.unsaveEvent(item.id);
+      const ev = item.data as Event;
+      newSaved
+        ? favoriteService.save({ target_type: 'event', target_id: item.id, target_title: ev.title, target_subtitle: ev.venue_city ?? ev.location, target_thumbnail: ev.thumbnail_url ?? ev.cover_url }).catch(() => {})
+        : favoriteService.unsave('event', item.id).catch(() => {});
     } else {
-      newSaved ? saveService.saveConcert(item.data as Concert) : saveService.unsaveConcert(item.id);
+      const ct = item.data as Concert;
+      newSaved
+        ? favoriteService.save({ target_type: 'concert', target_id: item.id, target_title: ct.title, target_subtitle: ct.venue_city ?? ct.artist?.username, target_thumbnail: ct.thumbnail_url }).catch(() => {})
+        : favoriteService.unsave('concert', item.id).catch(() => {});
     }
   };
 

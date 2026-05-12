@@ -351,3 +351,65 @@ export const feedStyles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+// ── Styles barre filtres + actions (nouvelle barre unifiée) ──────────────────
+export const fS = StyleSheet.create({
+  // Icône filtre : cercle compact, icône seule
+  filterIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 2,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+
+  // Icône action (messages, notifs, bookmark, live) : s'étire sur toute la largeur restante
+  actionIcon: {
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Dropdown vertical du filtre "Tout"
+  dropdownWrap: {
+    position: 'absolute',
+    top: 130,
+    left: 14,
+    zIndex: 999,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 4,
+    minWidth: 180,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginHorizontal: 4,
+  },
+  dropdownIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdownLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
