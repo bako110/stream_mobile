@@ -116,6 +116,14 @@ export const ChatScreen: React.FC = () => {
   const [imgUploading,     setImgUploading]     = useState(false);
   const captionRef = useRef<TextInput>(null);
 
+  // Preview avant envoi fichier
+  type FilePending = { uri: string; name: string; size?: number; mimeType?: string };
+  const [filePreview,      setFilePreview]      = useState<FilePending | null>(null);
+  const [fileCaption,      setFileCaption]      = useState('');
+  const [filePreviewOpen,  setFilePreviewOpen]  = useState(false);
+  const [fileUploading,    setFileUploading]    = useState(false);
+  const fileCaptionRef = useRef<TextInput>(null);
+
   // Edit / Delete / React
   const [editingMsg,    setEditingMsg]    = useState<Message | null>(null);
   const [selectedMsg,   setSelectedMsg]   = useState<Message | null>(null);
@@ -467,44 +475,49 @@ export const ChatScreen: React.FC = () => {
       const res = await pick({ type: [types.allFiles] });
       const file = res[0];
       if (!file?.uri) return;
-      setUploading(true);
-      // Normalize content:// → file:// for dev mode compatibility
-      let fileUri = file.uri;
-      if (Platform.OS === 'android' && file.uri.startsWith('content://')) {
+      // Affiche la prévisualisation — l'upload se fait à la confirmation
+      setFilePreview({ uri: file.uri, name: file.name ?? `fichier_${Date.now()}`, size: file.size ?? undefined, mimeType: file.type ?? undefined });
+      setFileCaption('');
+      setFilePreviewOpen(true);
+    } catch (e: any) {
+      const isCanceled = isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED;
+      if (!isCanceled) Alert.alert('Erreur', "Impossible d'ouvrir le fichier");
+    }
+  };
+
+  const handleSendFilePreview = async () => {
+    if (!filePreview || fileUploading) return;
+    setFileUploading(true);
+    try {
+      let fileUri = filePreview.uri;
+      if (Platform.OS === 'android' && filePreview.uri.startsWith('content://')) {
         const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload_${Date.now()}.tmp`;
-        try {
-          await ReactNativeBlobUtil.fs.cp(file.uri, dest);
-        } catch {
-          const data = await ReactNativeBlobUtil.fs.readFile(file.uri, 'base64');
+        try { await ReactNativeBlobUtil.fs.cp(filePreview.uri, dest); }
+        catch {
+          const data = await ReactNativeBlobUtil.fs.readFile(filePreview.uri, 'base64');
           await ReactNativeBlobUtil.fs.writeFile(dest, data, 'base64');
         }
         fileUri = `file://${dest}`;
       }
-      // Upload file via Cloudinary messages folder
       const formData = new FormData();
-      formData.append('files', {
-        uri:  fileUri,
-        name: file.name ?? `file_${Date.now()}`,
-        type: file.type ?? 'application/octet-stream',
-      } as any);
-
-      const { apiClient, Endpoints } = require('../api');
-      const result = await apiClient.upload(Endpoints.upload.images('messages'), formData);
+      formData.append('files', { uri: fileUri, name: filePreview.name, type: filePreview.mimeType ?? 'application/octet-stream' } as any);
+      const { apiClient: api, Endpoints: EP } = require('../../api');
+      const result = await api.upload(EP.upload.images('messages'), formData);
       const uploaded = result.data?.uploaded?.[0];
       if (!uploaded) throw new Error('Upload failed');
-
+      const caption = fileCaption.trim();
       const msg = await messageService.sendMessage(
-        partnerId, file.name ?? 'fichier', 'file', uploaded.url,
-        { filename: file.name || undefined, size: file.size || undefined, mime_type: file.type || undefined },
+        partnerId, caption || filePreview.name, 'file', uploaded.url,
+        { filename: filePreview.name, size: filePreview.size, mime_type: filePreview.mimeType },
       );
       setMessages(prev => [msg, ...prev]);
-    } catch (e: any) {
-      const isCanceled = e && typeof e === 'object' && 'code' in e && e.code === 'OPERATION_CANCELED';
-      if (!isCanceled) {
-        Alert.alert('Erreur', 'Impossible d\'envoyer le fichier');
-      }
+      setFilePreviewOpen(false);
+      setFilePreview(null);
+      setFileCaption('');
+    } catch {
+      Alert.alert('Erreur', "Impossible d'envoyer le fichier");
     } finally {
-      setUploading(false);
+      setFileUploading(false);
     }
   };
 
@@ -1151,6 +1164,75 @@ export const ChatScreen: React.FC = () => {
           ))}
         </View>
       )}
+
+      {/* ── Preview avant envoi fichier ── */}
+      <Modal
+        visible={filePreviewOpen}
+        transparent={false}
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
+      >
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <StatusBar hidden />
+          <View style={CP.header}>
+            <TouchableOpacity
+              onPress={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={CP.headerClose}
+            >
+              <Icon name="x" size={22} color="#fff" />
+            </TouchableOpacity>
+            <Text style={CP.headerTitle} numberOfLines={1}>{filePreview?.name ?? 'Fichier'}</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {/* Aperçu fichier centré */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+            <View style={{ width: 96, height: 96, borderRadius: 20, backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <Icon name="file-text" size={44} color="#7B3FF2" />
+            </View>
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 6 }} numberOfLines={2}>
+              {filePreview?.name}
+            </Text>
+            {filePreview?.size != null && (
+              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
+                {filePreview.size < 1024 ? `${filePreview.size} o`
+                  : filePreview.size < 1048576 ? `${(filePreview.size / 1024).toFixed(1)} Ko`
+                  : `${(filePreview.size / 1048576).toFixed(1)} Mo`}
+              </Text>
+            )}
+          </View>
+
+          {/* Barre commentaire + envoyer */}
+          <View style={CP.bottomBar}>
+            <View style={CP.captionRow}>
+              <Icon name="edit-3" size={16} color="rgba(255,255,255,0.5)" />
+              <TextInput
+                ref={fileCaptionRef}
+                style={CP.captionInput}
+                placeholder="Ajouter un commentaire…"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={fileCaption}
+                onChangeText={setFileCaption}
+                multiline
+                maxLength={500}
+              />
+            </View>
+            <TouchableOpacity
+              style={[CP.sendBtn, fileUploading && { opacity: 0.6 }]}
+              onPress={handleSendFilePreview}
+              disabled={fileUploading}
+              activeOpacity={0.85}
+            >
+              {fileUploading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Icon name="send" size={20} color="#fff" />
+              }
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ── Preview avant envoi image (style WhatsApp) ── */}
       <Modal

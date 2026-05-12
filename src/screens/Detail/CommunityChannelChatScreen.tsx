@@ -104,6 +104,14 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const [playProgress, setPlayProgress] = useState(0);
   const [playDuration, setPlayDuration] = useState(0);
 
+  // Preview avant envoi fichier
+  type FilePending = { uri: string; name: string; size?: number; mimeType?: string };
+  const [filePreview,     setFilePreview]     = useState<FilePending | null>(null);
+  const [fileCaption,     setFileCaption]     = useState('');
+  const [filePreviewOpen, setFilePreviewOpen] = useState(false);
+  const [fileUploading,   setFileUploading]   = useState(false);
+  const fileCaptionRef = useRef<TextInput>(null);
+
   // Media preview (images)
   const [mediaPreview,     setMediaPreview]     = useState<{ uri: string; name: string }[]>([]);
   const [mediaCaption,     setMediaCaption]     = useState('');
@@ -372,25 +380,37 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const handlePickFile = async () => {
     setAttachOpen(false);
     try {
-      const [result] = await pick({
-        type: [types.pdf, types.doc, types.docx, types.xls, types.xlsx, types.plainText],
-      });
-      setSending(true);
+      const [result] = await pick({ type: [types.pdf, types.doc, types.docx, types.xls, types.xlsx, types.plainText, types.allFiles] });
+      setFilePreview({ uri: result.uri, name: result.name ?? 'fichier', size: result.size ?? undefined, mimeType: result.type ?? undefined });
+      setFileCaption('');
+      setFilePreviewOpen(true);
+    } catch (e: any) {
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', "Impossible d'ouvrir le fichier.");
+    }
+  };
+
+  const handleSendFilePreview = async () => {
+    if (!filePreview || fileUploading) return;
+    setFileUploading(true);
+    try {
       const fd = new FormData();
-      fd.append('file', { uri: result.uri, name: result.name ?? 'fichier', type: result.type ?? 'application/octet-stream' } as any);
+      fd.append('file', { uri: filePreview.uri, name: filePreview.name, type: filePreview.mimeType ?? 'application/octet-stream' } as any);
       const res = await apiClient.upload<{ url: string; filename: string; size: number; mime_type: string }>(
         Endpoints.upload.file('messages'), fd,
       );
       const { url, filename, size, mime_type } = res.data;
-      const metadata = { filename: filename ?? result.name ?? 'fichier', size: size ?? result.size ?? 0, mime_type: mime_type ?? result.type ?? '' };
+      const metadata = { filename: filename ?? filePreview.name, size: size ?? filePreview.size ?? 0, mime_type: mime_type ?? filePreview.mimeType ?? '' };
       const reply_to_id = replyingTo?.id;
       setReplyingTo(null);
+      const caption = fileCaption.trim();
       const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'file', [url], reply_to_id, metadata);
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-    } catch (e: any) {
-      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', 'Impossible d\'envoyer le fichier.');
-    } finally { setSending(false); }
+      setFilePreviewOpen(false);
+      setFilePreview(null);
+      setFileCaption('');
+    } catch { Alert.alert('Erreur', "Impossible d'envoyer le fichier."); }
+    finally { setFileUploading(false); }
   };
 
   // ── Localisation ─────────────────────────────────────────────────────────────
@@ -884,6 +904,75 @@ export const CommunityChannelChatScreen: React.FC = () => {
           </>
         )}
       </KeyboardAvoidingView>
+
+      {/* ── Preview avant envoi fichier ── */}
+      <Modal
+        visible={filePreviewOpen}
+        transparent={false}
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
+      >
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <StatusBar hidden />
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12 }}>
+            <TouchableOpacity
+              onPress={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon name="x" size={22} color="#fff" />
+            </TouchableOpacity>
+            <Text style={{ flex: 1, color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center', marginHorizontal: 8 }} numberOfLines={1}>
+              {filePreview?.name ?? 'Fichier'}
+            </Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+            <View style={{ width: 96, height: 96, borderRadius: 20, backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <Icon name="file-text" size={44} color="#7B3FF2" />
+            </View>
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 6 }} numberOfLines={2}>
+              {filePreview?.name}
+            </Text>
+            {filePreview?.size != null && (
+              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
+                {filePreview.size < 1024 ? `${filePreview.size} o`
+                  : filePreview.size < 1048576 ? `${(filePreview.size / 1024).toFixed(1)} Ko`
+                  : `${(filePreview.size / 1048576).toFixed(1)} Mo`}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', backgroundColor: '#111', paddingHorizontal: 16, paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12, gap: 10 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#2a2a2a', borderRadius: 24, paddingHorizontal: 14, paddingVertical: 8, gap: 8 }}>
+              <Icon name="edit-3" size={16} color="rgba(255,255,255,0.4)" />
+              <TextInput
+                ref={fileCaptionRef}
+                style={{ flex: 1, color: '#fff', fontSize: 15, maxHeight: 100 }}
+                placeholder="Ajouter un commentaire…"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                value={fileCaption}
+                onChangeText={setFileCaption}
+                multiline
+                maxLength={500}
+              />
+            </View>
+            <TouchableOpacity
+              style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', opacity: fileUploading ? 0.6 : 1 }}
+              onPress={handleSendFilePreview}
+              disabled={fileUploading}
+              activeOpacity={0.85}
+            >
+              {fileUploading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Icon name="send" size={20} color="#fff" />
+              }
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Menu pièces jointes */}
       <Modal visible={attachOpen} transparent animationType="slide" onRequestClose={() => setAttachOpen(false)}>
