@@ -40,6 +40,18 @@ export async function compressVideo(
 ): Promise<CompressResult> {
   const { onProgress } = opts;
 
+  // Génère le thumbnail depuis l'URI original AVANT compression —
+  // le player natif iOS/Android décode les frames source sans frame noire initiale.
+  // On essaie d'abord avec l'URI tel quel, puis avec file:// si content://
+  let thumbnailUri: string | null = null;
+  try {
+    const thumbSrc = inputUri.startsWith('content://')
+      ? `file://${(await toFileUri(inputUri)).fileUri.replace('file://', '')}`
+      : inputUri.startsWith('file://') ? inputUri : `file://${inputUri}`;
+    const thumb = await createVideoThumbnail(thumbSrc);
+    thumbnailUri = thumb.path.startsWith('file://') ? thumb.path : `file://${thumb.path}`;
+  } catch {}
+
   const { fileUri, isCopy } = await toFileUri(inputUri);
 
   const compressed = await Video.compress(
@@ -62,19 +74,20 @@ export async function compressVideo(
 
   onProgress?.(90);
 
-  // Génère le thumbnail depuis la vidéo compressée
-  let thumbnailUri: string | null = null;
-  try {
-    const thumb = await createVideoThumbnail(compressed);
-    thumbnailUri = thumb.path.startsWith('file://') ? thumb.path : `file://${thumb.path}`;
-  } catch {}
-
   // Durée réelle via metadata
   let durationSec = 60;
   try {
     const meta = await getVideoMetaData(compressed);
     if (meta.duration) durationSec = Math.round(meta.duration);
   } catch {}
+
+  // Si le thumbnail n'a pas pu être généré depuis l'original, fallback sur la vidéo compressée
+  if (!thumbnailUri) {
+    try {
+      const thumb = await createVideoThumbnail(compressed);
+      thumbnailUri = thumb.path.startsWith('file://') ? thumb.path : `file://${thumb.path}`;
+    } catch {}
+  }
 
   return {
     uri:          compressed,
