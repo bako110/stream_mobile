@@ -1,4 +1,4 @@
-package com.stream_mobile
+package com.folix.mobile
 
 import android.app.Application
 import com.facebook.react.PackageList

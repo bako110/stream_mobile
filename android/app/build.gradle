@@ -91,7 +91,7 @@ android {
 
     namespace "com.stream_mobile"
     defaultConfig {
-        applicationId "com.stream_mobile"
+        applicationId "com.folix.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

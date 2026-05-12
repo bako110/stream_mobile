@@ -1,4 +1,4 @@
-package com.stream_mobile
+package com.folix.mobile
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
