@@ -678,15 +678,16 @@ export const FeedScreen: React.FC = () => {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={[s.header, { backgroundColor: colors.surface }]}>
         <View style={s.headerRow}>
-          {/* Gauche : avatar — masqué si recherche ouverte */}
+          {/* Gauche : avatar + nom — masqué si recherche ouverte */}
           {!searchOpen && (
             !currentUser ? (
-              <View style={[s.headerLeft, { pointerEvents: 'none', flex: 0 }]}>
+              <View style={[s.headerLeft, { pointerEvents: 'none' }]}>
                 <SkeletonBox width={34} height={34} borderRadius={17} />
+                <SkeletonBox width={80} height={12} borderRadius={6} />
               </View>
             ) : (
               <TouchableOpacity
-                style={[s.headerLeft, { flex: 0, marginRight: 0 }]}
+                style={s.headerLeft}
                 activeOpacity={0.7}
                 onPress={() => currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id })}
               >
@@ -697,16 +698,26 @@ export const FeedScreen: React.FC = () => {
                     <Text style={[s.avatarText, { color: colors.primary }]}>{initials}</Text>
                   </View>
                 )}
+                {displayName ? (
+                  <Text style={[s.userName, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                ) : null}
               </TouchableOpacity>
             )
           )}
 
-          {/* Centre : FoliX — position absolue pour rester centré quoi qu'il arrive */}
+          {/* Centre : FoliX — position absolue, toujours centré */}
           {!searchOpen && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-              <Text style={{ fontSize: 22, fontWeight: '900', letterSpacing: 1.5, color: colors.primary }}>
-                Foli<Text style={{ color: colors.textPrimary }}>X</Text>
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 24, fontWeight: '900', letterSpacing: 0.5, color: colors.textPrimary, fontStyle: 'italic' }}>
+                  Foli
+                </Text>
+                <View style={{ backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 1 }}>
+                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: 1 }}>X</Text>
+                </View>
+              </View>
             </View>
           )}
 
