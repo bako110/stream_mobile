@@ -596,6 +596,14 @@ export const communityService = {
     return res.data;
   },
 
+  async addChannelMember(communityId: string, channelId: string, userId: string): Promise<CommunityChannelMember> {
+    const res = await apiClient.post<CommunityChannelMember>(
+      Endpoints.communities.channelMembers(communityId, channelId),
+      { user_id: userId },
+    );
+    return res.data;
+  },
+
   async removeChannelMember(communityId: string, channelId: string, userId: string): Promise<void> {
     await apiClient.delete(`${Endpoints.communities.channelMembers(communityId, channelId)}/${userId}`);
   },

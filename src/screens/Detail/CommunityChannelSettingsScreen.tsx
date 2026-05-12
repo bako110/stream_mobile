@@ -12,7 +12,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import { apiClient, Endpoints } from '../../api';
-import type { CommunityChannel, CommunityChannelMember, ChannelType, UpdateChannelPayload } from '../../services/communityService';
+import type { CommunityChannel, CommunityChannelMember, CommunityMemberData, ChannelType, UpdateChannelPayload } from '../../services/communityService';
 
 interface RouteParams {
   communityId: string;
@@ -70,6 +70,12 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
 
   // Menu membre
   const [menuMember, setMenuMember] = useState<CommunityChannelMember | null>(null);
+
+  // Picker ajouter membre
+  const [showAddSheet,    setShowAddSheet]    = useState(false);
+  const [communityMembers, setCommunityMembers] = useState<CommunityMemberData[]>([]);
+  const [addSearch,       setAddSearch]       = useState('');
+  const [addingUser,      setAddingUser]      = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -142,6 +148,27 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
         } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
       }},
     ]);
+  };
+
+  const openAddSheet = async () => {
+    setAddSearch('');
+    setShowAddSheet(true);
+    try {
+      const all = await communityService.getMembers(communityId);
+      const channelUserIds = new Set(members.map(m => m.user_id));
+      setCommunityMembers(all.filter(m => !channelUserIds.has(m.user_id)));
+    } catch { setCommunityMembers([]); }
+  };
+
+  const handleAddMember = async (m: CommunityMemberData) => {
+    setAddingUser(m.user_id);
+    try {
+      const added = await communityService.addChannelMember(communityId, channelId, m.user_id);
+      setMembers(prev => [...prev, added]);
+      setCommunityMembers(prev => prev.filter(x => x.user_id !== m.user_id));
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible d\'ajouter ce membre.');
+    } finally { setAddingUser(null); }
   };
 
   const handleRemoveMember = (m: CommunityChannelMember) => {
@@ -230,6 +257,18 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Bouton + ajouter membre (onglet membres, admin/mod seulement) */}
+      {tab === 'members' && canManage && (
+        <TouchableOpacity
+          style={[S.addMemberBtn, { backgroundColor: colors.primary }]}
+          onPress={openAddSheet}
+          activeOpacity={0.85}
+        >
+          <Icon name="user-plus" size={16} color="#fff" />
+          <Text style={S.addMemberBtnText}>Ajouter un membre</Text>
+        </TouchableOpacity>
+      )}
 
       {tab === 'info' ? (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -462,6 +501,86 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Bottom sheet — ajouter un membre */}
+      <Modal visible={showAddSheet} transparent animationType="slide" onRequestClose={() => setShowAddSheet(false)}>
+        <Pressable style={S.overlay} onPress={() => setShowAddSheet(false)}>
+          <Pressable style={[S.addSheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
+            <View style={[S.addSheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[S.addSheetTitle, { color: colors.textPrimary }]}>Ajouter un membre</Text>
+
+            {/* Recherche */}
+            <View style={[S.addSearch, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+              <Icon name="search" size={15} color={colors.textTertiary} />
+              <TextInput
+                style={[{ flex: 1, color: colors.textPrimary, fontSize: 14, marginLeft: 8 }]}
+                placeholder="Rechercher…"
+                placeholderTextColor={colors.textTertiary}
+                value={addSearch}
+                onChangeText={setAddSearch}
+                autoCorrect={false}
+              />
+              {addSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setAddSearch('')}>
+                  <Icon name="x" size={14} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <FlatList
+              data={communityMembers.filter(m => {
+                if (!addSearch.trim()) return true;
+                const q = addSearch.toLowerCase();
+                return (m.display_name ?? '').toLowerCase().includes(q) || (m.username ?? '').toLowerCase().includes(q);
+              })}
+              keyExtractor={m => m.user_id}
+              style={{ maxHeight: 340 }}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item: m }) => (
+                <TouchableOpacity
+                  style={[S.addMemberRow, { borderBottomColor: colors.divider }]}
+                  onPress={() => handleAddMember(m)}
+                  disabled={addingUser === m.user_id}
+                  activeOpacity={0.75}
+                >
+                  {m.avatar_url
+                    ? <Image source={{ uri: m.avatar_url }} style={S.memberAvatar} />
+                    : <View style={[S.memberAvatarPlaceholder, { backgroundColor: colors.primary + '25' }]}>
+                        <Text style={[S.memberAvatarLetter, { color: colors.primary }]}>
+                          {(m.display_name || m.username || '?')[0].toUpperCase()}
+                        </Text>
+                      </View>
+                  }
+                  <View style={{ flex: 1 }}>
+                    <Text style={[S.memberName, { color: colors.textPrimary }]} numberOfLines={1}>
+                      {m.display_name || m.username}
+                    </Text>
+                    {m.username && <Text style={[S.memberUsername, { color: colors.textTertiary }]}>@{m.username}</Text>}
+                  </View>
+                  {addingUser === m.user_id
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Icon name="plus-circle" size={20} color={colors.primary} />
+                  }
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', padding: 32 }}>
+                  <Text style={{ color: colors.textTertiary, fontSize: 14 }}>
+                    {communityMembers.length === 0 ? 'Tous les membres sont déjà dans ce canal' : 'Aucun résultat'}
+                  </Text>
+                </View>
+              }
+            />
+
+            <TouchableOpacity
+              style={[S.menuItem, { justifyContent: 'center', borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth }]}
+              onPress={() => setShowAddSheet(false)}
+            >
+              <Text style={[S.menuItemText, { color: colors.textTertiary }]}>Fermer</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -509,6 +628,14 @@ const S = StyleSheet.create({
   roleText:              { fontSize: 11, fontWeight: '700' },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+
+  addMemberBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, marginBottom: 0, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center' },
+  addMemberBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  addSheet:         { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
+  addSheetHandle:   { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
+  addSheetTitle:    { fontSize: 16, fontWeight: '800', paddingHorizontal: 18, paddingVertical: 10 },
+  addSearch:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  addMemberRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
 
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
