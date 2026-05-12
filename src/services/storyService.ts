@@ -95,6 +95,11 @@ export const storyService = {
     await apiClient.post(Endpoints.stories.reply(storyId), { text });
   },
 
+  async getReplies(storyId: string): Promise<any[]> {
+    const res = await apiClient.get<any[]>(Endpoints.stories.replies(storyId));
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
   // ── Supprimer ─────────────────────────────────────────────────────────────
 
   async delete(storyId: string): Promise<void> {

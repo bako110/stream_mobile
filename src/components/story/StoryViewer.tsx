@@ -264,8 +264,11 @@ export const StoryViewer: React.FC<Props> = ({
   const [editMode,    setEditMode]    = useState(false);
   const [editCaption, setEditCaption] = useState('');
   const [viewersOpen,    setViewersOpen]    = useState(false);
+  const [viewersTab,     setViewersTab]     = useState<'views' | 'replies'>('views');
   const [viewers,        setViewers]        = useState<StoryViewerUser[]>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
+  const [replies,        setReplies]        = useState<any[]>([]);
+  const [repliesLoading, setRepliesLoading] = useState(false);
   const [saved,       setSaved]       = useState(false);
   const [liked,       setLiked]       = useState(false);
   const [likeCount,   setLikeCount]   = useState(0);
@@ -535,14 +538,39 @@ export const StoryViewer: React.FC<Props> = ({
     setEditMode(false); setPaused(false);
   };
 
-  const openViewers = async () => {
-    setPaused(true); setViewersOpen(true); setViewersLoading(true);
-    try { setViewers(await storyService.getViewers(story.id)); }
-    catch { setViewers([]); }
-    finally { setViewersLoading(false); }
+  const openViewers = async (tab: 'views' | 'replies' = 'views') => {
+    setPaused(true);
+    setViewersOpen(true);
+    setViewersTab(tab);
+    if (tab === 'views') {
+      setViewersLoading(true);
+      try { setViewers(await storyService.getViewers(story.id)); }
+      catch { setViewers([]); }
+      finally { setViewersLoading(false); }
+    } else {
+      setRepliesLoading(true);
+      try { setReplies(await storyService.getReplies(story.id)); }
+      catch { setReplies([]); }
+      finally { setRepliesLoading(false); }
+    }
   };
 
-  const closeViewers = () => { setViewersOpen(false); setPaused(false); };
+  const switchViewersTab = async (tab: 'views' | 'replies') => {
+    setViewersTab(tab);
+    if (tab === 'views' && viewers.length === 0) {
+      setViewersLoading(true);
+      try { setViewers(await storyService.getViewers(story.id)); }
+      catch { setViewers([]); }
+      finally { setViewersLoading(false); }
+    } else if (tab === 'replies' && replies.length === 0) {
+      setRepliesLoading(true);
+      try { setReplies(await storyService.getReplies(story.id)); }
+      catch { setReplies([]); }
+      finally { setRepliesLoading(false); }
+    }
+  };
+
+  const closeViewers = () => { setViewersOpen(false); setViewersTab('views'); setPaused(false); };
 
   if (!group || !story || !group.user) return null;
 
@@ -706,7 +734,7 @@ export const StoryViewer: React.FC<Props> = ({
         {/* ── Bouton like (story des autres) + bouton vues (propre story) ── */}
         <View style={s.bottomBar}>
           {isOwn ? (
-            <TouchableOpacity style={s.viewsBtn} onPress={openViewers} activeOpacity={0.8}>
+            <TouchableOpacity style={s.viewsBtn} onPress={() => openViewers('views')} activeOpacity={0.8}>
               <Icon name="eye" size={14} color="#fff" />
               <Text style={s.viewsBtnText}>{story.view_count ?? 0} vue{(story.view_count ?? 0) !== 1 ? 's' : ''}</Text>
               {likeCount > 0 && (
@@ -795,65 +823,159 @@ export const StoryViewer: React.FC<Props> = ({
           </View>
         )}
 
-        {/* ── Panel vues ────────────────────────────────────────────────── */}
+        {/* ── Panel vues + réponses ─────────────────────────────────────── */}
         {viewersOpen && (
           <TouchableWithoutFeedback onPress={closeViewers}>
             <View style={s.sheetOverlay}>
               <TouchableWithoutFeedback>
                 <View style={s.viewersPanel}>
                   <View style={s.panelHandle} />
-                  <View style={s.viewersPanelHeader}>
-                    <Icon name="eye" size={15} color={accent} />
-                    <Text style={s.viewersPanelTitle}>{viewers.length} vue{viewers.length !== 1 ? 's' : ''}</Text>
+
+                  {/* Onglets */}
+                  <View style={s.panelTabs}>
+                    <TouchableOpacity
+                      style={[s.panelTab, viewersTab === 'views' && { borderBottomColor: accent }]}
+                      onPress={() => switchViewersTab('views')}
+                    >
+                      <Icon name="eye" size={14} color={viewersTab === 'views' ? accent : 'rgba(255,255,255,0.4)'} />
+                      <Text style={[s.panelTabText, { color: viewersTab === 'views' ? accent : 'rgba(255,255,255,0.4)' }]}>
+                        Vues{viewers.length > 0 ? ` (${viewers.length})` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.panelTab, viewersTab === 'replies' && { borderBottomColor: accent }]}
+                      onPress={() => switchViewersTab('replies')}
+                    >
+                      <Icon name="message-circle" size={14} color={viewersTab === 'replies' ? accent : 'rgba(255,255,255,0.4)'} />
+                      <Text style={[s.panelTabText, { color: viewersTab === 'replies' ? accent : 'rgba(255,255,255,0.4)' }]}>
+                        Réponses{replies.length > 0 ? ` (${replies.length})` : ''}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                  {viewersLoading ? (
-                    <ActivityIndicator color={accent} style={{ marginTop: 32 }} />
-                  ) : viewers.length === 0 ? (
-                    <View style={s.emptyBox}>
-                      <Icon name="eye-off" size={38} color="rgba(255,255,255,0.2)" />
-                      <Text style={s.emptyText}>Aucune vue pour l'instant</Text>
-                    </View>
-                  ) : (
-                    <FlatList
-                      data={viewers}
-                      keyExtractor={v => v.id}
-                      showsVerticalScrollIndicator={false}
-                      renderItem={({ item: v }) => {
-                        const vName = v.display_name ?? v.username ?? 'Utilisateur';
-                        const vTime = (() => {
-                          const d = (Date.now() - new Date(v.viewed_at).getTime()) / 1000;
-                          if (d < 60) return 'A l\'instant';
-                          if (d < 3600) return `${Math.floor(d / 60)} min`;
-                          if (d < 86400) return `${Math.floor(d / 3600)} h`;
-                          return `${Math.floor(d / 86400)} j`;
-                        })();
-                        return (
-                          <View style={s.viewerRow}>
-                            {v.avatar_url
-                              ? <Image source={{ uri: v.avatar_url }} style={s.viewerAvatar} />
-                              : <View style={[s.viewerAvatarFallback, { backgroundColor: accent }]}>
-                                  <Text style={s.viewerAvatarLetter}>{vName[0].toUpperCase()}</Text>
-                                </View>
-                            }
-                            <View style={s.viewerInfo}>
-                              <Text style={s.viewerName}>{vName}</Text>
-                              <Text style={s.viewerMeta}>@{v.username} · {vTime}</Text>
+
+                  {/* Contenu onglet Vues */}
+                  {viewersTab === 'views' && (
+                    viewersLoading ? (
+                      <ActivityIndicator color={accent} style={{ marginTop: 32 }} />
+                    ) : viewers.length === 0 ? (
+                      <View style={s.emptyBox}>
+                        <Icon name="eye-off" size={38} color="rgba(255,255,255,0.2)" />
+                        <Text style={s.emptyText}>Aucune vue pour l'instant</Text>
+                      </View>
+                    ) : (
+                      <FlatList
+                        data={viewers}
+                        keyExtractor={v => v.id}
+                        showsVerticalScrollIndicator={false}
+                        renderItem={({ item: v }) => {
+                          const vName = v.display_name ?? v.username ?? 'Utilisateur';
+                          const vTime = (() => {
+                            const d = (Date.now() - new Date(v.viewed_at).getTime()) / 1000;
+                            if (d < 60) return 'A l\'instant';
+                            if (d < 3600) return `${Math.floor(d / 60)} min`;
+                            if (d < 86400) return `${Math.floor(d / 3600)} h`;
+                            return `${Math.floor(d / 86400)} j`;
+                          })();
+                          return (
+                            <View style={s.viewerRow}>
+                              {v.avatar_url
+                                ? <Image source={{ uri: v.avatar_url }} style={s.viewerAvatar} />
+                                : <View style={[s.viewerAvatarFallback, { backgroundColor: accent }]}>
+                                    <Text style={s.viewerAvatarLetter}>{vName[0].toUpperCase()}</Text>
+                                  </View>
+                              }
+                              <View style={s.viewerInfo}>
+                                <Text style={s.viewerName}>{vName}</Text>
+                                <Text style={s.viewerMeta}>@{v.username} · {vTime}</Text>
+                              </View>
+                              <View style={s.viewerActions}>
+                                <TouchableOpacity
+                                  style={s.vActBtn}
+                                  onPress={() => { closeViewers(); onNavigateToChat?.(v.id, vName, v.avatar_url ?? undefined); }}
+                                >
+                                  <Icon name="message-circle" size={16} color="#fff" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[s.vActBtn, { backgroundColor: '#25D366' }]}
+                                  onPress={() => { closeViewers(); onNavigateToCall?.(v.id, vName, 'voice'); }}
+                                >
+                                  <Icon name="phone" size={16} color="#fff" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[s.vActBtn, { backgroundColor: accent }]}
+                                  onPress={() => { closeViewers(); onNavigateToCall?.(v.id, vName, 'video'); }}
+                                >
+                                  <Icon name="video" size={16} color="#fff" />
+                                </TouchableOpacity>
+                              </View>
                             </View>
-                            <View style={s.viewerActions}>
-                              <TouchableOpacity style={s.vActBtn} onPress={() => { closeViewers(); onNavigateToChat?.(v.id, vName, v.avatar_url ?? undefined); }}>
-                                <Icon name="message-circle" size={16} color="#fff" />
-                              </TouchableOpacity>
-                              <TouchableOpacity style={[s.vActBtn, { backgroundColor: '#25D366' }]} onPress={() => { closeViewers(); onNavigateToCall?.(v.id, vName, 'voice'); }}>
-                                <Icon name="phone" size={16} color="#fff" />
-                              </TouchableOpacity>
-                              <TouchableOpacity style={[s.vActBtn, { backgroundColor: accent }]} onPress={() => { closeViewers(); onNavigateToCall?.(v.id, vName, 'video'); }}>
-                                <Icon name="video" size={16} color="#fff" />
-                              </TouchableOpacity>
+                          );
+                        }}
+                      />
+                    )
+                  )}
+
+                  {/* Contenu onglet Réponses */}
+                  {viewersTab === 'replies' && (
+                    repliesLoading ? (
+                      <ActivityIndicator color={accent} style={{ marginTop: 32 }} />
+                    ) : replies.length === 0 ? (
+                      <View style={s.emptyBox}>
+                        <Icon name="message-circle" size={38} color="rgba(255,255,255,0.2)" />
+                        <Text style={s.emptyText}>Aucune réponse pour l'instant</Text>
+                      </View>
+                    ) : (
+                      <FlatList
+                        data={replies}
+                        keyExtractor={r => r.id}
+                        showsVerticalScrollIndicator={false}
+                        renderItem={({ item: r }) => {
+                          const rName = r.sender?.display_name ?? r.sender?.username ?? 'Utilisateur';
+                          const rTime = (() => {
+                            const d = (Date.now() - new Date(r.created_at).getTime()) / 1000;
+                            if (d < 60) return 'A l\'instant';
+                            if (d < 3600) return `${Math.floor(d / 60)} min`;
+                            if (d < 86400) return `${Math.floor(d / 3600)} h`;
+                            return `${Math.floor(d / 86400)} j`;
+                          })();
+                          return (
+                            <View style={s.viewerRow}>
+                              {r.sender?.avatar_url
+                                ? <Image source={{ uri: r.sender.avatar_url }} style={s.viewerAvatar} />
+                                : <View style={[s.viewerAvatarFallback, { backgroundColor: accent }]}>
+                                    <Text style={s.viewerAvatarLetter}>{rName[0].toUpperCase()}</Text>
+                                  </View>
+                              }
+                              <View style={s.viewerInfo}>
+                                <Text style={s.viewerName}>{rName}</Text>
+                                <Text style={s.replyContent} numberOfLines={2}>{r.content}</Text>
+                                <Text style={s.viewerMeta}>{rTime}</Text>
+                              </View>
+                              <View style={s.viewerActions}>
+                                <TouchableOpacity
+                                  style={s.vActBtn}
+                                  onPress={() => { closeViewers(); onNavigateToChat?.(r.sender.id, rName, r.sender?.avatar_url ?? undefined); }}
+                                >
+                                  <Icon name="message-circle" size={16} color="#fff" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[s.vActBtn, { backgroundColor: '#25D366' }]}
+                                  onPress={() => { closeViewers(); onNavigateToCall?.(r.sender.id, rName, 'voice'); }}
+                                >
+                                  <Icon name="phone" size={16} color="#fff" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[s.vActBtn, { backgroundColor: accent }]}
+                                  onPress={() => { closeViewers(); onNavigateToCall?.(r.sender.id, rName, 'video'); }}
+                                >
+                                  <Icon name="video" size={16} color="#fff" />
+                                </TouchableOpacity>
+                              </View>
                             </View>
-                          </View>
-                        );
-                      }}
-                    />
+                          );
+                        }}
+                      />
+                    )
                   )}
                 </View>
               </TouchableWithoutFeedback>
@@ -1046,7 +1168,7 @@ const s = StyleSheet.create({
   // ── Viewers panel ─────────────────────────────────────────────────────────────
   viewersPanel: {
     backgroundColor: '#12121E', borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    paddingBottom: 36, maxHeight: H * 0.72,
+    paddingBottom: 36, maxHeight: H * 0.75,
   },
   viewersPanelHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1054,6 +1176,24 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   viewersPanelTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
+
+  // Onglets Vues / Réponses
+  panelTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 4,
+  },
+  panelTab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 12,
+    borderBottomWidth: 2, borderBottomColor: 'transparent',
+  },
+  panelTabActive: {
+    borderBottomColor: 'transparent',
+  },
+  panelTabText: { fontSize: 13, fontWeight: '700' },
+  replyContent:  { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2, lineHeight: 17 },
   emptyBox: { alignItems: 'center', paddingVertical: 44, gap: 12 },
   emptyText:{ color: 'rgba(255,255,255,0.35)', fontSize: 14 },
 
