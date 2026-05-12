@@ -1843,81 +1843,124 @@ const CardContextMenu: React.FC<CardMenuProps> = ({
   item, colors, isSaved, isFollowing, isOwnContent, authorName,
   onClose, onSave, onShare, onFollow, onReport, onHide, onRemind, hasReminder,
 }) => {
-  const title = item.data?.title as string | undefined;
+  const isEvent = item.kind === 'event';
+  const title   = item.data?.title as string | undefined;
+  const typeLabel = isEvent ? 'Événement' : 'Concert';
 
-  const actions = [
+  // Groupe 1 — actions principales
+  const mainActions = [
     {
-      icon: 'bell' as const,
+      icon: hasReminder ? 'bell-off' : 'bell',
       label: hasReminder ? 'Annuler le rappel' : 'Me rappeler',
-      sublabel: hasReminder ? 'Rappel actif' : '1h avant l\'événement',
+      sublabel: hasReminder ? 'Rappel actif — 1h avant' : '1h avant le début',
       color: hasReminder ? colors.primary : colors.textPrimary,
+      accent: hasReminder,
       onPress: () => { onClose(); onRemind(); },
     },
     {
-      icon: 'bookmark' as const,
+      icon: 'bookmark',
       label: isSaved ? 'Retirer des favoris' : 'Sauvegarder',
-      sublabel: isSaved ? 'Dans vos favoris' : 'Accès hors-ligne',
-      color: isSaved ? colors.primary : colors.textPrimary,
+      sublabel: isSaved ? 'Dans vos favoris' : 'Retrouver plus tard',
+      color: isSaved ? '#F59E0B' : colors.textPrimary,
+      accent: isSaved,
       onPress: () => { onClose(); onSave(); },
     },
     {
-      icon: 'share-2' as const,
+      icon: 'share-2',
       label: 'Partager',
-      sublabel: null,
+      sublabel: 'Via les apps installées',
       color: colors.textPrimary,
+      accent: false,
       onPress: () => { onClose(); onShare(); },
     },
-    ...(!isOwnContent ? [{
-      icon: (isFollowing ? 'user-x' : 'user-plus') as any,
-      label: isFollowing ? `Ne plus suivre` : `Suivre ${authorName}`,
-      sublabel: null as null,
-      color: isFollowing ? '#EF4444' : colors.textPrimary,
-      onPress: () => { onClose(); onFollow(); },
-    }] : []),
-    ...(!isOwnContent ? [{
-      icon: 'eye-off' as any,
-      label: 'Pas intéressé',
-      sublabel: 'Masquer du fil' as null,
-      color: colors.textSecondary,
-      onPress: () => { onClose(); onHide(); },
-    }] : []),
-    ...(!isOwnContent ? [{
-      icon: 'flag' as any,
-      label: 'Signaler',
-      sublabel: null as null,
-      color: '#EF4444',
-      onPress: () => { onClose(); onReport(); },
-    }] : []),
   ];
+
+  // Groupe 2 — actions sur l'auteur (masquées si contenu propre)
+  const authorActions = !isOwnContent ? [
+    {
+      icon: isFollowing ? 'user-x' : 'user-plus',
+      label: isFollowing ? `Ne plus suivre ${authorName}` : `Suivre ${authorName}`,
+      sublabel: isFollowing ? 'Retirer du fil' : 'Voir ses prochains contenus',
+      color: isFollowing ? '#EF4444' : colors.textPrimary,
+      accent: !isFollowing,
+      onPress: () => { onClose(); onFollow(); },
+    },
+  ] : [];
+
+  // Groupe 3 — actions négatives
+  const negativeActions = !isOwnContent ? [
+    {
+      icon: 'eye-off',
+      label: 'Pas intéressé',
+      sublabel: `Masquer ce ${typeLabel.toLowerCase()} du fil`,
+      color: colors.textSecondary,
+      accent: false,
+      onPress: () => { onClose(); onHide(); },
+    },
+    {
+      icon: 'flag',
+      label: 'Signaler',
+      sublabel: 'Contenu inapproprié',
+      color: '#EF4444',
+      accent: false,
+      onPress: () => { onClose(); onReport(); },
+    },
+  ] : [];
+
+  const renderGroup = (actions: typeof mainActions) =>
+    actions.map((a, i) => (
+      <React.Fragment key={i}>
+        {i > 0 && <View style={[cm.divider, { backgroundColor: colors.divider }]} />}
+        <TouchableOpacity style={cm.action} onPress={a.onPress} activeOpacity={0.7}>
+          <View style={[cm.iconWrap, {
+            backgroundColor: a.accent ? a.color + '22' : colors.backgroundSecondary,
+          }]}>
+            <Icon name={a.icon as any} size={18} color={a.color} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[cm.actionText, { color: a.color }]}>{a.label}</Text>
+            <Text style={[cm.actionSub, { color: colors.textTertiary }]}>{a.sublabel}</Text>
+          </View>
+          <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+        </TouchableOpacity>
+      </React.Fragment>
+    ));
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={cm.overlay} activeOpacity={1} onPress={onClose}>
         <View style={[cm.sheet, { backgroundColor: colors.surface }]}>
           <View style={[cm.handle, { backgroundColor: colors.divider }]} />
+
+          {/* Titre de la carte */}
           {title ? (
-            <Text style={[cm.sheetTitle, { color: colors.textTertiary }]} numberOfLines={1}>
-              {title}
-            </Text>
+            <View style={[cm.titleRow, { borderBottomColor: colors.divider }]}>
+              <Icon name={isEvent ? 'calendar' : 'music'} size={13} color={colors.textTertiary} />
+              <Text style={[cm.sheetTitle, { color: colors.textTertiary }]} numberOfLines={1}>{title}</Text>
+            </View>
           ) : null}
-          {actions.map((a, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && <View style={[cm.divider, { backgroundColor: colors.divider }]} />}
-              <TouchableOpacity style={cm.action} onPress={a.onPress} activeOpacity={0.7}>
-                <View style={[cm.iconWrap, { backgroundColor: a.color + '18' }]}>
-                  <Icon name={a.icon} size={18} color={a.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[cm.actionText, { color: a.color }]}>{a.label}</Text>
-                  {a.sublabel ? (
-                    <Text style={[cm.actionSub, { color: colors.textTertiary }]}>{a.sublabel}</Text>
-                  ) : null}
-                </View>
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
+
+          {/* Groupe principal */}
+          <View style={[cm.group, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+            {renderGroup(mainActions)}
+          </View>
+
+          {/* Groupe auteur */}
+          {authorActions.length > 0 && (
+            <View style={[cm.group, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+              {renderGroup(authorActions)}
+            </View>
+          )}
+
+          {/* Groupe négatif */}
+          {negativeActions.length > 0 && (
+            <View style={[cm.group, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+              {renderGroup(negativeActions)}
+            </View>
+          )}
+
           <TouchableOpacity
-            style={[cm.cancelBtn, { backgroundColor: colors.backgroundSecondary }]}
+            style={[cm.cancelBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
             onPress={onClose}
           >
             <Text style={[cm.cancelText, { color: colors.textSecondary }]}>Annuler</Text>
@@ -1930,15 +1973,17 @@ const CardContextMenu: React.FC<CardMenuProps> = ({
 
 const cm = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet:      { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Platform.OS === 'ios' ? 34 : 20, paddingTop: 10 },
-  handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
-  sheetTitle: { fontSize: 12, textAlign: 'center', paddingHorizontal: 20, marginBottom: 6, paddingBottom: 10 },
-  action:     { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14 },
-  iconWrap:   { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  sheet:      { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: Platform.OS === 'ios' ? 36 : 20, paddingTop: 10, paddingHorizontal: 12, gap: 8 },
+  handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
+  titleRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 4 },
+  sheetTitle: { fontSize: 12, fontWeight: '600' },
+  group:      { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  action:     { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 13 },
+  iconWrap:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   actionText: { fontSize: 15, fontWeight: '500' },
-  divider:    { height: StyleSheet.hairlineWidth, marginHorizontal: 20 },
-  cancelBtn:  { marginHorizontal: 16, marginTop: 10, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  cancelText: { fontSize: 15, fontWeight: '600' },
+  divider:    { height: StyleSheet.hairlineWidth },
+  cancelBtn:  { borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, marginTop: 4 },
+  cancelText: { fontSize: 16, fontWeight: '600' },
   actionSub:  { fontSize: 12, marginTop: 1 },
 });
 
