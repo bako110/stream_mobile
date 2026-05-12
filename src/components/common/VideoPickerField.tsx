@@ -70,7 +70,7 @@ export const VideoPickerField: React.FC<VideoPickerFieldProps> = ({
 
   const handlePick = () => {
     launchImageLibrary(
-      { mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any },
+      { mediaType: 'video', selectionLimit: 1 },
       (response) => {
         if (response.didCancel) return;
         if (response.errorCode) {

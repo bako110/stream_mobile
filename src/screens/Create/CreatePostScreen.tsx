@@ -84,7 +84,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
       return;
     }
     launchImageLibrary(
-      { mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any },
+      { mediaType: 'video', selectionLimit: 1 },
       res => {
         if (res.didCancel || res.errorCode) return;
         const uri = res.assets?.[0]?.uri;

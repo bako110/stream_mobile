@@ -436,7 +436,7 @@ export const CommunityChatScreen: React.FC = () => {
   const handlePickVideo = async () => {
     setAttachOpen(false);
     try {
-      const result = await launchImageLibrary({ mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any });
+      const result = await launchImageLibrary({ mediaType: 'video', selectionLimit: 1 });
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
       setSending(true);

@@ -210,7 +210,7 @@ export async function uploadVideoFromUri(
 }
 
 export async function pickAndUploadVideo(folder: VideoFolder = 'reels'): Promise<{ video: UploadedVideo; localUri: string } | null> {
-  const options: ImageLibraryOptions = { mediaType: 'video', selectionLimit: 1, videoQuality: 'high' as any };
+  const options: ImageLibraryOptions = { mediaType: 'video', selectionLimit: 1 };
   return new Promise((resolve, reject) => {
     launchImageLibrary(options, async (response) => {
       if (response.didCancel) { resolve(null); return; }

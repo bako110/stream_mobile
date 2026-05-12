@@ -279,7 +279,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const pickVideo = async (source: 'gallery' | 'camera') => {
     try {
       const res = await (source === 'camera' ? launchCamera : launchImageLibrary)({
-        mediaType: 'video', selectionLimit: 1, videoQuality: 'high' as any,
+        mediaType: 'video', selectionLimit: 1,
       });
       if (res.didCancel || !res.assets?.[0]?.uri) return;
       const asset    = res.assets[0];

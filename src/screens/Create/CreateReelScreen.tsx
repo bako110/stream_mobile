@@ -44,7 +44,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   }, [videoPaused, videoLocalUri]);
 
   const handlePickVideo = () => {
-    launchImageLibrary({ mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any }, res => {
+    launchImageLibrary({ mediaType: 'video', selectionLimit: 1 }, res => {
       if (res.didCancel) return;
       if (res.errorCode) {
         Alert.alert('Erreur', res.errorMessage ?? 'Impossible de sélectionner la vidéo.');
