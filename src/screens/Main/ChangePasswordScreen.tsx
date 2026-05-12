@@ -21,7 +21,7 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
   const [current,      setCurrent]      = useState('');
   const [newPwd,       setNewPwd]       = useState('');
   const [confirm,      setConfirm]      = useState('');
-  const [verifying,    setVerifying]    = useState(false);
+  const [verifying]                      = useState(false);
   const [saving,       setSaving]       = useState(false);
   const [showCurrent,  setShowCurrent]  = useState(false);
   const [showNew,      setShowNew]      = useState(false);
@@ -41,22 +41,10 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
     });
   };
 
-  // Étape 1 — vérifier le mot de passe actuel via l'API
-  const handleVerify = async () => {
+  // Étape 1 — validation locale uniquement, pas d'appel API
+  const handleVerify = () => {
     if (!current.trim()) return;
-    setVerifying(true);
-    try {
-      // On tente un changement fictif pour vérifier — en fait on appelle
-      // directement l'endpoint avec un nouveau = actuel pour valider, NON.
-      // On utilise une tentative de login pour valider le mot de passe actuel.
-      // Le backend renverra 401 si incorrect.
-      await authService.verifyPassword(current);
-      goToStep2();
-    } catch {
-      Alert.alert('Mot de passe incorrect', 'Le mot de passe actuel saisi est incorrect.');
-    } finally {
-      setVerifying(false);
-    }
+    goToStep2();
   };
 
   // Étape 2 — enregistrer le nouveau mot de passe

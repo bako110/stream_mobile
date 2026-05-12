@@ -6,12 +6,16 @@ import { LoginScreen }          from '../screens/Auth/LoginScreen';
 import { RegisterScreen }       from '../screens/Auth/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/Auth/ForgotPasswordScreen';
 import { SocialLoginScreen }    from '../screens/Auth/SocialLoginScreen';
+import { CGUScreen }                      from '../screens/Main/CGUScreen';
+import { PolitiqueConfidentialiteScreen } from '../screens/Main/PolitiqueConfidentialiteScreen';
 
 export type AuthStackParamList = {
   Login:          undefined;
   Register:       undefined;
   ForgotPassword: undefined;
   SocialLogin:    undefined;
+  CGU:                      undefined;
+  PolitiqueConfidentialite: undefined;
 };
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
@@ -29,6 +33,8 @@ const LoginWrapper: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSuccess }
       onGoRegister={() => nav.navigate('Register')}
       onGoForgotPassword={() => nav.navigate('ForgotPassword')}
       onGoSocialLogin={() => nav.navigate('SocialLogin')}
+      onGoCGU={() => nav.navigate('CGU')}
+      onGoPrivacy={() => nav.navigate('PolitiqueConfidentialite')}
     />
   );
 };
@@ -77,6 +83,12 @@ export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess }) => (
     </Stack.Screen>
     <Stack.Screen name="SocialLogin" options={{ animation: 'slide_from_bottom', presentation: 'modal' }}>
       {() => <SocialLoginWrapper onAuthSuccess={onAuthSuccess} />}
+    </Stack.Screen>
+    <Stack.Screen name="CGU" options={{ animation: 'slide_from_right' }}>
+      {({ navigation }) => <CGUScreen onBack={() => navigation.goBack()} />}
+    </Stack.Screen>
+    <Stack.Screen name="PolitiqueConfidentialite" options={{ animation: 'slide_from_right' }}>
+      {({ navigation }) => <PolitiqueConfidentialiteScreen onBack={() => navigation.goBack()} />}
     </Stack.Screen>
   </Stack.Navigator>
 );

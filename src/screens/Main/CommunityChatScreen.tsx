@@ -130,6 +130,8 @@ export const CommunityChatScreen: React.FC = () => {
   const [communityTitle,    setCommunityTitle]    = useState(communityName);
   const [communityVerified, setCommunityVerified] = useState(false);
   const [typingUsers,    setTypingUsers]    = useState<TypingUser[]>([]);
+  const [recordingUsers, setRecordingUsers] = useState<TypingUser[]>([]);
+  const recordingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [imgViewerList,  setImgViewerList]  = useState<string[]>([]);
   const [imgViewerIdx,   setImgViewerIdx]   = useState(0);
   const [imgViewerOpen,  setImgViewerOpen]  = useState(false);
@@ -188,7 +190,7 @@ export const CommunityChatScreen: React.FC = () => {
   }, [text]);
 
   // ── WebSocket ──────────────────────────────────────────────────────────────
-  const { sendWsMessage, sendTyping, isConnected, onlineCount } = useCommunityWebSocket(
+  const { sendWsMessage, sendTyping, sendRecording, isConnected, onlineCount } = useCommunityWebSocket(
     communityId,
     useCallback((payload: CommunityWsPayload) => {
       if (payload.type === 'community_message' || payload.type === 'community_message_sent' || payload.type === 'community_announcement') {
@@ -239,6 +241,16 @@ export const CommunityChatScreen: React.FC = () => {
           if (typingTimers.current[user_id]) clearTimeout(typingTimers.current[user_id]);
           setTypingUsers(p => p.filter(u => u.user_id !== user_id));
         }
+      } else if (payload.type === 'recording') {
+        const { user_id, is_recording } = payload;
+        if (is_recording) {
+          setRecordingUsers(prev => prev.some(u => u.user_id === user_id) ? prev : [...prev, { user_id, username: payload.username ?? null, display_name: payload.display_name ?? null }]);
+          if (recordingTimers.current[user_id]) clearTimeout(recordingTimers.current[user_id]);
+          recordingTimers.current[user_id] = setTimeout(() => setRecordingUsers(p => p.filter(u => u.user_id !== user_id)), 30000);
+        } else {
+          if (recordingTimers.current[user_id]) clearTimeout(recordingTimers.current[user_id]);
+          setRecordingUsers(p => p.filter(u => u.user_id !== user_id));
+        }
       } else if (payload.type === 'community_member_joined') {
         const name = payload.display_name || payload.username || 'Un membre';
         const sys = makeSystemMsg('joined', name);
@@ -258,6 +270,7 @@ export const CommunityChatScreen: React.FC = () => {
         });
       } else if (payload.type === 'community_member_left') {
         setTypingUsers(p => p.filter(u => u.user_id !== payload.user_id));
+        setRecordingUsers(p => p.filter(u => u.user_id !== payload.user_id));
       } else if (payload.type === 'community_updated') {
         setCommunityTitle(payload.name);
       } else if (payload.type === 'community_verified') {
@@ -330,6 +343,7 @@ export const CommunityChatScreen: React.FC = () => {
 
   useEffect(() => () => {
     Object.values(typingTimers.current).forEach(clearTimeout);
+    Object.values(recordingTimers.current).forEach(clearTimeout);
     if (typingDebounce.current) clearTimeout(typingDebounce.current);
   }, []);
 
@@ -454,19 +468,21 @@ export const CommunityChatScreen: React.FC = () => {
     try {
       setIsRecording(true);
       setRecordTime('0:00');
+      sendRecording(true);
       await audioRecorderCommunity.startRecorder(undefined, undefined, true);
       audioRecorderCommunity.addRecordBackListener((e: any) => {
         const totalSec = Math.floor(e.currentPosition / 1000);
         const m = Math.floor(totalSec / 60), s = totalSec % 60;
         setRecordTime(`${m}:${s.toString().padStart(2, '0')}`);
       });
-    } catch { setIsRecording(false); }
+    } catch { setIsRecording(false); sendRecording(false); }
   };
 
   const stopAndSendRecording = async () => {
     try {
       const result = await audioRecorderCommunity.stopRecorder();
       audioRecorderCommunity.removeRecordBackListener();
+      sendRecording(false);
       setIsRecording(false);
       if (!result) return;
       setSending(true);
@@ -486,6 +502,7 @@ export const CommunityChatScreen: React.FC = () => {
       await audioRecorderCommunity.stopRecorder();
       audioRecorderCommunity.removeRecordBackListener();
     } catch {}
+    sendRecording(false);
     setIsRecording(false);
   };
 
@@ -740,14 +757,6 @@ export const CommunityChatScreen: React.FC = () => {
   const openViewer = (list: string[], idx: number) => {
     setImgViewerList(list); setImgViewerIdx(idx); setImgViewerOpen(true);
   };
-
-  const typingText = (() => {
-    if (!typingUsers.length) return null;
-    const names = typingUsers.map(u => u.display_name || u.username || '…');
-    if (names.length === 1) return `${names[0]} écrit…`;
-    if (names.length === 2) return `${names[0]} et ${names[1]} écrivent…`;
-    return `${names[0]} et ${names.length - 1} autres écrivent…`;
-  })();
 
   // ══════════════════════════════════════════════════════════════════════════
   // ── Composants de rendu ───────────────────────────────────────────────────
@@ -1333,15 +1342,6 @@ export const CommunityChatScreen: React.FC = () => {
               windowSize={10}
             />
 
-            {/* Typing */}
-            {typingText && (
-              <View style={[S.typingRow, { backgroundColor: colors.surface }]}>
-                <View style={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
-                  {[0,1,2].map(i => <View key={i} style={[S.typingDot, { backgroundColor: colors.textTertiary }]} />)}
-                </View>
-                <Text style={[S.typingText, { color: colors.textTertiary }]}>{typingText}</Text>
-              </View>
-            )}
 
             {/* Reply banner */}
             {replyingTo && (
@@ -1398,6 +1398,19 @@ export const CommunityChatScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
               ) : (
+                <>
+                {(typingUsers.length > 0 || recordingUsers.length > 0) && !isRecording && (
+                  <View style={[S.partnerStatusBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+                    <View style={S.typingDotsRow}>
+                      {[0, 1, 2].map(i => <View key={i} style={[S.typingDot, { backgroundColor: colors.textTertiary }]} />)}
+                    </View>
+                    <Text style={[S.partnerStatusText, { color: colors.textTertiary }]}>
+                      {recordingUsers.length > 0
+                        ? `${recordingUsers[0].display_name || recordingUsers[0].username || 'Quelqu\'un'} enregistre un vocal…`
+                        : `${typingUsers[0].display_name || typingUsers[0].username || 'Quelqu\'un'} est en train d'écrire…`}
+                    </Text>
+                  </View>
+                )}
                 <View style={[S.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
                   <View style={[S.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                     {activeTab === 'discussion' && (
@@ -1459,6 +1472,7 @@ export const CommunityChatScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
                 </View>
+                </>
               )
             }
           </>
@@ -2023,10 +2037,6 @@ const S = StyleSheet.create({
   emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
   // Typing
-  typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 6 },
-  typingDot: { width: 5, height: 5, borderRadius: 3, opacity: 0.6 },
-  typingText: { fontSize: 12, fontStyle: 'italic', flex: 1 },
-
   // Reply/Edit banners
   replyBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderLeftWidth: 3 },
   replyBannerName: { fontSize: 12, fontWeight: '700' },
@@ -2109,6 +2119,11 @@ const S = StyleSheet.create({
   audioIconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   audioName:    { fontSize: 13, fontWeight: '600' },
   audioMeta:    { fontSize: 11, marginTop: 2 },
+
+  partnerStatusBar:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  typingDotsRow:     { flexDirection: 'row', gap: 3, alignItems: 'center' },
+  typingDot:         { width: 5, height: 5, borderRadius: 3 },
+  partnerStatusText: { fontSize: 12, fontStyle: 'italic' },
 
   // Recording bar
   recordingBar:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth },

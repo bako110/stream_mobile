@@ -49,7 +49,7 @@ const FONT_STYLES: {
 ];
 
 type StoryMode = 'text' | 'image' | 'video' | 'voice';
-type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'preview' | 'audience';
+type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'preview';
 
 interface ModeOption {
   key:       StoryMode;
@@ -188,10 +188,12 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   // ── Audience ──────────────────────────────────────────────────────────────
   const [audienceType,    setAudienceType]    = useState<StoryAudienceType>('everyone');
-  const [selectedUsers,   setSelectedUsers]   = useState<string[]>([]);  // user_ids
+  const [selectedUsers,   setSelectedUsers]   = useState<string[]>([]);
   const [contacts,        setContacts]        = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
   const [myId,            setMyId]            = useState<string | null>(null);
+  const [showAudienceSheet, setShowAudienceSheet] = useState(false);
+  const [contactSearch,     setContactSearch]     = useState('');
 
   const videoActive = mode === 'video' && !!localUri;
 
@@ -213,9 +215,11 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   const goBack = () => {
     stopAudioPreview();
-    if (step === 'audience') {
-      setStep('preview');
-    } else if (step === 'preview') {
+    if (showAudienceSheet) {
+      setShowAudienceSheet(false);
+      return;
+    }
+    if (step === 'preview') {
       if (mode === 'text')       { setStep('pick_mode'); setCaption(''); }
       else if (mode === 'voice') { setStep('record_voice'); setAudioUri(null); }
       else { setLocalUri(null); setAudioUri(null); setStep('pick_media'); }
@@ -228,10 +232,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     }
   };
 
-  // Charger les contacts (followers + following) quand on ouvre l'audience picker
-  const openAudiencePicker = async () => {
-    setStep('audience');
-    if (contacts.length > 0) return; // déjà chargés
+  const openAudienceSheet = async () => {
+    setShowAudienceSheet(true);
+    if (contacts.length > 0) return;
     setContactsLoading(true);
     try {
       const me = await authService.getMe();
@@ -797,12 +800,25 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                   <Text style={[s.addTextLabel, audioUri && { color: '#7B3FF2' }]}>Son</Text>
                 </TouchableOpacity>
               )}
+
+              {/* Chip audience */}
+              <TouchableOpacity style={s.audienceChip} onPress={openAudienceSheet} activeOpacity={0.75}>
+                <Icon
+                  name={audienceType === 'everyone' ? 'globe' : audienceType === 'selected' ? 'users' : 'eye-off'}
+                  size={13}
+                  color="#fff"
+                />
+                <Text style={s.audienceChipLabel}>
+                  {audienceType === 'everyone' ? 'Tous' : audienceType === 'selected' ? `${selectedUsers.length || '?'} pers.` : `Sauf ${selectedUsers.length || '?'}`}
+                </Text>
+                <Icon name="chevron-down" size={11} color="rgba(255,255,255,0.7)" />
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
               style={[s.publishBtn, (mode === 'text' && !caption.trim()) && { opacity: 0.4 }]}
-              onPress={openAudiencePicker}
-              disabled={mode === 'text' && !caption.trim()}
+              onPress={handlePublish}
+              disabled={uploading || (mode === 'text' && !caption.trim())}
               activeOpacity={0.85}
             >
               <LinearGradient
@@ -810,11 +826,150 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={s.publishBtnInner}
               >
-                <Text style={s.publishLabel}>Suivant</Text>
-                <Icon name="chevron-right" size={15} color="#fff" />
+                {uploading ? (
+                  <View style={{ alignItems: 'center', minWidth: 100 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <ActivityIndicator size={12} color="#fff" />
+                      <Text style={[s.publishLabel, { fontSize: 11 }]}>{uploadStep}</Text>
+                    </View>
+                    <View style={{ width: 100, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }}>
+                      <View style={{ width: `${uploadPct}%` as any, height: 3, backgroundColor: '#fff', borderRadius: 2 }} />
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Icon name="send" size={14} color="#fff" />
+                    <Text style={s.publishLabel}>Publier</Text>
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>
+
+          {/* Audience bottom sheet inline */}
+          {showAudienceSheet && (
+            <Animated.View entering={FadeInDown.duration(220)} style={s.audSheet}>
+              {/* Drag handle */}
+              <View style={s.audHandle} />
+
+              <Text style={s.audSheetTitle}>Qui peut voir cette story ?</Text>
+
+              {/* 3 options */}
+              <View style={s.audOptions}>
+                {([
+                  { key: 'everyone', icon: 'globe',   label: 'Tout le monde',   sub: 'Tous vos abonnes' },
+                  { key: 'except',   icon: 'eye-off',  label: 'Sauf...',          sub: 'Tout le monde sauf certains' },
+                  { key: 'selected', icon: 'users',    label: 'Seulement...',     sub: 'Uniquement les personnes choisies' },
+                ] as { key: StoryAudienceType; icon: string; label: string; sub: string }[]).map(opt => {
+                  const active = audienceType === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[s.audOptRow, active && s.audOptRowActive]}
+                      onPress={() => { setAudienceType(opt.key); if (opt.key === 'everyone') setSelectedUsers([]); }}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[s.audOptIcon, active && s.audOptIconActive]}>
+                        <Icon name={opt.icon} size={18} color={active ? '#7B3FF2' : 'rgba(255,255,255,0.7)'} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.audOptLabel, active && { color: '#fff' }]}>{opt.label}</Text>
+                        <Text style={s.audOptSub}>{opt.sub}</Text>
+                      </View>
+                      {active && <Icon name="check-circle" size={18} color="#7B3FF2" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Liste contacts si selected/except */}
+              {audienceType !== 'everyone' && (
+                <View style={s.audContactsWrap}>
+                  <Text style={s.audContactsLabel}>
+                    {audienceType === 'except' ? 'EXCLURE' : 'INCLURE'}
+                    {selectedUsers.length > 0 && `  •  ${selectedUsers.length} selectionne(s)`}
+                  </Text>
+                  {contactsLoading ? (
+                    <ActivityIndicator color="#7B3FF2" style={{ marginVertical: 16 }} />
+                  ) : contacts.length === 0 ? (
+                    <Text style={s.audEmpty}>Aucun abonne trouve</Text>
+                  ) : (
+                    <>
+                      {/* Champ de recherche */}
+                      <View style={s.audSearchRow}>
+                        <Icon name="search" size={14} color="rgba(255,255,255,0.4)" />
+                        <TextInput
+                          style={s.audSearchInput}
+                          placeholder="Rechercher..."
+                          placeholderTextColor="rgba(255,255,255,0.3)"
+                          value={contactSearch}
+                          onChangeText={setContactSearch}
+                          autoCorrect={false}
+                          autoCapitalize="none"
+                        />
+                        {contactSearch.length > 0 && (
+                          <TouchableOpacity onPress={() => setContactSearch('')}>
+                            <Icon name="x" size={13} color="rgba(255,255,255,0.4)" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      <ScrollView style={s.audContactsList} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                        {contacts
+                          .filter(c => c.name.toLowerCase().includes(contactSearch.toLowerCase()))
+                          .map((c, i, arr) => {
+                            const checked = selectedUsers.includes(c.id);
+                            return (
+                              <TouchableOpacity
+                                key={c.id}
+                                style={[s.audContactRow, i < arr.length - 1 && s.audContactRowBorder]}
+                                onPress={() => toggleUser(c.id)}
+                                activeOpacity={0.7}
+                              >
+                                {c.avatar_url ? (
+                                  <Image source={{ uri: c.avatar_url }} style={s.audAvatar} />
+                                ) : (
+                                  <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.audAvatarFallback}>
+                                    <Text style={s.audAvatarInitial}>{(c.name[0] ?? '?').toUpperCase()}</Text>
+                                  </LinearGradient>
+                                )}
+                                <Text style={s.audContactName} numberOfLines={1}>{c.name}</Text>
+                                <View style={[s.audCheckbox, checked && s.audCheckboxOn]}>
+                                  {checked && <Icon name="check" size={12} color="#fff" />}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        {contacts.filter(c => c.name.toLowerCase().includes(contactSearch.toLowerCase())).length === 0 && (
+                          <Text style={s.audEmpty}>Aucun resultat</Text>
+                        )}
+                      </ScrollView>
+                    </>
+                  )}
+                </View>
+              )}
+
+              {/* Fermer le sheet */}
+              <TouchableOpacity style={s.audDoneBtn} onPress={() => { setShowAudienceSheet(false); setContactSearch(''); }} activeOpacity={0.8}>
+                <Text style={s.audDoneLabel}>
+                  {audienceType === 'everyone'
+                    ? 'Confirmer'
+                    : selectedUsers.length === 0
+                      ? 'Selectionnez au moins une personne'
+                      : 'Confirmer'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
+          {/* Overlay tap-to-close audience sheet */}
+          {showAudienceSheet && (
+            <TouchableOpacity
+              style={s.audOverlay}
+              activeOpacity={1}
+              onPress={() => { setShowAudienceSheet(false); setContactSearch(''); }}
+            />
+          )}
 
           {/* Saisie texte */}
           {showTextInput && (
@@ -843,134 +998,6 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           )}
 
           <SuccessOverlay visible={showSuccess} />
-        </View>
-      )}
-
-      {/* ══════════════ STEP AUDIENCE ════════════════════════════════════════ */}
-      {step === 'audience' && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, zIndex: 1 }]}>
-          <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-
-          {/* Header */}
-          <View style={[aud.header, { paddingTop: Platform.OS === 'android' ? 48 : 56, borderBottomColor: colors.divider }]}>
-            <TouchableOpacity onPress={goBack} style={aud.backBtn}>
-              <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={[aud.title, { color: colors.textPrimary }]}>Qui peut voir ?</Text>
-            <View style={{ width: 40 }} />
-          </View>
-
-          <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-
-            {/* Trois options d'audience */}
-            <View style={{ padding: 16, gap: 10 }}>
-              {([
-                { key: 'everyone', icon: 'globe',  label: 'Tout le monde',     sub: 'Tous vos abonnés peuvent voir ce statut' },
-                { key: 'except',   icon: 'eye-off', label: 'Sauf...',           sub: 'Tout le monde sauf les personnes sélectionnées' },
-                { key: 'selected', icon: 'users',   label: 'Seulement...',      sub: 'Uniquement les personnes sélectionnées' },
-              ] as { key: StoryAudienceType; icon: string; label: string; sub: string }[]).map(opt => {
-                const active = audienceType === opt.key;
-                return (
-                  <TouchableOpacity
-                    key={opt.key}
-                    style={[aud.optCard, { backgroundColor: colors.surface, borderColor: active ? colors.primary : colors.divider, borderWidth: active ? 2 : StyleSheet.hairlineWidth }]}
-                    onPress={() => { setAudienceType(opt.key); if (opt.key === 'everyone') setSelectedUsers([]); }}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[aud.optIcon, { backgroundColor: active ? colors.primary + '20' : colors.backgroundSecondary }]}>
-                      <Icon name={opt.icon} size={20} color={active ? colors.primary : colors.textSecondary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[aud.optLabel, { color: colors.textPrimary }]}>{opt.label}</Text>
-                      <Text style={[aud.optSub, { color: colors.textTertiary }]}>{opt.sub}</Text>
-                    </View>
-                    {active && <Icon name="check-circle" size={20} color={colors.primary} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Liste des contacts si selected ou except */}
-            {audienceType !== 'everyone' && (
-              <View style={{ paddingHorizontal: 16 }}>
-                <Text style={[aud.contactsLabel, { color: colors.textTertiary }]}>
-                  {audienceType === 'except' ? 'SÉLECTIONNER LES PERSONNES À EXCLURE' : 'SÉLECTIONNER LES PERSONNES'}
-                  {selectedUsers.length > 0 && ` (${selectedUsers.length})`}
-                </Text>
-
-                {contactsLoading ? (
-                  <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} />
-                ) : contacts.length === 0 ? (
-                  <View style={aud.emptyContacts}>
-                    <Icon name="users" size={32} color={colors.textTertiary} />
-                    <Text style={[{ fontSize: 14, color: colors.textTertiary, textAlign: 'center' }]}>
-                      Aucun abonné trouvé
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[aud.contactsList, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
-                    {contacts.map((c, i) => {
-                      const checked = selectedUsers.includes(c.id);
-                      return (
-                        <TouchableOpacity
-                          key={c.id}
-                          style={[aud.contactRow, i < contacts.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}
-                          onPress={() => toggleUser(c.id)}
-                          activeOpacity={0.7}
-                        >
-                          {c.avatar_url ? (
-                            <Image source={{ uri: c.avatar_url }} style={aud.avatar} />
-                          ) : (
-                            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={aud.avatarFallback}>
-                              <Text style={aud.avatarInitial}>{(c.name[0] ?? '?').toUpperCase()}</Text>
-                            </LinearGradient>
-                          )}
-                          <Text style={[aud.contactName, { color: colors.textPrimary }]} numberOfLines={1}>{c.name}</Text>
-                          <View style={[aud.checkbox, { borderColor: checked ? colors.primary : colors.border, backgroundColor: checked ? colors.primary : 'transparent' }]}>
-                            {checked && <Icon name="check" size={13} color="#fff" />}
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            )}
-          </ScrollView>
-
-          {/* Bouton Publier final */}
-          <View style={[aud.footer, { borderTopColor: colors.divider, backgroundColor: colors.background }]}>
-            {audienceType !== 'everyone' && selectedUsers.length === 0 && (
-              <Text style={[aud.footerHint, { color: colors.textTertiary }]}>
-                Sélectionnez au moins une personne
-              </Text>
-            )}
-            <TouchableOpacity
-              style={[aud.publishBtn, { opacity: (audienceType !== 'everyone' && selectedUsers.length === 0) ? 0.4 : 1 }]}
-              onPress={handlePublish}
-              disabled={uploading || (audienceType !== 'everyone' && selectedUsers.length === 0)}
-              activeOpacity={0.85}
-            >
-              <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={aud.publishBtnInner}>
-                {uploading ? (
-                  <View style={{ alignItems: 'center', minWidth: 140 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <ActivityIndicator size={14} color="#fff" />
-                      <Text style={[aud.publishLabel, { fontSize: 12 }]}>{uploadStep}</Text>
-                    </View>
-                    <View style={{ width: 140, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }}>
-                      <View style={{ width: `${uploadPct}%` as any, height: 3, backgroundColor: '#fff', borderRadius: 2 }} />
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    <Icon name="send" size={15} color="#fff" />
-                    <Text style={aud.publishLabel}>Publier</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
         </View>
       )}
     </Modal>
@@ -1232,48 +1259,85 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
   },
   successBadgeText: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
-});
 
-// ── Styles audience picker ────────────────────────────────────────────────────
-
-const aud = StyleSheet.create({
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth,
+  // ── Audience chip (bottom bar) ────────────────────────────────────────────────
+  audienceChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 9, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
   },
-  backBtn:  { width: 40, alignItems: 'flex-start' },
-  title:    { fontSize: 18, fontWeight: '700' },
+  audienceChipLabel: { color: '#fff', fontSize: 12, fontWeight: '600' },
 
-  optCard: {
+  // ── Audience bottom sheet ─────────────────────────────────────────────────────
+  audOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    zIndex: 10,
+  },
+  audSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: '#1A1A2E',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    zIndex: 11,
+    maxHeight: H * 0.75,
+  },
+  audHandle: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center', marginTop: 10, marginBottom: 14,
+  },
+  audSheetTitle: {
+    fontSize: 15, fontWeight: '700', color: '#fff',
+    paddingHorizontal: 20, marginBottom: 12,
+  },
+  audOptions: { paddingHorizontal: 14, gap: 8 },
+  audOptRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    borderRadius: 14, padding: 14,
+    borderRadius: 14, padding: 13,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  optIcon:  { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  optLabel: { fontSize: 15, fontWeight: '700' },
-  optSub:   { fontSize: 12, marginTop: 2 },
+  audOptRowActive: { backgroundColor: 'rgba(123,63,242,0.18)', borderWidth: 1, borderColor: 'rgba(123,63,242,0.5)' },
+  audOptIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  audOptIconActive: { backgroundColor: 'rgba(123,63,242,0.25)' },
+  audOptLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
+  audOptSub:   { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
 
-  contactsLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7, marginBottom: 10, marginTop: 8 },
-  contactsList:  { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  contactRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
+  audContactsWrap: { paddingHorizontal: 14, marginTop: 16 },
+  audContactsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, color: 'rgba(255,255,255,0.4)', marginBottom: 8 },
+  audSearchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    marginBottom: 10,
   },
-  avatar:        { width: 42, height: 42, borderRadius: 21 },
-  avatarFallback:{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  contactName:   { flex: 1, fontSize: 14, fontWeight: '500' },
-  checkbox: {
-    width: 24, height: 24, borderRadius: 12, borderWidth: 2,
+  audSearchInput: { flex: 1, color: '#fff', fontSize: 13, padding: 0 },
+  audContactsList:  { maxHeight: 200 },
+  audContactRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 10,
+  },
+  audContactRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  audAvatar:        { width: 38, height: 38, borderRadius: 19 },
+  audAvatarFallback:{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  audAvatarInitial: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  audContactName:   { flex: 1, fontSize: 13, fontWeight: '500', color: '#fff' },
+  audCheckbox: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center', justifyContent: 'center',
   },
-  emptyContacts: { alignItems: 'center', paddingVertical: 40, gap: 10 },
+  audCheckboxOn: { backgroundColor: '#7B3FF2', borderColor: '#7B3FF2' },
+  audEmpty: { fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', paddingVertical: 20 },
 
-  footer: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 16, borderTopWidth: StyleSheet.hairlineWidth, gap: 8,
+  audDoneBtn: {
+    marginHorizontal: 14, marginTop: 16,
+    backgroundColor: '#7B3FF2', borderRadius: 14,
+    paddingVertical: 14, alignItems: 'center',
   },
-  footerHint:     { textAlign: 'center', fontSize: 12 },
-  publishBtn:     { borderRadius: 14, overflow: 'hidden' },
-  publishBtnInner:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
-  publishLabel:   { color: '#fff', fontSize: 15, fontWeight: '800' },
+  audDoneLabel: { color: '#fff', fontSize: 14, fontWeight: '800' },
 });

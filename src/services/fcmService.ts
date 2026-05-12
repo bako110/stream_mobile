@@ -7,7 +7,16 @@
  * Call setupFCM() once after login.
  * Call removeFCMToken() on logout.
  */
-import messaging from '@react-native-firebase/messaging';
+import {
+  getMessaging,
+  requestPermission,
+  getToken,
+  onTokenRefresh,
+  onMessage,
+  onNotificationOpenedApp,
+  getInitialNotification,
+  deleteToken,
+} from '@react-native-firebase/messaging';
 import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import notifee, {
   AndroidImportance,
@@ -19,11 +28,13 @@ import { Platform } from 'react-native';
 import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 import { navigate } from '../navigation/navigationRef';
+import { storage } from '../utils/storage';
+import { STORAGE_KEYS } from '../utils/constants';
 
 // ── Channel IDs — incrémenter le suffixe pour forcer recréation si besoin ─────
-const CHANNEL_CALLS    = 'incoming_calls_v3';
-const CHANNEL_MESSAGES = 'messages_v3';
-const CHANNEL_NOTIFS   = 'notifications_v3';
+const CHANNEL_CALLS    = 'incoming_calls_v6';
+const CHANNEL_MESSAGES = 'messages_v6';
+const CHANNEL_NOTIFS   = 'notifications_v6';
 
 async function _createChannels(): Promise<void> {
   if (Platform.OS !== 'android') return;
@@ -35,6 +46,15 @@ async function _createChannels(): Promise<void> {
   await notifee.deleteChannel('incoming_calls_v2').catch(() => {});
   await notifee.deleteChannel('messages_v2').catch(() => {});
   await notifee.deleteChannel('notifications_v2').catch(() => {});
+  await notifee.deleteChannel('incoming_calls_v3').catch(() => {});
+  await notifee.deleteChannel('messages_v3').catch(() => {});
+  await notifee.deleteChannel('notifications_v3').catch(() => {});
+  await notifee.deleteChannel('incoming_calls_v4').catch(() => {});
+  await notifee.deleteChannel('messages_v4').catch(() => {});
+  await notifee.deleteChannel('notifications_v4').catch(() => {});
+  await notifee.deleteChannel('incoming_calls_v5').catch(() => {});
+  await notifee.deleteChannel('messages_v5').catch(() => {});
+  await notifee.deleteChannel('notifications_v5').catch(() => {});
 
   await notifee.createChannel({
     id:               CHANNEL_CALLS,
@@ -43,7 +63,7 @@ async function _createChannels(): Promise<void> {
     visibility:       AndroidVisibility.PUBLIC,
     vibration:        true,
     vibrationPattern: [500, 300, 500, 300],
-    sound:            'default',
+    sound:            'incoming_call',
   });
   await notifee.createChannel({
     id:               CHANNEL_MESSAGES,
@@ -52,7 +72,7 @@ async function _createChannels(): Promise<void> {
     visibility:       AndroidVisibility.PRIVATE,
     vibration:        true,
     vibrationPattern: [300, 200, 300, 200],
-    sound:            'default',
+    sound:            'message_sound',
   });
   await notifee.createChannel({
     id:               CHANNEL_NOTIFS,
@@ -61,7 +81,7 @@ async function _createChannels(): Promise<void> {
     visibility:       AndroidVisibility.PRIVATE,
     vibration:        true,
     vibrationPattern: [250, 250],
-    sound:            'default',
+    sound:            'notification_sound',
   });
 }
 
@@ -75,7 +95,7 @@ export async function showIncomingCallNotification(
   await notifee.displayNotification({
     id:    `call_${callerId}`,
     title: callerName,
-    body:  callType === 'video' ? 'Appel vidéo entrant' : 'Appel vocal entrant',
+    body:  callType === 'video' ? 'Appel vidéo' : 'Appel vocal',
     android: {
       channelId:        CHANNEL_CALLS,
       category:         AndroidCategory.CALL,
@@ -87,16 +107,16 @@ export async function showIncomingCallNotification(
       },
       actions: [
         {
-          title:    '❌ Refuser',
+          title:    'Refuser',
           pressAction: { id: 'decline' },
         },
         {
-          title:    '✅ Accepter',
+          title:    'Accepter',
           pressAction: { id: 'accept', launchActivity: 'default' },
         },
       ],
       pressAction: { id: 'default', launchActivity: 'default' },
-      sound: 'default',
+      sound: 'incoming_call',
     },
     data: {
       type:        'call_offer',
@@ -118,13 +138,37 @@ export function setupNotifeeBackgroundHandler(): void {
   notifee.onBackgroundEvent(async ({ type, detail }) => {
     if (type === EventType.ACTION_PRESS) {
       const actionId = detail.pressAction?.id;
-      const data     = detail.notification?.data;
+      const data     = detail.notification?.data as Record<string, string> | undefined;
+
+      await notifee.cancelNotification(detail.notification!.id!);
+
       if (actionId === 'decline') {
-        await notifee.cancelNotification(detail.notification!.id!);
-      } else if (actionId === 'accept' || actionId === 'default') {
-        await notifee.cancelNotification(detail.notification!.id!);
-        // App will open — navigate handled by getInitialNotification
+        // Rejeter via REST avec le token stocké dans MMKV
+        if (data?.caller_id) {
+          try {
+            const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+            if (token) {
+              const { API_BASE_URL } = require('../utils/constants');
+              await fetch(`${API_BASE_URL}/api/v1/messages/call/reject`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body:    JSON.stringify({ caller_id: data.caller_id }),
+              });
+            }
+          } catch {}
+        }
+      } else if (actionId === 'accept') {
+        // Stocker l'intention dans MMKV — l'app la lira au démarrage
+        if (data) {
+          storage.setItem('pending_call_accept', JSON.stringify({
+            caller_id:    data.caller_id,
+            caller_name:  data.caller_name,
+            caller_avatar: data.caller_avatar ?? '',
+            call_type:    data.call_type ?? 'voice',
+          }));
+        }
       }
+      // Pour 'default' (tap) : l'app s'ouvre via getInitialNotification
     }
     if (type === EventType.DISMISSED) {
       await notifee.cancelNotification(detail.notification!.id!);
@@ -149,8 +193,8 @@ export async function handleBackgroundFCM(
 
   if (type === 'call_offer') {
     await showIncomingCallNotification(
-      (data.from         as string) ?? '',
-      (data.caller_name  as string) ?? 'Appel entrant',
+      (data.caller_id    as string) ?? '',
+      (data.caller_name  as string) ?? 'Appel',
       (data.caller_avatar as string) || null,
       ((data.call_type   as string) === 'video' ? 'video' : 'voice'),
     );
@@ -164,7 +208,7 @@ export async function handleBackgroundFCM(
       android: {
         channelId:    CHANNEL_MESSAGES,
         importance:   AndroidImportance.HIGH,
-        sound:        'default',
+        sound:        'message_sound',
         vibrationPattern: [300, 200, 300, 200],
         pressAction:  { id: 'default', launchActivity: 'default' },
       },
@@ -180,7 +224,7 @@ export async function handleBackgroundFCM(
     android: {
       channelId:    CHANNEL_NOTIFS,
       importance:   AndroidImportance.HIGH,
-      sound:        'default',
+      sound:        'notification_sound',
       vibrationPattern: [250, 250],
       pressAction:  { id: 'default', launchActivity: 'default' },
     },
@@ -194,11 +238,12 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
   const type = data.type;
   if (type === 'call_offer') {
     navigate('Call', {
-      partnerId:   data.caller_id   ?? data.from,
-      partnerName: data.caller_name ?? '',
-      callType:    (data.call_type as 'voice' | 'video') ?? 'voice',
-      isIncoming:  true,
-      offer:       undefined,
+      partnerId:    data.caller_id   ?? data.from,
+      partnerName:  data.caller_name ?? '',
+      callType:     (data.call_type as 'voice' | 'video') ?? 'voice',
+      isIncoming:   true,
+      autoAccept:   data._accept === 'true',
+      offer:        undefined,
     });
   } else if (type === 'message') {
     navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
@@ -231,7 +276,9 @@ async function _unregisterToken(token: string): Promise<void> {
 export async function setupFCM(): Promise<void> {
   await _createChannels();
 
-  const authStatus = await messaging().requestPermission();
+  const m = getMessaging();
+
+  const authStatus = await requestPermission(m);
   console.log('[FCM] authStatus=', authStatus);
   // 1 = AUTHORIZED, 2 = PROVISIONAL
   const enabled = authStatus === 1 || authStatus === 2;
@@ -240,25 +287,19 @@ export async function setupFCM(): Promise<void> {
     return;
   }
 
-  const token = await messaging().getToken();
+  const token = await getToken(m);
   console.log('[FCM] token=', token ? token.slice(0, 30) + '...' : 'null');
   if (token) await _registerToken(token);
 
-  messaging().onTokenRefresh(_registerToken);
+  onTokenRefresh(m, _registerToken);
 
-  // Foreground FCM message → Notifee pour appels + messages (son uniquement)
-  messaging().onMessage(async (remoteMessage) => {
-    const type = remoteMessage.data?.type as string | undefined;
-    if (type === 'call_offer') {
-      await handleBackgroundFCM(remoteMessage);
-    } else if (type === 'message') {
-      // Afficher la notification avec son même en foreground
-      await handleBackgroundFCM(remoteMessage);
-    }
+  // Foreground FCM — tout ignoré : WebSocket + toast custom gèrent appels et messages
+  onMessage(m, async (_remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
+    // Rien — le WebSocket déclenche le toast pour les appels et messages en foreground
   });
 
   // App opened from background notification tap
-  messaging().onNotificationOpenedApp((msg) => {
+  onNotificationOpenedApp(m, (msg: FirebaseMessagingTypes.RemoteMessage) => {
     _handleNotificationOpen(msg.data as Record<string, string>);
   });
 
@@ -266,12 +307,17 @@ export async function setupFCM(): Promise<void> {
   notifee.onForegroundEvent(({ type, detail }) => {
     if (type === EventType.ACTION_PRESS) {
       const actionId = detail.pressAction?.id;
-      const data = detail.notification?.data as Record<string, string> | undefined;
+      const data     = detail.notification?.data as Record<string, string> | undefined;
+      notifee.cancelNotification(detail.notification!.id!);
       if (actionId === 'accept') {
-        notifee.cancelNotification(detail.notification!.id!);
-        _handleNotificationOpen(data);
+        _handleNotificationOpen({ ...data, _accept: 'true' } as Record<string, string>);
       } else if (actionId === 'decline') {
-        notifee.cancelNotification(detail.notification!.id!);
+        // Envoyer call_hangup via WebSocket (app est active)
+        if (data?.caller_id) {
+          try {
+            apiClient.post(`/api/v1/messages/call/reject`, { caller_id: data.caller_id });
+          } catch {}
+        }
       } else if (actionId === 'default') {
         _handleNotificationOpen(data);
       }
@@ -279,7 +325,7 @@ export async function setupFCM(): Promise<void> {
   });
 
   // App opened from quit state (FCM)
-  const initial = await messaging().getInitialNotification();
+  const initial = await getInitialNotification(m);
   if (initial) _handleNotificationOpen(initial.data as Record<string, string>);
 
   // App opened from quit state (Notifee)
@@ -287,12 +333,34 @@ export async function setupFCM(): Promise<void> {
   if (initialNotifee) {
     _handleNotificationOpen(initialNotifee.notification.data as Record<string, string>);
   }
+
+  // Acceptation depuis background — lire l'intention stockée dans MMKV
+  const pendingRaw = storage.getItem('pending_call_accept');
+  if (pendingRaw) {
+    storage.removeItem('pending_call_accept');
+    try {
+      const pending = JSON.parse(pendingRaw);
+      const sdpRaw  = storage.getItem('pending_call_offer_sdp');
+      const offer   = sdpRaw ? JSON.parse(sdpRaw) : undefined;
+      if (sdpRaw) storage.removeItem('pending_call_offer_sdp');
+      navigate('Call', {
+        partnerId:    pending.caller_id,
+        partnerName:  pending.caller_name ?? 'Inconnu',
+        partnerAvatar: pending.caller_avatar || null,
+        callType:     pending.call_type ?? 'voice',
+        isIncoming:   true,
+        autoAccept:   true,
+        offer,
+      });
+    } catch {}
+  }
 }
 
 export async function removeFCMToken(): Promise<void> {
   try {
-    const token = await messaging().getToken();
+    const m = getMessaging();
+    const token = await getToken(m);
     if (token) await _unregisterToken(token);
-    await messaging().deleteToken();
+    await deleteToken(m);
   } catch {}
 }

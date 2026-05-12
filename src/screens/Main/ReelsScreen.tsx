@@ -65,6 +65,7 @@ export const ReelsScreen: React.FC = () => {
   const SCREEN_W = screenDims.width;
   const SCREEN_H = screenDims.height;
   const insets   = useSafeAreaInsets();
+  const HEADER_H = insets.top + 54; // hauteur du header flottant (statusBar + row)
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav    = useNavigation<Nav>();
@@ -75,7 +76,6 @@ export const ReelsScreen: React.FC = () => {
   const listRef          = useRef<FlatList>(null);
   const isLoadingMoreRef = useRef(false);
   const pageRef          = useRef(1);
-  const translateY       = useSharedValue(0);
   const currentIdxRef    = useRef(0);
   const currentReelRef   = useRef<{ id: string; startTime: number } | null>(null);
   const viewedReelsRef   = useRef<Set<string>>(new Set());
@@ -83,6 +83,7 @@ export const ReelsScreen: React.FC = () => {
   const mountedRef       = useRef(true);
   const searchTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef   = useRef<TextInput>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 });
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [reels,         setReels]         = useState<Reel[]>([]);
@@ -169,7 +170,6 @@ export const ReelsScreen: React.FC = () => {
         if (idx > 0) {
           currentIdxRef.current = idx;
           setCurrentIndex(idx);
-          translateY.value = -idx * SCREEN_H;
           setTimeout(() => {
             listRef.current?.scrollToIndex({ index: idx, animated: false });
           }, 150);
@@ -186,7 +186,7 @@ export const ReelsScreen: React.FC = () => {
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [SCREEN_H, params.initialReelId, translateY]);
+  }, [SCREEN_H, params.initialReelId]);
 
   // ── Load more ─────────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -258,15 +258,15 @@ export const ReelsScreen: React.FC = () => {
     const idx = reelsRef.current.findIndex(x => x.id === r.id);
     if (idx >= 0) {
       currentIdxRef.current = idx;
-      translateY.value = withSpring(-idx * SCREEN_H, { damping: 38, stiffness: 280, overshootClamping: true });
       setCurrentIndex(idx);
+      setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
     } else {
       setReels(prev => [r, ...prev.filter(x => x.id !== r.id)]);
       currentIdxRef.current = 0;
-      translateY.value = 0;
       setCurrentIndex(0);
+      setTimeout(() => listRef.current?.scrollToIndex({ index: 0, animated: false }), 50);
     }
-  }, [closeSearch, SCREEN_H, translateY]);
+  }, [closeSearch]);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -334,53 +334,43 @@ export const ReelsScreen: React.FC = () => {
     }
   }, [editReel, editCaption]);
 
-  // ── Pan gesture (scroll vertical) ────────────────────────────────────────
-  const panStartY = useRef(0);
-
-  const feedPan = Gesture.Pan()
-    .activeOffsetY([-8, 8])
-    .failOffsetX([-15, 15])
-    .runOnJS(true)
-    .onStart(() => {
-      panStartY.current = translateY.value;
-    })
-    .onUpdate(e => {
-      const raw     = panStartY.current + e.translationY;
-      const min     = -(reelsRef.current.length - 1) * SCREEN_H;
-      const clamped = Math.max(min - 80, Math.min(80, raw));
-      translateY.value = clamped;
-    })
-    .onEnd(e => {
-      const SNAP_DIST = 50;
-      const SNAP_VEL  = 400;
-      const cur  = currentIdxRef.current;
-      let next   = cur;
-
-      if (e.translationY < -SNAP_DIST || e.velocityY < -SNAP_VEL) {
-        next = Math.min(cur + 1, reelsRef.current.length - 1);
-      } else if (e.translationY > SNAP_DIST || e.velocityY > SNAP_VEL) {
-        next = Math.max(cur - 1, 0);
-      }
-
-      translateY.value = withSpring(-next * SCREEN_H, {
-        damping: 38, stiffness: 280, mass: 0.6, overshootClamping: true,
-      });
-
-      activePlayerRef.current?.pause();
+  // ── Avance au reel suivant (onEnd stable, hors renderItem) ───────────────
+  const goNextReel = useCallback(() => {
+    const next = currentIdxRef.current + 1;
+    if (next < reelsRef.current.length) {
       currentIdxRef.current = next;
       setCurrentIndex(next);
+      setTimeout(() => {
+        listRef.current?.scrollToIndex({ index: next, animated: true });
+      }, 0);
+    }
+  }, []);
 
-      // Charge la page suivante seulement quand on est dans les 3 derniers
-      // ET qu'on a consomme au moins 80% de la page courante
+  // ── viewabilityCallbacks (FlatList natif) ────────────────────────────────
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<{ index: number | null; item: Reel }> }) => {
+      if (!viewableItems.length) return;
+      const first = viewableItems[0];
+      const idx   = first.index ?? 0;
+      if (idx === currentIdxRef.current) return;
+
+      // Pause le player précédent
+      activePlayerRef.current?.pause();
+
+      currentIdxRef.current = idx;
+      setCurrentIndex(idx);
+
+      // Tracker la vue
+      sendViewForCurrent();
+      const cur = reelsRef.current[idx];
+      if (cur) currentReelRef.current = { id: cur.id, startTime: Date.now() };
+
+      // Charger plus si proche de la fin
       const total = reelsRef.current.length;
-      if (next >= total - 3 && next >= Math.floor(total * 0.8)) {
-        loadMoreRef.current();
-      }
-    });
-
-  const feedAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
+      if (idx >= total - 3) loadMoreRef.current();
+    },
+    [sendViewForCurrent],
+  );
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading) {
@@ -549,30 +539,41 @@ export const ReelsScreen: React.FC = () => {
     <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#000', overflow: 'hidden' }}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <GestureDetector gesture={feedPan}>
-        <Animated.View style={[{ width: SCREEN_W, height: SCREEN_H * reels.length }, feedAnimStyle]}>
-          {reels.map((item, index) => (
-            <ReelItem
-              key={item.id}
-              reel={item}
-              isActive={index === currentIndex && screenFocused}
-              index={index}
-              muted={muted}
-              onToggleMute={toggleMute}
-              screenW={SCREEN_W}
-              screenH={SCREEN_H}
-              insetTop={insets.top}
-              insetBottom={insets.bottom}
-              colors={colors}
-              currentUserId={myId ?? undefined}
-              onAdd={() => nav.navigate('CreateReel')}
-              onAuthorPress={userId => nav.navigate('UserProfile', { userId })}
-              onEnd={() => {}}
-              activePlayerRef={activePlayerRef}
-            />
-          ))}
-        </Animated.View>
-      </GestureDetector>
+      <FlatList
+        ref={listRef}
+        data={reels}
+        keyExtractor={r => r.id}
+        style={{ flex: 1, marginTop: HEADER_H }}
+        pagingEnabled={false}
+        snapToInterval={SCREEN_H - HEADER_H}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        disableIntervalMomentum
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig.current}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        getItemLayout={(_, index) => ({ length: SCREEN_H - HEADER_H, offset: (SCREEN_H - HEADER_H) * index, index })}
+        renderItem={({ item, index }) => (
+          <VideoSlide
+            reel={item}
+            isActive={index === currentIndex && screenFocused}
+            muted={muted}
+            screenW={SCREEN_W}
+            screenH={SCREEN_H - HEADER_H}
+            insetBottom={insets.bottom}
+            colors={colors}
+            currentUserId={myId ?? undefined}
+            onToggleMute={toggleMute}
+            onAdd={() => nav.navigate('CreateReel')}
+            onAuthorPress={userId => nav.navigate('UserProfile', { userId })}
+            onEnd={goNextReel}
+            activePlayerRef={activePlayerRef}
+          />
+        )}
+      />
 
       {/* Header flottant */}
       <View style={[s.floatingHeader, { top: insets.top + 6 }]} pointerEvents="box-none">
@@ -709,9 +710,12 @@ export const ReelsScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Préchargement du prochain reel */}
+      {/* Préchargement silencieux des 2 prochains reels */}
       {reels[currentIndex + 1]?.video_url && (
-        <VideoPreloader uri={reels[currentIndex + 1].video_url!} />
+        <VideoPreloader key={reels[currentIndex + 1].id} uri={reels[currentIndex + 1].video_url!} />
+      )}
+      {reels[currentIndex + 2]?.video_url && (
+        <VideoPreloader key={reels[currentIndex + 2].id} uri={reels[currentIndex + 2].video_url!} />
       )}
 
       {loadingMore && (
@@ -747,6 +751,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 }) => {
   const [paused,         setPaused]         = useState(false);
   const [buffering,      setBuffering]      = useState(false);
+  const [videoLoaded,    setVideoLoaded]    = useState(false);
+  const [videoError,     setVideoError]     = useState(false);
   const [liked,          setLiked]          = useState(reel.user_reaction === 'like');
   const [likes,          setLikes]          = useState(reel.like_count ?? 0);
   const [commentCount,   setCommentCount]   = useState(reel.comment_count ?? 0);
@@ -757,17 +763,16 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [barFocused,     setBarFocused]     = useState(false);
   const [reportVisible,  setReportVisible]  = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
-  // Ratio détecté depuis le thumbnail (disponible avant la vidéo)
-  // puis confirmé par onLoad de la vidéo
-  const [isPortrait, setIsPortrait] = useState<boolean | null>(null);
+  const [isPortrait,     setIsPortrait]     = useState<boolean | null>(null);
   const [refInfo, setRefInfo] = useState<{
     label: string; kind: string; thumbnail: string | null; color: string;
   } | null>(null);
 
-  const likeInFlight = useRef(false);
-  const pausedRef    = useRef(false);
-  const likedRef     = useRef(reel.user_reaction === 'like');
-  const mountedRef   = useRef(true);
+  const likeInFlight   = useRef(false);
+  const pausedRef      = useRef(false);
+  const likedRef       = useRef(reel.user_reaction === 'like');
+  const mountedRef     = useRef(true);
+  const retryTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isOwnReel = !!(currentUserId && reel.author?.id && currentUserId === String(reel.author.id));
 
@@ -775,10 +780,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const player = useVideoPlayer(
     reel.video_url ?? 'about:blank',
     p => {
-      p.loop   = true;
+      p.loop   = false;
       p.muted  = muted;
       p.volume = muted ? 0 : 1.0;
-      // Ne pas play ici — géré par l'effet isActive
     },
   );
 
@@ -787,6 +791,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       try {
         player.pause();
         player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {});
@@ -804,20 +809,50 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     );
   }, [reel.thumbnail_url]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Retry helper ──────────────────────────────────────────────────────────
+  const retryLoad = useCallback(() => {
+    if (!mountedRef.current || !reel.video_url) return;
+    setVideoError(false);
+    setVideoLoaded(false);
+    setBuffering(true);
+    try {
+      player.replaceSourceAsync({ uri: reel.video_url }).then(() => {
+        if (mountedRef.current && !pausedRef.current) player.play();
+      }).catch(() => {
+        if (mountedRef.current) setVideoError(true);
+      });
+    } catch {
+      if (mountedRef.current) setVideoError(true);
+    }
+  }, [player, reel.video_url]);
+
   // ── Événements player ─────────────────────────────────────────────────────
   useEffect(() => {
-    const subEnd    = player.addEventListener('onEnd', () => { if (isActive) onEnd(); });
-    const subBuf    = player.addEventListener('onBuffer', (val: boolean) => {
+    const subEnd = player.addEventListener('onEnd', () => {
+      if (isActive) onEnd();
+    });
+    const subBuf = player.addEventListener('onBuffer', (val: boolean) => {
       if (mountedRef.current) setBuffering(val);
     });
-    const subLoad   = player.addEventListener('onLoad', (data: any) => {
-      // Confirmation finale via les vraies dimensions de la vidéo
-      if (data?.width && data?.height && mountedRef.current) {
-        setIsPortrait(data.height >= data.width);
-      }
+    const subLoad = player.addEventListener('onLoad', (data: any) => {
+      if (!mountedRef.current) return;
+      setVideoLoaded(true);
+      setVideoError(false);
+      setBuffering(false);
+      if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
     });
-    return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); };
-  }, [isActive, onEnd, player]);
+    const subErr = player.addEventListener('onError', () => {
+      if (!mountedRef.current) return;
+      setVideoError(true);
+      setBuffering(false);
+      // Retry automatique une seule fois après 2 s
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = setTimeout(() => {
+        if (mountedRef.current && isActive) retryLoad();
+      }, 2000);
+    });
+    return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subErr.remove(); };
+  }, [isActive, onEnd, player, retryLoad]);
 
   // ── Play/Pause selon isActive ─────────────────────────────────────────────
   useEffect(() => {
@@ -834,11 +869,18 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     }
   }, [isActive, player]); // `paused` géré via pausedRef
 
-  // Réinitialiser paused quand on quitte le slide
+  // Réinitialiser états quand on quitte le slide
   useEffect(() => {
     if (!isActive) {
       pausedRef.current = false;
-      if (mountedRef.current) setPaused(false);
+      if (mountedRef.current) {
+        setPaused(false);
+        setVideoError(false);
+      }
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     }
   }, [isActive]);
 
@@ -1045,10 +1087,24 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         surfaceType="texture"
       />
 
-      {/* Buffering */}
-      {buffering && (
+      {/* Chargement / buffering */}
+      {(buffering && !videoLoaded && !videoError) && (
         <View style={s.bufferOverlay} pointerEvents="none">
-          <ActivityIndicator size="large" color="rgba(255,255,255,0.7)" />
+          <ActivityIndicator size="large" color="rgba(255,255,255,0.85)" />
+          <Text style={s.bufferText}>Chargement…</Text>
+        </View>
+      )}
+
+      {/* Erreur de chargement */}
+      {videoError && (
+        <View style={s.errorOverlay}>
+          <Icon name="wifi-off" size={40} color="rgba(255,255,255,0.7)" />
+          <Text style={s.errorTitle}>Vidéo indisponible</Text>
+          <Text style={s.errorSub}>Vérifiez votre connexion</Text>
+          <TouchableOpacity style={s.retryBtn} onPress={retryLoad} activeOpacity={0.8}>
+            <Icon name="refresh-cw" size={16} color="#fff" />
+            <Text style={s.retryText}>Réessayer</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -1072,6 +1128,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       <Animated.View pointerEvents="none" style={heartAnim}>
         <Icon name="heart" size={88} color="#E0389A" />
       </Animated.View>
+
+
 
       {/* Gradient bas */}
       <LinearGradient
@@ -1217,20 +1275,31 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
 // ─── VideoPreloader ───────────────────────────────────────────────────────────
 
-/**
- * Précharge silencieusement le reel suivant.
- * Pas de bufferConfig dans useVideoPlayer — on passe juste l'URI.
- */
+// Lance la lecture silencieuse pour remplir le buffer réseau, puis met en pause
+// après BUFFER_SECS secondes. Quand l'utilisateur arrive sur ce reel, le player
+// de VideoSlide reprend depuis un buffer déjà chargé.
+const BUFFER_SECS = 8;
+
 const VideoPreloader: React.FC<{ uri: string }> = memo(({ uri }) => {
   const player = useVideoPlayer(uri, p => {
     p.muted  = true;
     p.volume = 0;
+    p.loop   = false;
   });
 
   useEffect(() => {
-    // Tenter le preload si la méthode existe (API optionnelle)
-    try { (player as any).preload?.(); } catch {}
+    let pauseTimer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      player.play();
+      // Après BUFFER_SECS secondes de lecture silencieuse le buffer est chargé,
+      // on s'arrête pour ne pas consommer batterie/data inutilement.
+      pauseTimer = setTimeout(() => {
+        try { player.pause(); } catch {}
+      }, BUFFER_SECS * 1000);
+    } catch {}
+
     return () => {
+      if (pauseTimer) clearTimeout(pauseTimer);
       try { player.pause(); } catch {}
     };
   }, [uri, player]);
@@ -1238,140 +1307,6 @@ const VideoPreloader: React.FC<{ uri: string }> = memo(({ uri }) => {
   return null;
 });
 
-// ─── ReelItem (carousel horizontal par auteur) ────────────────────────────────
-
-interface ReelItemProps {
-  reel:           Reel;
-  isActive:       boolean;
-  index:          number;
-  muted:          boolean;
-  screenW:        number;
-  screenH:        number;
-  insetTop:       number;
-  insetBottom:    number;
-  colors:         any;
-  currentUserId?: string;
-  onToggleMute:   () => void;
-  onAdd?:         () => void;
-  onAuthorPress:  (userId: string) => void;
-  onEnd:          (index: number) => void;
-  activePlayerRef?: React.RefObject<{ pause: () => void } | null>;
-}
-
-const ReelItem: React.FC<ReelItemProps> = memo(({
-  reel, isActive, index, muted, screenW, screenH, insetBottom,
-  colors, currentUserId, onToggleMute, onAdd, onAuthorPress, onEnd, activePlayerRef,
-}) => {
-  const [authorReels, setAuthorReels] = useState<Reel[]>([reel]);
-  const [hIdx,        setHIdx]        = useState(0);
-  const loadedRef      = useRef(false);
-  const authorReelsRef = useRef<Reel[]>([reel]);
-  const translateX     = useSharedValue(0);
-
-  useEffect(() => { authorReelsRef.current = authorReels; }, [authorReels]);
-
-  // Charger les autres reels de l'auteur (après 600ms pour ne pas bloquer)
-  useEffect(() => {
-    if (!isActive || loadedRef.current || !reel.author?.id) return;
-    const timer = setTimeout(() => {
-      loadedRef.current = true;
-      userService.getUserReels(reel.author!.id)
-        .then(data => {
-          const list     = (Array.isArray(data) ? data : []) as Reel[];
-          const filtered = list.filter(r => !!r.video_url);
-          if (filtered.length <= 1) return;
-          const idx = filtered.findIndex(r => r.id === reel.id);
-          if (idx > 0) {
-            const [cur] = filtered.splice(idx, 1);
-            filtered.unshift(cur);
-          }
-          setAuthorReels(filtered);
-        })
-        .catch(() => {});
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [isActive, reel.author?.id, reel.id]);
-
-  // Reset position horizontale si on quitte ce slide
-  useEffect(() => {
-    if (!isActive) {
-      translateX.value = withSpring(0, { damping: 38, stiffness: 280, overshootClamping: true });
-      setHIdx(0);
-    }
-  }, [isActive, translateX]);
-
-  const startX = useRef(0);
-
-  const hPan = Gesture.Pan()
-    .activeOffsetX([-8, 8])
-    .failOffsetY([-12, 12])
-    .runOnJS(true)
-    .onStart(() => { startX.current = translateX.value; })
-    .onUpdate(e => {
-      const next    = startX.current + e.translationX;
-      const min     = -(authorReelsRef.current.length - 1) * screenW;
-      const clamped = Math.max(min - 60, Math.min(60, next));
-      translateX.value = clamped;
-    })
-    .onEnd(e => {
-      const SNAP_DIST = 50;
-      const SNAP_VEL  = 400;
-      const cur   = Math.round(-startX.current / screenW);
-      const total = authorReelsRef.current.length;
-      let target  = cur;
-      if (e.translationX < -SNAP_DIST || e.velocityX < -SNAP_VEL) {
-        target = Math.min(cur + 1, total - 1);
-      } else if (e.translationX > SNAP_DIST || e.velocityX > SNAP_VEL) {
-        target = Math.max(cur - 1, 0);
-      }
-      translateX.value = withSpring(-target * screenW, {
-        damping: 38, stiffness: 280, mass: 0.6, overshootClamping: true,
-      });
-      setHIdx(target);
-    });
-
-  return (
-    <View style={{ width: screenW, height: screenH, overflow: 'hidden' }}>
-      <GestureDetector gesture={hPan}>
-        <Animated.View
-          style={{
-            width: screenW * authorReels.length,
-            height: screenH,
-            flexDirection: 'row',
-            transform: [{ translateX }],
-          }}
-        >
-          {authorReels.map((r, i) => (
-            <VideoSlide
-              key={r.id}
-              reel={r}
-              isActive={isActive && i === hIdx}
-              muted={muted}
-              screenW={screenW}
-              screenH={screenH}
-              insetBottom={insetBottom}
-              colors={colors}
-              currentUserId={currentUserId}
-              onToggleMute={onToggleMute}
-              onAdd={i === 0 ? onAdd : undefined}
-              onAuthorPress={onAuthorPress}
-              onEnd={() => onEnd(index)}
-              activePlayerRef={isActive && i === hIdx ? activePlayerRef : undefined}
-            />
-          ))}
-        </Animated.View>
-      </GestureDetector>
-
-      {authorReels.length > 1 && (
-        <View style={s.hDots} pointerEvents="none">
-          {authorReels.map((_, i) => (
-            <View key={i} style={[s.hDot, i === hIdx && s.hDotActive]} />
-          ))}
-        </View>
-      )}
-    </View>
-  );
-});
 
 // ─── ActionBtn ────────────────────────────────────────────────────────────────
 
@@ -1415,8 +1350,24 @@ const s = StyleSheet.create({
   bufferOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)', zIndex: 6,
+    backgroundColor: 'rgba(0,0,0,0.2)', zIndex: 6, gap: 10,
   },
+  bufferText: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' },
+
+  errorOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 7, gap: 10,
+  },
+  errorTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  errorSub:   { color: 'rgba(255,255,255,0.55)', fontSize: 13 },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)', borderRadius: 22,
+    paddingHorizontal: 20, paddingVertical: 10,
+  },
+  retryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   reelInfo: { position: 'absolute', left: 16, right: 82, gap: 8, zIndex: 3 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -1449,14 +1400,10 @@ const s = StyleSheet.create({
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 
-  commentBarWrap: { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 12, paddingVertical: 8 },
+commentBarWrap: { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 12, paddingVertical: 8 },
   commentBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 26, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9, gap: 10 },
   commentBarInput: { flex: 1, fontSize: 13, color: '#fff', padding: 0, maxHeight: 60 },
   commentBarSend: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-
-  hDots: { position: 'absolute', top: 12, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, zIndex: 20 },
-  hDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
-  hDotActive: { width: 16, backgroundColor: '#fff' },
 
   mineHeader:      { flexDirection: 'row', alignItems: 'center', paddingTop: 48, paddingBottom: 14, paddingHorizontal: 16, gap: 12 },
   mineIconBtn:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },

@@ -11,6 +11,7 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BorderRadius, Spacing } from '../../theme';
 import { apiClient } from '../../api';
@@ -36,6 +37,8 @@ function accentFor(id: string): string {
 }
 
 export const NewConversationScreen: React.FC = () => {
+  const insets            = useSafeAreaInsets();
+  const STATUS_H          = insets.top;
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav               = useNavigation<any>();
@@ -46,8 +49,6 @@ export const NewConversationScreen: React.FC = () => {
   const [empty,   setEmpty]   = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 44;
 
   const search = useCallback((q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

@@ -12,6 +12,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonMessages, VerifiedBadge } from '../../components/common';
 import { BorderRadius, Spacing } from '../../theme';
@@ -66,6 +67,8 @@ function formatLastSeen(iso?: string | null): string {
 interface Props { onBack?: () => void; }
 
 export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
+  const insets            = useSafeAreaInsets();
+  const STATUS_H          = insets.top;
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav               = useNavigation<any>();
@@ -78,7 +81,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const [refreshing,    setRefreshing]    = useState(false);
   const [search,        setSearch]        = useState('');
 
-  const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 44;
 
   const load = useCallback(async () => {
     try {

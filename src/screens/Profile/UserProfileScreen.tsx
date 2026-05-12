@@ -59,6 +59,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const [userReels,    setUserReels]    = useState<any[]>([]);
   const [userPosts,    setUserPosts]    = useState<Post[]>([]);
   const [contentLoading, setContentLoading] = useState(false);
+  const [friends, setFriends] = useState<UserPublic[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -101,16 +102,18 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
       // Charger contenu de l'utilisateur
       setContentLoading(true);
-      const [evts, ccs, reels, posts] = await Promise.allSettled([
+      const [evts, ccs, reels, posts, following] = await Promise.allSettled([
         userService.getUserEvents(userId),
         userService.getUserConcerts(userId),
         userService.getUserReels(userId),
         postService.getByUser(userId),
+        userService.getFollowing(userId),
       ]);
-      if (evts.status === 'fulfilled')   setUserEvents(evts.value);
-      if (ccs.status === 'fulfilled')    setUserConcerts(ccs.value);
-      if (reels.status === 'fulfilled')  setUserReels(Array.isArray(reels.value) ? reels.value : []);
-      if (posts.status === 'fulfilled')  setUserPosts(posts.value);
+      if (evts.status === 'fulfilled')       setUserEvents(evts.value);
+      if (ccs.status === 'fulfilled')        setUserConcerts(ccs.value);
+      if (reels.status === 'fulfilled')      setUserReels(Array.isArray(reels.value) ? reels.value : []);
+      if (posts.status === 'fulfilled')      setUserPosts(posts.value);
+      if (following.status === 'fulfilled')  setFriends(following.value.slice(0, 10));
       setContentLoading(false);
     } catch (e) { console.warn('[UserProfile] load error:', e); }
     finally { setLoading(false); }
@@ -424,6 +427,50 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             </>
           )}
         </View>
+
+        {/* ── Amis (abonnements) ──────────────────────────────────────── */}
+        {friends.length > 0 && (
+          <View style={[styles.friendsSection, { backgroundColor: colors.surface }]}>
+            <View style={styles.friendsHeader}>
+              <Text style={[styles.friendsTitle, { color: colors.textPrimary }]}>
+                Amis · <Text style={{ color: colors.textTertiary }}>{profile.following_count}</Text>
+              </Text>
+              <TouchableOpacity onPress={() => openList('following')} activeOpacity={0.7}>
+                <Text style={[styles.friendsSeeAll, { color: colors.primary }]}>Voir tout</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendsScroll}>
+              {friends.map(f => {
+                const name = f.display_name || f.username || '?';
+                const initials2 = name[0]?.toUpperCase() ?? '?';
+                return (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={styles.friendItem}
+                    activeOpacity={0.75}
+                    onPress={() => navigation.push('UserProfile', { userId: f.id })}
+                  >
+                    <View style={styles.friendAvatarWrap}>
+                      {f.avatar_url ? (
+                        <Image source={{ uri: f.avatar_url }} style={styles.friendAvatar} />
+                      ) : (
+                        <View style={[styles.friendAvatar, styles.friendAvatarFallback, { backgroundColor: colors.primary + '22' }]}>
+                          <Text style={[styles.friendInitial, { color: colors.primary }]}>{initials2}</Text>
+                        </View>
+                      )}
+                      {f.is_verified && (
+                        <View style={[styles.friendVerified, { backgroundColor: colors.primary }]}>
+                          <Icon name="check" size={7} color="#fff" />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.friendName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ── Bannière profil privé ────────────────────────────────────── */}
         {isPrivateProfile && (
@@ -815,6 +862,19 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row', paddingHorizontal: 16, marginTop: 14, gap: 10, alignItems: 'center',
   },
+
+  friendsSection:  { marginTop: 10, paddingTop: 14, paddingBottom: 16 },
+  friendsHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
+  friendsTitle:    { fontSize: 15, fontWeight: '700' },
+  friendsSeeAll:   { fontSize: 13, fontWeight: '600' },
+  friendsScroll:   { paddingHorizontal: 16, gap: 14 },
+  friendItem:      { alignItems: 'center', width: 66, position: 'relative' },
+  friendAvatarWrap: { position: 'relative' },
+  friendAvatar:    { width: 60, height: 60, borderRadius: 30 },
+  friendAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  friendInitial:   { fontSize: 22, fontWeight: '700' },
+  friendVerified:  { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fff' },
+  friendName:      { fontSize: 11, marginTop: 5, textAlign: 'center', fontWeight: '500' },
   followBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 11, borderRadius: 10, borderWidth: 1,

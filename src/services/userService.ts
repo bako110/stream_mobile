@@ -78,8 +78,13 @@ export const userService = {
     await apiClient.delete(Endpoints.users.me);
   },
 
+  async deactivateMyAccount(): Promise<void> {
+    const me = await userService.getMe();
+    await apiClient.post(Endpoints.users.deactivate(String(me.id)));
+  },
+
   async getSuggestions(limit = 10, offset = 0): Promise<UserPublic[]> {
-    const res = await apiClient.get<UserPublic[]>(Endpoints.users.suggestions, { params: { limit, offset } });
+    const res = await apiClient.get<UserPublic[]>(`${Endpoints.users.suggestions}?limit=${limit}&offset=${offset}`);
     return res.data;
   },
 

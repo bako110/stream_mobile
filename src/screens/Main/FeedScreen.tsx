@@ -22,7 +22,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText } from '../../components/common';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, saveService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
@@ -660,7 +660,7 @@ export const FeedScreen: React.FC = () => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={[s.header, { backgroundColor: colors.surface }]}>
@@ -751,6 +751,13 @@ export const FeedScreen: React.FC = () => {
             </TouchableOpacity>
             {!searchOpen && (
               <>
+                <TouchableOpacity
+                  style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]}
+                  onPress={() => nav.navigate('Favorites')}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="bookmark" size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
                 <FeedHeaderBadges
                   onMessages={goToMessages}
                   onNotifs={goToNotifs}
@@ -781,8 +788,8 @@ export const FeedScreen: React.FC = () => {
 
         {/* ── Filtres dans le header ─────────────────────────────────────── */}
         {!searchOpen && (
-          <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ paddingTop: 8, paddingBottom: 4 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
               {/* Bouton "Tout" avec dropdown */}
               <TouchableOpacity
                 onPress={() => {
@@ -859,7 +866,7 @@ export const FeedScreen: React.FC = () => {
                   <Text style={{ fontSize: 13, fontWeight: '600', color: filter === 'posts' ? colors.primary : colors.textSecondary }}>Posts</Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </ScrollView>
           </View>
         )}
       </View>
@@ -1043,6 +1050,9 @@ export const FeedScreen: React.FC = () => {
           scrollEnabled={feedScrollEnabled}
           onViewableItemsChanged={onFeedViewableChanged}
           viewabilityConfig={feedViewabilityConfig}
+          ItemSeparatorComponent={() => (
+            <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
+          )}
           ListHeaderComponent={
             <>
               {/* ── En direct ───────────────────────────────────────── */}
@@ -2062,6 +2072,8 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   })();
 
   // ── State social branché sur l'API ────────────────────────────────────────
+  const [imgFs, setImgFs] = useState(false);
+  const bannerLastTap = useRef<number>(0);
   const [liked,        setLiked]        = useState(item.data?.user_reaction === 'like');
   const [likeCount,    setLikeCount]    = useState(item.data?.like_count ?? 0);
   const [commentCount, setCommentCount] = useState(item.data?.comment_count ?? 0);
@@ -2106,10 +2118,6 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   // commentCount mis à jour via onCommentCountChange passé au CommentsBottomSheet
 
   // ── "Voir plus" titre + description ──────────────────────────────────────
-  const [titleExpanded, setTitleExpanded] = useState(false);
-  const [titleTruncated, setTitleTruncated] = useState(false);
-  const [descExpanded, setDescExpanded] = useState(false);
-  const [descTruncated, setDescTruncated] = useState(false);
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
@@ -2253,47 +2261,20 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
       {/* ── Titre + description ──────────────────────────────────────── */}
       <View style={s.cardBody}>
-        <Text
-          style={[s.cardTitle, { color: colors.textPrimary }]}
-          numberOfLines={titleExpanded ? undefined : 2}
-          onTextLayout={(e) => {
-            if (!titleExpanded && e.nativeEvent.lines.length > 2) setTitleTruncated(true);
-          }}
-          onPress={onPress}
-        >
-          {title}
-        </Text>
-        {titleTruncated && !titleExpanded && (
-          <TouchableOpacity onPress={() => setTitleExpanded(true)} activeOpacity={0.7}>
-            <Text style={[s.seeMoreText, { color: colors.primary }]}>Voir plus</Text>
-          </TouchableOpacity>
-        )}
-        {titleExpanded && (
-          <TouchableOpacity onPress={() => setTitleExpanded(false)} activeOpacity={0.7}>
-            <Text style={[s.seeMoreText, { color: colors.primary }]}>Voir moins</Text>
-          </TouchableOpacity>
-        )}
+        <ExpandableText
+          text={title}
+          maxLines={2}
+          textStyle={[s.cardTitle, { color: colors.textPrimary }]}
+          primaryColor={colors.primary}
+        />
         {desc ? (
           <View style={{ marginTop: 4 }}>
-            <Text
-              style={[s.cardDesc, { color: colors.textSecondary }]}
-              numberOfLines={descExpanded ? undefined : 3}
-              onTextLayout={(e) => {
-                if (!descExpanded && e.nativeEvent.lines.length > 3) setDescTruncated(true);
-              }}
-            >
-              {desc}
-            </Text>
-            {descTruncated && !descExpanded && (
-              <TouchableOpacity onPress={() => setDescExpanded(true)} activeOpacity={0.7}>
-                <Text style={[s.seeMoreText, { color: colors.primary }]}>Voir plus</Text>
-              </TouchableOpacity>
-            )}
-            {descExpanded && (
-              <TouchableOpacity onPress={() => setDescExpanded(false)} activeOpacity={0.7}>
-                <Text style={[s.seeMoreText, { color: colors.primary }]}>Voir moins</Text>
-              </TouchableOpacity>
-            )}
+            <ExpandableText
+              text={desc}
+              maxLines={3}
+              textStyle={[s.cardDesc, { color: colors.textSecondary }]}
+              primaryColor={colors.primary}
+            />
           </View>
         ) : null}
       </View>
@@ -2305,10 +2286,40 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       </TouchableOpacity>
 
       {/* ── Banner : vidéo pub autoplay ou image ────────────────────── */}
-      <TouchableOpacity onPress={onPress} activeOpacity={0.92}>
+      {/* Image plein écran */}
+      {imgFs && thumbUrl && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setImgFs(false)} statusBarTranslucent>
+          <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+            <Image source={{ uri: thumbUrl }} style={{ width: '100%', height: '80%' }} resizeMode="contain" />
+            <TouchableOpacity
+              onPress={() => setImgFs(false)}
+              style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, right: 16,
+                width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)',
+                alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon name="x" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setImgFs(false); onPress(); }}
+              style={{ position: 'absolute', bottom: 48, paddingHorizontal: 32, paddingVertical: 14,
+                backgroundColor: colors.primary, borderRadius: 28,
+                flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              activeOpacity={0.85}
+            >
+              <Icon name="arrow-right" size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>Voir les détails</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      )}
+
+      <TouchableOpacity
+        onPress={() => thumbUrl && !videoUrl ? setImgFs(true) : onPress()}
+        activeOpacity={0.92}
+      >
         <View style={s.cardBanner}>
           {videoUrl ? (
-            <CardVideo uri={videoUrl} playing={isActive} />
+            <CardVideo uri={videoUrl} playing={iscAtive} />
           ) : thumbUrl ? (
             <Image source={{ uri: thumbUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
@@ -2434,8 +2445,6 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </TouchableOpacity>
       </View>
 
-      {/* ── Séparateur bas ────────────────────────────────────────────── */}
-      <View style={{ height: 8, backgroundColor: colors.backgroundSecondary }} />
     </View>
   );
 });

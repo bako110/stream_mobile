@@ -6,6 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
+import { ExpandableText } from '../../components/common';
 import { contentService } from '../../services';
 import type { Season, Episode } from '../../types';
 import type { FilmItem } from '../Main/FilmsScreen';
@@ -157,7 +158,12 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={[s.epNum, { color: colors.textTertiary }]}>Épisode {ep.number}</Text>
                   <Text style={[s.epTitle, { color: colors.textPrimary }]} numberOfLines={2}>{ep.title}</Text>
                   {ep.synopsis ? (
-                    <Text style={[s.epSynopsis, { color: colors.textSecondary }]} numberOfLines={2}>{ep.synopsis}</Text>
+                    <ExpandableText
+                      text={ep.synopsis}
+                      maxLines={2}
+                      primaryColor={colors.primary}
+                      textStyle={[s.epSynopsis, { color: colors.textSecondary }]}
+                    />
                   ) : null}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
                     {ep.duration_sec ? (

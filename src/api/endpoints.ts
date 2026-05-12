@@ -306,6 +306,14 @@ export const Endpoints = {
     status: (id: string) => `${V1}/lives/${id}/status`,
   },
 
+  // ── Favoris (prefix: /api/v1/favorites) ──────────────────────────────────
+  favorites: {
+    list:   (type?: string) => type ? `${V1}/favorites?type=${type}` : `${V1}/favorites`,
+    save:   `${V1}/favorites`,
+    unsave: (targetType: string, targetId: string) => `${V1}/favorites/${targetType}/${targetId}`,
+    check:  (targetType: string, targetId: string) => `${V1}/favorites/check/${targetType}/${targetId}`,
+  },
+
   // ── Système ───────────────────────────────────────────────────────────────
   system: {
     health: '/health',

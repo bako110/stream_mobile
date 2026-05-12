@@ -1,24 +1,23 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  FlatList, TextInput, ActivityIndicator, Modal,
-  Share, Alert, KeyboardAvoidingView, Platform, Linking,
+  Modal, Share, Alert, Platform, Linking,
   Dimensions, StyleSheet, StatusBar, InteractionManager,
   NativeScrollEvent, NativeSyntheticEvent,
 } from 'react-native';
 import Animated, {
   FadeInDown, FadeIn,
   useSharedValue, useAnimatedStyle,
-  withSpring, withSequence, runOnJS,
+  withSpring, withSequence,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText } from '../../components/common';
+import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { concertService, socialService, saveService, authService } from '../../services';
 import type { Concert } from '../../types';
-import type { Comment } from '../../types/reel';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -127,25 +126,19 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [concert,      setConcert]      = useState<Concert | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [isOwner,      setIsOwner]      = useState(false);
-  const [buyLoading,   setBuyLoading]   = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [liked,        setLiked]        = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
   const [saved,        setSaved]        = useState(false);
   const [showVideo,    setShowVideo]    = useState(false);
   const [showComments, setShowComments] = useState(false);
-  const [comments,     setComments]     = useState<Comment[]>([]);
-  const [commentText,  setCommentText]  = useState('');
-  const [sendingCmt,   setSendingCmt]   = useState(false);
-  const [loadingCmts,  setLoadingCmts]  = useState(false);
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
-  const sheetY     = useSharedValue(800);
 
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
   const saveStyle  = useAnimatedStyle(() => ({ transform: [{ scale: saveScale.value }] }));
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: sheetY.value }] }));
 
   const loadConcert = useCallback(async () => {
     try {
@@ -173,29 +166,8 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     return () => task.cancel();
   }, [loadConcert]);
 
-  const openComments = async () => {
-    setShowComments(true);
-    sheetY.value = withSpring(0, { damping: 20, stiffness: 200 });
-    setLoadingCmts(true);
-    try { setComments(await socialService.getComments({ concert_id: concertId })); } catch { /**/ }
-    finally { setLoadingCmts(false); }
-  };
-
-  const closeComments = () => {
-    sheetY.value = withSpring(800, { damping: 20 }, () => runOnJS(setShowComments)(false));
-    setCommentText('');
-  };
-
-  const sendComment = async () => {
-    if (!commentText.trim()) return;
-    setSendingCmt(true);
-    try {
-      const created = await socialService.createComment({ body: commentText.trim(), concert_id: concertId });
-      setComments(prev => [created, ...prev]);
-      setCommentText('');
-    } catch { /**/ }
-    finally { setSendingCmt(false); }
-  };
+  const openComments  = () => setShowComments(true);
+  const closeComments = () => setShowComments(false);
 
   const handleLike = () => {
     heartScale.value = withSequence(withSpring(1.4, { damping: 5, stiffness: 300 }), withSpring(1, { damping: 10 }));
@@ -237,28 +209,9 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     } catch { Alert.alert('Partage', 'Impossible d\'ouvrir cette application.'); }
   };
 
-  const handleBuyTicket = async () => {
+  const handleBuyTicket = () => {
     if (!concert) return;
-    const isFreeEv = concert.access_type === 'free';
-    Alert.alert(
-      isFreeEv ? 'S\'inscrire' : 'Acheter un billet',
-      isFreeEv ? `Confirmer votre inscription à\n${concert.title} ?` : `${concert.title}\nPrix : ${concert.ticket_price ?? '—'} €`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Confirmer', onPress: async () => {
-          setBuyLoading(true);
-          try {
-            await concertService.buyTicket(concertId);
-            setIsRegistered(true);
-            Alert.alert(isFreeEv ? 'Inscription confirmée !' : 'Billet confirmé !', 'Retrouvez-le dans votre profil.');
-          } catch (e: any) {
-            const msg = e?.message ?? '';
-            if (msg.includes('déjà inscrit')) { setIsRegistered(true); Alert.alert('Déjà inscrit', 'Vous participez déjà.'); }
-            else Alert.alert('Erreur', msg || 'Impossible de finaliser.');
-          } finally { setBuyLoading(false); }
-        }},
-      ],
-    );
+    setPaySheetOpen(true);
   };
 
   const handleEdit   = () => nav.navigate('CreateConcert' as any, { concertId });
@@ -445,7 +398,12 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           <Animated.View entering={FadeInDown.delay(160).springify()}
             style={{ paddingHorizontal: 16, paddingTop: 20, gap: 8 }}>
             <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textTertiary }}>À PROPOS</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}>{concert.description}</Text>
+            <ExpandableText
+              text={concert.description}
+              maxLines={4}
+              textStyle={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}
+              primaryColor={colors.primary}
+            />
           </Animated.View>
         ) : null}
 
@@ -529,97 +487,43 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           </View>
         ) : (
           <TouchableOpacity onPress={isRegistered ? undefined : handleBuyTicket}
-            disabled={buyLoading || isRegistered} activeOpacity={isRegistered ? 1 : 0.85} style={{ flex: 1 }}>
+            disabled={isRegistered} activeOpacity={isRegistered ? 1 : 0.85} style={{ flex: 1 }}>
             <LinearGradient
               colors={isRegistered ? ['#555', '#444'] : [colors.gradientStart, colors.gradientEnd]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                 gap: 8, paddingVertical: 16, borderRadius: 14 }}>
-              {buyLoading ? <ActivityIndicator color="#fff" /> : (
-                <>
-                  <Icon name={isRegistered ? 'check' : isFree ? 'check-circle' : 'tag'} size={20} color="#fff" />
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>
-                    {isRegistered ? 'Déjà inscrit' : isFree ? 'S\'inscrire gratuitement' : 'Acheter un billet'}
-                  </Text>
-                  {!isRegistered && !isFree && concert.ticket_price != null && (
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' }}>{concert.ticket_price} €</Text>
-                  )}
-                </>
+              <Icon name={isRegistered ? 'check' : isFree ? 'check-circle' : 'tag'} size={20} color="#fff" />
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>
+                {isRegistered ? 'Déjà inscrit' : isFree ? 'S\'inscrire gratuitement' : 'Acheter un billet'}
+              </Text>
+              {!isRegistered && !isFree && concert.ticket_price != null && (
+                <Text style={{ fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' }}>{concert.ticket_price} €</Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
         )}
       </Animated.View>
 
+      {/* ── Sheet paiement billet ────────────────────────────────────── */}
+      <TicketPaymentSheet
+        visible={paySheetOpen}
+        onClose={() => setPaySheetOpen(false)}
+        onSuccess={(_ticket) => setIsRegistered(true)}
+        title={concert.title}
+        accessType={concert.access_type as any}
+        ticketPrice={concert.ticket_price ?? null}
+        thumbnail={concert.thumbnail_url ?? null}
+        kind="concert"
+        onBuy={() => concertService.buyTicket(concertId)}
+      />
+
       {/* ── Sheet commentaires ────────────────────────────────────────── */}
-      {showComments && (
-        <>
-          <TouchableOpacity style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' }}
-            activeOpacity={1} onPress={closeComments} />
-          <Animated.View style={[{
-            position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '75%',
-            borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden',
-            backgroundColor: colors.surface,
-          }, sheetStyle]}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border,
-              alignSelf: 'center', marginTop: 10, marginBottom: 8 }} />
-            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.textPrimary,
-              paddingHorizontal: 16, paddingBottom: 12 }}>Commentaires</Text>
-            {loadingCmts ? (
-              <ActivityIndicator color={colors.primary} style={{ padding: 20 }} />
-            ) : (
-              <FlatList
-                data={comments} keyExtractor={c => c.id} style={{ maxHeight: 320 }}
-                ListEmptyComponent={
-                  <View style={{ alignItems: 'center', padding: 24, gap: 8 }}>
-                    <Icon name="message-circle" size={36} color={colors.textTertiary} />
-                    <Text style={{ color: colors.textTertiary }}>Soyez le premier à commenter</Text>
-                  </View>
-                }
-                renderItem={({ item: cmt }) => (
-                  <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 12,
-                    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
-                    <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]}
-                      style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
-                        {getInitials(cmt.author?.display_name ?? cmt.author?.username)}
-                      </Text>
-                    </LinearGradient>
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
-                        {cmt.author?.display_name ?? cmt.author?.username ?? 'Utilisateur'}
-                      </Text>
-                      <Text style={{ fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>{cmt.body}</Text>
-                      <Text style={{ fontSize: 11, color: colors.textTertiary }}>
-                        {new Date(cmt.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              />
-            )}
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10,
-                paddingHorizontal: 16, paddingVertical: 12,
-                paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-                borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
-                <TextInput
-                  value={commentText} onChangeText={setCommentText}
-                  placeholder="Ajouter un commentaire..." placeholderTextColor={colors.textDisabled}
-                  style={{ flex: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
-                    fontSize: 14, backgroundColor: colors.inputBg, color: colors.textPrimary }}
-                  returnKeyType="send" onSubmitEditing={sendComment}
-                />
-                <TouchableOpacity onPress={sendComment} disabled={sendingCmt || !commentText.trim()}
-                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary,
-                    alignItems: 'center', justifyContent: 'center' }}>
-                  {sendingCmt ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="send" size={15} color="#fff" />}
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </>
-      )}
+      <CommentsBottomSheet
+        visible={showComments}
+        onClose={closeComments}
+        concertId={concertId}
+      />
     </View>
   );
 };

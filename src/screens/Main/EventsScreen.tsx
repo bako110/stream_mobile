@@ -156,7 +156,7 @@ export const EventsScreen: React.FC = () => {
               <EventCard
                 event={item}
                 colors={colors}
-                onPress={() => (nav as any).navigate('CreateEvent', { eventId: item.id })}
+                onPress={() => (nav as any).navigate('EventDetail', { eventId: item.id })}
                 onDelete={() => handleDelete(item.id)}
               />
             </Animated.View>

@@ -143,7 +143,7 @@ export const ConcertsScreen: React.FC = () => {
               <ConcertCard
                 concert={item}
                 colors={colors}
-                onPress={() => (nav as any).navigate('CreateConcert', { concertId: item.id })}
+                onPress={() => (nav as any).navigate('ConcertDetail', { concertId: item.id })}
                 onDelete={() => handleDeleteConcert(item.id)}
               />
             </Animated.View>

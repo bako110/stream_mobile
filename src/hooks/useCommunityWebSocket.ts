@@ -61,6 +61,14 @@ export interface CommunityWsTyping {
   is_typing: boolean;
 }
 
+export interface CommunityWsRecording {
+  type: 'recording';
+  user_id: string;
+  username?: string | null;
+  display_name?: string | null;
+  is_recording: boolean;
+}
+
 export interface CommunityWsOnlineCount {
   type: 'online_count';
   count: number;
@@ -106,6 +114,12 @@ export interface CommunityWsCommunityUpdated {
 export interface CommunityWsCommunityDeleted {
   type: 'community_deleted';
   community_id: string;
+}
+
+export interface CommunityWsCommunityVerified {
+  type: 'community_verified';
+  community_id: string;
+  is_verified: boolean;
 }
 
 export interface CommunityWsAnnouncement {
@@ -167,6 +181,7 @@ export type CommunityWsPayload =
   | CommunityWsReaction
   | CommunityWsPollUpdated
   | CommunityWsTyping
+  | CommunityWsRecording
   | CommunityWsOnlineCount
   | CommunityWsMemberJoined
   | CommunityWsMemberLeft
@@ -174,6 +189,7 @@ export type CommunityWsPayload =
   | CommunityWsMemberRoleChanged
   | CommunityWsCommunityUpdated
   | CommunityWsCommunityDeleted
+  | CommunityWsCommunityVerified
   | { type: 'pong' }
   | { type: 'error'; detail: string };
 
@@ -290,5 +306,11 @@ export function useCommunityWebSocket(
     }
   }, []);
 
-  return { sendWsMessage, sendTyping, isConnected, onlineCount };
+  const sendRecording = useCallback((isRecording: boolean) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: isRecording ? 'recording_start' : 'recording_stop' }));
+    }
+  }, []);
+
+  return { sendWsMessage, sendTyping, sendRecording, isConnected, onlineCount };
 }

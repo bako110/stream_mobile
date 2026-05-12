@@ -123,6 +123,14 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const [imgViewerIdx,  setImgViewerIdx]  = useState(0);
   const [imgViewerOpen, setImgViewerOpen] = useState(false);
 
+  // Indicateurs temps réel (autres membres)
+  type TypingUser = { user_id: string; username: string | null; display_name: string | null };
+  const [typingUsers,    setTypingUsers]    = useState<TypingUser[]>([]);
+  const [recordingUsers, setRecordingUsers] = useState<TypingUser[]>([]);
+  const typingTimers    = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const recordingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const typingDebounce  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const listRef  = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
   const sendBtnAnim = useRef(new Animated.Value(0)).current;
@@ -131,22 +139,60 @@ export const CommunityChannelChatScreen: React.FC = () => {
     Animated.spring(sendBtnAnim, { toValue: text.trim() ? 1 : 0, useNativeDriver: true, tension: 120, friction: 8 }).start();
   }, [text]);
 
-  const { isConnected } = useCommunityWebSocket(
+  const { sendWsMessage, sendTyping, sendRecording, isConnected } = useCommunityWebSocket(
     communityId,
     useCallback((payload: CommunityWsPayload) => {
       if ((payload as any).channel_id && (payload as any).channel_id !== channelId) return;
       if (payload.type === 'community_message' || payload.type === 'community_message_sent') {
         const msg = payload as unknown as CommunityMessage;
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+        setTypingUsers(p => p.filter(u => u.user_id !== (msg as any).sender_id));
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
       } else if (payload.type === 'community_message_edited') {
         const e = payload as unknown as CommunityMessage;
         setMessages(prev => prev.map(m => m.id === e.id ? { ...m, content: e.content, edited_at: e.edited_at } : m));
       } else if (payload.type === 'community_message_deleted') {
         setMessages(prev => prev.filter(m => m.id !== payload.id));
+      } else if (payload.type === 'typing') {
+        const { user_id, is_typing } = payload;
+        if (is_typing) {
+          setTypingUsers(prev => prev.some(u => u.user_id === user_id) ? prev : [...prev, { user_id, username: payload.username ?? null, display_name: payload.display_name ?? null }]);
+          if (typingTimers.current[user_id]) clearTimeout(typingTimers.current[user_id]);
+          typingTimers.current[user_id] = setTimeout(() => setTypingUsers(p => p.filter(u => u.user_id !== user_id)), 4000);
+        } else {
+          if (typingTimers.current[user_id]) clearTimeout(typingTimers.current[user_id]);
+          setTypingUsers(p => p.filter(u => u.user_id !== user_id));
+        }
+      } else if (payload.type === 'recording') {
+        const { user_id, is_recording } = payload;
+        if (is_recording) {
+          setRecordingUsers(prev => prev.some(u => u.user_id === user_id) ? prev : [...prev, { user_id, username: payload.username ?? null, display_name: payload.display_name ?? null }]);
+          if (recordingTimers.current[user_id]) clearTimeout(recordingTimers.current[user_id]);
+          recordingTimers.current[user_id] = setTimeout(() => setRecordingUsers(p => p.filter(u => u.user_id !== user_id)), 30000);
+        } else {
+          if (recordingTimers.current[user_id]) clearTimeout(recordingTimers.current[user_id]);
+          setRecordingUsers(p => p.filter(u => u.user_id !== user_id));
+        }
+      } else if (payload.type === 'community_member_left') {
+        setTypingUsers(p => p.filter(u => u.user_id !== payload.user_id));
+        setRecordingUsers(p => p.filter(u => u.user_id !== payload.user_id));
       }
     }, [channelId]),
   );
+
+  useEffect(() => () => {
+    Object.values(typingTimers.current).forEach(clearTimeout);
+    Object.values(recordingTimers.current).forEach(clearTimeout);
+    if (typingDebounce.current) clearTimeout(typingDebounce.current);
+  }, []);
+
+  const handleTextChange = useCallback((val: string) => {
+    setText(val);
+    if (!isConnected) return;
+    if (typingDebounce.current) clearTimeout(typingDebounce.current);
+    sendTyping(true);
+    typingDebounce.current = setTimeout(() => sendTyping(false), 2000);
+  }, [isConnected, sendTyping]);
 
   const loadMessages = useCallback(async (p = 1, prepend = false) => {
     try {
@@ -296,19 +342,21 @@ export const CommunityChannelChatScreen: React.FC = () => {
     try {
       setIsRecording(true);
       setRecordTime('0:00');
+      sendRecording(true);
       await audioRecorderChannel.startRecorder(undefined, undefined, true);
       audioRecorderChannel.addRecordBackListener((e: any) => {
         const totalSec = Math.floor(e.currentPosition / 1000);
         const m = Math.floor(totalSec / 60), s = totalSec % 60;
         setRecordTime(`${m}:${s.toString().padStart(2, '0')}`);
       });
-    } catch { setIsRecording(false); }
+    } catch { setIsRecording(false); sendRecording(false); }
   };
 
   const stopAndSendRecording = async () => {
     try {
       const result = await audioRecorderChannel.stopRecorder();
       audioRecorderChannel.removeRecordBackListener();
+      sendRecording(false);
       setIsRecording(false);
       if (!result) return;
       setSending(true);
@@ -328,6 +376,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       await audioRecorderChannel.stopRecorder();
       audioRecorderChannel.removeRecordBackListener();
     } catch {}
+    sendRecording(false);
     setIsRecording(false);
   };
 
@@ -847,6 +896,19 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             ) : (
+              <>
+                {(typingUsers.length > 0 || recordingUsers.length > 0) && !isRecording && (
+                  <View style={[C.partnerStatusBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+                    <View style={C.typingDotsRow}>
+                      {[0, 1, 2].map(i => <View key={i} style={[C.typingDot, { backgroundColor: colors.textTertiary }]} />)}
+                    </View>
+                    <Text style={[C.partnerStatusText, { color: colors.textTertiary }]}>
+                      {recordingUsers.length > 0
+                        ? `${recordingUsers[0].display_name || recordingUsers[0].username || 'Quelqu\'un'} enregistre un vocal…`
+                        : `${typingUsers[0].display_name || typingUsers[0].username || 'Quelqu\'un'} est en train d'écrire…`}
+                    </Text>
+                  </View>
+                )}
               <View style={[C.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
                 {/* Bouton pièces jointes */}
                 {!editingMsg && (
@@ -862,7 +924,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
                     ref={inputRef}
                     style={[C.input, { color: colors.textPrimary }]}
                     value={text}
-                    onChangeText={setText}
+                    onChangeText={handleTextChange}
                     placeholder={isAnnouncement ? 'Écrire une annonce…' : 'Message…'}
                     placeholderTextColor={colors.textTertiary}
                     multiline maxLength={2000}
@@ -895,6 +957,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
                   </TouchableOpacity>
                 )}
               </View>
+              </>
             )}
           </>
         )}
@@ -1177,6 +1240,11 @@ const C = StyleSheet.create({
   replyBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderLeftWidth: 3 },
   replyBannerName: { fontSize: 12, fontWeight: '700', marginBottom: 1 },
   editBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: 2 },
+
+  partnerStatusBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  typingDotsRow:    { flexDirection: 'row', gap: 3, alignItems: 'center' },
+  typingDot:        { width: 5, height: 5, borderRadius: 3 },
+  partnerStatusText: { fontSize: 12, fontStyle: 'italic' },
 
   inputBar:    { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
   inputRow:    { flex: 1, flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingVertical: 4, paddingHorizontal: 12 },

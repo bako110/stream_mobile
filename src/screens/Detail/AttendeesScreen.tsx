@@ -18,8 +18,8 @@ interface Props {
   onScan?:    () => void;
 }
 
-const getInitials = (name: string) =>
-  name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+const getInitials = (name: string | null | undefined) =>
+  (name ?? '?').split(' ').map(n => n[0] ?? '').join('').slice(0, 2).toUpperCase() || '?';
 
 export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, onScan }) => {
   const { theme: { colors } } = useTheme();
@@ -55,7 +55,7 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
       const q = query.toLowerCase();
       list = list.filter(a =>
         (a.display_name ?? '').toLowerCase().includes(q) ||
-        a.username.toLowerCase().includes(q) ||
+        (a.username ?? '').toLowerCase().includes(q) ||
         (a.email ?? '').toLowerCase().includes(q),
       );
     }
@@ -101,11 +101,11 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
           {item.display_name ?? item.username}
         </Text>
         <Text style={[at.sub, { color: colors.textTertiary }]} numberOfLines={1}>
-          @{item.username}{item.email ? ` · ${item.email}` : ''}
+          {item.username ? `@${item.username}` : ''}{item.email ? ` · ${item.email}` : ''}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
           <Text style={[at.price, { color: colors.textTertiary }]}>
-            {item.price_paid === 0 ? 'Gratuit' : `${item.price_paid.toFixed(2)} €`}
+            {(Number(item.price_paid) || 0) === 0 ? 'Gratuit' : `${(Number(item.price_paid)).toFixed(2)} €`}
           </Text>
           <Text style={[at.date, { color: colors.textTertiary }]}>
             · {new Date(item.registered_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
@@ -183,7 +183,7 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
         <View style={[at.statDiv, { backgroundColor: colors.divider }]} />
         <View style={at.statItem}>
           <Text style={[at.statNum, { color: colors.textPrimary }]}>
-            {attendees.reduce((s, a) => s + a.price_paid, 0).toFixed(0)} €
+            {attendees.reduce((s, a) => s + (Number(a.price_paid) || 0), 0).toFixed(0)} €
           </Text>
           <Text style={[at.statLbl, { color: colors.textTertiary }]}>Revenus</Text>
         </View>

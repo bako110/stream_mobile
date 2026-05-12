@@ -78,6 +78,22 @@ export const authService = {
     await apiClient.put(Endpoints.auth.changePassword, payload);
   },
 
+  async deactivateSelf(reason: string): Promise<void> {
+    await apiClient.post(Endpoints.auth.deactivateSelf, { reason });
+  },
+
+  async reactivate(identifier: string, password: string): Promise<{ user: User } & AuthToken> {
+    const res = await apiClient.post<{ access_token: string; refresh_token: string; token_type: string; user: User }>(
+      Endpoints.auth.reactivate,
+      { identifier, password },
+    );
+    const { access_token, refresh_token, token_type, user } = res.data;
+    authService._saveTokens({ access_token, refresh_token, token_type });
+    _cachedUser = user;
+    _cachedAt = Date.now();
+    return { access_token, refresh_token, token_type, user };
+  },
+
   async verifyPassword(currentPassword: string): Promise<void> {
     // Vérifie le mot de passe actuel — le backend retourne 401 si incorrect
     await apiClient.put(Endpoints.auth.changePassword, {

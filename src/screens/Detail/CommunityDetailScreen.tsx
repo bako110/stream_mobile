@@ -23,6 +23,7 @@ import type {
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { useWs } from '../../context/WebSocketContext';
 import { ExpandableText } from '../../components/common';
+import { saveService } from '../../services/saveService';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 interface Props { route: { params: { communityId: string } }; }
@@ -84,6 +85,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [vrReason,       setVrReason]       = useState('');
   const [pendingCount,   setPendingCount]   = useState(0);
   const [viewerUrl,      setViewerUrl]      = useState<string | null>(null);
+  const [communitySaved, setCommunitySaved] = useState(() => saveService.isCommunitysaved(communityId));
 
   // Settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1175,13 +1177,37 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         <Text style={[s.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           {community.name}
         </Text>
-        {(isAdmin || isMod) ? (
-          <TouchableOpacity onPress={openSettings} style={s.headerIcon}>
-            <Icon name="settings" size={20} color={colors.textPrimary} />
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (communitySaved) {
+                saveService.unsaveCommunity(communityId);
+                setCommunitySaved(false);
+              } else if (community) {
+                saveService.saveCommunity({
+                  id: community.id,
+                  name: community.name,
+                  avatar_url: community.avatar_url,
+                  members_count: community.members_count,
+                  description: community.description,
+                });
+                setCommunitySaved(true);
+              }
+            }}
+            style={s.headerIcon}
+          >
+            <Icon
+              name="bookmark"
+              size={20}
+              color={communitySaved ? colors.primary : colors.textPrimary}
+            />
           </TouchableOpacity>
-        ) : (
-          <View style={{ width: 44 }} />
-        )}
+          {(isAdmin || isMod) && (
+            <TouchableOpacity onPress={openSettings} style={s.headerIcon}>
+              <Icon name="settings" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* ── Contenu principal ── */}

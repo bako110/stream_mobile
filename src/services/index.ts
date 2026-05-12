@@ -24,3 +24,5 @@ export type { ReportContentType, ReportReason, CreateReportPayload } from './rep
 export { postService } from './postService';
 export { liveService } from './liveService';
 export type { LiveStream, LiveToken, LiveStatus } from './liveService';
+export { favoriteService } from './favoriteService';
+export type { FavoriteType, FavoriteOut, SavePayload } from './favoriteService';

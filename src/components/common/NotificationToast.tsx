@@ -9,14 +9,16 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import InCallManager from 'react-native-incall-manager';
-import notifee, { AndroidImportance, AndroidVisibility } from '@notifee/react-native';
-import { Platform } from 'react-native';
+import Sound from 'react-native-sound';
 import { useWs, WsPayload } from '../../context/WebSocketContext';
 import { useTheme } from '../../hooks/useTheme';
 import { navigate } from '../../navigation/navigationRef';
 
-type ToastKind = 'notification' | 'message' | 'call';
+Sound.setCategory('Playback', true);
+const _msgSound   = new Sound('message_sound.mp3',   Sound.MAIN_BUNDLE, () => {});
+const _notifSound = new Sound('notification_sound.mp3', Sound.MAIN_BUNDLE, () => {});
+
+type ToastKind = 'notification' | 'message';
 
 interface ToastData {
   id:        string;
@@ -25,14 +27,11 @@ interface ToastData {
   body:      string;
   icon:      string;
   grad:      [string, string];
-  avatarUrl?: string | null;
-  ref_id?:   string | null;
-  ref_type?: string | null;
-  // Pour naviguer au tap
-  partnerId?:   string;
+  avatarUrl?:  string | null;
+  ref_id?:     string | null;
+  ref_type?:   string | null;
+  partnerId?:  string;
   partnerName?: string;
-  callType?:    'voice' | 'video';
-  offer?:       any;
 }
 
 const ICON_MAP: Record<string, string> = {
@@ -79,7 +78,7 @@ const { width: SW } = Dimensions.get('window');
 const TOAST_W = SW - 32;
 
 export const NotificationToast: React.FC = () => {
-  const { addListener, removeListener, sendMessage, isOutgoingCall } = useWs();
+  const { addListener, removeListener } = useWs();
   const { theme }  = useTheme();
   const { colors } = theme;
   const insets     = useSafeAreaInsets();
@@ -91,7 +90,6 @@ export const NotificationToast: React.FC = () => {
   const opacity    = useSharedValue(0);
 
   const dismiss = useCallback(() => {
-    InCallManager.stopRingtone();
     Vibration.cancel();
     opacity.value    = withTiming(0, { duration: 200 });
     translateY.value = withTiming(-120, { duration: 250 }, () => {
@@ -106,45 +104,17 @@ export const NotificationToast: React.FC = () => {
     opacity.value    = 0;
     translateY.value = withSpring(0, { damping: 18, stiffness: 200 });
     opacity.value    = withTiming(1, { duration: 180 });
-    if (data.kind === 'call') {
-      // Sonnerie + vibration répétée pour appel entrant
-      InCallManager.startRingtone('_DEFAULT_', 0, '', 30);
-      Vibration.vibrate([0, 700, 400, 700, 400, 700], true);
-      timerRef.current = setTimeout(() => {
-        InCallManager.stopRingtone();
-        Vibration.cancel();
-        dismiss();
-      }, 30_000);
+    if (data.kind === 'message') {
+      try { _msgSound.stop(); _msgSound.play(); } catch {}
     } else {
-      // Son + vibration via Notifee (utilise le canal avec son configuré)
-      Vibration.vibrate([0, 150]);
-      if (Platform.OS === 'android') {
-        const channelId = data.kind === 'message' ? 'messages_v2' : 'notifications_v2';
-        notifee.displayNotification({
-          id:    `toast_${data.id}`,
-          title: data.title,
-          body:  data.body,
-          android: {
-            channelId,
-            importance:  AndroidImportance.HIGH,
-            visibility:  AndroidVisibility.PRIVATE,
-            sound:         'default',
-            onlyAlertOnce: true,
-            // Auto-cancel immédiatement — on veut juste le son
-            autoCancel: true,
-          },
-        }).then(() => {
-          setTimeout(() => notifee.cancelNotification(`toast_${data.id}`), 500);
-        }).catch(() => {});
-      }
-      timerRef.current = setTimeout(dismiss, 4_000);
+      try { _notifSound.stop(); _notifSound.play(); } catch {}
     }
+    Vibration.vibrate([0, 150]);
+    timerRef.current = setTimeout(dismiss, 4_000);
   }, [dismiss]);
 
   useEffect(() => {
     const onWsEvent = (payload: WsPayload) => {
-
-      // ── Notification classique ───────────────────────────────────────────────
       if (payload.type === 'notification') {
         const notifType = payload.notification_type ?? 'system';
         show({
@@ -160,52 +130,27 @@ export const NotificationToast: React.FC = () => {
         return;
       }
 
-      // ── Message reçu (hors chat actif — géré par WebSocketContext) ──────────
       if (payload.type === 'message' && payload._showToast) {
         show({
-          id:        String(Date.now()),
-          kind:      'message',
-          title:     payload.sender_name ?? 'Nouveau message',
-          body:      payload.content ?? '',
-          icon:      'message-circle',
-          grad:      ['#3B82F6', '#60A5FA'],
-          avatarUrl: payload.sender_avatar ?? null,
-          partnerId: payload.sender_id,
+          id:          String(Date.now()),
+          kind:        'message',
+          title:       payload.sender_name ?? 'Nouveau message',
+          body:        payload.content ?? '',
+          icon:        'message-circle',
+          grad:        ['#3B82F6', '#60A5FA'],
+          avatarUrl:   payload.sender_avatar ?? null,
+          partnerId:   payload.sender_id,
           partnerName: payload.sender_name,
         });
         return;
       }
 
-      // ── Appel entrant ────────────────────────────────────────────────────────
-      if (payload.type === 'call_offer') {
-        // Ignorer si c'est l'écho de notre propre appel sortant
-        if (isOutgoingCall(payload.to)) return;
-        const isVideo = (payload.call_type ?? 'voice') === 'video';
-        show({
-          id:          String(Date.now()),
-          kind:        'call',
-          title:       payload.from_name ?? 'Appel entrant',
-          body:        isVideo ? 'Appel video entrant' : 'Appel vocal entrant',
-          icon:        isVideo ? 'video' : 'phone-call',
-          grad:        isVideo ? ['#7B3FF2', '#E0389A'] : ['#10B981', '#36D9A0'],
-          avatarUrl:   payload.from_avatar ?? null,
-          partnerId:   payload.from,
-          partnerName: payload.from_name,
-          callType:    payload.call_type ?? 'voice',
-          offer:       payload.sdp,
-        });
-        return;
-      }
-
-      // ── Appel raccroché — fermer le toast d'appel ────────────────────────────
-      if (payload.type === 'call_hangup') {
-        dismiss();
-      }
+      // call_offer et call_hangup gérés par Notifee full-screen uniquement
     };
 
     addListener(onWsEvent);
     return () => removeListener(onWsEvent);
-  }, [addListener, removeListener, show, dismiss, isOutgoingCall]);
+  }, [addListener, removeListener, show]);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity:   opacity.value,
@@ -217,14 +162,6 @@ export const NotificationToast: React.FC = () => {
     dismiss();
     if (toast.kind === 'message' && toast.partnerId) {
       navigate('Chat', { partnerId: toast.partnerId, partnerName: toast.partnerName ?? '' });
-    } else if (toast.kind === 'call' && toast.partnerId) {
-      navigate('Call', {
-        partnerId:   toast.partnerId,
-        partnerName: toast.partnerName ?? '',
-        callType:    toast.callType ?? 'voice',
-        isIncoming:  true,
-        offer:       toast.offer,
-      });
     } else if (toast.ref_type === 'concert' && toast.ref_id) {
       navigate('ConcertDetail', { concertId: toast.ref_id });
     } else if (toast.ref_type === 'event' && toast.ref_id) {
@@ -236,42 +173,16 @@ export const NotificationToast: React.FC = () => {
     }
   };
 
-  const handleAcceptCall = () => {
-    if (!toast || toast.kind !== 'call') return;
-    dismiss();
-    navigate('Call', {
-      partnerId:   toast.partnerId!,
-      partnerName: toast.partnerName ?? '',
-      partnerAvatar: toast.avatarUrl ?? null,
-      callType:    toast.callType ?? 'voice',
-      isIncoming:  true,
-      offer:       toast.offer,
-      autoAccept:  true,
-    });
-  };
-
-  const handleDeclineCall = () => {
-    if (toast?.kind === 'call' && toast.partnerId) {
-      sendMessage({ type: 'call_hangup', to: toast.partnerId });
-    }
-    dismiss();
-  };
-
   if (!toast) return null;
-
-  const isCall = toast.kind === 'call';
 
   return (
     <Animated.View
       style={[styles.container, { top: insets.top + 8, left: 16 }, animStyle]}
       pointerEvents="box-none"
     >
-      <TouchableOpacity activeOpacity={isCall ? 1 : 0.92} onPress={isCall ? undefined : handlePress} style={styles.touchable}>
-        <View style={[styles.card, { backgroundColor: colors.surface, paddingRight: isCall ? 10 : 14 }]}>
-          {/* Barre colorée gauche */}
+      <TouchableOpacity activeOpacity={0.92} onPress={handlePress} style={styles.touchable}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <LinearGradient colors={toast.grad} style={styles.leftBar} />
-
-          {/* Avatar ou icône */}
           {toast.avatarUrl ? (
             <Image source={{ uri: toast.avatarUrl }} style={styles.avatar} />
           ) : (
@@ -279,8 +190,6 @@ export const NotificationToast: React.FC = () => {
               <Icon name={toast.icon} size={16} color="#fff" />
             </LinearGradient>
           )}
-
-          {/* Texte */}
           <View style={styles.textWrap}>
             <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>
               {toast.title}
@@ -289,22 +198,9 @@ export const NotificationToast: React.FC = () => {
               {toast.body}
             </Text>
           </View>
-
-          {/* Boutons appel ou fermer */}
-          {isCall ? (
-            <View style={styles.callBtns}>
-              <TouchableOpacity style={[styles.callBtn, styles.declineBtn]} onPress={handleDeclineCall}>
-                <Icon name="phone-off" size={15} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.callBtn, styles.acceptBtn]} onPress={handleAcceptCall}>
-                <Icon name="phone" size={15} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity onPress={dismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Icon name="x" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={dismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Icon name="x" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -316,6 +212,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width:    TOAST_W,
     zIndex:   9999,
+    elevation: 99,
   },
   touchable: { borderRadius: 16 },
   card: {
@@ -348,8 +245,4 @@ const styles = StyleSheet.create({
   textWrap: { flex: 1, gap: 2 },
   title: { fontSize: 13, fontWeight: '700' },
   body:  { fontSize: 12, lineHeight: 17 },
-  callBtns:   { flexDirection: 'row', gap: 8 },
-  callBtn:    { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  declineBtn: { backgroundColor: '#EF4444' },
-  acceptBtn:  { backgroundColor: '#10B981' },
 });

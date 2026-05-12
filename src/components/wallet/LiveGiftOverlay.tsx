@@ -5,7 +5,7 @@
  * - Notifications en overlay quand quelqu'un envoie un cadeau (WS gift_received)
  * - Solde coins affiché + lien recharge
  */
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   ScrollView, ActivityIndicator, Animated, Dimensions,
@@ -287,85 +287,65 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
 
 // ── Composant principal exporté ───────────────────────────────────────────────
 
+export interface LiveGiftOverlayRef {
+  openGift: (receiverId: string, receiverName: string) => void;
+}
+
 interface Props {
   liveId: string;
-  receiverId: string;
-  receiverName: string;
-  // Notifs reçues depuis le WS (gift_received events parsés par le parent)
   incomingNotifs: GiftNotif[];
   onNotifShown: (id: string) => void;
 }
 
-export const LiveGiftOverlay: React.FC<Props> = ({
-  liveId, receiverId, receiverName, incomingNotifs, onNotifShown,
-}) => {
-  const [showSheet,   setShowSheet]   = useState(false);
+export const LiveGiftOverlay = React.forwardRef<LiveGiftOverlayRef, Props>((
+  { liveId, incomingNotifs, onNotifShown }, ref,
+) => {
+  const [sheet, setSheet] = useState<{ receiverId: string; receiverName: string } | null>(null);
   const [floats,      setFloats]      = useState<{ id: string; emoji: string }[]>([]);
   const [activeNotif, setActiveNotif] = useState<GiftNotif | null>(null);
 
-  // Afficher les notifs entrantes une par une
+  useImperativeHandle(ref, () => ({
+    openGift: (receiverId, receiverName) => setSheet({ receiverId, receiverName }),
+  }), []);
+
   useEffect(() => {
     if (incomingNotifs.length > 0 && !activeNotif) {
       const next = incomingNotifs[0];
       setActiveNotif(next);
-      // Lancer aussi un emoji flottant
-      const fid = `notif-${next.id}`;
-      setFloats(prev => [...prev, { id: fid, emoji: next.emoji }]);
+      setFloats(prev => [...prev, { id: `notif-${next.id}`, emoji: next.emoji }]);
     }
   }, [incomingNotifs, activeNotif]);
 
   const handleGiftSent = useCallback((emoji: string) => {
-    const id = `sent-${Date.now()}`;
-    setFloats(prev => [...prev, { id, emoji }]);
-  }, []);
-
-  const removeFloat = useCallback((id: string) => {
-    setFloats(prev => prev.filter(f => f.id !== id));
+    setFloats(prev => [...prev, { id: `sent-${Date.now()}`, emoji }]);
   }, []);
 
   return (
     <>
-      {/* Emojis flottants montants */}
       {floats.map(f => (
-        <FloatingGift key={f.id} emoji={f.emoji} onDone={() => removeFloat(f.id)} />
+        <FloatingGift key={f.id} emoji={f.emoji} onDone={() => setFloats(prev => prev.filter(x => x.id !== f.id))} />
       ))}
 
-      {/* Toast cadeau reçu */}
       {activeNotif && (
         <GiftToast
           key={activeNotif.id}
           notif={activeNotif}
-          onDone={() => {
-            onNotifShown(activeNotif.id);
-            setActiveNotif(null);
-          }}
+          onDone={() => { onNotifShown(activeNotif.id); setActiveNotif(null); }}
         />
       )}
 
-      {/* Bouton cadeau (icône cadeau flottant bas droite) */}
-      <TouchableOpacity style={g.giftTrigger} onPress={() => setShowSheet(true)} activeOpacity={0.8}>
-        <LinearGradient
-          colors={['#FFD700', '#FF6B00']}
-          style={g.giftTriggerGrad}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        >
-          <Text style={g.giftTriggerEmoji}>🎁</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-
-      {/* Bottom sheet */}
-      {showSheet && (
+      {sheet && (
         <GiftSheet
           liveId={liveId}
-          receiverId={receiverId}
-          receiverName={receiverName}
-          onClose={() => setShowSheet(false)}
+          receiverId={sheet.receiverId}
+          receiverName={sheet.receiverName}
+          onClose={() => setSheet(null)}
           onGiftSent={handleGiftSent}
         />
       )}
     </>
   );
-};
+});
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 

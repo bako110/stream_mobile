@@ -8,8 +8,7 @@ import type { Event } from '../types/event';
 import type { Concert } from '../types/concert';
 import type { Reel } from '../types/reel';
 import type { Story } from '../types/story';
-
-type SavedKey = keyof typeof SAVED_KEYS;
+import type { Post } from '../types/post';
 
 // ── Helpers génériques ────────────────────────────────────────────────────────
 
@@ -67,11 +66,26 @@ export const saveService = {
   isStorySaved:     (id: string)     => isItemSaved(SAVED_KEYS.STORIES, id),
   getSavedStories:  ()               => loadList<Story>(SAVED_KEYS.STORIES),
 
+  // Posts
+  savePost:         (post: Post)     => addItem(SAVED_KEYS.POSTS,   post),
+  unsavePost:       (id: string)     => removeItem(SAVED_KEYS.POSTS, id),
+  isPostSaved:      (id: string)     => isItemSaved(SAVED_KEYS.POSTS, id),
+  getSavedPosts:    ()               => loadList<Post>(SAVED_KEYS.POSTS),
+
+  // Communities
+  saveCommunity:    (c: { id: string; name: string; avatar_url?: string | null; members_count?: number; description?: string | null }) =>
+                      addItem(SAVED_KEYS.COMMUNITIES, c),
+  unsaveCommunity:  (id: string)     => removeItem(SAVED_KEYS.COMMUNITIES, id),
+  isCommunitysaved: (id: string)     => isItemSaved(SAVED_KEYS.COMMUNITIES, id),
+  getSavedCommunities: ()            => loadList<{ id: string; name: string; avatar_url?: string | null; members_count?: number; description?: string | null }>(SAVED_KEYS.COMMUNITIES),
+
   // Tout effacer
   clearAll: () => {
     storage.removeItem(SAVED_KEYS.EVENTS);
     storage.removeItem(SAVED_KEYS.CONCERTS);
     storage.removeItem(SAVED_KEYS.REELS);
     storage.removeItem(SAVED_KEYS.STORIES);
+    storage.removeItem(SAVED_KEYS.POSTS);
+    storage.removeItem(SAVED_KEYS.COMMUNITIES);
   },
 };

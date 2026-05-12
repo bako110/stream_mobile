@@ -1,5 +1,5 @@
-import React, { createContext, useState, useCallback, useMemo } from 'react';
-import { useColorScheme } from 'react-native';
+import React, { createContext, useState, useCallback, useMemo, useEffect } from 'react';
+import { useColorScheme, StatusBar } from 'react-native';
 import { createTheme, AppTheme } from '../theme';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
@@ -30,6 +30,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [mode, systemScheme]);
 
   const theme = useMemo(() => createTheme(isDark), [isDark]);
+
+  useEffect(() => {
+    try {
+      StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+    } catch {}
+  }, [isDark]);
 
   const setMode = useCallback((m: ThemeMode) => {
     storage.setItem(STORAGE_KEYS.THEME_MODE, m);

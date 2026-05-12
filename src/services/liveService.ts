@@ -63,4 +63,8 @@ async function getStatus(id: string): Promise<LiveStatus> {
   return r.data;
 }
 
-export const liveService = { getLives, getById, startLive, stopLive, getToken, getStatus };
+async function stopAllMine(): Promise<void> {
+  await apiClient.post(`/api/v1/lives/stop_all_mine`);
+}
+
+export const liveService = { getLives, getById, startLive, stopLive, getToken, getStatus, stopAllMine };

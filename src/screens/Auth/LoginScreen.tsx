@@ -28,9 +28,11 @@ interface Props {
   onGoRegister:        () => void;
   onGoForgotPassword?: () => void;
   onGoSocialLogin?:    () => void;
+  onGoCGU?:            () => void;
+  onGoPrivacy?:        () => void;
 }
 
-export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin }) => {
+export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoCGU, onGoPrivacy }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
@@ -102,7 +104,35 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
       await authService.login({ identifier: id, password });
       onLoginSuccess();
     } catch (e: any) {
-      setError(e?.message ?? 'Identifiants incorrects.');
+      // Compte désactivé — proposer la réactivation
+      const detail = e?.data?.detail ?? e?.response?.data?.detail;
+      if (e?.status === 403 && detail?.code === 'account_deactivated') {
+        const { Alert } = require('react-native');
+        Alert.alert(
+          'Compte désactivé',
+          'Votre compte est désactivé. Voulez-vous le réactiver et vous connecter ?',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            {
+              text: 'Réactiver',
+              onPress: async () => {
+                setLoading(true);
+                try {
+                  const id = isEmail ? identifier.trim() : `${country.dial}${identifier.trim()}`;
+                  await authService.reactivate(id, password);
+                  onLoginSuccess();
+                } catch (err: any) {
+                  setError(err?.message ?? 'Impossible de réactiver le compte.');
+                } finally {
+                  setLoading(false);
+                }
+              },
+            },
+          ],
+        );
+      } else {
+        setError(e?.message ?? 'Identifiants incorrects.');
+      }
     } finally {
       setLoading(false);
     }
@@ -273,6 +303,26 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             </TouchableOpacity>
           </Animated.View>
 
+          {/* CGU & Politique */}
+          {(onGoCGU || onGoPrivacy) && (
+            <Animated.View entering={FadeInUp.delay(580).duration(400)} style={styles.cguRow}>
+              <Text style={[styles.cguText, { color: colors.textTertiary }]}>En continuant, vous acceptez nos{' '}</Text>
+              {onGoCGU && (
+                <TouchableOpacity onPress={onGoCGU} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[styles.cguLink, { color: colors.primary }]}>CGU</Text>
+                </TouchableOpacity>
+              )}
+              {onGoCGU && onGoPrivacy && (
+                <Text style={[styles.cguText, { color: colors.textTertiary }]}>{' '}et notre{' '}</Text>
+              )}
+              {onGoPrivacy && (
+                <TouchableOpacity onPress={onGoPrivacy} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[styles.cguLink, { color: colors.primary }]}>Politique de confidentialité</Text>
+                </TouchableOpacity>
+              )}
+            </Animated.View>
+          )}
+
           {/* Boutons sociaux */}
           <Animated.View entering={FadeInUp.delay(600).duration(400)} style={styles.socialRow}>
             <View style={styles.socialDividerRow}>
@@ -368,4 +418,7 @@ const styles = StyleSheet.create({
   socialBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 14, borderWidth: 1 },
   socialBtnText:    { fontSize: 14, fontWeight: '700' },
   googleIcon:       { fontSize: 16, fontWeight: '900', color: '#DB4437', fontFamily: 'serif' },
+  cguRow:           { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', marginTop: 16 },
+  cguText:          { fontSize: 12 },
+  cguLink:          { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
 });

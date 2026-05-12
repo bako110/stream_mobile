@@ -73,8 +73,6 @@ export const feedStyles = StyleSheet.create({
   // ── Card — pleine largeur, 0 border radius ────────────────────────────────
   card: {
     width: SCREEN_W,
-    marginBottom: 10,
-    // Pas de borderRadius, pas de marginHorizontal
   },
 
   // Header auteur style réseau social

@@ -97,6 +97,13 @@ export const ChatScreen: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime,  setRecordTime]  = useState('0:00');
 
+  // Indicateurs temps réel du partenaire
+  const [partnerTyping,    setPartnerTyping]    = useState(false);
+  const [partnerRecording, setPartnerRecording] = useState(false);
+  const partnerTypingTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const partnerRecordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Audio playback
   const [playingId,    setPlayingId]    = useState<string | null>(null);
   const [playProgress, setPlayProgress] = useState(0);
@@ -178,6 +185,24 @@ export const ChatScreen: React.FC = () => {
             ? { ...m, deleted: true, content: '', attachment_url: undefined, attachment_meta: undefined }
             : m,
         ));
+      } else if (payload.type === 'typing' && payload.sender_id === partnerId) {
+        if (payload.is_typing) {
+          setPartnerTyping(true);
+          if (partnerTypingTimer.current) clearTimeout(partnerTypingTimer.current);
+          partnerTypingTimer.current = setTimeout(() => setPartnerTyping(false), 5000);
+        } else {
+          if (partnerTypingTimer.current) clearTimeout(partnerTypingTimer.current);
+          setPartnerTyping(false);
+        }
+      } else if (payload.type === 'recording' && payload.sender_id === partnerId) {
+        if (payload.is_recording) {
+          setPartnerRecording(true);
+          if (partnerRecordingTimer.current) clearTimeout(partnerRecordingTimer.current);
+          partnerRecordingTimer.current = setTimeout(() => setPartnerRecording(false), 30000);
+        } else {
+          if (partnerRecordingTimer.current) clearTimeout(partnerRecordingTimer.current);
+          setPartnerRecording(false);
+        }
       } else if (payload.type === 'presence' && payload.user_id === partnerId) {
         setPartnerOnline(payload.is_online === true);
         setPartnerLastSeen(payload.last_seen_at);
@@ -317,6 +342,19 @@ export const ChatScreen: React.FC = () => {
     }
   };
 
+  // ── Typing indicator ────────────────────────────────────────────────────────
+  const handleTextChange = (val: string) => {
+    setText(val);
+    if (val.trim()) {
+      sendWsMessage({ type: 'typing_start', to: partnerId });
+      if (typingDebounce.current) clearTimeout(typingDebounce.current);
+      typingDebounce.current = setTimeout(() => sendWsMessage({ type: 'typing_stop', to: partnerId }), 3000);
+    } else {
+      if (typingDebounce.current) clearTimeout(typingDebounce.current);
+      sendWsMessage({ type: 'typing_stop', to: partnerId });
+    }
+  };
+
   // ── Voice recording ───────────────────────────────────────────────────────
   const startRecording = async () => {
     if (Platform.OS === 'android') {
@@ -332,6 +370,7 @@ export const ChatScreen: React.FC = () => {
     try {
       setIsRecording(true);
       setRecordTime('0:00');
+      sendWsMessage({ type: 'recording_start', to: partnerId });
       await audioRecorder.startRecorder(undefined, undefined, true);
       audioRecorder.addRecordBackListener((e: any) => {
         setRecordTime(formatDuration(e.currentPosition));
@@ -346,19 +385,16 @@ export const ChatScreen: React.FC = () => {
       const result = await audioRecorder.stopRecorder();
       audioRecorder.removeRecordBackListener();
       setIsRecording(false);
+      sendWsMessage({ type: 'recording_stop', to: partnerId });
       if (!result) return;
 
       setUploading(true);
       const uploaded = await uploadAudioFile(result, `vocal_${Date.now()}.m4a`, 'audio/mp4');
       const msg = await messageService.sendMessage(
-        partnerId,
-        '',
-        'voice',
-        uploaded.url,
-        { duration: uploaded.duration },
+        partnerId, '', 'voice', uploaded.url, { duration: uploaded.duration },
       );
       setMessages(prev => [msg, ...prev]);
-    } catch (e) {
+    } catch {
       Alert.alert('Erreur', 'Impossible d\'envoyer le vocal');
     } finally {
       setUploading(false);
@@ -371,6 +407,7 @@ export const ChatScreen: React.FC = () => {
       audioRecorder.removeRecordBackListener();
     } catch {}
     setIsRecording(false);
+    sendWsMessage({ type: 'recording_stop', to: partnerId });
   };
 
   // ── Audio playback ────────────────────────────────────────────────────────
@@ -971,6 +1008,20 @@ export const ChatScreen: React.FC = () => {
         />
       )}
 
+      {/* Indicateur temps réel du partenaire */}
+      {(partnerTyping || partnerRecording) && !isRecording && (
+        <View style={[styles.partnerStatusBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+          <View style={styles.typingDotsRow}>
+            {[0, 1, 2].map(i => (
+              <View key={i} style={[styles.typingDot, { backgroundColor: colors.textTertiary }]} />
+            ))}
+          </View>
+          <Text style={[styles.partnerStatusText, { color: colors.textTertiary }]}>
+            {partnerRecording ? `${partnerName} enregistre un vocal…` : `${partnerName} est en train d'écrire…`}
+          </Text>
+        </View>
+      )}
+
       {/* Recording indicator */}
       {isRecording && (
         <View style={[styles.recordingBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
@@ -1028,7 +1079,7 @@ export const ChatScreen: React.FC = () => {
             <View style={[styles.inputWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
               <TextInput
                 value={text}
-                onChangeText={setText}
+                onChangeText={handleTextChange}
                 placeholder="Écrire un message…"
                 placeholderTextColor={colors.textDisabled}
                 style={[styles.input, { color: colors.textPrimary }]}
@@ -1368,6 +1419,12 @@ const styles = StyleSheet.create({
   fileInfo:   { flex: 1 },
   fileName:   { fontSize: 14, fontWeight: '600' },
   fileSize:   { fontSize: 11, marginTop: 1 },
+
+  // Partner status (typing / recording)
+  partnerStatusBar:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  partnerStatusText: { fontSize: 13, fontStyle: 'italic' },
+  typingDotsRow:     { flexDirection: 'row', gap: 3, alignItems: 'center' },
+  typingDot:         { width: 5, height: 5, borderRadius: 3, opacity: 0.6 },
 
   // Recording
   recordingBar: {

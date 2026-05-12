@@ -104,6 +104,150 @@ export const homeStyles = StyleSheet.create({
     padding:  0,
   },
 
+  // ── Lives spontanés (cartes larges) ─────────────────────────────────────────
+  spontSection: {
+    marginTop:    14,
+    marginBottom: 4,
+  },
+  spontHeader: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               8,
+    paddingHorizontal: Spacing[4],
+    marginBottom:      12,
+  },
+  spontLiveDot: {
+    width:           8,
+    height:          8,
+    borderRadius:    4,
+    backgroundColor: '#F0365A',
+  },
+  spontTitle: {
+    fontSize:   16,
+    fontWeight: '800',
+    flex:       1,
+  },
+  spontCount: {
+    fontSize:          11,
+    fontWeight:        '700',
+    color:             '#F0365A',
+    backgroundColor:   '#F0365A18',
+    paddingHorizontal: 10,
+    paddingVertical:   4,
+    borderRadius:      12,
+    overflow:          'hidden',
+  },
+  spontScroll: {
+    paddingHorizontal: Spacing[4],
+    gap:               12,
+    paddingBottom:     6,
+  },
+  // carte principale
+  spontCard: {
+    width:        170,
+    borderRadius: 16,
+    overflow:     'hidden',
+  },
+  spontThumb: {
+    width:          170,
+    height:         220,
+    borderRadius:   16,
+    overflow:       'hidden',
+    justifyContent: 'flex-end',
+  },
+  spontBgInitials: {
+    position:   'absolute',
+    alignSelf:  'center',
+    top:        '20%',
+    fontSize:   72,
+    fontWeight: '900',
+    color:      'rgba(255,255,255,0.07)',
+    letterSpacing: 2,
+  },
+  // pill LIVE haut gauche
+  spontLivePill: {
+    position:          'absolute',
+    top:               10,
+    left:              10,
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               5,
+    backgroundColor:   '#F0365A',
+    paddingHorizontal: 8,
+    paddingVertical:   4,
+    borderRadius:      6,
+  },
+  spontLiveDotSmall: {
+    width:           5,
+    height:          5,
+    borderRadius:    3,
+    backgroundColor: '#fff',
+  },
+  spontLivePillText: {
+    color:         '#fff',
+    fontSize:      9,
+    fontWeight:    '900',
+    letterSpacing: 0.8,
+  },
+  // viewers haut droit
+  spontViewersChip: {
+    position:          'absolute',
+    top:               10,
+    right:             10,
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               4,
+    backgroundColor:   'rgba(0,0,0,0.52)',
+    paddingHorizontal: 7,
+    paddingVertical:   4,
+    borderRadius:      20,
+  },
+  spontViewersText: {
+    fontSize:   10,
+    fontWeight: '700',
+    color:      'rgba(255,255,255,0.9)',
+  },
+  // bas de la carte
+  spontCardBottom: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           8,
+    padding:       10,
+  },
+  spontAvatarSmall: {
+    width:        34,
+    height:       34,
+    borderRadius: 17,
+    overflow:     'hidden',
+    borderWidth:  1.5,
+    borderColor:  'rgba(255,255,255,0.4)',
+    flexShrink:   0,
+  },
+  spontAvatarSmallText: {
+    color:      '#fff',
+    fontSize:   13,
+    fontWeight: '800',
+  },
+  spontCardName: {
+    color:      '#fff',
+    fontSize:   12,
+    fontWeight: '800',
+  },
+  spontCardTitle: {
+    color:    'rgba(255,255,255,0.65)',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  // gardés pour compat (plus utilisés mais exportés)
+  spontAvatarRing:    { display: 'none' as any },
+  spontAvatar:        { flex: 1 },
+  spontAvatarText:    { color: '#fff', fontSize: 18, fontWeight: '800' },
+  spontLiveBadge:     { display: 'none' as any },
+  spontLiveBadgeText: { color: '#fff', fontSize: 8, fontWeight: '900' },
+  spontName:          { fontSize: 11, fontWeight: '700' },
+  spontViewers:       { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  spontViewerDot:     { width: 5, height: 5, borderRadius: 3, backgroundColor: '#F0365A' },
+
   // ── Live banner ──────────────────────────────────────────────────────────────
   liveBanner: {
     marginTop:    12,

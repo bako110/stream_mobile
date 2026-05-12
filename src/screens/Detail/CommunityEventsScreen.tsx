@@ -22,6 +22,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { ExpandableText } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityEvent } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -208,9 +209,12 @@ function EventCard({ event, rsvpStatus, onRsvpChange, onEdit, onCancel, onDelete
         )}
 
         {event.description ? (
-          <Text style={[styles.eventDesc, { color: colors.textTertiary }]} numberOfLines={2}>
-            {event.description}
-          </Text>
+          <ExpandableText
+            text={event.description}
+            maxLines={2}
+            primaryColor={colors.primary}
+            textStyle={[styles.eventDesc, { color: colors.textTertiary }]}
+          />
         ) : null}
 
         {event.organizer && (

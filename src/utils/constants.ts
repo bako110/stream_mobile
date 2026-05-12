@@ -20,7 +20,7 @@ export const APP_VERSION = '1.0.0';
 
 // ── Pagination ─────────────────────────────────────────────────────────────
 export const DEFAULT_PAGE_LIMIT  = 20;
-export const REELS_PAGE_LIMIT    = 10;
+export const REELS_PAGE_LIMIT    = 20;
 export const SEARCH_PAGE_LIMIT   = 15;
 
 // ── Plans ──────────────────────────────────────────────────────────────────
@@ -50,8 +50,10 @@ export const DURATIONS = {
 
 // ── Saved items (MMKV keys) ────────────────────────────────────────────────
 export const SAVED_KEYS = {
-  EVENTS:   'folix_saved_events',
-  CONCERTS: 'folix_saved_concerts',
-  REELS:    'folix_saved_reels',
-  STORIES:  'folix_saved_stories',
+  EVENTS:      'folix_saved_events',
+  CONCERTS:    'folix_saved_concerts',
+  REELS:       'folix_saved_reels',
+  STORIES:     'folix_saved_stories',
+  POSTS:       'folix_saved_posts',
+  COMMUNITIES: 'folix_saved_communities',
 } as const;

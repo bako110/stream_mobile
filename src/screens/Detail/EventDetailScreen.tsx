@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  FlatList, TextInput, ActivityIndicator,
-  Share, Alert, KeyboardAvoidingView, Platform, Linking,
+  FlatList, ActivityIndicator,
+  Share, Alert, Platform, Linking,
   Modal, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBar, InteractionManager,
 } from 'react-native';
 
@@ -10,17 +10,16 @@ const { width: SW } = Dimensions.get('window');
 import Animated, {
   FadeInDown, FadeIn,
   useSharedValue, useAnimatedStyle,
-  withSpring, withSequence, runOnJS,
+  withSpring, withSequence,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, saveService, authService } from '../../services';
 import type { Event } from '../../types/event';
-import type { Comment } from '../../types/reel';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -184,28 +183,22 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const [loading,      setLoading]      = useState(true);
   const [isOwner,      setIsOwner]      = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
-  const [myTicket,     setMyTicket]     = useState<any | null>(null);
   const [liked,        setLiked]        = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
   const [saved,        setSaved]        = useState(false);
   const [showVideo,      setShowVideo]      = useState(false);
   const [showComments,   setShowComments]   = useState(false);
-  const [comments,       setComments]       = useState<Comment[]>([]);
-  const [commentText,    setCommentText]    = useState('');
-  const [sendingCmt,     setSendingCmt]     = useState(false);
-  const [loadingCmts,    setLoadingCmts]    = useState(false);
   const [reminded,       setReminded]       = useState(false);
   const [remindLoading,  setRemindLoading]  = useState(false);
   const [hidden,         setHidden]         = useState(false);
   const [paySheetOpen,   setPaySheetOpen]   = useState(false);
+  const [ticketLoading,  setTicketLoading]  = useState(false);
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
-  const sheetY     = useSharedValue(800);
 
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
   const saveStyle  = useAnimatedStyle(() => ({ transform: [{ scale: saveScale.value }] }));
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: sheetY.value }] }));
 
   const loadEvent = useCallback(async () => {
     try {
@@ -218,11 +211,6 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         const tickets = await eventService.getMyTickets();
         const found = tickets.find((t: any) => t.event_id === eventId) ?? null;
         setIsRegistered(!!found);
-        if (found) {
-          // Utilise le ticket tel que retourné par l'API (avec access_code, status, etc.)
-          // On attache event si l'API ne l'a pas retourné
-          setMyTicket(found.event ? found : { ...found, event: data });
-        }
       } catch { /**/ }
       try {
         const counts = await socialService.getReactionCounts({ event_id: eventId });
@@ -239,29 +227,8 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     return () => task.cancel();
   }, [loadEvent]);
 
-  const openComments = async () => {
-    setShowComments(true);
-    sheetY.value = withSpring(0, { damping: 20, stiffness: 200 });
-    setLoadingCmts(true);
-    try { setComments(await socialService.getComments({ event_id: eventId })); } catch { /**/ }
-    finally { setLoadingCmts(false); }
-  };
-
-  const closeComments = () => {
-    sheetY.value = withSpring(800, { damping: 20 }, () => runOnJS(setShowComments)(false));
-    setCommentText('');
-  };
-
-  const sendComment = async () => {
-    if (!commentText.trim()) return;
-    setSendingCmt(true);
-    try {
-      const created = await socialService.createComment({ body: commentText.trim(), event_id: eventId });
-      setComments(prev => [created, ...prev]);
-      setCommentText('');
-    } catch { /**/ }
-    finally { setSendingCmt(false); }
-  };
+  const openComments  = () => setShowComments(true);
+  const closeComments = () => setShowComments(false);
 
   const handleLike = () => {
     heartScale.value = withSequence(withSpring(1.4, { damping: 5, stiffness: 300 }), withSpring(1, { damping: 10 }));
@@ -301,6 +268,20 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       canOpen ? await Linking.openURL(url) : await handleNativeShare();
       socialService.share({ platform: net.key, event_id: eventId }).catch(() => {});
     } catch { Alert.alert('Partage', 'Impossible d\'ouvrir cette application.'); }
+  };
+
+  const handleViewTicket = async () => {
+    setTicketLoading(true);
+    try {
+      const tickets = await eventService.getMyTickets();
+      const fresh = tickets.find((t: any) => t.event_id === eventId);
+      if (fresh) {
+        const full = fresh.event ? fresh : { ...fresh, event };
+        nav.navigate('MyTicket' as any, { ticket: full });
+      }
+    } catch { /**/ } finally {
+      setTicketLoading(false);
+    }
   };
 
   const handleBuyTicket = () => {
@@ -496,7 +477,12 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           <Animated.View entering={FadeInDown.delay(140).springify()}
             style={{ paddingHorizontal: 16, paddingTop: 20, gap: 8 }}>
             <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textTertiary }}>À PROPOS</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}>{event.description}</Text>
+            <ExpandableText
+              text={event.description}
+              maxLines={4}
+              textStyle={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}
+              primaryColor={colors.primary}
+            />
           </Animated.View>
         ) : null}
 
@@ -591,18 +577,17 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               <Icon name="trash-2" size={16} color={colors.error} />
             </TouchableOpacity>
           </View>
-        ) : isRegistered && myTicket ? (
-          /* Inscrit — bouton "Voir mon billet" */
-          <TouchableOpacity
-            onPress={() => nav.navigate('MyTicket' as any, { ticket: myTicket })}
-            activeOpacity={0.85}
-          >
+        ) : isRegistered ? (
+          /* Inscrit — appel API pour récupérer le ticket frais */
+          <TouchableOpacity onPress={handleViewTicket} disabled={ticketLoading} activeOpacity={0.85}>
             <LinearGradient
               colors={['#10B981', '#059669']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                 gap: 8, paddingVertical: 16, borderRadius: 14 }}>
-              <Icon name="credit-card" size={20} color="#fff" />
+              {ticketLoading
+                ? <ActivityIndicator color="#fff" />
+                : <Icon name="credit-card" size={20} color="#fff" />}
               <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Voir mon billet</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -635,7 +620,6 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             setIsRegistered(true);
             if (ticket) {
               const full = ticket.event ? ticket : { ...ticket, event };
-              setMyTicket(full);
               nav.navigate('MyTicket' as any, { ticket: full });
             }
           }}
@@ -649,74 +633,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       )}
 
       {/* ── Sheet commentaires ────────────────────────────────────────── */}
-      {showComments && (
-        <>
-          <TouchableOpacity style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' }}
-            activeOpacity={1} onPress={closeComments} />
-          <Animated.View style={[{
-            position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '75%',
-            borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden',
-            backgroundColor: colors.surface,
-          }, sheetStyle]}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border,
-              alignSelf: 'center', marginTop: 10, marginBottom: 8 }} />
-            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.textPrimary,
-              paddingHorizontal: 16, paddingBottom: 12 }}>Commentaires</Text>
-            {loadingCmts ? (
-              <ActivityIndicator color={colors.primary} style={{ padding: 20 }} />
-            ) : (
-              <FlatList
-                data={comments} keyExtractor={c => c.id} style={{ maxHeight: 320 }}
-                ListEmptyComponent={
-                  <View style={{ alignItems: 'center', padding: 24, gap: 8 }}>
-                    <Icon name="message-circle" size={36} color={colors.textTertiary} />
-                    <Text style={{ color: colors.textTertiary }}>Soyez le premier à commenter</Text>
-                  </View>
-                }
-                renderItem={({ item: cmt }) => (
-                  <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 12,
-                    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
-                    <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]}
-                      style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
-                        {getInitials(cmt.author?.display_name ?? cmt.author?.username)}
-                      </Text>
-                    </LinearGradient>
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
-                        {cmt.author?.display_name ?? cmt.author?.username ?? 'Utilisateur'}
-                      </Text>
-                      <Text style={{ fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>{cmt.body}</Text>
-                      <Text style={{ fontSize: 11, color: colors.textTertiary }}>
-                        {new Date(cmt.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              />
-            )}
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10,
-                paddingHorizontal: 16, paddingVertical: 12,
-                paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-                borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
-                <TextInput
-                  value={commentText} onChangeText={setCommentText}
-                  placeholder="Ajouter un commentaire..." placeholderTextColor={colors.textDisabled}
-                  style={{ flex: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
-                    fontSize: 14, backgroundColor: colors.inputBg, color: colors.textPrimary }}
-                  returnKeyType="send" onSubmitEditing={sendComment}
-                />
-                <TouchableOpacity onPress={sendComment} disabled={sendingCmt || !commentText.trim()}
-                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary,
-                    alignItems: 'center', justifyContent: 'center' }}>
-                  {sendingCmt ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="send" size={15} color="#fff" />}
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </>
-      )}
+      <CommentsBottomSheet
+        visible={showComments}
+        onClose={closeComments}
+        eventId={eventId}
+      />
     </View>
   );
 };
