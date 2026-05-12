@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, Image, StyleSheet, Alert,
   Modal, TextInput, KeyboardAvoidingView, Platform, Dimensions,
-  FlatList, StatusBar,
+  FlatList, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withSequence,
 } from 'react-native-reanimated';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
 import type { AppColors } from '../../theme/colors';
 import type { Post } from '../../types/post';
@@ -134,6 +135,90 @@ function timeAgo(iso: string): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
   return `${Math.floor(diff / 86400)} j`;
 }
+
+// ── Modal vidéo fullscreen avec player autonome ───────────────────────────────
+const VideoFsModal: React.FC<{
+  visible: boolean;
+  uri: string;
+  thumbnailUri?: string | null;
+  onClose: () => void;
+  onViewPost: () => void;
+}> = ({ visible, uri, thumbnailUri, onClose, onViewPost }) => {
+  const [navigating, setNavigating] = useState(false);
+
+  const player = useVideoPlayer({ uri }, p => {
+    p.loop = false;
+    p.muted = false;
+  });
+
+  // play/pause en sync avec la visibilité
+  React.useEffect(() => {
+    if (visible) {
+      setNavigating(false);
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [visible]);
+
+  const handleViewPost = () => {
+    setNavigating(true);
+    player.pause();
+    // Petite pause pour que la pause soit effective avant la navigation
+    setTimeout(() => {
+      onClose();
+      onViewPost();
+    }, 120);
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={false}
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <StatusBar hidden />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <VideoView
+            player={player}
+            style={{ width: '100%', aspectRatio: 16 / 9 }}
+            resizeMode="contain"
+            controls
+          />
+        </View>
+
+        {/* Bouton fermer */}
+        <TouchableOpacity
+          style={pc.vfClose}
+          onPress={onClose}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon name="x" size={20} color="#fff" />
+        </TouchableOpacity>
+
+        {/* Bouton voir détails */}
+        <TouchableOpacity
+          style={pc.vfDetails}
+          onPress={handleViewPost}
+          activeOpacity={0.85}
+          disabled={navigating}
+        >
+          {navigating ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Icon name="arrow-right" size={14} color="#fff" />
+              <Text style={pc.vfDetailsTxt}>Voir les détails</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+};
 
 export const PostCard: React.FC<PostCardProps> = ({
   post, colors, currentUserId, onPress, onAuthorPress, onDelete,
@@ -595,45 +680,15 @@ export const PostCard: React.FC<PostCardProps> = ({
       </Modal>
 
       {/* Modal vidéo fullscreen */}
-      <Modal
-        visible={videoFs}
-        transparent={false}
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setVideoFs(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <StatusBar hidden />
-          {/* Player avec contrôles natifs */}
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <InlineVideoPlayer
-              uri={post.video_url!}
-              thumbnailUri={post.thumbnail_url}
-              aspectRatio={16 / 9}
-              borderRadius={0}
-              showControls
-              autoPlay
-            />
-          </View>
-          {/* Bouton fermer */}
-          <TouchableOpacity
-            style={pc.vfClose}
-            onPress={() => setVideoFs(false)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Icon name="x" size={20} color="#fff" />
-          </TouchableOpacity>
-          {/* Bouton voir détails */}
-          <TouchableOpacity
-            style={pc.vfDetails}
-            onPress={() => { setVideoFs(false); onPress(); }}
-            activeOpacity={0.85}
-          >
-            <Icon name="arrow-right" size={14} color="#fff" />
-            <Text style={pc.vfDetailsTxt}>Voir les détails</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      {post.video_url && (
+        <VideoFsModal
+          visible={videoFs}
+          uri={post.video_url}
+          thumbnailUri={post.thumbnail_url}
+          onClose={() => setVideoFs(false)}
+          onViewPost={onPress}
+        />
+      )}
 
       {/* Modal édition */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
