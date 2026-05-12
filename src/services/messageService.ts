@@ -1,6 +1,6 @@
 import { apiClient, Endpoints } from '../api';
 
-export type MessageType = 'text' | 'voice' | 'image' | 'video' | 'file';
+export type MessageType = 'text' | 'voice' | 'image' | 'video' | 'file' | 'sticker' | 'location';
 
 export interface AttachmentMeta {
   duration?:      number;
@@ -10,6 +10,9 @@ export interface AttachmentMeta {
   width?:         number;
   height?:        number;
   mime_type?:     string;
+  latitude?:      number;
+  longitude?:     number;
+  address?:       string | null;
 }
 
 export interface ConversationSummary {
@@ -80,5 +83,10 @@ export const messageService = {
 
   async deleteMessage(messageId: string): Promise<void> {
     await apiClient.delete(Endpoints.messages.message(messageId));
+  },
+
+  async reactToMessage(messageId: string, emoji: string): Promise<{ message_id: string; user_id: string; emoji: string | null }> {
+    const res = await apiClient.post(`/api/v1/messages/${messageId}/react`, { emoji });
+    return res.data;
   },
 };

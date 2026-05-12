@@ -15,8 +15,10 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import { pick, types } from '@react-native-documents/picker';
+import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
+import Geolocation from '@react-native-community/geolocation';
 import Slider from '@react-native-community/slider';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useTheme } from '../../hooks/useTheme';
@@ -76,6 +78,8 @@ const audioRecorder = new AudioRecorderPlayerClass();
 const { width: SCREEN_W } = Dimensions.get('window');
 
 export const ChatScreen: React.FC = () => {
+  const insets            = useSafeAreaInsets();
+  const STATUS_H          = insets.top;
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav               = useNavigation<any>();
@@ -102,11 +106,23 @@ export const ChatScreen: React.FC = () => {
   // Attachment modal
   const [showAttach,  setShowAttach]  = useState(false);
   const [uploading,   setUploading]   = useState(false);
+  const [locating,    setLocating]    = useState(false);
 
-  // Edit / Delete
+  // Preview avant envoi image (style WhatsApp)
+  const [imgPreviewUri,    setImgPreviewUri]    = useState<string | null>(null);
+  const [imgPreviewMeta,   setImgPreviewMeta]   = useState<{ fileName?: string; type?: string } | null>(null);
+  const [imgCaption,       setImgCaption]       = useState('');
+  const [imgPreviewOpen,   setImgPreviewOpen]   = useState(false);
+  const [imgUploading,     setImgUploading]     = useState(false);
+  const captionRef = useRef<TextInput>(null);
+
+  // Edit / Delete / React
   const [editingMsg,    setEditingMsg]    = useState<Message | null>(null);
   const [selectedMsg,   setSelectedMsg]   = useState<Message | null>(null);
   const [showActions,   setShowActions]   = useState(false);
+  const [reactions,     setReactions]     = useState<Record<string, string>>({});
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
 
   // Partner presence
   const [partnerOnline,   setPartnerOnline]   = useState(initialIsOnline ?? false);
@@ -115,7 +131,6 @@ export const ChatScreen: React.FC = () => {
 
   const listRef = useRef<FlatList>(null);
   const myIdRef = useRef<string | null>(null);
-  const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 44;
 
   // WebSocket (global context)
   const { sendMessage: sendWsMessage, isConnected, addListener, removeListener, setActiveChat } = useWs();
@@ -161,6 +176,16 @@ export const ChatScreen: React.FC = () => {
         setPartnerLastSeen(payload.last_seen_at);
       } else if (payload.type === 'error' && payload.detail === 'blocked') {
         setIsBlocked(true);
+      } else if (payload.type === 'message_reaction') {
+        const { message_id, emoji } = payload as any;
+        setReactions(prev => {
+          if (!emoji) {
+            const next = { ...prev };
+            delete next[message_id];
+            return next;
+          }
+          return { ...prev, [message_id]: emoji };
+        });
       }
     };
     addListener(handler);
@@ -190,11 +215,18 @@ export const ChatScreen: React.FC = () => {
   const loadMessages = useCallback(async (p = 1) => {
     try {
       const data = await messageService.getMessages(partnerId, p, 30);
+      // Initialiser/mettre à jour les réactions depuis les messages chargés
+      const newReactions: Record<string, string> = {};
+      data.forEach((m: any) => {
+        if (m.reaction) newReactions[m.id] = m.reaction;
+      });
       if (p === 1) {
         setMessages(data);
+        setReactions(newReactions);
         setHasMore(data.length === 30);
       } else {
         setMessages(prev => [...prev, ...data]);
+        setReactions(prev => ({ ...prev, ...newReactions }));
         setHasMore(data.length === 30);
       }
     } catch (e: any) {
@@ -253,6 +285,28 @@ export const ChatScreen: React.FC = () => {
       }
     } finally {
       setSending(false);
+    }
+  };
+
+  const sendSticker = async (emoji: string) => {
+    setShowStickerPicker(false);
+    const tempId = `pending-${Date.now()}`;
+    const optimistic = {
+      id: tempId,
+      sender_id: myId ?? '',
+      receiver_id: partnerId,
+      content: emoji,
+      message_type: 'sticker' as const,
+      created_at: new Date().toISOString(),
+      read: false,
+      pending: true,
+    };
+    setMessages(prev => [optimistic, ...prev]);
+    try {
+      const msg = await messageService.sendMessage(partnerId, emoji, 'sticker');
+      setMessages(prev => prev.map(m => m.id === tempId ? msg : m));
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
 
@@ -342,43 +396,48 @@ export const ChatScreen: React.FC = () => {
   };
 
   // ── Attachment handlers ───────────────────────────────────────────────────
+  const openImagePreview = (uri: string, fileName?: string, type?: string) => {
+    setImgPreviewUri(uri);
+    setImgPreviewMeta({ fileName, type });
+    setImgCaption('');
+    setImgPreviewOpen(true);
+  };
+
   const pickImage = async () => {
     setShowAttach(false);
-    try {
-      const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 as any });
-      const asset = result.assets?.[0];
-      if (!asset?.uri) return;
-      setUploading(true);
-      const uploaded = await uploadMessageImage(asset.uri, asset.fileName, asset.type);
-      const msg = await messageService.sendMessage(
-        partnerId, '', 'image', uploaded.url,
-        { width: uploaded.width, height: uploaded.height },
-      );
-      setMessages(prev => [msg, ...prev]);
-    } catch {
-      Alert.alert('Erreur', 'Impossible d\'envoyer l\'image');
-    } finally {
-      setUploading(false);
-    }
+    const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 as any });
+    const asset = result.assets?.[0];
+    if (!asset?.uri) return;
+    openImagePreview(asset.uri, asset.fileName, asset.type);
   };
 
   const takePhoto = async () => {
     setShowAttach(false);
+    const result = await launchCamera({ mediaType: 'photo', quality: 0.8 as any });
+    const asset = result.assets?.[0];
+    if (!asset?.uri) return;
+    openImagePreview(asset.uri, asset.fileName, asset.type);
+  };
+
+  const handleSendImagePreview = async () => {
+    if (!imgPreviewUri || imgUploading) return;
+    setImgUploading(true);
     try {
-      const result = await launchCamera({ mediaType: 'photo', quality: 0.8 as any });
-      const asset = result.assets?.[0];
-      if (!asset?.uri) return;
-      setUploading(true);
-      const uploaded = await uploadMessageImage(asset.uri, asset.fileName, asset.type);
+      const uploaded = await uploadMessageImage(imgPreviewUri, imgPreviewMeta?.fileName);
+      const caption = imgCaption.trim();
       const msg = await messageService.sendMessage(
-        partnerId, '', 'image', uploaded.url,
+        partnerId, caption, 'image', uploaded.url,
         { width: uploaded.width, height: uploaded.height },
       );
       setMessages(prev => [msg, ...prev]);
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'envoyer la photo');
+      Alert.alert('Erreur', "Impossible d'envoyer l'image");
     } finally {
-      setUploading(false);
+      setImgUploading(false);
+      setImgPreviewOpen(false);
+      setImgPreviewUri(null);
+      setImgPreviewMeta(null);
+      setImgCaption('');
     }
   };
 
@@ -449,6 +508,26 @@ export const ChatScreen: React.FC = () => {
     }
   };
 
+  const sendLocation = () => {
+    setShowAttach(false);
+    setLocating(true);
+    Geolocation.getCurrentPosition(
+      async (pos) => {
+        setLocating(false);
+        const { latitude, longitude } = pos.coords;
+        try {
+          const msg = await messageService.sendMessage(
+            partnerId, '', 'location', undefined,
+            { latitude, longitude, address: null },
+          );
+          setMessages(prev => [msg, ...prev]);
+        } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+      },
+      (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+    );
+  };
+
   // ── Call handlers ─────────────────────────────────────────────────────────
   const startCall = (callType: 'voice' | 'video') => {
     nav.navigate('Call', {
@@ -463,9 +542,37 @@ export const ChatScreen: React.FC = () => {
 
   // ── Long-press actions ────────────────────────────────────────────────────
   const onLongPressMessage = (msg: Message) => {
-    if (!isMine(msg) || msg.deleted) return;
+    if (msg.deleted) return;
     setSelectedMsg(msg);
     setShowActions(true);
+  };
+
+  const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🔥'];
+
+  const reactToMessage = async (emoji: string) => {
+    if (!selectedMsg) return;
+    setShowActions(false);
+    const msgId = selectedMsg.id;
+    setSelectedMsg(null);
+    try {
+      const res = await messageService.reactToMessage(msgId, emoji);
+      setReactions(prev => {
+        if (!res.emoji) {
+          const next = { ...prev };
+          delete next[msgId];
+          return next;
+        }
+        return { ...prev, [msgId]: res.emoji };
+      });
+    } catch {}
+  };
+
+  const copyMessage = () => {
+    if (!selectedMsg) return;
+    const { Clipboard } = require('react-native');
+    Clipboard?.setString?.(selectedMsg.content);
+    setShowActions(false);
+    setSelectedMsg(null);
   };
 
   const startEdit = () => {
@@ -537,6 +644,10 @@ export const ChatScreen: React.FC = () => {
     const msgType = item.message_type || 'text';
 
     switch (msgType) {
+      case 'sticker':
+        return (
+          <Text style={styles.stickerText}>{item.content}</Text>
+        );
       case 'voice': {
         const duration = item.attachment_meta?.duration ?? 0;
         const isPlaying = playingId === item.id;
@@ -647,6 +758,31 @@ export const ChatScreen: React.FC = () => {
             <Icon name="download" size={18} color={subtextColor} />
           </TouchableOpacity>
         );
+
+      case 'location': {
+        const lat = item.attachment_meta?.latitude;
+        const lng = item.attachment_meta?.longitude;
+        const addr = item.attachment_meta?.address;
+        const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+        return (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 180 }}
+            onPress={() => Linking.openURL(mapsUrl)}
+            activeOpacity={0.8}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: mine ? 'rgba(255,255,255,0.2)' : '#EF444420', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="map-pin" size={20} color={mine ? '#fff' : '#EF4444'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.msgText, { color: textColor, fontWeight: '700' }]}>Localisation</Text>
+              <Text style={{ color: subtextColor, fontSize: 12, marginTop: 2 }} numberOfLines={2}>
+                {addr ?? (lat != null ? `${lat.toFixed(5)}, ${lng?.toFixed(5)}` : '…')}
+              </Text>
+            </View>
+            <Icon name="external-link" size={16} color={subtextColor} />
+          </TouchableOpacity>
+        );
+      }
 
       default: // text
         return <Text style={[styles.msgText, { color: textColor }]}>{item.content}</Text>;
@@ -798,6 +934,11 @@ export const ChatScreen: React.FC = () => {
                     </View>
                   )}
                 </TouchableOpacity>
+                {reactions[item.id] && (
+                  <View style={[styles.reactionBadge, mine ? styles.reactionMine : styles.reactionTheirs]}>
+                    <Text style={styles.reactionEmoji}>{reactions[item.id]}</Text>
+                  </View>
+                )}
               </Animated.View>
             );
           }}
@@ -868,7 +1009,14 @@ export const ChatScreen: React.FC = () => {
                 multiline
                 maxLength={2000}
                 returnKeyType="default"
+                onFocus={() => { setShowEmojiPicker(false); setShowStickerPicker(false); }}
               />
+              <TouchableOpacity onPress={() => { setShowEmojiPicker(false); setShowStickerPicker(p => !p); }} style={styles.emojiBtn}>
+                <Text style={styles.emojiBtnText}>🎭</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setShowStickerPicker(false); setShowEmojiPicker(p => !p); }} style={styles.emojiBtn}>
+                <Text style={styles.emojiBtnText}>😊</Text>
+              </TouchableOpacity>
             </View>
 
             {text.trim().length > 0 ? (
@@ -908,18 +1056,136 @@ export const ChatScreen: React.FC = () => {
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setShowActions(false); setSelectedMsg(null); }}>
           <View style={[styles.actionSheet, { backgroundColor: colors.surface }]}>
             <View style={[styles.attachHandle, { backgroundColor: colors.divider }]} />
+
+            {/* Reactions rapides */}
+            <View style={styles.reactionsRow}>
+              {QUICK_REACTIONS.map(emoji => (
+                <TouchableOpacity key={emoji} style={styles.reactionQuickBtn} onPress={() => reactToMessage(emoji)}>
+                  <Text style={styles.reactionQuickText}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={[styles.attachHandle, { backgroundColor: colors.divider, marginBottom: 8 }]} />
+
+            {/* Copier */}
             {selectedMsg && selectedMsg.message_type === 'text' && (
+              <TouchableOpacity style={styles.actionItem} onPress={copyMessage}>
+                <Icon name="copy" size={20} color={colors.textPrimary} />
+                <Text style={[styles.actionText, { color: colors.textPrimary }]}>Copier</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Modifier — seulement ses propres messages texte */}
+            {selectedMsg && isMine(selectedMsg) && selectedMsg.message_type === 'text' && (
               <TouchableOpacity style={styles.actionItem} onPress={startEdit}>
                 <Icon name="edit-2" size={20} color={colors.primary} />
                 <Text style={[styles.actionText, { color: colors.textPrimary }]}>Modifier</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.actionItem} onPress={confirmDelete}>
-              <Icon name="trash-2" size={20} color={colors.error ?? '#FF4444'} />
-              <Text style={[styles.actionText, { color: colors.error ?? '#FF4444' }]}>Supprimer pour tous</Text>
-            </TouchableOpacity>
+
+            {/* Supprimer — seulement ses propres messages */}
+            {selectedMsg && isMine(selectedMsg) && (
+              <TouchableOpacity style={styles.actionItem} onPress={confirmDelete}>
+                <Icon name="trash-2" size={20} color={colors.error ?? '#FF4444'} />
+                <Text style={[styles.actionText, { color: colors.error ?? '#FF4444' }]}>Supprimer</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Sticker picker panel */}
+      {showStickerPicker && (
+        <View style={[styles.emojiPanel, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+          {[
+            '❤️','🔥','😂','😍','🥰','😎','🤔','😢','😡','👍',
+            '🎉','💯','🙌','💪','🫶','🥳','😇','🤩','😏','😜',
+            '👏','🫠','🤯','🥹','😴','🤣','😅','🫡','💀','✨',
+            '🐶','🐱','🦊','🐻','🐼','🐨','🦁','🐯','🐸','🐙',
+            '🍕','🍔','🍦','🎂','🍩','🍭','🍿','☕','🧃','🥤',
+          ].map(emoji => (
+            <TouchableOpacity key={emoji} style={styles.emojiItem} onPress={() => sendSticker(emoji)}>
+              <Text style={{ fontSize: 36 }}>{emoji}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* Emoji picker panel */}
+      {showEmojiPicker && (
+        <View style={[styles.emojiPanel, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+          {[
+            '😀','😂','😍','🥰','😎','🤔','😢','😡','👍','👎',
+            '❤️','🔥','🎉','💯','✅','😮','🙏','😴','🤣','😅',
+            '💪','🫶','🥹','😏','🤩','😇','🤗','😬','🥳','😜',
+          ].map(emoji => (
+            <TouchableOpacity key={emoji} style={styles.emojiItem} onPress={() => { setText(p => p + emoji); }}>
+              <Text style={styles.emojiText}>{emoji}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* ── Preview avant envoi image (style WhatsApp) ── */}
+      <Modal
+        visible={imgPreviewOpen}
+        transparent={false}
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => { if (!imgUploading) { setImgPreviewOpen(false); setImgPreviewUri(null); setImgCaption(''); } }}
+      >
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <StatusBar hidden />
+
+          {/* Header */}
+          <View style={CP.header}>
+            <TouchableOpacity
+              onPress={() => { if (!imgUploading) { setImgPreviewOpen(false); setImgPreviewUri(null); setImgCaption(''); } }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={CP.headerClose}
+            >
+              <Icon name="x" size={22} color="#fff" />
+            </TouchableOpacity>
+            <Text style={CP.headerTitle}>Aperçu</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {/* Image */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            {imgPreviewUri ? (
+              <Image source={{ uri: imgPreviewUri }} style={{ width: SCREEN_W, height: SCREEN_W * 1.1 }} resizeMode="contain" />
+            ) : null}
+          </View>
+
+          {/* Barre légende + envoyer */}
+          <View style={CP.bottomBar}>
+            <View style={CP.captionRow}>
+              <Icon name="edit-3" size={16} color="rgba(255,255,255,0.5)" />
+              <TextInput
+                ref={captionRef}
+                style={CP.captionInput}
+                placeholder="Ajouter une légende…"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={imgCaption}
+                onChangeText={setImgCaption}
+                multiline
+                maxLength={500}
+              />
+            </View>
+            <TouchableOpacity
+              style={[CP.sendBtn, imgUploading && { opacity: 0.6 }]}
+              onPress={handleSendImagePreview}
+              disabled={imgUploading}
+              activeOpacity={0.85}
+            >
+              {imgUploading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Icon name="send" size={20} color="#fff" />
+              }
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Attachment picker modal */}
@@ -930,10 +1196,11 @@ export const ChatScreen: React.FC = () => {
             <Text style={[styles.attachTitle, { color: colors.textPrimary }]}>Envoyer un média</Text>
             <View style={styles.attachGrid}>
               {[
-                { icon: 'image',    label: 'Photo',   color: '#4CAF50', onPress: pickImage },
-                { icon: 'camera',   label: 'Caméra',  color: '#E91E63', onPress: takePhoto },
-                { icon: 'video',    label: 'Vidéo',   color: '#9C27B0', onPress: pickVideo },
-                { icon: 'file',     label: 'Fichier', color: '#FF9800', onPress: pickFile },
+                { icon: 'image',    label: 'Photo',        color: '#4CAF50', onPress: pickImage },
+                { icon: 'camera',   label: 'Caméra',       color: '#E91E63', onPress: takePhoto },
+                { icon: 'video',    label: 'Vidéo',        color: '#9C27B0', onPress: pickVideo },
+                { icon: 'file',     label: 'Fichier',      color: '#FF9800', onPress: pickFile },
+                { icon: 'map-pin',  label: 'Localisation', color: '#EF4444', onPress: sendLocation },
               ].map((item, i) => (
                 <TouchableOpacity key={i} style={styles.attachItem} onPress={item.onPress}>
                   <View style={[styles.attachIcon, { backgroundColor: item.color + '18' }]}>
@@ -1108,5 +1375,67 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+
+  // Emoji picker button inside input
+  emojiBtn:     { paddingHorizontal: 6, justifyContent: 'center' },
+  emojiBtnText: { fontSize: 20 },
+
+  // Emoji picker panel
+  emojiPanel: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  emojiItem: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  emojiText: { fontSize: 26 },
+
+  // Quick reactions in action sheet
+  reactionsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 12 },
+  reactionQuickBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  reactionQuickText: { fontSize: 28 },
+
+  // Reaction badge under bubble
+  reactionBadge: {
+    position: 'absolute',
+    bottom: -10,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  reactionMine:   { right: 8 },
+  reactionTheirs: { left: 8 },
+  reactionEmoji:  { fontSize: 14 },
+  stickerText:    { fontSize: 64, lineHeight: 72 },
+});
+
+const CP = StyleSheet.create({
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12,
+  },
+  headerClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  bottomBar: {
+    flexDirection: 'row', alignItems: 'flex-end',
+    paddingHorizontal: 12, paddingBottom: 28, paddingTop: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)', gap: 10,
+  },
+  captionRow: {
+    flex: 1, flexDirection: 'row', alignItems: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 24,
+    paddingHorizontal: 12, paddingVertical: 8, gap: 8,
+  },
+  captionInput: {
+    flex: 1, color: '#fff', fontSize: 15, maxHeight: 100, paddingVertical: 0,
+  },
+  sendBtn: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: '#25D366',
+    alignItems: 'center', justifyContent: 'center',
   },
 });

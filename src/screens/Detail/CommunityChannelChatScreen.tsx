@@ -18,6 +18,7 @@ import { communityService } from '../../services/communityService';
 import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import { uploadMessageVideo } from '../../services/uploadService';
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
 import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
@@ -238,6 +239,27 @@ export const CommunityChannelChatScreen: React.FC = () => {
     }
   };
 
+  // ── Vidéo ────────────────────────────────────────────────────────────────────
+  const handlePickVideo = async () => {
+    setAttachOpen(false);
+    try {
+      const result = await launchImageLibrary({ mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any });
+      const asset = result.assets?.[0];
+      if (!asset?.uri) return;
+      setSending(true);
+      const uploaded = await uploadMessageVideo(asset.uri, asset.fileName, asset.type);
+      const reply_to_id = replyingTo?.id;
+      setReplyingTo(null);
+      const msg = await communityService.sendChannelMessage(
+        communityId, channelId, null as any, 'video', [uploaded.url], reply_to_id,
+        { duration: uploaded.duration, thumbnail_url: uploaded.thumbnail_url },
+      );
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la vidéo.'); }
+    finally { setSending(false); }
+  };
+
   // ── Audio ────────────────────────────────────────────────────────────────────
   const handlePickAudio = async () => {
     setAttachOpen(false);
@@ -385,6 +407,36 @@ export const CommunityChannelChatScreen: React.FC = () => {
     }
 
     const renderBubbleContent = () => {
+      // Vidéo
+      if (msg.message_type === 'video') {
+        const thumb = msg.metadata?.thumbnail_url;
+        const dur = msg.metadata?.duration;
+        return (
+          <TouchableOpacity
+            style={[C.bubble, { backgroundColor: bubbleBg, padding: 0, overflow: 'hidden' }, isMe ? myRadius : otherRadius]}
+            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
+            activeOpacity={0.8}
+          >
+            {thumb
+              ? <Image source={{ uri: thumb }} style={{ width: maxW, height: maxW * 0.6 }} resizeMode="cover" />
+              : <View style={{ width: maxW, height: maxW * 0.6, backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="video" size={36} color={isMe ? '#fff' : colors.primary} />
+                </View>
+            }
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.22)' }}>
+              <Icon name="play-circle" size={44} color="rgba(255,255,255,0.9)" />
+            </View>
+            {dur != null && (
+              <View style={{ position: 'absolute', bottom: 8, right: 10 }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 }}>
+                  {fmtDuration(dur)}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      }
+
       // Image
       if (msg.message_type === 'image' || msg.message_type === 'media') {
         return (
@@ -699,11 +751,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
             <Text style={[C.attachTitle, { color: colors.textPrimary }]}>Envoyer</Text>
             <View style={C.attachGrid}>
               {[
-                { icon: 'image',   label: 'Galerie',      color: '#7B3FF2', onPress: handlePickImage },
-                { icon: 'camera',  label: 'Appareil photo', color: '#10B981', onPress: handlePickCamera },
-                { icon: 'headphones', label: 'Audio',     color: '#F59E0B', onPress: handlePickAudio },
-                { icon: 'file-text', label: 'Fichier',    color: '#3B82F6', onPress: handlePickFile },
-                { icon: 'map-pin', label: 'Localisation', color: '#EF4444', onPress: handleSendLocation },
+                { icon: 'image',      label: 'Galerie',       color: '#7B3FF2', onPress: handlePickImage },
+                { icon: 'camera',     label: 'Appareil photo',color: '#10B981', onPress: handlePickCamera },
+                { icon: 'video',      label: 'Vidéo',         color: '#9C27B0', onPress: handlePickVideo },
+                { icon: 'headphones', label: 'Audio',         color: '#F59E0B', onPress: handlePickAudio },
+                { icon: 'file-text',  label: 'Fichier',       color: '#3B82F6', onPress: handlePickFile },
+                { icon: 'map-pin',    label: 'Localisation',  color: '#EF4444', onPress: handleSendLocation },
               ].map(item => (
                 <TouchableOpacity key={item.label} style={C.attachItem} onPress={item.onPress} activeOpacity={0.8}>
                   <View style={[C.attachIconBox, { backgroundColor: item.color + '18' }]}>

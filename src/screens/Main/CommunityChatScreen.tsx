@@ -3,19 +3,23 @@ import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
   ActivityIndicator, Image, Alert, Modal, Pressable,
-  ScrollView, Dimensions, Animated,
+  ScrollView, Dimensions, Animated, Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
 import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
+import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
+import Geolocation from '@react-native-community/geolocation';
+import { uploadMessageVideo } from '../../services/uploadService';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -28,7 +32,12 @@ interface PollData {
   total_votes: number; my_votes: string[];
   ends_at: string | null; allow_multiple: boolean; ended: boolean;
 }
-type CommunityMessage = Omit<CommunityMessageData, 'poll'> & { poll: PollData | null; };
+type SystemEventKind = 'joined' | 'blocked' | 'unblocked';
+type CommunityMessage = Omit<CommunityMessageData, 'poll'> & {
+  poll: PollData | null;
+  // messages système locaux (jamais envoyés au serveur)
+  _system?: { kind: SystemEventKind; name: string };
+};
 type ChatTab = 'discussion' | 'announcements' | 'media' | 'polls';
 
 const TABS: { key: ChatTab; label: string; icon: string }[] = [
@@ -38,6 +47,30 @@ const TABS: { key: ChatTab; label: string; icon: string }[] = [
   { key: 'polls',         label: 'Sondages',    icon: 'bar-chart-2' },
 ];
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '👏', '🔥', '🎉'];
+
+let _sysMsgCounter = 0;
+function makeSystemMsg(kind: SystemEventKind, name: string): CommunityMessage {
+  return {
+    id: `sys_${kind}_${Date.now()}_${++_sysMsgCounter}`,
+    community_id: '',
+    sender_id: '',
+    sender_username: null,
+    sender_display_name: null,
+    sender_avatar_url: null,
+    message_type: 'text',
+    content: null,
+    media_urls: [],
+    metadata: null,
+    reply_to_id: null,
+    reply_to: null,
+    is_pinned: false,
+    reactions: [],
+    poll: null,
+    created_at: new Date().toISOString(),
+    edited_at: null,
+    _system: { kind, name },
+  };
+}
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -52,16 +85,26 @@ function fmtDate(iso: string) {
 function sameDay(a: string, b: string) {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
+function fmtFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+}
+function fmtDuration(secs: number) {
+  const m = Math.floor(secs / 60), s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const CommunityChatScreen: React.FC = () => {
+  const insets   = useSafeAreaInsets();
+  const STATUS_H = insets.top;
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<any>();
   const route = useRoute();
   const { communityId, communityName } = route.params as RouteParams;
-  const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 44;
 
   const [activeTab,      setActiveTab]      = useState<ChatTab>('discussion');
   const [messages,       setMessages]       = useState<CommunityMessage[]>([]);
@@ -88,6 +131,24 @@ export const CommunityChatScreen: React.FC = () => {
   const [pollQ,          setPollQ]          = useState('');
   const [pollOpts,       setPollOpts]       = useState(['', '']);
   const [pollMulti,      setPollMulti]      = useState(false);
+  const [attachOpen,     setAttachOpen]     = useState(false);
+  const [locating,       setLocating]       = useState(false);
+
+  // preview avant envoi (style WhatsApp)
+  const [mediaPreview,      setMediaPreview]      = useState<{ uri: string; name: string }[]>([]);
+  const [mediaPreviewIdx,   setMediaPreviewIdx]   = useState(0);
+  const [mediaCaption,      setMediaCaption]      = useState('');
+  const [mediaPreviewOpen,  setMediaPreviewOpen]  = useState(false);
+  const [mediaUploading,    setMediaUploading]    = useState(false);
+  const captionRef = useRef<TextInput>(null);
+
+  // Édition d'annonce (modal dédié)
+  const [editAnnounceMsg,   setEditAnnounceMsg]   = useState<CommunityMessage | null>(null);
+  const [editAnnounceText,  setEditAnnounceText]  = useState('');
+  const [editAnnounceSaving, setEditAnnounceSaving] = useState(false);
+
+  // Clôture sondage
+  const [closePollLoading, setClosePollLoading] = useState<string | null>(null);
 
   const listRef        = useRef<FlatList>(null);
   const inputRef       = useRef<TextInput>(null);
@@ -143,9 +204,21 @@ export const CommunityChatScreen: React.FC = () => {
           if (typingTimers.current[user_id]) clearTimeout(typingTimers.current[user_id]);
           setTypingUsers(p => p.filter(u => u.user_id !== user_id));
         }
+      } else if (payload.type === 'community_member_joined') {
+        const name = payload.display_name || payload.username || 'Un membre';
+        const sys = makeSystemMsg('joined', name);
+        setMessages(prev => [...prev, sys]);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
       } else if (payload.type === 'community_member_kicked') {
         setMyId(id => {
-          if (id && payload.user_id === id) Alert.alert('Exclu', 'Vous avez été exclu de cette communauté.', [{ text: 'OK', onPress: () => nav.goBack() }]);
+          if (id && payload.user_id === id) {
+            Alert.alert(
+              'Exclu',
+              'Vous avez été exclu de cette communauté.',
+              [{ text: 'OK', onPress: () => nav.reset({ index: 0, routes: [{ name: 'Tabs' }] }) }],
+              { cancelable: false },
+            );
+          }
           return id;
         });
       } else if (payload.type === 'community_member_left') {
@@ -188,9 +261,22 @@ export const CommunityChatScreen: React.FC = () => {
   }, [communityId]);
 
   useEffect(() => {
-    authService.getMe().then(u => {
-      setMyId(String(u.id));
-      communityService.getMyRole(communityId).then(setMyRole).catch(() => {});
+    authService.getMe().then(async u => {
+      const uid = String(u.id);
+      setMyId(uid);
+      try {
+        const role = await communityService.getMyRole(communityId);
+        if (!role) {
+          // not a member — redirect immediately without showing messages
+          nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+          return;
+        }
+        setMyRole(role);
+      } catch {
+        // if the API returns 403/404, treat as non-member
+        nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+        return;
+      }
     }).catch(() => {});
     communityService.getById(communityId).then(c => setCommunityVerified(c.is_verified)).catch(() => {});
     loadMessages(1, false, 'discussion');
@@ -264,29 +350,145 @@ export const CommunityChatScreen: React.FC = () => {
     setSending(false);
   };
 
-  // ── Envoyer image ──────────────────────────────────────────────────────────
+  // ── Sélection image → preview (style WhatsApp) ────────────────────────────
   const handlePickMedia = () => {
-    launchImageLibrary({ mediaType: 'photo', selectionLimit: 4, quality: 0.8 }, async (resp) => {
+    setAttachOpen(false);
+    launchImageLibrary({ mediaType: 'photo', selectionLimit: 4, quality: 0.8 }, (resp) => {
       if (resp.didCancel || !resp.assets?.length) return;
+      const assets = resp.assets
+        .filter(a => !!a.uri)
+        .map((a, i) => ({ uri: a.uri!, name: a.fileName ?? `photo_${Date.now()}_${i}.jpg` }));
+      if (!assets.length) return;
+      setMediaPreview(assets);
+      setMediaPreviewIdx(0);
+      setMediaCaption('');
+      setMediaPreviewOpen(true);
+    });
+  };
+
+  const handlePickCamera = () => {
+    setAttachOpen(false);
+    launchCamera({ mediaType: 'photo', quality: 0.8 }, (resp) => {
+      if (resp.didCancel || !resp.assets?.length) return;
+      const a = resp.assets[0];
+      if (!a.uri) return;
+      setMediaPreview([{ uri: a.uri, name: a.fileName ?? `photo_${Date.now()}.jpg` }]);
+      setMediaPreviewIdx(0);
+      setMediaCaption('');
+      setMediaPreviewOpen(true);
+    });
+  };
+
+  const handlePickVideo = async () => {
+    setAttachOpen(false);
+    try {
+      const result = await launchImageLibrary({ mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any });
+      const asset = result.assets?.[0];
+      if (!asset?.uri) return;
       setSending(true);
-      try {
-        const urls: string[] = [];
-        for (const asset of resp.assets) {
-          if (!asset.uri) continue;
-          const fd = new FormData();
-          fd.append('file', { uri: asset.uri, name: `msg_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
-          const res = await apiClient.upload<{ uploaded: { url: string }[] }>(Endpoints.upload.images('communities'), fd);
-          const url = res.data?.uploaded?.[0]?.url;
-          if (url) urls.push(url);
-        }
-        if (urls.length > 0) {
-          const msg = await communityService.sendMessage(communityId, '', 'image', urls);
+      const uploaded = await uploadMessageVideo(asset.uri, asset.fileName, asset.type);
+      const reply_to_id = replyingTo?.id;
+      setReplyingTo(null);
+      const msg = await communityService.sendMessage(
+        communityId, '', 'video', [uploaded.url], reply_to_id,
+        { duration: uploaded.duration, thumbnail_url: uploaded.thumbnail_url },
+      );
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la vidéo.'); }
+    finally { setSending(false); }
+  };
+
+  const handlePickAudio = async () => {
+    setAttachOpen(false);
+    try {
+      const [result] = await pick({ type: [types.audio] });
+      setSending(true);
+      const fd = new FormData();
+      fd.append('file', { uri: result.uri, name: result.name ?? 'audio.mp3', type: result.type ?? 'audio/mpeg' } as any);
+      const res = await apiClient.upload<{ url: string; duration?: number }>(Endpoints.upload.audio('messages'), fd);
+      const url = res.data?.url;
+      if (!url) throw new Error('no url');
+      const metadata = { filename: result.name ?? 'audio.mp3', duration: res.data?.duration ?? null, size: result.size ?? null };
+      const reply_to_id = replyingTo?.id;
+      setReplyingTo(null);
+      const msg = await communityService.sendMessage(communityId, '', 'audio', [url], reply_to_id, metadata);
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (e: any) {
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', 'Impossible d\'envoyer l\'audio.');
+    } finally { setSending(false); }
+  };
+
+  const handlePickFile = async () => {
+    setAttachOpen(false);
+    try {
+      const [result] = await pick({ type: [types.pdf, types.doc, types.docx, types.xls, types.xlsx, types.plainText] });
+      setSending(true);
+      const fd = new FormData();
+      fd.append('file', { uri: result.uri, name: result.name ?? 'fichier', type: result.type ?? 'application/octet-stream' } as any);
+      const res = await apiClient.upload<{ url: string; filename: string; size: number; mime_type: string }>(
+        Endpoints.upload.file('messages'), fd,
+      );
+      const { url, filename, size, mime_type } = res.data;
+      const metadata = { filename: filename ?? result.name ?? 'fichier', size: size ?? result.size ?? 0, mime_type: mime_type ?? result.type ?? '' };
+      const reply_to_id = replyingTo?.id;
+      setReplyingTo(null);
+      const msg = await communityService.sendMessage(communityId, '', 'file', [url], reply_to_id, metadata);
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (e: any) {
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', 'Impossible d\'envoyer le fichier.');
+    } finally { setSending(false); }
+  };
+
+  const handleSendLocation = () => {
+    setAttachOpen(false);
+    setLocating(true);
+    Geolocation.getCurrentPosition(
+      async (pos) => {
+        setLocating(false);
+        const { latitude, longitude } = pos.coords;
+        const metadata = { latitude, longitude, address: null };
+        try {
+          const reply_to_id = replyingTo?.id;
+          setReplyingTo(null);
+          const msg = await communityService.sendMessage(communityId, '', 'location', [], reply_to_id, metadata);
           setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
           setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-        }
-      } catch {}
-      finally { setSending(false); }
-    });
+        } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+      },
+      (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+    );
+  };
+
+  // ── Envoi depuis le modal preview ─────────────────────────────────────────
+  const handleSendMedia = async () => {
+    if (!mediaPreview.length || mediaUploading) return;
+    setMediaUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const asset of mediaPreview) {
+        const fd = new FormData();
+        fd.append('file', { uri: asset.uri, name: asset.name, type: 'image/jpeg' } as any);
+        const res = await apiClient.upload<{ uploaded: { url: string }[] }>(Endpoints.upload.images('communities'), fd);
+        const url = res.data?.uploaded?.[0]?.url;
+        if (url) urls.push(url);
+      }
+      if (urls.length > 0) {
+        const caption = mediaCaption.trim();
+        const msg = await communityService.sendMessage(communityId, caption, 'image', urls);
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+      }
+    } catch {}
+    finally {
+      setMediaUploading(false);
+      setMediaPreviewOpen(false);
+      setMediaPreview([]);
+      setMediaCaption('');
+    }
   };
 
   // ── Réaction ───────────────────────────────────────────────────────────────
@@ -357,9 +559,52 @@ export const CommunityChatScreen: React.FC = () => {
     ]);
   };
 
+  // Édition message texte normal (via champ de saisie du bas)
   const handleEdit = (msg: CommunityMessage) => {
     setMenuMsg(null); setEditingMsg(msg); setText(msg.content ?? '');
     setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  // Édition annonce (modal dédié)
+  const handleEditAnnounce = (msg: CommunityMessage) => {
+    setMenuMsg(null);
+    setEditAnnounceMsg(msg);
+    setEditAnnounceText(msg.content ?? '');
+  };
+
+  const handleSaveAnnounce = async () => {
+    if (!editAnnounceMsg) return;
+    const content = editAnnounceText.trim();
+    if (!content || content === editAnnounceMsg.content) { setEditAnnounceMsg(null); return; }
+    setEditAnnounceSaving(true);
+    try {
+      const updated = await communityService.editMessage(communityId, editAnnounceMsg.id, content);
+      setMessages(prev => prev.map(m => m.id === editAnnounceMsg.id
+        ? { ...m, content: updated.content, edited_at: updated.edited_at } : m));
+      setEditAnnounceMsg(null);
+    } catch { Alert.alert('Erreur', 'Impossible de modifier l\'annonce'); }
+    finally { setEditAnnounceSaving(false); }
+  };
+
+  // Clôture sondage
+  const handleClosePoll = async (msg: CommunityMessage) => {
+    if (!msg.poll) return;
+    setMenuMsg(null);
+    Alert.alert('Clore le sondage', 'Les votes seront définitivement fermés.', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Clore', style: 'destructive', onPress: async () => {
+        setClosePollLoading(msg.poll!.poll_id);
+        try {
+          const res = await apiClient.post<PollData>(
+            `/api/v1/communities/${communityId}/polls/${msg.poll!.poll_id}/close`
+          );
+          setMessages(prev => prev.map(m =>
+            m.poll?.poll_id === msg.poll!.poll_id ? { ...m, poll: res.data } : m
+          ));
+        } catch { Alert.alert('Erreur', 'Impossible de clore le sondage'); }
+        finally { setClosePollLoading(null); }
+      }},
+    ]);
   };
 
   const openViewer = (list: string[], idx: number) => {
@@ -503,13 +748,38 @@ export const CommunityChatScreen: React.FC = () => {
       </View>
     ) : null;
 
+    // ── MESSAGE SYSTÈME (bienvenue / bloc / débloc) ──────────────────────────
+    if (msg._system) {
+      const { kind, name } = msg._system;
+      const cfg = {
+        joined:    { icon: 'user-check', color: '#10B981', bg: '#10B98112', text: `${name} a rejoint la communauté` },
+        blocked:   { icon: 'slash',      color: '#EF4444', bg: '#EF444412', text: `${name} a été bloqué` },
+        unblocked: { icon: 'check-circle', color: '#3B82F6', bg: '#3B82F612', text: `${name} a été débloqué et a rejoint à nouveau` },
+      }[kind];
+      return (
+        <View style={S.sysMsgRow}>
+          <View style={[S.sysMsgPill, { backgroundColor: cfg.bg, borderColor: cfg.color + '30' }]}>
+            <View style={[S.sysMsgIconWrap, { backgroundColor: cfg.color + '20' }]}>
+              <Icon name={cfg.icon} size={11} color={cfg.color} />
+            </View>
+            <Text style={[S.sysMsgText, { color: cfg.color }]}>{cfg.text}</Text>
+            <Text style={[S.sysMsgTime, { color: cfg.color + '80' }]}>{fmtTime(msg.created_at)}</Text>
+          </View>
+        </View>
+      );
+    }
+
     // ── ANNONCE ──────────────────────────────────────────────────────────────
     if (isAnnouncement) {
       return (
         <View style={{ marginHorizontal: 12 }}>
           {DateSep}
-          <TouchableOpacity activeOpacity={0.85} onLongPress={() => setMenuMsg(msg)} delayLongPress={350}
-            style={[S.announceBubble, { backgroundColor: '#F59E0B0D', borderColor: '#F59E0B40' }]}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onLongPress={() => canAnnounce ? setMenuMsg(msg) : null}
+            delayLongPress={350}
+            style={[S.announceBubble, { backgroundColor: '#F59E0B0D', borderColor: '#F59E0B40' }]}
+          >
             <View style={S.announceTop}>
               <View style={[S.announceIconBox, { backgroundColor: '#F59E0B20' }]}>
                 <Icon name="bell" size={14} color="#F59E0B" />
@@ -518,9 +788,17 @@ export const CommunityChatScreen: React.FC = () => {
                 <Text style={[S.announceLabel, { color: '#D97706' }]}>Annonce</Text>
                 <Text style={[S.announceMeta, { color: colors.textTertiary }]}>
                   {msg.sender_display_name || msg.sender_username} · {fmtTime(msg.created_at)}
+                  {msg.edited_at ? '  · modifié' : ''}
                 </Text>
               </View>
-              {msg.is_pinned && <View style={[S.pinnedBadge, { backgroundColor: '#F59E0B20' }]}><Icon name="bookmark" size={11} color="#F59E0B" /></View>}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {msg.is_pinned && <View style={[S.pinnedBadge, { backgroundColor: '#F59E0B20' }]}><Icon name="bookmark" size={11} color="#F59E0B" /></View>}
+                {canAnnounce && (
+                  <TouchableOpacity onPress={() => setMenuMsg(msg)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Icon name="more-horizontal" size={16} color="#D97706" />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             <Text style={[S.announceText, { color: colors.textPrimary }]}>{msg.content}</Text>
             <Reactions msg={msg} />
@@ -531,22 +809,36 @@ export const CommunityChatScreen: React.FC = () => {
 
     // ── SONDAGE ──────────────────────────────────────────────────────────────
     if (isPoll) {
+      const pollEnded = msg.poll?.ended ?? false;
       return (
         <View style={{ marginHorizontal: 12 }}>
           {DateSep}
-          <TouchableOpacity activeOpacity={0.9} onLongPress={() => setMenuMsg(msg)} delayLongPress={350}
-            style={[S.pollMessageWrap, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onLongPress={() => canAnnounce ? setMenuMsg(msg) : null}
+            delayLongPress={350}
+            style={[S.pollMessageWrap, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+          >
             <View style={S.pollMsgTop}>
               <View style={[S.pollIconBox, { backgroundColor: colors.primary + '20' }]}>
                 <Icon name="bar-chart-2" size={14} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[S.pollMsgLabel, { color: colors.primary }]}>Sondage</Text>
+                <Text style={[S.pollMsgLabel, { color: colors.primary }]}>
+                  Sondage{pollEnded ? ' · Terminé' : ''}
+                </Text>
                 <Text style={[S.announceMeta, { color: colors.textTertiary }]}>
                   {msg.sender_display_name || msg.sender_username} · {fmtTime(msg.created_at)}
                 </Text>
               </View>
-              {msg.is_pinned && <View style={[S.pinnedBadge, { backgroundColor: colors.primary + '20' }]}><Icon name="bookmark" size={11} color={colors.primary} /></View>}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {msg.is_pinned && <View style={[S.pinnedBadge, { backgroundColor: colors.primary + '20' }]}><Icon name="bookmark" size={11} color={colors.primary} /></View>}
+                {canAnnounce && (
+                  <TouchableOpacity onPress={() => setMenuMsg(msg)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Icon name="more-horizontal" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             <PollCard msg={msg} />
             <Reactions msg={msg} />
@@ -565,62 +857,163 @@ export const CommunityChatScreen: React.FC = () => {
     const myRadius = { borderBottomRightRadius: isLast ? 4 : 16 };
     const otherRadius = { borderBottomLeftRadius: isLast ? 4 : 16 };
 
+    const renderBubbleContent = () => {
+      // Vidéo
+      if (msg.message_type === 'video') {
+        const thumb = msg.metadata?.thumbnail_url;
+        const dur = msg.metadata?.duration;
+        return (
+          <TouchableOpacity
+            style={[S.bubble, { backgroundColor: bubbleBg, padding: 0, overflow: 'hidden' }, isMe ? myRadius : otherRadius]}
+            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
+            activeOpacity={0.8}
+          >
+            {thumb
+              ? <Image source={{ uri: thumb }} style={{ width: maxW, height: maxW * 0.6 }} resizeMode="cover" />
+              : <View style={{ width: maxW, height: maxW * 0.6, backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="video" size={36} color={isMe ? '#fff' : colors.primary} />
+                </View>
+            }
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.22)' }}>
+              <Icon name="play-circle" size={44} color="rgba(255,255,255,0.9)" />
+            </View>
+            {dur != null && (
+              <View style={{ position: 'absolute', bottom: 8, right: 10 }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 }}>
+                  {fmtDuration(dur)}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      }
+      // Audio
+      if (msg.message_type === 'audio') {
+        const meta = msg.metadata ?? {};
+        const dur = meta.duration ? fmtDuration(meta.duration) : null;
+        return (
+          <TouchableOpacity
+            style={[S.bubble, S.audioBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
+            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
+            activeOpacity={0.8}
+          >
+            <View style={[S.audioIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary + '20' }]}>
+              <Icon name="headphones" size={18} color={isMe ? '#fff' : colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[S.audioName, { color: textColor }]} numberOfLines={1}>{meta.filename ?? 'Audio'}</Text>
+              <Text style={[S.audioMeta, { color: timeColor }]}>
+                {[dur, meta.size ? fmtFileSize(meta.size) : null].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+            <Icon name="play-circle" size={24} color={isMe ? 'rgba(255,255,255,0.8)' : colors.primary} />
+          </TouchableOpacity>
+        );
+      }
+      // Fichier
+      if (msg.message_type === 'file') {
+        const meta = msg.metadata ?? {};
+        const ext = (meta.filename ?? '').split('.').pop()?.toUpperCase() ?? 'FILE';
+        const isPdf = ext === 'PDF';
+        return (
+          <TouchableOpacity
+            style={[S.bubble, S.fileBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
+            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
+            activeOpacity={0.8}
+          >
+            <View style={[S.fileIconBox, { backgroundColor: isPdf ? '#EF444420' : '#3B82F620' }]}>
+              <Text style={[S.fileExt, { color: isPdf ? '#EF4444' : '#3B82F6' }]}>{ext}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[S.fileName, { color: textColor }]} numberOfLines={2}>{meta.filename ?? 'Fichier'}</Text>
+              <Text style={[S.fileMeta, { color: timeColor }]}>
+                {meta.size ? fmtFileSize(meta.size) : ''} · {fmtTime(msg.created_at)}
+              </Text>
+            </View>
+            <Icon name="download" size={18} color={isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary} />
+          </TouchableOpacity>
+        );
+      }
+      // Localisation
+      if (msg.message_type === 'location') {
+        const meta = msg.metadata ?? {};
+        const lat = meta.latitude, lng = meta.longitude;
+        const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+        return (
+          <TouchableOpacity
+            style={[S.bubble, S.locationBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
+            onPress={() => Linking.openURL(mapsUrl)}
+            activeOpacity={0.8}
+          >
+            <View style={[S.locationIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : '#EF444420' }]}>
+              <Icon name="map-pin" size={20} color={isMe ? '#fff' : '#EF4444'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[S.locationTitle, { color: textColor }]}>Localisation</Text>
+              <Text style={[S.locationAddr, { color: timeColor }]} numberOfLines={2}>
+                {meta.address ?? `${lat?.toFixed(5)}, ${lng?.toFixed(5)}`}
+              </Text>
+            </View>
+            <Icon name="external-link" size={16} color={isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary} />
+          </TouchableOpacity>
+        );
+      }
+      // Image
+      if (isMedia) {
+        return (
+          <View style={{ gap: 4 }}>
+            <MediaGrid urls={msg.media_urls} containerW={maxW} />
+            {msg.content ? (
+              <View style={[S.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
+                <Text style={[S.msgText, { color: textColor }]}>{msg.content}</Text>
+              </View>
+            ) : null}
+            <Text style={[S.floatTime, { color: colors.textTertiary, textAlign: isMe ? 'right' : 'left' }]}>
+              {msg.is_pinned ? '📌 ' : ''}{fmtTime(msg.created_at)}
+            </Text>
+          </View>
+        );
+      }
+      // Texte
+      return (
+        <View style={[S.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
+          {msg.is_pinned && (
+            <View style={S.pinnedRow}>
+              <Icon name="bookmark" size={10} color={isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B'} />
+              <Text style={{ color: isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B', fontSize: 9, fontWeight: '700', marginLeft: 3 }}>Épinglé</Text>
+            </View>
+          )}
+          <Text style={[S.msgText, { color: textColor }]}>{msg.content}</Text>
+          <View style={S.msgMeta}>
+            {msg.edited_at && <Text style={[S.edited, { color: timeColor }]}>modifié · </Text>}
+            <Text style={[S.msgTime, { color: timeColor }]}>{fmtTime(msg.created_at)}</Text>
+          </View>
+        </View>
+      );
+    };
+
     return (
       <View style={{ marginHorizontal: 12 }}>
         {DateSep}
         <View style={[S.msgRow, isMe ? S.msgRowMe : S.msgRowOther, { marginBottom: isLast ? 10 : 2 }]}>
-          {/* Avatar gauche */}
           {!isMe && (isLast ? <Avatar msg={msg} /> : <View style={{ width: 40 }} />)}
-
           <View style={{ maxWidth: maxW }}>
-            {/* Nom expéditeur */}
             {!isMe && isFirst && (
               <Text style={[S.senderName, { color: colors.primary, marginLeft: 2, marginBottom: 3 }]}>
                 {msg.sender_display_name || msg.sender_username}
               </Text>
             )}
-
             <TouchableOpacity activeOpacity={0.85} onLongPress={() => setMenuMsg(msg)} delayLongPress={350}>
-              {/* Réponse parente */}
               {msg.reply_to && (
                 <View style={[S.replyBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.12)' : colors.backgroundSecondary, borderLeftColor: colors.primary }]}>
                   <Text style={[S.replyName, { color: colors.primary }]}>{msg.reply_to.sender_display_name || msg.reply_to.sender_username}</Text>
                   <Text style={[S.replyText, { color: isMe ? 'rgba(255,255,255,0.6)' : colors.textSecondary }]} numberOfLines={1}>
-                    {msg.reply_to.content || (msg.reply_to.message_type === 'image' ? '📷 Image' : '…')}
+                    {msg.reply_to.content || '📎 Pièce jointe'}
                   </Text>
                 </View>
               )}
-
-              {/* Bulle */}
-              {isMedia ? (
-                <View style={{ gap: 4 }}>
-                  <MediaGrid urls={msg.media_urls} containerW={maxW} />
-                  {msg.content ? (
-                    <View style={[S.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
-                      <Text style={[S.msgText, { color: textColor }]}>{msg.content}</Text>
-                    </View>
-                  ) : null}
-                  <Text style={[S.floatTime, { color: colors.textTertiary, textAlign: isMe ? 'right' : 'left' }]}>
-                    {msg.is_pinned ? '📌 ' : ''}{fmtTime(msg.created_at)}
-                  </Text>
-                </View>
-              ) : (
-                <View style={[S.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
-                  {msg.is_pinned && (
-                    <View style={S.pinnedRow}>
-                      <Icon name="bookmark" size={10} color={isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B'} />
-                      <Text style={{ color: isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B', fontSize: 9, fontWeight: '700', marginLeft: 3 }}>Épinglé</Text>
-                    </View>
-                  )}
-                  <Text style={[S.msgText, { color: textColor }]}>{msg.content}</Text>
-                  <View style={S.msgMeta}>
-                    {msg.edited_at && <Text style={[S.edited, { color: timeColor }]}>modifié · </Text>}
-                    <Text style={[S.msgTime, { color: timeColor }]}>{fmtTime(msg.created_at)}</Text>
-                  </View>
-                </View>
-              )}
+              {renderBubbleContent()}
             </TouchableOpacity>
-
             <Reactions msg={msg} />
           </View>
         </View>
@@ -821,46 +1214,70 @@ export const CommunityChatScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Barre de saisie */}
-            <View style={[S.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
-              <View style={[S.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-                <TouchableOpacity onPress={handlePickMedia} disabled={sending} style={S.inputIconBtn}>
-                  <Icon name="image" size={19} color={colors.textTertiary} />
-                </TouchableOpacity>
-                {canAnnounce && (
-                  <TouchableOpacity onPress={() => setPollModal(true)} disabled={sending} style={S.inputIconBtn}>
-                    <Icon name="bar-chart-2" size={19} color={colors.textTertiary} />
-                  </TouchableOpacity>
-                )}
-                <TextInput
-                  ref={inputRef}
-                  style={[S.input, { color: colors.textPrimary }]}
-                  value={text}
-                  onChangeText={handleTextChange}
-                  placeholder={activeTab === 'announcements' ? 'Écrire une annonce…' : 'Message…'}
-                  placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
-                  multiline maxLength={2000}
-                />
-              </View>
-              <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
-                <TouchableOpacity
-                  style={S.sendBtn}
-                  onPress={handleSend}
-                  disabled={!text.trim() || sending}
-                >
-                  <LinearGradient
-                    colors={text.trim() ? ['#7B3FF2', '#E0389A'] : [colors.backgroundSecondary, colors.backgroundSecondary]}
-                    style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  >
-                    {sending
-                      ? <ActivityIndicator size="small" color={text.trim() ? '#fff' : colors.textTertiary} />
-                      : <Icon name={editingMsg ? 'check' : 'send'} size={17} color={text.trim() ? '#fff' : colors.textTertiary} />
-                    }
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
+            {/* Barre de saisie — masquée pour non-admin dans Annonces et Sondages */}
+            {(activeTab === 'announcements' || activeTab === 'polls') && !canAnnounce
+              ? (
+                <View style={[S.readonlyBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+                  <Icon name={activeTab === 'announcements' ? 'bell' : 'bar-chart-2'} size={15} color={colors.textTertiary} />
+                  <Text style={[S.readonlyText, { color: colors.textTertiary }]}>
+                    {activeTab === 'announcements'
+                      ? 'Seuls les admins et modérateurs peuvent publier des annonces'
+                      : 'Seuls les admins et modérateurs peuvent créer des sondages'}
+                  </Text>
+                </View>
+              )
+              : (
+                <View style={[S.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
+                  <View style={[S.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                    {activeTab === 'discussion' && (
+                      <TouchableOpacity onPress={() => setAttachOpen(true)} disabled={sending || locating} style={S.inputIconBtn}>
+                        {locating
+                          ? <ActivityIndicator size="small" color={colors.primary} />
+                          : <Icon name="plus-circle" size={19} color={colors.primary} />
+                        }
+                      </TouchableOpacity>
+                    )}
+                    {canAnnounce && activeTab === 'discussion' && (
+                      <TouchableOpacity onPress={() => setPollModal(true)} disabled={sending} style={S.inputIconBtn}>
+                        <Icon name="bar-chart-2" size={19} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    )}
+                    {canAnnounce && activeTab === 'polls' && (
+                      <TouchableOpacity onPress={() => setPollModal(true)} disabled={sending} style={S.inputIconBtn}>
+                        <Icon name="plus" size={19} color={colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                    <TextInput
+                      ref={inputRef}
+                      style={[S.input, { color: colors.textPrimary }]}
+                      value={text}
+                      onChangeText={handleTextChange}
+                      placeholder={activeTab === 'announcements' ? 'Écrire une annonce…' : 'Message…'}
+                      placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
+                      multiline maxLength={2000}
+                    />
+                  </View>
+                  <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
+                    <TouchableOpacity
+                      style={S.sendBtn}
+                      onPress={handleSend}
+                      disabled={!text.trim() || sending}
+                    >
+                      <LinearGradient
+                        colors={text.trim() ? ['#7B3FF2', '#E0389A'] : [colors.backgroundSecondary, colors.backgroundSecondary]}
+                        style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      >
+                        {sending
+                          ? <ActivityIndicator size="small" color={text.trim() ? '#fff' : colors.textTertiary} />
+                          : <Icon name={editingMsg ? 'check' : 'send'} size={17} color={text.trim() ? '#fff' : colors.textTertiary} />
+                        }
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
+                </View>
+              )
+            }
           </>
         )}
       </KeyboardAvoidingView>
@@ -869,37 +1286,189 @@ export const CommunityChatScreen: React.FC = () => {
       <Modal visible={!!menuMsg} transparent animationType="fade" onRequestClose={() => setMenuMsg(null)}>
         <Pressable style={S.overlay} onPress={() => setMenuMsg(null)}>
           <View style={[S.menuSheet, { backgroundColor: colors.surface }]}>
-            {/* Quick emoji */}
-            <View style={[S.emojiRow, { borderBottomColor: colors.divider }]}>
-              {QUICK_EMOJIS.map(e => (
-                <TouchableOpacity key={e} onPress={() => { handleReact(menuMsg!, e); setMenuMsg(null); }} style={S.emojiBtn}>
-                  <Text style={S.emojiBig}>{e}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {/* Aperçu */}
+
+            {/* Aperçu du message */}
             <View style={[S.menuPreview, { borderBottomColor: colors.divider }]}>
-              <Text style={[S.menuPreviewName, { color: colors.primary }]}>{menuMsg?.sender_display_name || menuMsg?.sender_username}</Text>
-              <Text style={{ color: colors.textPrimary, fontSize: 13 }} numberOfLines={2}>{menuMsg?.content || (menuMsg?.media_urls?.length ? '📷 Image' : '…')}</Text>
+              {/* Badge type */}
+              {menuMsg?.message_type === 'announcement' && (
+                <View style={[S.menuTypeBadge, { backgroundColor: '#F59E0B18' }]}>
+                  <Icon name="bell" size={11} color="#F59E0B" />
+                  <Text style={[S.menuTypeBadgeText, { color: '#D97706' }]}>Annonce</Text>
+                </View>
+              )}
+              {menuMsg?.message_type === 'poll' && (
+                <View style={[S.menuTypeBadge, { backgroundColor: colors.primary + '18' }]}>
+                  <Icon name="bar-chart-2" size={11} color={colors.primary} />
+                  <Text style={[S.menuTypeBadgeText, { color: colors.primary }]}>Sondage</Text>
+                </View>
+              )}
+              <Text style={[S.menuPreviewName, { color: colors.primary }]}>
+                {menuMsg?.sender_display_name || menuMsg?.sender_username}
+              </Text>
+              <Text style={{ color: colors.textPrimary, fontSize: 13 }} numberOfLines={2}>
+                {menuMsg?.message_type === 'poll'
+                  ? menuMsg?.poll?.question ?? '…'
+                  : menuMsg?.content || (menuMsg?.media_urls?.length ? '📷 Image' : '…')}
+              </Text>
             </View>
-            {/* Actions */}
-            {[
-              { show: true, icon: 'corner-up-left', label: 'Répondre', color: colors.textPrimary, onPress: () => { setReplyingTo(menuMsg!); setMenuMsg(null); setTimeout(() => inputRef.current?.focus(), 100); } },
-              { show: menuMsg?.sender_id !== myId, icon: 'user', label: 'Voir le profil', color: colors.textPrimary, onPress: () => { setMenuMsg(null); nav.navigate('UserProfile', { userId: menuMsg!.sender_id }); } },
-              { show: menuMsg?.sender_id === myId && menuMsg?.message_type === 'text', icon: 'edit-2', label: 'Modifier', color: colors.textPrimary, onPress: () => handleEdit(menuMsg!) },
-              { show: isAdmin || isMod, icon: 'bookmark', label: menuMsg?.is_pinned ? 'Désépingler' : 'Épingler', color: '#F59E0B', onPress: () => handlePin(menuMsg!, !menuMsg!.is_pinned) },
-              { show: menuMsg?.sender_id === myId || isAdmin || isMod, icon: 'trash-2', label: 'Supprimer', color: '#EF4444', onPress: () => handleDelete(menuMsg!) },
-            ].filter(a => a.show).map((a, i) => (
-              <TouchableOpacity key={i} style={S.menuItem} onPress={a.onPress}>
-                <View style={[S.menuItemIcon, { backgroundColor: a.color + '15' }]}><Icon name={a.icon} size={16} color={a.color} /></View>
-                <Text style={[S.menuItemText, { color: a.color }]}>{a.label}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={[S.menuItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, justifyContent: 'center' }]} onPress={() => setMenuMsg(null)}>
+
+            {/* Réactions rapides — uniquement messages normaux */}
+            {menuMsg?.message_type !== 'announcement' && menuMsg?.message_type !== 'poll' && (
+              <View style={[S.emojiRow, { borderBottomColor: colors.divider }]}>
+                {QUICK_EMOJIS.map(e => (
+                  <TouchableOpacity key={e} onPress={() => { handleReact(menuMsg!, e); setMenuMsg(null); }} style={S.emojiBtn}>
+                    <Text style={S.emojiBig}>{e}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* ── Actions selon type ── */}
+            {(() => {
+              const m = menuMsg!;
+              if (!m) return null;
+              const isAnn  = m.message_type === 'announcement';
+              const isPoll = m.message_type === 'poll';
+              const isText = m.message_type === 'text';
+              const mine   = m.sender_id === myId;
+
+              const actions: { icon: string; label: string; color: string; onPress: () => void }[] = [];
+
+              // Répondre — tout sauf sondage
+              if (!isPoll) {
+                actions.push({ icon: 'corner-up-left', label: 'Répondre', color: colors.textPrimary,
+                  onPress: () => { setReplyingTo(m); setMenuMsg(null); setTimeout(() => inputRef.current?.focus(), 100); } });
+              }
+
+              // Voir profil
+              if (m.sender_id && m.sender_id !== myId) {
+                actions.push({ icon: 'user', label: 'Voir le profil', color: colors.textPrimary,
+                  onPress: () => { setMenuMsg(null); nav.navigate('UserProfile', { userId: m.sender_id }); } });
+              }
+
+              // Modifier — annonce : admin/mod ; texte normal : auteur seulement
+              if (isAnn && canAnnounce) {
+                actions.push({ icon: 'edit-2', label: 'Modifier l\'annonce', color: '#D97706',
+                  onPress: () => handleEditAnnounce(m) });
+              } else if (isText && mine) {
+                actions.push({ icon: 'edit-2', label: 'Modifier', color: colors.textPrimary,
+                  onPress: () => handleEdit(m) });
+              }
+
+              // Clore le sondage — admin/mod si pas encore terminé
+              if (isPoll && canAnnounce && !m.poll?.ended) {
+                actions.push({ icon: 'x-circle', label: 'Clore le sondage', color: '#F59E0B',
+                  onPress: () => handleClosePoll(m) });
+              }
+
+              // Épingler/désépingler — admin/mod sur tout sauf sondage
+              if ((isAdmin || isMod) && !isPoll) {
+                actions.push({ icon: 'bookmark', label: m.is_pinned ? 'Désépingler' : 'Épingler', color: '#F59E0B',
+                  onPress: () => handlePin(m, !m.is_pinned) });
+              }
+
+              // Supprimer — auteur ou admin/mod (annonces et sondages : admin/mod seulement)
+              const canDel = isAdmin || isMod || (!isAnn && !isPoll && mine);
+              if (canDel) {
+                actions.push({ icon: 'trash-2', label: 'Supprimer', color: '#EF4444',
+                  onPress: () => handleDelete(m) });
+              }
+
+              return actions.map((a, i) => (
+                <TouchableOpacity key={i} style={S.menuItem} onPress={a.onPress}>
+                  <View style={[S.menuItemIcon, { backgroundColor: a.color + '15' }]}>
+                    <Icon name={a.icon} size={16} color={a.color} />
+                  </View>
+                  <Text style={[S.menuItemText, { color: a.color }]}>{a.label}</Text>
+                </TouchableOpacity>
+              ));
+            })()}
+
+            <TouchableOpacity
+              style={[S.menuItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, justifyContent: 'center' }]}
+              onPress={() => setMenuMsg(null)}
+            >
               <Text style={[S.menuItemText, { color: colors.textTertiary }]}>Annuler</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
+      </Modal>
+
+      {/* ── Menu pièces jointes ── */}
+      <Modal visible={attachOpen} transparent animationType="slide" onRequestClose={() => setAttachOpen(false)}>
+        <Pressable style={S.overlay} onPress={() => setAttachOpen(false)}>
+          <Pressable style={[S.attachMenuSheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
+            <View style={[S.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[S.attachMenuTitle, { color: colors.textPrimary }]}>Envoyer</Text>
+            <View style={S.attachMenuGrid}>
+              {[
+                { icon: 'image',      label: 'Galerie',       color: '#7B3FF2', onPress: handlePickMedia },
+                { icon: 'camera',     label: 'Appareil photo',color: '#10B981', onPress: handlePickCamera },
+                { icon: 'video',      label: 'Vidéo',         color: '#9C27B0', onPress: handlePickVideo },
+                { icon: 'headphones', label: 'Audio',         color: '#F59E0B', onPress: handlePickAudio },
+                { icon: 'file-text',  label: 'Fichier',       color: '#3B82F6', onPress: handlePickFile },
+                { icon: 'map-pin',    label: 'Localisation',  color: '#EF4444', onPress: handleSendLocation },
+              ].map(item => (
+                <TouchableOpacity key={item.label} style={S.attachMenuItem} onPress={item.onPress} activeOpacity={0.8}>
+                  <View style={[S.attachMenuIcon, { backgroundColor: item.color + '18' }]}>
+                    <Icon name={item.icon} size={24} color={item.color} />
+                  </View>
+                  <Text style={[S.attachMenuLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={{ height: Platform.OS === 'ios' ? 20 : 8 }} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Modal édition annonce ── */}
+      <Modal
+        visible={!!editAnnounceMsg}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { if (!editAnnounceSaving) setEditAnnounceMsg(null); }}
+      >
+        <KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Pressable style={S.overlay} onPress={() => { if (!editAnnounceSaving) setEditAnnounceMsg(null); }} />
+          <View style={[S.bottomSheet, { backgroundColor: colors.surface, maxHeight: '75%' }]}>
+            <View style={[S.sheetHandle, { backgroundColor: colors.divider }]} />
+            <View style={[S.sheetHeader, { borderBottomColor: colors.divider }]}>
+              <View style={[S.announceIconBox, { backgroundColor: '#F59E0B20' }]}>
+                <Icon name="edit-2" size={14} color="#F59E0B" />
+              </View>
+              <Text style={[S.sheetTitle, { color: colors.textPrimary }]}>Modifier l'annonce</Text>
+              <TouchableOpacity onPress={() => setEditAnnounceMsg(null)} disabled={editAnnounceSaving}>
+                <Icon name="x" size={20} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 16, paddingTop: 12 }} keyboardShouldPersistTaps="handled">
+              <TextInput
+                style={[S.editAnnounceInput, { color: colors.textPrimary, borderColor: colors.divider, backgroundColor: colors.backgroundSecondary }]}
+                value={editAnnounceText}
+                onChangeText={setEditAnnounceText}
+                multiline
+                autoFocus
+                maxLength={2000}
+                placeholder="Contenu de l'annonce…"
+                placeholderTextColor={colors.textTertiary}
+              />
+              <TouchableOpacity
+                style={[S.editAnnounceBtn, { backgroundColor: '#F59E0B', opacity: editAnnounceSaving ? 0.6 : 1, marginBottom: 32 }]}
+                onPress={handleSaveAnnounce}
+                disabled={editAnnounceSaving || !editAnnounceText.trim()}
+              >
+                {editAnnounceSaving
+                  ? <ActivityIndicator color="#fff" />
+                  : <>
+                      <Icon name="check" size={16} color="#fff" />
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Enregistrer</Text>
+                    </>
+                }
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Messages épinglés ── */}
@@ -994,6 +1563,93 @@ export const CommunityChatScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Preview avant envoi (style WhatsApp) ── */}
+      <Modal
+        visible={mediaPreviewOpen}
+        transparent={false}
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); setMediaCaption(''); } }}
+      >
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <StatusBar hidden />
+
+          {/* Header */}
+          <View style={MP.header}>
+            <TouchableOpacity
+              onPress={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); setMediaCaption(''); } }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={MP.headerClose}
+            >
+              <Icon name="x" size={22} color="#fff" />
+            </TouchableOpacity>
+            <Text style={MP.headerTitle}>
+              {mediaPreview.length > 1 ? `${mediaPreviewIdx + 1} / ${mediaPreview.length}` : 'Aperçu'}
+            </Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {/* Image principale */}
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={{ flex: 1 }}
+            contentOffset={{ x: mediaPreviewIdx * W, y: 0 }}
+            onMomentumScrollEnd={e => setMediaPreviewIdx(Math.round(e.nativeEvent.contentOffset.x / W))}
+            scrollEnabled={mediaPreview.length > 1}
+          >
+            {mediaPreview.map((asset, i) => (
+              <View key={i} style={{ width: W, flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Image source={{ uri: asset.uri }} style={{ width: W, height: H * 0.62 }} resizeMode="contain" />
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* Miniatures (si plusieurs images) */}
+          {mediaPreview.length > 1 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={MP.thumbRow} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
+              {mediaPreview.map((asset, i) => (
+                <TouchableOpacity key={i} onPress={() => setMediaPreviewIdx(i)} activeOpacity={0.8}>
+                  <Image
+                    source={{ uri: asset.uri }}
+                    style={[MP.thumb, { borderColor: i === mediaPreviewIdx ? '#fff' : 'transparent' }]}
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Barre légende + envoyer */}
+          <View style={MP.bottomBar}>
+            <View style={MP.captionRow}>
+              <Icon name="edit-3" size={16} color="rgba(255,255,255,0.5)" style={{ marginLeft: 4 }} />
+              <TextInput
+                ref={captionRef}
+                style={MP.captionInput}
+                placeholder="Ajouter une légende…"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={mediaCaption}
+                onChangeText={setMediaCaption}
+                multiline
+                maxLength={500}
+              />
+            </View>
+            <TouchableOpacity
+              style={[MP.sendBtn, mediaUploading && { opacity: 0.6 }]}
+              onPress={handleSendMedia}
+              disabled={mediaUploading}
+              activeOpacity={0.85}
+            >
+              {mediaUploading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Icon name="send" size={20} color="#fff" />
+              }
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1168,4 +1824,84 @@ const S = StyleSheet.create({
   viewerClose: { position: 'absolute', top: 52, right: 20, zIndex: 10 },
   viewerCloseInner: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   viewerCounter: { position: 'absolute', top: 56, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+
+  // Messages système
+  sysMsgRow:      { alignItems: 'center', marginVertical: 8, paddingHorizontal: 16 },
+  sysMsgPill:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  sysMsgIconWrap: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  sysMsgText:     { fontSize: 12, fontWeight: '600', flexShrink: 1 },
+  sysMsgTime:     { fontSize: 10, fontWeight: '500', marginLeft: 2 },
+
+  // Menu contextuel — badge type
+  menuTypeBadge:     { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginBottom: 6 },
+  menuTypeBadgeText: { fontSize: 11, fontWeight: '700' },
+
+  // Barre lecture seule (non-admin dans Annonces/Sondages)
+  readonlyBar:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  readonlyText: { flex: 1, fontSize: 12, lineHeight: 17 },
+
+  // Édition annonce
+  editAnnounceInput: { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, lineHeight: 22, minHeight: 120, textAlignVertical: 'top', marginBottom: 14 },
+  editAnnounceBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 14 },
+
+  // Attach menu sheet
+  attachMenuSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 16 },
+  attachMenuTitle: { fontSize: 16, fontWeight: '800', marginBottom: 16, textAlign: 'center' },
+  attachMenuGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 8 },
+  attachMenuItem:  { alignItems: 'center', gap: 8, width: 72 },
+  attachMenuIcon:  { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  attachMenuLabel: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+
+  // Audio bubble
+  audioBubble:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  audioIconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  audioName:    { fontSize: 13, fontWeight: '600' },
+  audioMeta:    { fontSize: 11, marginTop: 2 },
+
+  // File bubble
+  fileBubble:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  fileIconBox: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  fileExt:     { fontSize: 11, fontWeight: '900' },
+  fileName:    { fontSize: 13, fontWeight: '600' },
+  fileMeta:    { fontSize: 11, marginTop: 2 },
+
+  // Location bubble
+  locationBubble:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  locationIconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  locationTitle:   { fontSize: 13, fontWeight: '700' },
+  locationAddr:    { fontSize: 12, marginTop: 2 },
+});
+
+// Styles du modal preview média
+const MP = StyleSheet.create({
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12,
+  },
+  headerClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  thumbRow: { maxHeight: 72, paddingVertical: 8 },
+  thumb: {
+    width: 54, height: 54, borderRadius: 8, borderWidth: 2,
+  },
+
+  bottomBar: {
+    flexDirection: 'row', alignItems: 'flex-end',
+    paddingHorizontal: 12, paddingBottom: 28, paddingTop: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)', gap: 10,
+  },
+  captionRow: {
+    flex: 1, flexDirection: 'row', alignItems: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 24,
+    paddingHorizontal: 12, paddingVertical: 8, gap: 8,
+  },
+  captionInput: {
+    flex: 1, color: '#fff', fontSize: 15, maxHeight: 100, paddingVertical: 0,
+  },
+  sendBtn: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: '#25D366',
+    alignItems: 'center', justifyContent: 'center',
+  },
 });

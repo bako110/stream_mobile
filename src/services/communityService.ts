@@ -380,10 +380,10 @@ export const communityService = {
     return res.data;
   },
 
-  async sendMessage(id: string, content: string, message_type = 'text', media_urls?: string[], reply_to_id?: string): Promise<CommunityMessageData> {
+  async sendMessage(id: string, content: string, message_type = 'text', media_urls?: string[], reply_to_id?: string, metadata?: Record<string, any>): Promise<CommunityMessageData> {
     const res = await apiClient.post<CommunityMessageData>(
       Endpoints.communities.messages(id),
-      { content: content || null, message_type, media_urls: media_urls ?? [], reply_to_id: reply_to_id ?? null },
+      { content: content || null, message_type, media_urls: media_urls ?? [], reply_to_id: reply_to_id ?? null, metadata: metadata ?? null },
     );
     return res.data;
   },
