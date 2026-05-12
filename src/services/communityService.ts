@@ -66,7 +66,7 @@ export interface BlockedMemberData {
   reason: string | null;
 }
 
-export type CommunityMessageType = 'text' | 'image' | 'media' | 'audio' | 'file' | 'location' | 'announcement' | 'poll' | 'event';
+export type CommunityMessageType = 'text' | 'image' | 'media' | 'video' | 'audio' | 'file' | 'location' | 'announcement' | 'poll' | 'event';
 
 export interface CommunityMessageData {
   id: string;

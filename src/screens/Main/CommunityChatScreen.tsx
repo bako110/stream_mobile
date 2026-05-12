@@ -3,8 +3,9 @@ import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
   ActivityIndicator, Image, Alert, Modal, Pressable,
-  ScrollView, Dimensions, Animated, Linking,
+  ScrollView, Dimensions, Animated, Linking, PermissionsAndroid,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -19,7 +20,12 @@ import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Geolocation from '@react-native-community/geolocation';
-import { uploadMessageVideo } from '../../services/uploadService';
+import { uploadMessageVideo, uploadAudioFile } from '../../services/uploadService';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
+const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
+const audioRecorderCommunity = new AudioRecorderPlayerClass();
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -133,6 +139,13 @@ export const CommunityChatScreen: React.FC = () => {
   const [pollMulti,      setPollMulti]      = useState(false);
   const [attachOpen,     setAttachOpen]     = useState(false);
   const [locating,       setLocating]       = useState(false);
+
+  // Enregistrement vocal
+  const [isRecording,  setIsRecording]  = useState(false);
+  const [recordTime,   setRecordTime]   = useState('0:00');
+  const [playingId,    setPlayingId]    = useState<string | null>(null);
+  const [playProgress, setPlayProgress] = useState(0);
+  const [playDuration, setPlayDuration] = useState(0);
 
   // preview avant envoi (style WhatsApp)
   const [mediaPreview,      setMediaPreview]      = useState<{ uri: string; name: string }[]>([]);
@@ -397,6 +410,79 @@ export const CommunityChatScreen: React.FC = () => {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la vidéo.'); }
     finally { setSending(false); }
+  };
+
+  // ── Enregistrement vocal en temps réel ───────────────────────────────────
+  const startRecording = async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        { title: 'Microphone', message: "L'app a besoin du micro pour enregistrer un vocal.", buttonPositive: 'OK' },
+      );
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        Alert.alert('Permission', 'Microphone requis pour enregistrer un vocal');
+        return;
+      }
+    }
+    try {
+      setIsRecording(true);
+      setRecordTime('0:00');
+      await audioRecorderCommunity.startRecorder(undefined, undefined, true);
+      audioRecorderCommunity.addRecordBackListener((e: any) => {
+        const totalSec = Math.floor(e.currentPosition / 1000);
+        const m = Math.floor(totalSec / 60), s = totalSec % 60;
+        setRecordTime(`${m}:${s.toString().padStart(2, '0')}`);
+      });
+    } catch { setIsRecording(false); }
+  };
+
+  const stopAndSendRecording = async () => {
+    try {
+      const result = await audioRecorderCommunity.stopRecorder();
+      audioRecorderCommunity.removeRecordBackListener();
+      setIsRecording(false);
+      if (!result) return;
+      setSending(true);
+      const uploaded = await uploadAudioFile(result, `vocal_${Date.now()}.m4a`, 'audio/mp4');
+      const reply_to_id = replyingTo?.id;
+      setReplyingTo(null);
+      const metadata = { duration: uploaded.duration ?? null, filename: `vocal_${Date.now()}.m4a` };
+      const msg = await communityService.sendMessage(communityId, '', 'audio', [uploaded.url], reply_to_id, metadata);
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch { Alert.alert('Erreur', "Impossible d'envoyer le vocal"); }
+    finally { setSending(false); }
+  };
+
+  const cancelRecording = async () => {
+    try {
+      await audioRecorderCommunity.stopRecorder();
+      audioRecorderCommunity.removeRecordBackListener();
+    } catch {}
+    setIsRecording(false);
+  };
+
+  const playAudio = async (msgId: string, url: string) => {
+    if (playingId) {
+      await audioRecorderCommunity.stopPlayer();
+      audioRecorderCommunity.removePlayBackListener();
+      if (playingId === msgId) { setPlayingId(null); return; }
+    }
+    setPlayingId(msgId);
+    setPlayProgress(0);
+    try {
+      await audioRecorderCommunity.startPlayer(url);
+      audioRecorderCommunity.addPlayBackListener((e: any) => {
+        setPlayProgress(e.currentPosition);
+        setPlayDuration(e.duration);
+        if (e.currentPosition >= e.duration - 100) {
+          audioRecorderCommunity.stopPlayer();
+          audioRecorderCommunity.removePlayBackListener();
+          setPlayingId(null);
+          setPlayProgress(0);
+        }
+      });
+    } catch { setPlayingId(null); }
   };
 
   const handlePickAudio = async () => {
@@ -890,24 +976,35 @@ export const CommunityChatScreen: React.FC = () => {
       // Audio
       if (msg.message_type === 'audio') {
         const meta = msg.metadata ?? {};
-        const dur = meta.duration ? fmtDuration(meta.duration) : null;
+        const url = msg.media_urls[0];
+        const isPlaying = playingId === msg.id;
+        const durSec = meta.duration ?? 0;
+        const progress = isPlaying && playDuration > 0 ? playProgress / playDuration : 0;
+        const durLabel = isPlaying && playDuration > 0
+          ? fmtDuration(Math.floor((playDuration - playProgress) / 1000))
+          : durSec ? fmtDuration(durSec) : '0:00';
         return (
-          <TouchableOpacity
-            style={[S.bubble, S.audioBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
-            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
-            activeOpacity={0.8}
-          >
-            <View style={[S.audioIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary + '20' }]}>
-              <Icon name="headphones" size={18} color={isMe ? '#fff' : colors.primary} />
-            </View>
+          <View style={[S.bubble, S.audioBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
+            <TouchableOpacity
+              style={[S.audioIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary + '20' }]}
+              onPress={() => url && playAudio(msg.id, url)}
+              activeOpacity={0.8}
+            >
+              <Icon name={isPlaying ? 'pause' : 'play'} size={18} color={isMe ? '#fff' : colors.primary} />
+            </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={[S.audioName, { color: textColor }]} numberOfLines={1}>{meta.filename ?? 'Audio'}</Text>
-              <Text style={[S.audioMeta, { color: timeColor }]}>
-                {[dur, meta.size ? fmtFileSize(meta.size) : null].filter(Boolean).join(' · ')}
-              </Text>
+              <Slider
+                style={{ height: 24, marginHorizontal: -4 }}
+                minimumValue={0} maximumValue={1}
+                value={progress}
+                minimumTrackTintColor={isMe ? 'rgba(255,255,255,0.8)' : colors.primary}
+                maximumTrackTintColor={isMe ? 'rgba(255,255,255,0.3)' : colors.divider}
+                thumbTintColor={isMe ? '#fff' : colors.primary}
+                disabled
+              />
+              <Text style={[S.audioMeta, { color: timeColor }]}>{durLabel}</Text>
             </View>
-            <Icon name="play-circle" size={24} color={isMe ? 'rgba(255,255,255,0.8)' : colors.primary} />
-          </TouchableOpacity>
+          </View>
         );
       }
       // Fichier
@@ -1226,7 +1323,19 @@ export const CommunityChatScreen: React.FC = () => {
                   </Text>
                 </View>
               )
-              : (
+              : isRecording ? (
+                <View style={[S.recordingBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+                  <View style={S.recordingDot} />
+                  <Text style={[S.recordingTime, { color: colors.textPrimary }]}>{recordTime}</Text>
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity onPress={cancelRecording} style={S.recordCancelBtn}>
+                    <Icon name="x" size={20} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={stopAndSendRecording} style={[S.recordSendBtn, { backgroundColor: colors.primary }]}>
+                    <Icon name="send" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
                 <View style={[S.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
                   <View style={[S.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                     {activeTab === 'discussion' && (
@@ -1257,24 +1366,36 @@ export const CommunityChatScreen: React.FC = () => {
                       multiline maxLength={2000}
                     />
                   </View>
-                  <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
-                    <TouchableOpacity
-                      style={S.sendBtn}
-                      onPress={handleSend}
-                      disabled={!text.trim() || sending}
-                    >
+                  {text.trim() ? (
+                    <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
+                      <TouchableOpacity
+                        style={S.sendBtn}
+                        onPress={handleSend}
+                        disabled={sending}
+                      >
+                        <LinearGradient
+                          colors={['#7B3FF2', '#E0389A']}
+                          style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
+                          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        >
+                          {sending
+                            ? <ActivityIndicator size="small" color="#fff" />
+                            : <Icon name={editingMsg ? 'check' : 'send'} size={17} color="#fff" />
+                          }
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </Animated.View>
+                  ) : (
+                    <TouchableOpacity style={S.sendBtn} onPress={startRecording} disabled={sending}>
                       <LinearGradient
-                        colors={text.trim() ? ['#7B3FF2', '#E0389A'] : [colors.backgroundSecondary, colors.backgroundSecondary]}
+                        colors={['#7B3FF2', '#E0389A']}
                         style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       >
-                        {sending
-                          ? <ActivityIndicator size="small" color={text.trim() ? '#fff' : colors.textTertiary} />
-                          : <Icon name={editingMsg ? 'check' : 'send'} size={17} color={text.trim() ? '#fff' : colors.textTertiary} />
-                        }
+                        <Icon name="mic" size={17} color="#fff" />
                       </LinearGradient>
                     </TouchableOpacity>
-                  </Animated.View>
+                  )}
                 </View>
               )
             }
@@ -1853,10 +1974,17 @@ const S = StyleSheet.create({
   attachMenuLabel: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
 
   // Audio bubble
-  audioBubble:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  audioBubble:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, minWidth: 200 },
   audioIconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   audioName:    { fontSize: 13, fontWeight: '600' },
   audioMeta:    { fontSize: 11, marginTop: 2 },
+
+  // Recording bar
+  recordingBar:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  recordingDot:    { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF4444' },
+  recordingTime:   { fontSize: 16, fontWeight: '600', minWidth: 44 },
+  recordCancelBtn: { padding: 8 },
+  recordSendBtn:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 
   // File bubble
   fileBubble:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },

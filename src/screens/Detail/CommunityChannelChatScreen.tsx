@@ -7,8 +7,9 @@ import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
   ActivityIndicator, Image, Alert, Modal, Pressable,
-  ScrollView, Dimensions, Animated, Linking,
+  ScrollView, Dimensions, Animated, Linking, PermissionsAndroid,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -18,7 +19,12 @@ import { communityService } from '../../services/communityService';
 import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import { uploadMessageVideo } from '../../services/uploadService';
+import { uploadMessageVideo, uploadAudioFile } from '../../services/uploadService';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
+const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
+const audioRecorderChannel = new AudioRecorderPlayerClass();
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
 import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
@@ -90,6 +96,13 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const [menuMsg,     setMenuMsg]     = useState<CommunityMessage | null>(null);
   const [attachOpen,  setAttachOpen]  = useState(false);
   const [locating,    setLocating]    = useState(false);
+
+  // Enregistrement vocal
+  const [isRecording,  setIsRecording]  = useState(false);
+  const [recordTime,   setRecordTime]   = useState('0:00');
+  const [playingId,    setPlayingId]    = useState<string | null>(null);
+  const [playProgress, setPlayProgress] = useState(0);
+  const [playDuration, setPlayDuration] = useState(0);
 
   // Media preview (images)
   const [mediaPreview,     setMediaPreview]     = useState<{ uri: string; name: string }[]>([]);
@@ -258,6 +271,79 @@ export const CommunityChannelChatScreen: React.FC = () => {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la vidéo.'); }
     finally { setSending(false); }
+  };
+
+  // ── Enregistrement vocal en temps réel ───────────────────────────────────────
+  const startRecording = async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        { title: 'Microphone', message: "L'app a besoin du micro pour enregistrer un vocal.", buttonPositive: 'OK' },
+      );
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        Alert.alert('Permission', 'Microphone requis pour enregistrer un vocal');
+        return;
+      }
+    }
+    try {
+      setIsRecording(true);
+      setRecordTime('0:00');
+      await audioRecorderChannel.startRecorder(undefined, undefined, true);
+      audioRecorderChannel.addRecordBackListener((e: any) => {
+        const totalSec = Math.floor(e.currentPosition / 1000);
+        const m = Math.floor(totalSec / 60), s = totalSec % 60;
+        setRecordTime(`${m}:${s.toString().padStart(2, '0')}`);
+      });
+    } catch { setIsRecording(false); }
+  };
+
+  const stopAndSendRecording = async () => {
+    try {
+      const result = await audioRecorderChannel.stopRecorder();
+      audioRecorderChannel.removeRecordBackListener();
+      setIsRecording(false);
+      if (!result) return;
+      setSending(true);
+      const uploaded = await uploadAudioFile(result, `vocal_${Date.now()}.m4a`, 'audio/mp4');
+      const reply_to_id = replyingTo?.id;
+      setReplyingTo(null);
+      const metadata = { duration: uploaded.duration ?? null, filename: `vocal_${Date.now()}.m4a` };
+      const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'audio', [uploaded.url], reply_to_id, metadata);
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch { Alert.alert('Erreur', "Impossible d'envoyer le vocal"); }
+    finally { setSending(false); }
+  };
+
+  const cancelRecording = async () => {
+    try {
+      await audioRecorderChannel.stopRecorder();
+      audioRecorderChannel.removeRecordBackListener();
+    } catch {}
+    setIsRecording(false);
+  };
+
+  const playAudio = async (msgId: string, url: string) => {
+    if (playingId) {
+      await audioRecorderChannel.stopPlayer();
+      audioRecorderChannel.removePlayBackListener();
+      if (playingId === msgId) { setPlayingId(null); return; }
+    }
+    setPlayingId(msgId);
+    setPlayProgress(0);
+    try {
+      await audioRecorderChannel.startPlayer(url);
+      audioRecorderChannel.addPlayBackListener((e: any) => {
+        setPlayProgress(e.currentPosition);
+        setPlayDuration(e.duration);
+        if (e.currentPosition >= e.duration - 100) {
+          audioRecorderChannel.stopPlayer();
+          audioRecorderChannel.removePlayBackListener();
+          setPlayingId(null);
+          setPlayProgress(0);
+        }
+      });
+    } catch { setPlayingId(null); }
   };
 
   // ── Audio ────────────────────────────────────────────────────────────────────
@@ -469,26 +555,35 @@ export const CommunityChannelChatScreen: React.FC = () => {
       // Audio
       if (msg.message_type === 'audio') {
         const meta = msg.metadata ?? {};
-        const dur = meta.duration ? fmtDuration(meta.duration) : null;
+        const url = msg.media_urls[0];
+        const isPlaying = playingId === msg.id;
+        const durSec = meta.duration ?? 0;
+        const progress = isPlaying && playDuration > 0 ? playProgress / playDuration : 0;
+        const durLabel = isPlaying && playDuration > 0
+          ? fmtDuration(Math.floor((playDuration - playProgress) / 1000))
+          : durSec ? fmtDuration(durSec) : '0:00';
         return (
-          <TouchableOpacity
-            style={[C.bubble, C.audioBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
-            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
-            activeOpacity={0.8}
-          >
-            <View style={[C.audioIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary + '20' }]}>
-              <Icon name="headphones" size={18} color={isMe ? '#fff' : colors.primary} />
-            </View>
+          <View style={[C.bubble, C.audioBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
+            <TouchableOpacity
+              style={[C.audioIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary + '20' }]}
+              onPress={() => url && playAudio(msg.id, url)}
+              activeOpacity={0.8}
+            >
+              <Icon name={isPlaying ? 'pause' : 'play'} size={18} color={isMe ? '#fff' : colors.primary} />
+            </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={[C.audioName, { color: textColor }]} numberOfLines={1}>
-                {meta.filename ?? 'Audio'}
-              </Text>
-              <Text style={[C.audioMeta, { color: timeColor }]}>
-                {[dur, meta.size ? fmtFileSize(meta.size) : null].filter(Boolean).join(' · ')}
-              </Text>
+              <Slider
+                style={{ height: 24, marginHorizontal: -4 }}
+                minimumValue={0} maximumValue={1}
+                value={progress}
+                minimumTrackTintColor={isMe ? 'rgba(255,255,255,0.8)' : colors.primary}
+                maximumTrackTintColor={isMe ? 'rgba(255,255,255,0.3)' : colors.divider}
+                thumbTintColor={isMe ? '#fff' : colors.primary}
+                disabled
+              />
+              <Text style={[C.audioMeta, { color: timeColor }]}>{durLabel}</Text>
             </View>
-            <Icon name="play-circle" size={24} color={isMe ? 'rgba(255,255,255,0.8)' : colors.primary} />
-          </TouchableOpacity>
+          </View>
         );
       }
 
@@ -701,6 +796,18 @@ export const CommunityChannelChatScreen: React.FC = () => {
                   Seuls les admins et modérateurs peuvent publier dans ce canal
                 </Text>
               </View>
+            ) : isRecording ? (
+              <View style={[C.recordingBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+                <View style={C.recordingDot} />
+                <Text style={[C.recordingTime, { color: colors.textPrimary }]}>{recordTime}</Text>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity onPress={cancelRecording} style={C.recordCancelBtn}>
+                  <Icon name="x" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={stopAndSendRecording} style={[C.recordSendBtn, { backgroundColor: colors.primary }]}>
+                  <Icon name="send" size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
             ) : (
               <View style={[C.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
                 {/* Bouton pièces jointes */}
@@ -723,20 +830,32 @@ export const CommunityChannelChatScreen: React.FC = () => {
                     multiline maxLength={2000}
                   />
                 </View>
-                <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
-                  <TouchableOpacity style={C.sendBtn} onPress={handleSend} disabled={!text.trim() || sending}>
+                {text.trim() ? (
+                  <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
+                    <TouchableOpacity style={C.sendBtn} onPress={handleSend} disabled={sending}>
+                      <LinearGradient
+                        colors={['#7B3FF2', '#E0389A']}
+                        style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      >
+                        {sending
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <Icon name={editingMsg ? 'check' : 'send'} size={17} color="#fff" />
+                        }
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ) : (
+                  <TouchableOpacity style={C.sendBtn} onPress={startRecording} disabled={sending}>
                     <LinearGradient
-                      colors={text.trim() ? ['#7B3FF2', '#E0389A'] : [colors.backgroundSecondary, colors.backgroundSecondary]}
+                      colors={['#7B3FF2', '#E0389A']}
                       style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     >
-                      {sending
-                        ? <ActivityIndicator size="small" color={text.trim() ? '#fff' : colors.textTertiary} />
-                        : <Icon name={editingMsg ? 'check' : 'send'} size={17} color={text.trim() ? '#fff' : colors.textTertiary} />
-                      }
+                      <Icon name="mic" size={17} color="#fff" />
                     </LinearGradient>
                   </TouchableOpacity>
-                </Animated.View>
+                )}
               </View>
             )}
           </>
@@ -902,10 +1021,15 @@ const C = StyleSheet.create({
   replyText: { fontSize: 11 },
 
   // Audio bubble
-  audioBubble: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  audioIconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  audioName: { fontSize: 13, fontWeight: '600' },
-  audioMeta: { fontSize: 11, marginTop: 2 },
+  audioBubble:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, minWidth: 200 },
+  audioIconBox:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  audioName:       { fontSize: 13, fontWeight: '600' },
+  audioMeta:       { fontSize: 11, marginTop: 2 },
+  recordingBar:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  recordingDot:    { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF4444' },
+  recordingTime:   { fontSize: 16, fontWeight: '600', minWidth: 44 },
+  recordCancelBtn: { padding: 8 },
+  recordSendBtn:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 
   // File bubble
   fileBubble: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
