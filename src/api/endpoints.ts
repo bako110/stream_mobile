@@ -11,6 +11,8 @@ export const Endpoints = {
     logout:         `${V1}/auth/logout`,
     me:             `${V1}/auth/me`,
     changePassword: `${V1}/auth/me/password`,
+    deactivateSelf: `${V1}/auth/deactivate`,
+    reactivate:     `${V1}/auth/reactivate`,
     oauthGoogle:    `${V1}/auth/oauth/google`,
     oauthFacebook:  `${V1}/auth/oauth/facebook`,
     forgotPassword: `${V1}/auth/forgot-password`,
@@ -225,6 +227,11 @@ export const Endpoints = {
     joinRequests:        (id: string) => `${V1}/communities/${id}/join-requests`,
     approveJoinRequest:  (cid: string, rid: string) => `${V1}/communities/${cid}/join-requests/${rid}/approve`,
     rejectJoinRequest:   (cid: string, rid: string) => `${V1}/communities/${cid}/join-requests/${rid}/reject`,
+    channels:            (id: string) => `${V1}/communities/${id}/channels`,
+    channel:             (cid: string, chid: string) => `${V1}/communities/${cid}/channels/${chid}`,
+    channelMessages:     (cid: string, chid: string) => `${V1}/communities/${cid}/channels/${chid}/messages`,
+    channelMessage:      (cid: string, chid: string, mid: string) => `${V1}/communities/${cid}/channels/${chid}/messages/${mid}`,
+    channelMembers:      (cid: string, chid: string) => `${V1}/communities/${cid}/channels/${chid}/members`,
   },
 
   // ── Upload médias (Cloudinary) ────────────────────────────────────────────

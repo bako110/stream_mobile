@@ -22,6 +22,7 @@ import type {
 } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { useWs } from '../../context/WebSocketContext';
+import { ExpandableText } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 interface Props { route: { params: { communityId: string } }; }
@@ -104,8 +105,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [editEntryPrice,  setEditEntryPrice]  = useState('0');
 
   // Onglet Membres
-  const [roleLoading,   setRoleLoading]   = useState<string | null>(null);
-  const [memberSearch,  setMemberSearch]  = useState('');
+  const [roleLoading,    setRoleLoading]    = useState<string | null>(null);
+  const [blockLoading,   setBlockLoading]   = useState<string | null>(null);
+  const [unblockLoading, setUnblockLoading] = useState<string | null>(null);
+  const [memberSearch,   setMemberSearch]   = useState('');
 
   const isAdmin  = myRole === 'admin';
   const isMod    = myRole === 'moderator';
@@ -325,31 +328,69 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       Alert.alert('Impossible', 'Vous ne pouvez pas bloquer un administrateur.');
       return;
     }
+    const name = member.display_name || member.username || 'Ce membre';
     Alert.alert(
       'Bloquer',
-      `Bloquer ${member.display_name || member.username} ? Cette personne sera exclue et ne pourra plus rejoindre.`,
+      `Bloquer ${name} ? Cette personne sera exclue et ne pourra plus rejoindre.`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Bloquer',
           style: 'destructive',
           onPress: async () => {
-            try { await communityService.blockMember(communityId, member.user_id); load(); }
-            catch { Alert.alert('Erreur', 'Impossible de bloquer.'); }
+            setBlockLoading(member.user_id);
+            try {
+              // 1. Éjecter d'abord — envoie community_member_kicked via WS → l'utilisateur est redirigé automatiquement
+              await apiClient.delete(`/api/v1/communities/${communityId}/members/${member.user_id}`).catch(() => {});
+              // 2. Bloquer pour l'empêcher de revenir
+              await communityService.blockMember(communityId, member.user_id);
+              // 3. Annonce visible dans le chat
+              await communityService.sendMessage(
+                communityId,
+                `${name} a été bloqué par un administrateur.`,
+                'announcement',
+              ).catch(() => {});
+              // 4. Mise à jour locale immédiate
+              setMembers(prev => prev.filter(m => m.user_id !== member.user_id));
+              setBlockedMembers(prev => [
+                ...prev,
+                {
+                  id: member.id,
+                  user_id: member.user_id,
+                  username: member.username,
+                  display_name: member.display_name,
+                  avatar_url: member.avatar_url,
+                  blocked_at: new Date().toISOString(),
+                  reason: null,
+                },
+              ]);
+            } catch { Alert.alert('Erreur', 'Impossible de bloquer.'); }
+            finally { setBlockLoading(null); }
           },
         },
       ],
     );
   }
 
-  function handleUnblock(b: BlockedMemberData) {
-    Alert.alert('Débloquer', `Débloquer ${b.display_name || b.username} ?`, [
+  async function handleUnblock(b: BlockedMemberData) {
+    const name = b.display_name || b.username || 'Ce membre';
+    Alert.alert('Débloquer', `Débloquer ${name} ? Il pourra rejoindre librement la communauté.`, [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Débloquer',
         onPress: async () => {
-          try { await communityService.unblockMember(communityId, b.user_id); load(); }
-          catch { Alert.alert('Erreur', 'Impossible de débloquer.'); }
+          setUnblockLoading(b.user_id);
+          try {
+            await communityService.unblockMember(communityId, b.user_id);
+            await communityService.sendMessage(
+              communityId,
+              `${name} a été débloqué et peut à nouveau rejoindre la communauté.`,
+              'announcement',
+            ).catch(() => {});
+            // Mise à jour locale immédiate
+            setBlockedMembers(prev => prev.filter(x => x.user_id !== b.user_id));
+          } catch { Alert.alert('Erreur', 'Impossible de débloquer.'); }
+          finally { setUnblockLoading(null); }
         },
       },
     ]);
@@ -785,10 +826,14 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     <Text style={[s.roleBtnTxt, { color: '#EF4444' }]}>Exclure</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[s.roleBtn, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]}
+                    style={[s.roleBtn, { backgroundColor: '#EF444415', borderColor: '#EF444440', opacity: blockLoading === member.user_id ? 0.5 : 1 }]}
                     onPress={() => handleBlock(member)}
+                    disabled={blockLoading === member.user_id}
                   >
-                    <Icon name="slash" size={12} color="#EF4444" />
+                    {blockLoading === member.user_id
+                      ? <ActivityIndicator size="small" color="#EF4444" style={{ width: 12, height: 12 }} />
+                      : <Icon name="slash" size={12} color="#EF4444" />
+                    }
                     <Text style={[s.roleBtnTxt, { color: '#EF4444' }]}>Bloquer</Text>
                   </TouchableOpacity>
                 </View>
@@ -807,13 +852,31 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           );
         })}
 
-        {/* Membres bloqués */}
-        {isAdmin && blockedMembers.length > 0 && (
+        {/* ── Membres bloqués ── */}
+        {isAdmin && (
           <>
-            <Text style={[s.memberCountLbl, { color: '#EF4444', marginTop: 20 }]}>
-              {blockedMembers.length} bloqué{blockedMembers.length !== 1 ? 's' : ''}
-            </Text>
-            {blockedMembers.map(b => (
+            <View style={[s.blockedSectionHeader, { borderTopColor: colors.divider, marginTop: 24 }]}>
+              <View style={s.blockedSectionLeft}>
+                <View style={s.blockedSectionDot} />
+                <Text style={[s.memberCountLbl, { color: '#EF4444', marginTop: 0 }]}>
+                  Membres bloqués
+                </Text>
+              </View>
+              <View style={[s.blockedCountBadge, { backgroundColor: blockedMembers.length > 0 ? '#EF444420' : colors.backgroundSecondary }]}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: blockedMembers.length > 0 ? '#EF4444' : colors.textTertiary }}>
+                  {blockedMembers.length}
+                </Text>
+              </View>
+            </View>
+
+            {blockedMembers.length === 0 ? (
+              <View style={[s.blockedEmpty, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                <Icon name="shield" size={18} color={colors.textTertiary} />
+                <Text style={[s.blockedEmptyText, { color: colors.textTertiary }]}>
+                  Aucun membre bloqué
+                </Text>
+              </View>
+            ) : blockedMembers.map(b => (
               <View key={b.id} style={[s.adminMemberRow, { borderBottomColor: colors.divider }]}>
                 {b.avatar_url ? (
                   <Image source={{ uri: b.avatar_url }} style={s.memberAvatar} />
@@ -835,10 +898,14 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   <Text style={[s.memberSub, { color: '#EF4444' }]}>Bloqué</Text>
                 </View>
                 <TouchableOpacity
-                  style={[s.roleBtn, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}
+                  style={[s.roleBtn, { backgroundColor: '#10B98115', borderColor: '#10B98140', opacity: unblockLoading === b.user_id ? 0.5 : 1 }]}
                   onPress={() => handleUnblock(b)}
+                  disabled={unblockLoading === b.user_id}
                 >
-                  <Icon name="user-check" size={12} color="#10B981" />
+                  {unblockLoading === b.user_id
+                    ? <ActivityIndicator size="small" color="#10B981" style={{ width: 12, height: 12 }} />
+                    : <Icon name="user-check" size={12} color="#10B981" />
+                  }
                   <Text style={[s.roleBtnTxt, { color: '#10B981' }]}>Débloquer</Text>
                 </TouchableOpacity>
               </View>
@@ -846,6 +913,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           </>
         )}
       </ScrollView>
+
     </View>
   );
 
@@ -1184,9 +1252,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
               {/* Description */}
               {community.description ? (
-                <Text style={[s.communityDesc, { color: colors.textSecondary }]} numberOfLines={3}>
-                  {community.description}
-                </Text>
+                <ExpandableText
+                  text={community.description}
+                  maxLines={3}
+                  primaryColor={colors.primary}
+                  textStyle={[s.communityDesc, { color: colors.textSecondary }]}
+                />
               ) : null}
 
               {/* Stats row */}
@@ -1547,6 +1618,17 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                         <Icon name="chevron-right" size={13} color={colors.textTertiary} />
                       </TouchableOpacity>
                     )}
+                    <TouchableOpacity
+                      style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                      onPress={() => (nav as any).navigate('CommunityChannels', { communityId, communityName: community.name, myRole })}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[s.navIcon, { backgroundColor: '#EC489920' }]}>
+                        <Icon name="hash" size={20} color="#EC4899" />
+                      </View>
+                      <Text style={[s.navLabel, { color: colors.textPrimary }]}>Canaux</Text>
+                      <Icon name="chevron-right" size={13} color={colors.textTertiary} />
+                    </TouchableOpacity>
                   </View>
 
                   {/* ── Section membres rapide ── */}
@@ -2076,8 +2158,8 @@ const s = StyleSheet.create({
   settingsSheet: {
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
-    maxHeight: '94%',
     flex: 1,
+    overflow: 'hidden',
   },
   handleWrap: { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
   handle: { width: 40, height: 4, borderRadius: 2 },
@@ -2192,7 +2274,7 @@ const s = StyleSheet.create({
   infoSummarySep: { width: 1, height: 14, opacity: 0.5 },
 
   settingsOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
-  settingsKav: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '94%' },
+  settingsKav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '92%' },
 
   // Tab badge
   tabBadge: {
@@ -2224,4 +2306,11 @@ const s = StyleSheet.create({
   secIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   secLabel: { fontSize: 14, fontWeight: '600' },
   secDesc: { fontSize: 11, marginTop: 2, lineHeight: 15 },
+
+  blockedSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 10, borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: 0 },
+  blockedSectionLeft:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  blockedSectionDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
+  blockedCountBadge:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  blockedEmpty:         { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
+  blockedEmptyText:     { fontSize: 13, fontWeight: '500' },
 });

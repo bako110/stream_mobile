@@ -55,6 +55,8 @@ import { CommunityMemberProfileScreen }   from '../screens/Detail/CommunityMembe
 import { CommunityLeaderboardScreen }     from '../screens/Detail/CommunityLeaderboardScreen';
 import { CommunityMemberCreatorStatsScreen } from '../screens/Detail/CommunityMemberCreatorStatsScreen';
 import { CommunityJoinRequestsScreen }   from '../screens/Detail/CommunityJoinRequestsScreen';
+import { CommunityChannelsScreen }        from '../screens/Detail/CommunityChannelsScreen';
+import { CommunityChannelChatScreen }     from '../screens/Detail/CommunityChannelChatScreen';
 import { PostDetailScreen }               from '../screens/Detail/PostDetailScreen';
 import { MyTicketScreen }        from '../screens/Detail/MyTicketScreen';
 import { AttendeesScreen }       from '../screens/Detail/AttendeesScreen';
@@ -89,7 +91,9 @@ import { SettingsCompteScreen }        from '../screens/Settings/SettingsCompteS
 import { SettingsContenuScreen }       from '../screens/Settings/SettingsContenuScreen';
 import { SettingsAProposScreen }       from '../screens/Settings/SettingsAProposScreen';
 import { SettingsDangerScreen }        from '../screens/Settings/SettingsDangerScreen';
-import { SettingsVerificationScreen }  from '../screens/Settings/SettingsVerificationScreen';
+import { CGUScreen }                          from '../screens/Main/CGUScreen';
+import { PolitiqueConfidentialiteScreen }     from '../screens/Main/PolitiqueConfidentialiteScreen';
+import { SettingsVerificationScreen }         from '../screens/Settings/SettingsVerificationScreen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -142,6 +146,8 @@ export type MainStackParamList = {
   CommunityLeaderboard:        { communityId: string; communityName: string };
   CommunityMemberCreatorStats: { communityId: string; communityName: string; memberId: string; memberName: string };
   CommunityJoinRequests:       { communityId: string; communityName: string };
+  CommunityChannels:           { communityId: string; communityName: string; myRole: string | null };
+  CommunityChannelChat:        { communityId: string; communityName: string; channelId: string; channelName: string; myRole: string | null; isAnnouncement?: boolean };
   Events:                  undefined;
   Concerts:        undefined;
   BlockedUsers:    undefined;
@@ -178,6 +184,8 @@ export type MainStackParamList = {
   SettingsContenu:           undefined;
   SettingsAPropos:           undefined;
   SettingsDanger:            undefined;
+  CGU:                       undefined;
+  PolitiqueConfidentialite:  undefined;
   SettingsVerification:      { user?: any } | undefined;
 };
 
@@ -324,6 +332,8 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CommunityLeaderboard"         component={CommunityLeaderboardScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityMemberCreatorStats"  component={CommunityMemberCreatorStatsScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityJoinRequests"   component={CommunityJoinRequestsScreen}   options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityChannels"       component={CommunityChannelsScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityChannelChat"    component={CommunityChannelChatScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="WebQRScanner"          component={WebQRScannerScreen}          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SettingsWallet"        component={SettingsWalletScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsMonetisation"  component={SettingsMonetisationScreen}  options={{ animation: 'slide_from_right' }} />
@@ -338,6 +348,12 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
           {() => <SettingsDangerScreen onLogout={onLogout} />}
         </Stack.Screen>
         <Stack.Screen name="SettingsVerification"  component={SettingsVerificationScreen}  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CGU" options={{ animation: 'slide_from_right' }}>
+          {({ navigation }) => <CGUScreen onBack={() => navigation.goBack()} />}
+        </Stack.Screen>
+        <Stack.Screen name="PolitiqueConfidentialite" options={{ animation: 'slide_from_right' }}>
+          {({ navigation }) => <PolitiqueConfidentialiteScreen onBack={() => navigation.goBack()} />}
+        </Stack.Screen>
       </Stack.Navigator>
       <NotificationToast />
     </>

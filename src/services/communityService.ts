@@ -236,6 +236,39 @@ export interface MemberCreatorStats {
   community_coins_earned: number;
 }
 
+// ── Canaux (sous-groupes) ─────────────────────────────────────────────────────
+
+export type ChannelType = 'text' | 'announcement' | 'voice';
+
+export interface CommunityChannel {
+  id: string;
+  community_id: string;
+  name: string;
+  description: string | null;
+  type: ChannelType;
+  emoji: string | null;
+  is_private: boolean;
+  position: number;
+  created_by: string;
+  created_at: string;
+  unread_count?: number;
+  last_message?: {
+    content: string | null;
+    sender_display_name: string | null;
+    created_at: string;
+  } | null;
+}
+
+export interface CreateChannelPayload {
+  name: string;
+  description?: string;
+  type?: ChannelType;
+  emoji?: string;
+  is_private?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const communityService = {
   async list(page = 1, limit = 20): Promise<CommunityData[]> {
     const res = await apiClient.get<CommunityData[]>(
@@ -507,5 +540,53 @@ export const communityService = {
       { note: note ?? null },
     );
     return res.data;
+  },
+
+  // ── Canaux ──────────────────────────────────────────────────────────────────
+
+  async getChannels(communityId: string): Promise<CommunityChannel[]> {
+    const res = await apiClient.get<CommunityChannel[]>(Endpoints.communities.channels(communityId));
+    return res.data;
+  },
+
+  async createChannel(communityId: string, data: CreateChannelPayload): Promise<CommunityChannel> {
+    const res = await apiClient.post<CommunityChannel>(Endpoints.communities.channels(communityId), data);
+    return res.data;
+  },
+
+  async updateChannel(communityId: string, channelId: string, data: Partial<CreateChannelPayload>): Promise<CommunityChannel> {
+    const res = await apiClient.patch<CommunityChannel>(Endpoints.communities.channel(communityId, channelId), data);
+    return res.data;
+  },
+
+  async deleteChannel(communityId: string, channelId: string): Promise<void> {
+    await apiClient.delete(Endpoints.communities.channel(communityId, channelId));
+  },
+
+  async getChannelMessages(communityId: string, channelId: string, page = 1, limit = 30): Promise<CommunityMessageData[]> {
+    const res = await apiClient.get<CommunityMessageData[]>(
+      `${Endpoints.communities.channelMessages(communityId, channelId)}?page=${page}&limit=${limit}`,
+    );
+    return res.data;
+  },
+
+  async sendChannelMessage(communityId: string, channelId: string, content: string, message_type = 'text', media_urls?: string[], reply_to_id?: string): Promise<CommunityMessageData> {
+    const res = await apiClient.post<CommunityMessageData>(
+      Endpoints.communities.channelMessages(communityId, channelId),
+      { content: content || null, message_type, media_urls: media_urls ?? [], reply_to_id: reply_to_id ?? null },
+    );
+    return res.data;
+  },
+
+  async deleteChannelMessage(communityId: string, channelId: string, messageId: string): Promise<void> {
+    await apiClient.delete(Endpoints.communities.channelMessage(communityId, channelId, messageId));
+  },
+
+  async addChannelMember(communityId: string, channelId: string, userId: string): Promise<void> {
+    await apiClient.post(Endpoints.communities.channelMembers(communityId, channelId), { user_id: userId });
+  },
+
+  async removeChannelMember(communityId: string, channelId: string, userId: string): Promise<void> {
+    await apiClient.delete(`${Endpoints.communities.channelMembers(communityId, channelId)}/${userId}`);
   },
 };
