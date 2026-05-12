@@ -151,7 +151,6 @@ const VideoFsModal: React.FC<{
     p.muted = false;
   });
 
-  // play/pause en sync avec la visibilité
   React.useEffect(() => {
     if (visible) {
       setNavigating(false);
@@ -163,12 +162,9 @@ const VideoFsModal: React.FC<{
 
   const handleViewPost = () => {
     setNavigating(true);
-    player.pause();
-    // Petite pause pour que la pause soit effective avant la navigation
-    setTimeout(() => {
-      onClose();
-      onViewPost();
-    }, 120);
+    try { player.pause(); player.release(); } catch {}
+    onClose();
+    onViewPost();
   };
 
   return (
@@ -177,7 +173,7 @@ const VideoFsModal: React.FC<{
       transparent={false}
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={onClose}
+      onRequestClose={() => { try { player.pause(); player.release(); } catch {} onClose(); }}
     >
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar hidden />
@@ -193,7 +189,7 @@ const VideoFsModal: React.FC<{
         {/* Bouton fermer */}
         <TouchableOpacity
           style={pc.vfClose}
-          onPress={onClose}
+          onPress={() => { try { player.pause(); player.release(); } catch {} onClose(); }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Icon name="x" size={20} color="#fff" />
@@ -244,6 +240,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [imageFs,       setImageFs]       = useState(false);
   const [imageFsIdx,    setImageFsIdx]    = useState(0);
   const [videoFs,       setVideoFs]       = useState(false);
+  const [videoFsKey,    setVideoFsKey]    = useState(0);
 
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
@@ -497,7 +494,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         <TouchableOpacity
           style={{ marginHorizontal: 12, marginBottom: 4 }}
           activeOpacity={0.92}
-          onPress={() => setVideoFs(true)}
+          onPress={() => { setVideoFsKey(k => k + 1); setVideoFs(true); }}
         >
           <InlineVideoPlayer
             uri={post.video_url}
@@ -679,9 +676,10 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       </Modal>
 
-      {/* Modal vidéo fullscreen */}
-      {post.video_url && (
+      {/* Modal vidéo fullscreen — key force le remount à chaque ouverture = player neuf */}
+      {post.video_url && videoFs && (
         <VideoFsModal
+          key={videoFsKey}
           visible={videoFs}
           uri={post.video_url}
           thumbnailUri={post.thumbnail_url}
