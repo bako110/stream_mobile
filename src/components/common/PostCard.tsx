@@ -243,29 +243,73 @@ export const PostCard: React.FC<PostCardProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Mini menu contextuel */}
-      {menuOpen && (
-        <View style={[pc.miniMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {isOwn ? (
-            <>
-              <TouchableOpacity style={pc.miniMenuItem} onPress={() => { setMenuOpen(false); setEditOpen(true); }}>
-                <Icon name="edit-2" size={15} color={colors.textSecondary} />
-                <Text style={{ fontSize: 14, color: colors.textSecondary }}>Modifier</Text>
-              </TouchableOpacity>
-              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
-              <TouchableOpacity style={pc.miniMenuItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
-                <Icon name="trash-2" size={15} color="#EF4444" />
-                <Text style={{ fontSize: 14, color: '#EF4444' }}>Supprimer</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <TouchableOpacity style={pc.miniMenuItem} onPress={() => setMenuOpen(false)}>
-              <Icon name="flag" size={15} color={colors.textSecondary} />
-              <Text style={{ fontSize: 14, color: colors.textSecondary }}>Signaler</Text>
+      {/* Modal menu contextuel — harmonisé avec les cartes événement/concert */}
+      <Modal transparent animationType="slide" visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
+        <TouchableOpacity style={pc.menuOverlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
+          <View style={[pc.menuSheet, { backgroundColor: colors.surface }]}>
+            <View style={[pc.menuHandle, { backgroundColor: colors.divider }]} />
+
+            {/* Titre du post */}
+            <View style={[pc.menuTitleRow, { borderBottomColor: colors.divider }]}>
+              <Icon name="file-text" size={13} color={colors.textTertiary} />
+              <Text style={[pc.menuTitleText, { color: colors.textTertiary }]} numberOfLines={1}>
+                {post.body ? post.body.slice(0, 50) + (post.body.length > 50 ? '…' : '') : 'Post'}
+              </Text>
+            </View>
+
+            {isOwn ? (
+              /* ── Propriétaire du post ── */
+              <>
+                <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                  <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); setEditOpen(true); }} activeOpacity={0.7}>
+                    <View style={[pc.menuIconWrap, { backgroundColor: colors.primary + '18' }]}>
+                      <Icon name="edit-2" size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[pc.menuActionText, { color: colors.textPrimary }]}>Modifier</Text>
+                      <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Éditer le contenu du post</Text>
+                    </View>
+                    <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+                  </TouchableOpacity>
+                </View>
+                <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                  <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); handleDelete(); }} activeOpacity={0.7}>
+                    <View style={[pc.menuIconWrap, { backgroundColor: '#EF444418' }]}>
+                      <Icon name="trash-2" size={18} color="#EF4444" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[pc.menuActionText, { color: '#EF4444' }]}>Supprimer</Text>
+                      <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Action irréversible</Text>
+                    </View>
+                    <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              /* ── Autres utilisateurs ── */
+              <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                <TouchableOpacity style={pc.menuAction} onPress={() => setMenuOpen(false)} activeOpacity={0.7}>
+                  <View style={[pc.menuIconWrap, { backgroundColor: '#EF444418' }]}>
+                    <Icon name="flag" size={18} color="#EF4444" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[pc.menuActionText, { color: '#EF4444' }]}>Signaler</Text>
+                    <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Contenu inapproprié</Text>
+                  </View>
+                  <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[pc.menuCancel, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+              onPress={() => setMenuOpen(false)}
+            >
+              <Text style={[pc.menuCancelText, { color: colors.textSecondary }]}>Annuler</Text>
             </TouchableOpacity>
-          )}
-        </View>
-      )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Feeling */}
       {post.feeling ? (
@@ -498,6 +542,19 @@ const pc = StyleSheet.create({
   socialBtnText: { fontSize: 13, fontWeight: '600' },
   miniMenu:      { position: 'absolute', top: 44, right: 12, zIndex: 10, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', minWidth: 140, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 5 },
   miniMenuItem:  { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  // ── Modal menu contextuel ─────────────────────────────────────────────────
+  menuOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  menuSheet:       { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: Platform.OS === 'ios' ? 36 : 20, paddingTop: 10, paddingHorizontal: 12, gap: 8 },
+  menuHandle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
+  menuTitleRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 4 },
+  menuTitleText:   { fontSize: 12, fontWeight: '600' },
+  menuGroup:       { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  menuAction:      { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 13 },
+  menuIconWrap:    { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  menuActionText:  { fontSize: 15, fontWeight: '500' },
+  menuActionSub:   { fontSize: 12, marginTop: 1 },
+  menuCancel:      { borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, marginTop: 4 },
+  menuCancelText:  { fontSize: 16, fontWeight: '600' },
   saveBtn:       { paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
   detailsBtn:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
   detailsBtnText:     { fontSize: 13, fontWeight: '700' },
