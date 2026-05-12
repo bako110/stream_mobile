@@ -397,21 +397,28 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const handleSendLocation = () => {
     setAttachOpen(false);
     setLocating(true);
+    const doSend = async (pos: any) => {
+      setLocating(false);
+      const { latitude, longitude } = pos.coords;
+      const metadata = { latitude, longitude, address: null };
+      try {
+        const reply_to_id = replyingTo?.id;
+        setReplyingTo(null);
+        const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'location', [], reply_to_id, metadata);
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+      } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+    };
     Geolocation.getCurrentPosition(
-      async (pos) => {
-        setLocating(false);
-        const { latitude, longitude } = pos.coords;
-        const metadata = { latitude, longitude, address: null };
-        try {
-          const reply_to_id = replyingTo?.id;
-          setReplyingTo(null);
-          const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'location', [], reply_to_id, metadata);
-          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
-          setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-        } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+      doSend,
+      () => {
+        Geolocation.getCurrentPosition(
+          doSend,
+          (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+        );
       },
-      (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
     );
   };
 

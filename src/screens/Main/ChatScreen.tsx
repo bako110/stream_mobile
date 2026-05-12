@@ -511,20 +511,27 @@ export const ChatScreen: React.FC = () => {
   const sendLocation = () => {
     setShowAttach(false);
     setLocating(true);
+    const doSend = async (pos: any) => {
+      setLocating(false);
+      const { latitude, longitude } = pos.coords;
+      try {
+        const msg = await messageService.sendMessage(
+          partnerId, '', 'location', undefined,
+          { latitude, longitude, address: null },
+        );
+        setMessages(prev => [msg, ...prev]);
+      } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+    };
     Geolocation.getCurrentPosition(
-      async (pos) => {
-        setLocating(false);
-        const { latitude, longitude } = pos.coords;
-        try {
-          const msg = await messageService.sendMessage(
-            partnerId, '', 'location', undefined,
-            { latitude, longitude, address: null },
-          );
-          setMessages(prev => [msg, ...prev]);
-        } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+      doSend,
+      () => {
+        Geolocation.getCurrentPosition(
+          doSend,
+          (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+        );
       },
-      (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
     );
   };
 
