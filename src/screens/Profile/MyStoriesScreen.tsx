@@ -309,6 +309,14 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
           initialStoryIndex={viewerIndex}
           currentUserId={myId}
           onClose={() => { setViewerOpen(false); load(); }}
+          onNavigateToChat={(partnerId, partnerName, avatarUrl) => {
+            setViewerOpen(false);
+            nav.navigate('Chat', { partnerId, partnerName, avatarUrl });
+          }}
+          onNavigateToCall={(partnerId, partnerName, callType) => {
+            setViewerOpen(false);
+            nav.navigate('Call', { partnerId, partnerName, callType, isIncoming: false });
+          }}
         />
       )}
 
