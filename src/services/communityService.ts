@@ -66,7 +66,7 @@ export interface BlockedMemberData {
   reason: string | null;
 }
 
-export type CommunityMessageType = 'text' | 'image' | 'media' | 'announcement' | 'poll' | 'event';
+export type CommunityMessageType = 'text' | 'image' | 'media' | 'audio' | 'file' | 'location' | 'announcement' | 'poll' | 'event';
 
 export interface CommunityMessageData {
   id: string;
@@ -78,6 +78,7 @@ export interface CommunityMessageData {
   message_type: CommunityMessageType;
   content: string | null;
   media_urls: string[];
+  metadata: Record<string, any> | null;
   reply_to_id: string | null;
   reply_to: {
     id: string; sender_id: string;
@@ -623,10 +624,16 @@ export const communityService = {
     return res.data;
   },
 
-  async sendChannelMessage(communityId: string, channelId: string, content: string, message_type = 'text', media_urls?: string[], reply_to_id?: string): Promise<CommunityMessageData> {
+  async sendChannelMessage(
+    communityId: string, channelId: string,
+    content: string, message_type = 'text',
+    media_urls?: string[],
+    reply_to_id?: string,
+    metadata?: Record<string, any>,
+  ): Promise<CommunityMessageData> {
     const res = await apiClient.post<CommunityMessageData>(
       Endpoints.communities.channelMessages(communityId, channelId),
-      { content: content || null, message_type, media_urls: media_urls ?? [], reply_to_id: reply_to_id ?? null },
+      { content: content || null, message_type, media_urls: media_urls ?? [], reply_to_id: reply_to_id ?? null, metadata: metadata ?? null },
     );
     return res.data;
   },

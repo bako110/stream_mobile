@@ -242,6 +242,8 @@ export const Endpoints = {
       `${V1}/upload/video?folder=${folder}`,
     audio: (folder: 'messages' | 'stories') =>
       `${V1}/upload/audio?folder=${folder}`,
+    file: (folder: 'messages') =>
+      `${V1}/upload/file?folder=${folder}`,
     deleteImage: `${V1}/upload/images`,
   },
 

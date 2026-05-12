@@ -1,15 +1,13 @@
 /**
  * CommunityChannelChatScreen
- * Chat d'un canal (sous-groupe) d'une communauté.
- * Reprend exactement la même logique que CommunityChatScreen
- * mais en ciblant les endpoints /channels/:channelId/messages.
+ * Chat complet : texte, images, audio, fichiers, localisation, répondre, modifier, supprimer, épingler.
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
   ActivityIndicator, Image, Alert, Modal, Pressable,
-  ScrollView, Dimensions, Animated,
+  ScrollView, Dimensions, Animated, Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -19,10 +17,12 @@ import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
 import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
+import DocumentPicker from 'react-native-document-picker';
+import Geolocation from '@react-native-community/geolocation';
 
 const { width: W } = Dimensions.get('window');
 
@@ -53,6 +53,15 @@ function fmtDate(iso: string) {
 function sameDay(a: string, b: string) {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
+function fmtFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+}
+function fmtDuration(secs: number) {
+  const m = Math.floor(secs / 60), s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 export const CommunityChannelChatScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -78,8 +87,10 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const [editingMsg,  setEditingMsg]  = useState<CommunityMessage | null>(null);
   const [replyingTo,  setReplyingTo]  = useState<CommunityMessage | null>(null);
   const [menuMsg,     setMenuMsg]     = useState<CommunityMessage | null>(null);
+  const [attachOpen,  setAttachOpen]  = useState(false);
+  const [locating,    setLocating]    = useState(false);
 
-  // Media preview
+  // Media preview (images)
   const [mediaPreview,     setMediaPreview]     = useState<{ uri: string; name: string }[]>([]);
   const [mediaCaption,     setMediaCaption]     = useState('');
   const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
@@ -98,13 +109,10 @@ export const CommunityChannelChatScreen: React.FC = () => {
     Animated.spring(sendBtnAnim, { toValue: text.trim() ? 1 : 0, useNativeDriver: true, tension: 120, friction: 8 }).start();
   }, [text]);
 
-  // WebSocket — on s'abonne au canal via le WS de la communauté
-  const { sendWsMessage, isConnected } = useCommunityWebSocket(
+  const { isConnected } = useCommunityWebSocket(
     communityId,
     useCallback((payload: CommunityWsPayload) => {
-      // Filtrer les messages de ce canal
       if ((payload as any).channel_id && (payload as any).channel_id !== channelId) return;
-
       if (payload.type === 'community_message' || payload.type === 'community_message_sent') {
         const msg = payload as unknown as CommunityMessage;
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
@@ -118,7 +126,6 @@ export const CommunityChannelChatScreen: React.FC = () => {
     }, [channelId]),
   );
 
-  // Chargement
   const loadMessages = useCallback(async (p = 1, prepend = false) => {
     try {
       const msgs = await communityService.getChannelMessages(communityId, channelId, p, 30);
@@ -150,7 +157,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
     loadMessages(next, true);
   }, [hasMore, loadingMore, loading, page]);
 
-  // Envoyer
+  // ── Envoi texte / édition ────────────────────────────────────────────────────
   const handleSend = async () => {
     const content = text.trim();
     if (!content || sending) return;
@@ -170,23 +177,34 @@ export const CommunityChannelChatScreen: React.FC = () => {
 
     const reply_to_id = replyingTo?.id ?? null;
     setReplyingTo(null);
-    const msgType = isAnnouncement ? 'announcement' : 'text';
-
     try {
-      const msg = await communityService.sendChannelMessage(communityId, channelId, content, msgType, [], reply_to_id ?? undefined);
+      const msg = await communityService.sendChannelMessage(communityId, channelId, content, isAnnouncement ? 'announcement' : 'text', [], reply_to_id ?? undefined);
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch {}
     setSending(false);
   };
 
-  // Sélection image
-  const handlePickMedia = () => {
+  // ── Images ───────────────────────────────────────────────────────────────────
+  const handlePickImage = () => {
+    setAttachOpen(false);
     launchImageLibrary({ mediaType: 'photo', selectionLimit: 4, quality: 0.8 }, (resp) => {
       if (resp.didCancel || !resp.assets?.length) return;
       const assets = resp.assets.filter(a => !!a.uri).map((a, i) => ({ uri: a.uri!, name: a.fileName ?? `photo_${Date.now()}_${i}.jpg` }));
       if (!assets.length) return;
       setMediaPreview(assets);
+      setMediaCaption('');
+      setMediaPreviewOpen(true);
+    });
+  };
+
+  const handlePickCamera = () => {
+    setAttachOpen(false);
+    launchCamera({ mediaType: 'photo', quality: 0.8 }, (resp) => {
+      if (resp.didCancel || !resp.assets?.length) return;
+      const a = resp.assets[0];
+      if (!a.uri) return;
+      setMediaPreview([{ uri: a.uri, name: a.fileName ?? `photo_${Date.now()}.jpg` }]);
       setMediaCaption('');
       setMediaPreviewOpen(true);
     });
@@ -205,11 +223,13 @@ export const CommunityChannelChatScreen: React.FC = () => {
         if (url) urls.push(url);
       }
       if (urls.length > 0) {
-        const msg = await communityService.sendChannelMessage(communityId, channelId, mediaCaption.trim(), 'image', urls);
+        const reply_to_id = replyingTo?.id;
+        setReplyingTo(null);
+        const msg = await communityService.sendChannelMessage(communityId, channelId, mediaCaption.trim(), 'image', urls, reply_to_id);
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
       }
-    } catch {}
+    } catch { Alert.alert('Erreur', 'Impossible d\'envoyer les images.'); }
     finally {
       setMediaUploading(false);
       setMediaPreviewOpen(false);
@@ -218,6 +238,77 @@ export const CommunityChannelChatScreen: React.FC = () => {
     }
   };
 
+  // ── Audio ────────────────────────────────────────────────────────────────────
+  const handlePickAudio = async () => {
+    setAttachOpen(false);
+    try {
+      const result = await DocumentPicker.pickSingle({ type: [DocumentPicker.types.audio] });
+      setSending(true);
+      const fd = new FormData();
+      fd.append('file', { uri: result.uri, name: result.name ?? 'audio.mp3', type: result.type ?? 'audio/mpeg' } as any);
+      const res = await apiClient.upload<{ url: string; duration?: number }>(Endpoints.upload.audio('messages'), fd);
+      const url = res.data?.url;
+      if (!url) throw new Error('no url');
+      const metadata = { filename: result.name ?? 'audio.mp3', duration: res.data?.duration ?? null, size: result.size ?? null };
+      const reply_to_id = replyingTo?.id;
+      setReplyingTo(null);
+      const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'audio', [url], reply_to_id, metadata);
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (e: any) {
+      if (!DocumentPicker.isCancel(e)) Alert.alert('Erreur', 'Impossible d\'envoyer l\'audio.');
+    } finally { setSending(false); }
+  };
+
+  // ── Fichiers ─────────────────────────────────────────────────────────────────
+  const handlePickFile = async () => {
+    setAttachOpen(false);
+    try {
+      const result = await DocumentPicker.pickSingle({
+        type: [DocumentPicker.types.pdf, DocumentPicker.types.doc, DocumentPicker.types.docx,
+               DocumentPicker.types.xls, DocumentPicker.types.xlsx, DocumentPicker.types.plainText],
+      });
+      setSending(true);
+      const fd = new FormData();
+      fd.append('file', { uri: result.uri, name: result.name ?? 'fichier', type: result.type ?? 'application/octet-stream' } as any);
+      const res = await apiClient.upload<{ url: string; filename: string; size: number; mime_type: string }>(
+        Endpoints.upload.file('messages'), fd,
+      );
+      const { url, filename, size, mime_type } = res.data;
+      const metadata = { filename: filename ?? result.name ?? 'fichier', size: size ?? result.size ?? 0, mime_type: mime_type ?? result.type ?? '' };
+      const reply_to_id = replyingTo?.id;
+      setReplyingTo(null);
+      const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'file', [url], reply_to_id, metadata);
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (e: any) {
+      if (!DocumentPicker.isCancel(e)) Alert.alert('Erreur', 'Impossible d\'envoyer le fichier.');
+    } finally { setSending(false); }
+  };
+
+  // ── Localisation ─────────────────────────────────────────────────────────────
+  const handleSendLocation = () => {
+    setAttachOpen(false);
+    setLocating(true);
+    Geolocation.getCurrentPosition(
+      async (pos) => {
+        setLocating(false);
+        const { latitude, longitude } = pos.coords;
+        const metadata = { latitude, longitude, address: null };
+        try {
+          const reply_to_id = replyingTo?.id;
+          setReplyingTo(null);
+          const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'location', [], reply_to_id, metadata);
+          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+          setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+        } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+      },
+      (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+    );
+  };
+
+  // ── Actions message ──────────────────────────────────────────────────────────
   const handleDelete = (msg: CommunityMessage) => {
     setMenuMsg(null);
     Alert.alert('Supprimer', 'Supprimer ce message ?', [
@@ -239,8 +330,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
     } catch {}
   };
 
-  // ── Rendu ──────────────────────────────────────────────────────────────────
-
+  // ── Rendu message ────────────────────────────────────────────────────────────
   const renderMessage = ({ item: msg, index }: { item: CommunityMessage; index: number }) => {
     const isMe = msg.sender_id === myId;
     const prev = messages[index - 1];
@@ -248,14 +338,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
     const showDate = !prev || !sameDay(prev.created_at, msg.created_at);
     const isFirst = !prev || prev.sender_id !== msg.sender_id || !sameDay(prev.created_at, msg.created_at);
     const isLast  = !next || next.sender_id !== msg.sender_id || !sameDay(next.created_at, msg.created_at);
-    const isImg   = msg.message_type === 'image' || msg.message_type === 'media';
-    const isAnn   = msg.message_type === 'announcement';
 
     const maxW = W * 0.72;
-    const bubbleBg   = isMe ? colors.primary : (colors.surfaceElevated ?? colors.backgroundSecondary);
-    const textColor  = isMe ? '#fff' : colors.textPrimary;
-    const timeColor  = isMe ? 'rgba(255,255,255,0.55)' : colors.textTertiary;
-    const myRadius   = { borderBottomRightRadius: isLast ? 4 : 16 };
+    const bubbleBg  = isMe ? colors.primary : (colors.surfaceElevated ?? colors.backgroundSecondary);
+    const textColor = isMe ? '#fff' : colors.textPrimary;
+    const timeColor = isMe ? 'rgba(255,255,255,0.55)' : colors.textTertiary;
+    const myRadius  = { borderBottomRightRadius: isLast ? 4 : 16 };
     const otherRadius = { borderBottomLeftRadius: isLast ? 4 : 16 };
 
     const DateSep = showDate ? (
@@ -269,16 +357,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
     ) : null;
 
     // Annonce
-    if (isAnn) {
+    if (msg.message_type === 'announcement') {
       return (
         <View style={{ marginHorizontal: 12 }}>
           {DateSep}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onLongPress={() => canManage ? setMenuMsg(msg) : undefined}
-            delayLongPress={350}
-            style={[C.announceBubble, { backgroundColor: '#F59E0B0D', borderColor: '#F59E0B40' }]}
-          >
+          <TouchableOpacity activeOpacity={0.85} onLongPress={() => canManage ? setMenuMsg(msg) : undefined} delayLongPress={350}
+            style={[C.announceBubble, { backgroundColor: '#F59E0B0D', borderColor: '#F59E0B40' }]}>
             <View style={C.announceTop}>
               <View style={[C.announceIconBox, { backgroundColor: '#F59E0B20' }]}>
                 <Icon name="bell" size={13} color="#F59E0B" />
@@ -300,6 +384,132 @@ export const CommunityChannelChatScreen: React.FC = () => {
         </View>
       );
     }
+
+    const renderBubbleContent = () => {
+      // Image
+      if (msg.message_type === 'image' || msg.message_type === 'media') {
+        return (
+          <View style={{ gap: 4 }}>
+            {msg.media_urls.length === 1 ? (
+              <TouchableOpacity onPress={() => { setImgViewerList(msg.media_urls); setImgViewerIdx(0); setImgViewerOpen(true); }}>
+                <Image source={{ uri: msg.media_urls[0] }} style={{ width: maxW, height: maxW * 0.65, borderRadius: 10 }} resizeMode="cover" />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
+                {msg.media_urls.slice(0, 4).map((url, i) => (
+                  <TouchableOpacity key={i} onPress={() => { setImgViewerList(msg.media_urls); setImgViewerIdx(i); setImgViewerOpen(true); }}>
+                    <Image source={{ uri: url }} style={{ width: (maxW - 3) / 2, height: (maxW - 3) / 2 * 0.7, borderRadius: 8 }} resizeMode="cover" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {msg.content ? (
+              <View style={[C.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
+                <Text style={[C.msgText, { color: textColor }]}>{msg.content}</Text>
+              </View>
+            ) : null}
+            <Text style={{ fontSize: 10, color: colors.textTertiary, textAlign: isMe ? 'right' : 'left', marginTop: 2 }}>
+              {fmtTime(msg.created_at)}
+            </Text>
+          </View>
+        );
+      }
+
+      // Audio
+      if (msg.message_type === 'audio') {
+        const meta = msg.metadata ?? {};
+        const dur = meta.duration ? fmtDuration(meta.duration) : null;
+        return (
+          <TouchableOpacity
+            style={[C.bubble, C.audioBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
+            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
+            activeOpacity={0.8}
+          >
+            <View style={[C.audioIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary + '20' }]}>
+              <Icon name="headphones" size={18} color={isMe ? '#fff' : colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[C.audioName, { color: textColor }]} numberOfLines={1}>
+                {meta.filename ?? 'Audio'}
+              </Text>
+              <Text style={[C.audioMeta, { color: timeColor }]}>
+                {[dur, meta.size ? fmtFileSize(meta.size) : null].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+            <Icon name="play-circle" size={24} color={isMe ? 'rgba(255,255,255,0.8)' : colors.primary} />
+          </TouchableOpacity>
+        );
+      }
+
+      // Fichier
+      if (msg.message_type === 'file') {
+        const meta = msg.metadata ?? {};
+        const ext = (meta.filename ?? '').split('.').pop()?.toUpperCase() ?? 'FILE';
+        const isPdf = ext === 'PDF';
+        return (
+          <TouchableOpacity
+            style={[C.bubble, C.fileBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
+            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
+            activeOpacity={0.8}
+          >
+            <View style={[C.fileIconBox, { backgroundColor: isPdf ? '#EF444420' : '#3B82F620' }]}>
+              <Text style={[C.fileExt, { color: isPdf ? '#EF4444' : '#3B82F6' }]}>{ext}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[C.fileName, { color: textColor }]} numberOfLines={2}>{meta.filename ?? 'Fichier'}</Text>
+              <Text style={[C.fileMeta, { color: timeColor }]}>
+                {meta.size ? fmtFileSize(meta.size) : ''} · {fmtTime(msg.created_at)}
+              </Text>
+            </View>
+            <Icon name="download" size={18} color={isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary} />
+          </TouchableOpacity>
+        );
+      }
+
+      // Localisation
+      if (msg.message_type === 'location') {
+        const meta = msg.metadata ?? {};
+        const lat = meta.latitude, lng = meta.longitude;
+        const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+        return (
+          <TouchableOpacity
+            style={[C.bubble, C.locationBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
+            onPress={() => Linking.openURL(mapsUrl)}
+            activeOpacity={0.8}
+          >
+            <View style={[C.locationIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : '#EF444420' }]}>
+              <Icon name="map-pin" size={20} color={isMe ? '#fff' : '#EF4444'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[C.locationTitle, { color: textColor }]}>Localisation</Text>
+              {meta.address ? (
+                <Text style={[C.locationAddr, { color: timeColor }]} numberOfLines={2}>{meta.address}</Text>
+              ) : (
+                <Text style={[C.locationAddr, { color: timeColor }]}>{lat?.toFixed(5)}, {lng?.toFixed(5)}</Text>
+              )}
+            </View>
+            <Icon name="external-link" size={16} color={isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary} />
+          </TouchableOpacity>
+        );
+      }
+
+      // Texte
+      return (
+        <View style={[C.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
+          {msg.is_pinned && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Icon name="bookmark" size={10} color={isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B'} />
+              <Text style={{ color: isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B', fontSize: 9, fontWeight: '700', marginLeft: 3 }}>Épinglé</Text>
+            </View>
+          )}
+          <Text style={[C.msgText, { color: textColor }]}>{msg.content}</Text>
+          <View style={C.msgMeta}>
+            {msg.edited_at && <Text style={[{ fontSize: 10, fontStyle: 'italic', color: timeColor }]}>modifié · </Text>}
+            <Text style={[C.msgTime, { color: timeColor }]}>{fmtTime(msg.created_at)}</Text>
+          </View>
+        </View>
+      );
+    };
 
     return (
       <View style={{ marginHorizontal: 12 }}>
@@ -327,59 +537,16 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 {msg.sender_display_name || msg.sender_username}
               </Text>
             )}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onLongPress={() => setMenuMsg(msg)}
-              delayLongPress={350}
-            >
+            <TouchableOpacity activeOpacity={0.85} onLongPress={() => setMenuMsg(msg)} delayLongPress={350}>
               {msg.reply_to && (
                 <View style={[C.replyBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.12)' : colors.backgroundSecondary, borderLeftColor: colors.primary }]}>
                   <Text style={[C.replyName, { color: colors.primary }]}>{msg.reply_to.sender_display_name || msg.reply_to.sender_username}</Text>
                   <Text style={[C.replyText, { color: isMe ? 'rgba(255,255,255,0.6)' : colors.textSecondary }]} numberOfLines={1}>
-                    {msg.reply_to.content || '📷 Image'}
+                    {msg.reply_to.content || '📎 Pièce jointe'}
                   </Text>
                 </View>
               )}
-
-              {isImg ? (
-                <View style={{ gap: 4 }}>
-                  {msg.media_urls.length === 1 ? (
-                    <TouchableOpacity onPress={() => { setImgViewerList(msg.media_urls); setImgViewerIdx(0); setImgViewerOpen(true); }}>
-                      <Image source={{ uri: msg.media_urls[0] }} style={{ width: maxW, height: maxW * 0.65, borderRadius: 10 }} resizeMode="cover" />
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
-                      {msg.media_urls.slice(0, 4).map((url, i) => (
-                        <TouchableOpacity key={i} onPress={() => { setImgViewerList(msg.media_urls); setImgViewerIdx(i); setImgViewerOpen(true); }}>
-                          <Image source={{ uri: url }} style={{ width: (maxW - 3) / 2, height: (maxW - 3) / 2 * 0.7, borderRadius: 8 }} resizeMode="cover" />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                  {msg.content ? (
-                    <View style={[C.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
-                      <Text style={[C.msgText, { color: textColor }]}>{msg.content}</Text>
-                    </View>
-                  ) : null}
-                  <Text style={{ fontSize: 10, color: colors.textTertiary, textAlign: isMe ? 'right' : 'left', marginTop: 2 }}>
-                    {fmtTime(msg.created_at)}
-                  </Text>
-                </View>
-              ) : (
-                <View style={[C.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
-                  {msg.is_pinned && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                      <Icon name="bookmark" size={10} color={isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B'} />
-                      <Text style={{ color: isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B', fontSize: 9, fontWeight: '700', marginLeft: 3 }}>Épinglé</Text>
-                    </View>
-                  )}
-                  <Text style={[C.msgText, { color: textColor }]}>{msg.content}</Text>
-                  <View style={C.msgMeta}>
-                    {msg.edited_at && <Text style={[{ fontSize: 10, fontStyle: 'italic', color: timeColor }]}>modifié · </Text>}
-                    <Text style={[C.msgTime, { color: timeColor }]}>{fmtTime(msg.created_at)}</Text>
-                  </View>
-                </View>
-              )}
+              {renderBubbleContent()}
             </TouchableOpacity>
           </View>
         </View>
@@ -392,16 +559,14 @@ export const CommunityChannelChatScreen: React.FC = () => {
       <StatusBar barStyle="light-content" backgroundColor={colors.surface} />
 
       {/* Header */}
-      <LinearGradient
-        colors={[colors.surface, colors.surface]}
-        style={[C.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}
-      >
+      <LinearGradient colors={[colors.surface, colors.surface]}
+        style={[C.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
         <TouchableOpacity onPress={() => nav.goBack()} style={C.headerBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         {channelAvatar
-          ? <Image source={{ uri: channelAvatar }} style={C.channelIconBox} />
-          : <View style={[C.channelIconBox, { backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center' }]}>
+          ? <Image source={{ uri: channelAvatar }} style={[C.channelIconBox, { borderRadius: 10 }]} />
+          : <View style={[C.channelIconBox, { backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }]}>
               <Icon name={isAnnouncement ? 'bell' : 'hash'} size={16} color={colors.primary} />
             </View>
         }
@@ -415,7 +580,6 @@ export const CommunityChannelChatScreen: React.FC = () => {
         }
       </LinearGradient>
 
-      {/* Messages */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -455,7 +619,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 <View style={{ flex: 1 }}>
                   <Text style={[C.replyBannerName, { color: colors.primary }]}>{replyingTo.sender_display_name || replyingTo.sender_username}</Text>
                   <Text style={[{ fontSize: 12, color: colors.textSecondary }]} numberOfLines={1}>
-                    {replyingTo.content || '📷 Image'}
+                    {replyingTo.content || '📎 Pièce jointe'}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -488,12 +652,16 @@ export const CommunityChannelChatScreen: React.FC = () => {
               </View>
             ) : (
               <View style={[C.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
+                {/* Bouton pièces jointes */}
+                {!editingMsg && (
+                  <TouchableOpacity onPress={() => setAttachOpen(true)} disabled={sending || locating} style={C.inputIconBtn}>
+                    {locating
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <Icon name="plus-circle" size={22} color={colors.primary} />
+                    }
+                  </TouchableOpacity>
+                )}
                 <View style={[C.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-                  {!isAnnouncement && (
-                    <TouchableOpacity onPress={handlePickMedia} disabled={sending} style={C.inputIconBtn}>
-                      <Icon name="image" size={19} color={colors.textTertiary} />
-                    </TouchableOpacity>
-                  )}
                   <TextInput
                     ref={inputRef}
                     style={[C.input, { color: colors.textPrimary }]}
@@ -524,11 +692,38 @@ export const CommunityChannelChatScreen: React.FC = () => {
         )}
       </KeyboardAvoidingView>
 
-      {/* Context menu */}
+      {/* Menu pièces jointes */}
+      <Modal visible={attachOpen} transparent animationType="slide" onRequestClose={() => setAttachOpen(false)}>
+        <Pressable style={C.overlay} onPress={() => setAttachOpen(false)}>
+          <Pressable style={[C.attachSheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
+            <View style={[C.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[C.attachTitle, { color: colors.textPrimary }]}>Envoyer</Text>
+            <View style={C.attachGrid}>
+              {[
+                { icon: 'image',   label: 'Galerie',      color: '#7B3FF2', onPress: handlePickImage },
+                { icon: 'camera',  label: 'Appareil photo', color: '#10B981', onPress: handlePickCamera },
+                { icon: 'headphones', label: 'Audio',     color: '#F59E0B', onPress: handlePickAudio },
+                { icon: 'file-text', label: 'Fichier',    color: '#3B82F6', onPress: handlePickFile },
+                { icon: 'map-pin', label: 'Localisation', color: '#EF4444', onPress: handleSendLocation },
+              ].map(item => (
+                <TouchableOpacity key={item.label} style={C.attachItem} onPress={item.onPress} activeOpacity={0.8}>
+                  <View style={[C.attachIconBox, { backgroundColor: item.color + '18' }]}>
+                    <Icon name={item.icon} size={24} color={item.color} />
+                  </View>
+                  <Text style={[C.attachLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={{ height: Platform.OS === 'ios' ? 20 : 8 }} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Context menu message */}
       <Modal visible={!!menuMsg} transparent animationType="fade" onRequestClose={() => setMenuMsg(null)}>
         <Pressable style={C.overlay} onPress={() => setMenuMsg(null)}>
           <View style={[C.menuSheet, { backgroundColor: colors.surface }]}>
-            {menuMsg?.message_type !== 'announcement' && (
+            {menuMsg?.message_type === 'text' && (
               <View style={[C.emojiRow, { borderBottomColor: colors.divider }]}>
                 {QUICK_EMOJIS.map(e => (
                   <TouchableOpacity key={e} onPress={() => setMenuMsg(null)} style={C.emojiBtn}>
@@ -542,13 +737,13 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 {menuMsg?.sender_display_name || menuMsg?.sender_username}
               </Text>
               <Text style={{ color: colors.textPrimary, fontSize: 13 }} numberOfLines={2}>
-                {menuMsg?.content || '📷 Image'}
+                {menuMsg?.content || '📎 Pièce jointe'}
               </Text>
             </View>
             {[
               { show: menuMsg?.message_type !== 'announcement', icon: 'corner-up-left', label: 'Répondre', color: colors.textPrimary,
                 onPress: () => { setReplyingTo(menuMsg!); setMenuMsg(null); setTimeout(() => inputRef.current?.focus(), 100); } },
-              { show: menuMsg?.sender_id === myId && menuMsg?.message_type !== 'announcement', icon: 'edit-2', label: 'Modifier', color: colors.textPrimary,
+              { show: menuMsg?.sender_id === myId && menuMsg?.message_type === 'text', icon: 'edit-2', label: 'Modifier', color: colors.textPrimary,
                 onPress: () => { setEditingMsg(menuMsg!); setText(menuMsg!.content ?? ''); setMenuMsg(null); setTimeout(() => inputRef.current?.focus(), 100); } },
               { show: !!(menuMsg?.sender_id && menuMsg.sender_id !== myId), icon: 'user', label: 'Voir le profil', color: colors.textPrimary,
                 onPress: () => { setMenuMsg(null); nav.navigate('UserProfile', { userId: menuMsg!.sender_id }); } },
@@ -569,7 +764,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
         </Pressable>
       </Modal>
 
-      {/* Preview média */}
+      {/* Preview images avant envoi */}
       <Modal visible={mediaPreviewOpen} transparent={false} statusBarTranslucent animationType="slide"
         onRequestClose={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); } }}>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -578,7 +773,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
             <TouchableOpacity onPress={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); } }} style={MP.closeBtn}>
               <Icon name="x" size={22} color="#fff" />
             </TouchableOpacity>
-            <Text style={MP.title}>Aperçu</Text>
+            <Text style={MP.title}>Aperçu ({mediaPreview.length})</Text>
             <View style={{ width: 36 }} />
           </View>
           <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
@@ -601,7 +796,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Image viewer */}
+      {/* Image viewer plein écran */}
       <Modal visible={imgViewerOpen} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setImgViewerOpen(false)}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <StatusBar hidden />
@@ -627,7 +822,7 @@ const C = StyleSheet.create({
   root:   { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
   headerBack: { padding: 6 },
-  channelIconBox: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  channelIconBox: { width: 32, height: 32 },
   headerTitle: { fontSize: 15, fontWeight: '800' },
   headerSub:   { fontSize: 11, marginTop: 1 },
   onlineDot: { width: 8, height: 8, borderRadius: 4 },
@@ -654,6 +849,25 @@ const C = StyleSheet.create({
   replyName: { fontSize: 11, fontWeight: '700', marginBottom: 1 },
   replyText: { fontSize: 11 },
 
+  // Audio bubble
+  audioBubble: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  audioIconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  audioName: { fontSize: 13, fontWeight: '600' },
+  audioMeta: { fontSize: 11, marginTop: 2 },
+
+  // File bubble
+  fileBubble: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  fileIconBox: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  fileExt:  { fontSize: 11, fontWeight: '900' },
+  fileName: { fontSize: 13, fontWeight: '600' },
+  fileMeta: { fontSize: 11, marginTop: 2 },
+
+  // Location bubble
+  locationBubble: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  locationIconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  locationTitle: { fontSize: 13, fontWeight: '700' },
+  locationAddr:  { fontSize: 12, marginTop: 2 },
+
   announceBubble: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8 },
   announceTop:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   announceIconBox: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -673,19 +887,27 @@ const C = StyleSheet.create({
   editBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: 2 },
 
   inputBar:    { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  inputRow:    { flex: 1, flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingVertical: 4, paddingHorizontal: 4 },
+  inputRow:    { flex: 1, flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingVertical: 4, paddingHorizontal: 12 },
   inputIconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
-  input:       { flex: 1, paddingHorizontal: 8, paddingVertical: 8, fontSize: 15, maxHeight: 120 },
+  input:       { flex: 1, paddingVertical: 8, fontSize: 15, maxHeight: 120 },
   sendBtn:     { width: 44, height: 44, borderRadius: 22, overflow: 'hidden' },
 
-  overlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
-  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 20, position: 'absolute', bottom: 0, left: 0, right: 0 },
+  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
   emojiRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   emojiBtn:  { padding: 4 },
   menuPreview:    { paddingHorizontal: 18, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   menuItem:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14 },
   menuItemIcon:   { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   menuItemText:   { fontSize: 15, fontWeight: '500' },
+
+  attachSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 16 },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  attachTitle: { fontSize: 16, fontWeight: '800', marginBottom: 16, textAlign: 'center' },
+  attachGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 8 },
+  attachItem:  { alignItems: 'center', gap: 8, width: 72 },
+  attachIconBox: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  attachLabel: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
 });
 
 const MP = StyleSheet.create({
