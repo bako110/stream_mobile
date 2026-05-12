@@ -678,17 +678,18 @@ export const FeedScreen: React.FC = () => {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={[s.header, { backgroundColor: colors.surface }]}>
         <View style={s.headerRow}>
-          {/* Gauche : avatar + nom  — masqué si recherche ouverte */}
+          {/* Gauche : avatar — masqué si recherche ouverte */}
           {!searchOpen && (
             !currentUser ? (
-              /* Skeleton header */
-              <View style={[s.headerLeft, { pointerEvents: 'none' }]}>
+              <View style={[s.headerLeft, { pointerEvents: 'none', flex: 0 }]}>
                 <SkeletonBox width={34} height={34} borderRadius={17} />
-                <SkeletonBox width={90} height={13} borderRadius={6} />
               </View>
             ) : (
-              <TouchableOpacity style={s.headerLeft} activeOpacity={0.7}
-                onPress={() => currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id })}>
+              <TouchableOpacity
+                style={[s.headerLeft, { flex: 0, marginRight: 0 }]}
+                activeOpacity={0.7}
+                onPress={() => currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id })}
+              >
                 {currentUser.avatar_url ? (
                   <Image source={{ uri: currentUser.avatar_url }} style={s.avatar} />
                 ) : (
@@ -696,13 +697,17 @@ export const FeedScreen: React.FC = () => {
                     <Text style={[s.avatarText, { color: colors.primary }]}>{initials}</Text>
                   </View>
                 )}
-                {displayName ? (
-                  <Text style={[s.userName, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {displayName}
-                  </Text>
-                ) : null}
               </TouchableOpacity>
             )
+          )}
+
+          {/* Centre : FoliX — position absolue pour rester centré quoi qu'il arrive */}
+          {!searchOpen && (
+            <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
+              <Text style={{ fontSize: 22, fontWeight: '900', letterSpacing: 1.5, color: colors.primary }}>
+                Foli<Text style={{ color: colors.textPrimary }}>X</Text>
+              </Text>
+            </View>
           )}
 
           {/* Barre de recherche animée — apparaît quand searchOpen */}
