@@ -158,6 +158,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [shareOpen,     setShareOpen]     = useState(false);
   const [imageFs,       setImageFs]       = useState(false);
   const [imageFsIdx,    setImageFsIdx]    = useState(0);
+  const [videoFs,       setVideoFs]       = useState(false);
 
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
@@ -406,16 +407,24 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       ) : null}
 
-      {/* Vidéo inline */}
+      {/* Vidéo — tap ouvre fullscreen */}
       {post.video_url && images.length === 0 && (
-        <View style={{ marginHorizontal: 12, marginBottom: 4 }}>
+        <TouchableOpacity
+          style={{ marginHorizontal: 12, marginBottom: 4 }}
+          activeOpacity={0.92}
+          onPress={() => setVideoFs(true)}
+        >
           <InlineVideoPlayer
             uri={post.video_url}
             thumbnailUri={post.thumbnail_url}
             aspectRatio={16 / 9}
             borderRadius={12}
           />
-        </View>
+          <View style={pc.detailsOverlay}>
+            <Icon name="maximize" size={13} color="#fff" />
+            <Text style={pc.detailsOverlayText}>Voir le post</Text>
+          </View>
+        </TouchableOpacity>
       )}
 
       {/* Images avec overlay "Voir les détails" */}
@@ -585,6 +594,47 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       </Modal>
 
+      {/* Modal vidéo fullscreen */}
+      <Modal
+        visible={videoFs}
+        transparent={false}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setVideoFs(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <StatusBar hidden />
+          {/* Player avec contrôles natifs */}
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <InlineVideoPlayer
+              uri={post.video_url!}
+              thumbnailUri={post.thumbnail_url}
+              aspectRatio={16 / 9}
+              borderRadius={0}
+              showControls
+              autoPlay
+            />
+          </View>
+          {/* Bouton fermer */}
+          <TouchableOpacity
+            style={pc.vfClose}
+            onPress={() => setVideoFs(false)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon name="x" size={20} color="#fff" />
+          </TouchableOpacity>
+          {/* Bouton voir détails */}
+          <TouchableOpacity
+            style={pc.vfDetails}
+            onPress={() => { setVideoFs(false); onPress(); }}
+            activeOpacity={0.85}
+          >
+            <Icon name="arrow-right" size={14} color="#fff" />
+            <Text style={pc.vfDetailsTxt}>Voir les détails</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
       {/* Modal édition */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -655,4 +705,17 @@ const pc = StyleSheet.create({
   detailsBtnText:     { fontSize: 13, fontWeight: '700' },
   detailsOverlay:     { position: 'absolute', bottom: 10, left: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   detailsOverlayText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  vfClose: {
+    position: 'absolute', top: 48, right: 16,
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  vfDetails: {
+    position: 'absolute', bottom: 40, alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 20, paddingVertical: 11, borderRadius: 30,
+  },
+  vfDetailsTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

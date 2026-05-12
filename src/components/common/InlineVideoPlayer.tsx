@@ -15,10 +15,11 @@ const { width: SCREEN_W } = Dimensions.get('window');
 interface Props {
   uri:           string;
   thumbnailUri?: string | null;
-  aspectRatio?:  number;      // default 16/9
+  aspectRatio?:  number;
   borderRadius?: number;
-  autoPlay?:     boolean;     // default false — user must tap
-  muted?:        boolean;     // default false
+  autoPlay?:     boolean;
+  muted?:        boolean;
+  showControls?: boolean;  // true = contrôles natifs (seek, barre de progression)
 }
 
 export const InlineVideoPlayer: React.FC<Props> = ({
@@ -28,26 +29,45 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   borderRadius  = 12,
   autoPlay      = false,
   muted         = false,
+  showControls  = false,
 }) => {
   const [playing, setPlaying] = useState(autoPlay);
   const [started, setStarted] = useState(autoPlay);
 
   const player = useVideoPlayer({ uri }, p => {
-    p.loop   = true;
+    p.loop   = !showControls;
     p.muted  = muted;
     if (autoPlay) p.play();
   });
 
   useEffect(() => {
+    if (showControls) return;
     if (playing) {
       setStarted(true);
       player.play();
     } else {
       player.pause();
     }
-  }, [playing]);
+  }, [playing, showControls]);
 
   const height = Math.round(SCREEN_W / aspectRatio);
+
+  if (showControls) {
+    return (
+      <View style={[styles.wrap, { height, borderRadius, overflow: 'hidden' }]}>
+        {!started && thumbnailUri ? (
+          <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : null}
+        <VideoView
+          player={player}
+          style={StyleSheet.absoluteFill}
+          resizeMode="contain"
+          controls
+          onTouchStart={() => { if (!started) { setStarted(true); player.play(); } }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.wrap, { height, borderRadius, overflow: 'hidden' }]}>
@@ -66,7 +86,7 @@ export const InlineVideoPlayer: React.FC<Props> = ({
         player={player}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
-        nativeControls={false}
+        controls={false}
       />
 
       {/* Overlay tap */}
@@ -75,7 +95,6 @@ export const InlineVideoPlayer: React.FC<Props> = ({
         activeOpacity={1}
         onPress={() => setPlaying(p => !p)}
       >
-        {/* Bouton play/pause centré — visible seulement si pausé */}
         {!playing && (
           <View style={styles.playOverlay}>
             <View style={styles.playCircle}>
@@ -99,7 +118,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   playOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems:      'center',
     justifyContent:  'center',
     backgroundColor: 'rgba(0,0,0,0.28)',

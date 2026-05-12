@@ -565,6 +565,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
               thumbnailUri={post.thumbnail_url}
               aspectRatio={16 / 9}
               borderRadius={12}
+              showControls
             />
           </View>
         )}
