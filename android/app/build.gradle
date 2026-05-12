@@ -89,7 +89,7 @@ android {
         abortOnError false
     }
 
-    namespace "com.stream_mobile"
+    namespace "com.folix.mobile"
     defaultConfig {
         applicationId "com.folix.mobile"
         minSdkVersion rootProject.ext.minSdkVersion

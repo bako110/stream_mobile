@@ -10,8 +10,12 @@ export interface Post {
   id: string;
   user_id: string;
   body?: string | null;
+  caption?: string | null;
   image_url?: string | null;
   image_urls?: string[] | null;
+  media_urls?: string[] | null;
+  video_url?: string | null;
+  thumbnail_url?: string | null;
   feeling?: string | null;
   like_count: number;
   comment_count: number;
@@ -26,5 +30,7 @@ export interface PostCreate {
   body?: string;
   image_url?: string;
   image_urls?: string[];
+  video_url?: string;
+  thumbnail_url?: string;
   feeling?: string;
 }

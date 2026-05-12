@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, Platform, StatusBar,
+  ScrollView, Alert, Platform, StatusBar,
   Dimensions, KeyboardAvoidingView,
 } from 'react-native';
-import Animated, {
-  FadeInDown, FadeIn,
-  useSharedValue, useAnimatedStyle, withTiming, withRepeat, withSequence,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
@@ -15,8 +12,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { reelService } from '../../services';
-import { uploadVideoFromUri } from '../../services/uploadService';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { backgroundUploadService } from '../../services/backgroundUploadService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -24,19 +21,7 @@ const VIDEO_H = Math.round(SCREEN_W * 9 / 16);
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-type PublishStep = 'idle' | 'compressing' | 'uploading' | 'creating' | 'done';
-
-const STEP_LABELS: Record<PublishStep, string> = {
-  idle:        '',
-  compressing: 'Compression…',
-  uploading:   'Envoi de la vidéo…',
-  creating:    'Finalisation…',
-  done:        'Reel publié ! 🎉',
-};
-
-interface Props {
-  onBack: () => void;
-}
+interface Props { onBack: () => void }
 
 export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   const { theme } = useTheme();
@@ -45,12 +30,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
 
   const [caption,       setCaption]       = useState('');
   const [videoLocalUri, setVideoLocalUri] = useState<string | null>(null);
-  const [step,          setStep]          = useState<PublishStep>('idle');
   const [videoPaused,   setVideoPaused]   = useState(false);
-
-  const isPublishing = step !== 'idle' && step !== 'done';
-
-  const isVideoPaused = !videoLocalUri || videoPaused || isPublishing;
 
   const videoPlayer = useVideoPlayer(
     videoLocalUri ? { uri: videoLocalUri } : { uri: 'about:blank' },
@@ -59,28 +39,9 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
 
   useEffect(() => {
     if (!videoLocalUri) return;
-    if (isVideoPaused) { videoPlayer.pause(); }
-    else               { videoPlayer.play(); }
-  }, [isVideoPaused, videoLocalUri]);
-
-  // Barre de progression animée
-  const progressWidth = useSharedValue(0);
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value}%` as any,
-  }));
-
-  const dotOpacity = useSharedValue(1);
-  useEffect(() => {
-    if (isPublishing) {
-      dotOpacity.value = withRepeat(
-        withSequence(withTiming(0.3, { duration: 600 }), withTiming(1, { duration: 600 })),
-        -1, true,
-      );
-    } else {
-      dotOpacity.value = 1;
-    }
-  }, [isPublishing]);
-  const dotStyle = useAnimatedStyle(() => ({ opacity: dotOpacity.value }));
+    if (videoPaused) videoPlayer.pause();
+    else             videoPlayer.play();
+  }, [videoPaused, videoLocalUri]);
 
   const handlePickVideo = () => {
     launchImageLibrary({ mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any }, res => {
@@ -102,74 +63,48 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
     setVideoPaused(false);
   };
 
-  const handlePublish = async () => {
+  const handlePublish = () => {
     if (!videoLocalUri) return;
-    try {
-      // ── Étape 1 : compression (0→80%) ────────────────────────────────────
-      setStep('compressing');
-      progressWidth.value = 0;
 
-      const uploaded = await uploadVideoFromUri(
-        videoLocalUri,
-        'reels',
-        undefined,
-        undefined,
-        (pct) => {
-          // pct 10→90 pendant compression, on mappe sur 0→80 dans la barre
-          progressWidth.value = withTiming(pct * 0.88, { duration: 150 });
-          if (pct >= 90) setStep('uploading');
-        },
-      );
+    const capturedCaption = caption.trim();
+    const capturedUri     = videoLocalUri;
 
-      // ── Étape 2 : création backend (88→96%) ──────────────────────────────
-      setStep('creating');
-      progressWidth.value = withTiming(92, { duration: 200 });
+    // Fermer l'écran immédiatement
+    videoPlayer.pause();
+    onBack();
+    nav.navigate('Tabs', { screen: 'Reels', params: { reelPublished: true } } as any);
 
-      await reelService.create({
-        video_url:     uploaded.url,
-        caption:       caption.trim() || undefined,
-        thumbnail_url: uploaded.thumbnail_url,
-        duration_sec:  uploaded.duration ? Math.round(uploaded.duration) : undefined,
-      });
-
-      progressWidth.value = withTiming(100, { duration: 300 });
-
-      // ── Étape 3 : done ────────────────────────────────────────────────────
-      setStep('done');
-      videoPlayer.pause();
-      videoPlayer.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {});
-
-      setTimeout(() => {
-        onBack();
-        nav.navigate('Tabs', { screen: 'Reels', params: { reelPublished: true } } as any);
-      }, 1200);
-
-    } catch (err: any) {
-      progressWidth.value = withTiming(0, { duration: 200 });
-      setStep('idle');
-      Alert.alert('Erreur', err?.message ?? 'Impossible de publier le reel.');
-    }
+    // Upload en arrière-plan
+    backgroundUploadService.enqueueVideo({
+      localUri: capturedUri,
+      folder:   'reels',
+      type:     'reel',
+      label:    capturedCaption || 'Nouveau Reel',
+      onDone: async (result) => {
+        await reelService.create({
+          video_url:     result.videoUrl!,
+          caption:       capturedCaption || undefined,
+          thumbnail_url: result.thumbnailUrl,
+          duration_sec:  result.durationSec ? Math.round(result.durationSec) : undefined,
+        });
+      },
+    });
   };
 
-  const canPublish = !!videoLocalUri && !isPublishing && step !== 'done';
+  const canPublish = !!videoLocalUri;
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
+      {/* Header */}
       <LinearGradient
         colors={[colors.gradientStart, colors.gradientEnd]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
         style={s.header}
       >
-        <TouchableOpacity
-          onPress={() => { videoPlayer.pause(); onBack(); }}
-          style={s.backBtn}
-          activeOpacity={0.7}
-          disabled={isPublishing}
-        >
-          <Icon name="x" size={22} color={isPublishing ? 'rgba(255,255,255,0.35)' : '#fff'} />
+        <TouchableOpacity onPress={() => { videoPlayer.pause(); onBack(); }} style={s.backBtn} activeOpacity={0.7}>
+          <Icon name="x" size={22} color="#fff" />
         </TouchableOpacity>
 
         <Text style={s.headerTitle}>Nouveau Reel</Text>
@@ -180,63 +115,43 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
           style={[s.publishBtn, { opacity: canPublish ? 1 : 0.45 }]}
           activeOpacity={0.8}
         >
-          <Text style={s.publishBtnText}>Publier</Text>
+          <Text style={s.publishBtnText}>Envoyer</Text>
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* ── Barre de progression publication ────────────────────────────── */}
-      {step !== 'idle' && (
-        <Animated.View entering={FadeIn.duration(200)} style={[s.progressBar, { backgroundColor: colors.backgroundSecondary }]}>
-          <Animated.View style={[s.progressFill, progressStyle, { backgroundColor: step === 'done' ? colors.accentGreen : colors.primary }]} />
+      {/* Hint arrière-plan */}
+      {videoLocalUri && (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          style={[s.bgHint, { backgroundColor: colors.primary + '18', borderBottomColor: colors.primary + '33' }]}
+        >
+          <Icon name="upload-cloud" size={13} color={colors.primary} />
+          <Text style={[s.bgHintText, { color: colors.primary }]}>
+            Compression et envoi en arrière-plan après "Envoyer"
+          </Text>
         </Animated.View>
       )}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} scrollEnabled={!isPublishing}>
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
-          {/* ── Zone vidéo ──────────────────────────────────────────────── */}
+          {/* Zone vidéo */}
           <Animated.View entering={FadeInDown.delay(60).springify()} style={s.videoZone}>
             <LinearGradient
               colors={[colors.gradientStart + '33', colors.gradientEnd + '22']}
-              style={StyleSheet.absoluteFill}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
             />
 
             {videoLocalUri ? (
               <TouchableOpacity
-                style={StyleSheet.absoluteFill}
-                onPress={() => !isPublishing && setVideoPaused(p => !p)}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                onPress={() => setVideoPaused(p => !p)}
                 activeOpacity={1}
               >
-                {videoLocalUri ? (
-                  <VideoView
-                    player={videoPlayer}
-                    style={StyleSheet.absoluteFill}
-                    resizeMode="cover"
-                  />
-                ) : null}
+                <VideoView player={videoPlayer} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
 
-                {/* Overlay publication */}
-                {isPublishing && (
-                  <Animated.View entering={FadeIn.duration(180)} style={s.publishingOverlay}>
-                    <Animated.View style={dotStyle}>
-                      <ActivityIndicator size="large" color="#fff" />
-                    </Animated.View>
-                    <Text style={s.publishingLabel}>{STEP_LABELS[step]}</Text>
-                  </Animated.View>
-                )}
-
-                {/* Overlay done */}
-                {step === 'done' && (
-                  <Animated.View entering={FadeIn.duration(300)} style={s.doneOverlay}>
-                    <View style={s.doneCircle}>
-                      <Icon name="check" size={36} color="#fff" />
-                    </View>
-                    <Text style={s.doneLabel}>Reel publié !</Text>
-                  </Animated.View>
-                )}
-
-                {/* Overlay pause preview */}
-                {videoPaused && !isPublishing && step !== 'done' && (
+                {/* Overlay pause */}
+                {videoPaused && (
                   <View style={s.videoOverlay} pointerEvents="none">
                     <View style={s.playCircle}>
                       <Icon name="play" size={32} color="#fff" />
@@ -245,11 +160,9 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
                 )}
 
                 {/* Bouton supprimer */}
-                {!isPublishing && step !== 'done' && (
-                  <TouchableOpacity onPress={handleRemoveVideo} style={s.removeVideoBtn} activeOpacity={0.8}>
-                    <Icon name="x-circle" size={28} color="#fff" />
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity onPress={handleRemoveVideo} style={s.removeVideoBtn} activeOpacity={0.8}>
+                  <Icon name="x-circle" size={28} color="#fff" />
+                </TouchableOpacity>
               </TouchableOpacity>
             ) : (
               <>
@@ -268,7 +181,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
             )}
           </Animated.View>
 
-          {/* ── Caption ─────────────────────────────────────────────────── */}
+          {/* Caption */}
           <Animated.View entering={FadeInDown.delay(140).springify()} style={[s.section, { marginBottom: 40 }]}>
             <Text style={[s.label, { color: colors.textPrimary }]}>Description</Text>
             <TextInput
@@ -278,12 +191,10 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
               placeholderTextColor={colors.textDisabled}
               multiline
               maxLength={300}
-              editable={!isPublishing}
               style={[s.captionInput, {
                 backgroundColor: colors.backgroundSecondary,
                 color:           colors.textPrimary,
                 borderColor:     colors.border,
-                opacity:         isPublishing ? 0.5 : 1,
               }]}
             />
             <Text style={[s.charCount, { color: colors.textTertiary }]}>{caption.length}/300</Text>
@@ -312,11 +223,9 @@ const s = StyleSheet.create({
   publishBtn:     { paddingHorizontal: 18, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 8 },
   publishBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
 
-  // Barre de progression
-  progressBar:  { height: 3, backgroundColor: 'transparent', overflow: 'hidden' },
-  progressFill: { height: 3, borderRadius: 2 },
+  bgHint:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  bgHintText: { fontSize: 12, fontWeight: '500', flex: 1 },
 
-  // Zone vidéo
   videoZone: {
     width:           SCREEN_W,
     height:          VIDEO_H,
@@ -326,23 +235,15 @@ const s = StyleSheet.create({
     overflow:        'hidden',
     backgroundColor: '#000',
   },
-  videoZoneTitle: { fontSize: 17, fontWeight: '700', marginTop: 4, color: '#fff' },
-  videoZoneSub:   { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
-  pickVideoBtn:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  videoZoneTitle:   { fontSize: 17, fontWeight: '700', marginTop: 4, color: '#fff' },
+  videoZoneSub:     { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
+  pickVideoBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
   pickVideoBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  removeVideoBtn: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 4 },
+  removeVideoBtn:   { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 4 },
 
-  videoOverlay:    { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' },
-  playCircle:      { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  videoOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' },
+  playCircle:   { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
 
-  publishingOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', gap: 14 },
-  publishingLabel:   { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-  doneOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)', gap: 14 },
-  doneCircle:  { width: 72, height: 72, borderRadius: 36, backgroundColor: '#36D9A0', alignItems: 'center', justifyContent: 'center' },
-  doneLabel:   { color: '#fff', fontSize: 18, fontWeight: '800' },
-
-  // Caption
   section:      { marginTop: 16, paddingHorizontal: 16 },
   label:        { fontSize: 13, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.8 },
   captionInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, lineHeight: 20, minHeight: 90, textAlignVertical: 'top' },

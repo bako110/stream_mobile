@@ -14,7 +14,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, ImagePickerSection, VideoPickerField } from '../../components/common';
 import { concertService } from '../../services';
-import { uploadVideoFromUri } from '../../services/uploadService';
+import { backgroundUploadService } from '../../services/backgroundUploadService';
 import type { ConcertType, AccessType, ConcertCreate } from '../../types';
 import { createConcertStyles as s } from '../../styles/CreateConcertScreen.styles';
 
@@ -65,10 +65,8 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
   const [galleryUrls,  setGalleryUrls]  = useState<string[]>([]);
   const [videoUrl,      setVideoUrl]      = useState('');
   const [videoLocalUri, setVideoLocalUri] = useState('');
-  const [uploadingVideo, setUploadingVideo] = useState(false);
-
-  const [saving,      setSaving]      = useState(false);
-  const [publishing,  setPublishing]  = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [loadingData, setLoadingData] = useState(isEditing);
 
   // ── Charger les données en mode édition ──────────────────────────────────
@@ -185,25 +183,12 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
     video_url:     videoUrl.trim() || undefined,
   });
 
-  const resolvePayload = async () => {
-    let finalVideoUrl = videoUrl;
-    if (videoLocalUri) {
-      setUploadingVideo(true);
-      const uploaded = await uploadVideoFromUri(videoLocalUri, 'reels');
-      setUploadingVideo(false);
-      finalVideoUrl = uploaded.url;
-      setVideoUrl(uploaded.url);
-      setVideoLocalUri('');
-    }
-    return { ...buildPayload(), video_url: finalVideoUrl || undefined };
-  };
-
   const handleSaveDraft = async () => {
     const err = validate();
     if (err) { Alert.alert('Champs manquants', err); return; }
     setSaving(true);
     try {
-      const payload = await resolvePayload();
+      const payload = { ...buildPayload(), video_url: videoUrl || undefined };
       if (isEditing) {
         await concertService.update(concertId!, payload);
         Alert.alert('Modifications enregistrées', 'Votre concert a été mis à jour.');
@@ -214,7 +199,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
       onBack?.();
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
-    } finally { setSaving(false); setUploadingVideo(false); }
+    } finally { setSaving(false); }
   };
 
   const handlePublish = async () => {
@@ -228,20 +213,42 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Publier',
-          onPress: async () => {
+          onPress: () => {
             publishScale.value = withSpring(0.95, {}, () => { publishScale.value = withSpring(1); });
             setPublishing(true);
-            try {
-              const payload = await resolvePayload();
-              const saved = isEditing
-                ? await concertService.update(concertId!, payload)
-                : await concertService.create(payload);
-              await concertService.publish(saved.id);
-              Alert.alert('Concert publié !', 'Votre concert est maintenant live sur FoliX.');
-              onBack?.();
-            } catch (e: any) {
-              Alert.alert('Erreur', e?.message ?? 'Impossible de publier.');
-            } finally { setPublishing(false); setUploadingVideo(false); }
+
+            const basePayload = buildPayload();
+            const capturedLocalUri = videoLocalUri;
+            const capturedTitle    = title.trim() || 'Concert';
+            const isEdit           = isEditing;
+            const editId           = concertId;
+
+            setPublishing(false);
+            onBack?.();
+
+            if (capturedLocalUri) {
+              // Vidéo locale → upload en arrière-plan puis création/publication
+              backgroundUploadService.enqueueVideo({
+                localUri: capturedLocalUri,
+                folder:   'concerts',
+                type:     'concert',
+                label:    capturedTitle,
+                onDone: async (result) => {
+                  const payload = { ...basePayload, video_url: result.videoUrl, thumbnail_url: result.thumbnailUrl ?? basePayload.thumbnail_url };
+                  const saved = isEdit
+                    ? await concertService.update(editId!, payload)
+                    : await concertService.create(payload);
+                  await concertService.publish(saved.id);
+                },
+              });
+            } else {
+              // Pas de vidéo locale → création/publication immédiate
+              const payload = { ...basePayload, video_url: videoUrl || undefined };
+              (isEdit
+                ? concertService.update(editId!, payload)
+                : concertService.create(payload)
+              ).then(saved => concertService.publish(saved.id)).catch(() => {});
+            }
           },
         },
       ],
@@ -514,7 +521,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
               hint="Ajoutez une vidéo promotionnelle pour votre concert"
               localUri={videoLocalUri}
               remoteUrl={videoUrl}
-              uploading={uploadingVideo}
+              uploading={false}
               colors={colors}
               onPick={(uri) => { setVideoLocalUri(uri); setVideoUrl(''); }}
               onRemove={() => { setVideoLocalUri(''); setVideoUrl(''); }}

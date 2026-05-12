@@ -8,7 +8,7 @@ import { storage } from '../utils/storage';
 import { compressVideo, cleanupTempVideos } from './videoCompressService';
 
 export type UploadFolder = 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'content';
-export type VideoFolder  = 'reels' | 'stories' | 'messages' | 'events' | 'concerts' | 'content';
+export type VideoFolder  = 'reels' | 'stories' | 'messages' | 'events' | 'concerts' | 'content' | 'posts';
 export type AudioFolder  = 'messages' | 'stories';
 
 export interface UploadedImage {

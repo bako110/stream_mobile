@@ -9,7 +9,7 @@ import { apiClient } from '../api';
 const HIDDEN_KEY   = 'folix_feed_hidden';
 const REMINDER_KEY = 'folix_feed_reminders';
 
-type RefType = 'event' | 'concert';
+type RefType = 'event' | 'concert' | 'post' | 'reel';
 
 interface HiddenEntry   { id: string; type: RefType }
 interface ReminderEntry { id: string; type: RefType; eventDate: string; title: string }

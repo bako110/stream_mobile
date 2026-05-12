@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
 import { CommentsBottomSheet, ShareBottomSheet, ExpandableText } from '../../components/common';
+import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import type { Post } from '../../types/post';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -369,7 +370,8 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
   const CARD_H    = Math.round(CARD_W * 14 / 9);
 
   const renderPortraitCard = ({ item, index }: { item: Post; index: number }) => {
-    const thumb    = item.image_urls?.[0] ?? item.image_url ?? null;
+    const thumb    = item.image_urls?.[0] ?? item.image_url ?? item.thumbnail_url ?? null;
+    const hasVideo = !!item.video_url && !item.image_urls?.length && !item.image_url;
     const imgCount = (item.image_urls?.length ?? 0) + (item.image_url && !item.image_urls?.length ? 1 : 0);
 
     return (
@@ -411,6 +413,12 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
                     )}
                   </View>
                 </LinearGradient>
+                {/* Badge play si c'est une vidéo */}
+                {hasVideo && (
+                  <View style={s.pVideoBadge}>
+                    <Icon name="play" size={10} color="#fff" style={{ marginLeft: 1 }} />
+                  </View>
+                )}
               </>
             ) : (
               /* Pas de thumbnail — fond + texte */
@@ -548,6 +556,18 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
             textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
           />
         ) : null}
+
+        {/* Vidéo inline */}
+        {post.video_url && allUrls.length === 0 && (
+          <View style={[s.imagesWrap, !post.body && { marginTop: 0 }]}>
+            <InlineVideoPlayer
+              uri={post.video_url}
+              thumbnailUri={post.thumbnail_url}
+              aspectRatio={16 / 9}
+              borderRadius={12}
+            />
+          </View>
+        )}
 
         {/* Images */}
         {allUrls.length > 0 && (
@@ -880,6 +900,7 @@ const s = StyleSheet.create({
   pStat:      { flexDirection: 'row', alignItems: 'center', gap: 3 },
   pStatTxt:   { color: '#fff', fontSize: 11, fontWeight: '600' },
   pImgBadge:  { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6 },
+  pVideoBadge:{ position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   pBody:      { paddingHorizontal: 10, paddingVertical: 8 },
   pBodyTxt:   { fontSize: 12, fontWeight: '400', lineHeight: 17 },
 

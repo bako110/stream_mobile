@@ -12,6 +12,7 @@ import { ReelsScreen }              from '../screens/Main/ReelsScreen';
 import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
+import { UploadProgressBanner } from '../components/common/UploadProgressBanner';
 
 // ── Écrans stack ──────────────────────────────────────────────────────────────
 import { FeedScreen }            from '../screens/Main/FeedScreen';
@@ -358,6 +359,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
           {({ navigation }) => <PolitiqueConfidentialiteScreen onBack={() => navigation.goBack()} />}
         </Stack.Screen>
       </Stack.Navigator>
+      <UploadProgressBanner />
       <NotificationToast />
     </>
   );

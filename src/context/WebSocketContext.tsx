@@ -25,6 +25,7 @@ import {
   type CoinTransferPayload,
   type GiftReceivedPayload,
   type StoryAddedPayload,
+  type StoryViewPayload,
   type CommentOnContentPayload,
   type ReactionOnContentPayload,
   type PresencePayload,
@@ -87,6 +88,7 @@ interface WebSocketContextValue {
   lastCoinTransfer:         CoinTransferPayload | null;
   lastGiftReceived:         GiftReceivedPayload | null;
   lastStoryAdded:           StoryAddedPayload | null;
+  lastStoryView:            StoryViewPayload | null;
   lastCommentOnContent:     CommentOnContentPayload | null;
   lastReactionOnContent:    ReactionOnContentPayload | null;
   lastPresenceUpdate:       PresencePayload | null;
@@ -121,6 +123,7 @@ const Ctx = createContext<WebSocketContextValue>({
   lastCoinTransfer:         null,
   lastGiftReceived:         null,
   lastStoryAdded:           null,
+  lastStoryView:            null,
   lastCommentOnContent:     null,
   lastReactionOnContent:    null,
   lastPresenceUpdate:       null,
@@ -164,6 +167,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [lastCoinTransfer,      setLastCoinTransfer]      = useState<CoinTransferPayload | null>(null);
   const [lastGiftReceived,      setLastGiftReceived]      = useState<GiftReceivedPayload | null>(null);
   const [lastStoryAdded,        setLastStoryAdded]        = useState<StoryAddedPayload | null>(null);
+  const [lastStoryView,         setLastStoryView]         = useState<StoryViewPayload | null>(null);
   const [lastCommentOnContent,  setLastCommentOnContent]  = useState<CommentOnContentPayload | null>(null);
   const [lastReactionOnContent, setLastReactionOnContent] = useState<ReactionOnContentPayload | null>(null);
   const [lastPresenceUpdate,      setLastPresenceUpdate]      = useState<PresencePayload | null>(null);
@@ -180,6 +184,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const wsEventHandlerRef = useRef(createWsEventHandler({
     onFeedUpdated:        () => { /* géré par FeedScreen via addListener */ },
     onStoryAdded:         (d) => { if (isMounted.current) setLastStoryAdded(d); },
+    onStoryView:          (d) => { if (isMounted.current) setLastStoryView(d); },
     onCommentOnContent:   (d) => { if (isMounted.current) { setLastCommentOnContent(d); setUnreadActivity(n => n + 1); } },
     onReactionOnContent:  (d) => { if (isMounted.current) { setLastReactionOnContent(d); setUnreadActivity(n => n + 1); } },
     onNewFollower:        (d) => { if (isMounted.current) { setLastNewFollower(d); setUnreadActivity(n => n + 1); } },
@@ -550,6 +555,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     lastCoinTransfer,
     lastGiftReceived,
     lastStoryAdded,
+    lastStoryView,
     lastCommentOnContent,
     lastReactionOnContent,
     lastPresenceUpdate,
@@ -565,6 +571,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     notifyCallConnected, notifyCallEnded, markCallAccepted, markCallEnded,
     isOutgoingCall, drainCallBuffer,
     lastNewFollower, lastCoinTransfer, lastGiftReceived, lastStoryAdded,
+    lastStoryView,
     lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate, lastConcertLive,
     lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated,
   ]);

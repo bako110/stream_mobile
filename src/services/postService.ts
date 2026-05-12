@@ -3,8 +3,9 @@ import { Endpoints } from '../api/endpoints';
 import type { Post, PostCreate } from '../types/post';
 
 export const postService = {
-  async getFeed(page = 1, limit = 20): Promise<Post[]> {
-    const res = await apiClient.get<Post[]>(`${Endpoints.posts.feed}?page=${page}&limit=${limit}`);
+  async getFeed(page = 1, limit = 20, following = false): Promise<Post[]> {
+    const q = `page=${page}&limit=${limit}${following ? '&following=true' : ''}`;
+    const res = await apiClient.get<Post[]>(`${Endpoints.posts.feed}?${q}`);
     if (__DEV__) console.log('[postService] getFeed result:', JSON.stringify(res.data).slice(0, 200));
     return Array.isArray(res.data) ? res.data : [];
   },

@@ -1,22 +1,20 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, Image, View } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ViewStyle, View } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import { useTheme } from '../../hooks/useTheme';
 
 interface Props {
-  provider: 'google' | 'facebook';
+  provider: 'google';
   onPress: () => void;
   style?: ViewStyle;
 }
 
 const AnimTouch = Animated.createAnimatedComponent(TouchableOpacity);
 
-const GOOGLE_COLORS = ['#EA4335', '#FBBC05', '#34A853', '#4285F4'];
-const FB_COLOR = '#1877F2';
 
-export const SocialAuthButton: React.FC<Props> = ({ provider, onPress, style }) => {
+export const SocialAuthButton: React.FC<Props> = ({ onPress, style }) => {
   const { theme } = useTheme();
   const { colors, borderRadius, fontWeight, fontSize } = theme;
   const scale = useSharedValue(1);
@@ -24,9 +22,6 @@ export const SocialAuthButton: React.FC<Props> = ({ provider, onPress, style }) 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-
-  const isGoogle = provider === 'google';
-  const label = isGoogle ? 'Continuer avec Google' : 'Continuer avec Facebook';
 
   return (
     <AnimTouch
@@ -47,14 +42,10 @@ export const SocialAuthButton: React.FC<Props> = ({ provider, onPress, style }) 
       ]}
     >
       <View style={styles.iconWrap}>
-        {isGoogle ? (
-          <Text style={styles.googleG}>G</Text>
-        ) : (
-          <Text style={[styles.googleG, { color: FB_COLOR }]}>f</Text>
-        )}
+        <Text style={styles.googleG}>G</Text>
       </View>
       <Text style={[styles.label, { color: colors.textPrimary, fontSize: fontSize.base, fontWeight: fontWeight.medium }]}>
-        {label}
+        Continuer avec Google
       </Text>
     </AnimTouch>
   );

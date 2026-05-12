@@ -40,4 +40,6 @@ export { AvatarWithBadge } from './AvatarWithBadge';
 export { ReportModal } from './ReportModal';
 export { CreatePostBox } from './CreatePostBox';
 export { PostCard } from './PostCard';
-export { ExpandableText } from './ExpandableText';
+export { ExpandableText }        from './ExpandableText';
+export { InlineVideoPlayer }     from './InlineVideoPlayer';
+export { UploadProgressBanner }  from './UploadProgressBanner';

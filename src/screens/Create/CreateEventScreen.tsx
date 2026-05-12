@@ -15,7 +15,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, ImagePickerSection, VideoPickerField } from '../../components/common';
 import { eventService } from '../../services';
-import { uploadVideoFromUri } from '../../services/uploadService';
+import { backgroundUploadService } from '../../services/backgroundUploadService';
 import type { EventType, EventAccessType, EventCreate } from '../../types';
 import { createEventStyles as s } from '../../styles/CreateEventScreen.styles';
 
@@ -78,8 +78,6 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
   const [galleryUrls,    setGalleryUrls]    = useState<string[]>([]);
   const [videoUrl,       setVideoUrl]       = useState('');
   const [videoLocalUri,  setVideoLocalUri]  = useState('');
-  const [uploadingVideo, setUploadingVideo] = useState(false);
-
   const [saving,     setSaving]     = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [loadingData, setLoadingData] = useState(isEditing);
@@ -230,25 +228,12 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const resolvePayload = async () => {
-    let finalVideoUrl = videoUrl;
-    if (videoLocalUri) {
-      setUploadingVideo(true);
-      const uploaded = await uploadVideoFromUri(videoLocalUri, 'reels');
-      setUploadingVideo(false);
-      finalVideoUrl = uploaded.url;
-      setVideoUrl(uploaded.url);
-      setVideoLocalUri('');
-    }
-    return { ...buildPayload(), video_url: finalVideoUrl || undefined };
-  };
-
   const handleSaveDraft = async () => {
     const err = validate();
     if (err) { Alert.alert('Champs manquants', err); return; }
     setSaving(true);
     try {
-      const payload = await resolvePayload();
+      const payload = { ...buildPayload(), video_url: videoUrl || undefined };
       if (isEditing) {
         await eventService.update(eventId!, payload);
         Alert.alert('Modifications enregistrées', 'Votre événement a été mis à jour.');
@@ -259,7 +244,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
       onBack?.();
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
-    } finally { setSaving(false); setUploadingVideo(false); }
+    } finally { setSaving(false); }
   };
 
   const handlePublish = async () => {
@@ -273,20 +258,39 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Publier',
-          onPress: async () => {
+          onPress: () => {
             publishScale.value = withSpring(0.95, {}, () => { publishScale.value = withSpring(1); });
-            setPublishing(true);
-            try {
-              const payload = await resolvePayload();
-              const saved = isEditing
-                ? await eventService.update(eventId!, payload)
-                : await eventService.create(payload);
-              await eventService.publish(saved.id);
-              Alert.alert('Publié !', 'Votre événement est maintenant visible par tous.');
-              onBack?.();
-            } catch (e: any) {
-              Alert.alert('Erreur', e?.message ?? 'Impossible de publier.');
-            } finally { setPublishing(false); setUploadingVideo(false); }
+
+            const basePayload      = buildPayload();
+            const capturedLocalUri = videoLocalUri;
+            const capturedTitle    = title.trim() || 'Événement';
+            const isEdit           = isEditing;
+            const editId           = eventId;
+
+            setPublishing(false);
+            onBack?.();
+
+            if (capturedLocalUri) {
+              backgroundUploadService.enqueueVideo({
+                localUri: capturedLocalUri,
+                folder:   'events',
+                type:     'event',
+                label:    capturedTitle,
+                onDone: async (result) => {
+                  const payload = { ...basePayload, video_url: result.videoUrl, thumbnail_url: result.thumbnailUrl ?? basePayload.thumbnail_url };
+                  const saved = isEdit
+                    ? await eventService.update(editId!, payload)
+                    : await eventService.create(payload);
+                  await eventService.publish(saved.id);
+                },
+              });
+            } else {
+              const payload = { ...basePayload, video_url: videoUrl || undefined };
+              (isEdit
+                ? eventService.update(editId!, payload)
+                : eventService.create(payload)
+              ).then(saved => eventService.publish(saved.id)).catch(() => {});
+            }
           },
         },
       ],
@@ -629,7 +633,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
               hint="Ajoutez une vidéo promotionnelle pour votre événement"
               localUri={videoLocalUri}
               remoteUrl={videoUrl}
-              uploading={uploadingVideo}
+              uploading={false}
               colors={colors}
               onPick={(uri) => { setVideoLocalUri(uri); setVideoUrl(''); }}
               onRemove={() => { setVideoLocalUri(''); setVideoUrl(''); }}

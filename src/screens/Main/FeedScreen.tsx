@@ -46,7 +46,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 // ── Types locaux ──────────────────────────────────────────────────────────────
 
-type FeedFilter = 'all' | 'events' | 'concerts' | 'posts';
+type FeedFilter = 'all' | 'following' | 'live';
 
 interface FeedItem {
   kind:    'event' | 'concert' | 'reel' | 'reel_row' | 'post' | 'suggestions' | 'communities';
@@ -148,7 +148,7 @@ export const FeedScreen: React.FC = () => {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
-  const [filterDropOpen, setFilterDropOpen] = useState(false);
+  const [filterDropOpen, setFilterDropOpen] = useState(false); // conservé pour éviter les refs cassées
   const [fabOpen,        setFabOpen]        = useState(false);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
@@ -399,32 +399,63 @@ export const FeedScreen: React.FC = () => {
         }
 
         setItems(result);
-      } else {
-        // Filtre spécifique — fallback sur les services classiques
-        const results: FeedItem[] = [];
-        if (f === 'events') {
-          const evts = await eventService.list({ status: 'published' });
-          evts.forEach(e => results.push({ kind: 'event', id: e.id, data: e }));
+      } else if (f === 'following') {
+        // Onglet Suivis — posts + events + concerts des comptes suivis
+        const [postsResult, feedResult, reelsResult] = await Promise.all([
+          postService.getFeed(1, 30, true).catch(() => [] as Post[]),
+          searchService.getFeed(1, 30).catch(() => ({ items: [] })),
+          reelService.getFeed().catch(() => ({ items: [], has_more: false, page: 1 })),
+        ]);
+        const postItems: FeedItem[] = (Array.isArray(postsResult) ? postsResult : [])
+          .filter((p: Post) => p.id)
+          .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
+        const feedItems: FeedItem[] = (feedResult.items ?? [])
+          .filter((item: any) => item.kind !== 'reel' && item.id)
+          .map((item: any) => ({ kind: item.kind as 'event' | 'concert', id: item.id, data: item }));
+        const reelItems: FeedItem[] = (reelsResult.items ?? [])
+          .filter((r: any) => r.id)
+          .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
+        const seen = new Set<string>();
+        const merged = [...postItems, ...feedItems, ...reelItems].filter(item => {
+          const key = `${item.kind}-${item.id}`;
+          if (seen.has(key)) return false;
+          seen.add(key); return true;
+        });
+        // Trier par date décroissante
+        merged.sort((a, b) => {
+          const getDate = (item: FeedItem) =>
+            item.data?.created_at ?? item.data?.starts_at ?? item.data?.scheduled_at ?? '';
+          return new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime();
+        });
+        // Grouper les reels en rangées
+        const allReels = merged.filter(i => i.kind === 'reel');
+        const nonReels = merged.filter(i => i.kind !== 'reel');
+        const reelRows: FeedItem[] = [];
+        for (let r = 0; r < allReels.length; r += 5) {
+          reelRows.push({ kind: 'reel_row', id: `__reel_row_f__${r}`, data: allReels.slice(r, r + 5).map(ri => ri.data) });
         }
-        if (f === 'concerts') {
-          const ccs = await concertService.list();
-          ccs.forEach((c: Concert) => results.push({ kind: 'concert', id: c.id, data: c }));
-        }
-        if (f === 'posts') {
-          const posts = await postService.getFeed(1, 50).catch(() => [] as Post[]);
-          (Array.isArray(posts) ? posts : []).forEach((p: Post) => results.push({ kind: 'post', id: p.id, data: p }));
-        }
-        if (f !== 'posts') {
-          results.sort((a, b) => {
-            const dateA = a.kind === 'event'
-              ? (a.data as Event).starts_at
-              : (a.data as Concert).scheduled_at;
-            const dateB = b.kind === 'event'
-              ? (b.data as Event).starts_at
-              : (b.data as Concert).scheduled_at;
-            return new Date(dateB).getTime() - new Date(dateA).getTime();
-          });
-        }
+        const result: FeedItem[] = [];
+        let reelRowIdx = 0;
+        nonReels.forEach((item, i) => {
+          result.push(item);
+          if (reelRowIdx < reelRows.length && (i === 2 || (i > 2 && (i - 2) % 5 === 0))) {
+            result.push(reelRows[reelRowIdx++]);
+          }
+        });
+        while (reelRowIdx < reelRows.length) result.push(reelRows[reelRowIdx++]);
+        setItems(result.length > 0 ? result : []);
+      } else if (f === 'live') {
+        // Onglet En direct — concerts live + lives spontanés comme feed items
+        const [concerts, spont] = await Promise.all([
+          concertService.getLive().catch(() => [] as Concert[]),
+          liveService.getLives().catch(() => [] as LiveStream[]),
+        ]);
+        const liveConc = Array.isArray(concerts) ? concerts : [];
+        const liveSp   = Array.isArray(spont)    ? spont    : [];
+        setLiveConcerts(liveConc);
+        setSpontLives(liveSp);
+        // On affiche les concerts live comme feed items
+        const results: FeedItem[] = liveConc.map(c => ({ kind: 'concert' as const, id: c.id, data: c }));
         setItems(results);
       }
     } catch (err) {
@@ -631,6 +662,7 @@ export const FeedScreen: React.FC = () => {
       );
     }
     if (item.kind === 'post') {
+      const postAuthorId = (item.data as Post).author?.id;
       return (
         <PostCard
           post={item.data as Post}
@@ -638,10 +670,15 @@ export const FeedScreen: React.FC = () => {
           currentUserId={currentUser?.id}
           onPress={() => (nav as any).navigate('PostDetail', { postId: item.id })}
           onAuthorPress={() => {
-            const authorId = (item.data as Post).author?.id;
-            if (authorId) (nav as any).navigate('UserProfile', { userId: authorId });
+            if (postAuthorId) (nav as any).navigate('UserProfile', { userId: postAuthorId });
           }}
           onDelete={handlePostDeleted}
+          isFollowing={!!postAuthorId && followingSet.has(postAuthorId)}
+          onToggleFollow={() => { if (postAuthorId) handleToggleFollow(postAuthorId); }}
+          onHide={() => {
+            feedPreferenceService.toggleHide(item.id, item.kind as any);
+            setItems(prev => prev.filter(i => !(i.kind === 'post' && i.id === item.id)));
+          }}
         />
       );
     }
@@ -821,60 +858,49 @@ export const FeedScreen: React.FC = () => {
           </View>
         )}
 
-        {/* ── Barre filtres + actions ────────────────────────────────────── */}
+        {/* ── Onglets + actions ─────────────────────────────────────────── */}
         {!searchOpen && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, gap: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
-
-            {/* Bouton filtre — occupe son espace, ouvre dropdown */}
-            <TouchableOpacity
-              onPress={() => setFilterDropOpen(o => !o)}
-              style={[fS.filterIcon, {
-                backgroundColor: filterDropOpen || filter !== 'all' ? colors.primary + '22' : colors.backgroundSecondary,
-                borderColor: filterDropOpen || filter !== 'all' ? colors.primary : 'transparent',
-              }]}
-              activeOpacity={0.75}
-            >
-              <Icon name="sliders" size={17} color={filter !== 'all' || filterDropOpen ? colors.primary : colors.textSecondary} />
-              {filter !== 'all' && <View style={{ position: 'absolute', top: 4, right: 4, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />}
-            </TouchableOpacity>
-
-            {/* Séparateur */}
-            <View style={{ width: 1, height: 22, backgroundColor: colors.divider }} />
-
-            {/* Messages, Notifs, Favoris, Live — occupent toute la largeur restante */}
-            <FeedHeaderBadges
-              onMessages={goToMessages}
-              onNotifs={goToNotifs}
-              onMenu={openMenu}
-              onFavorites={() => nav.navigate('Favorites')}
-              onLive={() => nav.navigate('GoLive')}
-              colors={colors}
-            />
-          </View>
-        )}
-
-        {/* ── Dropdown vertical filtres ──────────────────────────────────── */}
-        {!searchOpen && filterDropOpen && (
-          <View style={[fS.dropdownWrap, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.textPrimary }]}>
-            {([
-              { key: 'all',      icon: 'grid',      label: 'Tout'        },
-              { key: 'events',   icon: 'calendar',  label: 'Événements'  },
-              { key: 'concerts', icon: 'music',     label: 'Concerts'    },
-              { key: 'posts',    icon: 'file-text', label: 'Posts'       },
-            ] as { key: FeedFilter; icon: string; label: string }[]).map((opt) => (
-              <TouchableOpacity
-                key={opt.key}
-                onPress={() => { setFilter(opt.key); setFilterDropOpen(false); load(opt.key); }}
-                style={[fS.dropdownItem, filter === opt.key && { backgroundColor: colors.primary + '12' }]}
-                activeOpacity={0.75}
-              >
-                <View style={[fS.dropdownIconWrap, { backgroundColor: filter === opt.key ? colors.primary + '22' : colors.backgroundSecondary }]}>
-                  <Icon name={opt.icon} size={15} color={filter === opt.key ? colors.primary : colors.textSecondary} />
-                </View>
-                <Text style={[fS.dropdownLabel, { color: filter === opt.key ? colors.primary : colors.textPrimary }]}>{opt.label}</Text>
-                {filter === opt.key && <Icon name="check" size={14} color={colors.primary} />}
-              </TouchableOpacity>
-            ))}
+          <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
+            {/* Ligne 1 : onglets pill */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, gap: 6 }}>
+              {([
+                { key: 'all',       label: 'Pour toi'   },
+                { key: 'following', label: 'Suivis'     },
+                { key: 'live',      label: 'En direct'  },
+              ] as { key: FeedFilter; label: string }[]).map(tab => {
+                const active = filter === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    onPress={() => { setFilter(tab.key); setFilterDropOpen(false); load(tab.key); }}
+                    activeOpacity={0.75}
+                    style={{
+                      paddingHorizontal: 14, paddingVertical: 7,
+                      borderRadius: 20,
+                      backgroundColor: active ? colors.primary : colors.backgroundSecondary,
+                      flexDirection: 'row', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    {tab.key === 'live' && (
+                      <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: active ? '#fff' : '#F0365A' }, active ? {} : liveDotStyle]} />
+                    )}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {/* Actions à droite */}
+              <View style={{ flex: 1 }} />
+              <FeedHeaderBadges
+                onMessages={goToMessages}
+                onNotifs={goToNotifs}
+                onMenu={openMenu}
+                onFavorites={() => nav.navigate('Favorites')}
+                onLive={() => nav.navigate('GoLive')}
+                colors={colors}
+              />
+            </View>
           </View>
         )}
 
@@ -1843,20 +1869,26 @@ const CardContextMenu: React.FC<CardMenuProps> = ({
   item, colors, isSaved, isFollowing, isOwnContent, authorName,
   onClose, onSave, onShare, onFollow, onReport, onHide, onRemind, hasReminder,
 }) => {
-  const isEvent = item.kind === 'event';
-  const title   = item.data?.title as string | undefined;
-  const typeLabel = isEvent ? 'Événement' : 'Concert';
+  const isEvent   = item.kind === 'event';
+  const isConcert = item.kind === 'concert';
+  const isPost    = item.kind === 'post';
+  const isReel    = item.kind === 'reel';
+  const title     = (item.data?.title ?? item.data?.body ?? item.data?.caption) as string | undefined;
+  const typeLabel = isEvent ? 'événement' : isConcert ? 'concert' : isPost ? 'post' : 'reel';
+  const typeIcon  = isEvent ? 'calendar' : isConcert ? 'music' : isPost ? 'file-text' : 'play-circle';
+  // Rappel uniquement pertinent pour events/concerts
+  const showRemind = isEvent || isConcert;
 
   // Groupe 1 — actions principales
   const mainActions = [
-    {
+    ...(showRemind ? [{
       icon: hasReminder ? 'bell-off' : 'bell',
       label: hasReminder ? 'Annuler le rappel' : 'Me rappeler',
       sublabel: hasReminder ? 'Rappel actif — 1h avant' : '1h avant le début',
       color: hasReminder ? colors.primary : colors.textPrimary,
       accent: hasReminder,
       onPress: () => { onClose(); onRemind(); },
-    },
+    }] : []),
     {
       icon: 'bookmark',
       label: isSaved ? 'Retirer des favoris' : 'Sauvegarder',
@@ -1892,7 +1924,7 @@ const CardContextMenu: React.FC<CardMenuProps> = ({
     {
       icon: 'eye-off',
       label: 'Pas intéressé',
-      sublabel: `Masquer ce ${typeLabel.toLowerCase()} du fil`,
+      sublabel: `Masquer ce ${typeLabel} du fil`,
       color: colors.textSecondary,
       accent: false,
       onPress: () => { onClose(); onHide(); },
@@ -1935,7 +1967,7 @@ const CardContextMenu: React.FC<CardMenuProps> = ({
           {/* Titre de la carte */}
           {title ? (
             <View style={[cm.titleRow, { borderBottomColor: colors.divider }]}>
-              <Icon name={isEvent ? 'calendar' : 'music'} size={13} color={colors.textTertiary} />
+              <Icon name={typeIcon} size={13} color={colors.textTertiary} />
               <Text style={[cm.sheetTitle, { color: colors.textTertiary }]} numberOfLines={1}>{title}</Text>
             </View>
           ) : null}

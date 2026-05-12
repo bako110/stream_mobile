@@ -73,6 +73,9 @@ export interface WsEventCallbacks {
   // Présence
   onPresence?: (data: PresencePayload) => void;
 
+  // Stories
+  onStoryView?: (data: StoryViewPayload) => void;
+
   // Activité / notifications
   onActivity?: () => void;
   onNotification?: () => void;
@@ -141,6 +144,15 @@ export interface PresencePayload {
   last_seen_at?: string;
 }
 
+export interface StoryViewPayload {
+  story_id: string;
+  viewer_id: string;
+  viewer_username?: string | null;
+  viewer_display_name?: string | null;
+  viewer_avatar?: string | null;
+  view_count: number;
+}
+
 // ── Handler principal ─────────────────────────────────────────────────────────
 
 export function createWsEventHandler(callbacks: WsEventCallbacks) {
@@ -155,20 +167,20 @@ export function createWsEventHandler(callbacks: WsEventCallbacks) {
         callbacks.onStoryAdded?.(payload as unknown as StoryAddedPayload);
         break;
 
+      case 'story_view':
+        callbacks.onStoryView?.(payload as unknown as StoryViewPayload);
+        break;
+
       case 'comment_on_content':
         callbacks.onCommentOnContent?.(payload as unknown as CommentOnContentPayload);
-        // Incrémenter badge d'activité
-        callbacks.onActivity?.();
         break;
 
       case 'reaction_on_content':
         callbacks.onReactionOnContent?.(payload as unknown as ReactionOnContentPayload);
-        callbacks.onActivity?.();
         break;
 
       case 'new_follower':
         callbacks.onNewFollower?.(payload as unknown as NewFollowerPayload);
-        callbacks.onActivity?.();
         break;
 
       case 'coin_transfer_received':

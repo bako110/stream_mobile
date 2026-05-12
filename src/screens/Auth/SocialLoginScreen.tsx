@@ -6,7 +6,6 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
-import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, SocialAuthButton } from '../../components/common';
 import { authService } from '../../services/authService';
@@ -25,7 +24,7 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess }) 
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
-  const [loading, setLoading] = useState<'google' | 'facebook' | null>(null);
+  const [loading, setLoading] = useState<'google' | null>(null);
 
   const handleGoogle = useCallback(async () => {
     setLoading('google');
@@ -45,21 +44,6 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess }) 
     }
   }, [onAuthSuccess]);
 
-  const handleFacebook = useCallback(async () => {
-    setLoading('facebook');
-    try {
-      const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
-      if (result.isCancelled) return;
-      const data = await AccessToken.getCurrentAccessToken();
-      if (!data) throw new Error('Token Facebook manquant');
-      await authService.oauthFacebook(data.accessToken);
-      onAuthSuccess();
-    } catch (e: any) {
-      Alert.alert('Erreur Facebook', e?.message ?? 'Connexion impossible');
-    } finally {
-      setLoading(null);
-    }
-  }, [onAuthSuccess]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -108,15 +92,6 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess }) 
             />
             {loading === 'google' && (
               <ActivityIndicator style={styles.spinner} color={colors.primary} />
-            )}
-          </View>
-          <View style={{ opacity: loading === 'facebook' ? 0.6 : 1, marginTop: 12 }}>
-            <SocialAuthButton
-              provider="facebook"
-              onPress={handleFacebook}
-            />
-            {loading === 'facebook' && (
-              <ActivityIndicator style={styles.spinner} color="#1877F2" />
             )}
           </View>
         </Animated.View>

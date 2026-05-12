@@ -17,6 +17,8 @@ import { favoriteService } from '../../services/favoriteService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 import { ExpandableText } from './ExpandableText';
 import { ShareBottomSheet } from './ShareBottomSheet';
+import { InlineVideoPlayer } from './InlineVideoPlayer';
+import { ReportModal } from './ReportModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GAP    = 3;
@@ -120,6 +122,9 @@ interface PostCardProps {
   onPress: () => void;
   onAuthorPress?: () => void;
   onDelete?: (postId: string) => void;
+  onToggleFollow?: () => void;
+  isFollowing?: boolean;
+  onHide?: () => void;
 }
 
 function timeAgo(iso: string): string {
@@ -132,6 +137,7 @@ function timeAgo(iso: string): string {
 
 export const PostCard: React.FC<PostCardProps> = ({
   post, colors, currentUserId, onPress, onAuthorPress, onDelete,
+  onToggleFollow, isFollowing = false, onHide,
 }) => {
   const author   = post.author;
   const name     = author?.display_name ?? author?.username ?? 'Utilisateur';
@@ -146,11 +152,12 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [editOpen,     setEditOpen]     = useState(false);
   const [editBody,     setEditBody]     = useState(post.body ?? '');
   const [editSaving,   setEditSaving]   = useState(false);
-  const [menuOpen,     setMenuOpen]     = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [shareOpen,    setShareOpen]    = useState(false);
-  const [imageFs,      setImageFs]      = useState(false);
-  const [imageFsIdx,   setImageFsIdx]   = useState(0);
+  const [menuOpen,      setMenuOpen]      = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [commentsOpen,  setCommentsOpen]  = useState(false);
+  const [shareOpen,     setShareOpen]     = useState(false);
+  const [imageFs,       setImageFs]       = useState(false);
+  const [imageFsIdx,    setImageFsIdx]    = useState(0);
 
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
@@ -243,13 +250,13 @@ export const PostCard: React.FC<PostCardProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Modal menu contextuel — harmonisé avec les cartes événement/concert */}
+      {/* Menu contextuel unifié */}
       <Modal transparent animationType="slide" visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity style={pc.menuOverlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
           <View style={[pc.menuSheet, { backgroundColor: colors.surface }]}>
             <View style={[pc.menuHandle, { backgroundColor: colors.divider }]} />
 
-            {/* Titre du post */}
+            {/* Titre */}
             <View style={[pc.menuTitleRow, { borderBottomColor: colors.divider }]}>
               <Icon name="file-text" size={13} color={colors.textTertiary} />
               <Text style={[pc.menuTitleText, { color: colors.textTertiary }]} numberOfLines={1}>
@@ -257,38 +264,106 @@ export const PostCard: React.FC<PostCardProps> = ({
               </Text>
             </View>
 
-            {isOwn ? (
-              /* ── Propriétaire du post ── */
-              <>
-                <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-                  <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); setEditOpen(true); }} activeOpacity={0.7}>
-                    <View style={[pc.menuIconWrap, { backgroundColor: colors.primary + '18' }]}>
-                      <Icon name="edit-2" size={18} color={colors.primary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[pc.menuActionText, { color: colors.textPrimary }]}>Modifier</Text>
-                      <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Éditer le contenu du post</Text>
-                    </View>
-                    <Icon name="chevron-right" size={15} color={colors.textDisabled} />
-                  </TouchableOpacity>
+            {/* Groupe 1 — actions principales */}
+            <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+              <TouchableOpacity style={pc.menuAction} onPress={() => {
+                setMenuOpen(false);
+                const next = !saved;
+                setSaved(next);
+                if (next) {
+                  favoriteService.save({ target_type: 'post', target_id: post.id, target_title: post.body ?? post.caption, target_thumbnail: post.media_urls?.[0] ?? post.image_url ?? null }).catch(() => setSaved(false));
+                } else {
+                  favoriteService.unsave('post', post.id).catch(() => setSaved(true));
+                }
+              }} activeOpacity={0.7}>
+                <View style={[pc.menuIconWrap, { backgroundColor: saved ? '#F59E0B22' : colors.backgroundSecondary }]}>
+                  <Icon name="bookmark" size={18} color={saved ? '#F59E0B' : colors.textPrimary} />
                 </View>
-                <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-                  <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); handleDelete(); }} activeOpacity={0.7}>
-                    <View style={[pc.menuIconWrap, { backgroundColor: '#EF444418' }]}>
-                      <Icon name="trash-2" size={18} color="#EF4444" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[pc.menuActionText, { color: '#EF4444' }]}>Supprimer</Text>
-                      <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Action irréversible</Text>
-                    </View>
-                    <Icon name="chevron-right" size={15} color={colors.textDisabled} />
-                  </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={[pc.menuActionText, { color: saved ? '#F59E0B' : colors.textPrimary }]}>{saved ? 'Retirer des favoris' : 'Sauvegarder'}</Text>
+                  <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>{saved ? 'Dans vos favoris' : 'Retrouver plus tard'}</Text>
                 </View>
-              </>
-            ) : (
-              /* ── Autres utilisateurs ── */
+                <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+              </TouchableOpacity>
+              <View style={[pc.menuDivider, { backgroundColor: colors.divider }]} />
+              <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); setShareOpen(true); }} activeOpacity={0.7}>
+                <View style={[pc.menuIconWrap, { backgroundColor: colors.backgroundSecondary }]}>
+                  <Icon name="share-2" size={18} color={colors.textPrimary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[pc.menuActionText, { color: colors.textPrimary }]}>Partager</Text>
+                  <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Via les apps installées</Text>
+                </View>
+                <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Groupe 2 — actions auteur (non-propriétaire) */}
+            {!isOwn && (
               <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-                <TouchableOpacity style={pc.menuAction} onPress={() => setMenuOpen(false)} activeOpacity={0.7}>
+                <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); onToggleFollow?.(); }} activeOpacity={0.7}>
+                  <View style={[pc.menuIconWrap, { backgroundColor: isFollowing ? '#EF444418' : colors.primary + '18' }]}>
+                    <Icon name={isFollowing ? 'user-x' : 'user-plus'} size={18} color={isFollowing ? '#EF4444' : colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[pc.menuActionText, { color: isFollowing ? '#EF4444' : colors.textPrimary }]}>
+                      {isFollowing ? `Ne plus suivre ${name}` : `Suivre ${name}`}
+                    </Text>
+                    <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>
+                      {isFollowing ? 'Retirer du fil' : 'Voir ses prochains contenus'}
+                    </Text>
+                  </View>
+                  <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Groupe 3 — actions propriétaire */}
+            {isOwn && (
+              <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); setEditOpen(true); }} activeOpacity={0.7}>
+                  <View style={[pc.menuIconWrap, { backgroundColor: colors.primary + '18' }]}>
+                    <Icon name="edit-2" size={18} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[pc.menuActionText, { color: colors.textPrimary }]}>Modifier</Text>
+                    <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Éditer le contenu du post</Text>
+                  </View>
+                  <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+                </TouchableOpacity>
+                <View style={[pc.menuDivider, { backgroundColor: colors.divider }]} />
+                <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); handleDelete(); }} activeOpacity={0.7}>
+                  <View style={[pc.menuIconWrap, { backgroundColor: '#EF444418' }]}>
+                    <Icon name="trash-2" size={18} color="#EF4444" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[pc.menuActionText, { color: '#EF4444' }]}>Supprimer</Text>
+                    <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Action irréversible</Text>
+                  </View>
+                  <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Groupe 4 — actions négatives (non-propriétaire) */}
+            {!isOwn && (
+              <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                {onHide && (
+                  <>
+                    <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); onHide(); }} activeOpacity={0.7}>
+                      <View style={[pc.menuIconWrap, { backgroundColor: colors.backgroundSecondary }]}>
+                        <Icon name="eye-off" size={18} color={colors.textSecondary} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[pc.menuActionText, { color: colors.textSecondary }]}>Pas intéressé</Text>
+                        <Text style={[pc.menuActionSub, { color: colors.textTertiary }]}>Masquer ce post du fil</Text>
+                      </View>
+                      <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+                    </TouchableOpacity>
+                    <View style={[pc.menuDivider, { backgroundColor: colors.divider }]} />
+                  </>
+                )}
+                <TouchableOpacity style={pc.menuAction} onPress={() => { setMenuOpen(false); setReportVisible(true); }} activeOpacity={0.7}>
                   <View style={[pc.menuIconWrap, { backgroundColor: '#EF444418' }]}>
                     <Icon name="flag" size={18} color="#EF4444" />
                   </View>
@@ -330,6 +405,18 @@ export const PostCard: React.FC<PostCardProps> = ({
           />
         </View>
       ) : null}
+
+      {/* Vidéo inline */}
+      {post.video_url && images.length === 0 && (
+        <View style={{ marginHorizontal: 12, marginBottom: 4 }}>
+          <InlineVideoPlayer
+            uri={post.video_url}
+            thumbnailUri={post.thumbnail_url}
+            aspectRatio={16 / 9}
+            borderRadius={12}
+          />
+        </View>
+      )}
 
       {/* Images avec overlay "Voir les détails" */}
       {images.length > 0 && (
@@ -405,6 +492,13 @@ export const PostCard: React.FC<PostCardProps> = ({
           <Icon name="bookmark" size={18} color={saved ? colors.primary : colors.textTertiary} />
         </TouchableOpacity>
       </View>
+
+      <ReportModal
+        visible={reportVisible}
+        contentType="post"
+        contentId={post.id}
+        onClose={() => setReportVisible(false)}
+      />
 
       <ShareBottomSheet
         visible={shareOpen}
@@ -553,6 +647,7 @@ const pc = StyleSheet.create({
   menuIconWrap:    { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuActionText:  { fontSize: 15, fontWeight: '500' },
   menuActionSub:   { fontSize: 12, marginTop: 1 },
+  menuDivider:     { height: StyleSheet.hairlineWidth },
   menuCancel:      { borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, marginTop: 4 },
   menuCancelText:  { fontSize: 16, fontWeight: '600' },
   saveBtn:       { paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },

@@ -9,7 +9,6 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
-import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
@@ -53,7 +52,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
     setError('');
   };
 
-  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | null>(null);
+  const [socialLoading, setSocialLoading] = useState<'google' | null>(null);
 
   const handleGoogleLogin = useCallback(async () => {
     setSocialLoading('google');
@@ -70,23 +69,6 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
         setError(e?.message ?? 'Erreur Google Sign-In');
       }
-    } finally {
-      setSocialLoading(null);
-    }
-  }, [onLoginSuccess]);
-
-  const handleFacebookLogin = useCallback(async () => {
-    setSocialLoading('facebook');
-    setError('');
-    try {
-      const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
-      if (result.isCancelled) { setSocialLoading(null); return; }
-      const data = await AccessToken.getCurrentAccessToken();
-      if (!data) throw new Error('Token Facebook manquant');
-      await authService.oauthFacebook(data.accessToken);
-      onLoginSuccess();
-    } catch (e: any) {
-      setError(e?.message ?? 'Erreur Facebook Login');
     } finally {
       setSocialLoading(null);
     }
@@ -332,7 +314,6 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             </View>
 
             <View style={styles.socialBtns}>
-              {/* Google */}
               <TouchableOpacity
                 style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.divider }]}
                 onPress={handleGoogleLogin}
@@ -345,21 +326,6 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                   <Text style={styles.googleIcon}>G</Text>
                 )}
                 <Text style={[styles.socialBtnText, { color: colors.textPrimary }]}>Google</Text>
-              </TouchableOpacity>
-
-              {/* Facebook */}
-              <TouchableOpacity
-                style={[styles.socialBtn, { backgroundColor: '#1877F2', borderColor: '#1877F2' }]}
-                onPress={handleFacebookLogin}
-                disabled={!!socialLoading}
-                activeOpacity={0.75}
-              >
-                {socialLoading === 'facebook' ? (
-                  <ActivityIndicator size={18} color="#fff" />
-                ) : (
-                  <Icon name="facebook" size={18} color="#fff" />
-                )}
-                <Text style={[styles.socialBtnText, { color: '#fff' }]}>Facebook</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

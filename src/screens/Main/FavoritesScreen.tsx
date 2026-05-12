@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   Image, StyleSheet, StatusBar, ActivityIndicator,
@@ -56,19 +56,32 @@ export const FavoritesScreen: React.FC = () => {
   const [data, setData]     = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+
+  const mountedRef = useRef(false);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const favs = await favoriteService.list(TAB_TO_TYPE[tab]);
+      const favs = await favoriteService.list(TAB_TO_TYPE[tabRef.current]);
       setData(favs.map(fromApi));
     } catch {
       setData([]);
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, []);
 
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  useFocusEffect(useCallback(() => {
+    mountedRef.current = true;
+    refresh();
+  }, [refresh]));
+
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    refresh();
+  }, [tab]);
 
   const handleRemove = async (id: string) => {
     try {

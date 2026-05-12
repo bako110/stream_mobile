@@ -7,13 +7,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/Feather';
+import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
 import { uploadImageFromUri } from '../../services/uploadService';
+import { backgroundUploadService } from '../../services/backgroundUploadService';
 
 const { width: W } = Dimensions.get('window');
-const MAX_IMAGES = 6;
+const MAX_IMAGES   = 6;
 
 const FEELINGS = [
   '😊 Content', '😢 Triste', '😂 Heureux', '🔥 Motivé',
@@ -32,20 +34,35 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const { currentUser } = useUser();
   const insets          = useSafeAreaInsets();
 
-  const [body,         setBody]         = useState('');
-  const [feeling,      setFeeling]      = useState<string | undefined>();
-  const [localUris,    setLocalUris]    = useState<string[]>([]);
-  const [showFeelings, setShowFeelings] = useState(false);
-  const [posting,      setPosting]      = useState(false);
+  const [body,          setBody]          = useState('');
+  const [feeling,       setFeeling]       = useState<string | undefined>();
+  const [localUris,     setLocalUris]     = useState<string[]>([]);
+  const [videoUri,      setVideoUri]      = useState<string | null>(null);
+  const [showFeelings,  setShowFeelings]  = useState(false);
+  const [posting,       setPosting]       = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 200); }, []);
 
+  const videoPlayer = useVideoPlayer(
+    videoUri ? { uri: videoUri } : { uri: 'about:blank' },
+    p => { p.loop = true; p.muted = true; },
+  );
+
+  useEffect(() => {
+    if (videoUri) videoPlayer.play();
+    else videoPlayer.pause();
+  }, [videoUri]);
+
   const displayName = currentUser?.display_name ?? currentUser?.first_name ?? currentUser?.username ?? '';
-  const initials    = displayName ? displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '?';
-  const canPost     = body.trim().length > 0 || localUris.length > 0;
+  const initials    = displayName ? displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : '?';
+  const canPost     = body.trim().length > 0 || localUris.length > 0 || !!videoUri;
 
   const handlePickImages = () => {
+    if (videoUri) {
+      Alert.alert('Vidéo déjà sélectionnée', 'Retire la vidéo pour ajouter des photos.');
+      return;
+    }
     const remaining = MAX_IMAGES - localUris.length;
     if (remaining <= 0) {
       Alert.alert('Maximum', `Tu peux ajouter jusqu'à ${MAX_IMAGES} images.`);
@@ -61,43 +78,112 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
     );
   };
 
-  const removeImage = (idx: number) => {
-    setLocalUris(prev => prev.filter((_, i) => i !== idx));
+  const handlePickVideo = () => {
+    if (localUris.length > 0) {
+      Alert.alert('Photos déjà sélectionnées', 'Retire les photos pour ajouter une vidéo.');
+      return;
+    }
+    launchImageLibrary(
+      { mediaType: 'video', selectionLimit: 1, videoQuality: 'medium' as any },
+      res => {
+        if (res.didCancel || res.errorCode) return;
+        const uri = res.assets?.[0]?.uri;
+        if (uri) setVideoUri(uri);
+      },
+    );
   };
+
+  const removeImage = (idx: number) => setLocalUris(prev => prev.filter((_, i) => i !== idx));
+  const removeVideo = () => { videoPlayer.pause(); setVideoUri(null); };
+
+  // ── Publier ─────────────────────────────────────────────────────────────────
 
   const handlePost = async () => {
     if (!canPost) return;
-    setPosting(true);
-    try {
-      let image_url: string | undefined;
-      let image_urls: string[] | undefined;
 
-      if (localUris.length === 1) {
-        const r = await uploadImageFromUri(localUris[0], 'posts', `p_${Date.now()}.jpg`, 'image/jpeg');
-        image_url = r.url;
-      } else if (localUris.length > 1) {
-        const results = await Promise.all(
-          localUris.map((uri, i) => uploadImageFromUri(uri, 'posts', `p_${Date.now()}_${i}.jpg`, 'image/jpeg'))
-        );
-        image_urls = results.map(r => r.url);
-        image_url  = image_urls[0];
+    // Cas simple : texte seul ou images seules (pas de vidéo) → upload sync rapide
+    if (!videoUri) {
+      setPosting(true);
+      try {
+        let image_url: string | undefined;
+        let image_urls: string[] | undefined;
+
+        if (localUris.length === 1) {
+          const r = await uploadImageFromUri(localUris[0], 'posts', `p_${Date.now()}.jpg`);
+          image_url = r.url;
+        } else if (localUris.length > 1) {
+          const results = await Promise.all(
+            localUris.map((uri, i) => uploadImageFromUri(uri, 'posts', `p_${Date.now()}_${i}.jpg`))
+          );
+          image_urls = results.map(r => r.url);
+          image_url  = image_urls[0];
+        }
+
+        await postService.create({
+          body: body.trim() || undefined,
+          image_url,
+          image_urls,
+          feeling,
+        });
+        onPostCreated();
+      } catch {
+        Alert.alert('Erreur', 'Impossible de publier.');
+      } finally {
+        setPosting(false);
       }
+      return;
+    }
 
-      await postService.create({
-        body: body.trim() || undefined,
-        image_url,
-        image_urls,
-        feeling,
+    // Cas vidéo → compression + upload en arrière-plan
+    const capturedBody    = body.trim();
+    const capturedFeeling = feeling;
+    const capturedVideo   = videoUri;
+    const capturedImages  = [...localUris];
+
+    // On ferme l'écran immédiatement
+    onPostCreated();
+
+    const hasImages = capturedImages.length > 0;
+
+    if (hasImages) {
+      backgroundUploadService.enqueueVideoWithImages({
+        videoUri:    capturedVideo,
+        imageUris:   capturedImages,
+        videoFolder: 'posts',
+        imageFolder: 'posts',
+        type:        'post',
+        label:       capturedBody ? capturedBody.slice(0, 40) : 'Nouveau post',
+        onDone: async (result) => {
+          await postService.create({
+            body:          capturedBody || undefined,
+            feeling:       capturedFeeling,
+            video_url:     result.videoUrl,
+            thumbnail_url: result.thumbnailUrl,
+            image_url:     result.imageUrls?.[0],
+            image_urls:    result.imageUrls,
+          });
+        },
       });
-      onPostCreated();
-    } catch {
-      Alert.alert('Erreur', 'Impossible de publier.');
-    } finally {
-      setPosting(false);
+    } else {
+      backgroundUploadService.enqueueVideo({
+        localUri: capturedVideo,
+        folder:   'posts',
+        type:     'post',
+        label:    capturedBody ? capturedBody.slice(0, 40) : 'Nouveau post',
+        onDone: async (result) => {
+          await postService.create({
+            body:          capturedBody || undefined,
+            feeling:       capturedFeeling,
+            video_url:     result.videoUrl,
+            thumbnail_url: result.thumbnailUrl,
+          });
+        },
+      });
     }
   };
 
-  // Grille d'aperçu selon nombre d'images
+  // ── Grille images ────────────────────────────────────────────────────────────
+
   const renderImageGrid = () => {
     if (localUris.length === 0) return null;
     const n = localUris.length;
@@ -112,7 +198,6 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         </View>
       );
     }
-
     if (n === 2) {
       return (
         <View style={s.gridRow}>
@@ -127,7 +212,6 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         </View>
       );
     }
-
     if (n === 3) {
       return (
         <View style={s.gridRow}>
@@ -150,8 +234,6 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         </View>
       );
     }
-
-    // 4+
     const shown = localUris.slice(0, 4);
     const extra = n - 4;
     return (
@@ -160,9 +242,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           <View key={i} style={[s.gridQuarterFour, { marginLeft: i % 2 === 1 ? 2 : 0, marginTop: i >= 2 ? 2 : 0 }]}>
             <Image source={{ uri }} style={s.imgFill} resizeMode="cover" />
             {i === 3 && extra > 0 ? (
-              <View style={s.extraOverlay}>
-                <Text style={s.extraText}>+{extra}</Text>
-              </View>
+              <View style={s.extraOverlay}><Text style={s.extraText}>+{extra}</Text></View>
             ) : (
               <TouchableOpacity style={s.removeBtn} onPress={() => removeImage(i)}>
                 <Icon name="x" size={14} color="#fff" />
@@ -195,10 +275,20 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         >
           {posting
             ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={s.publishBtnText}>Publier</Text>
+            : <Text style={s.publishBtnText}>{videoUri ? 'Envoyer' : 'Publier'}</Text>
           }
         </TouchableOpacity>
       </View>
+
+      {/* Hint arrière-plan (si vidéo sélectionnée) */}
+      {videoUri && (
+        <View style={[s.bgHint, { backgroundColor: colors.primary + '18', borderBottomColor: colors.primary + '33' }]}>
+          <Icon name="upload-cloud" size={14} color={colors.primary} />
+          <Text style={[s.bgHintText, { color: colors.primary }]}>
+            La compression et l'envoi se feront en arrière-plan
+          </Text>
+        </View>
+      )}
 
       <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
 
@@ -238,12 +328,33 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           />
         </View>
 
+        {/* Aperçu vidéo */}
+        {videoUri && (
+          <View style={s.videoPreviewWrap}>
+            <VideoView
+              player={videoPlayer}
+              style={s.videoPreview}
+              resizeMode="cover"
+            />
+            <TouchableOpacity style={s.removeVideoBtn} onPress={removeVideo}>
+              <Icon name="x-circle" size={26} color="#fff" />
+            </TouchableOpacity>
+            <View style={s.videoBadge}>
+              <Icon name="video" size={11} color="#fff" />
+              <Text style={s.videoBadgeText}>Vidéo</Text>
+            </View>
+          </View>
+        )}
+
         {/* Grille images */}
-        {localUris.length > 0 && (
+        {!videoUri && localUris.length > 0 && (
           <View style={s.gridWrap}>
             {renderImageGrid()}
             {localUris.length < MAX_IMAGES && (
-              <TouchableOpacity style={[s.addMoreBtn, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]} onPress={handlePickImages}>
+              <TouchableOpacity
+                style={[s.addMoreBtn, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+                onPress={handlePickImages}
+              >
                 <Icon name="plus" size={20} color={colors.textTertiary} />
                 <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>Ajouter</Text>
               </TouchableOpacity>
@@ -277,14 +388,26 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
       <View style={[s.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: insets.bottom || 8 }]}>
         <Text style={[s.actionLabel, { color: colors.textSecondary }]}>Ajouter à votre post</Text>
         <View style={s.actionBtns}>
-          <TouchableOpacity style={s.actionBtn} onPress={handlePickImages}>
-            <Icon name="image" size={22} color="#4CAF50" />
+          {/* Photo */}
+          <TouchableOpacity style={s.actionBtn} onPress={handlePickImages} disabled={!!videoUri}>
+            <Icon name="image" size={22} color={videoUri ? colors.textDisabled : '#4CAF50'} />
             {localUris.length > 0 && (
               <View style={[s.actionBadge, { backgroundColor: colors.primary }]}>
                 <Text style={s.actionBadgeText}>{localUris.length}</Text>
               </View>
             )}
           </TouchableOpacity>
+
+          {/* Vidéo */}
+          <TouchableOpacity
+            style={[s.actionBtn, videoUri && { backgroundColor: colors.primary + '18', borderRadius: 20 }]}
+            onPress={handlePickVideo}
+            disabled={localUris.length > 0}
+          >
+            <Icon name="video" size={22} color={localUris.length > 0 ? colors.textDisabled : colors.primary} />
+          </TouchableOpacity>
+
+          {/* Feeling */}
           <TouchableOpacity
             style={[s.actionBtn, showFeelings && { backgroundColor: colors.primary + '18', borderRadius: 20 }]}
             onPress={() => setShowFeelings(v => !v)}
@@ -297,8 +420,8 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   );
 };
 
-const GRID_H  = (W * 0.55);
-const HALF_H  = GRID_H / 2 - 1;
+const GRID_H = (W * 0.55);
+const HALF_H = GRID_H / 2 - 1;
 
 const s = StyleSheet.create({
   root:           { flex: 1 },
@@ -306,6 +429,10 @@ const s = StyleSheet.create({
   headerTitle:    { fontSize: 17, fontWeight: '700' },
   publishBtn:     { paddingHorizontal: 18, paddingVertical: 7, borderRadius: 20 },
   publishBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  bgHint:         { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  bgHintText:     { fontSize: 12, fontWeight: '500' },
+
   authorRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   avatar:         { width: 46, height: 46, borderRadius: 23, overflow: 'hidden' },
   authorName:     { fontSize: 15, fontWeight: '700' },
@@ -314,7 +441,12 @@ const s = StyleSheet.create({
   inputWrap:      { paddingHorizontal: 14, paddingBottom: 12, flex: 1, minHeight: 120 },
   input:          { fontSize: 18, lineHeight: 26, textAlignVertical: 'top', flex: 1 },
 
-  // Grille
+  videoPreviewWrap: { marginHorizontal: 14, marginBottom: 12, borderRadius: 12, overflow: 'hidden', height: W * 0.56 },
+  videoPreview:     { width: '100%', height: '100%' },
+  removeVideoBtn:   { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 14, padding: 2 },
+  videoBadge:       { position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  videoBadgeText:   { color: '#fff', fontSize: 11, fontWeight: '700' },
+
   gridWrap:         { marginHorizontal: 14, marginBottom: 12 },
   gridSingle:       { borderRadius: 12, overflow: 'hidden', height: GRID_H },
   imgSingle:        { width: '100%', height: '100%' },
@@ -325,7 +457,7 @@ const s = StyleSheet.create({
   gridQuarterFour:  { width: (W - 28) / 2 - 1, height: HALF_H, overflow: 'hidden' },
   imgFill:          { width: '100%', height: '100%' },
   removeBtn:        { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
-  extraOverlay:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  extraOverlay:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   extraText:        { color: '#fff', fontSize: 22, fontWeight: '800' },
   addMoreBtn:       { marginTop: 8, height: 48, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
 
@@ -333,6 +465,7 @@ const s = StyleSheet.create({
   feelingsTitle:  { fontSize: 13, fontWeight: '600', marginBottom: 10 },
   feelingsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   feelingChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+
   actionBar:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   actionLabel:    { fontSize: 14, fontWeight: '600' },
   actionBtns:     { flexDirection: 'row', gap: 8 },

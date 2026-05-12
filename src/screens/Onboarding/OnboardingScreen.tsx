@@ -1,205 +1,305 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import {
-  View, Text, StyleSheet, Dimensions, FlatList,
-  ViewToken, StatusBar, TouchableOpacity,
+  View, Text, StyleSheet, Dimensions,
+  StatusBar, TouchableOpacity,
 } from 'react-native';
 import Animated, {
-  SharedValue,
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
-  interpolate, Extrapolation,
+  useSharedValue, useAnimatedStyle,
+  withTiming, withDelay, withRepeat, withSequence,
+  Easing, interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
-import { useTheme } from '../../hooks/useTheme';
-import { Button, AppLogo } from '../../components/common';
+import Icon from 'react-native-vector-icons/Feather';
+import { AppLogo } from '../../components/common';
 
-const { width } = Dimensions.get('window');
-
-interface Slide {
-  id: string;
-  emoji: string;
-  title: string;
-  subtitle: string;
-  colors: [string, string];
-}
+const { width: W, height: H } = Dimensions.get('window');
 
 interface Props {
   onFinish: () => void;
+  onLogin?: () => void;
 }
 
-const SLIDES: Slide[] = [
-  {
-    id: '1',
-    emoji:    '🎵',
-    title:    'Concerts en Direct',
-    subtitle: 'Suivez vos artistes préférés en live, immersif et en temps réel, peu importe où vous êtes.',
-    colors:   ['#7B3FF2', '#E0389A'],
-  },
-  {
-    id: '2',
-    emoji:    '🎬',
-    title:    'Films & Séries',
-    subtitle: 'Des milliers de contenus exclusifs, films et séries premium en streaming illimité.',
-    colors:   ['#FF7A2F', '#E0389A'],
-  },
-  {
-    id: '3',
-    emoji:    '🎪',
-    title:    'Événements Uniques',
-    subtitle: 'Festivals, anniversaires, conférences — vivez chaque moment intense, en ligne ou sur place.',
-    colors:   ['#36D9A0', '#7B3FF2'],
-  },
-];
+// ── Orbe lumineux animé ───────────────────────────────────────────────────────
+const Orb: React.FC<{
+  x: number; y: number; r: number;
+  color: string; delay: number; duration: number;
+}> = ({ x, y, r, color, delay, duration }) => {
+  const scale   = useSharedValue(1);
+  const opacity = useSharedValue(0);
 
-export const OnboardingScreen: React.FC<Props> = ({ onFinish }) => {
-  const { theme, isDark } = useTheme();
-  const { colors } = theme;
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(1, { duration: 800 }));
+    scale.value   = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(1.18, { duration, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1,    { duration, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1, false,
+    ));
+  }, []);
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  const flatRef = useRef<FlatList<Slide>>(null);
-
-  const scrollX = useSharedValue(0);
-
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    if (viewableItems[0]?.index != null) {
-      setActiveIndex(viewableItems[0].index);
-    }
-  }).current;
-
-  const goNext = useCallback(() => {
-    if (activeIndex < SLIDES.length - 1) {
-      flatRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
-    } else {
-      onFinish();
-    }
-  }, [activeIndex, onFinish]);
-
-  const renderSlide = ({ item, index }: { item: Slide; index: number }) => (
-    <View style={styles.slide}>
-      {/* Bulle illustrative animée */}
-      <View style={styles.bubbleWrap}>
-        <LinearGradient
-          colors={[item.colors[0] + '30', item.colors[1] + '18']}
-          style={styles.bubbleBg}
-        />
-        <Text style={styles.emoji}>{item.emoji}</Text>
-        {/* Cercles décoratifs */}
-        <View style={[styles.ring1, { borderColor: item.colors[0] + '40' }]} />
-        <View style={[styles.ring2, { borderColor: item.colors[1] + '28' }]} />
-      </View>
-
-      <Text style={[styles.slideTitle, { color: colors.textPrimary }]}>
-        {item.title}
-      </Text>
-      <Text style={[styles.slideSubtitle, { color: colors.textSecondary }]}>
-        {item.subtitle}
-      </Text>
-    </View>
-  );
+  const anim = useAnimatedStyle(() => ({
+    opacity:   interpolate(opacity.value, [0, 1], [0, 0.55], Extrapolation.CLAMP),
+    transform: [{ scale: scale.value }],
+  }));
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        anim,
+        {
+          position: 'absolute',
+          left: x - r, top: y - r,
+          width: r * 2, height: r * 2,
+          borderRadius: r,
+          backgroundColor: color,
+        },
+      ]}
+    />
+  );
+};
+
+// ── Ligne de badge feature ────────────────────────────────────────────────────
+const FeaturePill: React.FC<{ icon: string; label: string; delay: number }> = ({ icon, label, delay }) => {
+  const opacity = useSharedValue(0);
+  const tx      = useSharedValue(-16);
+
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(1, { duration: 500 }));
+    tx.value      = withDelay(delay, withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }));
+  }, []);
+
+  const anim = useAnimatedStyle(() => ({
+    opacity:   opacity.value,
+    transform: [{ translateX: tx.value }],
+  }));
+
+  return (
+    <Animated.View style={[s.pill, anim]}>
+      <Icon name={icon} size={13} color="rgba(255,255,255,0.7)" />
+      <Text style={s.pillText}>{label}</Text>
+    </Animated.View>
+  );
+};
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin }) => {
+  const logoScale   = useSharedValue(0.72);
+  const logoOpacity = useSharedValue(0);
+  const titleOpacity = useSharedValue(0);
+  const titleY      = useSharedValue(28);
+  const ctaOpacity  = useSharedValue(0);
+  const ctaY        = useSharedValue(24);
+
+  useEffect(() => {
+    // Logo
+    logoOpacity.value = withDelay(200, withTiming(1, { duration: 700 }));
+    logoScale.value   = withDelay(200, withTiming(1, { duration: 700, easing: Easing.out(Easing.back(1.6)) }));
+    // Titre
+    titleOpacity.value = withDelay(650, withTiming(1, { duration: 600 }));
+    titleY.value       = withDelay(650, withTiming(0, { duration: 600, easing: Easing.out(Easing.cubic) }));
+    // CTA
+    ctaOpacity.value  = withDelay(1100, withTiming(1, { duration: 500 }));
+    ctaY.value        = withDelay(1100, withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }));
+  }, []);
+
+  const logoAnim  = useAnimatedStyle(() => ({
+    opacity:   logoOpacity.value,
+    transform: [{ scale: logoScale.value }],
+  }));
+  const titleAnim = useAnimatedStyle(() => ({
+    opacity:   titleOpacity.value,
+    transform: [{ translateY: titleY.value }],
+  }));
+  const ctaAnim   = useAnimatedStyle(() => ({
+    opacity:   ctaOpacity.value,
+    transform: [{ translateY: ctaY.value }],
+  }));
+
+  return (
+    <View style={s.root}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+      {/* Fond */}
+      <LinearGradient
+        colors={['#07070F', '#0D0818', '#07070F']}
+        style={StyleSheet.absoluteFill}
       />
 
-      {/* Logo */}
-      <View style={styles.header}>
-        <AppLogo size="sm" />
+      {/* Orbes atmospheriques */}
+      <Orb x={W * 0.18} y={H * 0.28} r={220} color="#6D28D9"  delay={0}    duration={4200} />
+      <Orb x={W * 0.82} y={H * 0.38} r={180} color="#BE185D"  delay={600}  duration={3800} />
+      <Orb x={W * 0.50} y={H * 0.72} r={200} color="#1D4ED8"  delay={300}  duration={5000} />
+
+      {/* Ligne de separation lumineuse */}
+      <View style={s.glowLine} pointerEvents="none" />
+
+      {/* ── Contenu principal ── */}
+      <View style={s.content}>
+
+        {/* Logo */}
+        <Animated.View style={[s.logoWrap, logoAnim]}>
+          <AppLogo size="xl" />
+        </Animated.View>
+
+        {/* Texte hero */}
+        <Animated.View style={[s.textBlock, titleAnim]}>
+          <Text style={s.headline}>
+            Tout ce que{'\n'}vous aimez,{'\n'}
+            <Text style={s.headlineAccent}>ici.</Text>
+          </Text>
+          <Text style={s.sub}>
+            Live, films, events, communautes —{'\n'}une seule app, zero compromis.
+          </Text>
+        </Animated.View>
+
+        {/* Pills features */}
+        <View style={s.pills}>
+          <FeaturePill icon="radio"       label="Concerts live"     delay={900}  />
+          <FeaturePill icon="film"        label="Films & series"    delay={1010} />
+          <FeaturePill icon="calendar"    label="Evenements"        delay={1120} />
+          <FeaturePill icon="play-circle" label="Reels & feed"      delay={1230} />
+        </View>
+
       </View>
 
-      {/* Slides */}
-      <FlatList
-        ref={flatRef}
-        data={SLIDES}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={item => item.id}
-        renderItem={renderSlide}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
-        onScroll={e => { scrollX.value = e.nativeEvent.contentOffset.x; }}
-        scrollEventThrottle={16}
-      />
+      {/* ── CTA fixe en bas ── */}
+      <Animated.View style={[s.cta, ctaAnim]}>
 
-      {/* Dots indicateurs */}
-      <View style={styles.dotsRow}>
-        {SLIDES.map((_, i) => (
-          <AnimDot key={i} index={i} activeIndex={activeIndex} scrollX={scrollX} primaryColor={colors.primary} borderColor={colors.border} />
-        ))}
-      </View>
+        {/* Principal */}
+        <TouchableOpacity onPress={onFinish} activeOpacity={0.86}>
+          <LinearGradient
+            colors={['#7C3AED', '#DB2777']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.btnPrimary}
+          >
+            <Text style={s.btnPrimaryText}>Rejoindre FoliX</Text>
+            <Icon name="arrow-right" size={18} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
 
-      {/* Actions */}
-      <View style={[styles.footer, { paddingBottom: 48 }]}>
-        <Button
-          label={activeIndex === SLIDES.length - 1 ? 'Commencer  →' : 'Suivant  →'}
-          onPress={goNext}
-          size="lg"
-        />
+        {/* Secondaire */}
+        <TouchableOpacity
+          onPress={onLogin ?? onFinish}
+          activeOpacity={0.7}
+          style={s.btnSecondary}
+        >
+          <Text style={s.btnSecondaryText}>
+            Deja membre ?{'  '}
+            <Text style={s.btnSecondaryAccent}>Connexion</Text>
+          </Text>
+        </TouchableOpacity>
 
-        {activeIndex < SLIDES.length - 1 && (
-          <TouchableOpacity onPress={onFinish} style={styles.skipBtn}>
-            <Text style={[styles.skipText, { color: colors.textTertiary }]}>Passer</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      </Animated.View>
+
     </View>
   );
 };
 
-// Dot animé
-const AnimDot: React.FC<{
-  index: number;
-  activeIndex: number;
-  scrollX: SharedValue<number>;
-  primaryColor: string;
-  borderColor: string;
-}> = ({ index, activeIndex, scrollX, primaryColor, borderColor }) => {
-  const isActive = index === activeIndex;
+// ── Styles ────────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#07070F' },
 
-  const dotStyle = useAnimatedStyle(() => {
-    const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
-    const w = interpolate(scrollX.value, inputRange, [8, 24, 8], Extrapolation.CLAMP);
-    const opacity = interpolate(scrollX.value, inputRange, [0.4, 1, 0.4], Extrapolation.CLAMP);
-    return { width: w, opacity };
-  });
+  glowLine: {
+    position: 'absolute',
+    top: H * 0.48,
+    left: 0, right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
 
-  return (
-    <Animated.View style={[
-      styles.dot,
-      dotStyle,
-      { backgroundColor: isActive ? primaryColor : borderColor },
-    ]} />
-  );
-};
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 48,
+  },
 
-const styles = StyleSheet.create({
-  root:          { flex: 1 },
-  header:        { paddingTop: 56, alignItems: 'center', paddingBottom: 4 },
-  slide:         { width, alignItems: 'center', paddingHorizontal: 32, paddingTop: 12 },
-  bubbleWrap:    {
-    width: width * 0.68, height: width * 0.68,
-    borderRadius: width * 0.34,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 36, overflow: 'visible',
+  logoWrap: {
+    marginBottom: 32,
   },
-  bubbleBg:      { ...StyleSheet.absoluteFill, borderRadius: width * 0.34 },
-  emoji:         { fontSize: 88 },
-  ring1:         {
-    position: 'absolute', width: width * 0.76, height: width * 0.76,
-    borderRadius: width * 0.38, borderWidth: 1.5,
+
+  textBlock: {
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  ring2:         {
-    position: 'absolute', width: width * 0.84, height: width * 0.84,
-    borderRadius: width * 0.42, borderWidth: 1,
+  headline: {
+    fontSize: 46,
+    fontWeight: '900',
+    color: '#fff',
+    textAlign: 'center',
+    lineHeight: 54,
+    letterSpacing: -1,
+    marginBottom: 18,
   },
-  slideTitle:    { fontSize: 28, fontWeight: '800', textAlign: 'center', lineHeight: 36, marginBottom: 14 },
-  slideSubtitle: { fontSize: 15, textAlign: 'center', lineHeight: 24, fontWeight: '400' },
-  dotsRow:       { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 24 },
-  dot:           { height: 8, borderRadius: 4 },
-  footer:        { paddingHorizontal: 28, gap: 0 },
-  skipBtn:       { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 24 },
-  skipText:      { fontSize: 14, fontWeight: '500' },
+  headlineAccent: {
+    color: '#A855F7',
+  },
+  sub: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.42)',
+    textAlign: 'center',
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+
+  pills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.70)',
+    letterSpacing: 0.2,
+  },
+
+  cta: {
+    paddingHorizontal: 24,
+    paddingBottom: 52,
+    gap: 4,
+  },
+  btnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 18,
+    borderRadius: 18,
+  },
+  btnPrimaryText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.1,
+  },
+  btnSecondary: {
+    alignSelf: 'center',
+    paddingVertical: 16,
+  },
+  btnSecondaryText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.38)',
+    textAlign: 'center',
+  },
+  btnSecondaryAccent: {
+    color: '#A855F7',
+    fontWeight: '700',
+  },
 });
