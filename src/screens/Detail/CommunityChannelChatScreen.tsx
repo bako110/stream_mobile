@@ -21,7 +21,7 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
 import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
-import DocumentPicker from 'react-native-document-picker';
+import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Geolocation from '@react-native-community/geolocation';
 
 const { width: W } = Dimensions.get('window');
@@ -242,7 +242,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const handlePickAudio = async () => {
     setAttachOpen(false);
     try {
-      const result = await DocumentPicker.pickSingle({ type: [DocumentPicker.types.audio] });
+      const [result] = await pick({ type: [types.audio] });
       setSending(true);
       const fd = new FormData();
       fd.append('file', { uri: result.uri, name: result.name ?? 'audio.mp3', type: result.type ?? 'audio/mpeg' } as any);
@@ -256,7 +256,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e: any) {
-      if (!DocumentPicker.isCancel(e)) Alert.alert('Erreur', 'Impossible d\'envoyer l\'audio.');
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', 'Impossible d\'envoyer l\'audio.');
     } finally { setSending(false); }
   };
 
@@ -264,9 +264,8 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const handlePickFile = async () => {
     setAttachOpen(false);
     try {
-      const result = await DocumentPicker.pickSingle({
-        type: [DocumentPicker.types.pdf, DocumentPicker.types.doc, DocumentPicker.types.docx,
-               DocumentPicker.types.xls, DocumentPicker.types.xlsx, DocumentPicker.types.plainText],
+      const [result] = await pick({
+        type: [types.pdf, types.doc, types.docx, types.xls, types.xlsx, types.plainText],
       });
       setSending(true);
       const fd = new FormData();
@@ -282,7 +281,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e: any) {
-      if (!DocumentPicker.isCancel(e)) Alert.alert('Erreur', 'Impossible d\'envoyer le fichier.');
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', 'Impossible d\'envoyer le fichier.');
     } finally { setSending(false); }
   };
 
