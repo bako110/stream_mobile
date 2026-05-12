@@ -771,22 +771,40 @@ export const ChatScreen: React.FC = () => {
         const lng = item.attachment_meta?.longitude;
         const addr = item.attachment_meta?.address;
         const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+        const mapImg = lat != null
+          ? `https://static-maps.yandex.ru/1.x/?lang=fr_FR&ll=${lng},${lat}&z=15&l=map&size=400,200&pt=${lng},${lat},pm2rdm`
+          : null;
         return (
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 180 }}
+            style={[styles.locationCard, mine ? styles.locationCardMe : styles.locationCardOther]}
             onPress={() => Linking.openURL(mapsUrl)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: mine ? 'rgba(255,255,255,0.2)' : '#EF444420', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="map-pin" size={20} color={mine ? '#fff' : '#EF4444'} />
+            <View style={styles.locationMapBox}>
+              {mapImg ? (
+                <Image source={{ uri: mapImg }} style={styles.locationMapImg} resizeMode="cover" />
+              ) : (
+                <View style={[styles.locationMapImg, { backgroundColor: '#e8f5e9', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Icon name="map" size={40} color="#4CAF50" />
+                </View>
+              )}
+              <View style={styles.locationPinWrap}>
+                <View style={styles.locationPinCircle}>
+                  <Icon name="map-pin" size={16} color="#fff" />
+                </View>
+                <View style={styles.locationPinTail} />
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.msgText, { color: textColor, fontWeight: '700' }]}>Localisation</Text>
-              <Text style={{ color: subtextColor, fontSize: 12, marginTop: 2 }} numberOfLines={2}>
-                {addr ?? (lat != null ? `${lat.toFixed(5)}, ${lng?.toFixed(5)}` : '…')}
-              </Text>
+            <View style={[styles.locationFooter, mine ? styles.locationFooterMe : styles.locationFooterOther]}>
+              <Icon name="map-pin" size={13} color={mine ? 'rgba(255,255,255,0.8)' : '#EF4444'} />
+              <View style={{ flex: 1, marginLeft: 6 }}>
+                <Text style={[styles.locationLabel, { color: mine ? '#fff' : colors.textPrimary }]}>Ma position</Text>
+                <Text style={[styles.locationCoords, { color: mine ? 'rgba(255,255,255,0.65)' : colors.textTertiary }]} numberOfLines={1}>
+                  {addr ?? (lat != null ? `${lat.toFixed(4)}, ${lng?.toFixed(4)}` : '…')}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={14} color={mine ? 'rgba(255,255,255,0.5)' : colors.textTertiary} />
             </View>
-            <Icon name="external-link" size={16} color={subtextColor} />
           </TouchableOpacity>
         );
       }
@@ -1418,6 +1436,21 @@ const styles = StyleSheet.create({
   reactionTheirs: { left: 8 },
   reactionEmoji:  { fontSize: 14 },
   stickerText:    { fontSize: 64, lineHeight: 72 },
+
+  // Location card — style WhatsApp
+  locationCard:        { borderRadius: 12, overflow: 'hidden', width: 240 },
+  locationCardMe:      { backgroundColor: '#075E54' },
+  locationCardOther:   { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e0e0e0' },
+  locationMapBox:      { width: '100%', height: 140, position: 'relative' },
+  locationMapImg:      { width: '100%', height: 140 },
+  locationPinWrap:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  locationPinCircle:   { width: 32, height: 32, borderRadius: 16, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  locationPinTail:     { width: 3, height: 10, backgroundColor: '#EF4444', borderRadius: 2, marginTop: -2 },
+  locationFooter:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
+  locationFooterMe:    { backgroundColor: '#054d43' },
+  locationFooterOther: { backgroundColor: '#f5f5f5' },
+  locationLabel:       { fontSize: 13, fontWeight: '700' },
+  locationCoords:      { fontSize: 11, marginTop: 1 },
 });
 
 const CP = StyleSheet.create({

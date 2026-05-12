@@ -1044,22 +1044,40 @@ export const CommunityChatScreen: React.FC = () => {
         const meta = msg.metadata ?? {};
         const lat = meta.latitude, lng = meta.longitude;
         const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+        const mapImg = lat != null
+          ? `https://static-maps.yandex.ru/1.x/?lang=fr_FR&ll=${lng},${lat}&z=15&l=map&size=400,200&pt=${lng},${lat},pm2rdm`
+          : null;
         return (
           <TouchableOpacity
-            style={[S.bubble, S.locationBubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}
+            style={[S.locationCard, isMe ? S.locationCardMe : S.locationCardOther]}
             onPress={() => Linking.openURL(mapsUrl)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <View style={[S.locationIconBox, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : '#EF444420' }]}>
-              <Icon name="map-pin" size={20} color={isMe ? '#fff' : '#EF4444'} />
+            <View style={S.locationMapBox}>
+              {mapImg ? (
+                <Image source={{ uri: mapImg }} style={S.locationMapImg} resizeMode="cover" />
+              ) : (
+                <View style={[S.locationMapImg, { backgroundColor: '#e8f5e9', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Icon name="map" size={40} color="#4CAF50" />
+                </View>
+              )}
+              <View style={S.locationPinWrap}>
+                <View style={S.locationPinCircle}>
+                  <Icon name="map-pin" size={16} color="#fff" />
+                </View>
+                <View style={S.locationPinTail} />
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[S.locationTitle, { color: textColor }]}>Localisation</Text>
-              <Text style={[S.locationAddr, { color: timeColor }]} numberOfLines={2}>
-                {meta.address ?? `${lat?.toFixed(5)}, ${lng?.toFixed(5)}`}
-              </Text>
+            <View style={[S.locationFooter, isMe ? S.locationFooterMe : S.locationFooterOther]}>
+              <Icon name="map-pin" size={13} color={isMe ? 'rgba(255,255,255,0.8)' : '#EF4444'} />
+              <View style={{ flex: 1, marginLeft: 6 }}>
+                <Text style={[S.locationLabel, { color: isMe ? '#fff' : colors.textPrimary }]}>Ma position</Text>
+                <Text style={[S.locationCoords, { color: isMe ? 'rgba(255,255,255,0.65)' : colors.textTertiary }]} numberOfLines={1}>
+                  {meta.address ?? (lat != null ? `${lat.toFixed(4)}, ${lng?.toFixed(4)}` : '…')}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={14} color={isMe ? 'rgba(255,255,255,0.5)' : colors.textTertiary} />
             </View>
-            <Icon name="external-link" size={16} color={isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary} />
           </TouchableOpacity>
         );
       }
@@ -2002,10 +2020,19 @@ const S = StyleSheet.create({
   fileMeta:    { fontSize: 11, marginTop: 2 },
 
   // Location bubble
-  locationBubble:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  locationIconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  locationTitle:   { fontSize: 13, fontWeight: '700' },
-  locationAddr:    { fontSize: 12, marginTop: 2 },
+  locationCard:        { borderRadius: 12, overflow: 'hidden', width: 240 },
+  locationCardMe:      { backgroundColor: '#054d43' },
+  locationCardOther:   { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e0e0e0' },
+  locationMapBox:      { width: '100%', height: 140, position: 'relative' },
+  locationMapImg:      { width: '100%', height: 140 },
+  locationPinWrap:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  locationPinCircle:   { width: 32, height: 32, borderRadius: 16, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  locationPinTail:     { width: 3, height: 10, backgroundColor: '#EF4444', borderRadius: 2, marginTop: -2 },
+  locationFooter:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
+  locationFooterMe:    { backgroundColor: '#054d43' },
+  locationFooterOther: { backgroundColor: '#f5f5f5' },
+  locationLabel:       { fontSize: 13, fontWeight: '700' },
+  locationCoords:      { fontSize: 11, marginTop: 1 },
 });
 
 // Styles du modal preview média
