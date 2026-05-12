@@ -271,6 +271,13 @@ export const StoryViewer: React.FC<Props> = ({
   const [likeCount,   setLikeCount]   = useState(0);
   const [likeToast,   setLikeToast]   = useState<{ name: string; avatar: string | null } | null>(null);
 
+  // Réponse story (style WhatsApp)
+  const [replyText,     setReplyText]     = useState('');
+  const [replyFocused,  setReplyFocused]  = useState(false);
+  const [replySending,  setReplySending]  = useState(false);
+  const [replySent,     setReplySent]     = useState(false);
+  const replyInputRef = useRef<any>(null);
+
   // Cœur flottant style WhatsApp
   const heartAnim   = useRef(new Animated.Value(0)).current;
   const heartScale  = useRef(new Animated.Value(0)).current;
@@ -375,6 +382,33 @@ export const StoryViewer: React.FC<Props> = ({
       setLikeCount(c => newLiked ? Math.max(0, c - 1) : c + 1);
     });
   }, [story, liked, isOwn, showHeartAnim]);
+
+  const handleReplyFocus = useCallback(() => {
+    setReplyFocused(true);
+    setPaused(true);
+  }, []);
+
+  const handleReplyBlur = useCallback(() => {
+    setReplyFocused(false);
+    if (!replyText.trim()) setPaused(false);
+  }, [replyText]);
+
+  const handleSendReply = useCallback(async () => {
+    if (!story || !replyText.trim() || replySending) return;
+    setReplySending(true);
+    try {
+      await storyService.reply(story.id, replyText.trim());
+      setReplyText('');
+      setReplyFocused(false);
+      setReplySent(true);
+      setPaused(false);
+      setTimeout(() => setReplySent(false), 2500);
+    } catch {
+      // silencieux — le DM échoue, on ne bloque pas l'UX
+    } finally {
+      setReplySending(false);
+    }
+  }, [story, replyText, replySending]);
 
   // ── Audio ──────────────────────────────────────────────────────────────────
 
@@ -693,6 +727,58 @@ export const StoryViewer: React.FC<Props> = ({
           )}
         </View>
 
+        {/* ── Champ réponse story (style WhatsApp) — uniquement pour les autres ── */}
+        {!isOwn && !viewersOpen && !menuOpen && !editMode && (
+          <View style={s.replyBar} pointerEvents="box-none">
+            <TouchableOpacity
+              style={[s.replyInput, replyFocused && s.replyInputFocused]}
+              activeOpacity={1}
+              onPress={() => replyInputRef.current?.focus()}
+            >
+              <TextInput
+                ref={replyInputRef}
+                style={s.replyInputText}
+                placeholder={`Répondre à ${group?.user?.display_name ?? group?.user?.username ?? ''}…`}
+                placeholderTextColor="rgba(255,255,255,0.45)"
+                value={replyText}
+                onChangeText={setReplyText}
+                onFocus={handleReplyFocus}
+                onBlur={handleReplyBlur}
+                returnKeyType="send"
+                onSubmitEditing={handleSendReply}
+                multiline={false}
+                maxLength={500}
+              />
+            </TouchableOpacity>
+
+            {!replyFocused && !replyText && (
+              <TouchableOpacity style={s.replyEmoji} onPress={() => { setReplyText('❤️'); }}>
+                <Text style={{ fontSize: 24 }}>❤️</Text>
+              </TouchableOpacity>
+            )}
+
+            {(replyText.trim().length > 0 || replyFocused) && (
+              <TouchableOpacity
+                style={[s.replySendBtn, { opacity: replySending ? 0.5 : 1 }]}
+                onPress={handleSendReply}
+                disabled={replySending || !replyText.trim()}
+              >
+                {replySending
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Icon name="send" size={18} color="#fff" />
+                }
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {replySent && (
+          <View style={s.replySentToast} pointerEvents="none">
+            <Icon name="check-circle" size={14} color="#25D366" />
+            <Text style={s.replySentText}>Message envoyé</Text>
+          </View>
+        )}
+
         {/* ── Toast like reçu (propriétaire) ───────────────────────────── */}
         {likeToast && (
           <View style={s.likeToast} pointerEvents="none">
@@ -892,7 +978,7 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28,
   },
   captionBottom: {
-    position: 'absolute', bottom: 80, left: 16, right: 16,
+    position: 'absolute', bottom: Platform.OS === 'ios' ? 150 : 136, left: 16, right: 16,
   },
   captionPill: {
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -911,7 +997,7 @@ const s = StyleSheet.create({
 
   // ── Bottom bar (like / views) ─────────────────────────────────────────────────
   bottomBar: {
-    position: 'absolute', bottom: 30, left: 16, right: 16,
+    position: 'absolute', bottom: Platform.OS === 'ios' ? 90 : 76, left: 16, right: 16,
     flexDirection: 'row', alignItems: 'center', zIndex: 8,
   },
   viewsBtn: {
@@ -1016,6 +1102,70 @@ const s = StyleSheet.create({
   editCancelText: { color: 'rgba(255,255,255,0.6)', fontWeight: '600' },
   editSaveGrad:   { borderRadius: 12, overflow: 'hidden', paddingHorizontal: 22, paddingVertical: 12 },
   editSaveText:   { color: '#fff', fontWeight: '800' },
+
+  // ── Reply bar (style WhatsApp) ────────────────────────────────────────────────
+  replyBar: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 36 : 20,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 15,
+  },
+  replyInput: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+    minHeight: 44,
+  },
+  replyInputFocused: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  replyInputText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    padding: 0,
+  },
+  replyEmoji: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  replySendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  replySentToast: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 100 : 80,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 50,
+  },
+  replySentText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });
 
 // ── MusicWidget styles ──────────────────────────────────────────────────────

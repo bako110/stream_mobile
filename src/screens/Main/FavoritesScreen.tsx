@@ -1,16 +1,25 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  Image, StyleSheet, StatusBar,
+  Image, StyleSheet, StatusBar, ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { saveService } from '../../services';
+import { favoriteService } from '../../services/favoriteService';
+import type { FavoriteType } from '../../services/favoriteService';
 
 type Tab = 'events' | 'concerts' | 'reels' | 'posts' | 'communities';
+
+const TAB_TO_TYPE: Record<Tab, FavoriteType> = {
+  events:      'event',
+  concerts:    'concert',
+  reels:       'reel',
+  posts:       'post',
+  communities: 'community',
+};
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'events',      label: 'Evenements', icon: 'calendar'      },
@@ -20,36 +29,52 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'communities', label: 'Communautes',icon: 'users'          },
 ];
 
+// Convertit un FavoriteOut (API) en objet utilisable par les helpers getThumb/getTitle/getSub
+function fromApi(fav: Awaited<ReturnType<typeof favoriteService.list>>[number]): any {
+  return {
+    id:            fav.target_id,
+    title:         fav.target_title,
+    name:          fav.target_title,
+    caption:       fav.target_title,
+    thumbnail_url: fav.target_thumbnail,
+    avatar_url:    fav.target_thumbnail,
+    cover_url:     fav.target_thumbnail,
+    description:   fav.target_subtitle,
+    venue_city:    fav.target_subtitle,
+    artist_name:   fav.target_subtitle,
+    _favId:        fav.id,
+  };
+}
+
 export const FavoritesScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<any>();
   const insets = useSafeAreaInsets();
 
-  const [tab, setTab]   = useState<Tab>('events');
-  const [data, setData] = useState<any[]>([]);
+  const [tab, setTab]       = useState<Tab>('events');
+  const [data, setData]     = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(() => {
-    switch (tab) {
-      case 'events':      setData(saveService.getSavedEvents());       break;
-      case 'concerts':    setData(saveService.getSavedConcerts());     break;
-      case 'reels':       setData(saveService.getSavedReels());        break;
-      case 'posts':       setData(saveService.getSavedPosts());        break;
-      case 'communities': setData(saveService.getSavedCommunities());  break;
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const favs = await favoriteService.list(TAB_TO_TYPE[tab]);
+      setData(favs.map(fromApi));
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
     }
   }, [tab]);
 
-  useFocusEffect(refresh);
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
-  const handleRemove = (id: string) => {
-    switch (tab) {
-      case 'events':      saveService.unsaveEvent(id);       break;
-      case 'concerts':    saveService.unsaveConcert(id);     break;
-      case 'reels':       saveService.unsaveReel(id);        break;
-      case 'posts':       saveService.unsavePost(id);        break;
-      case 'communities': saveService.unsaveCommunity(id);   break;
-    }
-    refresh();
+  const handleRemove = async (id: string) => {
+    try {
+      await favoriteService.unsave(TAB_TO_TYPE[tab], id);
+      setData(prev => prev.filter(i => i.id !== id));
+    } catch {}
   };
 
   const handlePress = (item: any) => {
@@ -121,17 +146,24 @@ export const FavoritesScreen: React.FC = () => {
       </View>
 
       {/* Liste */}
+      {loading ? (
+        <View style={styles.empty}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : null}
       <FlatList
-        data={data}
+        data={loading ? [] : data}
         keyExtractor={i => i.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Icon name={currentTab.icon} size={44} color={colors.textTertiary} />
-            <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
-              Aucun favori dans {currentTab.label}
-            </Text>
-          </View>
+          loading ? null : (
+            <View style={styles.empty}>
+              <Icon name={currentTab.icon} size={44} color={colors.textTertiary} />
+              <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
+                Aucun favori dans {currentTab.label}
+              </Text>
+            </View>
+          )
         }
         renderItem={({ item, index }) => {
           const thumb = getThumb(item);

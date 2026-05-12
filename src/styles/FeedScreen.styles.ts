@@ -21,14 +21,15 @@ export const feedStyles = StyleSheet.create({
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
+    minHeight:      44,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems:    'center',
     gap:           8,
-    flex:          1,
-    marginRight:   8,
+    maxWidth:      Math.round(SCREEN_W * 0.30),
     overflow:      'hidden',
+    flexShrink:    1,
   },
   avatar: {
     width: 36, height: 36, borderRadius: 18,
@@ -38,7 +39,7 @@ export const feedStyles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { fontSize: 13, fontWeight: '700' },
-  userName:   { fontSize: 14, fontWeight: '600', flex: 1 },
+  userName:   { fontSize: 14, fontWeight: '600', flexShrink: 1 },
   headerCenter: {
     position: 'absolute', left: 0, right: 0, alignItems: 'center',
   },

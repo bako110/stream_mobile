@@ -18,7 +18,8 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
-import { eventService, socialService, saveService, authService } from '../../services';
+import { eventService, socialService, authService } from '../../services';
+import { favoriteService } from '../../services/favoriteService';
 import type { Event } from '../../types/event';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -204,7 +205,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     try {
       const data = await eventService.getById(eventId);
       setEvent(data);
-      setSaved(saveService.isEventSaved(eventId));
+      favoriteService.check('event', eventId).then(setSaved).catch(() => {});
       try {
         const user = await authService.getMe();
         setIsOwner(user?.id === data.organizer?.id);
@@ -246,7 +247,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     if (!event) return;
     const newSaved = !saved;
     setSaved(newSaved);
-    newSaved ? saveService.saveEvent(event) : saveService.unsaveEvent(eventId);
+    if (newSaved) {
+      favoriteService.save({ target_type: 'event', target_id: eventId, target_title: event.title, target_subtitle: event.venue_city ?? event.location, target_thumbnail: event.thumbnail_url ?? event.cover_url }).catch(() => {});
+    } else {
+      favoriteService.unsave('event', eventId).catch(() => {});
+    }
   };
 
   const shareText = event

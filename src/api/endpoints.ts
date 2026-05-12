@@ -254,6 +254,7 @@ export const Endpoints = {
     create:  `${V1}/stories`,
     view:    (id: string) => `${V1}/stories/${id}/view`,
     like:    (id: string) => `${V1}/stories/${id}/like`,
+    reply:   (id: string) => `${V1}/stories/${id}/reply`,
     viewers: (id: string) => `${V1}/stories/${id}/viewers`,
     edit:    (id: string) => `${V1}/stories/${id}`,
     delete:  (id: string) => `${V1}/stories/${id}`,

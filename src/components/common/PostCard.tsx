@@ -13,6 +13,7 @@ import type { AppColors } from '../../theme/colors';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
+import { favoriteService } from '../../services/favoriteService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 import { ExpandableText } from './ExpandableText';
 import { ShareBottomSheet } from './ShareBottomSheet';
@@ -342,8 +343,18 @@ export const PostCard: React.FC<PostCardProps> = ({
         <TouchableOpacity
           style={pc.saveBtn}
           onPress={() => {
-            if (saved) { saveService.unsavePost(post.id); setSaved(false); }
-            else       { saveService.savePost(post);      setSaved(true);  }
+            if (saved) {
+              setSaved(false);
+              favoriteService.unsave('post', post.id).catch(() => {});
+            } else {
+              setSaved(true);
+              favoriteService.save({
+                target_type: 'post',
+                target_id: post.id,
+                target_title: post.body ?? post.caption,
+                target_thumbnail: post.media_urls?.[0] ?? null,
+              }).catch(() => {});
+            }
           }}
           activeOpacity={0.8}
         >

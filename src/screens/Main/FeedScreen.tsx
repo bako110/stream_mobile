@@ -673,17 +673,21 @@ export const FeedScreen: React.FC = () => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        translucent
+        backgroundColor={theme.isDark ? 'transparent' : colors.surface}
+      />
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={[s.header, { backgroundColor: colors.surface }]}>
         <View style={s.headerRow}>
-          {/* Gauche : avatar + nom — masqué si recherche ouverte */}
+          {/* Gauche : avatar + nom tronqué — masqué si recherche ouverte */}
           {!searchOpen && (
             !currentUser ? (
               <View style={[s.headerLeft, { pointerEvents: 'none' }]}>
                 <SkeletonBox width={34} height={34} borderRadius={17} />
-                <SkeletonBox width={80} height={12} borderRadius={6} />
+                <SkeletonBox width={60} height={12} borderRadius={6} />
               </View>
             ) : (
               <TouchableOpacity
@@ -699,8 +703,8 @@ export const FeedScreen: React.FC = () => {
                   </View>
                 )}
                 {displayName ? (
-                  <Text style={[s.userName, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {displayName}
+                  <Text style={[s.userName, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+                    {displayName.split(' ')[0]}
                   </Text>
                 ) : null}
               </TouchableOpacity>
@@ -819,7 +823,7 @@ export const FeedScreen: React.FC = () => {
 
         {/* ── Barre filtres + actions ────────────────────────────────────── */}
         {!searchOpen && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, gap: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
 
             {/* Bouton filtre — occupe son espace, ouvre dropdown */}
             <TouchableOpacity

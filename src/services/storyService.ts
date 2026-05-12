@@ -89,6 +89,12 @@ export const storyService = {
     return res.data;
   },
 
+  // ── Répondre à une story (DM vers l'auteur) ──────────────────────────────
+
+  async reply(storyId: string, text: string): Promise<void> {
+    await apiClient.post(Endpoints.stories.reply(storyId), { text });
+  },
+
   // ── Supprimer ─────────────────────────────────────────────────────────────
 
   async delete(storyId: string): Promise<void> {

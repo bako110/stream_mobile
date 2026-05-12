@@ -23,7 +23,7 @@ import type {
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { useWs } from '../../context/WebSocketContext';
 import { ExpandableText } from '../../components/common';
-import { saveService } from '../../services/saveService';
+import { favoriteService } from '../../services/favoriteService';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 interface Props { route: { params: { communityId: string } }; }
@@ -85,7 +85,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [vrReason,       setVrReason]       = useState('');
   const [pendingCount,   setPendingCount]   = useState(0);
   const [viewerUrl,      setViewerUrl]      = useState<string | null>(null);
-  const [communitySaved, setCommunitySaved] = useState(() => saveService.isCommunitysaved(communityId));
+  const [communitySaved, setCommunitySaved] = useState(false);
 
   // Settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -146,6 +146,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         communityService.getMyRole(communityId).catch(() => null),
       ]);
       setCommunity(c);
+      favoriteService.check('community', communityId).then(setCommunitySaved).catch(() => {});
       const uid = String(me.id);
       setMyId(uid);
       setMyName((me as any).display_name || (me as any).username || '');
@@ -1181,17 +1182,17 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           <TouchableOpacity
             onPress={() => {
               if (communitySaved) {
-                saveService.unsaveCommunity(communityId);
                 setCommunitySaved(false);
+                favoriteService.unsave('community', communityId).catch(() => setCommunitySaved(true));
               } else if (community) {
-                saveService.saveCommunity({
-                  id: community.id,
-                  name: community.name,
-                  avatar_url: community.avatar_url,
-                  members_count: community.members_count,
-                  description: community.description,
-                });
                 setCommunitySaved(true);
+                favoriteService.save({
+                  target_type: 'community',
+                  target_id: community.id,
+                  target_title: community.name,
+                  target_subtitle: community.description ?? null,
+                  target_thumbnail: community.avatar_url ?? null,
+                }).catch(() => setCommunitySaved(false));
               }
             }}
             style={s.headerIcon}

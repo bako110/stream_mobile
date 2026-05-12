@@ -16,7 +16,8 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
-import { concertService, socialService, saveService, authService } from '../../services';
+import { concertService, socialService, authService } from '../../services';
+import { favoriteService } from '../../services/favoriteService';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -144,7 +145,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     try {
       const data = await concertService.getById(concertId);
       setConcert(data);
-      setSaved(saveService.isConcertSaved(concertId));
+      favoriteService.check('concert', concertId).then(setSaved).catch(() => {});
       try {
         const user = await authService.getMe();
         setIsOwner(user?.id === data.artist?.id);
@@ -185,7 +186,11 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     if (!concert) return;
     const newSaved = !saved;
     setSaved(newSaved);
-    newSaved ? saveService.saveConcert(concert) : saveService.unsaveConcert(concertId);
+    if (newSaved) {
+      favoriteService.save({ target_type: 'concert', target_id: concertId, target_title: concert.title, target_subtitle: concert.venue_city ?? concert.artist?.username, target_thumbnail: concert.thumbnail_url }).catch(() => {});
+    } else {
+      favoriteService.unsave('concert', concertId).catch(() => {});
+    }
   };
 
   const shareText = concert

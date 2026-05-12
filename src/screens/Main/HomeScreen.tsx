@@ -26,8 +26,9 @@ import { useWs } from '../../context/WebSocketContext';
 import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, AvatarWithBadge } from '../../components/common';
 import {
   concertService, eventService, authService, searchService,
-  socialService, saveService,
+  socialService,
 } from '../../services';
+import { favoriteService } from '../../services/favoriteService';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { userService } from '../../services';
@@ -960,9 +961,11 @@ const PostCard: React.FC<PostCardProps> = ({ item, colors, isDark, onPress, onCo
 
   const [liked,      setLiked]      = useState(false);
   const [likeCount,  setLikeCount]  = useState(0);
-  const [saved,      setSaved]      = useState(() =>
-    isConcert ? saveService.isConcertSaved(item.id) : saveService.isEventSaved(item.id)
-  );
+  const [saved,      setSaved]      = useState(false);
+  useEffect(() => {
+    favoriteService.check(isConcert ? 'concert' : 'event', item.id).then(setSaved).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
   const [reactionLoading, setReactionLoading] = useState(false);
   const likeScale = useSharedValue(1);
   const likeStyle = useAnimatedStyle(() => ({ transform: [{ scale: likeScale.value }] }));
@@ -999,14 +1002,19 @@ const PostCard: React.FC<PostCardProps> = ({ item, colors, isDark, onPress, onCo
   };
 
   const handleSave = () => {
+    const newSaved = !saved;
+    setSaved(newSaved);
     if (isConcert) {
-      if (saved) saveService.unsaveConcert(item.id);
-      else       saveService.saveConcert(item.data as Concert);
+      const ct = item.data as Concert;
+      newSaved
+        ? favoriteService.save({ target_type: 'concert', target_id: item.id, target_title: ct.title, target_subtitle: ct.venue_city ?? ct.artist?.username, target_thumbnail: ct.thumbnail_url }).catch(() => {})
+        : favoriteService.unsave('concert', item.id).catch(() => {});
     } else {
-      if (saved) saveService.unsaveEvent(item.id);
-      else       saveService.saveEvent(item.data as Event);
+      const ev = item.data as Event;
+      newSaved
+        ? favoriteService.save({ target_type: 'event', target_id: item.id, target_title: ev.title, target_subtitle: ev.venue_city ?? ev.location, target_thumbnail: ev.thumbnail_url ?? ev.cover_url }).catch(() => {})
+        : favoriteService.unsave('event', item.id).catch(() => {});
     }
-    setSaved(!saved);
   };
 
   const handleShare = async () => {
