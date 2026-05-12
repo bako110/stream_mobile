@@ -172,21 +172,22 @@ const rp = StyleSheet.create({
 // ── PostDetailScreen ──────────────────────────────────────────────────────────
 interface Props {
   postId:         string;
+  initialPost?:   Post;
   onBack:         () => void;
   onAuthorPress?: (userId: string) => void;
   navigation?:    any;
 }
 
-export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPress, navigation }) => {
+export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack, onAuthorPress, navigation }) => {
   const { theme: { colors } } = useTheme();
   const { currentUser }       = useUser();
   const insets                = useSafeAreaInsets();
 
-  const [post,          setPost]          = useState<Post | null>(null);
-  const [loading,       setLoading]       = useState(true);
-  const [liked,         setLiked]         = useState(false);
-  const [likeCount,     setLikeCount]     = useState(0);
-  const [commentCount,  setCommentCount]  = useState(0);
+  const [post,          setPost]          = useState<Post | null>(initialPost ?? null);
+  const [loading,       setLoading]       = useState(!initialPost);
+  const [liked,         setLiked]         = useState(initialPost?.user_reaction === 'like');
+  const [likeCount,     setLikeCount]     = useState(initialPost?.like_count ?? 0);
+  const [commentCount,  setCommentCount]  = useState(initialPost?.comment_count ?? 0);
   const [commentsOpen,  setCommentsOpen]  = useState(false);
   const [shareOpen,     setShareOpen]     = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
@@ -240,10 +241,19 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, onBack, onAuthorPres
   }, [postId, loadAuthorPosts, onBack]);
 
   useEffect(() => {
-    setPost(null); setLoading(true);
     setAuthorPosts([]); setAuthorPage(1);
     setAuthorHasMore(true); authorIdRef.current = null;
-    load();
+
+    if (initialPost) {
+      // Données déjà disponibles — pas de fetch, on charge juste les posts de l'auteur
+      if (initialPost.author?.id) {
+        authorIdRef.current = String(initialPost.author.id);
+        loadAuthorPosts(String(initialPost.author.id), 1, true);
+      }
+    } else {
+      setPost(null); setLoading(true);
+      load();
+    }
   }, [postId]);
 
   const handleEndReached = useCallback(() => {

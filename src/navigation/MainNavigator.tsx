@@ -165,7 +165,7 @@ export type MainStackParamList = {
   MyStories:       undefined;
   StoryViewers:    { storyId: string; viewCount: number; myId?: string };
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
-  PostDetail:      { postId: string };
+  PostDetail:      { postId: string; initialPost?: any };
   CreatePost:      undefined;
   Wallet:          undefined;
   BuyCoins:        undefined;
@@ -207,7 +207,7 @@ const LiveViewerWrapper: React.FC<any>     = ({ navigation, route }) => <LiveVie
 const CreateEventWrapper: React.FC<any>    = ({ navigation, route }) => <CreateEventScreen eventId={route.params?.eventId} onBack={() => navigation.goBack()} />;
 const CreateConcertWrapper: React.FC<any>  = ({ navigation, route }) => <CreateConcertScreen concertId={route.params?.concertId} onBack={() => navigation.goBack()} />;
 const CreatePostWrapper: React.FC<any>     = ({ navigation }) => <CreatePostScreen onBack={() => navigation.goBack()} onPostCreated={() => navigation.goBack()} />;
-const PostDetailWrapper: React.FC<any>     = ({ navigation, route }) => <PostDetailScreen postId={route.params.postId} onBack={() => navigation.goBack()} onAuthorPress={(userId: string) => navigation.navigate('UserProfile', { userId })} navigation={navigation} />;
+const PostDetailWrapper: React.FC<any>     = ({ navigation, route }) => <PostDetailScreen postId={route.params.postId} initialPost={route.params.initialPost} onBack={() => navigation.goBack()} onAuthorPress={(userId: string) => navigation.navigate('UserProfile', { userId })} navigation={navigation} />;
 const MyTicketWrapper: React.FC<any>       = ({ navigation, route }) => <MyTicketScreen ticket={route.params.ticket} onBack={() => navigation.goBack()} />;
 const AttendeesWrapper: React.FC<any>      = ({ navigation, route }) => (
   <AttendeesScreen

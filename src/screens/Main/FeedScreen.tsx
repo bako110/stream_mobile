@@ -668,7 +668,7 @@ export const FeedScreen: React.FC = () => {
           post={item.data as Post}
           colors={colors}
           currentUserId={currentUser?.id}
-          onPress={() => (nav as any).navigate('PostDetail', { postId: item.id })}
+          onPress={() => (nav as any).navigate('PostDetail', { postId: item.id, initialPost: item.data })}
           onAuthorPress={() => {
             if (postAuthorId) (nav as any).navigate('UserProfile', { userId: postAuthorId });
           }}
