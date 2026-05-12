@@ -57,6 +57,7 @@ import { CommunityMemberCreatorStatsScreen } from '../screens/Detail/CommunityMe
 import { CommunityJoinRequestsScreen }   from '../screens/Detail/CommunityJoinRequestsScreen';
 import { CommunityChannelsScreen }        from '../screens/Detail/CommunityChannelsScreen';
 import { CommunityChannelChatScreen }     from '../screens/Detail/CommunityChannelChatScreen';
+import { CommunityChannelSettingsScreen } from '../screens/Detail/CommunityChannelSettingsScreen';
 import { PostDetailScreen }               from '../screens/Detail/PostDetailScreen';
 import { MyTicketScreen }        from '../screens/Detail/MyTicketScreen';
 import { AttendeesScreen }       from '../screens/Detail/AttendeesScreen';
@@ -147,7 +148,8 @@ export type MainStackParamList = {
   CommunityMemberCreatorStats: { communityId: string; communityName: string; memberId: string; memberName: string };
   CommunityJoinRequests:       { communityId: string; communityName: string };
   CommunityChannels:           { communityId: string; communityName: string; myRole: string | null };
-  CommunityChannelChat:        { communityId: string; communityName: string; channelId: string; channelName: string; myRole: string | null; isAnnouncement?: boolean };
+  CommunityChannelChat:        { communityId: string; communityName: string; channelId: string; channelName: string; channelAvatar?: string | null; myRole: string | null; isAnnouncement?: boolean };
+  CommunityChannelSettings:    { communityId: string; communityName: string; channelId: string; channelName: string; myRole: string | null };
   Events:                  undefined;
   Concerts:        undefined;
   BlockedUsers:    undefined;
@@ -333,7 +335,8 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CommunityMemberCreatorStats"  component={CommunityMemberCreatorStatsScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityJoinRequests"   component={CommunityJoinRequestsScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityChannels"       component={CommunityChannelsScreen}       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="CommunityChannelChat"    component={CommunityChannelChatScreen}    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityChannelChat"     component={CommunityChannelChatScreen}         options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunityChannelSettings" component={CommunityChannelSettingsScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="WebQRScanner"          component={WebQRScannerScreen}          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SettingsWallet"        component={SettingsWalletScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsMonetisation"  component={SettingsMonetisationScreen}  options={{ animation: 'slide_from_right' }} />

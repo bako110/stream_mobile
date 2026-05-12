@@ -247,7 +247,10 @@ export interface CommunityChannel {
   description: string | null;
   type: ChannelType;
   emoji: string | null;
+  avatar_url: string | null;
   is_private: boolean;
+  has_password: boolean;
+  members_count: number;
   position: number;
   created_by: string;
   created_at: string;
@@ -259,12 +262,29 @@ export interface CommunityChannel {
   } | null;
 }
 
+export interface CommunityChannelMember {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  role: 'member' | 'moderator' | 'banned';
+  joined_at: string;
+}
+
 export interface CreateChannelPayload {
   name: string;
   description?: string;
   type?: ChannelType;
   emoji?: string;
+  avatar_url?: string;
   is_private?: boolean;
+  password?: string;
+}
+
+export interface UpdateChannelPayload extends Partial<CreateChannelPayload> {
+  remove_password?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -554,13 +574,38 @@ export const communityService = {
     return res.data;
   },
 
-  async updateChannel(communityId: string, channelId: string, data: Partial<CreateChannelPayload>): Promise<CommunityChannel> {
+  async updateChannel(communityId: string, channelId: string, data: UpdateChannelPayload): Promise<CommunityChannel> {
     const res = await apiClient.patch<CommunityChannel>(Endpoints.communities.channel(communityId, channelId), data);
     return res.data;
   },
 
   async deleteChannel(communityId: string, channelId: string): Promise<void> {
     await apiClient.delete(Endpoints.communities.channel(communityId, channelId));
+  },
+
+  async joinChannel(communityId: string, channelId: string, password?: string): Promise<CommunityChannelMember> {
+    const res = await apiClient.post<CommunityChannelMember>(
+      `${Endpoints.communities.channelMembers(communityId, channelId)}/join`,
+      { password: password ?? null },
+    );
+    return res.data;
+  },
+
+  async getChannelMembers(communityId: string, channelId: string): Promise<CommunityChannelMember[]> {
+    const res = await apiClient.get<CommunityChannelMember[]>(Endpoints.communities.channelMembers(communityId, channelId));
+    return res.data;
+  },
+
+  async removeChannelMember(communityId: string, channelId: string, userId: string): Promise<void> {
+    await apiClient.delete(`${Endpoints.communities.channelMembers(communityId, channelId)}/${userId}`);
+  },
+
+  async updateChannelMemberRole(communityId: string, channelId: string, userId: string, role: 'member' | 'moderator' | 'banned'): Promise<CommunityChannelMember> {
+    const res = await apiClient.patch<CommunityChannelMember>(
+      `${Endpoints.communities.channelMembers(communityId, channelId)}/${userId}`,
+      { role },
+    );
+    return res.data;
   },
 
   async getChannelMessages(communityId: string, channelId: string, page = 1, limit = 30): Promise<CommunityMessageData[]> {
@@ -580,13 +625,5 @@ export const communityService = {
 
   async deleteChannelMessage(communityId: string, channelId: string, messageId: string): Promise<void> {
     await apiClient.delete(Endpoints.communities.channelMessage(communityId, channelId, messageId));
-  },
-
-  async addChannelMember(communityId: string, channelId: string, userId: string): Promise<void> {
-    await apiClient.post(Endpoints.communities.channelMembers(communityId, channelId), { user_id: userId });
-  },
-
-  async removeChannelMember(communityId: string, channelId: string, userId: string): Promise<void> {
-    await apiClient.delete(`${Endpoints.communities.channelMembers(communityId, channelId)}/${userId}`);
   },
 };

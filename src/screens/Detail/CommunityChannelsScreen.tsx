@@ -2,14 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, TextInput, Modal, Pressable,
-  KeyboardAvoidingView, Platform, ScrollView,
+  KeyboardAvoidingView, Platform, ScrollView, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
+import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, ChannelType } from '../../services/communityService';
 
 interface RouteParams {
@@ -19,9 +21,9 @@ interface RouteParams {
 }
 
 const CHANNEL_TYPES: { key: ChannelType; label: string; icon: string; desc: string }[] = [
-  { key: 'text',         label: 'Texte',        icon: 'hash',        desc: 'Salon de discussion général' },
-  { key: 'announcement', label: 'Annonces',      icon: 'bell',        desc: 'Réservé aux admins et modérateurs' },
-  { key: 'voice',        label: 'Vocal',         icon: 'mic',         desc: 'Canal vocal (bientôt disponible)' },
+  { key: 'text',         label: 'Texte',    icon: 'hash', desc: 'Salon de discussion général' },
+  { key: 'announcement', label: 'Annonces', icon: 'bell', desc: 'Réservé aux admins et modérateurs' },
+  { key: 'voice',        label: 'Vocal',    icon: 'mic',  desc: 'Canal vocal (bientôt disponible)' },
 ];
 
 const CHANNEL_EMOJIS = ['💬','📢','🎮','🎵','📚','🎨','🏆','💡','🌍','🎬','⚽','🛠️','🎤','🧵','📸'];
@@ -33,8 +35,7 @@ const TYPE_COLORS: Record<ChannelType, string> = {
 };
 
 function fmtTime(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
+  const d = new Date(iso), now = new Date();
   const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000);
   if (diffMin < 1)  return 'maintenant';
   if (diffMin < 60) return `il y a ${diffMin} min`;
@@ -51,26 +52,36 @@ export const CommunityChannelsScreen: React.FC = () => {
   const route = useRoute();
   const { communityId, communityName, myRole: myRoleParam } = route.params as RouteParams;
 
-  const [myRole,    setMyRole]    = useState<string | null>(myRoleParam ?? null);
+  const [myRole,   setMyRole]   = useState<string | null>(myRoleParam ?? null);
   const isAdmin    = myRole === 'admin';
   const isMod      = myRole === 'moderator';
   const canManage  = isAdmin || isMod;
 
-  const [channels,  setChannels]  = useState<CommunityChannel[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  const [channels, setChannels] = useState<CommunityChannel[]>([]);
+  const [loading,  setLoading]  = useState(true);
 
   // Modal création/édition
   const [createOpen,  setCreateOpen]  = useState(false);
   const [editChannel, setEditChannel] = useState<CommunityChannel | null>(null);
   const [saving,      setSaving]      = useState(false);
 
-  // Champs du formulaire
+  // Champs formulaire
   const [formName,      setFormName]      = useState('');
   const [formDesc,      setFormDesc]      = useState('');
   const [formType,      setFormType]      = useState<ChannelType>('text');
   const [formEmoji,     setFormEmoji]     = useState('💬');
   const [formPrivate,   setFormPrivate]   = useState(false);
+  const [formPassword,  setFormPassword]  = useState('');
+  const [showPassword,  setShowPassword]  = useState(false);
+  const [removePassword, setRemovePassword] = useState(false);
+  const [formAvatar,    setFormAvatar]    = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [showEmojiPick, setShowEmojiPick] = useState(false);
+
+  // Modal mot de passe pour rejoindre
+  const [joinChannel,   setJoinChannel]   = useState<CommunityChannel | null>(null);
+  const [joinPassword,  setJoinPassword]  = useState('');
+  const [joining,       setJoining]       = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -89,6 +100,7 @@ export const CommunityChannelsScreen: React.FC = () => {
     setEditChannel(null);
     setFormName(''); setFormDesc(''); setFormType('text');
     setFormEmoji('💬'); setFormPrivate(false);
+    setFormPassword(''); setRemovePassword(false); setFormAvatar(null);
     setCreateOpen(true);
   };
 
@@ -99,7 +111,27 @@ export const CommunityChannelsScreen: React.FC = () => {
     setFormType(ch.type);
     setFormEmoji(ch.emoji ?? '💬');
     setFormPrivate(ch.is_private);
+    setFormPassword('');
+    setRemovePassword(false);
+    setFormAvatar(ch.avatar_url);
     setCreateOpen(true);
+  };
+
+  const handlePickAvatar = async () => {
+    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, async (resp) => {
+      if (resp.didCancel || !resp.assets?.length) return;
+      const asset = resp.assets[0];
+      if (!asset.uri) return;
+      setAvatarUploading(true);
+      try {
+        const fd = new FormData();
+        fd.append('file', { uri: asset.uri, name: asset.fileName ?? 'avatar.jpg', type: 'image/jpeg' } as any);
+        const res = await apiClient.upload<{ uploaded: { url: string }[] }>(Endpoints.upload.images('communities'), fd);
+        const url = res.data?.uploaded?.[0]?.url;
+        if (url) setFormAvatar(url);
+      } catch { Alert.alert('Erreur', 'Impossible de télécharger la photo.'); }
+      finally { setAvatarUploading(false); }
+    });
   };
 
   const handleSave = async () => {
@@ -107,17 +139,22 @@ export const CommunityChannelsScreen: React.FC = () => {
     if (!name) { Alert.alert('Nom requis', 'Le nom du canal ne peut pas être vide.'); return; }
     setSaving(true);
     try {
+      const payload: any = {
+        name,
+        description: formDesc.trim() || undefined,
+        type: formType,
+        emoji: formEmoji,
+        avatar_url: formAvatar ?? undefined,
+        is_private: formPrivate,
+      };
       if (editChannel) {
-        const updated = await communityService.updateChannel(communityId, editChannel.id, {
-          name, description: formDesc.trim() || undefined,
-          type: formType, emoji: formEmoji, is_private: formPrivate,
-        });
+        payload.remove_password = removePassword;
+        if (!removePassword && formPassword.trim()) payload.password = formPassword.trim();
+        const updated = await communityService.updateChannel(communityId, editChannel.id, payload);
         setChannels(prev => prev.map(c => c.id === updated.id ? updated : c));
       } else {
-        const created = await communityService.createChannel(communityId, {
-          name, description: formDesc.trim() || undefined,
-          type: formType, emoji: formEmoji, is_private: formPrivate,
-        });
+        if (formPassword.trim()) payload.password = formPassword.trim();
+        const created = await communityService.createChannel(communityId, payload);
         setChannels(prev => [...prev, created]);
       }
       setCreateOpen(false);
@@ -146,14 +183,39 @@ export const CommunityChannelsScreen: React.FC = () => {
       Alert.alert('Bientôt disponible', 'Les canaux vocaux arrivent prochainement !');
       return;
     }
+    if (ch.has_password && !canManage) {
+      setJoinChannel(ch);
+      setJoinPassword('');
+      return;
+    }
     nav.navigate('CommunityChannelChat', {
-      communityId,
-      communityName,
+      communityId, communityName,
       channelId: ch.id,
-      channelName: `${ch.emoji ?? '#'} ${ch.name}`,
+      channelName: ch.name,
+      channelAvatar: ch.avatar_url,
       myRole,
       isAnnouncement: ch.type === 'announcement',
     });
+  };
+
+  const handleJoinWithPassword = async () => {
+    if (!joinChannel) return;
+    setJoining(true);
+    try {
+      await communityService.joinChannel(communityId, joinChannel.id, joinPassword.trim());
+      const ch = joinChannel;
+      setJoinChannel(null);
+      nav.navigate('CommunityChannelChat', {
+        communityId, communityName,
+        channelId: ch.id,
+        channelName: ch.name,
+        channelAvatar: ch.avatar_url,
+        myRole,
+        isAnnouncement: ch.type === 'announcement',
+      });
+    } catch (e: any) {
+      Alert.alert('Accès refusé', e?.response?.data?.detail ?? 'Mot de passe incorrect.');
+    } finally { setJoining(false); }
   };
 
   const renderChannel = ({ item: ch }: { item: CommunityChannel }) => {
@@ -164,20 +226,24 @@ export const CommunityChannelsScreen: React.FC = () => {
         onPress={() => openChannel(ch)}
         activeOpacity={0.75}
       >
-        {/* Icone */}
-        <View style={[S.channelIcon, { backgroundColor: color + '18' }]}>
-          {ch.emoji ? (
-            <Text style={{ fontSize: 18 }}>{ch.emoji}</Text>
-          ) : (
-            <Icon name={ch.type === 'announcement' ? 'bell' : ch.type === 'voice' ? 'mic' : 'hash'} size={18} color={color} />
-          )}
-        </View>
+        {/* Avatar ou icone */}
+        {ch.avatar_url ? (
+          <Image source={{ uri: ch.avatar_url }} style={[S.channelAvatar, { borderColor: colors.divider }]} />
+        ) : (
+          <View style={[S.channelIcon, { backgroundColor: color + '18' }]}>
+            {ch.emoji
+              ? <Text style={{ fontSize: 20 }}>{ch.emoji}</Text>
+              : <Icon name={ch.type === 'announcement' ? 'bell' : ch.type === 'voice' ? 'mic' : 'hash'} size={20} color={color} />
+            }
+          </View>
+        )}
 
         {/* Info */}
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <Text style={[S.channelName, { color: colors.textPrimary }]} numberOfLines={1}>{ch.name}</Text>
             {ch.is_private && <Icon name="lock" size={11} color={colors.textTertiary} />}
+            {ch.has_password && <Icon name="key" size={11} color="#F59E0B" />}
             {ch.type === 'announcement' && (
               <View style={[S.typeBadge, { backgroundColor: '#F59E0B20' }]}>
                 <Text style={[S.typeBadgeText, { color: '#D97706' }]}>Annonces</Text>
@@ -192,7 +258,7 @@ export const CommunityChannelsScreen: React.FC = () => {
           {ch.last_message ? (
             <Text style={[S.channelLast, { color: colors.textTertiary }]} numberOfLines={1}>
               {ch.last_message.sender_display_name ? `${ch.last_message.sender_display_name}: ` : ''}
-              {ch.last_message.content ?? '📷 Média'}
+              {ch.last_message.content ?? 'Média'}
             </Text>
           ) : ch.description ? (
             <Text style={[S.channelLast, { color: colors.textTertiary }]} numberOfLines={1}>{ch.description}</Text>
@@ -204,24 +270,25 @@ export const CommunityChannelsScreen: React.FC = () => {
           {ch.last_message && (
             <Text style={[S.channelTime, { color: colors.textTertiary }]}>{fmtTime(ch.last_message.created_at)}</Text>
           )}
-          {(ch.unread_count ?? 0) > 0 && (
-            <View style={[S.unreadBadge, { backgroundColor: color }]}>
-              <Text style={S.unreadText}>{ch.unread_count! > 99 ? '99+' : ch.unread_count}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Actions admin */}
-        {canManage && (
-          <View style={{ flexDirection: 'row', gap: 2, marginLeft: 8 }}>
-            <TouchableOpacity onPress={() => openEdit(ch)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={S.actionBtn}>
-              <Icon name="edit-2" size={14} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleDelete(ch)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={S.actionBtn}>
-              <Icon name="trash-2" size={14} color="#EF4444" />
-            </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            {ch.unread_count ? (
+              <View style={[S.unreadBadge, { backgroundColor: colors.primary }]}>
+                <Text style={S.unreadText}>{ch.unread_count > 99 ? '99+' : ch.unread_count}</Text>
+              </View>
+            ) : null}
+            {canManage && (
+              <TouchableOpacity
+                style={S.actionBtn}
+                onPress={() => nav.navigate('CommunityChannelSettings', {
+                  communityId, communityName, channelId: ch.id, channelName: ch.name, myRole,
+                })}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon name="settings" size={15} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
           </View>
-        )}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -266,15 +333,10 @@ export const CommunityChannelsScreen: React.FC = () => {
               </View>
               <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>Aucun canal</Text>
               <Text style={[S.emptySub, { color: colors.textTertiary }]}>
-                {canManage
-                  ? 'Créez des canaux pour organiser les discussions par thème.'
-                  : 'Aucun canal disponible pour l\'instant.'}
+                {canManage ? 'Créez des canaux pour organiser les discussions.' : 'Aucun canal disponible.'}
               </Text>
               {canManage && (
-                <TouchableOpacity
-                  style={[S.emptyBtn, { backgroundColor: colors.primary }]}
-                  onPress={openCreate}
-                >
+                <TouchableOpacity style={[S.emptyBtn, { backgroundColor: colors.primary }]} onPress={openCreate}>
                   <Icon name="plus" size={16} color="#fff" />
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Créer un canal</Text>
                 </TouchableOpacity>
@@ -284,135 +346,239 @@ export const CommunityChannelsScreen: React.FC = () => {
         />
       )}
 
-      {/* Modal création / édition */}
-      <Modal
-        visible={createOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => { if (!saving) setCreateOpen(false); }}
-      >
-        <KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
+      {/* ── Modal création / édition ── */}
+      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => { if (!saving) setCreateOpen(false); }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable style={S.overlay} onPress={() => { if (!saving) setCreateOpen(false); }} />
-          <View style={[S.sheet, { backgroundColor: colors.surface, zIndex: 10 }]}>
-            <View style={[S.sheetHandle, { backgroundColor: colors.divider }]} />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={[S.sheet, { backgroundColor: colors.surface }]}>
+              <View style={[S.sheetHandle, { backgroundColor: colors.divider }]} />
 
-            {/* Header modal */}
-            <View style={[S.sheetHeader, { borderBottomColor: colors.divider }]}>
-              <View style={[S.sheetHeaderIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Icon name={editChannel ? 'edit-2' : 'plus'} size={16} color={colors.primary} />
+              {/* Header modal */}
+              <View style={[S.sheetHeader, { borderBottomColor: colors.divider }]}>
+                <View style={[S.sheetHeaderIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <Icon name={editChannel ? 'edit-2' : 'plus'} size={16} color={colors.primary} />
+                </View>
+                <Text style={[S.sheetTitle, { color: colors.textPrimary }]}>
+                  {editChannel ? 'Modifier le canal' : 'Nouveau canal'}
+                </Text>
+                <TouchableOpacity onPress={() => setCreateOpen(false)} disabled={saving}>
+                  <Icon name="x" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
               </View>
-              <Text style={[S.sheetTitle, { color: colors.textPrimary }]}>
-                {editChannel ? 'Modifier le canal' : 'Nouveau canal'}
-              </Text>
-              <TouchableOpacity onPress={() => setCreateOpen(false)} disabled={saving}>
-                <Icon name="x" size={20} color={colors.textTertiary} />
-              </TouchableOpacity>
-            </View>
 
-            <ScrollView style={{ paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-              {/* Type */}
-              <Text style={[S.label, { color: colors.textSecondary }]}>Type de canal</Text>
-              <View style={S.typeRow}>
-                {CHANNEL_TYPES.map(t => {
-                  const active = formType === t.key;
-                  const col = TYPE_COLORS[t.key];
-                  return (
+                {/* Photo de profil */}
+                <Text style={[S.label, { color: colors.textSecondary }]}>Photo du canal</Text>
+                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                  <TouchableOpacity onPress={handlePickAvatar} disabled={avatarUploading} activeOpacity={0.8}>
+                    {formAvatar ? (
+                      <Image source={{ uri: formAvatar }} style={S.avatarPicker} />
+                    ) : (
+                      <View style={[S.avatarPicker, { backgroundColor: colors.backgroundSecondary, borderWidth: 1.5, borderColor: colors.divider, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' }]}>
+                        {avatarUploading
+                          ? <ActivityIndicator color={colors.primary} />
+                          : <Icon name="camera" size={26} color={colors.textTertiary} />
+                        }
+                      </View>
+                    )}
+                    <View style={[S.avatarEditBadge, { backgroundColor: colors.primary }]}>
+                      <Icon name={avatarUploading ? 'loader' : 'camera'} size={12} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
+                  {formAvatar && (
+                    <TouchableOpacity onPress={() => setFormAvatar(null)} style={{ marginTop: 6 }}>
+                      <Text style={{ color: '#EF4444', fontSize: 12 }}>Supprimer la photo</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Type */}
+                <Text style={[S.label, { color: colors.textSecondary }]}>Type de canal</Text>
+                <View style={S.typeRow}>
+                  {CHANNEL_TYPES.map(t => {
+                    const active = formType === t.key;
+                    const col = TYPE_COLORS[t.key];
+                    return (
+                      <TouchableOpacity
+                        key={t.key}
+                        style={[S.typeCard, { borderColor: active ? col : colors.divider, backgroundColor: active ? col + '12' : colors.backgroundSecondary }]}
+                        onPress={() => setFormType(t.key)}
+                        activeOpacity={0.8}
+                      >
+                        <Icon name={t.icon} size={20} color={active ? col : colors.textTertiary} />
+                        <Text style={[S.typeCardLabel, { color: active ? col : colors.textPrimary }]}>{t.label}</Text>
+                        <Text style={[S.typeCardDesc, { color: colors.textTertiary }]} numberOfLines={2}>{t.desc}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Emoji + Nom */}
+                <Text style={[S.label, { color: colors.textSecondary }]}>Nom & icône</Text>
+                <View style={S.nameRow}>
+                  <TouchableOpacity
+                    style={[S.emojiPicker, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+                    onPress={() => setShowEmojiPick(p => !p)}
+                  >
+                    <Text style={{ fontSize: 22 }}>{formEmoji}</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[S.nameInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, color: colors.textPrimary }]}
+                    value={formName}
+                    onChangeText={setFormName}
+                    placeholder="Nom du canal"
+                    placeholderTextColor={colors.textTertiary}
+                    maxLength={50}
+                  />
+                </View>
+                {showEmojiPick && (
+                  <View style={[S.emojiGrid, { backgroundColor: colors.backgroundSecondary }]}>
+                    {CHANNEL_EMOJIS.map(e => (
+                      <TouchableOpacity key={e} onPress={() => { setFormEmoji(e); setShowEmojiPick(false); }} style={S.emojiGridBtn}>
+                        <Text style={{ fontSize: 22 }}>{e}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Description */}
+                <Text style={[S.label, { color: colors.textSecondary }]}>Description (optionnel)</Text>
+                <TextInput
+                  style={[S.descInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, color: colors.textPrimary }]}
+                  value={formDesc}
+                  onChangeText={setFormDesc}
+                  placeholder="Décrivez ce canal…"
+                  placeholderTextColor={colors.textTertiary}
+                  multiline maxLength={200}
+                />
+
+                {/* Privé */}
+                <TouchableOpacity
+                  style={[S.toggleRow, { borderColor: colors.divider }]}
+                  onPress={() => setFormPrivate(p => !p)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[S.toggleIcon, { backgroundColor: formPrivate ? colors.primary + '20' : colors.backgroundSecondary }]}>
+                    <Icon name="lock" size={16} color={formPrivate ? colors.primary : colors.textTertiary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }]}>Canal privé</Text>
+                    <Text style={[{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }]}>Visible uniquement sur invitation</Text>
+                  </View>
+                  <View style={[S.checkBox, { backgroundColor: formPrivate ? colors.primary : colors.backgroundSecondary, borderColor: formPrivate ? colors.primary : colors.divider }]}>
+                    {formPrivate && <Icon name="check" size={12} color="#fff" />}
+                  </View>
+                </TouchableOpacity>
+
+                {/* Mot de passe */}
+                <Text style={[S.label, { color: colors.textSecondary }]}>Mot de passe d'accès (optionnel)</Text>
+                {editChannel?.has_password && !removePassword ? (
+                  <View style={{ gap: 8, marginBottom: 12 }}>
+                    <View style={[S.passwordRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                      <Icon name="key" size={16} color="#F59E0B" />
+                      <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13 }}>Mot de passe actif</Text>
+                    </View>
                     <TouchableOpacity
-                      key={t.key}
-                      style={[S.typeCard, { borderColor: active ? col : colors.divider, backgroundColor: active ? col + '12' : colors.backgroundSecondary }]}
-                      onPress={() => setFormType(t.key)}
+                      style={[S.toggleRow, { borderColor: '#EF444440' }]}
+                      onPress={() => setRemovePassword(true)}
                       activeOpacity={0.8}
                     >
-                      <Icon name={t.icon} size={20} color={active ? col : colors.textTertiary} />
-                      <Text style={[S.typeCardLabel, { color: active ? col : colors.textPrimary }]}>{t.label}</Text>
-                      <Text style={[S.typeCardDesc, { color: colors.textTertiary }]} numberOfLines={2}>{t.desc}</Text>
+                      <Icon name="trash-2" size={15} color="#EF4444" />
+                      <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '600', marginLeft: 8 }}>Supprimer le mot de passe</Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
+                    <Text style={{ color: colors.textTertiary, fontSize: 12 }}>Ou définissez un nouveau :</Text>
+                  </View>
+                ) : removePassword ? (
+                  <View style={[S.passwordRow, { backgroundColor: '#EF444415', borderColor: '#EF444440', marginBottom: 12 }]}>
+                    <Icon name="trash-2" size={14} color="#EF4444" />
+                    <Text style={{ flex: 1, color: '#EF4444', fontSize: 13 }}>Mot de passe supprimé à la sauvegarde</Text>
+                    <TouchableOpacity onPress={() => setRemovePassword(false)}>
+                      <Icon name="x" size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+                <View style={[S.passwordRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, marginBottom: 16 }]}>
+                  <Icon name="key" size={16} color={colors.textTertiary} />
+                  <TextInput
+                    style={[{ flex: 1, color: colors.textPrimary, fontSize: 14, marginLeft: 8 }]}
+                    value={formPassword}
+                    onChangeText={setFormPassword}
+                    placeholder={editChannel?.has_password ? 'Nouveau mot de passe…' : 'Définir un mot de passe…'}
+                    placeholderTextColor={colors.textTertiary}
+                    secureTextEntry={!showPassword}
+                    maxLength={50}
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(p => !p)}>
+                    <Icon name={showPassword ? 'eye-off' : 'eye'} size={16} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
 
-              {/* Emoji + Nom */}
-              <Text style={[S.label, { color: colors.textSecondary }]}>Nom & icône</Text>
-              <View style={S.nameRow}>
+                {/* Bouton sauvegarder */}
                 <TouchableOpacity
-                  style={[S.emojiPicker, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
-                  onPress={() => setShowEmojiPick(p => !p)}
+                  style={[S.saveBtn, { opacity: saving || avatarUploading ? 0.6 : 1 }]}
+                  onPress={handleSave}
+                  disabled={saving || avatarUploading}
                 >
-                  <Text style={{ fontSize: 22 }}>{formEmoji}</Text>
+                  <LinearGradient colors={['#7B3FF2', '#E0389A']} style={S.saveBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                    {saving ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={S.saveBtnText}>{editChannel ? 'Enregistrer' : 'Créer le canal'}</Text>
+                    }
+                  </LinearGradient>
                 </TouchableOpacity>
-                <TextInput
-                  style={[S.nameInput, { color: colors.textPrimary, borderColor: colors.divider, backgroundColor: colors.backgroundSecondary }]}
-                  placeholder="nom-du-canal"
-                  placeholderTextColor={colors.textTertiary}
-                  value={formName}
-                  onChangeText={v => setFormName(v.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-àâéèêëîïôùûüç]/g, ''))}
-                  maxLength={50}
-                  autoCapitalize="none"
-                />
-              </View>
+                <View style={{ height: 24 }} />
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
-              {/* Grille emoji */}
-              {showEmojiPick && (
-                <View style={[S.emojiGrid, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-                  {CHANNEL_EMOJIS.map(e => (
-                    <TouchableOpacity key={e} onPress={() => { setFormEmoji(e); setShowEmojiPick(false); }} style={S.emojiCell}>
-                      <Text style={{ fontSize: 24 }}>{e}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Description */}
-              <Text style={[S.label, { color: colors.textSecondary }]}>Description (optionnelle)</Text>
+      {/* ── Modal mot de passe pour rejoindre ── */}
+      <Modal visible={!!joinChannel} transparent animationType="fade" onRequestClose={() => setJoinChannel(null)}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 24 }}>
+          <View style={[S.joinSheet, { backgroundColor: colors.surface }]}>
+            <View style={[{ width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F59E0B20', marginBottom: 14, alignSelf: 'center' }]}>
+              <Icon name="key" size={24} color="#F59E0B" />
+            </View>
+            <Text style={[{ fontSize: 17, fontWeight: '800', color: colors.textPrimary, textAlign: 'center', marginBottom: 6 }]}>
+              Canal protégé
+            </Text>
+            <Text style={[{ fontSize: 13, color: colors.textTertiary, textAlign: 'center', marginBottom: 20 }]}>
+              Ce canal est protégé par un mot de passe.
+            </Text>
+            <View style={[S.passwordRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, marginBottom: 16 }]}>
+              <Icon name="key" size={16} color={colors.textTertiary} />
               <TextInput
-                style={[S.descInput, { color: colors.textPrimary, borderColor: colors.divider, backgroundColor: colors.backgroundSecondary }]}
-                placeholder="À quoi sert ce canal ?"
+                style={[{ flex: 1, color: colors.textPrimary, fontSize: 14, marginLeft: 8 }]}
+                value={joinPassword}
+                onChangeText={setJoinPassword}
+                placeholder="Mot de passe…"
                 placeholderTextColor={colors.textTertiary}
-                value={formDesc}
-                onChangeText={setFormDesc}
-                maxLength={200}
-                multiline
+                secureTextEntry
+                autoFocus
               />
-
-              {/* Privé */}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity
-                style={[S.privateRow, { borderColor: colors.divider, backgroundColor: colors.backgroundSecondary }]}
-                onPress={() => setFormPrivate(p => !p)}
-                activeOpacity={0.8}
+                style={[S.joinCancelBtn, { borderColor: colors.divider }]}
+                onPress={() => setJoinChannel(null)}
               >
-                <View style={[S.privateIconBox, { backgroundColor: formPrivate ? colors.primary + '20' : colors.backgroundSecondary }]}>
-                  <Icon name={formPrivate ? 'lock' : 'unlock'} size={18} color={formPrivate ? colors.primary : colors.textTertiary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[S.privateLabel, { color: colors.textPrimary }]}>Canal privé</Text>
-                  <Text style={[S.privateDesc, { color: colors.textTertiary }]}>
-                    Seuls les membres ajoutés explicitement peuvent y accéder
-                  </Text>
-                </View>
-                <View style={[S.toggle, { backgroundColor: formPrivate ? colors.primary : colors.divider }]}>
-                  <View style={[S.toggleThumb, { left: formPrivate ? 18 : 2 }]} />
-                </View>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Annuler</Text>
               </TouchableOpacity>
-
-              {/* Bouton enregistrer */}
               <TouchableOpacity
-                style={[S.saveBtn, { backgroundColor: saving ? colors.primary + '80' : colors.primary, marginBottom: 32 }]}
-                onPress={handleSave}
-                disabled={saving || !formName.trim()}
-                activeOpacity={0.85}
+                style={[S.joinConfirmBtn, { opacity: joining ? 0.7 : 1 }]}
+                onPress={handleJoinWithPassword}
+                disabled={joining}
               >
-                {saving
-                  ? <ActivityIndicator color="#fff" />
-                  : <>
-                      <Icon name={editChannel ? 'check' : 'plus'} size={18} color="#fff" />
-                      <Text style={S.saveBtnText}>{editChannel ? 'Enregistrer' : 'Créer le canal'}</Text>
-                    </>
+                {joining
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={{ color: '#fff', fontWeight: '700' }}>Entrer</Text>
                 }
               </TouchableOpacity>
-            </ScrollView>
+            </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
@@ -421,58 +587,64 @@ export const CommunityChannelsScreen: React.FC = () => {
 const S = StyleSheet.create({
   root:   { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
-  backBtn:    { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  backBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '800' },
   headerSub:   { fontSize: 12, marginTop: 1 },
-  addBtn:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  addBtn:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
-  channelRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
-  channelIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  channelName: { fontSize: 15, fontWeight: '700' },
-  channelLast: { fontSize: 12, marginTop: 2 },
-  channelTime: { fontSize: 11 },
+  channelRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
+  channelAvatar: { width: 46, height: 46, borderRadius: 14, borderWidth: 1 },
+  channelIcon:  { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  channelName:  { fontSize: 15, fontWeight: '700' },
+  channelLast:  { fontSize: 12, marginTop: 2 },
+  channelTime:  { fontSize: 11 },
   typeBadge:     { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
   typeBadgeText: { fontSize: 10, fontWeight: '700' },
   unreadBadge:   { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   unreadText:    { color: '#fff', fontSize: 11, fontWeight: '800' },
-  actionBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  actionBtn:     { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, marginTop: 60 },
-  emptyIcon:  { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyIcon:  { width: 70, height: 70, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 24 },
   emptyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
 
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%', paddingBottom: 16 },
-  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%', paddingBottom: 8 },
+  sheetHandle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
+  sheetHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   sheetHeaderIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  sheetTitle: { flex: 1, fontSize: 16, fontWeight: '700' },
+  sheetTitle:      { flex: 1, fontSize: 16, fontWeight: '700' },
 
-  label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 18, marginBottom: 8 },
+  label:    { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 16 },
+  typeRow:  { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  typeCard: { flex: 1, borderRadius: 12, borderWidth: 1.5, padding: 10, alignItems: 'center', gap: 5 },
+  typeCardLabel: { fontSize: 12, fontWeight: '700' },
+  typeCardDesc:  { fontSize: 10, textAlign: 'center' },
 
-  typeRow:  { flexDirection: 'row', gap: 8 },
-  typeCard: { flex: 1, borderWidth: 1.5, borderRadius: 14, padding: 12, alignItems: 'center', gap: 6 },
-  typeCardLabel: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  typeCardDesc:  { fontSize: 10, textAlign: 'center', lineHeight: 14 },
+  nameRow:    { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 4 },
+  emojiPicker: { width: 48, height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  nameInput:  { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, fontSize: 15 },
+  emojiGrid:  { flexDirection: 'row', flexWrap: 'wrap', borderRadius: 12, padding: 8, marginBottom: 4, gap: 4 },
+  emojiGridBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
-  nameRow:    { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  emojiPicker: { width: 50, height: 50, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  nameInput:  { flex: 1, height: 50, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 15 },
+  descInput:  { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 70, textAlignVertical: 'top', marginBottom: 4 },
 
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', borderWidth: 1, borderRadius: 14, padding: 8, marginTop: 8, gap: 4 },
-  emojiCell: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 4 },
+  toggleIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  checkBox:   { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
 
-  descInput: { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 14, minHeight: 80, textAlignVertical: 'top', marginBottom: 4 },
+  passwordRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
 
-  privateRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 6 },
-  privateIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  privateLabel:   { fontSize: 14, fontWeight: '700', marginBottom: 2 },
-  privateDesc:    { fontSize: 12, lineHeight: 16 },
-  toggle:         { width: 40, height: 22, borderRadius: 11, justifyContent: 'center' },
-  toggleThumb:    { position: 'absolute', width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff' },
+  avatarPicker:   { width: 90, height: 90, borderRadius: 22 },
+  avatarEditBadge: { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 
-  saveBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 14, marginTop: 16 },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  saveBtn:     { marginTop: 8, borderRadius: 14, overflow: 'hidden', height: 52 },
+  saveBtnGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+
+  joinSheet:      { borderRadius: 20, padding: 24, width: '100%' },
+  joinCancelBtn:  { flex: 1, height: 46, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  joinConfirmBtn: { flex: 1, height: 46, borderRadius: 12, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
 });
