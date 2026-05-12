@@ -631,6 +631,14 @@ export const communityService = {
     return res.data;
   },
 
+  async editChannelMessage(communityId: string, channelId: string, messageId: string, content: string): Promise<CommunityMessageData> {
+    const res = await apiClient.patch<CommunityMessageData>(
+      Endpoints.communities.channelMessage(communityId, channelId, messageId),
+      { content },
+    );
+    return res.data;
+  },
+
   async deleteChannelMessage(communityId: string, channelId: string, messageId: string): Promise<void> {
     await apiClient.delete(Endpoints.communities.channelMessage(communityId, channelId, messageId));
   },

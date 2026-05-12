@@ -31,6 +31,7 @@ interface RouteParams {
   communityName: string;
   channelId: string;
   channelName: string;
+  channelAvatar?: string | null;
   myRole: string | null;
   isAnnouncement?: boolean;
 }
@@ -59,7 +60,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const { colors } = theme;
   const nav = useNavigation<any>();
   const route = useRoute();
-  const { communityId, communityName, channelId, channelName, myRole, isAnnouncement } = route.params as RouteParams;
+  const { communityId, communityName, channelId, channelName, channelAvatar, myRole, isAnnouncement } = route.params as RouteParams;
 
   const isAdmin     = myRole === 'admin';
   const isMod       = myRole === 'moderator';
@@ -160,8 +161,8 @@ export const CommunityChannelChatScreen: React.FC = () => {
       const msgId = editingMsg.id;
       setEditingMsg(null);
       try {
-        const updated = await communityService.deleteChannelMessage(communityId, channelId, msgId) as any;
-        if (updated) setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content, edited_at: new Date().toISOString() } : m));
+        const updated = await communityService.editChannelMessage(communityId, channelId, msgId, content);
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: updated.content, edited_at: updated.edited_at } : m));
       } catch {}
       setSending(false);
       return;
@@ -398,9 +399,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
         <TouchableOpacity onPress={() => nav.goBack()} style={C.headerBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <View style={[C.channelIconBox, { backgroundColor: colors.primary + '20' }]}>
-          <Icon name={isAnnouncement ? 'bell' : 'hash'} size={16} color={colors.primary} />
-        </View>
+        {channelAvatar
+          ? <Image source={{ uri: channelAvatar }} style={C.channelIconBox} />
+          : <View style={[C.channelIconBox, { backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center' }]}>
+              <Icon name={isAnnouncement ? 'bell' : 'hash'} size={16} color={colors.primary} />
+            </View>
+        }
         <View style={{ flex: 1 }}>
           <Text style={[C.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{channelName}</Text>
           <Text style={[C.headerSub, { color: colors.textTertiary }]}>{communityName}</Text>
@@ -544,6 +548,8 @@ export const CommunityChannelChatScreen: React.FC = () => {
             {[
               { show: menuMsg?.message_type !== 'announcement', icon: 'corner-up-left', label: 'Répondre', color: colors.textPrimary,
                 onPress: () => { setReplyingTo(menuMsg!); setMenuMsg(null); setTimeout(() => inputRef.current?.focus(), 100); } },
+              { show: menuMsg?.sender_id === myId && menuMsg?.message_type !== 'announcement', icon: 'edit-2', label: 'Modifier', color: colors.textPrimary,
+                onPress: () => { setEditingMsg(menuMsg!); setText(menuMsg!.content ?? ''); setMenuMsg(null); setTimeout(() => inputRef.current?.focus(), 100); } },
               { show: !!(menuMsg?.sender_id && menuMsg.sender_id !== myId), icon: 'user', label: 'Voir le profil', color: colors.textPrimary,
                 onPress: () => { setMenuMsg(null); nav.navigate('UserProfile', { userId: menuMsg!.sender_id }); } },
               { show: canManage && menuMsg?.message_type !== 'announcement', icon: 'bookmark', label: menuMsg?.is_pinned ? 'Désépingler' : 'Épingler', color: '#F59E0B',
