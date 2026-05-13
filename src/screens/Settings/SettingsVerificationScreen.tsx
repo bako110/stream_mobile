@@ -33,6 +33,8 @@ export const SettingsVerificationScreen: React.FC = () => {
   const { colors } = theme;
   const { refreshUser } = useUser();
 
+  const VERIFICATION_FEE = 500;
+
   const [status,      setStatus]      = useState<VerifStatus>((user?.verification_status as VerifStatus) ?? 'none');
   const [fetching,    setFetching]    = useState(true);
   const [step,        setStep]        = useState(0);
@@ -41,15 +43,20 @@ export const SettingsVerificationScreen: React.FC = () => {
   const [bio,         setBio]         = useState('');
   const [links,       setLinks]       = useState('');
   const [loading,     setLoading]     = useState(false);
+  const [myCoins,     setMyCoins]     = useState<number | null>(null);
 
   const canGoStep2 = !!accountType;
   const canGoStep3 = fullName.trim().length >= 2 && bio.trim().length >= 20;
 
   const fetchStatus = async () => {
     try {
-      const res = await apiClient.get<{ status: VerifStatus; is_verified: boolean }>(Endpoints.users.verificationStatus);
-      setStatus(res.data.status);
-      if (res.data.is_verified || res.data.status === 'approved') await refreshUser();
+      const [verifRes, walletRes] = await Promise.all([
+        apiClient.get<{ status: VerifStatus; is_verified: boolean }>(Endpoints.users.verificationStatus),
+        apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance),
+      ]);
+      setStatus(verifRes.data.status);
+      setMyCoins(walletRes.data?.coins_balance ?? 0);
+      if (verifRes.data.is_verified || verifRes.data.status === 'approved') await refreshUser();
     } catch {}
     finally { setFetching(false); }
   };
@@ -61,14 +68,41 @@ export const SettingsVerificationScreen: React.FC = () => {
   }, []);
 
   const handleSubmit = async () => {
+    if (myCoins !== null && myCoins < VERIFICATION_FEE) {
+      Alert.alert(
+        'Solde insuffisant',
+        `Il te faut ${VERIFICATION_FEE} coins pour soumettre une demande.\nTon solde actuel : ${myCoins} coins.\nIl te manque ${VERIFICATION_FEE - myCoins} coins.`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Acheter des coins', onPress: () => nav.navigate('BuyCoins') },
+        ],
+      );
+      return;
+    }
     setLoading(true);
     try {
       const note = [`Type: ${accountType}`, `Nom: ${fullName.trim()}`, `Bio: ${bio.trim()}`, links.trim() ? `Liens: ${links.trim()}` : ''].filter(Boolean).join('\n');
       await apiClient.post(Endpoints.users.verifyRequest, { note });
+      setMyCoins(prev => prev !== null ? prev - VERIFICATION_FEE : null);
       setStatus('pending');
       setStep(0);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible d\'envoyer la demande.');
+      const detail = e?.response?.data?.detail ?? '';
+      if (e?.response?.status === 402 || detail.toLowerCase().includes('insuffisant')) {
+        const walletRes = await apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance).catch(() => null);
+        const realBalance = walletRes?.data?.coins_balance ?? 0;
+        setMyCoins(realBalance);
+        Alert.alert(
+          'Solde insuffisant',
+          `Ton solde est de ${realBalance} coins. Il te manque ${VERIFICATION_FEE - realBalance} coins.`,
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Acheter des coins', onPress: () => nav.navigate('BuyCoins') },
+          ],
+        );
+      } else {
+        Alert.alert('Erreur', detail || 'Impossible d\'envoyer la demande.');
+      }
     } finally { setLoading(false); }
   };
 
@@ -78,7 +112,7 @@ export const SettingsVerificationScreen: React.FC = () => {
       none:     { icon: 'shield',       color: colors.textTertiary, title: 'Non vérifié',        sub: '' },
       pending:  { icon: 'clock',        color: '#F59E0B',           title: 'En cours d\'examen', sub: 'Notre équipe examine votre dossier. Cela peut prendre quelques jours.' },
       approved: { icon: 'check-circle', color: BLUE,                title: 'Compte vérifié ✓',   sub: 'Votre compte est certifié FoliX.' },
-      rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',    sub: user?.verification_note ?? 'Votre demande n\'a pas été approuvée. Vous pouvez en soumettre une nouvelle.' },
+      rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',    sub: (user?.verification_note ? user.verification_note + '\n\n' : '') + `Tes ${VERIFICATION_FEE} coins ont été remboursés dans ton wallet. Tu peux soumettre une nouvelle demande.` },
     };
     const cfg = CFG[status];
     return (
@@ -205,9 +239,13 @@ export const SettingsVerificationScreen: React.FC = () => {
   // ── Step 3 ─────────────────────────────────────────────────────────────────
   const renderStep3 = () => {
     const typeInfo = ACCOUNT_TYPES.find(t => t.key === accountType)!;
+    const canAfford = myCoins === null || myCoins >= VERIFICATION_FEE;
+    const soldeApres = myCoins !== null ? myCoins - VERIFICATION_FEE : null;
     return (
       <View style={{ gap: 14 }}>
         <Text style={[vs.stepTitle, { color: colors.textPrimary }]}>Vérifiez votre demande</Text>
+
+        {/* Recap demande */}
         <View style={[vs.summaryCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
           {[
             { label: 'Type', value: typeInfo?.label },
@@ -216,23 +254,57 @@ export const SettingsVerificationScreen: React.FC = () => {
             ...(links.trim() ? [{ label: 'Liens', value: links.trim() }] : []),
           ].map((row, i, arr) => (
             <View key={i} style={[vs.summaryRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
-              <Text style={[{ fontSize: 13, color: colors.textTertiary }]}>{row.label}</Text>
-              <Text style={[{ fontSize: 13, fontWeight: '600', color: colors.textPrimary, flex: 1, textAlign: 'right' }]} numberOfLines={3}>{row.value}</Text>
+              <Text style={{ fontSize: 13, color: colors.textTertiary }}>{row.label}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary, flex: 1, textAlign: 'right' }} numberOfLines={3}>{row.value}</Text>
             </View>
           ))}
         </View>
+
+        {/* Bloc paiement */}
+        <View style={[vs.feeBox, { backgroundColor: canAfford ? BLUE + '12' : '#EF444412', borderColor: canAfford ? BLUE + '40' : '#EF444440' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Icon name="zap" size={16} color={canAfford ? BLUE : '#EF4444'} />
+            <Text style={{ fontSize: 14, fontWeight: '800', color: canAfford ? BLUE : '#EF4444' }}>
+              Frais de dossier : {VERIFICATION_FEE} coins
+            </Text>
+          </View>
+          {myCoins !== null && (
+            <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
+              Ton solde : {myCoins.toLocaleString('fr-FR')} coins
+              {canAfford && soldeApres !== null ? `  →  ${soldeApres.toLocaleString('fr-FR')} coins après` : ''}
+            </Text>
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+            <Icon name="rotate-ccw" size={12} color="#22C55E" style={{ marginTop: 2 }} />
+            <Text style={{ fontSize: 12, color: '#22C55E', flex: 1, lineHeight: 17 }}>
+              Ces coins sont remboursés automatiquement dans ton wallet si ta demande est refusée.
+            </Text>
+          </View>
+          {!canAfford && (
+            <TouchableOpacity
+              onPress={() => nav.navigate('BuyCoins')}
+              style={{ marginTop: 10, backgroundColor: '#EF4444', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}
+              activeOpacity={0.85}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
+                Acheter des coins — il te manque {VERIFICATION_FEE - (myCoins ?? 0)} coins
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={vs.navRow}>
           <TouchableOpacity style={[vs.secondaryBtn, { borderColor: colors.border }]} onPress={() => setStep(2)}>
             <Icon name="arrow-left" size={16} color={colors.textSecondary} />
             <Text style={[vs.secondaryBtnText, { color: colors.textSecondary }]}>Modifier</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[vs.primaryBtn, { flex: 1, backgroundColor: BLUE, opacity: loading ? 0.7 : 1 }]}
-            onPress={handleSubmit} disabled={loading}
+            style={[vs.primaryBtn, { flex: 1, backgroundColor: canAfford ? BLUE : colors.border, opacity: loading ? 0.7 : 1 }]}
+            onPress={handleSubmit} disabled={loading || !canAfford}
           >
             {loading
               ? <ActivityIndicator color="#fff" size="small" />
-              : <><Icon name="send" size={15} color="#fff" /><Text style={vs.primaryBtnText}>Envoyer la demande</Text></>
+              : <><Icon name="send" size={15} color="#fff" /><Text style={vs.primaryBtnText}>Envoyer — {VERIFICATION_FEE} coins</Text></>
             }
           </TouchableOpacity>
         </View>
@@ -311,4 +383,5 @@ const vs = StyleSheet.create({
   progressNum:    { fontSize: 12, fontWeight: '700' },
   progressLabel:  { fontSize: 10, fontWeight: '600' },
   progressLine:   { flex: 1, height: 2, marginBottom: 14 },
+  feeBox:         { borderRadius: 16, borderWidth: 1, padding: 14 },
 });
