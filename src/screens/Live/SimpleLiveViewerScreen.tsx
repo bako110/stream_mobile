@@ -1,16 +1,22 @@
 /**
  * SimpleLiveViewerScreen — Viewer du live spontané.
- * - Spotlight cliquable (plein écran) + PiP viewer quand quelqu'un d'autre est en spotlight
- * - Contrôles caméra/micro pour le viewer
- * - Bouton quitter propre
- * - Chat WS + REST
+ *
+ * Système de modération TikTok-style :
+ * - Par défaut : viewer silencieux (can_publish=false côté LiveKit)
+ * - Bouton "Lever la main" → POST /lives/{id}/hand-raise/{identity} → notif WS au host
+ * - Quand le host accepte → WS "live_guest_invited" → cam/micro débloqués automatiquement
+ * - Quand le host fait redescendre → WS "live_guest_demoted" → cam/micro recoupés
+ * - Indicateur "Sur scène" visible quand on est invité
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar,
-  Platform, FlatList, TextInput, KeyboardAvoidingView,
-  ActivityIndicator, Image, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback,
+  StatusBar, Platform, FlatList, TextInput, KeyboardAvoidingView,
+  ActivityIndicator, Image,
 } from 'react-native';
+import Animated, {
+  FadeIn, SlideInUp, SlideOutDown,
+} from 'react-native-reanimated';
 import {
   LiveKitRoom,
   useParticipants,
@@ -33,307 +39,416 @@ import { storage } from '../../utils/storage';
 import { useWs } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
-import type { GiftNotif } from '../../components/wallet/LiveGiftOverlay';
-import type { LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
+import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveViewer'>;
 
-interface ChatMsg { id: string; user: string; avatar?: string | null; text: string; }
+interface ChatMsg {
+  id:      string;
+  user:    string;
+  userId?: string;
+  avatar?: string | null;
+  text:    string;
+  isJoin?: boolean;
+  isGift?: boolean;
+  isSys?:  boolean;
+}
 
-// ── Avatar placeholder quand la caméra est off ────────────────────────────────
+// ── Avatar fallback ───────────────────────────────────────────────────────────
 
-const ParticipantAvatar: React.FC<{ name: string; size: number }> = ({ name, size }) => (
-  <View style={[mv.avatarBox, { width: size, height: size, borderRadius: size / 2 }]}>
-    <Text style={[mv.avatarText, { fontSize: size * 0.38 }]}>
-      {(name || '?')[0].toUpperCase()}
-    </Text>
+const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, size, color = '#F0365A' }) => (
+  <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+    <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.38 }}>{(name || '?')[0].toUpperCase()}</Text>
   </View>
 );
 
-// ── Zone vidéo multi-participants avec spotlight ───────────────────────────────
+// ── Zone vidéo multi-participants ─────────────────────────────────────────────
 
-const MultiVideoView: React.FC<{ onGift: (id: string, name: string) => void; onTap: () => void }> = ({ onGift, onTap }) => {
-  const allTracks  = useTracks([Track.Source.Camera], { onlySubscribed: false });
+const MultiVideoView: React.FC<{
+  onGift: (id: string, name: string) => void;
+  onTap:  () => void;
+}> = ({ onGift, onTap }) => {
+  const allTracks    = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const participants = useParticipants();
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
-  // Tous les tracks (caméra on OU off)
-  const allCamTracks = allTracks;
-  const activeTracks = allCamTracks.filter(t => !t.publication?.isMuted);
-
-  // Spotlight par défaut : 1er remote
-  const defaultSpotlight = allCamTracks.find(t => !t.participant.isLocal) ?? allCamTracks[0] ?? null;
-  const spotlightTrack   = allCamTracks.find(t => t.participant.identity === spotlightId) ?? defaultSpotlight;
-  const thumbnailTracks  = allCamTracks.filter(t => t !== spotlightTrack);
-  const localTrack       = activeTracks.find(t => t.participant.isLocal) ?? null;
+  const defaultSpotlight = allTracks.find(t => !t.participant.isLocal) ?? allTracks[0] ?? null;
+  const spotlightTrack   = allTracks.find(t => t.participant.identity === spotlightId) ?? defaultSpotlight;
+  const thumbnailTracks  = allTracks.filter(t => t !== spotlightTrack);
+  const localTrack       = allTracks.find(t => t.participant.isLocal && !t.publication?.isMuted) ?? null;
   const showLocalPip     = localTrack && spotlightTrack && !spotlightTrack.participant.isLocal;
 
-  const spotlightName = spotlightTrack
+  const spotlightName  = spotlightTrack
     ? (spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity))
     : '';
   const spotlightCamOn = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
 
-  if (allCamTracks.length === 0) {
+  if (allTracks.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
         <ActivityIndicator size="large" color="#F0365A" />
         <Text style={mv.noVideoText}>
-          {participants.length === 0 ? 'Connexion au live...' : 'En attente de la vidéo...'}
+          {participants.length === 0 ? 'Connexion...' : 'En attente de la vidéo...'}
         </Text>
       </View>
     );
   }
 
   return (
-    <View
-      style={StyleSheet.absoluteFill}
-      onStartShouldSetResponder={() => true}
-      onResponderGrant={onTap}
-    >
-      {/* Spotlight plein écran — vidéo ou avatar */}
-      {spotlightTrack && (
-        spotlightCamOn
-          ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
-          : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
-              <ParticipantAvatar name={spotlightName} size={100} />
-              <Text style={mv.spotlightNameBig}>{spotlightName}</Text>
-            </View>
-      )}
+    <TouchableWithoutFeedback onPress={onTap}>
+      <View style={StyleSheet.absoluteFill}>
+        {/* Spotlight */}
+        {spotlightTrack && (
+          spotlightCamOn
+            ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+            : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
+                <Av name={spotlightName} size={96} />
+                <Text style={mv.spotlightName}>{spotlightName}</Text>
+              </View>
+        )}
 
-      {/* Bouton cadeau sur le spotlight (non-local uniquement) */}
-      {spotlightTrack && !spotlightTrack.participant.isLocal && (
-        <TouchableOpacity
-          style={mv.spotlightGiftBtn}
-          onPress={() => onGift(spotlightTrack.participant.identity, spotlightName)}
-          activeOpacity={0.8}
-        >
-          <Text style={mv.spotlightGiftEmoji}>🎁</Text>
-          <Text style={mv.spotlightGiftLabel}>Cadeau</Text>
-        </TouchableOpacity>
-      )}
+        {/* Label nom */}
+        {spotlightTrack && (
+          <View style={mv.spotLabel}>
+            <Text style={mv.spotLabelText} numberOfLines={1}>{spotlightName}</Text>
+          </View>
+        )}
 
-      {/* Label nom spotlight */}
-      {spotlightTrack && (
-        <View style={mv.spotlightLabel}>
-          <Text style={mv.spotlightLabelText}>{spotlightName}</Text>
-        </View>
-      )}
+        {/* Bouton cadeau sur le spotlight */}
+        {spotlightTrack && !spotlightTrack.participant.isLocal && (
+          <TouchableOpacity
+            style={mv.spotGiftBtn}
+            onPress={() => onGift(spotlightTrack.participant.identity, spotlightName)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: 20 }}>🎁</Text>
+          </TouchableOpacity>
+        )}
 
-      {/* PiP local */}
-      {showLocalPip && localTrack && (
-        <TouchableOpacity style={mv.pip} onPress={() => setSpotlightId(localTrack.participant.identity)} activeOpacity={0.85}>
-          <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
-          <View style={mv.pipLabel}><Text style={mv.pipLabelText}>Toi</Text></View>
-        </TouchableOpacity>
-      )}
+        {/* PiP local (quand on est sur scène) */}
+        {showLocalPip && localTrack && (
+          <TouchableOpacity style={mv.pip} onPress={() => setSpotlightId(localTrack.participant.identity)} activeOpacity={0.85}>
+            <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={mv.pipGrad}>
+              <Text style={mv.pipLabel}>Toi</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
-      {/* Vignettes */}
-      {thumbnailTracks.length > 0 && (
-        <View style={mv.thumbnailsContainer}>
-          <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Vignettes autres participants */}
+        {thumbnailTracks.length > 0 && (
+          <View style={mv.thumbsCol}>
             {thumbnailTracks.map(t => {
-              const camOn = !t.publication?.isMuted;
-              const tName = t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity);
+              const camOn   = !t.publication?.isMuted;
+              const tName   = t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity);
               const isLocal = t.participant.isLocal;
               return (
                 <TouchableOpacity
                   key={t.participant.identity}
-                  style={mv.thumbnail}
+                  style={mv.thumb}
                   onPress={() => setSpotlightId(t.participant.identity)}
                   activeOpacity={0.8}
                 >
                   {camOn
                     ? <VideoTrack trackRef={t} style={StyleSheet.absoluteFill} objectFit="cover" />
-                    : <View style={[StyleSheet.absoluteFill, mv.thumbnailNoCam]}>
-                        <ParticipantAvatar name={tName} size={44} />
-                      </View>
+                    : <View style={[StyleSheet.absoluteFill, mv.thumbNoCam]}><Av name={tName} size={40} /></View>
                   }
-                  <View style={mv.thumbnailLabel}>
-                    <Text style={mv.thumbnailLabelText} numberOfLines={1}>{tName}</Text>
-                  </View>
-                  {/* Bouton cadeau sur la vignette (non-local) */}
+                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={mv.thumbGrad}>
+                    <Text style={mv.thumbLabel} numberOfLines={1}>{tName}</Text>
+                  </LinearGradient>
                   {!isLocal && (
                     <TouchableOpacity
                       style={mv.thumbGiftBtn}
                       onPress={() => onGift(t.participant.identity, tName)}
                       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                     >
-                      <Text style={mv.thumbGiftEmoji}>🎁</Text>
+                      <Text style={{ fontSize: 13 }}>🎁</Text>
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
-        </View>
-      )}
-    </View>
+          </View>
+        )}
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 
 // ── Contenu dans LiveKitRoom ──────────────────────────────────────────────────
 
 const RoomContent: React.FC<{
-  live: LiveStream | null;
-  liveId: string;
-  viewerCount: number;
-  messages: ChatMsg[];
-  chatInput: string;
+  live:         LiveStream | null;
+  liveId:       string;
+  myIdentity:   string;
+  viewerCount:  number;
+  messages:     ChatMsg[];
+  chatInput:    string;
   setChatInput: (v: string) => void;
-  sending: boolean;
-  showChat: boolean;
-  setShowChat: (v: boolean) => void;
-  chatRef: React.RefObject<FlatList | null>;
-  onSend: () => void;
-  onLeave: () => void;
-  giftNotifs: GiftNotif[];
+  sending:      boolean;
+  chatRef:      React.RefObject<FlatList | null>;
+  onSend:       () => void;
+  onLeave:      () => void;
+  giftNotifs:   GiftNotif[];
   onGiftNotifShown: (id: string) => void;
-  likeCount: number;
-  onLike: () => void;
-}> = ({ live, liveId, viewerCount, messages, chatInput, setChatInput, sending, showChat, setShowChat, chatRef, onSend, onLeave, giftNotifs, onGiftNotifShown, likeCount, onLike }) => {
+  likeCount:    number;
+  onLike:       () => void;
+  elapsed:      number;
+  goOnStageRef:  { current: (() => void) | null };
+  leaveStageRef: { current: (() => void) | null };
+}> = ({
+  live, liveId, myIdentity, viewerCount, messages, chatInput, setChatInput,
+  sending, chatRef, onSend, onLeave, giftNotifs, onGiftNotifShown,
+  likeCount, onLike, elapsed, goOnStageRef, leaveStageRef,
+}) => {
   const { localParticipant } = useLocalParticipant();
-  const [camOn, setCamOn] = useState(false);
-  const [micOn, setMicOn] = useState(false);
+  const [onStage,    setOnStage]    = useState(false);
+  const [camOn,      setCamOn]      = useState(false);
+  const [micOn,      setMicOn]      = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+  const [showInput,  setShowInput]  = useState(false);
   const likeRef = useRef<LiveLikeButtonRef>(null);
   const giftRef = useRef<LiveGiftOverlayRef>(null);
 
   const hostId   = live?.user_id ?? '';
-  const hostName2 = live?.user?.display_name ?? live?.user?.username ?? 'Host';
+  const hostName = live?.user?.display_name ?? live?.user?.username ?? 'Host';
 
-  const hostName = live?.user?.display_name ?? live?.user?.username ?? 'Live';
+  // Monter sur scène : activer cam + micro
+  const goOnStage = useCallback(async () => {
+    try {
+      await localParticipant.setCameraEnabled(true);
+      await localParticipant.setMicrophoneEnabled(true);
+      setCamOn(true); setMicOn(true);
+      setOnStage(true);
+    } catch {}
+  }, [localParticipant]);
+
+  // Descendre de scène : couper cam + micro
+  const leaveStage = useCallback(async () => {
+    try {
+      await localParticipant.setCameraEnabled(false);
+      await localParticipant.setMicrophoneEnabled(false);
+      setCamOn(false); setMicOn(false);
+      setOnStage(false); setHandRaised(false);
+    } catch {}
+  }, [localParticipant]);
+
+  // Exposer les fonctions au parent via les refs
+  useEffect(() => {
+    goOnStageRef.current  = goOnStage;
+    leaveStageRef.current = leaveStage;
+  }, [goOnStage, leaveStage, goOnStageRef, leaveStageRef]);
 
   const toggleCam = useCallback(async () => {
-    try {
-      await localParticipant.setCameraEnabled(!camOn);
-      setCamOn(v => !v);
-    } catch {}
-  }, [camOn, localParticipant]);
+    if (!onStage) return;
+    try { await localParticipant.setCameraEnabled(!camOn); setCamOn(v => !v); } catch {}
+  }, [camOn, onStage, localParticipant]);
 
   const toggleMic = useCallback(async () => {
+    if (!onStage) return;
+    try { await localParticipant.setMicrophoneEnabled(!micOn); setMicOn(v => !v); } catch {}
+  }, [micOn, onStage, localParticipant]);
+
+  const handleHandRaise = useCallback(async () => {
+    if (handRaised) {
+      setHandRaised(false);
+      return;
+    }
+    setHandRaised(true);
     try {
-      await localParticipant.setMicrophoneEnabled(!micOn);
-      setMicOn(v => !v);
-    } catch {}
-  }, [micOn, localParticipant]);
+      await apiClient.post(Endpoints.lives.handRaise(liveId, myIdentity));
+    } catch {
+      setHandRaised(false);
+    }
+  }, [handRaised, liveId, myIdentity]);
+
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   return (
-    <KeyboardAvoidingView
-      style={st.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+    <KeyboardAvoidingView style={st.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Vidéo — tap n'importe où = like */}
+      {/* Vidéo */}
       <MultiVideoView
         onGift={(id, name) => giftRef.current?.openGift(id, name)}
         onTap={() => likeRef.current?.trigger()}
       />
 
-      {/* Top overlay */}
-      <LinearGradient colors={['rgba(0,0,0,0.75)', 'transparent']} style={st.topOverlay}>
-        <TouchableOpacity onPress={onLeave} style={st.iconBtn}>
-          <Icon name="arrow-left" size={24} color="#fff" />
+      {/* Gradients */}
+      <LinearGradient colors={['rgba(0,0,0,0.72)', 'transparent']} style={st.gradTop} pointerEvents="none" />
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={st.gradBottom} pointerEvents="none" />
+
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <View style={st.header}>
+        <TouchableOpacity onPress={onLeave} style={st.backBtn}>
+          <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
-        <View style={st.topCenter}>
-          <TouchableOpacity onPress={() => giftRef.current?.openGift(hostId, hostName2)} activeOpacity={0.8}>
-            {live?.user?.avatar_url ? (
-              <Image source={{ uri: live.user.avatar_url }} style={st.hostAvatar} />
-            ) : (
-              <View style={[st.hostAvatar, st.hostAvatarFallback]}>
-                <Text style={st.hostAvatarText}>{hostName[0]?.toUpperCase()}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <View style={st.liveBadgeRow}>
-              <View style={st.liveBadge}>
-                <View style={st.liveDot} />
-                <Text style={st.liveText}>LIVE</Text>
-              </View>
+
+        <TouchableOpacity style={st.hostInfo} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
+          {live?.user?.avatar_url
+            ? <Image source={{ uri: live.user.avatar_url }} style={st.hostAvatar} />
+            : <Av name={hostName} size={40} color="#F0365A" />
+          }
+          <View>
+            <View style={st.livePill}>
+              <View style={st.liveDot} />
+              <Text style={st.liveText}>LIVE</Text>
+              <Text style={st.timerText}>{fmt(elapsed)}</Text>
             </View>
-            <Text style={st.liveTitle} numberOfLines={1}>{live?.title}</Text>
             <Text style={st.hostName} numberOfLines={1}>{hostName}</Text>
           </View>
-        </View>
-        <View style={st.viewerBadge}>
-          <Icon name="eye" size={13} color="#fff" />
-          <Text style={st.viewerText}>{viewerCount}</Text>
-        </View>
-      </LinearGradient>
+        </TouchableOpacity>
 
-      {/* Contrôles media du viewer (bas droite) */}
-      <View style={st.mediaControls}>
-        <TouchableOpacity
-          style={[st.mediaBtn, camOn && st.mediaBtnActive]}
-          onPress={toggleCam}
-        >
-          <Icon name={camOn ? 'video' : 'video-off'} size={18} color={camOn ? '#4ade80' : '#fff'} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[st.mediaBtn, micOn && st.mediaBtnActive]}
-          onPress={toggleMic}
-        >
-          <Icon name={micOn ? 'mic' : 'mic-off'} size={18} color={micOn ? '#4ade80' : '#fff'} />
-        </TouchableOpacity>
-        <TouchableOpacity style={[st.mediaBtn, st.leaveBtn]} onPress={onLeave}>
-          <Icon name="log-out" size={18} color="#fff" />
-        </TouchableOpacity>
+        <View style={{ flex: 1 }} />
+
+        <View style={st.viewerPill}>
+          <Icon name="eye" size={12} color="#fff" />
+          <Text style={st.viewerCount}>{viewerCount}</Text>
+        </View>
+        <View style={st.likeWrap}>
+          <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
+        </View>
       </View>
 
-      {/* Chat */}
-      {showChat && (
-        <View style={st.chatContainer}>
-          <FlatList
-            ref={chatRef}
-            data={messages}
-            keyExtractor={m => m.id}
-            renderItem={({ item }) => (
-              <View style={st.chatBubble}>
-                <Text style={st.chatUser}>{item.user} </Text>
-                <Text style={st.chatText}>{item.text}</Text>
-              </View>
-            )}
-            style={st.chatList}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={<Text style={st.chatEmpty}>Aucun message</Text>}
-          />
-          <View style={st.chatInputRow}>
+      {/* ── BADGE "SUR SCÈNE" ─────────────────────────────────────────── */}
+      {onStage && (
+        <Animated.View entering={SlideInUp.duration(350)} exiting={SlideOutDown.duration(250)} style={st.onStageBadge}>
+          <View style={st.onStageDot} />
+          <Text style={st.onStageText}>Tu es sur scène</Text>
+        </Animated.View>
+      )}
+
+      {/* ── CHAT (bas gauche) ─────────────────────────────────────────── */}
+      <View style={st.chatZone} pointerEvents="box-none">
+        <FlatList
+          ref={chatRef}
+          data={messages}
+          keyExtractor={m => m.id}
+          renderItem={({ item }) => {
+            if (item.isJoin || item.isSys) {
+              return (
+                <Animated.View entering={FadeIn.duration(250)} style={st.sysRow}>
+                  <Text style={st.sysText}>{item.text}</Text>
+                </Animated.View>
+              );
+            }
+            if (item.isGift) {
+              return (
+                <Animated.View entering={FadeIn.duration(200)} style={st.giftMsg}>
+                  <Text style={st.giftText}>{item.text}</Text>
+                </Animated.View>
+              );
+            }
+            return (
+              <Animated.View entering={FadeIn.duration(200)} style={st.chatRow}>
+                {item.avatar
+                  ? <Image source={{ uri: item.avatar }} style={st.chatAvatar} />
+                  : <Av name={item.user} size={24} />
+                }
+                <View style={st.chatBubble}>
+                  <Text style={st.chatUser}>{item.user} </Text>
+                  <Text style={st.chatText}>{item.text}</Text>
+                </View>
+              </Animated.View>
+            );
+          }}
+          style={st.chatList}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ justifyContent: 'flex-end' }}
+          pointerEvents="none"
+        />
+
+        {showInput ? (
+          <View style={st.inputRow}>
             <TextInput
               value={chatInput}
               onChangeText={setChatInput}
               placeholder="Message..."
-              placeholderTextColor="#999"
+              placeholderTextColor="rgba(255,255,255,0.45)"
               style={st.chatField}
-              onSubmitEditing={onSend}
+              onSubmitEditing={() => { onSend(); setShowInput(false); }}
               returnKeyType="send"
+              autoFocus
+              onBlur={() => { if (!chatInput.trim()) setShowInput(false); }}
             />
-            <TouchableOpacity onPress={onSend} style={st.sendBtn} disabled={sending}>
-              <Icon name="send" size={16} color="#fff" />
+            <TouchableOpacity onPress={() => { onSend(); setShowInput(false); }} style={st.sendBtn} disabled={sending || !chatInput.trim()}>
+              <Icon name="send" size={15} color="#fff" />
             </TouchableOpacity>
           </View>
-        </View>
-      )}
+        ) : (
+          <TouchableOpacity style={st.chatPlaceholder} onPress={() => setShowInput(true)} activeOpacity={0.8}>
+            <Icon name="message-circle" size={14} color="rgba(255,255,255,0.55)" />
+            <Text style={st.chatPlaceholderText}>Message...</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
-      {/* Toggle chat */}
-      <TouchableOpacity style={st.toggleChatBtn} onPress={() => setShowChat(!showChat)}>
-        <Icon name="message-circle" size={20} color="#fff" />
-      </TouchableOpacity>
+      {/* ── CONTRÔLES DROITE ──────────────────────────────────────────── */}
+      <View style={st.sideControls}>
+        {/* Cadeau */}
+        <TouchableOpacity style={st.sideBtn} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
+          <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' }]}>
+            <Text style={{ fontSize: 22 }}>🎁</Text>
+          </View>
+          <Text style={st.sideBtnLabel}>Cadeau</Text>
+        </TouchableOpacity>
 
-      {/* Cadeaux live */}
+        {onStage ? (
+          <>
+            {/* Micro (visible seulement sur scène) */}
+            <TouchableOpacity style={st.sideBtn} onPress={toggleMic} activeOpacity={0.8}>
+              <View style={[st.sideBtnCircle, !micOn && st.sideBtnOff]}>
+                <Icon name={micOn ? 'mic' : 'mic-off'} size={20} color={micOn ? '#4ade80' : '#F0365A'} />
+              </View>
+              <Text style={st.sideBtnLabel}>{micOn ? 'Micro' : 'Muet'}</Text>
+            </TouchableOpacity>
+
+            {/* Caméra (visible seulement sur scène) */}
+            <TouchableOpacity style={st.sideBtn} onPress={toggleCam} activeOpacity={0.8}>
+              <View style={[st.sideBtnCircle, !camOn && st.sideBtnOff]}>
+                <Icon name={camOn ? 'video' : 'video-off'} size={20} color={camOn ? '#4ade80' : '#F0365A'} />
+              </View>
+              <Text style={st.sideBtnLabel}>{camOn ? 'Cam' : 'Cam off'}</Text>
+            </TouchableOpacity>
+
+            {/* Descendre */}
+            <TouchableOpacity style={st.sideBtn} onPress={leaveStage} activeOpacity={0.8}>
+              <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(240,54,90,0.2)', borderColor: '#F0365A' }]}>
+                <Icon name="arrow-down" size={20} color="#F0365A" />
+              </View>
+              <Text style={[st.sideBtnLabel, { color: '#F0365A' }]}>Descendre</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          /* Lever la main — seul bouton visible quand pas sur scène */
+          <TouchableOpacity style={st.sideBtn} onPress={handleHandRaise} activeOpacity={0.8}>
+            <Animated.View style={[st.sideBtnCircle, handRaised && st.sideBtnHandActive]}>
+              <Text style={{ fontSize: 22 }}>{handRaised ? '✋' : '🖐️'}</Text>
+            </Animated.View>
+            <Text style={[st.sideBtnLabel, handRaised && { color: '#FFD700' }]}>
+              {handRaised ? 'En attente...' : 'Lever la main'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Quitter */}
+        <TouchableOpacity style={st.sideBtn} onPress={onLeave} activeOpacity={0.8}>
+          <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(240,54,90,0.2)', borderColor: '#F0365A' }]}>
+            <Icon name="log-out" size={20} color="#F0365A" />
+          </View>
+          <Text style={[st.sideBtnLabel, { color: '#F0365A' }]}>Quitter</Text>
+        </TouchableOpacity>
+      </View>
+
       <LiveGiftOverlay
         ref={giftRef}
         liveId={liveId}
         incomingNotifs={giftNotifs}
         onNotifShown={onGiftNotifShown}
       />
-
-      {/* Bouton like — haut droite */}
-      <View style={st.likeContainer}>
-        <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
-      </View>
     </KeyboardAvoidingView>
   );
 };
@@ -354,15 +469,27 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [messages,    setMessages]    = useState<ChatMsg[]>([]);
   const [chatInput,   setChatInput]   = useState('');
   const [sending,     setSending]     = useState(false);
-  const [showChat,    setShowChat]    = useState(true);
   const [giftNotifs,  setGiftNotifs]  = useState<GiftNotif[]>([]);
   const [likeCount,   setLikeCount]   = useState(0);
+  const [elapsed,     setElapsed]     = useState(0);
+  // identity LiveKit du viewer (= userId stocké)
+  const [myIdentity,  setMyIdentity]  = useState('');
+
+  const chatRef      = useRef<FlatList>(null);
+  const wsRef        = useRef<WebSocket | null>(null);
+  const elapsedRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const likeThrottle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingLikes = useRef(0);
+  // Refs vers les fonctions de RoomContent pour réagir aux WS
+  const goOnStageRef  = useRef<(() => void) | null>(null);
+  const leaveStageRef = useRef<(() => void) | null>(null);
 
-  const chatRef = useRef<FlatList>(null);
-  const wsRef   = useRef<WebSocket | null>(null);
   const { lastLiveEnded, lastLiveViewersUpdated } = useWs();
+
+  const addSysMsg = useCallback((text: string) => {
+    setMessages(prev => [...prev.slice(-149), { id: `sys-${Date.now()}`, user: '', text, isSys: true }]);
+    setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -371,28 +498,34 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         setLive(l);
         if (l.status !== 'active') { setEnded(true); setLoading(false); return; }
         setViewerCount(l.current_viewers + 1);
+
         const t = await liveService.getToken(liveId);
         setToken(t.token);
         setWsUrl(t.livekit_url);
+
+        // Identity LiveKit = userId stocké localement (même valeur que le token `sub`)
+        const storedUserId = storage.getItem(STORAGE_KEYS.LAST_USER_ID);
+        if (storedUserId) setMyIdentity(storedUserId);
+
+        const startMs = new Date(l.started_at).getTime();
+        elapsedRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - startMs) / 1000)), 1000);
       } catch {}
       setLoading(false);
     })();
+    return () => { if (elapsedRef.current) clearInterval(elapsedRef.current); };
   }, [liveId]);
 
-  // Live terminé via WS
   useEffect(() => {
-    if (!lastLiveEnded) return;
     if (lastLiveEnded === liveId) { setEnded(true); setToken(null); }
   }, [lastLiveEnded, liveId]);
 
-  // Viewers mis à jour via WS
   useEffect(() => {
-    if (!lastLiveViewersUpdated) return;
-    if (lastLiveViewersUpdated.live_id === liveId) {
+    if (lastLiveViewersUpdated?.live_id === liveId) {
       setViewerCount(lastLiveViewersUpdated.current_viewers);
     }
   }, [lastLiveViewersUpdated, liveId]);
 
+  // WS chat + événements de modération
   useEffect(() => {
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken || !token) return;
@@ -401,50 +534,76 @@ export const SimpleLiveViewerScreen: React.FC = () => {
       ws = new WebSocket(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}?token=${accessToken}`);
     } catch { return; }
     wsRef.current = ws;
+
     ws.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data);
+
         if (d.type === 'comment_added' && d.comment) {
           const c = d.comment;
           setMessages(prev => [...prev.slice(-149), {
             id:     c.id ?? String(Date.now()),
             user:   c.author?.display_name ?? c.author?.username ?? 'Anonyme',
+            userId: c.author?.id,
             avatar: c.author?.avatar_url ?? null,
             text:   c.body,
           }]);
           setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
         }
+
         if (d.type === 'gift_received' && d.gift) {
           const gf = d.gift;
+          const senderName = gf.sender?.display_name ?? gf.sender?.username ?? 'Quelqu\'un';
           setGiftNotifs(prev => [...prev, {
-            id:         gf.id ?? String(Date.now()),
-            senderName: gf.sender?.display_name ?? gf.sender?.username ?? 'Quelqu\'un',
-            emoji:      gf.gift_type?.emoji ?? '🎁',
-            giftName:   gf.gift_type?.name ?? 'Cadeau',
-            coins:      gf.coins_spent ?? 0,
+            id: gf.id ?? String(Date.now()), senderName,
+            emoji: gf.gift_type?.emoji ?? '🎁', giftName: gf.gift_type?.name ?? 'Cadeau',
+            coins: gf.coins_spent ?? 0,
           }]);
+          setMessages(prev => [...prev.slice(-149), {
+            id: `gift-${Date.now()}`, user: senderName,
+            text: `${senderName} a envoyé ${gf.gift_type?.emoji ?? '🎁'} ${gf.gift_type?.name ?? 'Cadeau'}`,
+            isGift: true,
+          }]);
+          setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+        }
+
+        if (d.type === 'like_added') {
+          setLikeCount(c => c + (d.count ?? 1));
+        }
+
+        // Invitation à monter sur scène
+        if (d.type === 'live_guest_invited' && d.live_id === liveId && d.identity === myIdentity) {
+          addSysMsg('Le host t\'a invité à monter sur scène ! 🎤');
+          goOnStageRef.current?.();
+        }
+
+        // Renvoyé de scène
+        if (d.type === 'live_guest_demoted' && d.live_id === liveId && d.identity === myIdentity) {
+          addSysMsg('Tu as été redescendu de scène.');
+          leaveStageRef.current?.();
         }
       } catch {}
     };
+
     const ping = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
     }, 25_000);
     return () => { clearInterval(ping); try { ws.close(); } catch {} };
-  }, [liveId, token]);
+  }, [liveId, token, myIdentity, addSysMsg]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
     if (!text || sending) return;
     setChatInput('');
     setSending(true);
-    try {
-      await apiClient.post(Endpoints.social.comments, { body: text, live_id: liveId });
-    } catch {}
+    try { await apiClient.post(Endpoints.social.comments, { body: text, live_id: liveId }); }
+    catch {}
     finally { setSending(false); }
   }, [chatInput, sending, liveId]);
 
   const handleLeave = useCallback(() => {
     try { wsRef.current?.close(); } catch {}
+    if (elapsedRef.current) clearInterval(elapsedRef.current);
     nav.goBack();
   }, [nav]);
 
@@ -456,30 +615,27 @@ export const SimpleLiveViewerScreen: React.FC = () => {
       const batch = pendingLikes.current;
       pendingLikes.current = 0;
       likeThrottle.current = null;
-      try {
-        await apiClient.post(`/api/v1/lives/${liveId}/like`, { count: batch });
-      } catch {}
+      try { await apiClient.post(Endpoints.lives.like(liveId), { count: batch }); }
+      catch {}
     }, 500);
   }, [liveId]);
 
   if (loading) {
-    return (
-      <View style={[st.root, st.center]}>
-        <ActivityIndicator size="large" color="#F0365A" />
-      </View>
-    );
+    return <View style={[st.root, st.center]}><ActivityIndicator size="large" color="#F0365A" /></View>;
   }
 
   if (ended) {
     return (
       <View style={[st.root, st.center]}>
         <StatusBar barStyle="light-content" backgroundColor="#000" />
-        <Icon name="radio" size={48} color="#555" />
-        <Text style={st.endedTitle}>Le live est terminé</Text>
-        <Text style={st.endedSub}>{live?.title ?? ''}</Text>
-        <TouchableOpacity style={st.endedBtn} onPress={handleLeave}>
-          <Text style={st.endedBtnText}>Retour</Text>
-        </TouchableOpacity>
+        <View style={st.endedCard}>
+          <Icon name="radio" size={44} color="rgba(255,255,255,0.3)" />
+          <Text style={st.endedTitle}>Live terminé</Text>
+          <Text style={st.endedSub}>{live?.title ?? ''}</Text>
+          <TouchableOpacity style={st.endedBtn} onPress={handleLeave}>
+            <Text style={st.endedBtnText}>Retour</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -488,7 +644,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     return (
       <View style={[st.root, st.center]}>
         <ActivityIndicator size="large" color="#F0365A" />
-        <Text style={st.connectText}>Connexion au live...</Text>
+        <Text style={st.connectText}>Connexion...</Text>
       </View>
     );
   }
@@ -498,13 +654,12 @@ export const SimpleLiveViewerScreen: React.FC = () => {
       <RoomContent
         live={live}
         liveId={liveId}
+        myIdentity={myIdentity}
         viewerCount={viewerCount}
         messages={messages}
         chatInput={chatInput}
         setChatInput={setChatInput}
         sending={sending}
-        showChat={showChat}
-        setShowChat={setShowChat}
         chatRef={chatRef}
         onSend={sendChat}
         onLeave={handleLeave}
@@ -512,6 +667,9 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         onGiftNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
         likeCount={likeCount}
         onLike={handleLike}
+        elapsed={elapsed}
+        goOnStageRef={goOnStageRef}
+        leaveStageRef={leaveStageRef}
       />
     </LiveKitRoom>
   );
@@ -520,164 +678,150 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 // ── Styles MultiVideoView ─────────────────────────────────────────────────────
 
 const mv = StyleSheet.create({
-  noVideo:     { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
-  noVideoText: { color: '#999', marginTop: 12, fontSize: 14 },
-
-  spotlightLabel: {
-    position: 'absolute', top: Platform.OS === 'ios' ? 110 : 90,
-    left: 12, backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, zIndex: 5,
+  noVideo:      { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
+  noVideoText:  { color: '#999', fontSize: 14 },
+  noVideoBg:    { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
+  spotlightName:{ color: '#fff', fontSize: 16, fontWeight: '700' },
+  spotLabel: {
+    position: 'absolute', bottom: 52, left: 12, zIndex: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 3,
   },
-  spotlightLabelText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-
+  spotLabelText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  spotGiftBtn: {
+    position: 'absolute', bottom: 60, right: 100, zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 28, padding: 10,
+    borderWidth: 1, borderColor: '#FFD700',
+  },
   pip: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 180 : 160,
-    right: 12,
-    width: 80, height: 120,
-    borderRadius: 14, overflow: 'hidden',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)',
-    zIndex: 15,
+    position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, right: 12,
+    width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.45)', zIndex: 15,
   },
-  pipLabel: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 3,
+  pipGrad: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 30,
+    justifyContent: 'flex-end', paddingBottom: 4,
   },
-  pipLabelText: { color: '#fff', fontSize: 9, textAlign: 'center' },
-
-  thumbnailsContainer: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 180 : 160,
-    left: 12, maxHeight: 300, zIndex: 15,
+  pipLabel: { color: '#fff', fontSize: 9, textAlign: 'center' },
+  thumbsCol: {
+    position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170,
+    left: 12, zIndex: 15, gap: 8,
   },
-  thumbnail: {
-    width: 80, height: 120,
-    borderRadius: 14, overflow: 'hidden',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)',
-    marginBottom: 8,
+  thumb: {
+    width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
   },
-  thumbnailLabel: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 3, paddingHorizontal: 4,
-  },
-  thumbnailLabelText: { color: '#fff', fontSize: 9 },
-
-  noVideoBg: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
-  avatarBox: { backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '800' },
-  spotlightNameBig: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 10 },
-  thumbnailNoCam: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' },
-
-  spotlightGiftBtn: {
-    position: 'absolute', bottom: 60, right: 14, zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 24,
-    paddingHorizontal: 14, paddingVertical: 8,
-    alignItems: 'center', borderWidth: 1, borderColor: '#FFD700',
-  },
-  spotlightGiftEmoji: { fontSize: 22 },
-  spotlightGiftLabel: { color: '#FFD700', fontSize: 10, fontWeight: '700', marginTop: 2 },
-
-  thumbGiftBtn: {
-    position: 'absolute', top: 4, right: 4, zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12,
-    padding: 3,
-  },
-  thumbGiftEmoji: { fontSize: 14 },
+  thumbNoCam:  { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a', flex: 1 },
+  thumbGrad:   { position: 'absolute', bottom: 0, left: 0, right: 0, height: 32, justifyContent: 'flex-end', paddingBottom: 4 },
+  thumbLabel:  { color: '#fff', fontSize: 9, textAlign: 'center', paddingHorizontal: 2 },
+  thumbGiftBtn:{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 2 },
 });
 
 // ── Styles page ───────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: '#000' },
-  center:  { justifyContent: 'center', alignItems: 'center' },
+  root:        { flex: 1, backgroundColor: '#000' },
+  center:      { justifyContent: 'center', alignItems: 'center' },
   connectText: { color: '#999', marginTop: 12, fontSize: 14 },
 
-  topOverlay: {
+  gradTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 180, zIndex: 5 } as any,
+  gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 240, zIndex: 5 } as any,
+
+  header: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    paddingTop: Platform.OS === 'ios' ? 54 : 36,
-    paddingHorizontal: 14, paddingBottom: 24,
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10, zIndex: 10,
+    paddingTop: Platform.OS === 'ios' ? 52 : 34,
+    paddingHorizontal: 14, paddingBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10,
   },
-  iconBtn:            { padding: 8, marginTop: 2 },
-  topCenter:          { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  hostAvatar:         { width: 54, height: 54, borderRadius: 27, borderWidth: 2.5, borderColor: '#F0365A' },
-  hostAvatarFallback: { backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' },
-  hostAvatarText:     { color: '#fff', fontWeight: '800', fontSize: 18 },
-  liveBadgeRow:       { flexDirection: 'row', marginBottom: 2 },
-  liveBadge: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F0365A', borderRadius: 4,
-    paddingHorizontal: 6, paddingVertical: 2,
+  backBtn:    { padding: 6 },
+  hostInfo:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  hostAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#F0365A' },
+  livePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#F0365A', borderRadius: 10,
+    paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start',
   },
-  liveDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', marginRight: 4 },
-  liveText: { color: '#fff', fontWeight: '800', fontSize: 10, letterSpacing: 0.5 },
-  liveTitle: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  hostName:  { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
-  viewerBadge: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, gap: 4, marginTop: 2,
+  liveDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveText:   { color: '#fff', fontWeight: '800', fontSize: 10, letterSpacing: 0.5 },
+  timerText:  { color: 'rgba(255,255,255,0.85)', fontSize: 10 },
+  hostName:   { color: '#fff', fontSize: 12, fontWeight: '600' },
+  viewerPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 12,
+    paddingHorizontal: 8, paddingVertical: 4,
   },
-  viewerText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  viewerCount: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  likeWrap:    { marginLeft: 4 },
 
-  // Contrôles media viewer (bas droite)
-  mediaControls: {
-    position: 'absolute', right: 12,
-    bottom: Platform.OS === 'ios' ? 110 : 90,
-    gap: 10, zIndex: 20, alignItems: 'center',
+  // Badge "sur scène"
+  onStageBadge: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 92,
+    alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(74,222,128,0.2)',
+    borderWidth: 1, borderColor: '#4ade80',
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6,
+    zIndex: 30,
   },
-  mediaBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
-  },
-  mediaBtnActive: { borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.15)' },
-  leaveBtn:       { backgroundColor: 'rgba(240,54,90,0.4)', borderColor: '#F0365A' },
+  onStageDot:  { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
+  onStageText: { color: '#4ade80', fontSize: 13, fontWeight: '700' },
 
-  chatContainer: {
-    position: 'absolute', bottom: 0, left: 0, right: 70,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 18,
+  // Chat
+  chatZone: {
+    position: 'absolute', bottom: 0, left: 0, right: 90,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 18,
     paddingLeft: 12, zIndex: 10,
   },
-  chatList: { flexGrow: 0, maxHeight: 200, marginBottom: 8 },
+  chatList: { flexGrow: 0, maxHeight: 220, marginBottom: 8 },
+  chatRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginBottom: 5 },
+  chatAvatar: { width: 24, height: 24, borderRadius: 12 },
   chatBubble: {
-    backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-    paddingHorizontal: 10, paddingVertical: 6, marginBottom: 4,
+    backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14,
+    paddingHorizontal: 10, paddingVertical: 5, maxWidth: 220,
     flexDirection: 'row', flexWrap: 'wrap',
   },
-  chatUser:  { color: '#F0365A', fontSize: 11, fontWeight: '700' },
-  chatText:  { color: '#fff', fontSize: 13, flexShrink: 1 },
-  chatEmpty: { color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', paddingVertical: 8 },
-  chatInputRow: {
-    flexDirection: 'row', alignItems: 'center',
+  chatUser: { color: '#F0365A', fontSize: 12, fontWeight: '700' },
+  chatText: { color: '#fff', fontSize: 13 },
+  sysRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4, alignSelf: 'flex-start' },
+  sysText:  { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+  giftMsg:  { backgroundColor: 'rgba(255,215,0,0.18)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 4, alignSelf: 'flex-start' },
+  giftText: { color: '#FFD700', fontSize: 12, fontWeight: '700' },
+  chatPlaceholder: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
     backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 24, paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-start',
+  },
+  chatPlaceholderText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 24, paddingLeft: 14, paddingRight: 4,
   },
-  chatField: {
-    flex: 1, color: '#fff', fontSize: 14,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-  },
-  sendBtn: { backgroundColor: '#F0365A', borderRadius: 20, padding: 8 },
-  toggleChatBtn: {
-    position: 'absolute', right: 12,
-    bottom: Platform.OS === 'ios' ? 68 : 50,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20, padding: 10, zIndex: 20,
-  },
+  chatField: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: Platform.OS === 'ios' ? 10 : 7 },
+  sendBtn:   { backgroundColor: '#F0365A', borderRadius: 20, padding: 8, margin: 3 },
 
-  endedTitle:   { color: '#fff', fontSize: 20, fontWeight: '700', marginTop: 16 },
-  endedSub:     { color: '#999', fontSize: 14, marginTop: 4 },
-  endedBtn: {
-    marginTop: 24, backgroundColor: '#F0365A',
-    borderRadius: 24, paddingHorizontal: 32, paddingVertical: 12,
+  // Contrôles droite
+  sideControls: {
+    position: 'absolute', right: 12,
+    bottom: Platform.OS === 'ios' ? 80 : 60,
+    alignItems: 'center', gap: 14, zIndex: 20,
   },
-  endedBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  likeContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 58 : 40,
-    right: 14,
-    zIndex: 40,
-    alignItems: 'center',
+  sideBtn:       { alignItems: 'center', gap: 4 },
+  sideBtnCircle: {
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)',
   },
+  sideBtnOff:        { borderColor: '#F0365A', backgroundColor: 'rgba(240,54,90,0.15)' },
+  sideBtnHandActive: { borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.2)' },
+  sideBtnLabel:      { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '600' },
+
+  // Ended
+  endedCard:    { alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 24, padding: 36, marginHorizontal: 32 },
+  endedTitle:   { color: '#fff', fontSize: 20, fontWeight: '800' },
+  endedSub:     { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
+  endedBtn:     { marginTop: 8, backgroundColor: '#F0365A', borderRadius: 24, paddingHorizontal: 36, paddingVertical: 13 },
+  endedBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

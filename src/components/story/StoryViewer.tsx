@@ -6,6 +6,7 @@ import {
   FlatList, ActivityIndicator, Easing,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
+import type { VideoPlayerStatus } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -58,8 +59,9 @@ const BUFFER_CFG = {
   bufferForPlaybackAfterRebufferMs: 1500,
 };
 
-const StoryVideoView: React.FC<{ uri: string; paused: boolean }> = ({ uri, paused }) => {
+const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void }> = ({ uri, paused, onReady }) => {
   const [buffering, setBuffering] = useState(false);
+  const [ready,     setReady]     = useState(false);
 
   const player = useVideoPlayer(
     { uri, bufferConfig: BUFFER_CFG },
@@ -76,16 +78,21 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean }> = ({ uri, pause
     else        player.play();
   }, [paused]);
 
-  // Détecte les stalls via onBuffer
   useEffect(() => {
-    const sub = player.addEventListener('onBuffer', (isBuffering: boolean) => setBuffering(isBuffering));
-    return () => sub.remove();
+    const bufSub = player.addEventListener('onBuffer', (isBuffering: boolean) => setBuffering(isBuffering));
+    const stsSub = player.addEventListener('onStatusChange', (status: VideoPlayerStatus) => {
+      if (status === 'readyToPlay' && !ready) {
+        setReady(true);
+        onReady();
+      }
+    });
+    return () => { bufSub.remove(); stsSub.remove(); };
   }, []);
 
   return (
     <View style={s.media}>
       <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />
-      {buffering && (
+      {(!ready || buffering) && (
         <View style={s.bufferOverlay}>
           <ActivityIndicator size="large" color="#fff" />
         </View>
@@ -269,6 +276,7 @@ export const StoryViewer: React.FC<Props> = ({
   const [viewersLoading, setViewersLoading] = useState(false);
   const [replies,        setReplies]        = useState<any[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
+  const [videoReady,  setVideoReady]  = useState(false);
   const [saved,       setSaved]       = useState(false);
   const [liked,       setLiked]       = useState(false);
   const [likeCount,   setLikeCount]   = useState(0);
@@ -429,6 +437,13 @@ export const StoryViewer: React.FC<Props> = ({
     return () => { stopAudio(); };
   }, [story?.id, paused]);
 
+  // ── Reset videoReady on story change ──────────────────────────────────────
+
+  useEffect(() => {
+    if (story?.media_type === 'video') setVideoReady(false);
+    else setVideoReady(true);
+  }, [story?.id]);
+
   // ── Progress ───────────────────────────────────────────────────────────────
 
   const startProgress = useCallback(() => {
@@ -438,9 +453,9 @@ export const StoryViewer: React.FC<Props> = ({
   }, [storyIdx, groupIdx, duration]);
 
   useEffect(() => {
-    if (!paused && !menuOpen && !editMode) startProgress();
+    if (!paused && !menuOpen && !editMode && videoReady) startProgress();
     else progressAnim.stopAnimation();
-  }, [storyIdx, groupIdx, paused, menuOpen, editMode]);
+  }, [storyIdx, groupIdx, paused, menuOpen, editMode, videoReady]);
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
@@ -605,7 +620,7 @@ export const StoryViewer: React.FC<Props> = ({
           <Image source={{ uri: story.media_url }} style={s.media} resizeMode="cover" />
         )}
         {story.media_type === 'video' && story.media_url && (
-          <StoryVideoView key={story.id} uri={story.media_url} paused={paused} />
+          <StoryVideoView key={story.id} uri={story.media_url} paused={paused} onReady={() => setVideoReady(true)} />
         )}
         {story.media_type === 'audio' && (
           <LinearGradient colors={[story.background_color ?? '#FF9800', '#000']} style={s.media}>

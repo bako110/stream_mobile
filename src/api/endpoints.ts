@@ -263,6 +263,7 @@ export const Endpoints = {
 
   // ── Messages DM (prefix: /api/v1/messages) ───────────────────────────────
   messages: {
+    unreadCount:      `${V1}/messages/unread-count`,
     conversations:    `${V1}/messages/conversations`,
     conversation:     (userId: string) => `${V1}/messages/conversations/${userId}`,
     markRead:         (userId: string) => `${V1}/messages/conversations/${userId}/read`,
@@ -306,6 +307,11 @@ export const Endpoints = {
     stop:   (id: string) => `${V1}/lives/${id}/stop`,
     token:  (id: string) => `${V1}/lives/${id}/token`,
     status: (id: string) => `${V1}/lives/${id}/status`,
+    ban:       (id: string, identity: string) => `${V1}/lives/${id}/ban/${identity}`,
+    like:      (id: string) => `${V1}/lives/${id}/like`,
+    handRaise: (id: string, identity: string) => `${V1}/lives/${id}/hand-raise/${identity}`,
+    invite:    (id: string, identity: string) => `${V1}/lives/${id}/invite/${identity}`,
+    demote:    (id: string, identity: string) => `${V1}/lives/${id}/demote/${identity}`,
   },
 
   // ── Favoris (prefix: /api/v1/favorites) ──────────────────────────────────
