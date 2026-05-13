@@ -12,7 +12,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback,
   StatusBar, Platform, FlatList, TextInput, KeyboardAvoidingView,
-  ActivityIndicator, Image,
+  ActivityIndicator, Image, Alert,
 } from 'react-native';
 import Animated, {
   FadeIn, SlideInUp, SlideOutDown,
@@ -42,6 +42,7 @@ import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
+import { useUser } from '../../context/UserContext';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveViewer'>;
@@ -203,6 +204,7 @@ const RoomContent: React.FC<{
   live:         LiveStream | null;
   liveId:       string;
   myIdentity:   string;
+  isHost:       boolean;
   viewerCount:  number;
   messages:     ChatMsg[];
   chatInput:    string;
@@ -211,6 +213,8 @@ const RoomContent: React.FC<{
   chatRef:      React.RefObject<FlatList | null>;
   onSend:       () => void;
   onLeave:      () => void;
+  onBanUser:    (userId: string, name: string) => void;
+  onDemoteUser: (identity: string, name: string) => void;
   giftNotifs:   GiftNotif[];
   onGiftNotifShown: (id: string) => void;
   likeCount:    number;
@@ -219,8 +223,8 @@ const RoomContent: React.FC<{
   goOnStageRef:  { current: (() => void) | null };
   leaveStageRef: { current: (() => void) | null };
 }> = ({
-  live, liveId, myIdentity, viewerCount, messages, chatInput, setChatInput,
-  sending, chatRef, onSend, onLeave, giftNotifs, onGiftNotifShown,
+  live, liveId, myIdentity, isHost, viewerCount, messages, chatInput, setChatInput,
+  sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, giftNotifs, onGiftNotifShown,
   likeCount, onLike, elapsed, goOnStageRef, leaveStageRef,
 }) => {
   const { localParticipant } = useLocalParticipant();
@@ -363,16 +367,29 @@ const RoomContent: React.FC<{
                 </Animated.View>
               );
             }
+            const canModerate = isHost && item.userId && item.userId !== myIdentity;
             return (
               <Animated.View entering={FadeIn.duration(200)} style={st.chatRow}>
                 {item.avatar
                   ? <Image source={{ uri: item.avatar }} style={st.chatAvatar} />
                   : <Av name={item.user} size={24} />
                 }
-                <View style={st.chatBubble}>
+                <TouchableOpacity
+                  style={st.chatBubble}
+                  activeOpacity={canModerate ? 0.7 : 1}
+                  onLongPress={() => {
+                    if (!canModerate) return;
+                    Alert.alert(item.user, 'Action de modération', [
+                      { text: 'Annuler', style: 'cancel' },
+                      { text: 'Faire descendre de scène', onPress: () => onDemoteUser(item.userId!, item.user) },
+                      { text: 'Bannir du live', style: 'destructive', onPress: () => onBanUser(item.userId!, item.user) },
+                    ]);
+                  }}
+                  delayLongPress={400}
+                >
                   <Text style={st.chatUser}>{item.user} </Text>
                   <Text style={st.chatText}>{item.text}</Text>
-                </View>
+                </TouchableOpacity>
               </Animated.View>
             );
           }}
@@ -505,6 +522,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const goOnStageRef  = useRef<(() => void) | null>(null);
   const leaveStageRef = useRef<(() => void) | null>(null);
 
+  const { currentUser } = useUser();
   const { lastLiveEnded, lastLiveViewersUpdated, addListener, removeListener } = useWs();
 
   const addSysMsg = useCallback((text: string) => {
@@ -623,16 +641,48 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     if (!text || sending) return;
     setChatInput('');
     setSending(true);
+    // Affichage local immédiat
+    setMessages(prev => [...prev.slice(-149), {
+      id:     `local-${Date.now()}`,
+      user:   currentUser?.display_name ?? currentUser?.username ?? 'Moi',
+      userId: currentUser?.id ? String(currentUser.id) : undefined,
+      avatar: currentUser?.avatar_url ?? null,
+      text,
+    }]);
+    setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
     try { await apiClient.post(Endpoints.social.comments, { body: text, live_id: liveId }); }
     catch {}
     finally { setSending(false); }
-  }, [chatInput, sending, liveId]);
+  }, [chatInput, sending, liveId, currentUser]);
 
   const handleLeave = useCallback(() => {
     try { wsRef.current?.close(); } catch {}
     if (elapsedRef.current) clearInterval(elapsedRef.current);
     nav.goBack();
   }, [nav]);
+
+  const isHost = !!live && !!currentUser && String(live.user_id) === String(currentUser.id);
+
+  const handleBanUser = useCallback((identity: string, name: string) => {
+    Alert.alert('Bannir du live', `Exclure ${name} ?`, [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Exclure', style: 'destructive',
+        onPress: async () => {
+          try { await apiClient.post(Endpoints.lives.ban(liveId, identity)); }
+          catch { Alert.alert('Erreur', 'Impossible d\'exclure ce participant.'); }
+        },
+      },
+    ]);
+  }, [liveId]);
+
+  const handleDemoteUser = useCallback(async (identity: string, name: string) => {
+    try {
+      await apiClient.post(Endpoints.lives.demote(liveId, identity));
+    } catch {
+      Alert.alert('Erreur', 'Impossible de faire descendre ce participant.');
+    }
+  }, [liveId]);
 
   const handleLike = useCallback(() => {
     pendingLikes.current += 1;
@@ -682,6 +732,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         live={live}
         liveId={liveId}
         myIdentity={myIdentity}
+        isHost={isHost}
         viewerCount={viewerCount}
         messages={messages}
         chatInput={chatInput}
@@ -690,6 +741,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         chatRef={chatRef}
         onSend={sendChat}
         onLeave={handleLeave}
+        onBanUser={handleBanUser}
+        onDemoteUser={handleDemoteUser}
         giftNotifs={giftNotifs}
         onGiftNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
         likeCount={likeCount}
