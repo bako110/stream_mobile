@@ -505,7 +505,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const goOnStageRef  = useRef<(() => void) | null>(null);
   const leaveStageRef = useRef<(() => void) | null>(null);
 
-  const { lastLiveEnded, lastLiveViewersUpdated } = useWs();
+  const { lastLiveEnded, lastLiveViewersUpdated, addListener, removeListener } = useWs();
 
   const addSysMsg = useCallback((text: string) => {
     setMessages(prev => [...prev.slice(-149), { id: `sys-${Date.now()}`, user: '', text, isSys: true }]);
@@ -546,7 +546,25 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     }
   }, [lastLiveViewersUpdated, liveId]);
 
-  // WS chat + événements de modération
+  // Événements modération via WS global (live_guest_invited / live_guest_demoted)
+  useEffect(() => {
+    const handler = (d: { type: string; live_id?: string; identity?: string; [key: string]: any }) => {
+      if (d.live_id !== liveId) return;
+
+      if (d.type === 'live_guest_invited' && d.identity === myIdentity) {
+        addSysMsg('Le host t\'a invité à monter sur scène !');
+        goOnStageRef.current?.();
+      }
+      if (d.type === 'live_guest_demoted' && d.identity === myIdentity) {
+        addSysMsg('Tu as été redescendu de scène.');
+        leaveStageRef.current?.();
+      }
+    };
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [liveId, myIdentity, addSysMsg, addListener, removeListener]);
+
+  // WS chat (commentaires, cadeaux, likes)
   useEffect(() => {
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken || !token) return;
@@ -591,18 +609,6 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         if (d.type === 'like_added') {
           setLikeCount(c => c + (d.count ?? 1));
         }
-
-        // Invitation à monter sur scène
-        if (d.type === 'live_guest_invited' && d.live_id === liveId && d.identity === myIdentity) {
-          addSysMsg('Le host t\'a invité à monter sur scène ! 🎤');
-          goOnStageRef.current?.();
-        }
-
-        // Renvoyé de scène
-        if (d.type === 'live_guest_demoted' && d.live_id === liveId && d.identity === myIdentity) {
-          addSysMsg('Tu as été redescendu de scène.');
-          leaveStageRef.current?.();
-        }
       } catch {}
     };
 
@@ -610,7 +616,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
       if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
     }, 25_000);
     return () => { clearInterval(ping); try { ws.close(); } catch {} };
-  }, [liveId, token, myIdentity, addSysMsg]);
+  }, [liveId, token, addSysMsg]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();

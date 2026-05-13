@@ -44,6 +44,7 @@ import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import { useUser } from '../../context/UserContext';
+import { useWs } from '../../context/WebSocketContext';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveStream'>;
@@ -263,6 +264,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   const room                 = useRoomContext();
   const allParticipants      = useParticipants();
   const { currentUser }      = useUser();
+  const { addListener, removeListener } = useWs();
   const remoteParticipants   = allParticipants.filter(p => !p.isLocal);
 
   const [muted,        setMuted]        = useState(false);
@@ -378,34 +380,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
         if (d.type === 'like_added') {
           setLikeCount(c => c + (d.count ?? 1));
         }
-
-        // ── Demande de scène (live_hand_raise)
-        if (d.type === 'live_hand_raise' && d.live_id === liveId) {
-          const newReq: HandRequest = {
-            identity:    d.identity,
-            displayName: d.display_name ?? d.identity,
-            avatarUrl:   d.avatar_url ?? null,
-          };
-          setHandRequests(prev => {
-            // Éviter les doublons
-            if (prev.some(r => r.identity === d.identity)) return prev;
-            return [...prev, newReq];
-          });
-          setShowRequests(true);
-          addSysMsg(`${d.display_name ?? d.identity} veut monter sur scène ✋`);
-        }
-
-        // ── Confirmation invitation broadcast (au cas où)
-        if (d.type === 'live_guest_invited' && d.live_id === liveId) {
-          setOnStage(prev => new Set([...prev, d.identity]));
-          addSysMsg(`${d.identity} est maintenant sur scène 🎤`);
-        }
-
-        // ── Confirmation redescente broadcast
-        if (d.type === 'live_guest_demoted' && d.live_id === liveId) {
-          setOnStage(prev => { const next = new Set(prev); next.delete(d.identity); return next; });
-          addSysMsg(`${d.identity} a été redescendu de scène`);
-        }
       } catch {}
     };
 
@@ -414,6 +388,41 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
     }, 25_000);
     return () => { clearInterval(ping); try { ws.close(); } catch {} };
   }, [liveId, addSysMsg]);
+
+  // Événements modération via le WS global (broadcast_all du backend)
+  useEffect(() => {
+    const handler = (d: { type: string; live_id?: string; identity?: string; display_name?: string; avatar_url?: string; [key: string]: any }) => {
+      if (d.live_id !== liveId && d.live_id !== undefined) return;
+
+      if (d.type === 'live_hand_raise') {
+        const newReq: HandRequest = {
+          identity:    d.identity ?? '',
+          displayName: d.display_name ?? d.identity ?? '',
+          avatarUrl:   d.avatar_url ?? null,
+        };
+        setHandRequests(prev => {
+          if (prev.some(r => r.identity === d.identity)) return prev;
+          return [...prev, newReq];
+        });
+        setShowRequests(true);
+        addSysMsg(`${d.display_name ?? d.identity} veut monter sur scène`);
+      }
+
+      if (d.type === 'live_guest_invited') {
+        setOnStage(prev => new Set([...prev, d.identity ?? '']));
+        setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
+        addSysMsg(`${d.identity} est maintenant sur scène`);
+      }
+
+      if (d.type === 'live_guest_demoted') {
+        setOnStage(prev => { const next = new Set(prev); next.delete(d.identity ?? ''); return next; });
+        addSysMsg(`${d.identity} a été redescendu de scène`);
+      }
+    };
+
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [liveId, addSysMsg, addListener, removeListener]);
 
   // ── Actions modération
   const handleAccept = useCallback(async (req: HandRequest) => {
