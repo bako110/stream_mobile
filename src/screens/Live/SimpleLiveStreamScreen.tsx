@@ -392,7 +392,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   // Événements modération via le WS global (broadcast_all du backend)
   useEffect(() => {
     const handler = (d: { type: string; live_id?: string; identity?: string; display_name?: string; avatar_url?: string; [key: string]: any }) => {
-      if (d.live_id !== liveId && d.live_id !== undefined) return;
+      if (!['live_hand_raise', 'live_guest_invited', 'live_guest_demoted'].includes(d.type)) return;
+      if (d.live_id !== liveId) return;
 
       if (d.type === 'live_hand_raise') {
         const newReq: HandRequest = {
