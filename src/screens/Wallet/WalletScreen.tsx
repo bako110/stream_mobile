@@ -14,7 +14,7 @@ import {
   StyleSheet,
   RefreshControl,
   Animated,
-  ActivityIndicator,
+  Alert,
   StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -38,11 +38,14 @@ interface WalletBalance {
 
 interface Transaction {
   id: string;
-  type: 'purchase' | 'gift_sent' | 'gift_received' | 'withdrawal' | 'bonus' | 'refund' | 'community_entry' | 'transfer_sent' | 'transfer_received';
-  amount: number;
+  transaction_type: 'credit_purchase' | 'gift_sent' | 'gift_received' | 'withdrawal' | 'bonus' | 'refund' | 'community_entry' | 'transfer_sent' | 'transfer_received' | 'boost_purchase' | 'community_reward' | 'view_revenue' | 'subscription_revenue';
+  coins_amount: number;
   description: string;
   created_at: string;
   status: 'completed' | 'pending' | 'failed';
+  balance_after?: number;
+  reference_type?: string;
+  reference_id?: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -53,18 +56,41 @@ const formatDate = (iso: string) => {
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-const txIcon = (type: Transaction['type']) => {
+const txIcon = (type: Transaction['transaction_type']) => {
   switch (type) {
-    case 'purchase':          return { name: 'shopping-cart',    lib: 'feather', color: '#3B82F6' };
-    case 'gift_sent':         return { name: 'gift',             lib: 'feather', color: '#E85DAD' };
-    case 'gift_received':     return { name: 'gift',             lib: 'mci',     color: '#3FEDB6' };
-    case 'withdrawal':        return { name: 'arrow-up-right',   lib: 'feather', color: '#FF8C4A' };
-    case 'bonus':             return { name: 'star',             lib: 'feather', color: '#FFD700' };
-    case 'refund':            return { name: 'rotate-ccw',       lib: 'feather', color: '#9B65F5' };
-    case 'community_entry':   return { name: 'users',            lib: 'feather', color: '#7B3FF2' };
-    case 'transfer_sent':     return { name: 'arrow-up-right',   lib: 'feather', color: '#EF4444' };
-    case 'transfer_received': return { name: 'arrow-down-left',  lib: 'feather', color: '#10B981' };
-    default:                  return { name: 'circle',           lib: 'feather', color: '#6B698A' };
+    case 'credit_purchase':       return { name: 'shopping-cart',   lib: 'feather', color: '#3B82F6' };
+    case 'gift_sent':             return { name: 'gift',             lib: 'feather', color: '#E85DAD' };
+    case 'gift_received':         return { name: 'gift',             lib: 'mci',     color: '#3FEDB6' };
+    case 'withdrawal':            return { name: 'arrow-up-right',   lib: 'feather', color: '#FF8C4A' };
+    case 'bonus':                 return { name: 'star',             lib: 'feather', color: '#FFD700' };
+    case 'refund':                return { name: 'rotate-ccw',       lib: 'feather', color: '#9B65F5' };
+    case 'community_entry':       return { name: 'users',            lib: 'feather', color: '#7B3FF2' };
+    case 'community_reward':      return { name: 'award',            lib: 'feather', color: '#36D9A0' };
+    case 'transfer_sent':         return { name: 'arrow-up-right',   lib: 'feather', color: '#EF4444' };
+    case 'transfer_received':     return { name: 'arrow-down-left',  lib: 'feather', color: '#10B981' };
+    case 'boost_purchase':        return { name: 'zap',              lib: 'feather', color: '#FF7A2F' };
+    case 'view_revenue':          return { name: 'eye',              lib: 'feather', color: '#06B6D4' };
+    case 'subscription_revenue':  return { name: 'repeat',           lib: 'feather', color: '#8B5CF6' };
+    default:                      return { name: 'circle',           lib: 'feather', color: '#6B698A' };
+  }
+};
+
+const txLabel = (type: Transaction['transaction_type']): string => {
+  switch (type) {
+    case 'credit_purchase':      return 'Achat de coins';
+    case 'gift_sent':            return 'Cadeau envoyé';
+    case 'gift_received':        return 'Cadeau reçu';
+    case 'withdrawal':           return 'Retrait';
+    case 'bonus':                return 'Bonus';
+    case 'refund':               return 'Remboursement';
+    case 'community_entry':      return 'Adhésion communauté';
+    case 'community_reward':     return 'Récompense communauté';
+    case 'transfer_sent':        return 'Transfert envoyé';
+    case 'transfer_received':    return 'Transfert reçu';
+    case 'boost_purchase':       return 'Boost acheté';
+    case 'view_revenue':         return 'Revenus vues';
+    case 'subscription_revenue': return 'Revenus abonnement';
+    default:                     return 'Transaction';
   }
 };
 
@@ -172,15 +198,36 @@ const WalletScreen: React.FC = () => {
 
   const s = styles(colors);
 
+  // ── Ouvre la facture détaillée d'une transaction ────────────────────────
+  const openReceipt = (tx: Transaction) => {
+    const label      = txLabel(tx.transaction_type);
+    const isCredit   = tx.coins_amount > 0;
+    const absAmt     = Math.abs(tx.coins_amount);
+    const eurAmt     = ((absAmt / 100) * 0.5).toFixed(2);
+    const statusStr  = tx.status === 'completed' ? 'Confirmée' : tx.status === 'pending' ? 'En attente' : 'Échouée';
+    const balInfo    = tx.balance_after != null ? `\nSolde après : ${tx.balance_after.toLocaleString('fr-FR')} coins` : '';
+
+    Alert.alert(
+      label,
+      `${tx.description}\n\n` +
+      `Montant : ${isCredit ? '+' : '-'}${absAmt.toLocaleString('fr-FR')} coins (${isCredit ? '+' : '-'}${eurAmt} EUR)\n` +
+      `Statut : ${statusStr}\n` +
+      `Date : ${formatDate(tx.created_at)}` +
+      balInfo,
+      [{ text: 'Fermer' }],
+    );
+  };
+
   // ── Render transaction item ──────────────────────────────────────────────
   const renderTx = (tx: Transaction) => {
-    const icon = txIcon(tx.type);
-    const isCredit = ['gift_received', 'bonus', 'refund', 'purchase', 'transfer_received'].includes(tx.type);
-    const sign = isCredit ? '+' : '-';
+    const icon     = txIcon(tx.transaction_type);
+    const isCredit = tx.coins_amount > 0;
+    const absAmt   = Math.abs(tx.coins_amount);
+    const sign     = isCredit ? '+' : '-';
     const amtColor = isCredit ? colors.success : colors.error;
 
     return (
-      <View key={tx.id} style={s.txRow}>
+      <TouchableOpacity key={tx.id} style={s.txRow} activeOpacity={0.7} onPress={() => openReceipt(tx)}>
         <View style={[s.txIconBox, { backgroundColor: `${icon.color}22` }]}>
           {icon.lib === 'mci' ? (
             <MaterialCommunityIcons name={icon.name} size={20} color={icon.color} />
@@ -189,21 +236,21 @@ const WalletScreen: React.FC = () => {
           )}
         </View>
         <View style={s.txInfo}>
-          <Text style={s.txDesc} numberOfLines={1}>{tx.description}</Text>
+          <Text style={s.txDesc} numberOfLines={1}>{tx.description || txLabel(tx.transaction_type)}</Text>
           <Text style={s.txDate}>{formatDate(tx.created_at)}</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[s.txAmount, { color: amtColor }]}>
-            {sign}{tx.amount} <Text style={s.txAmountSub}>coins</Text>
+            {sign}{absAmt.toLocaleString('fr-FR')} <Text style={s.txAmountSub}>coins</Text>
           </Text>
           {tx.status === 'pending' && (
             <Text style={[s.txStatus, { color: colors.warning }]}>En attente</Text>
           )}
           {tx.status === 'failed' && (
-            <Text style={[s.txStatus, { color: colors.error }]}>Échoué</Text>
+            <Text style={[s.txStatus, { color: colors.error }]}>Echoué</Text>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -306,10 +353,34 @@ const WalletScreen: React.FC = () => {
           <Text style={s.sectionTitle}>Transactions récentes</Text>
 
           {transactions.length === 0 ? (
-            <View style={s.emptyState}>
-              <MaterialCommunityIcons name="wallet-outline" size={56} color={colors.textSecondary} />
-              <Text style={s.emptyTitle}>Aucune transaction</Text>
-              <Text style={s.emptySubtitle}>Vos transactions apparaîtront ici</Text>
+            <View style={[s.emptyState, { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.border, padding: 24 }]}>
+              <MaterialCommunityIcons name="wallet-outline" size={48} color="#7B3FF2" />
+              <Text style={s.emptyTitle}>Aucune transaction pour l'instant</Text>
+              <Text style={s.emptySubtitle}>Achete des coins, envoie un cadeau ou rejoins une communaute — tout apparaitra ici.</Text>
+
+              {/* Recap solde */}
+              <View style={{ width: '100%', marginTop: 16, gap: 8 }}>
+                <View style={[s.receiptRow, { borderColor: colors.border }]}>
+                  <Text style={[s.receiptLabel, { color: colors.textSecondary }]}>Solde actuel</Text>
+                  <Text style={[s.receiptValue, { color: '#7B3FF2' }]}>{(balance?.coins_balance ?? 0).toLocaleString('fr-FR')} coins</Text>
+                </View>
+                <View style={[s.receiptRow, { borderColor: colors.border }]}>
+                  <Text style={[s.receiptLabel, { color: colors.textSecondary }]}>Equivalent EUR</Text>
+                  <Text style={[s.receiptValue, { color: colors.textPrimary }]}>{coinsToEur(balance?.coins_balance ?? 0)} EUR</Text>
+                </View>
+                <View style={[s.receiptRow, { borderColor: colors.border }]}>
+                  <Text style={[s.receiptLabel, { color: colors.textSecondary }]}>Taux de conversion</Text>
+                  <Text style={[s.receiptValue, { color: colors.textPrimary }]}>100 coins = 0,50 EUR</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => navigation.navigate('BuyCoins')}
+                style={{ marginTop: 16, backgroundColor: '#7B3FF2', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 20 }}
+                activeOpacity={0.85}
+              >
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Acheter des coins</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={s.txList}>
@@ -525,6 +596,21 @@ const styles = (colors: any) => StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 15,
+  },
+  receiptRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  receiptLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  receiptValue: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 
