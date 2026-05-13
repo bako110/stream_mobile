@@ -281,6 +281,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   // Modération
   const [handRequests, setHandRequests] = useState<HandRequest[]>([]);
   const [showRequests, setShowRequests] = useState(false);
+  const [showOnStage,  setShowOnStage]  = useState(false);
   const [onStage,      setOnStage]      = useState<Set<string>>(new Set());
 
   const chatRef  = useRef<FlatList>(null);
@@ -476,10 +477,19 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
     const text = chatInput.trim();
     if (!text || sending) return;
     setChatInput(''); setShowInput(false); setSending(true);
+    // Affichage local immédiat
+    const localMsg = {
+      id: `local-${Date.now()}`,
+      user: currentUser?.display_name ?? currentUser?.username ?? 'Moi',
+      avatar: currentUser?.avatar_url ?? null,
+      text,
+    };
+    setMessages(prev => [...prev.slice(-149), localMsg]);
+    setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
     try { await apiClient.post(Endpoints.social.comments, { body: text, live_id: liveId }); }
     catch {}
     finally { setSending(false); }
-  }, [chatInput, sending, liveId]);
+  }, [chatInput, sending, liveId, currentUser]);
 
   const toggleMute = useCallback(() => {
     const next = !muted;
@@ -642,8 +652,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
       {/* ── CONTRÔLES DROITE ────────────────────────────────────────── */}
       <View style={st.sideControls}>
 
-        {/* Demandes — badge rouge si en attente */}
-        <TouchableOpacity style={st.sideBtn} onPress={() => setShowRequests(v => !v)} activeOpacity={0.8}>
+        {/* Demandes — badge si en attente */}
+        <TouchableOpacity style={st.sideBtn} onPress={() => { setShowRequests(v => !v); setShowOnStage(false); }} activeOpacity={0.8}>
           <View style={[st.sideBtnCircle, pendingCount > 0 && st.sideBtnPending]}>
             <Text style={{ fontSize: 20 }}>✋</Text>
             {pendingCount > 0 && (
@@ -651,9 +661,22 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
             )}
           </View>
           <Text style={[st.sideBtnLabel, pendingCount > 0 && { color: '#FFD700' }]}>
-            {pendingCount > 0 ? `${pendingCount} demande${pendingCount > 1 ? 's' : ''}` : 'Scène'}
+            {pendingCount > 0 ? `${pendingCount} demande${pendingCount > 1 ? 's' : ''}` : 'Demandes'}
           </Text>
         </TouchableOpacity>
+
+        {/* Sur scène — visible si au moins 1 participant invité */}
+        {onStage.size > 0 && (
+          <TouchableOpacity style={st.sideBtn} onPress={() => { setShowOnStage(v => !v); setShowRequests(false); }} activeOpacity={0.8}>
+            <View style={[st.sideBtnCircle, { borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.15)' }]}>
+              <Icon name="users" size={20} color="#4ade80" />
+              <View style={[st.badge, { backgroundColor: '#4ade80' }]}>
+                <Text style={st.badgeText}>{onStage.size}</Text>
+              </View>
+            </View>
+            <Text style={[st.sideBtnLabel, { color: '#4ade80' }]}>Scène</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Flip */}
         <TouchableOpacity style={st.sideBtn} onPress={flipCam} activeOpacity={0.8}>
@@ -696,6 +719,37 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           onRefuse={handleRefuse}
           onClose={() => setShowRequests(false)}
         />
+      )}
+
+      {/* ── PANEL SUR SCÈNE ──────────────────────────────────────────── */}
+      {showOnStage && onStage.size > 0 && (
+        <Animated.View entering={SlideInRight.duration(280)} exiting={SlideOutRight.duration(220)} style={os.panel}>
+          <View style={os.header}>
+            <Text style={os.title}>Sur scène ({onStage.size})</Text>
+            <TouchableOpacity onPress={() => setShowOnStage(false)} style={os.closeBtn}>
+              <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {Array.from(onStage).map(identity => {
+              const p    = remoteParticipants.find(rp => rp.identity === identity);
+              const name = p?.name || identity;
+              return (
+                <View key={identity} style={os.row}>
+                  <Av name={name} size={36} color="#4ade80" />
+                  <Text style={os.name} numberOfLines={1}>{name}</Text>
+                  <TouchableOpacity style={os.demoteBtn} onPress={() => handleDemote(identity, name)} activeOpacity={0.8}>
+                    <Icon name="arrow-down" size={13} color="#fff" />
+                    <Text style={os.demoteText}>Descendre</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={os.banBtn} onPress={() => handleBan(identity, name)} activeOpacity={0.8}>
+                    <Icon name="slash" size={13} color="#F0365A" />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
       )}
 
       {/* Cadeaux */}
@@ -930,4 +984,42 @@ const st = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#000',
   },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+});
+
+// ── Styles panel "Sur scène" ──────────────────────────────────────────────────
+
+const os = StyleSheet.create({
+  panel: {
+    position: 'absolute', top: Platform.OS === 'ios' ? 110 : 90,
+    right: 0, width: 230, maxHeight: 320,
+    backgroundColor: 'rgba(18,18,30,0.96)',
+    borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
+    borderWidth: 1, borderRightWidth: 0,
+    borderColor: 'rgba(74,222,128,0.3)',
+    zIndex: 50, overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
+  },
+  title:    { color: '#4ade80', fontSize: 13, fontWeight: '700' },
+  closeBtn: { padding: 4 },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  name:      { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
+  demoteBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(240,54,90,0.2)', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: '#F0365A',
+  },
+  demoteText: { color: '#F0365A', fontSize: 11, fontWeight: '700' },
+  banBtn: {
+    padding: 6, backgroundColor: 'rgba(240,54,90,0.12)',
+    borderRadius: 8, borderWidth: 1, borderColor: 'rgba(240,54,90,0.3)',
+  },
 });
