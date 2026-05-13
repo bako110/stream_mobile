@@ -951,7 +951,7 @@ export default function BoostScreen() {
           <View style={[sc.introBox, { backgroundColor: '#7B3FF215', borderColor: '#7B3FF230' }]}>
             <Icon name="cpu" size={18} color="#7B3FF2" />
             <Text style={[sc.introText, { color: colors.textSecondary }]}>
-              Analyse de ton compte en temps reel — suggestions personnalisees selon tes reels, events et audience.
+              On a analyse ton compte et on a trouve des opportunites pour toi. Booste ce qui marche deja et passe au niveau superieur !
             </Text>
           </View>
 
