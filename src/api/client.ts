@@ -105,8 +105,7 @@ async function request<T>(
       if (response.status === 401) _onUnauthorized?.();
       if (response.status === 403 && json?.detail?.code === 'account_blocked') {
         _onAccountBlocked?.(json.detail?.reason, json.detail?.contact);
-        // Ne pas propager l'erreur — le callback gère l'affichage
-        return { data: null as T, status: response.status };
+        throw new ApiError(403, json.detail?.message ?? 'Compte bloqué', json);
       }
       throw new ApiError(
         response.status,
