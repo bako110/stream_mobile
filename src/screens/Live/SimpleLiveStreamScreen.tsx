@@ -17,7 +17,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
   Platform, Alert, ActivityIndicator, FlatList, TextInput,
-  Image, ScrollView,
+  Image, ScrollView, AppState, AppStateStatus,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import {
@@ -311,7 +311,19 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+
+    // Couper la caméra en background pour éviter le crash Android
+    const handleAppState = (next: AppStateStatus) => {
+      if (next === 'background' || next === 'inactive') {
+        localParticipant.setCameraEnabled(false).catch(() => {});
+      } else if (next === 'active') {
+        localParticipant.setCameraEnabled(true).catch(() => {});
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppState);
+
     return () => {
+      sub.remove();
       if (timerRef.current) clearInterval(timerRef.current);
       localParticipant.setCameraEnabled(false).catch(() => {});
       localParticipant.setMicrophoneEnabled(false).catch(() => {});
@@ -837,13 +849,20 @@ export const SimpleLiveStreamScreen: React.FC = () => {
       .finally(() => setLoadingToken(false));
   }, [liveId]);
 
+  const endedRef = useRef(false);
+
   const handleEnd = useCallback(async () => {
+    endedRef.current = true;
     try { await liveService.stopLive(liveId); } catch {}
     nav.goBack();
   }, [liveId, nav]);
 
   useEffect(() => {
-    return () => { liveService.stopLive(liveId).catch(() => {}); };
+    return () => {
+      if (!endedRef.current) {
+        liveService.stopLive(liveId).catch(() => {});
+      }
+    };
   }, [liveId]);
 
   if (loadingToken || !token || !wsUrl) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, ActivityIndicator,
@@ -15,7 +15,25 @@ import { Endpoints } from '../../api/endpoints';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Tab = 'new' | 'active' | 'history';
+type Tab = 'suggest' | 'new' | 'active' | 'history';
+
+interface BoostSuggestion {
+  target: string;
+  tier_id: string;
+  tier_label: string;
+  coins: number;
+  duration_days: number;
+  target_quantity: number;
+  quantity_label: string;
+  reason: string;
+  impact_label: string;
+  priority: number;
+  content_id?: string | null;
+  content_type?: string | null;
+  content_title?: string | null;
+  engagement_rate?: number | null;
+  affordable: boolean;
+}
 type ContentType = 'reel' | 'community' | 'post' | 'event' | 'concert' | 'live';
 
 interface BoostTier {
@@ -623,6 +641,96 @@ const ContentPicker: React.FC<{
   );
 };
 
+// ── IMPACT ICON MAP ────────────────────────────────────────────────────────
+
+const IMPACT_ICONS: Record<string, string> = {
+  'Fort potentiel viral':  'trending-up',
+  'Lancement de contenu':  'play-circle',
+  'Augmenter la portée':   'bar-chart-2',
+  "Croissance d'audience": 'users',
+  'Remplir l\'event':      'calendar',
+  'Remplir la salle':      'music',
+  'Amplifier un post':     'file-text',
+  'Visibilité du profil':  'eye',
+};
+
+// ── SUGGESTION CARD ────────────────────────────────────────────────────────
+
+const SuggestionCard: React.FC<{
+  suggestion: BoostSuggestion;
+  balance: number;
+  colors: any;
+  onBoost: (s: BoostSuggestion) => void;
+}> = ({ suggestion, balance, colors, onBoost }) => {
+  const cat = BOOST_CATEGORIES.find(c => c.id === suggestion.target);
+  const [g1, g2] = cat?.gradient ?? ['#7B3FF2', '#E0389A'];
+  const icon = IMPACT_ICONS[suggestion.impact_label] ?? cat?.icon ?? 'zap';
+  const canAfford = suggestion.affordable && balance >= suggestion.coins;
+
+  return (
+    <View style={[sc.card, { backgroundColor: colors.surface, borderColor: g1 + '30' }]}>
+      <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sc.topBar} />
+
+      <View style={sc.body}>
+        {/* Icon + impact label */}
+        <LinearGradient colors={[g1, g2]} style={sc.iconBox}>
+          <Icon name={icon as any} size={18} color="#fff" />
+        </LinearGradient>
+
+        <View style={{ flex: 1 }}>
+          <View style={sc.topRow}>
+            <Text style={[sc.impactLabel, { color: g1 }]}>{suggestion.impact_label}</Text>
+            <View style={[sc.priorityBadge, { backgroundColor: suggestion.priority === 1 ? '#EF444415' : g1 + '15' }]}>
+              <Text style={[sc.priorityText, { color: suggestion.priority === 1 ? '#EF4444' : g1 }]}>
+                {suggestion.priority === 1 ? 'Urgent' : suggestion.tier_label}
+              </Text>
+            </View>
+          </View>
+
+          {/* Contenu cible */}
+          {suggestion.content_title ? (
+            <Text style={[sc.contentTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              {suggestion.content_title}
+            </Text>
+          ) : null}
+
+          {/* Raison personnalisée */}
+          <Text style={[sc.reason, { color: colors.textSecondary }]}>{suggestion.reason}</Text>
+
+          {/* Stats engagement si dispo */}
+          {suggestion.engagement_rate != null && suggestion.engagement_rate > 0 ? (
+            <View style={[sc.engBadge, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
+              <Icon name="activity" size={10} color="#22C55E" />
+              <Text style={sc.engText}>{(suggestion.engagement_rate * 100).toFixed(1)}% d'engagement</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Footer: quantité + bouton */}
+      <View style={[sc.footer, { borderTopColor: colors.divider ?? colors.border }]}>
+        <View>
+          <Text style={[sc.qty, { color: colors.textPrimary }]}>{suggestion.quantity_label}</Text>
+          <Text style={[sc.dur, { color: colors.textTertiary }]}>{suggestion.duration_days} jour{suggestion.duration_days > 1 ? 's' : ''}</Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => onBoost(suggestion)}
+          activeOpacity={0.85}
+          style={[sc.boostBtnWrap, { opacity: canAfford ? 1 : 0.55 }]}
+        >
+          <LinearGradient colors={canAfford ? [g1, g2] : ['#888', '#666']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sc.boostBtn}>
+            <Icon name="zap" size={12} color="#fff" />
+            <Text style={sc.boostBtnText}>
+              {canAfford ? `${suggestion.coins.toLocaleString('fr-FR')} coins` : 'Solde insuffisant'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 // ── BOOST SCREEN ───────────────────────────────────────────────────────────
 
 export default function BoostScreen() {
@@ -631,8 +739,10 @@ export default function BoostScreen() {
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? '';
 
-  const [tab,           setTab]           = useState<Tab>('new');
+  const [tab,           setTab]           = useState<Tab>('suggest');
   const [balance,       setBalance]       = useState(0);
+  const [suggestions,      setSuggestions]      = useState<BoostSuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [catIdx,        setCatIdx]        = useState(0);
   const [selectedTier,  setSelectedTier]  = useState<BoostTier | null>(null);
   const [targetContent, setTargetContent] = useState<TargetContent | null>(null);
@@ -662,6 +772,13 @@ export default function BoostScreen() {
       .then(r => setActiveBoosts(Array.isArray(r.data) ? r.data : []))
       .catch(() => {})
       .finally(() => setLoadingActive(false));
+    apiClient.get<{ suggestions: BoostSuggestion[]; wallet_balance: number }>(Endpoints.wallet.boostSuggestions)
+      .then(r => {
+        setSuggestions(r.data?.suggestions ?? []);
+        if (r.data?.wallet_balance != null) setBalance(r.data.wallet_balance);
+      })
+      .catch(() => setSuggestions([]))
+      .finally(() => setLoadingSuggestions(false));
   }, []);
 
   useEffect(() => {
@@ -672,6 +789,30 @@ export default function BoostScreen() {
       .catch(() => {})
       .finally(() => { setLoadingHistory(false); setHistoryLoaded(true); });
   }, [tab, historyLoaded]);
+
+  function handleBoostFromSuggestion(s: BoostSuggestion) {
+    if (!s.affordable || balance < s.coins) {
+      Alert.alert('Solde insuffisant', `Il te manque ${(s.coins - balance).toLocaleString('fr-FR')} coins.`, [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Acheter des coins', onPress: () => navigation.navigate('BuyCoins') },
+      ]);
+      return;
+    }
+    // Pré-remplir le formulaire
+    const catI = BOOST_CATEGORIES.findIndex(c => c.id === s.target);
+    if (catI >= 0) {
+      setCatIdx(catI);
+      const tier = BOOST_CATEGORIES[catI].tiers.find(t => t.id === s.tier_id) ?? null;
+      if (tier) {
+        if (s.content_id && s.content_type && s.content_title) {
+          setTargetContent({ id: s.content_id, title: s.content_title });
+        }
+        setSelectedTier(tier);
+        setShowModal(true);
+        setTab('new');
+      }
+    }
+  }
 
   function selectCat(i: number) {
     setCatIdx(i);
@@ -783,7 +924,8 @@ export default function BoostScreen() {
       {/* Tabs */}
       <View style={[s.tabsBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         {([
-          { key: 'new',     label: 'Nouveau',   badge: 0 },
+          { key: 'suggest', label: 'Pour toi',   badge: suggestions.length },
+          { key: 'new',     label: 'Nouveau',    badge: 0 },
           { key: 'active',  label: 'Actifs',     badge: activeBoosts.length },
           { key: 'history', label: 'Historique', badge: 0 },
         ] as const).map(({ key, label, badge }) => (
@@ -801,6 +943,46 @@ export default function BoostScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* ── TAB: Suggestions ────────────────────────────────────────────── */}
+      {tab === 'suggest' && (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+          {/* Intro */}
+          <View style={[sc.introBox, { backgroundColor: '#7B3FF215', borderColor: '#7B3FF230' }]}>
+            <Icon name="cpu" size={18} color="#7B3FF2" />
+            <Text style={[sc.introText, { color: colors.textSecondary }]}>
+              Analyse de ton compte en temps reel — suggestions personnalisees selon tes reels, events et audience.
+            </Text>
+          </View>
+
+          {loadingSuggestions ? (
+            <ActivityIndicator style={{ marginTop: 40 }} color="#7B3FF2" />
+          ) : suggestions.length === 0 ? (
+            <View style={s.emptyState}>
+              <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.emptyIcon}>
+                <Icon name="star" size={28} color="#fff" />
+              </LinearGradient>
+              <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Aucune suggestion pour l'instant</Text>
+              <Text style={[s.emptySub, { color: colors.textTertiary }]}>
+                Publie des reels ou des events pour obtenir des recommandations personnalisees.
+              </Text>
+              <TouchableOpacity onPress={() => setTab('new')} style={[s.emptyBtn, { backgroundColor: '#7B3FF2' }]}>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Explorer les boosts</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            suggestions.map((sug, i) => (
+              <SuggestionCard
+                key={`${sug.target}-${i}`}
+                suggestion={sug}
+                balance={balance}
+                colors={colors}
+                onBoost={handleBoostFromSuggestion}
+              />
+            ))
+          )}
+        </ScrollView>
+      )}
 
       {/* ── TAB: Nouveau boost ───────────────────────────────────────────── */}
       {tab === 'new' && (
@@ -1122,8 +1304,8 @@ export default function BoostScreen() {
       <Animated.View
         pointerEvents="none"
         style={[
-          StyleSheet.absoluteFillObject,
-          { opacity: successAnim, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)' },
+          StyleSheet.absoluteFill,
+          { opacity: successAnim, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: 'rgba(0,0,0,0.8)' },
         ]}
       >
         <Animated.View style={[s.successBox, { transform: [{ scale: successScale }] }]}>
@@ -1273,4 +1455,27 @@ const s = StyleSheet.create({
   successRing:  { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
   successTitle: { color: '#fff', fontSize: 26, fontWeight: '900' },
   successSub:   { color: 'rgba(255,255,255,0.75)', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+});
+
+const sc = StyleSheet.create({
+  card:          { borderRadius: 18, overflow: 'hidden', borderWidth: 1, marginBottom: 10 },
+  topBar:        { height: 3 },
+  body:          { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
+  iconBox:       { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  topRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
+  impactLabel:   { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4, flex: 1 },
+  priorityBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
+  priorityText:  { fontSize: 10, fontWeight: '700' },
+  contentTitle:  { fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  reason:        { fontSize: 12, lineHeight: 18 },
+  engBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start' },
+  engText:       { fontSize: 10, fontWeight: '700', color: '#22C55E' },
+  footer:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  qty:           { fontSize: 13, fontWeight: '700' },
+  dur:           { fontSize: 11, marginTop: 1 },
+  boostBtnWrap:  { borderRadius: 20, overflow: 'hidden' },
+  boostBtn:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8 },
+  boostBtnText:  { color: '#fff', fontSize: 12, fontWeight: '800' },
+  introBox:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 1, padding: 12 },
+  introText:     { flex: 1, fontSize: 12, lineHeight: 18 },
 });

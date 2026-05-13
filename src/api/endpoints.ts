@@ -292,10 +292,11 @@ export const Endpoints = {
     creatorStats:     `${V1}/wallet/creator/stats`,
     purchaseCustom:   `${V1}/wallet/purchase/custom`,
     // Boost
-    boostsActive:     `${V1}/wallet/boosts/active`,
-    boostsHistory:    `${V1}/wallet/boosts/history`,
-    boostsPurchase:   `${V1}/wallet/boosts/purchase`,
-    boostCancel:      (id: string) => `${V1}/wallet/boosts/${id}`,
+    boostsActive:      `${V1}/wallet/boosts/active`,
+    boostsHistory:     `${V1}/wallet/boosts/history`,
+    boostsPurchase:    `${V1}/wallet/boosts/purchase`,
+    boostCancel:       (id: string) => `${V1}/wallet/boosts/${id}`,
+    boostSuggestions:  `${V1}/wallet/boosts/suggestions`,
   },
 
   // ── Lives simples (spontanés) ─────────────────────────────────────────────

@@ -12,7 +12,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback,
   StatusBar, Platform, FlatList, TextInput, KeyboardAvoidingView,
-  ActivityIndicator, Image, Alert,
+  ActivityIndicator, Image, Alert, AppState, AppStateStatus,
 } from 'react-native';
 import Animated, {
   FadeIn, FadeOut, SlideInUp, SlideOutDown,
@@ -281,6 +281,20 @@ const RoomContent: React.FC<{
     goOnStageRef.current  = goOnStage;
     leaveStageRef.current = leaveStage;
   }, [goOnStage, leaveStage, goOnStageRef, leaveStageRef]);
+
+  // Couper la caméra en background pour éviter le crash Android
+  useEffect(() => {
+    if (!onStage) return;
+    const handleAppState = (next: AppStateStatus) => {
+      if (next === 'background' || next === 'inactive') {
+        localParticipant.setCameraEnabled(false).catch(() => {});
+      } else if (next === 'active') {
+        localParticipant.setCameraEnabled(true).catch(() => {});
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppState);
+    return () => sub.remove();
+  }, [onStage, localParticipant]);
 
   const toggleCam = useCallback(async () => {
     if (!onStage) return;
