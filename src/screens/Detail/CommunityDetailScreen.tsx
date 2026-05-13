@@ -1289,6 +1289,20 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               </View>
             </View>
 
+            {/* ── Banner communauté bloquée (créateur uniquement) ── */}
+            {(community as any).is_blocked && String((community as any).creator_id) === myId && (
+              <View style={[s.blockedBanner, { backgroundColor: '#EF44441A', borderColor: '#EF444440' }]}>
+                <Icon name="slash" size={16} color="#EF4444" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.blockedBannerTitle, { color: '#EF4444' }]}>Communauté bloquée</Text>
+                  <Text style={[s.blockedBannerSub, { color: colors.textSecondary }]}>
+                    Cette communauté a été bloquée par un administrateur. Elle n'est plus visible par les membres.
+                    Contactez le support pour plus d'informations.
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* ── Infos ── */}
             <View style={s.infoBlock}>
               {/* Nom + badge vérifié */}
@@ -2412,4 +2426,7 @@ const s = StyleSheet.create({
   blockedCountBadge:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   blockedEmpty:         { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
   blockedEmptyText:     { fontSize: 13, fontWeight: '500' },
+  blockedBanner:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginHorizontal: 16, marginTop: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
+  blockedBannerTitle:   { fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  blockedBannerSub:     { fontSize: 12, lineHeight: 18 },
 });
