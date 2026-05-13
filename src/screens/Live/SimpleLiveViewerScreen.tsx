@@ -78,14 +78,17 @@ const MultiVideoView: React.FC<{
   const participants = useParticipants();
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
-  const defaultSpotlight = allTracks.find(t => !t.participant.isLocal) ?? allTracks[0] ?? null;
-  const spotlightTrack   = allTracks.find(t => t.participant.identity === spotlightId) ?? defaultSpotlight;
-  const thumbnailTracks  = allTracks.filter(t => t !== spotlightTrack);
-  const localTrack       = allTracks.find(t => t.participant.isLocal && !t.publication?.isMuted) ?? null;
-  const showLocalPip     = localTrack && spotlightTrack && !spotlightTrack.participant.isLocal;
+  const localTrack      = allTracks.find(t => t.participant.isLocal) ?? null;
+  const remoteTracks    = allTracks.filter(t => !t.participant.isLocal);
+  const defaultSpotlight = remoteTracks[0] ?? null;
+  const spotlightTrack   = remoteTracks.find(t => t.participant.identity === spotlightId) ?? defaultSpotlight;
+  // Vignettes = autres remotes seulement (le local est dans le PiP)
+  const thumbnailTracks  = remoteTracks.filter(t => t !== spotlightTrack);
+  const localCamOn       = localTrack ? !localTrack.publication?.isMuted : false;
+  const showLocalPip     = localTrack && localCamOn && spotlightTrack;
 
   const spotlightName  = spotlightTrack
-    ? (spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity))
+    ? (spotlightTrack.participant.name || spotlightTrack.participant.identity)
     : '';
   const spotlightCamOn = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
 
@@ -148,23 +151,22 @@ const MultiVideoView: React.FC<{
           </TouchableOpacity>
         )}
 
-        {/* PiP local (quand on est sur scène) */}
+        {/* PiP local "Toi" — coin bas gauche, visible seulement quand on est sur scène */}
         {showLocalPip && localTrack && (
-          <TouchableOpacity style={mv.pip} onPress={() => setSpotlightId(localTrack.participant.identity)} activeOpacity={0.85}>
+          <View style={mv.pip} pointerEvents="none">
             <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
             <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={mv.pipGrad}>
               <Text style={mv.pipLabel}>Toi</Text>
             </LinearGradient>
-          </TouchableOpacity>
+          </View>
         )}
 
-        {/* Vignettes autres participants */}
+        {/* Vignettes autres participants remotes (jamais le local) */}
         {thumbnailTracks.length > 0 && (
           <View style={mv.thumbsCol}>
             {thumbnailTracks.map(t => {
-              const camOn   = !t.publication?.isMuted;
-              const tName   = t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity);
-              const isLocal = t.participant.isLocal;
+              const camOn = !t.publication?.isMuted;
+              const tName = t.participant.name || t.participant.identity;
               return (
                 <TouchableOpacity
                   key={t.participant.identity}
@@ -179,15 +181,13 @@ const MultiVideoView: React.FC<{
                   <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={mv.thumbGrad}>
                     <Text style={mv.thumbLabel} numberOfLines={1}>{tName}</Text>
                   </LinearGradient>
-                  {!isLocal && (
-                    <TouchableOpacity
-                      style={mv.thumbGiftBtn}
-                      onPress={() => onGift(t.participant.identity, tName)}
-                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                    >
-                      <Text style={{ fontSize: 13 }}>🎁</Text>
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={mv.thumbGiftBtn}
+                    onPress={() => onGift(t.participant.identity, tName)}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                  >
+                    <Text style={{ fontSize: 13 }}>🎁</Text>
+                  </TouchableOpacity>
                 </TouchableOpacity>
               );
             })}
@@ -695,7 +695,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     ]);
   }, [liveId]);
 
-  const handleDemoteUser = useCallback(async (identity: string, name: string) => {
+  const handleDemoteUser = useCallback(async (identity: string, _name: string) => {
     try {
       await apiClient.post(Endpoints.lives.demote(liveId, identity));
     } catch {
@@ -788,29 +788,27 @@ const mv = StyleSheet.create({
   noCamMicText:  { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   spotlightName: { color: '#fff', fontSize: 16, fontWeight: '700' },
   spotLabel: {
-    position: 'absolute', bottom: 52, left: 12, zIndex: 5,
+    position: 'absolute', bottom: Platform.OS === 'ios' ? 260 : 240, left: 12, zIndex: 5,
     backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8,
     paddingHorizontal: 8, paddingVertical: 3,
   },
   spotLabelText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   spotGiftBtn: {
-    position: 'absolute', bottom: 60, right: 100, zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 28, padding: 10,
-    borderWidth: 1, borderColor: '#FFD700',
+    display: 'none',
   },
   pip: {
-    position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, right: 12,
-    width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.45)', zIndex: 15,
+    position: 'absolute', top: Platform.OS === 'ios' ? 115 : 95, left: 12,
+    width: 72, height: 108, borderRadius: 12, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)', zIndex: 15,
   },
   pipGrad: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 30,
-    justifyContent: 'flex-end', paddingBottom: 4,
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
+    justifyContent: 'flex-end', paddingBottom: 3,
   },
   pipLabel: { color: '#fff', fontSize: 9, textAlign: 'center' },
   thumbsCol: {
-    position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170,
-    left: 12, zIndex: 15, gap: 8,
+    position: 'absolute', top: Platform.OS === 'ios' ? 115 : 95,
+    left: 92, zIndex: 15, gap: 8,
   },
   thumb: {
     width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
