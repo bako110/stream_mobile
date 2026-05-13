@@ -307,11 +307,12 @@ export const Endpoints = {
     stop:   (id: string) => `${V1}/lives/${id}/stop`,
     token:  (id: string) => `${V1}/lives/${id}/token`,
     status: (id: string) => `${V1}/lives/${id}/status`,
-    ban:       (id: string, identity: string) => `${V1}/lives/${id}/ban/${identity}`,
-    like:      (id: string) => `${V1}/lives/${id}/like`,
-    handRaise: (id: string, identity: string) => `${V1}/lives/${id}/hand-raise/${identity}`,
-    invite:    (id: string, identity: string) => `${V1}/lives/${id}/invite/${identity}`,
-    demote:    (id: string, identity: string) => `${V1}/lives/${id}/demote/${identity}`,
+    ban:        (id: string, identity: string) => `${V1}/lives/${id}/ban/${identity}`,
+    globalBan:  (id: string, userId: string)   => `${V1}/lives/${id}/global-ban/${userId}`,
+    like:       (id: string) => `${V1}/lives/${id}/like`,
+    handRaise:  (id: string, identity: string) => `${V1}/lives/${id}/hand-raise/${identity}`,
+    invite:     (id: string, identity: string) => `${V1}/lives/${id}/invite/${identity}`,
+    demote:     (id: string, identity: string) => `${V1}/lives/${id}/demote/${identity}`,
   },
 
   // ── Favoris (prefix: /api/v1/favorites) ──────────────────────────────────

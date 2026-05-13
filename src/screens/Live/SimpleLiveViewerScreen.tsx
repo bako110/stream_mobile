@@ -382,7 +382,7 @@ const RoomContent: React.FC<{
                     Alert.alert(item.user, 'Action de modération', [
                       { text: 'Annuler', style: 'cancel' },
                       { text: 'Faire descendre de scène', onPress: () => onDemoteUser(item.userId!, item.user) },
-                      { text: 'Bannir du live', style: 'destructive', onPress: () => onBanUser(item.userId!, item.user) },
+                      { text: 'Exclure du live', style: 'destructive', onPress: () => onBanUser(item.userId!, item.user) },
                     ]);
                   }}
                   delayLongPress={400}
@@ -664,13 +664,32 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const isHost = !!live && !!currentUser && String(live.user_id) === String(currentUser.id);
 
   const handleBanUser = useCallback((identity: string, name: string) => {
-    Alert.alert('Bannir du live', `Exclure ${name} ?`, [
+    Alert.alert(name, 'Choisir une action de bannissement', [
       { text: 'Annuler', style: 'cancel' },
       {
-        text: 'Exclure', style: 'destructive',
+        text: 'Exclure du live',
         onPress: async () => {
           try { await apiClient.post(Endpoints.lives.ban(liveId, identity)); }
           catch { Alert.alert('Erreur', 'Impossible d\'exclure ce participant.'); }
+        },
+      },
+      {
+        text: 'Bannir de tous mes lives', style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Bannir de tous les lives',
+            `${name} ne pourra plus rejoindre aucun de tes lives.`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Confirmer', style: 'destructive',
+                onPress: async () => {
+                  try { await apiClient.post(Endpoints.lives.globalBan(liveId, identity)); }
+                  catch { Alert.alert('Erreur', 'Impossible de bannir cet utilisateur.'); }
+                },
+              },
+            ]
+          );
         },
       },
     ]);

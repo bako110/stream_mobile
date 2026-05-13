@@ -171,7 +171,7 @@ const HostVideoView: React.FC<{
                       text: 'Faire descendre',
                       onPress: () => onDemote(id, tName),
                     }] : []),
-                    { text: 'Exclure du live', style: 'destructive' as const, onPress: () => onBan(id, tName) },
+                    { text: 'Bannir...', style: 'destructive' as const, onPress: () => onBan(id, tName) },
                   ]);
                 }}
                 activeOpacity={0.8}
@@ -454,10 +454,10 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   }, [liveId, addSysMsg]);
 
   const handleBan = useCallback((identity: string, name: string) => {
-    Alert.alert('Exclure du live', `Exclure ${name} ?`, [
+    Alert.alert(name, 'Choisir une action de bannissement', [
       { text: 'Annuler', style: 'cancel' },
       {
-        text: 'Exclure', style: 'destructive',
+        text: 'Exclure du live',
         onPress: async () => {
           try {
             await apiClient.post(Endpoints.lives.ban(liveId, identity));
@@ -467,6 +467,31 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           } catch {
             Alert.alert('Erreur', 'Impossible d\'exclure ce participant.');
           }
+        },
+      },
+      {
+        text: 'Bannir de tous mes lives', style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Bannir de tous les lives',
+            `${name} ne pourra plus rejoindre aucun de tes lives.`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Confirmer', style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await apiClient.post(Endpoints.lives.globalBan(liveId, identity));
+                    setHandRequests(prev => prev.filter(r => r.identity !== identity));
+                    setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
+                    addSysMsg(`${name} a été banni de tous tes lives`);
+                  } catch {
+                    Alert.alert('Erreur', 'Impossible de bannir cet utilisateur.');
+                  }
+                },
+              },
+            ]
+          );
         },
       },
     ]);
