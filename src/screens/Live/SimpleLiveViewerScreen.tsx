@@ -53,9 +53,11 @@ interface ChatMsg {
   userId?: string;
   avatar?: string | null;
   text:    string;
-  isJoin?: boolean;
-  isGift?: boolean;
-  isSys?:  boolean;
+  isJoin?:  boolean;
+  isGift?:  boolean;
+  isSys?:   boolean;
+  edited?:  boolean;
+  isLocal?: boolean;
 }
 
 interface GiftTick {
@@ -223,9 +225,12 @@ const RoomContent: React.FC<{
   onLeave:      () => void;
   onBanUser:    (userId: string, name: string) => void;
   onDemoteUser: (identity: string, name: string) => void;
+  onDeleteMsg:  (id: string) => void;
+  onEditMsg:    (id: string, newText: string) => void;
   giftNotifs:   GiftNotif[];
   onGiftNotifShown: (id: string) => void;
   giftTicker:   GiftTick[];
+  giftHistory:  GiftTick[];
   likeCount:    number;
   onLike:       () => void;
   elapsed:      number;
@@ -233,8 +238,9 @@ const RoomContent: React.FC<{
   leaveStageRef: { current: (() => void) | null };
 }> = ({
   live, liveId, myIdentity, isHost, viewerCount, messages, chatInput, setChatInput,
-  sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, giftNotifs, onGiftNotifShown,
-  giftTicker, likeCount, onLike, elapsed, goOnStageRef, leaveStageRef,
+  sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, onDeleteMsg, onEditMsg,
+  giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike,
+  elapsed, goOnStageRef, leaveStageRef,
 }) => {
   const { localParticipant } = useLocalParticipant();
   const [onStage,    setOnStage]    = useState(false);
@@ -242,6 +248,8 @@ const RoomContent: React.FC<{
   const [micOn,      setMicOn]      = useState(false);
   const [handRaised, setHandRaised] = useState(false);
   const [showInput,  setShowInput]  = useState(false);
+  const [showGifts,  setShowGifts]  = useState(false);
+  const [editTarget, setEditTarget] = useState<{ id: string; text: string } | null>(null);
   const likeRef = useRef<LiveLikeButtonRef>(null);
   const giftRef = useRef<LiveGiftOverlayRef>(null);
 
@@ -347,7 +355,7 @@ const RoomContent: React.FC<{
         </View>
       </View>
 
-      {/* ── GIFT TICKER ───────────────────────────────────────────────── */}
+      {/* ── GIFT TICKER (bas gauche, au-dessus du chat) ───────────────── */}
       {giftTicker.length > 0 && (
         <View style={gt.container} pointerEvents="none">
           {giftTicker.map(t => (
@@ -384,13 +392,7 @@ const RoomContent: React.FC<{
                 </Animated.View>
               );
             }
-            if (item.isGift) {
-              return (
-                <Animated.View entering={FadeIn.duration(200)} style={st.giftMsg}>
-                  <Text style={st.giftText}>{item.text}</Text>
-                </Animated.View>
-              );
-            }
+            const isMine = item.isLocal === true;
             const canModerate = isHost && item.userId && item.userId !== myIdentity;
             return (
               <Animated.View entering={FadeIn.duration(200)} style={st.chatRow}>
@@ -399,9 +401,23 @@ const RoomContent: React.FC<{
                   : <Av name={item.user} size={24} />
                 }
                 <TouchableOpacity
-                  style={st.chatBubble}
-                  activeOpacity={canModerate ? 0.7 : 1}
+                  style={[st.chatBubble, isMine && st.chatBubbleMine]}
+                  activeOpacity={(isMine || canModerate) ? 0.7 : 1}
                   onLongPress={() => {
+                    if (isMine) {
+                      Alert.alert('Mon message', item.text, [
+                        { text: 'Annuler', style: 'cancel' },
+                        {
+                          text: 'Modifier', onPress: () => {
+                            setEditTarget({ id: item.id, text: item.text });
+                            setChatInput(item.text);
+                            setShowInput(true);
+                          },
+                        },
+                        { text: 'Supprimer', style: 'destructive', onPress: () => onDeleteMsg(item.id) },
+                      ]);
+                      return;
+                    }
                     if (!canModerate) return;
                     Alert.alert(item.user, 'Action de modération', [
                       { text: 'Annuler', style: 'cancel' },
@@ -412,7 +428,7 @@ const RoomContent: React.FC<{
                   delayLongPress={400}
                 >
                   <Text style={st.chatUser}>{item.user} </Text>
-                  <Text style={st.chatText}>{item.text}</Text>
+                  <Text style={st.chatText}>{item.text}{item.edited ? ' ✏' : ''}</Text>
                 </TouchableOpacity>
               </Animated.View>
             );
@@ -425,19 +441,45 @@ const RoomContent: React.FC<{
 
         {showInput ? (
           <View style={st.inputRow}>
+            {editTarget && (
+              <TouchableOpacity onPress={() => { setEditTarget(null); setChatInput(''); setShowInput(false); }} style={st.editCancelBtn}>
+                <Icon name="x" size={14} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            )}
             <TextInput
               value={chatInput}
               onChangeText={setChatInput}
-              placeholder="Message..."
+              placeholder={editTarget ? 'Modifier...' : 'Message...'}
               placeholderTextColor="rgba(255,255,255,0.45)"
               style={st.chatField}
-              onSubmitEditing={() => { onSend(); setShowInput(false); }}
+              onSubmitEditing={() => {
+                if (editTarget) {
+                  onEditMsg(editTarget.id, chatInput.trim());
+                  setEditTarget(null);
+                  setChatInput('');
+                  setShowInput(false);
+                } else {
+                  onSend();
+                  setShowInput(false);
+                }
+              }}
               returnKeyType="send"
               autoFocus
-              onBlur={() => { if (!chatInput.trim()) setShowInput(false); }}
+              onBlur={() => { if (!chatInput.trim()) { setShowInput(false); setEditTarget(null); } }}
             />
-            <TouchableOpacity onPress={() => { onSend(); setShowInput(false); }} style={st.sendBtn} disabled={sending || !chatInput.trim()}>
-              <Icon name="send" size={15} color="#fff" />
+            <TouchableOpacity
+              onPress={() => {
+                if (editTarget) {
+                  onEditMsg(editTarget.id, chatInput.trim());
+                  setEditTarget(null); setChatInput(''); setShowInput(false);
+                } else {
+                  onSend(); setShowInput(false);
+                }
+              }}
+              style={[st.sendBtn, editTarget && { backgroundColor: '#4ade80' }]}
+              disabled={sending || !chatInput.trim()}
+            >
+              <Icon name={editTarget ? 'check' : 'send'} size={15} color="#fff" />
             </TouchableOpacity>
           </View>
         ) : (
@@ -450,7 +492,7 @@ const RoomContent: React.FC<{
 
       {/* ── CONTRÔLES DROITE ──────────────────────────────────────────── */}
       <View style={st.sideControls}>
-        {/* Cadeau */}
+        {/* Cadeau — envoyer */}
         <TouchableOpacity style={st.sideBtn} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
           <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' }]}>
             <Text style={{ fontSize: 22 }}>🎁</Text>
@@ -458,9 +500,19 @@ const RoomContent: React.FC<{
           <Text style={st.sideBtnLabel}>Cadeau</Text>
         </TouchableOpacity>
 
+        {/* Cadeaux reçus — historique */}
+        {giftHistory.length > 0 && (
+          <TouchableOpacity style={st.sideBtn} onPress={() => setShowGifts(v => !v)} activeOpacity={0.8}>
+            <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(255,215,0,0.15)', borderColor: 'rgba(255,215,0,0.5)' }]}>
+              <Icon name="star" size={20} color="#FFD700" />
+              <View style={st.giftBadge}><Text style={st.giftBadgeText}>{giftHistory.length}</Text></View>
+            </View>
+            <Text style={[st.sideBtnLabel, { color: '#FFD700' }]}>Reçus</Text>
+          </TouchableOpacity>
+        )}
+
         {onStage ? (
           <>
-            {/* Micro (visible seulement sur scène) */}
             <TouchableOpacity style={st.sideBtn} onPress={toggleMic} activeOpacity={0.8}>
               <View style={[st.sideBtnCircle, !micOn && st.sideBtnOff]}>
                 <Icon name={micOn ? 'mic' : 'mic-off'} size={20} color={micOn ? '#4ade80' : '#F0365A'} />
@@ -468,7 +520,6 @@ const RoomContent: React.FC<{
               <Text style={st.sideBtnLabel}>{micOn ? 'Micro' : 'Muet'}</Text>
             </TouchableOpacity>
 
-            {/* Caméra (visible seulement sur scène) */}
             <TouchableOpacity style={st.sideBtn} onPress={toggleCam} activeOpacity={0.8}>
               <View style={[st.sideBtnCircle, !camOn && st.sideBtnOff]}>
                 <Icon name={camOn ? 'video' : 'video-off'} size={20} color={camOn ? '#4ade80' : '#F0365A'} />
@@ -476,7 +527,6 @@ const RoomContent: React.FC<{
               <Text style={st.sideBtnLabel}>{camOn ? 'Cam' : 'Cam off'}</Text>
             </TouchableOpacity>
 
-            {/* Descendre */}
             <TouchableOpacity style={st.sideBtn} onPress={leaveStage} activeOpacity={0.8}>
               <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(240,54,90,0.2)', borderColor: '#F0365A' }]}>
                 <Icon name="arrow-down" size={20} color="#F0365A" />
@@ -485,7 +535,6 @@ const RoomContent: React.FC<{
             </TouchableOpacity>
           </>
         ) : (
-          /* Lever la main — seul bouton visible quand pas sur scène */
           <TouchableOpacity style={st.sideBtn} onPress={handleHandRaise} activeOpacity={0.8}>
             <Animated.View style={[st.sideBtnCircle, handRaised && st.sideBtnHandActive]}>
               <Text style={{ fontSize: 22 }}>{handRaised ? '✋' : '🖐️'}</Text>
@@ -496,7 +545,6 @@ const RoomContent: React.FC<{
           </TouchableOpacity>
         )}
 
-        {/* Quitter */}
         <TouchableOpacity style={st.sideBtn} onPress={onLeave} activeOpacity={0.8}>
           <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(240,54,90,0.2)', borderColor: '#F0365A' }]}>
             <Icon name="log-out" size={20} color="#F0365A" />
@@ -504,6 +552,33 @@ const RoomContent: React.FC<{
           <Text style={[st.sideBtnLabel, { color: '#F0365A' }]}>Quitter</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ── PANEL CADEAUX REÇUS ───────────────────────────────────────── */}
+      {showGifts && (
+        <Animated.View entering={SlideInUp.duration(280)} exiting={SlideOutDown.duration(220)} style={gp.panel}>
+          <View style={gp.header}>
+            <Text style={gp.title}>Cadeaux reçus ({giftHistory.length})</Text>
+            <TouchableOpacity onPress={() => setShowGifts(false)} style={gp.closeBtn}>
+              <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          </View>
+          <Text style={gp.total}>
+            Total : {giftHistory.reduce((s, t) => s + t.coins, 0)} pièces
+          </Text>
+          <View style={gp.list}>
+            {giftHistory.slice(0, 20).map((t, i) => (
+              <View key={`${t.id}-${i}`} style={gp.row}>
+                <Text style={gp.rowEmoji}>{t.emoji}</Text>
+                <View style={gp.rowInfo}>
+                  <Text style={gp.rowSender} numberOfLines={1}>{t.senderName}</Text>
+                  <Text style={gp.rowGift}>{t.giftName}</Text>
+                </View>
+                <Text style={gp.rowCoins}>{t.coins}</Text>
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+      )}
 
       <LiveGiftOverlay
         ref={giftRef}
@@ -533,6 +608,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [sending,     setSending]     = useState(false);
   const [giftNotifs,  setGiftNotifs]  = useState<GiftNotif[]>([]);
   const [giftTicker,  setGiftTicker]  = useState<GiftTick[]>([]);
+  const [giftHistory, setGiftHistory] = useState<GiftTick[]>([]);
   const [likeCount,   setLikeCount]   = useState(0);
   const [elapsed,     setElapsed]     = useState(0);
   // identity LiveKit du viewer (= userId stocké)
@@ -650,6 +726,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
             emoji: tick.emoji, giftName: tick.giftName, coins: tick.coins,
           }]);
           setGiftTicker(prev => [...prev.slice(-2), tick]);
+          setGiftHistory(prev => [tick, ...prev.slice(0, 49)]);
           setTimeout(() => setGiftTicker(prev => prev.filter(t => t.id !== tick.id)), 5000);
         }
 
@@ -672,11 +749,12 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     setSending(true);
     // Affichage local immédiat
     setMessages(prev => [...prev.slice(-149), {
-      id:     `local-${Date.now()}`,
-      user:   currentUser?.display_name ?? currentUser?.username ?? 'Moi',
-      userId: currentUser?.id ? String(currentUser.id) : undefined,
-      avatar: currentUser?.avatar_url ?? null,
+      id:      `local-${Date.now()}`,
+      user:    currentUser?.display_name ?? currentUser?.username ?? 'Moi',
+      userId:  currentUser?.id ? String(currentUser.id) : undefined,
+      avatar:  currentUser?.avatar_url ?? null,
       text,
+      isLocal: true,
     }]);
     setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
     try { await apiClient.post(Endpoints.social.comments, { body: text, live_id: liveId }); }
@@ -689,6 +767,14 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     if (elapsedRef.current) clearInterval(elapsedRef.current);
     nav.goBack();
   }, [nav]);
+
+  const handleDeleteMsg = useCallback((id: string) => {
+    setMessages(prev => prev.filter(m => m.id !== id));
+  }, []);
+
+  const handleEditMsg = useCallback((id: string, newText: string) => {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, text: newText, edited: true } : m));
+  }, []);
 
   const isHost = !!live && !!currentUser && String(live.user_id) === String(currentUser.id);
 
@@ -791,9 +877,12 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         onLeave={handleLeave}
         onBanUser={handleBanUser}
         onDemoteUser={handleDemoteUser}
+        onDeleteMsg={handleDeleteMsg}
+        onEditMsg={handleEditMsg}
         giftNotifs={giftNotifs}
         onGiftNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
         giftTicker={giftTicker}
+        giftHistory={giftHistory}
         likeCount={likeCount}
         onLike={handleLike}
         elapsed={elapsed}
@@ -914,8 +1003,17 @@ const st = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5, maxWidth: 220,
     flexDirection: 'row', flexWrap: 'wrap',
   },
+  chatBubbleMine: { backgroundColor: 'rgba(240,54,90,0.25)', borderWidth: 1, borderColor: 'rgba(240,54,90,0.4)' },
   chatUser: { color: '#F0365A', fontSize: 12, fontWeight: '700' },
   chatText: { color: '#fff', fontSize: 13 },
+  editCancelBtn: { padding: 6 },
+  giftBadge: {
+    position: 'absolute', top: -2, right: -2,
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#000',
+  },
+  giftBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
   sysRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4, alignSelf: 'flex-start' },
   sysText:  { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
   giftMsg:  { backgroundColor: 'rgba(255,215,0,0.18)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 4, alignSelf: 'flex-start' },
@@ -964,21 +1062,60 @@ const st = StyleSheet.create({
 const gt = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 115 : 95,
-    right: 76,
-    zIndex: 25,
+    bottom: Platform.OS === 'ios' ? 290 : 270,
+    left: 12,
+    zIndex: 40,
     gap: 6,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.75)',
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,
-    borderWidth: 1, borderColor: 'rgba(255,215,0,0.55)',
-    maxWidth: 190,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.6)',
+    maxWidth: 200,
   },
   emoji:  { fontSize: 18 },
   info:   { flex: 1 },
   sender: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
   detail: { color: 'rgba(255,255,255,0.65)', fontSize: 10 },
+});
+
+// ── Styles panel cadeaux reçus ────────────────────────────────────────────────
+
+const gp = StyleSheet.create({
+  panel: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 80 : 60,
+    right: 76,
+    width: 220, maxHeight: 320,
+    backgroundColor: 'rgba(15,15,25,0.96)',
+    borderRadius: 18,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
+    zIndex: 50, overflow: 'hidden',
+    paddingBottom: 8,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  title:    { color: '#FFD700', fontSize: 13, fontWeight: '800' },
+  closeBtn: { padding: 4 },
+  total: {
+    color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600',
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  list: { paddingHorizontal: 10, paddingTop: 4 },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  rowEmoji:  { fontSize: 20 },
+  rowInfo:   { flex: 1 },
+  rowSender: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  rowGift:   { color: 'rgba(255,255,255,0.5)', fontSize: 10 },
+  rowCoins:  { color: '#FFD700', fontSize: 12, fontWeight: '800' },
 });
