@@ -29,6 +29,7 @@ import {
   socialService,
 } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
+import { saveService } from '../../services/saveService';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { userService } from '../../services';
@@ -417,7 +418,13 @@ export const HomeScreen: React.FC = () => {
                   key={live.id}
                   style={s.spontCard}
                   activeOpacity={0.88}
-                  onPress={() => nav.navigate('SimpleLiveViewer', { liveId: live.id })}
+                  onPress={() => {
+                    if (currentUser?.id === live.user_id) {
+                      nav.navigate('SimpleLiveStream', { liveId: live.id });
+                    } else {
+                      nav.navigate('SimpleLiveViewer', { liveId: live.id });
+                    }
+                  }}
                 >
                   {/* Thumbnail / fond */}
                   <View style={s.spontThumb}>
@@ -961,11 +968,9 @@ const PostCard: React.FC<PostCardProps> = ({ item, colors, isDark, onPress, onCo
 
   const [liked,      setLiked]      = useState(false);
   const [likeCount,  setLikeCount]  = useState(0);
-  const [saved,      setSaved]      = useState(false);
-  useEffect(() => {
-    favoriteService.check(isConcert ? 'concert' : 'event', item.id).then(setSaved).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
+  const [saved, setSaved] = useState(() =>
+    isConcert ? saveService.isConcertSaved(item.id) : saveService.isEventSaved(item.id)
+  );
   const [reactionLoading, setReactionLoading] = useState(false);
   const likeScale = useSharedValue(1);
   const likeStyle = useAnimatedStyle(() => ({ transform: [{ scale: likeScale.value }] }));

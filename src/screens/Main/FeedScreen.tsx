@@ -27,6 +27,7 @@ import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
+import { saveService } from '../../services/saveService';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { communityService } from '../../services/communityService';
@@ -90,6 +91,7 @@ const badgeS = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });
 
+
 // ── Badges isolés — ne re-rendent que le FeedScreen quand les unread changent ─
 
 const FeedHeaderBadges: React.FC<{
@@ -103,7 +105,7 @@ const FeedHeaderBadges: React.FC<{
   const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
   const totalNotifs = unreadNotifications + unreadActivity;
   return (
-    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, gap: 6 }}>
       {/* Messages */}
       <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onMessages} activeOpacity={0.8}>
         <Icon name="send" size={18} color={colors.textPrimary} />
@@ -128,7 +130,7 @@ const FeedHeaderBadges: React.FC<{
       </TouchableOpacity>
       {/* Live */}
       <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: '#F0365A18' }]} onPress={onLive} activeOpacity={0.8}>
-        <Icon name="radio" size={18} color="#F0365A" />
+        <Icon name="video" size={18} color="#F0365A" />
       </TouchableOpacity>
     </View>
   );
@@ -166,17 +168,23 @@ export const FeedScreen: React.FC = () => {
   // Reel actif dans le feed (autoplay)
   const [activeReelId,      setActiveReelId]      = useState<string | null>(null);
   const [activeCardId,      setActiveCardId]       = useState<string | null>(null);
+  const [activePostId,      setActivePostId]       = useState<string | null>(null);
   const [feedFocused,       setFeedFocused]        = useState(true);
   const [feedScrollEnabled, setFeedScrollEnabled]  = useState(true);
 
   const feedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    setActiveReelId(null); // reels gérés en rangée horizontale, pas d'autoplay individuel
-    // Activer la vidéo pub de la première carte event/concert visible avec video_url
+    setActiveReelId(null);
+    // Activer la vidéo pub de la première carte event/concert visible
     const cardItem = viewableItems.find(v =>
       (v.item?.kind === 'event' || v.item?.kind === 'concert') && v.item?.data?.video_url,
     );
     setActiveCardId(cardItem ? cardItem.item.id : null);
+    // Activer la vidéo du premier post visible avec video_url
+    const postItem = viewableItems.find(v =>
+      v.item?.kind === 'post' && (v.item?.data as Post)?.video_url,
+    );
+    setActivePostId(postItem ? postItem.item.id : null);
   }).current;
 
   // Sheet commentaires
@@ -298,12 +306,16 @@ export const FeedScreen: React.FC = () => {
   const load = useCallback(async (f: FeedFilter) => {
     try {
       if (f === 'all') {
-        const [feedResult, reelsResult, postsResult, commResult] = await Promise.all([
+        const [feedResult, reelsResult, postsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
           searchService.getFeed(1, 50).catch(() => ({ items: [] })),
           reelService.getFeed().catch(() => ({ items: [], has_more: false, page: 1 })),
           postService.getFeed(1, 30).catch(() => [] as Post[]),
           communityService.list(1, 8).catch(() => []),
+          concertService.getLive().catch(() => [] as Concert[]),
+          liveService.getLives().catch(() => [] as LiveStream[]),
         ]);
+        setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
+        setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
         const commData: CommunityData[] = Array.isArray(commResult)
           ? commResult.slice(0, 5)
           : Array.isArray((commResult as any)?.items)
@@ -469,7 +481,7 @@ export const FeedScreen: React.FC = () => {
   // Recharge quand le filtre change
   useEffect(() => { setLoading(true); load(filter); }, [filter]);
 
-  // Charger les lives en direct
+  // Charger les lives en direct (appelé aussi depuis load('all') via Promise.all)
   const loadLive = useCallback(async () => {
     try {
       const [concerts, spont] = await Promise.all([
@@ -479,10 +491,6 @@ export const FeedScreen: React.FC = () => {
       setLiveConcerts(Array.isArray(concerts) ? concerts : []);
       setSpontLives(Array.isArray(spont) ? spont : []);
     } catch { /* silencieux */ }
-  }, []);
-
-  useEffect(() => {
-    loadLive();
   }, []);
 
   // WS : nouveau live spontané démarré
@@ -530,6 +538,7 @@ export const FeedScreen: React.FC = () => {
     return () => {
       setFeedFocused(false);
       setActiveReelId(null);
+      setActivePostId(null);
     };
   }, [filter]));
 
@@ -668,6 +677,7 @@ export const FeedScreen: React.FC = () => {
           post={item.data as Post}
           colors={colors}
           currentUserId={currentUser?.id}
+          isActive={activePostId === item.id && feedFocused}
           onPress={() => (nav as any).navigate('PostDetail', { postId: item.id, initialPost: item.data })}
           onAuthorPress={() => {
             if (postAuthorId) (nav as any).navigate('UserProfile', { userId: postAuthorId });
@@ -701,7 +711,7 @@ export const FeedScreen: React.FC = () => {
         onAuthorPress={() => { if (aid) (nav as any).navigate('UserProfile', { userId: aid }); }}
       />
     );
-  }, [colors, activeCardId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickSuggestions, suggestLoading, loadSuggestions]);
+  }, [colors, activeCardId, activePostId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickSuggestions, suggestLoading, loadSuggestions]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -861,13 +871,13 @@ export const FeedScreen: React.FC = () => {
         {/* ── Onglets + actions ─────────────────────────────────────────── */}
         {!searchOpen && (
           <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
-            {/* Ligne 1 : onglets pill */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, gap: 6 }}>
+            {/* Ligne 1 : onglets — répartis sur toute la largeur */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, gap: 6 }}>
               {([
-                { key: 'all',       label: 'Pour toi'   },
-                { key: 'following', label: 'Suivis'     },
-                { key: 'live',      label: 'En direct'  },
-              ] as { key: FeedFilter; label: string }[]).map(tab => {
+                { key: 'all',       label: 'Pour toi',  icon: 'home'   },
+                { key: 'following', label: 'Suivis',    icon: 'users'  },
+                { key: 'live',      label: 'En direct', icon: 'radio'  },
+              ] as { key: FeedFilter; label: string; icon: string }[]).map(tab => {
                 const active = filter === tab.key;
                 return (
                   <TouchableOpacity
@@ -875,32 +885,33 @@ export const FeedScreen: React.FC = () => {
                     onPress={() => { setFilter(tab.key); setFilterDropOpen(false); load(tab.key); }}
                     activeOpacity={0.75}
                     style={{
-                      paddingHorizontal: 14, paddingVertical: 7,
+                      flex: 1,
+                      paddingVertical: 8,
                       borderRadius: 20,
                       backgroundColor: active ? colors.primary : colors.backgroundSecondary,
-                      flexDirection: 'row', alignItems: 'center', gap: 5,
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
                     }}
                   >
-                    {tab.key === 'live' && (
-                      <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: active ? '#fff' : '#F0365A' }, active ? {} : liveDotStyle]} />
-                    )}
+                    {tab.key === 'live'
+                      ? <Animated.View style={[{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: active ? '#fff' : '#F0365A' }, active ? {} : liveDotStyle]} />
+                      : <Icon name={tab.icon} size={14} color={active ? '#fff' : colors.textSecondary} />
+                    }
                     <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>
                       {tab.label}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
-              {/* Actions à droite */}
-              <View style={{ flex: 1 }} />
-              <FeedHeaderBadges
-                onMessages={goToMessages}
-                onNotifs={goToNotifs}
-                onMenu={openMenu}
-                onFavorites={() => nav.navigate('Favorites')}
-                onLive={() => nav.navigate('GoLive')}
-                colors={colors}
-              />
             </View>
+            {/* Ligne 2 : icônes d'actions — réparties sur toute la largeur */}
+            <FeedHeaderBadges
+              onMessages={goToMessages}
+              onNotifs={goToNotifs}
+              onMenu={openMenu}
+              onFavorites={() => nav.navigate('Favorites')}
+              onLive={() => nav.navigate('GoLive')}
+              colors={colors}
+            />
           </View>
         )}
 
@@ -1195,7 +1206,13 @@ export const FeedScreen: React.FC = () => {
                           key={live.id}
                           style={{ width: 110, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
                           activeOpacity={0.85}
-                          onPress={() => nav.navigate('SimpleLiveViewer' as any, { liveId: live.id })}
+                          onPress={() => {
+                            if (currentUser?.id === live.user_id) {
+                              nav.navigate('SimpleLiveStream' as any, { liveId: live.id });
+                            } else {
+                              nav.navigate('SimpleLiveViewer' as any, { liveId: live.id });
+                            }
+                          }}
                         >
                           <View style={{ width: 110, height: 150, position: 'relative' }}>
                             <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={{ width: 110, height: 150, alignItems: 'center', justifyContent: 'center' }}>
@@ -2164,11 +2181,9 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const [likeCount,    setLikeCount]    = useState(item.data?.like_count ?? 0);
   const [commentCount, setCommentCount] = useState(item.data?.comment_count ?? 0);
   const [shareCount,   setShareCount]   = useState(item.data?.share_count ?? 0);
-  const [saved,        setSaved]        = useState(false);
-  React.useEffect(() => {
-    favoriteService.check(isEvent ? 'event' : 'concert', item.id).then(setSaved).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
+  const [saved, setSaved] = useState(() =>
+    isEvent ? saveService.isEventSaved(item.id) : saveService.isConcertSaved(item.id)
+  );
   const [cardMenuOpen,   setCardMenuOpen]   = useState(false);
   const [reportVisible,  setReportVisible]  = useState(false);
   const refType = isEvent ? 'event' : 'concert';

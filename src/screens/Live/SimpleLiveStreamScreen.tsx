@@ -704,7 +704,20 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
 export const SimpleLiveStreamScreen: React.FC = () => {
   const nav   = useNavigation<Nav>();
   const route = useRoute<RouteT>();
-  const { liveId, publisherToken, livekitUrl } = route.params;
+  const { liveId, publisherToken: initialToken, livekitUrl: initialUrl } = route.params;
+
+  const [token,  setToken]  = useState<string | null>(initialToken ?? null);
+  const [wsUrl,  setWsUrl]  = useState<string | null>(initialUrl  ?? null);
+  const [loadingToken, setLoadingToken] = useState(!initialToken || !initialUrl);
+
+  // Si on revient sur ce screen sans token (ex: retour depuis la liste), on le récupère
+  useEffect(() => {
+    if (token && wsUrl) { setLoadingToken(false); return; }
+    liveService.getToken(liveId)
+      .then(t => { setToken(t.token); setWsUrl(t.livekit_url); })
+      .catch(() => nav.goBack())
+      .finally(() => setLoadingToken(false));
+  }, [liveId]);
 
   const handleEnd = useCallback(async () => {
     try { await liveService.stopLive(liveId); } catch {}
@@ -715,7 +728,7 @@ export const SimpleLiveStreamScreen: React.FC = () => {
     return () => { liveService.stopLive(liveId).catch(() => {}); };
   }, [liveId]);
 
-  if (!publisherToken || !livekitUrl) {
+  if (loadingToken || !token || !wsUrl) {
     return (
       <View style={[st.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#F0365A" />
@@ -724,7 +737,7 @@ export const SimpleLiveStreamScreen: React.FC = () => {
   }
 
   return (
-    <LiveKitRoom serverUrl={livekitUrl} token={publisherToken} connect>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect>
       <StreamContent liveId={liveId} onEnd={handleEnd} />
     </LiveKitRoom>
   );
