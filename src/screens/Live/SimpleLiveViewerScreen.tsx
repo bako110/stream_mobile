@@ -15,7 +15,7 @@ import {
   ActivityIndicator, Image, Alert,
 } from 'react-native';
 import Animated, {
-  FadeIn, SlideInUp, SlideOutDown,
+  FadeIn, FadeOut, SlideInUp, SlideOutDown,
 } from 'react-native-reanimated';
 import {
   LiveKitRoom,
@@ -56,6 +56,14 @@ interface ChatMsg {
   isJoin?: boolean;
   isGift?: boolean;
   isSys?:  boolean;
+}
+
+interface GiftTick {
+  id:         string;
+  emoji:      string;
+  senderName: string;
+  giftName:   string;
+  coins:      number;
 }
 
 // ── Avatar fallback ───────────────────────────────────────────────────────────
@@ -217,6 +225,7 @@ const RoomContent: React.FC<{
   onDemoteUser: (identity: string, name: string) => void;
   giftNotifs:   GiftNotif[];
   onGiftNotifShown: (id: string) => void;
+  giftTicker:   GiftTick[];
   likeCount:    number;
   onLike:       () => void;
   elapsed:      number;
@@ -225,7 +234,7 @@ const RoomContent: React.FC<{
 }> = ({
   live, liveId, myIdentity, isHost, viewerCount, messages, chatInput, setChatInput,
   sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, giftNotifs, onGiftNotifShown,
-  likeCount, onLike, elapsed, goOnStageRef, leaveStageRef,
+  giftTicker, likeCount, onLike, elapsed, goOnStageRef, leaveStageRef,
 }) => {
   const { localParticipant } = useLocalParticipant();
   const [onStage,    setOnStage]    = useState(false);
@@ -337,6 +346,21 @@ const RoomContent: React.FC<{
           <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
         </View>
       </View>
+
+      {/* ── GIFT TICKER ───────────────────────────────────────────────── */}
+      {giftTicker.length > 0 && (
+        <View style={gt.container} pointerEvents="none">
+          {giftTicker.map(t => (
+            <Animated.View key={t.id} entering={FadeIn.duration(300)} exiting={FadeOut.duration(400)} style={gt.row}>
+              <Text style={gt.emoji}>{t.emoji}</Text>
+              <View style={gt.info}>
+                <Text style={gt.sender} numberOfLines={1}>{t.senderName}</Text>
+                <Text style={gt.detail}>{t.giftName} · {t.coins} pièces</Text>
+              </View>
+            </Animated.View>
+          ))}
+        </View>
+      )}
 
       {/* ── BADGE "SUR SCÈNE" ─────────────────────────────────────────── */}
       {onStage && (
@@ -508,6 +532,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [chatInput,   setChatInput]   = useState('');
   const [sending,     setSending]     = useState(false);
   const [giftNotifs,  setGiftNotifs]  = useState<GiftNotif[]>([]);
+  const [giftTicker,  setGiftTicker]  = useState<GiftTick[]>([]);
   const [likeCount,   setLikeCount]   = useState(0);
   const [elapsed,     setElapsed]     = useState(0);
   // identity LiveKit du viewer (= userId stocké)
@@ -526,8 +551,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const { lastLiveEnded, lastLiveViewersUpdated, addListener, removeListener } = useWs();
 
   const addSysMsg = useCallback((text: string) => {
-    setMessages(prev => [...prev.slice(-149), { id: `sys-${Date.now()}`, user: '', text, isSys: true }]);
+    const id = `sys-${Date.now()}`;
+    setMessages(prev => [...prev.slice(-149), { id, user: '', text, isSys: true }]);
     setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+    setTimeout(() => setMessages(prev => prev.filter(m => m.id !== id)), 4000);
   }, []);
 
   useEffect(() => {
@@ -609,19 +636,21 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         }
 
         if (d.type === 'gift_received' && d.gift) {
-          const gf = d.gift;
+          const gf         = d.gift;
           const senderName = gf.sender?.display_name ?? gf.sender?.username ?? 'Quelqu\'un';
+          const tick: GiftTick = {
+            id:         gf.id ?? String(Date.now()),
+            senderName,
+            emoji:      gf.gift_type?.emoji ?? '🎁',
+            giftName:   gf.gift_type?.name  ?? 'Cadeau',
+            coins:      gf.coins_spent ?? 0,
+          };
           setGiftNotifs(prev => [...prev, {
-            id: gf.id ?? String(Date.now()), senderName,
-            emoji: gf.gift_type?.emoji ?? '🎁', giftName: gf.gift_type?.name ?? 'Cadeau',
-            coins: gf.coins_spent ?? 0,
+            id: tick.id, senderName,
+            emoji: tick.emoji, giftName: tick.giftName, coins: tick.coins,
           }]);
-          setMessages(prev => [...prev.slice(-149), {
-            id: `gift-${Date.now()}`, user: senderName,
-            text: `${senderName} a envoyé ${gf.gift_type?.emoji ?? '🎁'} ${gf.gift_type?.name ?? 'Cadeau'}`,
-            isGift: true,
-          }]);
-          setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+          setGiftTicker(prev => [...prev.slice(-2), tick]);
+          setTimeout(() => setGiftTicker(prev => prev.filter(t => t.id !== tick.id)), 5000);
         }
 
         if (d.type === 'like_added') {
@@ -764,6 +793,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         onDemoteUser={handleDemoteUser}
         giftNotifs={giftNotifs}
         onGiftNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
+        giftTicker={giftTicker}
         likeCount={likeCount}
         onLike={handleLike}
         elapsed={elapsed}
@@ -927,4 +957,28 @@ const st = StyleSheet.create({
   endedSub:     { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
   endedBtn:     { marginTop: 8, backgroundColor: '#F0365A', borderRadius: 24, paddingHorizontal: 36, paddingVertical: 13 },
   endedBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+});
+
+// ── Styles gift ticker ────────────────────────────────────────────────────────
+
+const gt = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 115 : 95,
+    right: 76,
+    zIndex: 25,
+    gap: 6,
+    alignItems: 'flex-end',
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.55)',
+    maxWidth: 190,
+  },
+  emoji:  { fontSize: 18 },
+  info:   { flex: 1 },
+  sender: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
+  detail: { color: 'rgba(255,255,255,0.65)', fontSize: 10 },
 });

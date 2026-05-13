@@ -65,6 +65,14 @@ interface HandRequest {
   avatarUrl?:  string | null;
 }
 
+interface GiftTick {
+  id:         string;
+  emoji:      string;
+  senderName: string;
+  giftName:   string;
+  coins:      number;
+}
+
 // ── Avatar fallback ───────────────────────────────────────────────────────────
 
 const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, size, color = '#F0365A' }) => (
@@ -277,6 +285,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   const [showInput,    setShowInput]    = useState(false);
   const [joinToasts,   setJoinToasts]   = useState<{ id: string; name: string }[]>([]);
   const [giftNotifs,   setGiftNotifs]   = useState<GiftNotif[]>([]);
+  const [giftTicker,   setGiftTicker]   = useState<GiftTick[]>([]);
   const [likeCount,    setLikeCount]    = useState(0);
   // Modération
   const [handRequests, setHandRequests] = useState<HandRequest[]>([]);
@@ -290,8 +299,10 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   const giftRef  = useRef<LiveGiftOverlayRef>(null);
 
   const addSysMsg = useCallback((text: string) => {
-    setMessages(prev => [...prev.slice(-149), { id: `sys-${Date.now()}`, user: '', text, isSys: true }]);
+    const id = `sys-${Date.now()}`;
+    setMessages(prev => [...prev.slice(-149), { id, user: '', text, isSys: true }]);
     setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+    setTimeout(() => setMessages(prev => prev.filter(m => m.id !== id)), 4000);
   }, []);
 
   // Démarrer cam + mic
@@ -317,6 +328,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
       setMessages(prev => [...prev.slice(-149), { id: tid, user: '', text: `${name} a rejoint`, isJoin: true }]);
       setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
       setTimeout(() => setJoinToasts(prev => prev.filter(t => t.id !== tid)), 3000);
+      setTimeout(() => setMessages(prev => prev.filter(m => m.id !== tid)), 4000);
     };
     const onLeave = (p: RemoteParticipant) => {
       const name = p.name || p.identity || 'Quelqu\'un';
@@ -362,19 +374,21 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
 
         // ── Cadeaux reçus
         if (d.type === 'gift_received' && d.gift) {
-          const gf = d.gift;
-          const sn = gf.sender?.display_name ?? gf.sender?.username ?? 'Quelqu\'un';
+          const gf   = d.gift;
+          const sn   = gf.sender?.display_name ?? gf.sender?.username ?? 'Quelqu\'un';
+          const tick: GiftTick = {
+            id:         gf.id ?? String(Date.now()),
+            senderName: sn,
+            emoji:      gf.gift_type?.emoji ?? '🎁',
+            giftName:   gf.gift_type?.name  ?? 'Cadeau',
+            coins:      gf.coins_spent ?? 0,
+          };
           setGiftNotifs(prev => [...prev, {
-            id: gf.id ?? String(Date.now()), senderName: sn,
-            emoji: gf.gift_type?.emoji ?? '🎁', giftName: gf.gift_type?.name ?? 'Cadeau',
-            coins: gf.coins_spent ?? 0,
+            id: tick.id, senderName: sn,
+            emoji: tick.emoji, giftName: tick.giftName, coins: tick.coins,
           }]);
-          setMessages(prev => [...prev.slice(-149), {
-            id: `gift-${Date.now()}`, user: sn,
-            text: `${sn} a envoyé ${gf.gift_type?.emoji ?? '🎁'} ${gf.gift_type?.name ?? 'Cadeau'}`,
-            isGift: true,
-          }]);
-          setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+          setGiftTicker(prev => [...prev.slice(-2), tick]);
+          setTimeout(() => setGiftTicker(prev => prev.filter(t => t.id !== tick.id)), 5000);
         }
 
         // ── Likes
@@ -606,6 +620,21 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
         <View style={{ flex: 1 }} />
         <LiveLikeButton total={likeCount} onLike={() => {}} />
       </View>
+
+      {/* ── GIFT TICKER ──────────────────────────────────────────────── */}
+      {giftTicker.length > 0 && (
+        <View style={gt.container} pointerEvents="none">
+          {giftTicker.map(t => (
+            <Animated.View key={t.id} entering={FadeIn.duration(300)} exiting={FadeOut.duration(400)} style={gt.row}>
+              <Text style={gt.emoji}>{t.emoji}</Text>
+              <View style={gt.info}>
+                <Text style={gt.sender} numberOfLines={1}>{t.senderName}</Text>
+                <Text style={gt.detail}>{t.giftName} · {t.coins} pièces</Text>
+              </View>
+            </Animated.View>
+          ))}
+        </View>
+      )}
 
       {/* ── TOASTS join ──────────────────────────────────────────────── */}
       <View style={st.toastsContainer} pointerEvents="none">
@@ -1047,4 +1076,28 @@ const os = StyleSheet.create({
     padding: 6, backgroundColor: 'rgba(240,54,90,0.12)',
     borderRadius: 8, borderWidth: 1, borderColor: 'rgba(240,54,90,0.3)',
   },
+});
+
+// ── Styles gift ticker ────────────────────────────────────────────────────────
+
+const gt = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 115 : 95,
+    right: 76,
+    zIndex: 25,
+    gap: 6,
+    alignItems: 'flex-end',
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.55)',
+    maxWidth: 190,
+  },
+  emoji:  { fontSize: 18 },
+  info:   { flex: 1 },
+  sender: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
+  detail: { color: 'rgba(255,255,255,0.65)', fontSize: 10 },
 });
