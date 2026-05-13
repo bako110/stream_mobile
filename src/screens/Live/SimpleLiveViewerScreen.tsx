@@ -68,9 +68,11 @@ const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, si
 // ── Zone vidéo multi-participants ─────────────────────────────────────────────
 
 const MultiVideoView: React.FC<{
+  hostName:      string;
+  hostAvatarUrl: string | null | undefined;
   onGift: (id: string, name: string) => void;
   onTap:  () => void;
-}> = ({ onGift, onTap }) => {
+}> = ({ hostName, hostAvatarUrl, onGift, onTap }) => {
   const allTracks    = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const participants = useParticipants();
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
@@ -86,14 +88,31 @@ const MultiVideoView: React.FC<{
     : '';
   const spotlightCamOn = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
 
-  if (allTracks.length === 0) {
+  // Pas encore connecté du tout
+  if (participants.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
         <ActivityIndicator size="large" color="#F0365A" />
-        <Text style={mv.noVideoText}>
-          {participants.length === 0 ? 'Connexion...' : 'En attente de la vidéo...'}
-        </Text>
       </View>
+    );
+  }
+
+  // Connecté mais aucune caméra active — afficher avatar du host style TikTok
+  if (allTracks.length === 0) {
+    return (
+      <TouchableWithoutFeedback onPress={onTap}>
+        <View style={[StyleSheet.absoluteFill, mv.noCamBg]}>
+          {hostAvatarUrl
+            ? <Image source={{ uri: hostAvatarUrl }} style={mv.noCamAvatar} />
+            : <Av name={hostName} size={100} />
+          }
+          <Text style={mv.noCamName}>{hostName}</Text>
+          <View style={mv.noCamMicRow}>
+            <Icon name="mic" size={14} color="rgba(255,255,255,0.7)" />
+            <Text style={mv.noCamMicText}>Audio uniquement</Text>
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
     );
   }
 
@@ -273,6 +292,8 @@ const RoomContent: React.FC<{
 
       {/* Vidéo */}
       <MultiVideoView
+        hostName={hostName}
+        hostAvatarUrl={live?.user?.avatar_url}
         onGift={(id, name) => giftRef.current?.openGift(id, name)}
         onTap={() => likeRef.current?.trigger()}
       />
@@ -678,10 +699,16 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 // ── Styles MultiVideoView ─────────────────────────────────────────────────────
 
 const mv = StyleSheet.create({
-  noVideo:      { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
-  noVideoText:  { color: '#999', fontSize: 14 },
-  noVideoBg:    { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
-  spotlightName:{ color: '#fff', fontSize: 16, fontWeight: '700' },
+  noVideo:       { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
+  noVideoText:   { color: '#999', fontSize: 14 },
+  noVideoBg:     { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
+  // Fond quand caméra désactivée — style TikTok (avatar centré sur fond sombre/flou)
+  noCamBg:       { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a12', gap: 14 },
+  noCamAvatar:   { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#F0365A' },
+  noCamName:     { color: '#fff', fontSize: 18, fontWeight: '800' },
+  noCamMicRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  noCamMicText:  { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  spotlightName: { color: '#fff', fontSize: 16, fontWeight: '700' },
   spotLabel: {
     position: 'absolute', bottom: 52, left: 12, zIndex: 5,
     backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8,

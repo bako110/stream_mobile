@@ -43,6 +43,7 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
+import { useUser } from '../../context/UserContext';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveStream'>;
@@ -74,14 +75,17 @@ const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, si
 // ── Zone vidéo host ───────────────────────────────────────────────────────────
 
 const HostVideoView: React.FC<{
-  mirror:   boolean;
-  liveId:   string;
-  onStage:  Set<string>;   // identities actuellement sur scène
-  onGift:   (id: string, name: string) => void;
-  onDemote: (id: string, name: string) => void;
-  onBan:    (id: string, name: string) => void;
-}> = ({ mirror, liveId, onStage, onGift, onDemote, onBan }) => {
+  mirror:        boolean;
+  liveId:        string;
+  hostName:      string;
+  hostAvatarUrl: string | null | undefined;
+  onStage:       Set<string>;
+  onGift:        (id: string, name: string) => void;
+  onDemote:      (id: string, name: string) => void;
+  onBan:         (id: string, name: string) => void;
+}> = ({ mirror, liveId, hostName, hostAvatarUrl, onStage, onGift, onDemote, onBan }) => {
   const allTracks       = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  const { localParticipant } = useLocalParticipant();
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
   const localTrack      = allTracks.find(t => t.participant.isLocal) ?? null;
@@ -92,11 +96,28 @@ const HostVideoView: React.FC<{
   const spotlightName   = spotlightTrack ? (spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity)) : '';
   const spotlightCamOn  = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
 
-  if (!localTrack && allTracks.length === 0) {
+  // Pas encore connecté à la room
+  if (!localParticipant.sid && allTracks.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
         <ActivityIndicator size="large" color="#F0365A" />
-        <Text style={mv.noVideoText}>Activation de la caméra...</Text>
+      </View>
+    );
+  }
+
+  // Connecté mais caméra off — afficher avatar style TikTok
+  if (!localCamOn && allTracks.filter(t => !t.participant.isLocal).length === 0) {
+    return (
+      <View style={[StyleSheet.absoluteFill, mv.noCamBg]}>
+        {hostAvatarUrl
+          ? <Image source={{ uri: hostAvatarUrl }} style={mv.noCamAvatar} />
+          : <Av name={hostName} size={100} />
+        }
+        <Text style={mv.noCamName}>{hostName}</Text>
+        <View style={mv.noCamMicRow}>
+          <Icon name="mic" size={14} color="rgba(255,255,255,0.7)" />
+          <Text style={mv.noCamMicText}>Micro actif · Caméra désactivée</Text>
+        </View>
       </View>
     );
   }
@@ -241,6 +262,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   const { localParticipant } = useLocalParticipant();
   const room                 = useRoomContext();
   const allParticipants      = useParticipants();
+  const { currentUser }      = useUser();
   const remoteParticipants   = allParticipants.filter(p => !p.isLocal);
 
   const [muted,        setMuted]        = useState(false);
@@ -488,6 +510,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
       <HostVideoView
         mirror={camFront}
         liveId={liveId}
+        hostName={currentUser?.display_name ?? currentUser?.username ?? 'Toi'}
+        hostAvatarUrl={currentUser?.avatar_url}
         onStage={onStage}
         onGift={(id, name) => giftRef.current?.openGift(id, name)}
         onDemote={handleDemote}
@@ -752,10 +776,16 @@ const hr = StyleSheet.create({
 // ── Styles HostVideoView ──────────────────────────────────────────────────────
 
 const mv = StyleSheet.create({
-  noVideo:    { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
-  noVideoText:{ color: '#888', fontSize: 13 },
-  noVideoBg:  { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
-  spotName:   { color: '#fff', fontSize: 16, fontWeight: '700' },
+  noVideo:      { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
+  noVideoText:  { color: '#888', fontSize: 13 },
+  noVideoBg:    { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
+  // Fond quand caméra désactivée — style TikTok
+  noCamBg:      { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a12', gap: 14 },
+  noCamAvatar:  { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#F0365A' },
+  noCamName:    { color: '#fff', fontSize: 18, fontWeight: '800' },
+  noCamMicRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  noCamMicText: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  spotName:     { color: '#fff', fontSize: 16, fontWeight: '700' },
   pip: {
     position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, right: 12,
     width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
