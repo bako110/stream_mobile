@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
-  Platform, TouchableOpacity, StatusBar, TextInput, ActivityIndicator,
+  Platform, TouchableOpacity, StatusBar, TextInput, ActivityIndicator, Linking,
 } from 'react-native';
 import Animated, {
   FadeInDown, FadeInUp,
@@ -16,7 +16,7 @@ import { authService } from '../../services';
 import { QRScannerScreen } from './QRScannerScreen';
 
 GoogleSignin.configure({
-  webClientId: '862524928219-ojtrr3me5atb36mnd99fu71h37e94pte.apps.googleusercontent.com',
+  webClientId: '679923149254-fj18oqdipsfinbqaksiikta9eql9d6kn.apps.googleusercontent.com',
   offlineAccess: false,
 });
 
@@ -40,9 +40,10 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
   const [identifier,  setIdentifier]  = useState('');
   const [country,     setCountry]     = useState<Country>(DEFAULT_COUNTRY);
   const [password,    setPassword]    = useState('');
-  const [loading,     setLoading]     = useState(false);
-  const [error,       setError]       = useState('');
-  const [showScanner, setShowScanner] = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState('');
+  const [blockedInfo,   setBlockedInfo]   = useState<{ reason?: string; contact?: string } | null>(null);
+  const [showScanner,   setShowScanner]   = useState(false);
 
   const isEmail = method === 'email';
 
@@ -86,9 +87,10 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
       await authService.login({ identifier: id, password });
       onLoginSuccess();
     } catch (e: any) {
-      // Compte désactivé — proposer la réactivation
       const detail = e?.data?.detail ?? e?.response?.data?.detail;
-      if (e?.status === 403 && detail?.code === 'account_deactivated') {
+      if (e?.status === 403 && detail?.code === 'account_blocked') {
+        setBlockedInfo({ reason: detail?.reason ?? undefined, contact: detail?.contact ?? 'support@folix.app' });
+      } else if (e?.status === 403 && detail?.code === 'account_deactivated') {
         const { Alert } = require('react-native');
         Alert.alert(
           'Compte désactivé',
@@ -249,6 +251,36 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             />
           </Animated.View>
 
+          {/* Compte bloqué par un admin */}
+          {blockedInfo ? (
+            <Animated.View entering={FadeInDown.duration(250)}
+              style={[styles.blockedBox, { backgroundColor: '#EF44441A', borderColor: '#EF444440' }]}>
+              <Icon name="slash" size={20} color="#EF4444" style={{ marginBottom: 6 }} />
+              <Text style={[styles.blockedTitle, { color: '#EF4444' }]}>Compte bloqué</Text>
+              {blockedInfo.reason ? (
+                <Text style={[styles.blockedReason, { color: colors.textSecondary }]}>
+                  Raison : {blockedInfo.reason}
+                </Text>
+              ) : null}
+              <Text style={[styles.blockedSub, { color: colors.textSecondary }]}>
+                Votre compte a été bloqué par un administrateur.{'\n'}
+                Contactez le support pour en savoir plus.
+              </Text>
+              <TouchableOpacity
+                onPress={() => Linking.openURL(`mailto:${blockedInfo.contact ?? 'support@folix.app'}`)}
+                style={[styles.blockedContactBtn, { backgroundColor: '#EF444420', borderColor: '#EF444460' }]}
+              >
+                <Icon name="mail" size={13} color="#EF4444" />
+                <Text style={[styles.blockedContactText, { color: '#EF4444' }]}>
+                  Contacter le support
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setBlockedInfo(null)} style={{ marginTop: 8 }}>
+                <Text style={[{ fontSize: 12, color: colors.textTertiary }]}>Retour</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ) : null}
+
           {/* Erreur */}
           {error ? (
             <Animated.Text entering={FadeInDown.duration(250)}
@@ -387,4 +419,10 @@ const styles = StyleSheet.create({
   cguRow:           { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', marginTop: 16 },
   cguText:          { fontSize: 12 },
   cguLink:          { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
+  blockedBox:       { borderRadius: 16, borderWidth: 1, padding: 18, marginTop: 16, alignItems: 'center' },
+  blockedTitle:     { fontSize: 17, fontWeight: '800', marginBottom: 6 },
+  blockedReason:    { fontSize: 13, marginBottom: 6, textAlign: 'center' },
+  blockedSub:       { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 12 },
+  blockedContactBtn:{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
+  blockedContactText:{ fontSize: 13, fontWeight: '700' },
 });
