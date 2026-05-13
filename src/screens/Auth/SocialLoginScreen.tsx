@@ -11,16 +11,17 @@ import { AppLogo, SocialAuthButton } from '../../components/common';
 import { authService } from '../../services/authService';
 
 GoogleSignin.configure({
-  webClientId: '862524928219-ojtrr3me5atb36mnd99fu71h37e94pte.apps.googleusercontent.com',
+  webClientId: '679923149254-fj18oqdipsfinbqaksiikta9eql9d6kn.apps.googleusercontent.com',
   offlineAccess: false,
 });
 
 interface Props {
-  onGoBack:      () => void;
-  onAuthSuccess: () => void;
+  onGoBack:           () => void;
+  onAuthSuccess:      () => void;
+  onAccountBlocked?:  (reason?: string, contact?: string) => void;
 }
 
-export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess }) => {
+export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess, onAccountBlocked }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
@@ -37,7 +38,12 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess }) 
       onAuthSuccess();
     } catch (e: any) {
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
-        Alert.alert('Erreur Google', e?.message ?? 'Connexion impossible');
+        const detail = e?.data?.detail ?? e?.response?.data?.detail;
+        if (e?.status === 403 && detail?.code === 'account_blocked') {
+          onAccountBlocked?.(detail?.reason, detail?.contact ?? 'support@folix.app');
+        } else {
+          Alert.alert('Erreur Google', e?.message ?? 'Connexion impossible');
+        }
       }
     } finally {
       setLoading(null);

@@ -29,7 +29,7 @@ interface Props {
   onGoSocialLogin?:    () => void;
   onGoCGU?:            () => void;
   onGoPrivacy?:        () => void;
-  initialBlockedInfo?: { reason?: string; contact?: string } | null;
+  initialBlockedInfo?: { reason?: string; contact?: string; blockedAt?: string } | null;
 }
 
 export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoCGU, onGoPrivacy, initialBlockedInfo }) => {
@@ -43,7 +43,9 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
   const [password,    setPassword]    = useState('');
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState('');
-  const [blockedInfo,   setBlockedInfo]   = useState<{ reason?: string; contact?: string } | null>(initialBlockedInfo ?? null);
+  const [blockedInfo,   setBlockedInfo]   = useState<{ reason?: string; contact?: string; blockedAt?: string } | null>(
+    initialBlockedInfo ? { ...initialBlockedInfo, blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) } : null
+  );
   const [showScanner,   setShowScanner]   = useState(false);
 
   const isEmail = method === 'email';
@@ -69,7 +71,16 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
       onLoginSuccess();
     } catch (e: any) {
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
-        setError(e?.message ?? 'Erreur Google Sign-In');
+        const detail = e?.data?.detail ?? e?.response?.data?.detail;
+        if (e?.status === 403 && detail?.code === 'account_blocked') {
+          setBlockedInfo({
+            reason: detail?.reason ?? undefined,
+            contact: detail?.contact ?? 'support@folix.app',
+            blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
+          });
+        } else {
+          setError(e?.message ?? 'Erreur Google Sign-In');
+        }
       }
     } finally {
       setSocialLoading(null);
@@ -90,7 +101,11 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
     } catch (e: any) {
       const detail = e?.data?.detail ?? e?.response?.data?.detail;
       if (e?.status === 403 && detail?.code === 'account_blocked') {
-        setBlockedInfo({ reason: detail?.reason ?? undefined, contact: detail?.contact ?? 'support@folix.app' });
+        setBlockedInfo({
+          reason: detail?.reason ?? undefined,
+          contact: detail?.contact ?? 'support@folix.app',
+          blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
+        });
       } else if (e?.status === 403 && detail?.code === 'account_deactivated') {
         const { Alert } = require('react-native');
         Alert.alert(
@@ -267,6 +282,11 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                 Votre compte a été bloqué par un administrateur.{'\n'}
                 Contactez le support pour en savoir plus.
               </Text>
+              {blockedInfo.blockedAt ? (
+                <Text style={[{ fontSize: 11, color: colors.textTertiary, marginBottom: 8 }]}>
+                  Bloqué le {blockedInfo.blockedAt}
+                </Text>
+              ) : null}
               <TouchableOpacity
                 onPress={() => Linking.openURL(`mailto:${blockedInfo.contact ?? 'support@folix.app'}`)}
                 style={[styles.blockedContactBtn, { backgroundColor: '#EF444420', borderColor: '#EF444460' }]}

@@ -16,6 +16,7 @@ import { storage } from '../utils/storage';
 import { authService } from '../services/authService';
 import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
+import { favoriteService } from '../services/favoriteService';
 import { callHistoryService } from '../services/callHistoryService';
 import { cancelCallNotification, showIncomingCallNotification } from '../services/fcmService';
 import { navigate } from '../navigation/navigationRef';
@@ -138,7 +139,7 @@ const INITIAL_DELAY  = 1_000;
 const PING_INTERVAL  = 25_000;
 const CALL_TIMEOUT   = 30_000;
 
-export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountBlocked?: (reason?: string, contact?: string) => void }> = ({ children, onAccountBlocked }) => {
   const wsRef           = useRef<WebSocket | null>(null);
   const retryCount      = useRef(0);
   const retryTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -302,11 +303,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // ── refreshUnread ─────────────────────────────────────────────────────────
 
   const refreshUnread = useCallback(() => {
-    messageService.getConversations()
-      .then(convs => {
-        const total = convs.reduce((sum, c) => sum + (c.unread_count || 0), 0);
-        if (isMounted.current) setUnreadMessages(total);
-      })
+    messageService.getUnreadCount()
+      .then(count => { if (isMounted.current) setUnreadMessages(count); })
       .catch(() => {});
     notificationService.getUnreadCount()
       .then(count => { if (isMounted.current) setUnreadNotifications(count); })
@@ -345,6 +343,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         storage.setItem(STORAGE_KEYS.LAST_USER_ID, id);
       }).catch(() => {});
       refreshUnreadRef.current();
+      favoriteService.syncFromServer().catch(() => {});
       if (pingTimer.current) clearInterval(pingTimer.current);
       pingTimer.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
@@ -355,6 +354,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         const payload: WsPayload = JSON.parse(event.data as string);
         if (payload.type === 'pong') return;
+
+        if (payload.type === 'account_blocked' && isMounted.current) {
+          onAccountBlocked?.(payload.reason, payload.contact);
+          return;
+        }
 
         // ── Compteurs non-lus ──────────────────────────────────────────────
         if (payload.type === 'message' && isMounted.current) {

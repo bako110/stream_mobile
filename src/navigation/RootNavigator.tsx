@@ -54,7 +54,7 @@ const NAV_THEME_DARK: Theme = {
 export const RootNavigator: React.FC = () => {
   const { isDark } = useTheme();
   const [appState, setAppState] = useState<AppState>('splash');
-  const [blockedInfo, setBlockedInfo] = useState<{ reason?: string; contact?: string } | null>(null);
+  const [blockedInfo, setBlockedInfo] = useState<{ reason?: string; contact?: string; blockedAt?: string } | null>(null);
 
   const handleSplashDone = async () => {
     const onboardingDone = storage.getBoolean(STORAGE_KEYS.ONBOARDING_DONE);
@@ -127,7 +127,21 @@ export const RootNavigator: React.FC = () => {
   return (
     <NavigationContainer ref={navigationRef} theme={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT}>
       {appState === 'main'
-        ? <UserProvider><WebSocketProvider><MainNavigator onLogout={handleLogout} /></WebSocketProvider></UserProvider>
+        ? (
+          <UserProvider>
+            <WebSocketProvider onAccountBlocked={(reason, contact) => {
+              authService._clearTokens();
+              setBlockedInfo({
+                reason,
+                contact,
+                blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
+              });
+              setAppState('auth');
+            }}>
+              <MainNavigator onLogout={handleLogout} />
+            </WebSocketProvider>
+          </UserProvider>
+        )
         : <AuthNavigator onAuthSuccess={handleAuthSuccess} initialBlockedInfo={blockedInfo} />
       }
     </NavigationContainer>

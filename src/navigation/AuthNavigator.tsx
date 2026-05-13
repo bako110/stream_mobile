@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,10 +22,10 @@ const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 interface Props {
   onAuthSuccess: () => void;
-  initialBlockedInfo?: { reason?: string; contact?: string } | null;
+  initialBlockedInfo?: { reason?: string; contact?: string; blockedAt?: string } | null;
 }
 
-const LoginWrapper: React.FC<{ onAuthSuccess: () => void; initialBlockedInfo?: { reason?: string; contact?: string } | null }> = ({ onAuthSuccess, initialBlockedInfo }) => {
+const LoginWrapper: React.FC<{ onAuthSuccess: () => void; initialBlockedInfo?: { reason?: string; contact?: string; blockedAt?: string } | null }> = ({ onAuthSuccess, initialBlockedInfo }) => {
   const nav = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   return (
     <LoginScreen
@@ -40,12 +40,16 @@ const LoginWrapper: React.FC<{ onAuthSuccess: () => void; initialBlockedInfo?: {
   );
 };
 
-const SocialLoginWrapper: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSuccess }) => {
+const SocialLoginWrapper: React.FC<{ onAuthSuccess: () => void; onAccountBlocked?: (reason?: string, contact?: string) => void }> = ({ onAuthSuccess, onAccountBlocked }) => {
   const nav = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   return (
     <SocialLoginScreen
       onGoBack={() => nav.goBack()}
       onAuthSuccess={onAuthSuccess}
+      onAccountBlocked={(reason, contact) => {
+        nav.goBack();
+        onAccountBlocked?.(reason, contact);
+      }}
     />
   );
 };
@@ -65,7 +69,18 @@ const ForgotPasswordWrapper: React.FC = () => {
   return <ForgotPasswordScreen onGoBack={() => nav.goBack()} />;
 };
 
-export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedInfo }) => (
+export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedInfo }) => {
+  const [blockedInfo, setBlockedInfo] = useState(initialBlockedInfo ?? null);
+
+  const handleAccountBlocked = (reason?: string, contact?: string) => {
+    setBlockedInfo({
+      reason,
+      contact,
+      blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
+    });
+  };
+
+  return (
   <Stack.Navigator
     screenOptions={{
       headerShown: false,
@@ -74,7 +89,7 @@ export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedIn
     }}
   >
     <Stack.Screen name="Login">
-      {() => <LoginWrapper onAuthSuccess={onAuthSuccess} initialBlockedInfo={initialBlockedInfo} />}
+      {() => <LoginWrapper onAuthSuccess={onAuthSuccess} initialBlockedInfo={blockedInfo} />}
     </Stack.Screen>
     <Stack.Screen name="Register">
       {() => <RegisterWrapper onAuthSuccess={onAuthSuccess} />}
@@ -83,7 +98,7 @@ export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedIn
       {() => <ForgotPasswordWrapper />}
     </Stack.Screen>
     <Stack.Screen name="SocialLogin" options={{ animation: 'slide_from_bottom', presentation: 'modal' }}>
-      {() => <SocialLoginWrapper onAuthSuccess={onAuthSuccess} />}
+      {() => <SocialLoginWrapper onAuthSuccess={onAuthSuccess} onAccountBlocked={handleAccountBlocked} />}
     </Stack.Screen>
     <Stack.Screen name="CGU" options={{ animation: 'slide_from_right' }}>
       {({ navigation }) => <CGUScreen onBack={() => navigation.goBack()} />}
@@ -92,4 +107,5 @@ export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedIn
       {({ navigation }) => <PolitiqueConfidentialiteScreen onBack={() => navigation.goBack()} />}
     </Stack.Screen>
   </Stack.Navigator>
-);
+  );
+};
