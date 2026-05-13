@@ -22,10 +22,10 @@ const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 interface Props {
   onAuthSuccess: () => void;
+  initialBlockedInfo?: { reason?: string; contact?: string } | null;
 }
 
-// Wrappers pour injecter la navigation entre écrans
-const LoginWrapper: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSuccess }) => {
+const LoginWrapper: React.FC<{ onAuthSuccess: () => void; initialBlockedInfo?: { reason?: string; contact?: string } | null }> = ({ onAuthSuccess, initialBlockedInfo }) => {
   const nav = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   return (
     <LoginScreen
@@ -35,6 +35,7 @@ const LoginWrapper: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSuccess }
       onGoSocialLogin={() => nav.navigate('SocialLogin')}
       onGoCGU={() => nav.navigate('CGU')}
       onGoPrivacy={() => nav.navigate('PolitiqueConfidentialite')}
+      initialBlockedInfo={initialBlockedInfo}
     />
   );
 };
@@ -64,7 +65,7 @@ const ForgotPasswordWrapper: React.FC = () => {
   return <ForgotPasswordScreen onGoBack={() => nav.goBack()} />;
 };
 
-export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess }) => (
+export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedInfo }) => (
   <Stack.Navigator
     screenOptions={{
       headerShown: false,
@@ -73,7 +74,7 @@ export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess }) => (
     }}
   >
     <Stack.Screen name="Login">
-      {() => <LoginWrapper onAuthSuccess={onAuthSuccess} />}
+      {() => <LoginWrapper onAuthSuccess={onAuthSuccess} initialBlockedInfo={initialBlockedInfo} />}
     </Stack.Screen>
     <Stack.Screen name="Register">
       {() => <RegisterWrapper onAuthSuccess={onAuthSuccess} />}

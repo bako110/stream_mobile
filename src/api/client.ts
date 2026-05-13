@@ -28,6 +28,7 @@ class ApiError extends Error {
 let authToken: string | null = null;
 let _refreshTokenFn: (() => Promise<string>) | null = null;
 let _onUnauthorized: (() => void) | null = null;
+let _onAccountBlocked: ((reason?: string, contact?: string) => void) | null = null;
 let _refreshPromise: Promise<string> | null = null;
 
 export const setAuthToken = (token: string | null) => {
@@ -40,6 +41,10 @@ export const setRefreshTokenFn = (fn: () => Promise<string>) => {
 
 export const setOnUnauthorized = (fn: () => void) => {
   _onUnauthorized = fn;
+};
+
+export const setOnAccountBlocked = (fn: (reason?: string, contact?: string) => void) => {
+  _onAccountBlocked = fn;
 };
 
 const buildHeaders = (extra?: Record<string, string>): Record<string, string> => {
@@ -98,6 +103,11 @@ async function request<T>(
 
     if (!response.ok) {
       if (response.status === 401) _onUnauthorized?.();
+      if (response.status === 403 && json?.detail?.code === 'account_blocked') {
+        _onAccountBlocked?.(json.detail?.reason, json.detail?.contact);
+        // Ne pas propager l'erreur — le callback gère l'affichage
+        return { data: null as T, status: response.status };
+      }
       throw new ApiError(
         response.status,
         json?.detail ?? json?.message ?? `Erreur ${response.status}`,

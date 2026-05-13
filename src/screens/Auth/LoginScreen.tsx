@@ -29,9 +29,10 @@ interface Props {
   onGoSocialLogin?:    () => void;
   onGoCGU?:            () => void;
   onGoPrivacy?:        () => void;
+  initialBlockedInfo?: { reason?: string; contact?: string } | null;
 }
 
-export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoCGU, onGoPrivacy }) => {
+export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoCGU, onGoPrivacy, initialBlockedInfo }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
@@ -42,7 +43,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
   const [password,    setPassword]    = useState('');
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState('');
-  const [blockedInfo,   setBlockedInfo]   = useState<{ reason?: string; contact?: string } | null>(null);
+  const [blockedInfo,   setBlockedInfo]   = useState<{ reason?: string; contact?: string } | null>(initialBlockedInfo ?? null);
   const [showScanner,   setShowScanner]   = useState(false);
 
   const isEmail = method === 'email';

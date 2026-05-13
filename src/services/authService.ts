@@ -1,7 +1,7 @@
 import { apiClient, Endpoints } from '../api';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
-import { setAuthToken, setRefreshTokenFn, setOnUnauthorized } from '../api/client';
+import { setAuthToken, setRefreshTokenFn, setOnUnauthorized, setOnAccountBlocked } from '../api/client';
 import type {
   User, LoginRequest, RegisterRequest,
   AuthToken, PasswordChangeRequest,
@@ -150,7 +150,7 @@ export const authService = {
     return res.data;
   },
 
-  loadStoredToken(onUnauthorized?: () => void): string | null {
+  loadStoredToken(onUnauthorized?: () => void, onAccountBlocked?: (reason?: string, contact?: string) => void): string | null {
     const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (token) setAuthToken(token);
     setRefreshTokenFn(async () => {
@@ -158,6 +158,7 @@ export const authService = {
       return refreshed.access_token;
     });
     if (onUnauthorized) setOnUnauthorized(onUnauthorized);
+    if (onAccountBlocked) setOnAccountBlocked(onAccountBlocked);
     return token;
   },
 
