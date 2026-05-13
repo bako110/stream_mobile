@@ -535,6 +535,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   function handleRequestVerification() {
     setVrReason('');
+    // Charger le solde si pas encore fait
+    if (myCoins === null) {
+      apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance)
+        .then(r => setMyCoins(r.data?.coins_balance ?? 0))
+        .catch(() => setMyCoins(0));
+    }
     setVrModalOpen(true);
   }
 
@@ -542,11 +548,26 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     setVrLoading(true);
     try {
       await communityService.requestVerification(communityId, vrReason.trim() || undefined);
+      setMyCoins(prev => prev !== null ? prev - 500 : null);
       setVrStatus('pending');
       setVrModalOpen(false);
-      Alert.alert('Demande envoyée', 'Les administrateurs vont examiner votre demande.');
+      Alert.alert('Demande envoyée', '500 coins ont été débités. Les administrateurs vont examiner votre demande.');
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible d\'envoyer la demande.');
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail ?? e?.message ?? 'Impossible d\'envoyer la demande.';
+      if (status === 402) {
+        setVrModalOpen(false);
+        Alert.alert(
+          'Solde insuffisant',
+          `Il faut 500 coins pour demander la vérification.\n\n${detail}`,
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Acheter des coins', onPress: () => nav.navigate('Wallet') },
+          ],
+        );
+      } else {
+        Alert.alert('Erreur', detail);
+      }
     } finally { setVrLoading(false); }
   }
 
@@ -1554,8 +1575,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                              : vrStatus === 'rejected' ? '#EF4444' : '#1D9BF0',
                       }]}>
                         {vrStatus === 'pending'  ? 'Demande en cours d\'examen…'
-                        : vrStatus === 'rejected' ? 'Refusée — Renvoyer une demande'
-                        : 'Demander la vérification officielle'}
+                        : vrStatus === 'rejected' ? 'Refusée (coins remboursés) — Renvoyer'
+                        : 'Demander la vérification — 500 coins'}
                       </Text>
                     </>
                   )}
@@ -1810,21 +1831,71 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               <Text style={[{ fontSize: 10, color: colors.textTertiary, textAlign: 'right', marginTop: 4 }]}>
                 {vrReason.length}/300
               </Text>
-              <TouchableOpacity
-                style={[s.actionBtn, { backgroundColor: '#1D9BF0', marginTop: 14 }]}
-                onPress={handleSubmitVerificationRequest}
-                disabled={vrLoading}
-                activeOpacity={0.8}
-              >
-                {vrLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Icon name="send" size={16} color="#fff" />
-                    <Text style={[s.actionTxt, { color: '#fff' }]}>Envoyer la demande</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+
+              {/* Boite frais */}
+              {(() => {
+                const fee = 500;
+                const hasCoins = myCoins !== null;
+                const canAfford = myCoins !== null && myCoins >= fee;
+                const afterBalance = myCoins !== null ? myCoins - fee : null;
+                return (
+                  <View style={[s.vrFeeBox, { borderColor: canAfford ? '#1D9BF040' : '#EF444440', backgroundColor: canAfford ? '#1D9BF008' : '#EF444408' }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: canAfford ? '#1D9BF0' : '#EF4444' }}>
+                        Frais de vérification
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Icon name="zap" size={13} color="#F59E0B" />
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#F59E0B' }}>500 coins</Text>
+                      </View>
+                    </View>
+                    {hasCoins && (
+                      <View style={{ gap: 3 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 11, color: colors.textTertiary }}>Votre solde</Text>
+                          <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>{myCoins} coins</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 11, color: colors.textTertiary }}>Solde après</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: canAfford ? '#36D9A0' : '#EF4444' }}>
+                            {afterBalance} coins
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                    <Text style={{ fontSize: 10, color: '#36D9A0', marginTop: 6 }}>
+                      Remboursement automatique si la demande est refusée
+                    </Text>
+                  </View>
+                );
+              })()}
+
+              {myCoins !== null && myCoins < 500 ? (
+                <TouchableOpacity
+                  style={[s.actionBtn, { backgroundColor: '#EF4444', marginTop: 10 }]}
+                  onPress={() => { setVrModalOpen(false); nav.navigate('Wallet'); }}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="zap" size={16} color="#fff" />
+                  <Text style={[s.actionTxt, { color: '#fff' }]}>Acheter des coins</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[s.actionBtn, { backgroundColor: '#1D9BF0', marginTop: 10 }]}
+                  onPress={handleSubmitVerificationRequest}
+                  disabled={vrLoading}
+                  activeOpacity={0.8}
+                >
+                  {vrLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Icon name="send" size={16} color="#fff" />
+                      <Text style={[s.actionTxt, { color: '#fff' }]}>Envoyer la demande</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </KeyboardAvoidingView>
         </View>
@@ -2180,6 +2251,7 @@ const s = StyleSheet.create({
 
   // VR box
   vrBox: { marginHorizontal: 20, borderRadius: 22, padding: 20 },
+  vrFeeBox: { borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 12 },
 
   // Settings sheet
   settingsSheet: {
