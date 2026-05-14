@@ -76,8 +76,6 @@ const CoinSlider: React.FC<{
 }> = ({ value, min, max, onChange, colors }) => {
   const pct = max > min ? (value - min) / (max - min) : 0;
   const thumbX = useRef(new Animated.Value(pct * SLIDER_W)).current;
-  const isDragging = useRef(false);
-
   const handlePress = useCallback((e: any) => {
     const x = Math.max(0, Math.min(e.nativeEvent.locationX, SLIDER_W));
     const newPct = x / SLIDER_W;
@@ -156,7 +154,7 @@ const WithdrawScreen: React.FC = () => {
     try {
       const [balRes, wdRes] = await Promise.allSettled([
         apiClient.get<WalletBalance>(Endpoints.wallet.balance),
-        apiClient.get<Withdrawal[]>(Endpoints.wallet.withdrawals),
+        apiClient.get<Withdrawal[]>(Endpoints.wallet.withdrawHistory),
       ]);
       if (balRes.status === 'fulfilled') {
         const bal = balRes.value.data?.coins_balance ?? 0;
@@ -210,9 +208,11 @@ const WithdrawScreen: React.FC = () => {
             setSubmitting(true);
             try {
               await apiClient.post(Endpoints.wallet.withdraw, {
-                amount_coins: amount,
+                coins_amount: amount,
                 payout_method: method,
-                ...(method === 'mobile_money' && { phone }),
+                payout_details: method === 'mobile_money'
+                  ? { phone: phone.trim() }
+                  : {},
               });
               setBalance(prev => prev - amount);
               setWithdrawals(prev => [{
