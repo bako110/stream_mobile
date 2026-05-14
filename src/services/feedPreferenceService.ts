@@ -53,8 +53,13 @@ export const feedPreferenceService = {
     saveHidden(list);
 
     // Sync backend (silencieux — pas bloquant)
-    const path = type === 'event' ? `/api/v1/events/${id}/hide` : `/api/v1/concerts/${id}/hide`;
-    apiClient.post(path, {}).catch(() => {});
+    const pathMap: Record<RefType, string> = {
+      event:   `/api/v1/events/${id}/hide`,
+      concert: `/api/v1/concerts/${id}/hide`,
+      post:    `/api/v1/posts/${id}/hide`,
+      reel:    `/api/v1/reels/${id}/hide`,
+    };
+    apiClient.post(pathMap[type], {}).catch(() => {});
 
     return isNowHidden;
   },

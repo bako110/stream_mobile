@@ -24,7 +24,7 @@ import { ReportModal } from './ReportModal';
 const { width: SCREEN_W } = Dimensions.get('window');
 const GAP    = 3;
 const RADIUS = 12;
-const GRID_H = SCREEN_W * 0.62;
+const GRID_H = SCREEN_W * 0.75;
 const HALF_H = (GRID_H - GAP) / 2;
 
 interface ImageGridProps {
@@ -58,7 +58,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ urls, onPressImage }) => {
     return (
       <ImgTile
         uri={urls[0]}
-        style={{ width: '100%', aspectRatio: 4 / 3 }}
+        style={{ width: '100%', aspectRatio: 1 }}
         radius={{ tl: RADIUS, tr: RADIUS, bl: RADIUS, br: RADIUS }}
         onPress={() => onPressImage?.(0)}
       />
@@ -120,6 +120,7 @@ interface PostCardProps {
   post: Post;
   colors: AppColors;
   currentUserId?: string;
+  isActive?: boolean;
   onPress: () => void;
   onAuthorPress?: () => void;
   onDelete?: (postId: string) => void;
@@ -217,7 +218,7 @@ const VideoFsModal: React.FC<{
 };
 
 export const PostCard: React.FC<PostCardProps> = ({
-  post, colors, currentUserId, onPress, onAuthorPress, onDelete,
+  post, colors, currentUserId, isActive = false, onPress, onAuthorPress, onDelete,
   onToggleFollow, isFollowing = false, onHide,
 }) => {
   const author   = post.author;
@@ -489,34 +490,26 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       ) : null}
 
-      {/* Vidéo — tap ouvre fullscreen */}
+      {/* Vidéo — autoplay muet, tap sur la zone externe = détails, tap sur le player = play/pause */}
       {post.video_url && images.length === 0 && (
-        <TouchableOpacity
-          style={{ marginHorizontal: 12, marginBottom: 4 }}
-          activeOpacity={0.92}
-          onPress={() => { setVideoFsKey(k => k + 1); setVideoFs(true); }}
-        >
+        <View style={{ marginHorizontal: 12, marginBottom: 4 }}>
           <InlineVideoPlayer
             uri={post.video_url}
             thumbnailUri={post.thumbnail_url}
-            aspectRatio={16 / 9}
+            aspectRatio={4 / 3}
             borderRadius={12}
+            autoPlay
+            muted
+            isActive={isActive}
+            onPress={onPress}
           />
-          <View style={pc.detailsOverlay}>
-            <Icon name="maximize" size={13} color="#fff" />
-            <Text style={pc.detailsOverlayText}>Voir le post</Text>
-          </View>
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* Images avec overlay "Voir les détails" */}
       {images.length > 0 && (
         <View>
-          <ImageGrid urls={images} onPressImage={i => { setImageFsIdx(i); setImageFs(true); }} />
-          <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={pc.detailsOverlay}>
-            <Icon name="arrow-right" size={13} color="#fff" />
-            <Text style={pc.detailsOverlayText}>Voir les détails</Text>
-          </TouchableOpacity>
+          <ImageGrid urls={images} onPressImage={() => onPress()} />
         </View>
       )}
 

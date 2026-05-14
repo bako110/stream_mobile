@@ -248,9 +248,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     const newSaved = !saved;
     setSaved(newSaved);
     if (newSaved) {
-      favoriteService.save({ target_type: 'event', target_id: eventId, target_title: event.title, target_subtitle: event.venue_city ?? event.location, target_thumbnail: event.thumbnail_url ?? event.cover_url }).catch(() => {});
+      favoriteService.save({ target_type: 'event', target_id: eventId, target_title: event.title, target_subtitle: event.venue_city ?? event.location, target_thumbnail: event.thumbnail_url ?? event.cover_url })
+        .then(() => console.log('[Fav] event saved ok'))
+        .catch((e) => console.warn('[Fav] event save error:', e));
     } else {
-      favoriteService.unsave('event', eventId).catch(() => {});
+      favoriteService.unsave('event', eventId).catch((e) => console.warn('[Fav] event unsave error:', e));
     }
   };
 

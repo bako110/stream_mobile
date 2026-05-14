@@ -686,7 +686,7 @@ export const FeedScreen: React.FC = () => {
           isFollowing={!!postAuthorId && followingSet.has(postAuthorId)}
           onToggleFollow={() => { if (postAuthorId) handleToggleFollow(postAuthorId); }}
           onHide={() => {
-            feedPreferenceService.toggleHide(item.id, item.kind as any);
+            feedPreferenceService.toggleHide(item.id, 'post');
             setItems(prev => prev.filter(i => !(i.kind === 'post' && i.id === item.id)));
           }}
         />
@@ -709,6 +709,7 @@ export const FeedScreen: React.FC = () => {
           else nav.navigate('EventDetail', { eventId: item.id });
         }}
         onAuthorPress={() => { if (aid) (nav as any).navigate('UserProfile', { userId: aid }); }}
+        onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
   }, [colors, activeCardId, activePostId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickSuggestions, suggestLoading, loadSuggestions]);
@@ -1861,6 +1862,7 @@ interface FeedCardProps {
   onComment: (onCountChange: (delta: number) => void) => void;
   onPress:   () => void;
   onAuthorPress: () => void;
+  onHide:    () => void;
 }
 
 // ── Card Context Menu ─────────────────────────────────────────────────────────
@@ -2043,7 +2045,7 @@ const CardVideo: React.FC<{ uri: string; playing: boolean }> = ({ uri, playing }
   return <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />;
 };
 
-const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, isActive, onToggleFollow, onComment, onPress, onAuthorPress }) => {
+const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, isActive, onToggleFollow, onComment, onPress, onAuthorPress, onHide }) => {
   const isEvent  = item.kind === 'event';
   const isConcert = item.kind === 'concert';
   const event    = isEvent  ? (item.data as any) : null;
@@ -2193,13 +2195,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
   const handleHide = async () => {
     await feedPreferenceService.toggleHide(item.id, refType);
-    // La carte disparaît car le feed est rechargé au focus suivant.
-    // Pour un retrait immédiat on passe par un callback externe si besoin.
-    Alert.alert(
-      'Masqué',
-      'Ce contenu n\'apparaîtra plus dans votre fil.',
-      [{ text: 'OK' }],
-    );
+    onHide();
   };
 
   const handleRemind = async () => {
@@ -2247,14 +2243,20 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
     setSaved(newSaved);
     if (isEvent) {
       const ev = item.data as Event;
-      newSaved
-        ? favoriteService.save({ target_type: 'event', target_id: item.id, target_title: ev.title, target_subtitle: ev.venue_city ?? ev.location, target_thumbnail: ev.thumbnail_url ?? ev.cover_url }).catch(() => {})
-        : favoriteService.unsave('event', item.id).catch(() => {});
+      if (newSaved) {
+        favoriteService.save({ target_type: 'event', target_id: item.id, target_title: ev.title, target_subtitle: (ev as any).venue_city ?? (ev as any).location, target_thumbnail: (ev as any).thumbnail_url ?? (ev as any).cover_url })
+          .catch(() => setSaved(false));
+      } else {
+        favoriteService.unsave('event', item.id).catch(() => setSaved(true));
+      }
     } else {
       const ct = item.data as Concert;
-      newSaved
-        ? favoriteService.save({ target_type: 'concert', target_id: item.id, target_title: ct.title, target_subtitle: ct.venue_city ?? ct.artist?.username, target_thumbnail: ct.thumbnail_url }).catch(() => {})
-        : favoriteService.unsave('concert', item.id).catch(() => {});
+      if (newSaved) {
+        favoriteService.save({ target_type: 'concert', target_id: item.id, target_title: ct.title, target_subtitle: (ct as any).venue_city ?? ct.artist?.username, target_thumbnail: (ct as any).thumbnail_url })
+          .catch(() => setSaved(false));
+      } else {
+        favoriteService.unsave('concert', item.id).catch(() => setSaved(true));
+      }
     }
   };
 
@@ -2428,7 +2430,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       >
         <View style={s.cardBanner}>
           {videoUrl ? (
-            <CardVideo uri={videoUrl} playing={iscAtive} />
+            <CardVideo uri={videoUrl} playing={isActive} />
           ) : thumbUrl ? (
             <Image source={{ uri: thumbUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
