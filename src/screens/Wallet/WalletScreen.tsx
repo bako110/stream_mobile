@@ -16,6 +16,7 @@ import {
   Animated,
   Alert,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -149,6 +150,10 @@ const WalletScreen: React.FC = () => {
   const [balance, setBalance]       = useState<WalletBalance | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError]           = useState<string | null>(null);
+  const [txOffset, setTxOffset]     = useState(0);
+  const [txHasMore, setTxHasMore]   = useState(false);
+  const [txLoadingMore, setTxLoadingMore] = useState(false);
+  const TX_LIMIT = 10;
 
   // Animated coin count-up
   const animatedCoins = useRef(new Animated.Value(0)).current;
@@ -170,15 +175,33 @@ const WalletScreen: React.FC = () => {
       setError(null);
       const [balRes, txRes] = await Promise.all([
         apiClient.get<WalletBalance>(Endpoints.wallet.balance),
-        apiClient.get<Transaction[]>(`${Endpoints.wallet.transactions}?limit=10`),
+        apiClient.get<Transaction[]>(`${Endpoints.wallet.transactions}?limit=${TX_LIMIT}&offset=0`),
       ]);
       setBalance(balRes.data);
-      setTransactions(txRes.data ?? []);
+      const txList = txRes.data ?? [];
+      setTransactions(txList);
+      setTxOffset(TX_LIMIT);
+      setTxHasMore(txList.length === TX_LIMIT);
       runCountUp(balRes.data?.coins_balance ?? 0);
     } catch (e: any) {
       setError(e?.message ?? 'Erreur de chargement');
     }
   }, [runCountUp]);
+
+  const loadMoreTx = useCallback(async () => {
+    if (txLoadingMore || !txHasMore) return;
+    setTxLoadingMore(true);
+    try {
+      const res = await apiClient.get<Transaction[]>(
+        `${Endpoints.wallet.transactions}?limit=${TX_LIMIT}&offset=${txOffset}`,
+      );
+      const more = res.data ?? [];
+      setTransactions(prev => [...prev, ...more]);
+      setTxOffset(prev => prev + TX_LIMIT);
+      setTxHasMore(more.length === TX_LIMIT);
+    } catch { /* silencieux */ }
+    finally { setTxLoadingMore(false); }
+  }, [txLoadingMore, txHasMore, txOffset]);
 
   useEffect(() => {
     fetchData().finally(() => setLoading(false));
@@ -383,9 +406,24 @@ const WalletScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={s.txList}>
-              {transactions.map(renderTx)}
-            </View>
+            <>
+              <View style={s.txList}>
+                {transactions.map(renderTx)}
+              </View>
+              {txHasMore && (
+                <TouchableOpacity
+                  onPress={loadMoreTx}
+                  disabled={txLoadingMore}
+                  style={{ alignItems: 'center', paddingVertical: 14, marginTop: 4 }}
+                  activeOpacity={0.7}
+                >
+                  {txLoadingMore
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Voir plus</Text>
+                  }
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
       </ScrollView>
