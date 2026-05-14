@@ -2540,8 +2540,10 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </TouchableOpacity>
 
         <TouchableOpacity style={s.socialBtn} onPress={() => onComment(delta => setCommentCount(v => v + delta))} activeOpacity={0.8}>
-          <Icon name="message-circle" size={18} color={colors.textTertiary} />
-          <Text style={[s.socialBtnText, { color: colors.textTertiary }]}>Reagir</Text>
+          <Icon name="message-circle" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
+          <Text style={[s.socialBtnText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+            {commentCount > 0 ? commentCount.toLocaleString('fr') : 'Reagir'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={s.socialBtn} onPress={handleShare} activeOpacity={0.8}>
