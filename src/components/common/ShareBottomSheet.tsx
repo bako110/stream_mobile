@@ -36,11 +36,10 @@ function timeAgo(iso: string) {
 }
 
 function getDeepLink(type: ContentType, id: string): string {
-  const base = 'https://folix.app';
-  if (type === 'post')    return `${base}/post/${id}`;
-  if (type === 'event')   return `${base}/event/${id}`;
-  if (type === 'concert') return `${base}/concert/${id}`;
-  return base;
+  if (type === 'post')    return `folix://post/${id}`;
+  if (type === 'event')   return `folix://event/${id}`;
+  if (type === 'concert') return `folix://concert/${id}`;
+  return 'folix://';
 }
 
 export const ShareBottomSheet: React.FC<Props> = (props) => {

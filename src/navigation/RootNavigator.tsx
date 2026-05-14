@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { Platform, Linking } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, Theme } from '@react-navigation/native';
 import { SplashScreen }     from '../screens/Onboarding/SplashScreen';
 import { OnboardingScreen } from '../screens/Onboarding/OnboardingScreen';
@@ -55,6 +55,27 @@ export const RootNavigator: React.FC = () => {
   const { isDark } = useTheme();
   const [appState, setAppState] = useState<AppState>('splash');
   const [blockedInfo, setBlockedInfo] = useState<{ reason?: string; contact?: string; blockedAt?: string } | null>(null);
+  const pendingUrlRef = useRef<string | null>(null);
+
+  // Capturer le deep link reçu avant que l'app soit prête
+  useEffect(() => {
+    Linking.getInitialURL().then(url => {
+      if (url) pendingUrlRef.current = url;
+    });
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      if (appState !== 'main') {
+        pendingUrlRef.current = url;
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  const navigatePendingUrl = () => {
+    const url = pendingUrlRef.current;
+    if (!url) return;
+    pendingUrlRef.current = null;
+    setTimeout(() => Linking.openURL(url).catch(() => {}), 500);
+  };
 
   const handleSplashDone = async () => {
     const onboardingDone = storage.getBoolean(STORAGE_KEYS.ONBOARDING_DONE);
@@ -86,6 +107,7 @@ export const RootNavigator: React.FC = () => {
       setAppState('main');
       setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       requestContactsPermission();
+      navigatePendingUrl();
     } catch {
       // getMe a echoue — tenter le refresh
       try {
@@ -93,6 +115,7 @@ export const RootNavigator: React.FC = () => {
         setAppState('main');
         setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
         requestContactsPermission();
+        navigatePendingUrl();
       } catch {
         // Refresh aussi echoue — session completement expiree
         authService._clearTokens();
@@ -111,6 +134,7 @@ export const RootNavigator: React.FC = () => {
     console.log('[FCM] calling setupFCM from login...');
     setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
     requestContactsPermission();
+    navigatePendingUrl();
   };
   const handleLogout = () => {
     setAppState('auth');
