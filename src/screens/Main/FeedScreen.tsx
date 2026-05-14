@@ -23,6 +23,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText } from '../../components/common';
+import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
@@ -2190,6 +2191,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   );
   const [cardMenuOpen,   setCardMenuOpen]   = useState(false);
   const [reportVisible,  setReportVisible]  = useState(false);
+  const [shareOpen,      setShareOpen]      = useState(false);
   const refType = isEvent ? 'event' : 'concert';
   const [hasReminder, setHasReminder] = useState(
     () => feedPreferenceService.hasReminder(item.id, refType)
@@ -2262,15 +2264,14 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
     }
   };
 
-  const handleShare = async () => {
-    try {
-      await Share.share({ title, message: `${title} — ${formatDate(date)} à ${city ?? 'FoliX'}\n\nVia FoliX` });
-      setShareCount((c: number) => c + 1);
-      const payload = isEvent
-        ? { platform: 'native', event_id: item.id }
-        : { platform: 'native', concert_id: item.id };
-      socialService.share(payload).catch(() => { setShareCount((c: number) => Math.max(0, c - 1)); });
-    } catch { /* annulé */ }
+  const handleShare = () => setShareOpen(true);
+
+  const handleShareDone = () => {
+    setShareCount((c: number) => c + 1);
+    const payload = isEvent
+      ? { platform: 'native', event_id: item.id }
+      : { platform: 'native', concert_id: item.id };
+    socialService.share(payload).catch(() => setShareCount((c: number) => Math.max(0, c - 1)));
   };
 
   const author       = isEvent ? event?.organizer : concert?.artist ?? null;
@@ -2533,15 +2534,14 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       <View style={[s.socialBar, { borderTopColor: colors.divider, backgroundColor: colors.surface }]}>
         <TouchableOpacity style={s.socialBtn} onPress={handleLike} activeOpacity={0.8}>
           <Animated.View style={heartStyle}>
-            <Icon name="heart" size={18} color={liked ? '#E0389A' : colors.textTertiary}
-              fill={liked ? '#E0389A' : 'none'} />
+            <Icon name="heart" size={18} color={liked ? '#E0389A' : colors.textTertiary} />
           </Animated.View>
           <Text style={[s.socialBtnText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
             {liked ? 'Tu adores' : 'Adorer'}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.socialBtn} onPress={() => onComment(delta => setCommentCount(v => v + delta), count => setCommentCount(v => Math.max(v, count)))} activeOpacity={0.8}>
+        <TouchableOpacity style={s.socialBtn} onPress={() => onComment((delta: number) => setCommentCount((v: number) => v + delta), (count: number) => setCommentCount((v: number) => Math.max(v, count)))} activeOpacity={0.8}>
           <Icon name="message-circle" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
           <Text style={[s.socialBtnText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
             {commentCount > 0 ? commentCount.toLocaleString('fr') : 'Reagir'}
@@ -2559,6 +2559,27 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           </Animated.View>
         </TouchableOpacity>
       </View>
+
+      {/* Sheet partage */}
+      {shareOpen && (
+        isEvent ? (
+          <ShareBottomSheet
+            type="event"
+            event={item.data as Event}
+            visible={shareOpen}
+            onClose={() => setShareOpen(false)}
+            onShareCountChange={handleShareDone}
+          />
+        ) : (
+          <ShareBottomSheet
+            type="concert"
+            concert={item.data as Concert}
+            visible={shareOpen}
+            onClose={() => setShareOpen(false)}
+            onShareCountChange={handleShareDone}
+          />
+        )
+      )}
 
     </View>
   );

@@ -124,8 +124,19 @@ export const RootNavigator: React.FC = () => {
     return <OnboardingScreen onFinish={handleOnboardingDone} />;
   }
 
+  const linking = {
+    prefixes: ['folix://', 'https://folix.app'],
+    config: {
+      screens: {
+        PostDetail:    'post/:postId',
+        EventDetail:   'event/:eventId',
+        ConcertDetail: 'concert/:concertId',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer ref={navigationRef} theme={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT}>
+    <NavigationContainer ref={navigationRef} theme={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT} linking={linking}>
       {appState === 'main'
         ? (
           <UserProvider>

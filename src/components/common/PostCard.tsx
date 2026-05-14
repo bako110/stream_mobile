@@ -587,6 +587,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       />
 
       <ShareBottomSheet
+        type="post"
         visible={shareOpen}
         onClose={() => setShareOpen(false)}
         post={post}

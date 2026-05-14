@@ -759,6 +759,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
       {/* ShareBottomSheet */}
       {post && (
         <ShareBottomSheet
+          type="post"
           visible={shareOpen}
           onClose={() => setShareOpen(false)}
           post={post}
