@@ -25,11 +25,13 @@ export interface SavePayload {
 // ── API calls ─────────────────────────────────────────────────────────────────
 
 async function list(type?: FavoriteType): Promise<FavoriteOut[]> {
-  return apiClient.get<FavoriteOut[]>(Endpoints.favorites.list(type));
+  const res = await apiClient.get<FavoriteOut[]>(Endpoints.favorites.list(type));
+  return (res as any).data ?? [];
 }
 
 async function save(payload: SavePayload): Promise<FavoriteOut> {
-  return apiClient.post<FavoriteOut>(Endpoints.favorites.save, payload);
+  const res = await apiClient.post<FavoriteOut>(Endpoints.favorites.save, payload);
+  return (res as any).data;
 }
 
 async function unsave(targetType: FavoriteType, targetId: string): Promise<void> {
@@ -40,7 +42,7 @@ async function check(targetType: FavoriteType, targetId: string): Promise<boolea
   const res = await apiClient.get<{ saved: boolean }>(
     Endpoints.favorites.check(targetType, targetId),
   );
-  return res.saved;
+  return (res as any).data?.saved ?? false;
 }
 
 // ── Helpers combinés (server + MMKV local) ────────────────────────────────────
