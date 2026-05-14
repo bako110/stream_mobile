@@ -65,8 +65,13 @@ export const FavoritesScreen: React.FC = () => {
     setLoading(true);
     try {
       const favs = await favoriteService.list(TAB_TO_TYPE[tabRef.current]);
-      setData(favs.map(fromApi));
-    } catch {
+      console.log('[Favorites] raw favs:', JSON.stringify(favs)?.slice(0, 300));
+      console.log('[Favorites] isArray:', Array.isArray(favs), 'length:', (favs as any)?.length);
+      const mapped = Array.isArray(favs) ? favs.map(fromApi) : [];
+      console.log('[Favorites] mapped:', mapped.length);
+      setData(mapped);
+    } catch (e) {
+      console.log('[Favorites] error:', e);
       setData([]);
     } finally {
       setLoading(false);
