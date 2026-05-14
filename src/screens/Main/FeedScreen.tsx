@@ -191,6 +191,7 @@ export const FeedScreen: React.FC = () => {
   const [commentItem,    setCommentItem]    = useState<FeedItem | null>(null);
   const [commentVisible, setCommentVisible] = useState(false);
   const commentCountChangeRef = useRef<((delta: number) => void) | null>(null);
+  const commentCountLoadedRef = useRef<((count: number) => void) | null>(null);
 
   // Recherche auto avec debounce 300ms
   const liveSearch = useCallback((query: string) => {
@@ -703,7 +704,7 @@ export const FeedScreen: React.FC = () => {
         isActive={activeCardId === item.id && feedFocused}
         isFollowing={!!aid && followingSet.has(aid)}
         onToggleFollow={() => { if (aid) handleToggleFollow(aid); }}
-        onComment={(onCountChange) => { commentCountChangeRef.current = onCountChange; openComments(item); }}
+        onComment={(onCountChange, onCountLoaded) => { commentCountChangeRef.current = onCountChange; commentCountLoadedRef.current = onCountLoaded; openComments(item); }}
         onPress={() => {
           if (item.kind === 'concert') nav.navigate('ConcertDetail', { concertId: item.id });
           else nav.navigate('EventDetail', { eventId: item.id });
@@ -1326,6 +1327,7 @@ export const FeedScreen: React.FC = () => {
         concertId={commentItem?.kind === 'concert' ? commentItem.id : undefined}
         postId={commentItem?.kind === 'post'     ? commentItem.id : undefined}
         onCommentCountChange={delta => commentCountChangeRef.current?.(delta)}
+        onCountLoaded={count => commentCountLoadedRef.current?.(count)}
       />
 
       {/* ── Menu Explorer (style TikTok/Facebook) ───────────────────────── */}
@@ -1859,7 +1861,7 @@ interface FeedCardProps {
   isFollowing: boolean;
   isActive:  boolean;
   onToggleFollow: () => void;
-  onComment: (onCountChange: (delta: number) => void) => void;
+  onComment: (onCountChange: (delta: number) => void, onCountLoaded: (count: number) => void) => void;
   onPress:   () => void;
   onAuthorPress: () => void;
   onHide:    () => void;
@@ -2539,7 +2541,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.socialBtn} onPress={() => onComment(delta => setCommentCount(v => v + delta))} activeOpacity={0.8}>
+        <TouchableOpacity style={s.socialBtn} onPress={() => onComment(delta => setCommentCount(v => v + delta), count => setCommentCount(v => Math.max(v, count)))} activeOpacity={0.8}>
           <Icon name="message-circle" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
           <Text style={[s.socialBtnText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
             {commentCount > 0 ? commentCount.toLocaleString('fr') : 'Reagir'}

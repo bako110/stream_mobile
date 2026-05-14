@@ -546,8 +546,10 @@ export const PostCard: React.FC<PostCardProps> = ({
         </TouchableOpacity>
 
         <TouchableOpacity style={pc.socialBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
-          <Icon name="message-circle" size={18} color={colors.textTertiary} />
-          <Text style={[pc.socialBtnText, { color: colors.textTertiary }]}>Reagir</Text>
+          <Icon name="message-circle" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
+          <Text style={[pc.socialBtnText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+            {commentCount > 0 ? commentCount.toLocaleString('fr') : 'Reagir'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={pc.socialBtn} onPress={() => setShareOpen(true)} activeOpacity={0.8}>
@@ -595,6 +597,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         onClose={() => setCommentsOpen(false)}
         postId={post.id}
         onCommentCountChange={delta => setCommentCount(c => Math.max(0, c + delta))}
+        onCountLoaded={count => setCommentCount(c => Math.max(c, count))}
       />
 
       {/* Visionneuse plein écran */}

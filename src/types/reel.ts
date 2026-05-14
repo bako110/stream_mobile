@@ -32,6 +32,7 @@ export interface CommentAuthor {
   avatar_url?: string | null;
   first_name?: string | null;
   last_name?: string | null;
+  is_verified?: boolean | null;
 }
 
 export interface Comment {

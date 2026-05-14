@@ -28,6 +28,7 @@ interface Props {
   postId?: string;
   onCommentAdded?: () => void;
   onCommentCountChange?: (delta: number) => void;
+  onCountLoaded?: (count: number) => void;
 }
 
 interface CommentEx extends Comment {
@@ -234,7 +235,7 @@ const CommentRow: React.FC<RowProps> = ({
 // ─── CommentsBottomSheet ──────────────────────────────────────────────────────
 
 export const CommentsBottomSheet: React.FC<Props> = ({
-  visible, onClose, reelId, contentId, concertId, eventId, postId, onCommentAdded, onCommentCountChange,
+  visible, onClose, reelId, contentId, concertId, eventId, postId, onCommentAdded, onCommentCountChange, onCountLoaded,
 }) => {
   const { theme }                        = useTheme();
   const { colors }                       = theme;
@@ -255,11 +256,17 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     }
   }, [currentUser?.id]);
 
-  const [comments,    setComments]    = useState<CommentEx[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [text,        setText]        = useState('');
-  const [sending,     setSending]     = useState(false);
-  const [replyTo,     setReplyTo]     = useState<CommentEx | null>(null);
+  const [comments,     setComments]     = useState<CommentEx[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [loadingMore,  setLoadingMore]  = useState(false);
+  const [page,         setPage]         = useState(1);
+  const [totalCount,   setTotalCount]   = useState(0);
+  const [hasMore,      setHasMore]      = useState(false);
+  const [text,         setText]         = useState('');
+  const [sending,      setSending]      = useState(false);
+  const [replyTo,      setReplyTo]      = useState<CommentEx | null>(null);
+
+  const PAGE_LIMIT = 20;
 
   // Edition
   const [editingId,  setEditingId]  = useState<string | null>(null);
@@ -333,12 +340,35 @@ export const CommentsBottomSheet: React.FC<Props> = ({
   const fetchComments = useCallback(async () => {
     if (!targetParams) return;
     setLoading(true);
+    setPage(1);
     try {
-      const data = await socialService.getComments(targetParams);
+      const data = await socialService.getComments({ ...targetParams, page: 1, limit: PAGE_LIMIT });
       setComments(data.map(c => ({ ...c, userReaction: null, replies: [], repliesLoaded: false, showReplies: false })));
-    } catch { setComments([]); }
+      setTotalCount(data.length < PAGE_LIMIT ? data.length : -1);
+      setHasMore(data.length === PAGE_LIMIT);
+      if (data.length > 0) onCountLoaded?.(data.length);
+    } catch { setComments([]); setHasMore(false); }
     finally { setLoading(false); }
   }, [reelId, contentId, concertId, eventId, postId]);
+
+  const loadMore = useCallback(async () => {
+    if (!targetParams || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const data = await socialService.getComments({ ...targetParams, page: nextPage, limit: PAGE_LIMIT });
+      setComments(prev => {
+        const ids = new Set(prev.map(c => c.id));
+        const fresh = data
+          .filter(c => !ids.has(c.id))
+          .map(c => ({ ...c, userReaction: null, replies: [], repliesLoaded: false, showReplies: false }));
+        return [...prev, ...fresh];
+      });
+      setPage(nextPage);
+      setHasMore(data.length === PAGE_LIMIT);
+    } catch { /* silent */ }
+    finally { setLoadingMore(false); }
+  }, [reelId, contentId, concertId, eventId, postId, loadingMore, hasMore, page]);
 
   useEffect(() => {
     if (visible) { fetchComments(); }
@@ -502,7 +532,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
           {/* Header */}
           <View style={[st.header, { borderBottomColor: colors.border }]}>
             <Text style={[st.headerTitle, { color: colors.textPrimary }]}>
-              Commentaires{comments.length > 0 ? ` (${comments.length})` : ''}
+              Commentaires{comments.length > 0 ? ` (${totalCount > 0 ? totalCount.toLocaleString('fr') : comments.length})` : ''}
             </Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Icon name="x" size={22} color={colors.textSecondary} />
@@ -538,6 +568,19 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                   onDelete={handleDelete}
                 />
               )}
+              ListFooterComponent={hasMore ? (
+                <TouchableOpacity
+                  style={[st.loadMoreBtn, { borderColor: colors.primary + '40' }]}
+                  onPress={loadMore}
+                  activeOpacity={0.7}
+                  disabled={loadingMore}
+                >
+                  {loadingMore
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Text style={[st.loadMoreText, { color: colors.primary }]}>Voir plus</Text>
+                  }
+                </TouchableOpacity>
+              ) : null}
             />
           )}
 
@@ -667,4 +710,10 @@ const st = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
   },
+  loadMoreBtn: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, marginVertical: 8,
+    borderRadius: 20, borderWidth: 1,
+  },
+  loadMoreText: { fontSize: 13, fontWeight: '700' },
 });
