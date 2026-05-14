@@ -46,9 +46,9 @@ interface WalletBalance {
 
 interface Withdrawal {
   id: string;
-  amount_coins: number;
-  amount_eur: number;
-  payout_method: PayoutMethod;
+  coins_amount: number;
+  eur_amount: number;
+  payout_method: string;
   status: WithdrawalStatus;
   created_at: string;
   processed_at?: string;
@@ -217,8 +217,8 @@ const WithdrawScreen: React.FC = () => {
               setBalance(prev => prev - amount);
               setWithdrawals(prev => [{
                 id: `tmp_${Date.now()}`,
-                amount_coins: amount,
-                amount_eur: parseFloat(coinsToEur(amount)),
+                coins_amount: amount,
+                eur_amount: parseFloat(coinsToEur(amount)),
                 payout_method: method,
                 status: 'pending',
                 created_at: new Date().toISOString(),
@@ -433,8 +433,8 @@ const WithdrawScreen: React.FC = () => {
                       </View>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={s.historyAmount}>
-                          {wd.amount_coins.toLocaleString('fr-FR')} coins
-                          <Text style={s.historyAmountEur}> · {wd.amount_eur.toFixed(2)} €</Text>
+                          {wd.coins_amount.toLocaleString('fr-FR')} coins
+                          <Text style={s.historyAmountEur}> · {Number(wd.eur_amount).toFixed(2)} €</Text>
                         </Text>
                         <Text style={s.historyDate}>
                           {formatDate(wd.created_at)} · {wd.payout_method === 'stripe' ? 'Stripe' : 'Mobile Money'}
