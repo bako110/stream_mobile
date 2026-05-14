@@ -2,6 +2,13 @@ import { apiClient, Endpoints } from '../api';
 
 export type MessageType = 'text' | 'voice' | 'image' | 'video' | 'file' | 'sticker' | 'location';
 
+export interface ReplyPreview {
+  id:           string;
+  content:      string;
+  sender_id:    string;
+  message_type: MessageType;
+}
+
 export interface AttachmentMeta {
   duration?:      number;
   filename?:      string;
@@ -18,32 +25,38 @@ export interface AttachmentMeta {
 export interface ConversationSummary {
   partner_id:   string;
   partner: {
-    id:          string;
-    username:    string;
-    full_name?:  string;
-    avatar_url?: string;
-    is_online?:  boolean;
+    id:           string;
+    username:     string;
+    full_name?:   string;
+    avatar_url?:  string;
+    is_online?:   boolean;
     is_verified?: boolean;
     last_seen_at?: string;
   };
-  last_message: string;
-  last_time:    string;
-  unread_count: number;
+  last_message:  string;
+  last_time:     string;
+  last_type?:    MessageType;
+  unread_count:  number;
 }
 
 export interface Message {
-  id:              string;
-  sender_id:       string;
-  receiver_id:     string;
-  content:         string;
-  message_type:    MessageType;
-  attachment_url?: string;
-  attachment_meta?: AttachmentMeta;
-  created_at:      string;
-  read:            boolean;
-  edited_at?:      string;
-  deleted?:        boolean;
-  pending?:        boolean;
+  id:                  string;
+  sender_id:           string;
+  receiver_id:         string;
+  content:             string;
+  message_type:        MessageType;
+  attachment_url?:     string;
+  attachment_meta?:    AttachmentMeta;
+  created_at:          string;
+  read:                boolean;
+  edited_at?:          string;
+  deleted?:            boolean;
+  pending?:            boolean;
+  pinned?:             boolean;
+  pinned_at?:          string;
+  reply_to?:           ReplyPreview;
+  forwarded_from_id?:  string;
+  reaction?:           string;
 }
 
 export const messageService = {
@@ -69,10 +82,14 @@ export const messageService = {
     messageType: MessageType = 'text',
     attachmentUrl?: string,
     attachmentMeta?: AttachmentMeta,
+    replyToId?: string,
+    forwardedFromId?: string,
   ): Promise<Message> {
     const body: any = { content, message_type: messageType };
-    if (attachmentUrl) body.attachment_url = attachmentUrl;
-    if (attachmentMeta) body.attachment_meta = attachmentMeta;
+    if (attachmentUrl)   body.attachment_url = attachmentUrl;
+    if (attachmentMeta)  body.attachment_meta = attachmentMeta;
+    if (replyToId)       body.reply_to_id = replyToId;
+    if (forwardedFromId) body.forwarded_from_id = forwardedFromId;
     const res = await apiClient.post<Message>(Endpoints.messages.conversation(partnerId), body);
     return res.data;
   },
@@ -88,6 +105,40 @@ export const messageService = {
 
   async deleteMessage(messageId: string): Promise<void> {
     await apiClient.delete(Endpoints.messages.message(messageId));
+  },
+
+  async deleteMessageForMe(messageId: string): Promise<void> {
+    await apiClient.delete(`${Endpoints.messages.message(messageId)}/for-me`);
+  },
+
+  async pinMessage(messageId: string): Promise<Message> {
+    const res = await apiClient.post<Message>(`${Endpoints.messages.message(messageId)}/pin`);
+    return res.data;
+  },
+
+  async unpinMessage(messageId: string): Promise<Message> {
+    const res = await apiClient.delete<Message>(`${Endpoints.messages.message(messageId)}/pin`);
+    return res.data;
+  },
+
+  async getPinnedMessages(partnerId: string): Promise<Message[]> {
+    const res = await apiClient.get<Message[]>(`${Endpoints.messages.conversation(partnerId)}/pinned`);
+    return res.data;
+  },
+
+  async searchMessages(partnerId: string, query: string): Promise<Message[]> {
+    const res = await apiClient.get<Message[]>(
+      `${Endpoints.messages.conversation(partnerId)}/search?q=${encodeURIComponent(query)}`,
+    );
+    return res.data;
+  },
+
+  async forwardMessage(messageId: string, receiverId: string): Promise<Message> {
+    const res = await apiClient.post<Message>(
+      `${Endpoints.messages.message(messageId)}/forward`,
+      { receiver_id: receiverId },
+    );
+    return res.data;
   },
 
   async reactToMessage(messageId: string, emoji: string): Promise<{ message_id: string; user_id: string; emoji: string | null }> {

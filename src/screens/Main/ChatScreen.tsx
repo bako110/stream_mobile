@@ -28,6 +28,7 @@ import { uploadAudioFile, uploadMessageImage, uploadMessageVideo, uploadFileFrom
 import { useWs } from '../../context/WebSocketContext';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
+import type { ConversationSummary } from '../../services/messageService';
 
 interface RouteParams {
   partnerId:   string;
@@ -143,6 +144,17 @@ export const ChatScreen: React.FC = () => {
   const [partnerLastSeen, setPartnerLastSeen] = useState<string | null>(initialLastSeen ?? null);
   const [isBlocked,       setIsBlocked]       = useState(false);
 
+  const [replyingTo,        setReplyingTo]        = useState<Message | null>(null);
+  const [pinnedMessages,    setPinnedMessages]    = useState<Message[]>([]);
+  const [showPinned,        setShowPinned]        = useState(false);
+  const [showSearch,        setShowSearch]        = useState(false);
+  const [searchQuery,       setSearchQuery]       = useState('');
+  const [searchResults,     setSearchResults]     = useState<Message[]>([]);
+  const [searchLoading,     setSearchLoading]     = useState(false);
+  const [forwardingMsg,     setForwardingMsg]     = useState<Message | null>(null);
+  const [showForwardPicker, setShowForwardPicker] = useState(false);
+  const [convList,          setConvList]          = useState<ConversationSummary[]>([]);
+
   const listRef = useRef<FlatList>(null);
   const myIdRef = useRef<string | null>(null);
 
@@ -218,6 +230,15 @@ export const ChatScreen: React.FC = () => {
           }
           return { ...prev, [message_id]: emoji };
         });
+      } else if (payload.type === 'message_pinned') {
+        setMessages(prev => {
+          const pinned = prev.find(m => m.id === payload.message_id);
+          if (pinned) setPinnedMessages(p => [{ ...pinned, pinned: true }, ...p.filter(x => x.id !== pinned.id)]);
+          return prev.map(m => m.id === payload.message_id ? { ...m, pinned: true } : m);
+        });
+      } else if (payload.type === 'message_unpinned') {
+        setMessages(prev => prev.map(m => m.id === payload.message_id ? { ...m, pinned: false } : m));
+        setPinnedMessages(prev => prev.filter(m => m.id !== payload.message_id));
       }
     };
     addListener(handler);
@@ -256,6 +277,7 @@ export const ChatScreen: React.FC = () => {
         setMessages(data);
         setReactions(newReactions);
         setHasMore(data.length === 30);
+        messageService.getPinnedMessages(partnerId).then(pins => setPinnedMessages(pins)).catch(() => {});
       } else {
         setMessages(prev => [...prev, ...data]);
         setReactions(prev => ({ ...prev, ...newReactions }));
@@ -306,7 +328,8 @@ export const ChatScreen: React.FC = () => {
     setMessages(prev => [optimistic, ...prev]);
 
     try {
-      const msg = await messageService.sendMessage(partnerId, content, 'text');
+      const msg = await messageService.sendMessage(partnerId, content, 'text', undefined, undefined, replyingTo?.id);
+      setReplyingTo(null);
       setMessages(prev => prev.map(m => m.id === tempId ? msg : m));
     } catch (e: any) {
       setMessages(prev => prev.filter(m => m.id !== tempId));
@@ -571,6 +594,116 @@ export const ChatScreen: React.FC = () => {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
     );
+  };
+
+  // ── More menu ────────────────────────────────────────────────────────────
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  const handleViewProfile = () => {
+    setShowMoreMenu(false);
+    nav.navigate('UserProfile', { userId: partnerId });
+  };
+
+  const handleBlockUser = () => {
+    setShowMoreMenu(false);
+    Alert.alert(
+      'Bloquer cet utilisateur',
+      `Bloquer ${partnerName} ? Vous ne pourrez plus échanger de messages.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Bloquer', style: 'destructive', onPress: async () => {
+            try {
+              const { apiClient } = require('../../api');
+              await apiClient.post(`/api/v1/users/${partnerId}/block`);
+              setIsBlocked(true);
+            } catch {
+              Alert.alert('Erreur', 'Impossible de bloquer cet utilisateur.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleClearChat = () => {
+    setShowMoreMenu(false);
+    Alert.alert(
+      'Vider la conversation',
+      'Supprimer tous les messages affichés ? Cette action est locale uniquement.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Vider', style: 'destructive', onPress: () => setMessages([]) },
+      ],
+    );
+  };
+
+  const loadConvsForForward = async () => {
+    try { setConvList(await messageService.getConversations()); } catch {}
+  };
+
+  const handleForwardMessage = (msg: Message) => {
+    setShowActions(false);
+    setSelectedMsg(null);
+    setForwardingMsg(msg);
+    loadConvsForForward();
+    setShowForwardPicker(true);
+  };
+
+  const doForward = async (receiverId: string, receiverName: string) => {
+    if (!forwardingMsg) return;
+    setShowForwardPicker(false);
+    try {
+      await messageService.forwardMessage(forwardingMsg.id, receiverId);
+      Alert.alert('Transféré', `Message transféré à ${receiverName}`);
+    } catch {
+      Alert.alert('Erreur', 'Impossible de transférer ce message');
+    }
+    setForwardingMsg(null);
+  };
+
+  const handlePinToggle = async (msg: Message) => {
+    setShowActions(false);
+    setSelectedMsg(null);
+    try {
+      if (msg.pinned) {
+        await messageService.unpinMessage(msg.id);
+        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, pinned: false } : m));
+        setPinnedMessages(prev => prev.filter(m => m.id !== msg.id));
+      } else {
+        await messageService.pinMessage(msg.id);
+        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, pinned: true } : m));
+        setPinnedMessages(prev => [{ ...msg, pinned: true }, ...prev.filter(m => m.id !== msg.id)]);
+      }
+    } catch {
+      Alert.alert('Erreur', "Impossible de modifier l'épingle");
+    }
+  };
+
+  const handleDeleteForMe = async () => {
+    if (!selectedMsg) return;
+    setShowActions(false);
+    const msgId = selectedMsg.id;
+    setSelectedMsg(null);
+    try {
+      await messageService.deleteMessageForMe(msgId);
+      setMessages(prev => prev.filter(m => m.id !== msgId));
+    } catch {
+      Alert.alert('Erreur', 'Impossible de supprimer ce message');
+    }
+  };
+
+  const handleSearchInConv = async (q: string) => {
+    setSearchQuery(q);
+    if (!q.trim()) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      setSearchResults(await messageService.searchMessages(partnerId, q));
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
   // ── Call handlers ─────────────────────────────────────────────────────────
@@ -906,10 +1039,47 @@ export const ChatScreen: React.FC = () => {
         <TouchableOpacity style={styles.callBtn} onPress={() => startCall('video')}>
           <Icon name="video" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.moreBtn}>
+        <TouchableOpacity style={styles.moreBtn} onPress={() => setShowMoreMenu(true)}>
           <Icon name="more-vertical" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
+
+      {/* Bandeau messages épinglés */}
+      {pinnedMessages.length > 0 && !showSearch && (
+        <TouchableOpacity
+          style={[styles.pinnedBanner, { backgroundColor: colors.primary + '12', borderBottomColor: colors.divider }]}
+          onPress={() => setShowPinned(true)}
+          activeOpacity={0.8}
+        >
+          <Icon name="bookmark" size={13} color={colors.primary} />
+          <Text style={[styles.pinnedBannerText, { color: colors.primary }]} numberOfLines={1}>
+            {pinnedMessages.length} message{pinnedMessages.length > 1 ? 's' : ''} épinglé{pinnedMessages.length > 1 ? 's' : ''}
+          </Text>
+          <Text style={[styles.pinnedBannerSub, { color: colors.textTertiary }]} numberOfLines={1}>
+            {(pinnedMessages[0]?.content || '📎 Pièce jointe').slice(0, 40)}
+          </Text>
+          <Icon name="chevron-right" size={13} color={colors.textTertiary} />
+        </TouchableOpacity>
+      )}
+
+      {/* Barre de recherche dans la conversation */}
+      {showSearch && (
+        <View style={[styles.chatSearchBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+          <Icon name="search" size={15} color={colors.textTertiary} />
+          <TextInput
+            style={[styles.chatSearchInput, { color: colors.textPrimary }]}
+            placeholder="Rechercher dans la conversation…"
+            placeholderTextColor={colors.textDisabled}
+            value={searchQuery}
+            onChangeText={handleSearchInConv}
+            autoFocus
+          />
+          {searchLoading && <ActivityIndicator size="small" color={colors.primary} />}
+          <TouchableOpacity onPress={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }}>
+            <Icon name="x" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Upload indicator */}
       {uploading && (
@@ -925,7 +1095,7 @@ export const ChatScreen: React.FC = () => {
       ) : (
         <FlatList
           ref={listRef}
-          data={messages}
+          data={showSearch && searchQuery ? searchResults : messages}
           keyExtractor={m => m.id}
           inverted
           contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 6 }}
@@ -973,6 +1143,22 @@ export const ChatScreen: React.FC = () => {
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={styles.bubbleInner}
                     >
+                      {item.forwarded_from_id && (
+                        <View style={styles.forwardedLabel}>
+                          <Icon name="corner-up-right" size={11} color="rgba(255,255,255,0.6)" />
+                          <Text style={[styles.forwardedText, { color: 'rgba(255,255,255,0.6)' }]}>Transféré</Text>
+                        </View>
+                      )}
+                      {item.reply_to && (
+                        <View style={[styles.replyPreview, { backgroundColor: 'rgba(255,255,255,0.15)', borderLeftColor: 'rgba(255,255,255,0.6)' }]}>
+                          <Text style={[styles.replyName, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
+                            {item.reply_to.sender_id === myId ? 'Vous' : partnerName}
+                          </Text>
+                          <Text style={[styles.replyText, { color: 'rgba(255,255,255,0.65)' }]} numberOfLines={1}>
+                            {item.reply_to.message_type !== 'text' ? `📎 ${item.reply_to.message_type}` : item.reply_to.content}
+                          </Text>
+                        </View>
+                      )}
                       {renderBubbleContent(item, true)}
                       <View style={styles.bubbleFooter}>
                         {item.edited_at && <Text style={[styles.editedLabel, { color: 'rgba(255,255,255,0.55)' }]}>modifié</Text>}
@@ -989,6 +1175,22 @@ export const ChatScreen: React.FC = () => {
                     </LinearGradient>
                   ) : (
                     <View style={[styles.bubbleInner, { backgroundColor: colors.surface }]}>
+                      {item.forwarded_from_id && (
+                        <View style={styles.forwardedLabel}>
+                          <Icon name="corner-up-right" size={11} color={colors.textTertiary} />
+                          <Text style={[styles.forwardedText, { color: colors.textTertiary }]}>Transféré</Text>
+                        </View>
+                      )}
+                      {item.reply_to && (
+                        <View style={[styles.replyPreview, { backgroundColor: colors.backgroundSecondary, borderLeftColor: colors.primary }]}>
+                          <Text style={[styles.replyName, { color: colors.primary }]} numberOfLines={1}>
+                            {item.reply_to.sender_id === myId ? 'Vous' : partnerName}
+                          </Text>
+                          <Text style={[styles.replyText, { color: colors.textTertiary }]} numberOfLines={1}>
+                            {item.reply_to.message_type !== 'text' ? `📎 ${item.reply_to.message_type}` : item.reply_to.content}
+                          </Text>
+                        </View>
+                      )}
                       {renderBubbleContent(item, false)}
                       <View style={styles.bubbleFooter}>
                         {item.edited_at && <Text style={[styles.editedLabel, { color: colors.textTertiary }]}>modifié</Text>}
@@ -1150,6 +1352,38 @@ export const ChatScreen: React.FC = () => {
               <TouchableOpacity style={styles.actionItem} onPress={copyMessage}>
                 <Icon name="copy" size={20} color={colors.textPrimary} />
                 <Text style={[styles.actionText, { color: colors.textPrimary }]}>Copier</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Répondre */}
+            {selectedMsg && !selectedMsg.deleted && (
+              <TouchableOpacity style={styles.actionItem} onPress={() => { setReplyingTo(selectedMsg); setShowActions(false); setSelectedMsg(null); }}>
+                <Icon name="corner-up-left" size={20} color={colors.primary} />
+                <Text style={[styles.actionText, { color: colors.textPrimary }]}>Répondre</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Transférer */}
+            {selectedMsg && !selectedMsg.deleted && (
+              <TouchableOpacity style={styles.actionItem} onPress={() => handleForwardMessage(selectedMsg)}>
+                <Icon name="corner-up-right" size={20} color={colors.textPrimary} />
+                <Text style={[styles.actionText, { color: colors.textPrimary }]}>Transférer</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Épingler */}
+            {selectedMsg && !selectedMsg.deleted && (
+              <TouchableOpacity style={styles.actionItem} onPress={() => handlePinToggle(selectedMsg)}>
+                <Icon name="bookmark" size={20} color={selectedMsg?.pinned ? '#F59E0B' : colors.textPrimary} />
+                <Text style={[styles.actionText, { color: colors.textPrimary }]}>{selectedMsg?.pinned ? 'Désépingler' : 'Épingler'}</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Supprimer pour moi */}
+            {selectedMsg && (
+              <TouchableOpacity style={styles.actionItem} onPress={handleDeleteForMe}>
+                <Icon name="eye-off" size={20} color={colors.textTertiary} />
+                <Text style={[styles.actionText, { color: colors.textTertiary }]}>Supprimer pour moi</Text>
               </TouchableOpacity>
             )}
 
@@ -1332,6 +1566,124 @@ export const ChatScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Reply banner */}
+      {replyingTo && !isBlocked && (
+        <View style={[styles.replyBanner, { backgroundColor: colors.primary + '12', borderTopColor: colors.divider }]}>
+          <View style={[styles.replyBannerBar, { backgroundColor: colors.primary }]} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.replyBannerName, { color: colors.primary }]}>
+              {replyingTo.sender_id === myId ? 'Vous' : partnerName}
+            </Text>
+            <Text style={[styles.replyBannerText, { color: colors.textSecondary }]} numberOfLines={1}>
+              {replyingTo.message_type !== 'text' ? `📎 ${replyingTo.message_type}` : replyingTo.content}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="x" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* More menu */}
+      <Modal visible={showMoreMenu} transparent animationType="fade" onRequestClose={() => setShowMoreMenu(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowMoreMenu(false)}>
+          <View style={[styles.attachSheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.attachHandle, { backgroundColor: colors.divider }]} />
+            <TouchableOpacity style={styles.actionItem} onPress={() => { setShowMoreMenu(false); setShowSearch(true); }}>
+              <Icon name="search" size={20} color={colors.textPrimary} />
+              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Rechercher</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={() => { setShowMoreMenu(false); setShowPinned(true); }}>
+              <Icon name="bookmark" size={20} color={colors.textPrimary} />
+              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Messages épinglés</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={handleViewProfile}>
+              <Icon name="user" size={20} color={colors.textPrimary} />
+              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Voir le profil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={handleClearChat}>
+              <Icon name="trash" size={20} color={colors.textTertiary} />
+              <Text style={[styles.actionText, { color: colors.textTertiary }]}>Vider la conversation</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={handleBlockUser}>
+              <Icon name="slash" size={20} color={colors.error ?? '#FF4444'} />
+              <Text style={[styles.actionText, { color: colors.error ?? '#FF4444' }]}>Bloquer {partnerName}</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Messages épinglés modal */}
+      <Modal visible={showPinned} transparent animationType="slide" onRequestClose={() => setShowPinned(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowPinned(false)}>
+          <View style={[styles.attachSheet, { backgroundColor: colors.surface, maxHeight: '60%' }]}>
+            <View style={[styles.attachHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[styles.attachTitle, { color: colors.textPrimary, marginBottom: 12 }]}>Messages épinglés</Text>
+            {pinnedMessages.length === 0 ? (
+              <Text style={{ color: colors.textTertiary, textAlign: 'center', paddingVertical: 20 }}>Aucun message épinglé</Text>
+            ) : (
+              <FlatList
+                data={pinnedMessages}
+                keyExtractor={m => m.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.actionItem, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}
+                    onPress={() => {
+                      setShowPinned(false);
+                      const idx = messages.findIndex(m => m.id === item.id);
+                      if (idx !== -1) listRef.current?.scrollToIndex({ index: idx, animated: true });
+                    }}
+                  >
+                    <Icon name="bookmark" size={16} color="#F59E0B" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.actionText, { color: colors.textPrimary, fontSize: 13 }]} numberOfLines={2}>
+                        {item.message_type !== 'text' ? `📎 ${item.message_type}` : item.content}
+                      </Text>
+                      <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }}>
+                        {item.sender_id === myId ? 'Vous' : partnerName}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Forward picker modal */}
+      <Modal visible={showForwardPicker} transparent animationType="slide" onRequestClose={() => { setShowForwardPicker(false); setForwardingMsg(null); }}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setShowForwardPicker(false); setForwardingMsg(null); }}>
+          <View style={[styles.attachSheet, { backgroundColor: colors.surface, maxHeight: '65%' }]}>
+            <View style={[styles.attachHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[styles.attachTitle, { color: colors.textPrimary, marginBottom: 12 }]}>Transférer à…</Text>
+            {convList.length === 0 ? (
+              <Text style={{ color: colors.textTertiary, textAlign: 'center', paddingVertical: 20 }}>Aucune conversation</Text>
+            ) : (
+              <FlatList
+                data={convList}
+                keyExtractor={c => c.partner_id}
+                renderItem={({ item }) => {
+                  const name = item.partner?.full_name ?? item.partner?.username ?? item.partner_id;
+                  return (
+                    <TouchableOpacity
+                      style={[styles.actionItem, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}
+                      onPress={() => doForward(item.partner_id, name)}
+                    >
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14 }}>{name[0]?.toUpperCase()}</Text>
+                      </View>
+                      <Text style={[styles.actionText, { color: colors.textPrimary }]}>{name}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Attachment picker modal */}
@@ -1578,6 +1930,30 @@ const styles = StyleSheet.create({
   locationFooterOther: { backgroundColor: '#f5f5f5' },
   locationLabel:       { fontSize: 13, fontWeight: '700' },
   locationCoords:      { fontSize: 11, marginTop: 1 },
+
+  // Pinned banner
+  pinnedBanner:     { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth },
+  pinnedBannerText: { fontSize: 12, fontWeight: '700' },
+  pinnedBannerSub:  { fontSize: 12, flex: 1 },
+
+  // Search bar in conversation
+  chatSearchBar:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  chatSearchInput: { flex: 1, fontSize: 14, padding: 0 },
+
+  // Reply preview inside bubble
+  replyPreview: { borderLeftWidth: 3, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6, gap: 2 },
+  replyName:    { fontSize: 12, fontWeight: '700' },
+  replyText:    { fontSize: 12 },
+
+  // Forwarded label
+  forwardedLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  forwardedText:  { fontSize: 11, fontStyle: 'italic' },
+
+  // Reply banner above input
+  replyBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  replyBannerBar:  { width: 3, height: 36, borderRadius: 2 },
+  replyBannerName: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
+  replyBannerText: { fontSize: 13 },
 });
 
 const CP = StyleSheet.create({
