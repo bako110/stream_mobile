@@ -8,25 +8,19 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { reelService } from '../../services';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
-import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const VIDEO_H = Math.round(SCREEN_W * 9 / 16);
-
-type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 interface Props { onBack: () => void }
 
 export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   const { theme } = useTheme();
   const { colors } = theme;
-  const nav = useNavigation<Nav>();
 
   const [caption,       setCaption]       = useState('');
   const [videoLocalUri, setVideoLocalUri] = useState<string | null>(null);
@@ -69,10 +63,9 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
     const capturedCaption = caption.trim();
     const capturedUri     = videoLocalUri;
 
-    // Fermer l'écran immédiatement
+    // Fermer l'écran immédiatement — le banner global suit la progression
     videoPlayer.pause();
     onBack();
-    nav.navigate('Tabs', { screen: 'Reels', params: { reelPublished: true } } as any);
 
     // Upload en arrière-plan
     backgroundUploadService.enqueueVideo({

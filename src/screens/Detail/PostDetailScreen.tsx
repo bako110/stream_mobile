@@ -576,6 +576,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               aspectRatio={16 / 9}
               borderRadius={12}
               showControls
+              muted={false}
             />
           </View>
         )}

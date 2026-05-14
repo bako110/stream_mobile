@@ -47,6 +47,11 @@ export interface Message {
 }
 
 export const messageService = {
+  async getUnreadCount(): Promise<number> {
+    const res = await apiClient.get<{ unread_count: number }>(Endpoints.messages.unreadCount);
+    return res.data.unread_count;
+  },
+
   async getConversations(): Promise<ConversationSummary[]> {
     const res = await apiClient.get<ConversationSummary[]>(Endpoints.messages.conversations);
     return res.data;
