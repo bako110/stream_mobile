@@ -628,12 +628,28 @@ export const ChatScreen: React.FC = () => {
 
   const handleClearChat = () => {
     setShowMoreMenu(false);
+    const myCount    = messages.filter(m => m.sender_id === myId && !m.deleted).length;
+    const theirCount = messages.filter(m => m.sender_id !== myId && !m.deleted).length;
     Alert.alert(
       'Vider la conversation',
-      'Supprimer tous les messages affichés ? Cette action est locale uniquement.',
+      `Cette action va :\n\n• Supprimer définitivement vos ${myCount} message${myCount > 1 ? 's' : ''} pour tout le monde\n• Masquer les ${theirCount} message${theirCount > 1 ? 's' : ''} reçus de votre côté uniquement\n\nCette action est irréversible.`,
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Vider', style: 'destructive', onPress: () => setMessages([]) },
+        {
+          text: 'Vider quand même', style: 'destructive', onPress: async () => {
+            const snapshot = [...messages];
+            setMessages([]);
+            setPinnedMessages([]);
+            await Promise.all(snapshot.map(m => {
+              if (m.deleted) return Promise.resolve();
+              if (m.sender_id === myId) {
+                return messageService.deleteMessage(m.id).catch(() => {});
+              } else {
+                return messageService.deleteMessageForMe(m.id).catch(() => {});
+              }
+            }));
+          },
+        },
       ],
     );
   };
