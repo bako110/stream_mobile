@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Share, Platform, StatusBar, Dimensions,
+  Share, Platform, StatusBar, Dimensions, ActivityIndicator, Alert,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useTheme } from '../../hooks/useTheme';
 import type { EventTicket } from '../../types/event';
+import { getAuthToken } from '../../api';
+import { API_BASE_URL } from '../../utils/constants';
+import { Endpoints } from '../../api/endpoints';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -25,6 +29,7 @@ const formatTime = (iso: string) =>
 export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
   const { theme: { colors } } = useTheme();
   const event = ticket.event;
+  const [downloading, setDownloading] = useState(false);
 
   // is_used : compatibilité avec l'ancien champ + le nouveau champ status
   const isUsed = ticket.status === 'used' || ticket.is_used === true;
@@ -34,6 +39,28 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
     ac: ticket.access_code,
     e:  ticket.event_id,
   });
+
+  const handleDownloadPdf = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const token = getAuthToken();
+      const url = `${API_BASE_URL}${Endpoints.events.myTicketPdf(ticket.event_id)}`;
+      const dest = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/billet_${ticket.event_id.slice(0, 8)}.pdf`;
+      const res = await ReactNativeBlobUtil.config({ path: dest })
+        .fetch('GET', url, token ? { Authorization: `Bearer ${token}` } : {});
+      if (Platform.OS === 'ios') {
+        ReactNativeBlobUtil.ios.presentOptionsMenu(res.path());
+      } else {
+        await ReactNativeBlobUtil.android.actionViewIntent(res.path(), 'application/pdf');
+      }
+    } catch (err: any) {
+      console.error('[MyTicketScreen] download error:', err?.message ?? err);
+      Alert.alert('Erreur', `Impossible de telecharger le billet.\n${err?.message ?? String(err)}`);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handleShare = async () => {
     try {
@@ -59,9 +86,16 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={st.headerTitle}>Mon billet</Text>
-        <TouchableOpacity onPress={handleShare} style={st.shareBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="share-2" size={20} color="#fff" />
-        </TouchableOpacity>
+        <View style={st.headerActions}>
+          <TouchableOpacity onPress={handleDownloadPdf} style={st.headerBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            {downloading
+              ? <ActivityIndicator size={18} color="#fff" />
+              : <Icon name="download" size={20} color="#fff" />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleShare} style={st.headerBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Icon name="share-2" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -188,10 +222,11 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
 };
 
 const st = StyleSheet.create({
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 16 },
-  backBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  shareBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 16 },
+  backBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  headerBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle:   { fontSize: 18, fontWeight: '800', color: '#fff' },
 
   ticketCard:  { marginHorizontal: 20, marginTop: 24, borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
 
