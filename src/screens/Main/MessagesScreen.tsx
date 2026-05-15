@@ -385,6 +385,11 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                     <Text style={styles.badgeText}>{totalUnread > 99 ? '99+' : totalUnread}</Text>
                   </View>
                 )}
+                {activeTab === 'calls' && missedCallCount > 0 && (
+                  <View style={[styles.badge, { backgroundColor: '#E0389A' }]}>
+                    <Text style={styles.badgeText}>{missedCallCount > 99 ? '99+' : missedCallCount}</Text>
+                  </View>
+                )}
               </View>
 
               {activeTab === 'messages' ? (
