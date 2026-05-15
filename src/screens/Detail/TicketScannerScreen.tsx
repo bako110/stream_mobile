@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   Platform, StatusBar, ActivityIndicator, ScrollView,
 } from 'react-native';
-import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
+import { Camera, CameraType } from 'react-native-camera-kit';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
@@ -26,7 +26,6 @@ const formatTime = (iso: string) =>
 
 export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBack }) => {
   const { theme: { colors } } = useTheme();
-  const device = useCameraDevice('back');
 
   const [state, setState] = useState<ScanState>('scanning');
   const [result, setResult] = useState<TicketScanResult | null>(null);
@@ -47,28 +46,25 @@ export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBa
     }
   }, [state, eventId]);
 
-  const codeScanner = useCodeScanner({
-    codeTypes: ['qr'],
-    onCodeScanned: (codes) => {
-      const raw = codes[0]?.value;
-      if (!raw) return;
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed.ac && parsed.e === eventId) {
-          handleCode(parsed.ac);
-        } else if (parsed.e !== eventId) {
-          setError("Ce billet n'est pas pour cet événement");
-          setState('result');
-        } else {
-          setError('QR code non reconnu');
-          setState('result');
-        }
-      } catch {
-        setError('QR code invalide');
+  const handleReadCode = useCallback((event: { nativeEvent: { codeStringValue: string } }) => {
+    const raw = event.nativeEvent.codeStringValue;
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.ac && parsed.e === eventId) {
+        handleCode(parsed.ac);
+      } else if (parsed.e !== eventId) {
+        setError("Ce billet n'est pas pour cet événement");
+        setState('result');
+      } else {
+        setError('QR code non reconnu');
         setState('result');
       }
-    },
-  });
+    } catch {
+      setError('QR code invalide');
+      setState('result');
+    }
+  }, [eventId, handleCode]);
 
   const handleValidate = async () => {
     if (!result) return;
@@ -120,13 +116,13 @@ export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBa
       </LinearGradient>
 
       {/* Camera / Result */}
-      {state === 'scanning' && device ? (
+      {state === 'scanning' ? (
         <View style={{ flex: 1 }}>
           <Camera
             style={StyleSheet.absoluteFill}
-            device={device}
-            isActive
-            codeScanner={codeScanner}
+            cameraType={CameraType.Back}
+            scanBarcode
+            onReadCode={handleReadCode}
           />
           {/* Viseur */}
           <View style={st.overlay}>
@@ -150,11 +146,39 @@ export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBa
           style={{ flex: 1, backgroundColor: colors.background }}
           contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         >
-          {/* Badge statut */}
-          <View style={[st.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: statusColor }]}>
-            <Icon name={statusIcon} size={22} color={statusColor} />
-            <Text style={[st.statusTxt, { color: statusColor }]}>{statusLabel}</Text>
-          </View>
+          {/* Banniere billet deja utilise */}
+          {result?.status === 'used' && (
+            <View style={st.alreadyUsedBanner}>
+              <View style={st.alreadyUsedIconWrap}>
+                <Icon name="x-octagon" size={36} color="#fff" />
+              </View>
+              <Text style={st.alreadyUsedTitle}>BILLET DEJA UTILISE</Text>
+              <Text style={st.alreadyUsedSub}>Ce billet a deja ete scanné et valide</Text>
+              {result.used_at && (
+                <View style={st.alreadyUsedDateRow}>
+                  <Icon name="clock" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={st.alreadyUsedDate}>
+                    Entree le {formatDate(result.used_at)} a {formatTime(result.used_at)}
+                  </Text>
+                </View>
+              )}
+              <Text style={st.alreadyUsedRefuse}>ENTREE REFUSEE</Text>
+            </View>
+          )}
+
+          {/* Badge statut pour les autres cas (valide, erreur) */}
+          {result?.status !== 'used' && (
+            <View style={[st.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: statusColor }]}>
+              <Icon name={statusIcon} size={22} color={statusColor} />
+              <Text style={[st.statusTxt, { color: statusColor }]}>{statusLabel}</Text>
+            </View>
+          )}
+          {!result && error && (
+            <View style={[st.statusBadge, { backgroundColor: '#EF444418', borderColor: '#EF4444' }]}>
+              <Icon name="x-circle" size={22} color="#EF4444" />
+              <Text style={[st.statusTxt, { color: '#EF4444' }]}>{error}</Text>
+            </View>
+          )}
 
           {result && (
             <>
@@ -278,7 +302,7 @@ const st = StyleSheet.create({
   headerTitle:  { fontSize: 16, fontWeight: '800', color: '#fff' },
   headerSub:    { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
 
-  overlay:      { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  overlay:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   viewfinder:   { width: 240, height: 240, position: 'relative' },
   corner:       { position: 'absolute', width: CORNER, height: CORNER, borderColor: '#fff', borderWidth: 3 },
   tl:           { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 4 },
@@ -298,7 +322,7 @@ const st = StyleSheet.create({
 
   userRow:      { flexDirection: 'row', alignItems: 'center' },
   avatar:       { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImg:    { ...StyleSheet.absoluteFillObject },
+  avatarImg:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   nameRow:      { flexDirection: 'row', alignItems: 'center' },
   displayName:  { fontSize: 17, fontWeight: '700' },
   username:     { fontSize: 13, marginTop: 2 },
@@ -312,4 +336,12 @@ const st = StyleSheet.create({
 
   scanAgainBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, borderWidth: 1.5 },
   scanAgainTxt: { fontSize: 14, fontWeight: '700' },
+
+  alreadyUsedBanner:  { backgroundColor: '#EF4444', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, gap: 8 },
+  alreadyUsedIconWrap:{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  alreadyUsedTitle:   { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: 1 },
+  alreadyUsedSub:     { fontSize: 13, color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
+  alreadyUsedDateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  alreadyUsedDate:    { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+  alreadyUsedRefuse:  { fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.6)', letterSpacing: 2, marginTop: 4 },
 });
