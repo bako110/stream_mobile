@@ -141,8 +141,8 @@ const HeroSlide: React.FC<{ item: FilmItem; onPress: () => void }> = ({ item, on
       <View style={hs.content}>
         {item.is_premium && (
           <View style={hs.premiumBadge}>
-            <Icon name="star" size={9} color="#fff" />
-            <Text style={hs.premiumText}>PREMIUM</Text>
+            <Icon name="lock" size={9} color="#fff" />
+            <Text style={hs.premiumText}>PREMIUM{item.price ? ` · ${item.price}€` : ''}</Text>
           </View>
         )}
 
@@ -168,9 +168,15 @@ const HeroSlide: React.FC<{ item: FilmItem; onPress: () => void }> = ({ item, on
 
         {/* Boutons */}
         <View style={hs.buttons}>
-          <TouchableOpacity style={hs.btnWatch} onPress={onPress} activeOpacity={0.88}>
-            <Icon name="play" size={15} color="#000" />
-            <Text style={hs.btnWatchText}>Regarder</Text>
+          <TouchableOpacity
+            style={[hs.btnWatch, item.is_premium && { backgroundColor: '#E8501A' }]}
+            onPress={onPress}
+            activeOpacity={0.88}
+          >
+            <Icon name={item.is_premium ? 'lock' : 'play'} size={15} color={item.is_premium ? '#fff' : '#000'} />
+            <Text style={[hs.btnWatchText, item.is_premium && { color: '#fff' }]}>
+              {item.is_premium ? `Acheter · ${item.price ?? ''}€` : 'Regarder'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={hs.btnMore} onPress={onPress} activeOpacity={0.88}>
             <Icon name="info" size={15} color="#fff" />
@@ -305,10 +311,13 @@ const Card: React.FC<{
             pointerEvents="none"
           />
 
-          {/* Premium dot */}
+          {/* Badge premium */}
           {item.is_premium && (
-            <View style={card.premDot}>
-              <Icon name="star" size={8} color="#fff" />
+            <View style={card.premBadge}>
+              <Icon name="lock" size={8} color="#fff" />
+              <Text style={card.premBadgeTxt}>
+                {item.price ? `${item.price}€` : 'PPV'}
+              </Text>
             </View>
           )}
 
@@ -340,7 +349,8 @@ const card = StyleSheet.create({
   poster:       { width: '100%', aspectRatio: 2 / 3, borderRadius: 12, overflow: 'hidden' },
   placeholder:  { alignItems: 'center', justifyContent: 'center' },
   gradient:     { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
-  premDot:      { position: 'absolute', top: 8, right: 8, backgroundColor: '#E8501A', width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  premBadge:    { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8501A', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7 },
+  premBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
   ratingBadge:  { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
   ratingText:   { color: '#FFB800', fontSize: 10, fontWeight: '700' },
   overlay:      { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10 },
