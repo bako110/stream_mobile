@@ -17,7 +17,6 @@ import { authService } from '../services/authService';
 import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { favoriteService } from '../services/favoriteService';
-import { callHistoryService } from '../services/callHistoryService';
 import { cancelCallNotification, showIncomingCallNotification } from '../services/fcmService';
 import { navigate } from '../navigation/navigationRef';
 import {
@@ -213,26 +212,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   const finalisePendingCall = useCallback((
     partnerId: string,
     direction: 'incoming' | 'outgoing' | 'missed',
-    connectedAt: number | null,
+    _connectedAt: number | null,
   ) => {
     const pending = pendingCalls.current.get(partnerId);
     if (!pending) return;
     if (pending.timeoutId) clearTimeout(pending.timeoutId);
     pendingCalls.current.delete(partnerId);
-
-    const durationSec = connectedAt
-      ? Math.round((Date.now() - connectedAt) / 1000)
-      : 0;
-
-    callHistoryService.add({
-      partnerId:   pending.partnerId,
-      partnerName: pending.partnerName,
-      avatarUrl:   pending.avatarUrl,
-      callType:    pending.callType,
-      direction,
-      startedAt:   pending.startedAt,
-      durationSec,
-    }).catch(() => {});
 
     if (direction === 'missed' && isMounted.current) {
       setMissedCallCount(c => c + 1);
