@@ -201,6 +201,24 @@ export async function handleBackgroundFCM(
     return;
   }
 
+  if (type === 'missed_call') {
+    const callerName  = (data.caller_name as string) || 'Appel manqué';
+    const callLabel   = (data.call_type as string) === 'video' ? 'vidéo' : 'vocal';
+    await notifee.displayNotification({
+      title: callerName,
+      body:  `Appel ${callLabel} manqué`,
+      android: {
+        channelId:    CHANNEL_NOTIFS,
+        importance:   AndroidImportance.HIGH,
+        sound:        'notification_sound',
+        smallIcon:    'ic_notification',
+        pressAction:  { id: 'default', launchActivity: 'default' },
+      },
+      data: data as Record<string, string>,
+    });
+    return;
+  }
+
   if (type === 'message') {
     await notifee.displayNotification({
       title: (data.sender_name as string) || title,
@@ -245,6 +263,8 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
       autoAccept:   data._accept === 'true',
       offer:        undefined,
     });
+  } else if (type === 'missed_call') {
+    navigate('Messages', { initialTab: 'calls' });
   } else if (type === 'message') {
     navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
   } else {

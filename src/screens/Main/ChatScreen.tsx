@@ -97,6 +97,7 @@ export const ChatScreen: React.FC = () => {
   // Voice recording
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime,  setRecordTime]  = useState('0:00');
+  const recordDurationMs = useRef(0);
 
   // Indicateurs temps réel du partenaire
   const [partnerTyping,    setPartnerTyping]    = useState(false);
@@ -393,9 +394,11 @@ export const ChatScreen: React.FC = () => {
     try {
       setIsRecording(true);
       setRecordTime('0:00');
+      recordDurationMs.current = 0;
       sendWsMessage({ type: 'recording_start', to: partnerId });
       await audioRecorder.startRecorder(undefined, undefined, true);
       audioRecorder.addRecordBackListener((e: any) => {
+        recordDurationMs.current = e.currentPosition;
         setRecordTime(formatDuration(e.currentPosition));
       });
     } catch {
@@ -404,23 +407,37 @@ export const ChatScreen: React.FC = () => {
   };
 
   const stopAndSendRecording = async () => {
-    try {
-      const result = await audioRecorder.stopRecorder();
-      audioRecorder.removeRecordBackListener();
-      setIsRecording(false);
-      sendWsMessage({ type: 'recording_stop', to: partnerId });
-      if (!result) return;
+    const result = await audioRecorder.stopRecorder().catch(() => null);
+    audioRecorder.removeRecordBackListener();
+    setIsRecording(false);
+    sendWsMessage({ type: 'recording_stop', to: partnerId });
+    if (!result) return;
 
-      setUploading(true);
+    const durationSec = Math.max(1, Math.ceil(recordDurationMs.current / 1000));
+    const tempId = `pending-${Date.now()}`;
+    const optimistic = {
+      id: tempId,
+      sender_id: myId ?? '',
+      receiver_id: partnerId,
+      content: '',
+      message_type: 'voice' as const,
+      attachment_url: result,
+      attachment_meta: { duration: durationSec },
+      created_at: new Date().toISOString(),
+      read: false,
+      pending: true,
+    };
+    setMessages(prev => [optimistic, ...prev]);
+
+    try {
       const uploaded = await uploadAudioFile(result, `vocal_${Date.now()}.m4a`, 'audio/mp4');
       const msg = await messageService.sendMessage(
-        partnerId, '', 'voice', uploaded.url, { duration: uploaded.duration },
+        partnerId, '', 'voice', uploaded.url, { duration: durationSec },
       );
-      setMessages(prev => [msg, ...prev]);
+      setMessages(prev => prev.map(m => m.id === tempId ? msg : m));
     } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
       Alert.alert('Erreur', 'Impossible d\'envoyer le vocal');
-    } finally {
-      setUploading(false);
     }
   };
 

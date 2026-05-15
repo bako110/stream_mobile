@@ -232,7 +232,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
       direction,
       startedAt:   pending.startedAt,
       durationSec,
-    });
+    }).catch(() => {});
 
     if (direction === 'missed' && isMounted.current) {
       setMissedCallCount(c => c + 1);
@@ -250,9 +250,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     const existing = pendingCalls.current.get(partnerId);
     if (existing?.timeoutId) clearTimeout(existing.timeoutId);
 
-    // 30s timeout → missed
+    // 30s timeout → missed uniquement pour incoming, outgoing reste outgoing
     const timeoutId = setTimeout(() => {
-      finalisePendingCall(partnerId, 'missed', null);
+      const p = pendingCalls.current.get(partnerId);
+      const timeoutDir = p?.direction === 'incoming' ? 'missed' : 'outgoing';
+      finalisePendingCall(partnerId, timeoutDir, null);
     }, CALL_TIMEOUT);
 
     pendingCalls.current.set(partnerId, {
@@ -428,6 +430,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
         if (payload.type === 'call_hangup' && isMounted.current) {
           const fromId = payload.from ?? payload.sender_id;
           if (fromId) cancelCallNotification(fromId).catch(() => {});
+        }
+
+        // Appel manqué enregistre cote backend → incrémenter le badge
+        if (payload.type === 'missed_call' && isMounted.current) {
+          setMissedCallCount(c => c + 1);
         }
 
         // ── Buffer les events call si CallScreen pas encore monté ─────────

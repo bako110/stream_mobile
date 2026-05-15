@@ -142,7 +142,11 @@ export const messageService = {
   },
 
   async reactToMessage(messageId: string, emoji: string): Promise<{ message_id: string; user_id: string; emoji: string | null }> {
-    const res = await apiClient.post(`/api/v1/messages/${messageId}/react`, { emoji });
+    const res = await apiClient.post<{ message_id: string; user_id: string; emoji: string | null }>(`/api/v1/messages/${messageId}/react`, { emoji });
     return res.data;
+  },
+
+  async deleteConversation(partnerId: string): Promise<void> {
+    await apiClient.delete(Endpoints.messages.deleteConversation(partnerId));
   },
 };

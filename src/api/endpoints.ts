@@ -263,12 +263,13 @@ export const Endpoints = {
 
   // ── Messages DM (prefix: /api/v1/messages) ───────────────────────────────
   messages: {
-    unreadCount:      `${V1}/messages/unread-count`,
-    conversations:    `${V1}/messages/conversations`,
-    conversation:     (userId: string) => `${V1}/messages/conversations/${userId}`,
-    markRead:         (userId: string) => `${V1}/messages/conversations/${userId}/read`,
-    usersSearch:      `${V1}/messages/users/search`,
-    message:          (messageId: string) => `${V1}/messages/messages/${messageId}`,
+    unreadCount:          `${V1}/messages/unread-count`,
+    conversations:        `${V1}/messages/conversations`,
+    conversation:         (userId: string) => `${V1}/messages/conversations/${userId}`,
+    deleteConversation:   (userId: string) => `${V1}/messages/conversations/${userId}`,
+    markRead:             (userId: string) => `${V1}/messages/conversations/${userId}/read`,
+    usersSearch:          `${V1}/messages/users/search`,
+    message:              (messageId: string) => `${V1}/messages/messages/${messageId}`,
   },
 
   // ── Orange Money ──────────────────────────────────────────────────────────
@@ -322,6 +323,14 @@ export const Endpoints = {
     save:   `${V1}/favorites`,
     unsave: (targetType: string, targetId: string) => `${V1}/favorites/${targetType}/${targetId}`,
     check:  (targetType: string, targetId: string) => `${V1}/favorites/check/${targetType}/${targetId}`,
+  },
+
+  // ── Appels (historique persistant) ───────────────────────────────────────
+  calls: {
+    log:     `${V1}/calls/log`,
+    history: `${V1}/calls/`,
+    byId:    (id: string) => `${V1}/calls/${id}`,
+    clear:   `${V1}/calls/`,
   },
 
   // ── Système ───────────────────────────────────────────────────────────────

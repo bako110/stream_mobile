@@ -151,7 +151,7 @@ export const CallScreen: React.FC = () => {
       callType, direction,
       startedAt:   startedAtRef.current,
       durationSec,
-    });
+    }).catch(() => {});
   }, [partnerId, partnerName, partnerAvatar, callType]);
 
   useEffect(() => { stateRef.current = callState; }, [callState]);
@@ -303,10 +303,10 @@ export const CallScreen: React.FC = () => {
   const hangup = useCallback(() => {
     if (stateRef.current === 'ended') return;
     const wasConnected = !!connectedAtRef.current;
+    // missed = seulement si on était le receveur et qu'on n'a pas répondu avant de couper
     const dir = wasConnected
       ? (isIncoming ? 'incoming' : 'outgoing')
-      : (isIncoming ? 'missed' : 'outgoing');
-    // Le receveur qui rejette n'entend pas le son — c'est l'appelant qui l'entend via call_hangup
+      : (isIncoming ? 'missed'   : 'outgoing');
     iInitiatedEndRef.current = true;
     saveCallRecord(dir);
     notifyCallEnded(partnerId);
@@ -420,10 +420,10 @@ export const CallScreen: React.FC = () => {
 
       if (payload.type === 'call_hangup') {
         const wasConnected = !!connectedAtRef.current;
+        // missed = seulement si on était le receveur (incoming) et qu'on n'a pas répondu
         const dir = wasConnected
           ? (isIncoming ? 'incoming' : 'outgoing')
-          : (isIncoming ? 'missed' : 'outgoing');
-        // Son de rejet uniquement chez l'appelant (outgoing) quand le receveur refuse
+          : (isIncoming ? 'missed'   : 'outgoing');
         if (!wasConnected && !isIncoming) playRejected();
         saveCallRecord(dir);
         notifyCallEnded(partnerId);
