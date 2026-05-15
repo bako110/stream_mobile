@@ -350,7 +350,11 @@ export const CallScreen: React.FC = () => {
       if (stateRef.current === 'ringing') hangupRef.current?.();
     }, 30_000);
 
-    return () => { mountedRef.current = false; clearTimeout(timeout); };
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(timeout);
+      cleanupCall();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -427,20 +431,36 @@ export const CallScreen: React.FC = () => {
     return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
   }, [callState]);
 
-  useEffect(() => {
-    if (callState !== 'ended') return;
+  const cleanupCall = useCallback(() => {
     InCallManager.stop();
     stopIncoming();
     stopRingback();
     stopRejected();
     Vibration.cancel();
-    localStreamRef.current?.getTracks().forEach((t: any) => t.stop());
-    pcRef.current?.close();
-    pcRef.current = null;
-    const delay = iInitiatedEndRef.current ? 0 : 1500;
+    // Stopper tous les tracks (caméra + micro)
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((t: any) => {
+        try { t.enabled = false; } catch {}
+        try { t.stop(); } catch {}
+      });
+      localStreamRef.current = null;
+    }
+    setLocalStream(null);
+    setRemoteStream(null);
+    if (pcRef.current) {
+      try { pcRef.current.close(); } catch {}
+      pcRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (callState !== 'ended') return;
+    cleanupCall();
+    const delay = iInitiatedEndRef.current ? 0 : 1200;
     const t = setTimeout(() => { if (mountedRef.current) nav.goBack(); }, delay);
     return () => clearTimeout(t);
-  }, [callState]);
+  }, [callState, cleanupCall]);
 
   const toggleMute = useCallback(() => {
     const t = localStreamRef.current?.getAudioTracks()[0];
