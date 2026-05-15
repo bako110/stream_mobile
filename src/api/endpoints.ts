@@ -59,6 +59,7 @@ export const Endpoints = {
     films:           `${V1}/content/films`,
     filmById:        (id: string) => `${V1}/content/films/${id}`,
     publishFilm:     (id: string) => `${V1}/content/films/${id}/publish`,
+    myAccesses:      `${V1}/content/my-accesses`,
     filmPurchase:    (id: string) => `${V1}/content/films/${id}/purchase`,
     filmAccess:      (id: string) => `${V1}/content/films/${id}/access`,
     // Séries

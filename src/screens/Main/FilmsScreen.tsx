@@ -15,6 +15,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
+import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
 
 type NavProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -58,8 +60,9 @@ export interface FilmItem {
 
 const HeroCarousel: React.FC<{
   items: FilmItem[];
+  purchasedIds: Set<string>;
   onPress: (item: FilmItem) => void;
-}> = ({ items, onPress }) => {
+}> = ({ items, purchasedIds, onPress }) => {
   const [idx, setIdx] = useState(0);
   const ref = useRef<FlatList>(null);
   const timer = useRef<ReturnType<typeof setInterval>>();
@@ -96,7 +99,7 @@ const HeroCarousel: React.FC<{
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScrollEnd}
         getItemLayout={(_, i) => ({ length: SW, offset: SW * i, index: i })}
-        renderItem={({ item }) => <HeroSlide item={item} onPress={() => onPress(item)} />}
+        renderItem={({ item }) => <HeroSlide item={item} purchased={purchasedIds.has(item.id)} onPress={() => onPress(item)} />}
       />
 
       {/* Indicateurs — en bas à gauche */}
@@ -117,8 +120,9 @@ const HeroCarousel: React.FC<{
   );
 };
 
-const HeroSlide: React.FC<{ item: FilmItem; onPress: () => void }> = ({ item, onPress }) => {
+const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => void }> = ({ item, purchased, onPress }) => {
   const bg = item.banner_url || item.thumbnail_url;
+  const isPremiumUnpaid = item.is_premium && !purchased;
 
   return (
     <View style={{ width: SW, height: HERO_H }}>
@@ -130,25 +134,30 @@ const HeroSlide: React.FC<{ item: FilmItem; onPress: () => void }> = ({ item, on
         </View>
       )}
 
-      {/* Dégradé progressif du bas */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.65)', 'rgba(0,0,0,0.95)']}
         locations={[0, 0.35, 0.65, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Contenu en bas */}
       <View style={hs.content}>
+        {/* Badge premium ou accès */}
         {item.is_premium && (
-          <View style={hs.premiumBadge}>
-            <Icon name="lock" size={9} color="#fff" />
-            <Text style={hs.premiumText}>PREMIUM{item.price ? ` · ${item.price}€` : ''}</Text>
-          </View>
+          purchased ? (
+            <View style={hs.accessBadge}>
+              <Icon name="check-circle" size={9} color="#10b981" />
+              <Text style={hs.accessText}>ACCÈS</Text>
+            </View>
+          ) : (
+            <View style={hs.premiumBadge}>
+              <Icon name="lock" size={9} color="#fff" />
+              <Text style={hs.premiumText}>PREMIUM{item.price ? ` · ${item.price}€` : ''}</Text>
+            </View>
+          )
         )}
 
         <Text style={hs.title} numberOfLines={2}>{item.title}</Text>
 
-        {/* Méta */}
         <View style={hs.meta}>
           {item.year ? <Text style={hs.metaText}>{item.year}</Text> : null}
           {item.year && item.language ? <Text style={hs.metaDot}>•</Text> : null}
@@ -166,16 +175,15 @@ const HeroSlide: React.FC<{ item: FilmItem; onPress: () => void }> = ({ item, on
           <Text style={hs.synopsis} numberOfLines={2}>{item.synopsis}</Text>
         ) : null}
 
-        {/* Boutons */}
         <View style={hs.buttons}>
           <TouchableOpacity
-            style={[hs.btnWatch, item.is_premium && { backgroundColor: '#E8501A' }]}
+            style={[hs.btnWatch, isPremiumUnpaid && { backgroundColor: '#E8501A' }]}
             onPress={onPress}
             activeOpacity={0.88}
           >
-            <Icon name={item.is_premium ? 'lock' : 'play'} size={15} color={item.is_premium ? '#fff' : '#000'} />
-            <Text style={[hs.btnWatchText, item.is_premium && { color: '#fff' }]}>
-              {item.is_premium ? `Acheter · ${item.price ?? ''}€` : 'Regarder'}
+            <Icon name={isPremiumUnpaid ? 'lock' : 'play'} size={15} color={isPremiumUnpaid ? '#fff' : '#000'} />
+            <Text style={[hs.btnWatchText, isPremiumUnpaid && { color: '#fff' }]}>
+              {isPremiumUnpaid ? `Acheter · ${item.price ?? ''}€` : 'Regarder'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={hs.btnMore} onPress={onPress} activeOpacity={0.88}>
@@ -192,6 +200,8 @@ const hs = StyleSheet.create({
   content:      { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 18, paddingBottom: 28 },
   premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#E8501A', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, marginBottom: 10 },
   premiumText:  { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  accessBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#10b98122', borderWidth: 1, borderColor: '#10b981', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, marginBottom: 10 },
+  accessText:   { color: '#10b981', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   title:        { color: '#fff', fontSize: 26, fontWeight: '900', lineHeight: 31, letterSpacing: -0.5, marginBottom: 8 },
   meta:         { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   metaText:     { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600' },
@@ -273,8 +283,9 @@ const Card: React.FC<{
   index: number;
   tab: Tab;
   colors: any;
+  purchased: boolean;
   onPress: () => void;
-}> = ({ item, index, tab, colors, onPress }) => {
+}> = ({ item, index, tab, colors, purchased, onPress }) => {
   const scale = useSharedValue(1);
   const anim  = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -311,14 +322,21 @@ const Card: React.FC<{
             pointerEvents="none"
           />
 
-          {/* Badge premium */}
+          {/* Badge premium ou accès */}
           {item.is_premium && (
-            <View style={card.premBadge}>
-              <Icon name="lock" size={8} color="#fff" />
-              <Text style={card.premBadgeTxt}>
-                {item.price ? `${item.price}€` : 'PPV'}
-              </Text>
-            </View>
+            purchased ? (
+              <View style={[card.premBadge, { backgroundColor: '#10b98133', borderWidth: 1, borderColor: '#10b981' }]}>
+                <Icon name="check" size={8} color="#10b981" />
+                <Text style={[card.premBadgeTxt, { color: '#10b981' }]}>Accès</Text>
+              </View>
+            ) : (
+              <View style={card.premBadge}>
+                <Icon name="lock" size={8} color="#fff" />
+                <Text style={card.premBadgeTxt}>
+                  {item.price ? `${item.price}€` : 'PPV'}
+                </Text>
+              </View>
+            )
           )}
 
           {/* Note en bas à gauche */}
@@ -411,6 +429,14 @@ export const FilmsScreen: React.FC = () => {
   const [items, setItems]           = useState<FilmItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
+
+  // Charger les accès PPV une seule fois
+  useEffect(() => {
+    apiClient.get<{ access_ids: string[] }>(Endpoints.content.myAccesses)
+      .then(r => setPurchasedIds(new Set(r.data?.access_ids ?? [])))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -461,7 +487,7 @@ export const FilmsScreen: React.FC = () => {
         {loading ? (
           <View style={{ height: HERO_H, backgroundColor: colors.backgroundSecondary }} />
         ) : items.length > 0 ? (
-          <HeroCarousel items={items} onPress={goDetail} />
+          <HeroCarousel items={items} purchasedIds={purchasedIds} onPress={goDetail} />
         ) : (
           <View style={{ height: HERO_H * 0.5, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name={tab === 'film' ? 'film' : 'tv'} size={48} color={colors.textTertiary} />
@@ -489,9 +515,9 @@ export const FilmsScreen: React.FC = () => {
           <View style={ss.grid}>
             {rows.map(([a, b], ri) => (
               <View key={ri} style={ss.row}>
-                <Card item={a} index={ri * 2}     tab={tab} colors={colors} onPress={() => goDetail(a)} />
+                <Card item={a} index={ri * 2}     tab={tab} colors={colors} purchased={purchasedIds.has(a.id)} onPress={() => goDetail(a)} />
                 {b ? (
-                  <Card item={b} index={ri * 2 + 1} tab={tab} colors={colors} onPress={() => goDetail(b)} />
+                  <Card item={b} index={ri * 2 + 1} tab={tab} colors={colors} purchased={purchasedIds.has(b.id)} onPress={() => goDetail(b)} />
                 ) : (
                   <View style={{ width: CARD_W }} />
                 )}

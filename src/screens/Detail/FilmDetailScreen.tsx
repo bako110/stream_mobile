@@ -217,12 +217,18 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <Icon name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
 
-          {/* Premium */}
+          {/* Premium / Accès */}
           {item.is_premium && (
-            <Animated.View entering={FadeIn.delay(200)} style={[s.premBadge, { top: insets.top + 8 }]}>
-              <Icon name="star" size={10} color="#fff" />
-              <Text style={s.premText}>PREMIUM</Text>
-              {item.price != null && <Text style={s.premPrice}>{item.price} €</Text>}
+            <Animated.View entering={FadeIn.delay(200)} style={[
+              s.premBadge,
+              { top: insets.top + 8 },
+              hasAccess && { backgroundColor: '#10b98133', borderColor: '#10b981', borderWidth: 1 },
+            ]}>
+              <Icon name={hasAccess ? 'check-circle' : 'star'} size={10} color={hasAccess ? '#10b981' : '#fff'} />
+              <Text style={[s.premText, hasAccess && { color: '#10b981' }]}>
+                {hasAccess ? 'ACCÈS DÉBLOQUÉ' : 'PREMIUM'}
+              </Text>
+              {!hasAccess && item.price != null && <Text style={s.premPrice}>{item.price} €</Text>}
             </Animated.View>
           )}
         </View>
