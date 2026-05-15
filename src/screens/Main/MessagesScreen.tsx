@@ -4,7 +4,7 @@
  */
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
+  View, Text, FlatList, TouchableOpacity, Alert,
   TextInput, StyleSheet, Platform, StatusBar,
   RefreshControl, ActivityIndicator, Image,
 } from 'react-native';
@@ -234,11 +234,24 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
     setSelectedIds(new Set());
   }, []);
 
-  const deleteSelected = useCallback(async () => {
-    const ids = Array.from(selectedIds);
-    await Promise.all(ids.map(id => callHistoryService.remove(id).catch(() => {})));
-    setCallHistory(prev => prev.filter(r => !selectedIds.has(r.id)));
-    exitSelect();
+  const deleteSelected = useCallback(() => {
+    const count = selectedIds.size;
+    Alert.alert(
+      'Supprimer',
+      `Supprimer ${count} appel${count > 1 ? 's' : ''} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer', style: 'destructive',
+          onPress: async () => {
+            const ids = Array.from(selectedIds);
+            await Promise.all(ids.map(id => callHistoryService.remove(id).catch(() => {})));
+            setCallHistory(prev => prev.filter(r => !selectedIds.has(r.id)));
+            exitSelect();
+          },
+        },
+      ],
+    );
   }, [selectedIds, exitSelect]);
 
   // ── Conversations selection ───────────────────────────────────────────────────
@@ -259,11 +272,24 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
     setConvSelectedIds(new Set());
   }, []);
 
-  const deleteConvsSelected = useCallback(async () => {
-    const ids = Array.from(convSelectedIds);
-    await Promise.all(ids.map(id => messageService.deleteConversation(id).catch(() => {})));
-    setConversations(prev => prev.filter(c => !convSelectedIds.has(c.partner_id)));
-    exitConvSelect();
+  const deleteConvsSelected = useCallback(() => {
+    const count = convSelectedIds.size;
+    Alert.alert(
+      'Supprimer',
+      `Supprimer ${count} conversation${count > 1 ? 's' : ''} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer', style: 'destructive',
+          onPress: async () => {
+            const ids = Array.from(convSelectedIds);
+            await Promise.all(ids.map(id => messageService.deleteConversation(id).catch(() => {})));
+            setConversations(prev => prev.filter(c => !convSelectedIds.has(c.partner_id)));
+            exitConvSelect();
+          },
+        },
+      ],
+    );
   }, [convSelectedIds, exitConvSelect]);
 
   return (
