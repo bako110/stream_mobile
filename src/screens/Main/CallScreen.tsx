@@ -218,16 +218,21 @@ export const CallScreen: React.FC = () => {
     });
 
     (pc as any).ontrack = (event: any) => {
+      // Préférer event.streams[0] mais fallback sur construction manuelle
       const incoming = event.streams?.[0] ?? null;
       if (incoming) {
         remoteStreamRef.current = incoming;
         if (mountedRef.current) setRemoteStream(incoming);
       } else if (event.track) {
-        if (!remoteStreamRef.current) remoteStreamRef.current = new MediaStream(undefined as any);
-        remoteStreamRef.current.addTrack(event.track);
+        if (!remoteStreamRef.current) {
+          remoteStreamRef.current = new MediaStream([event.track] as any);
+        } else {
+          remoteStreamRef.current.addTrack(event.track);
+        }
+        const snap = remoteStreamRef.current;
         if (mountedRef.current) {
           setRemoteStream(null);
-          setTimeout(() => { if (mountedRef.current) setRemoteStream(remoteStreamRef.current); }, 0);
+          setTimeout(() => { if (mountedRef.current) setRemoteStream(snap); }, 50);
         }
       }
     };
@@ -305,10 +310,12 @@ export const CallScreen: React.FC = () => {
           const stream = await getLocalStream();
           if (!mountedRef.current) return;
           InCallManager.start({ media: isVideo ? 'video' : 'audio' });
-          InCallManager.setSpeakerphoneOn(false);
+          InCallManager.setSpeakerphoneOn(isVideo);
           playRingback();
           const pc = createPC(stream);
-          const offerDesc = await pc.createOffer({});
+          const offerDesc = await pc.createOffer(
+            isVideo ? { offerToReceiveVideo: true, offerToReceiveAudio: true } : { offerToReceiveAudio: true }
+          );
           await pc.setLocalDescription(offerDesc);
           sendWs({ type: 'call_offer', to: partnerId, to_name: partnerName, to_avatar: partnerAvatar ?? null, call_type: callType, sdp: offerDesc });
         } catch {}
