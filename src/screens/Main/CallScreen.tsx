@@ -24,6 +24,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
+import { useActiveCall } from '../../context/ActiveCallContext';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_H * 0.15;
@@ -136,6 +137,8 @@ export const CallScreen: React.FC = () => {
     drainCallBuffer,
   } = useWs();
 
+  const { startCall, minimizeCall, endCall: endActiveCall } = useActiveCall();
+
 
   useEffect(() => { stateRef.current = callState; }, [callState]);
 
@@ -245,6 +248,7 @@ export const CallScreen: React.FC = () => {
       if (stateRef.current !== 'connected') {
         connectedAtRef.current = Date.now();
         notifyCallConnected(partnerId);
+        startCall({ partnerId, partnerName, partnerAvatar, callType });
         if (mountedRef.current) setCallState('connected');
       }
     };
@@ -288,14 +292,20 @@ export const CallScreen: React.FC = () => {
     } catch { hangupRef.current?.(); }
   }, [offer, partnerId, isVideo, getLocalStream, createPC, flushPendingCandidates, sendWs, markCallAccepted]);
 
+  const minimize = useCallback(() => {
+    minimizeCall();
+    nav.goBack();
+  }, [minimizeCall, nav]);
+
   const hangup = useCallback(() => {
     if (stateRef.current === 'ended') return;
     iInitiatedEndRef.current = true;
+    endActiveCall();
     notifyCallEnded(partnerId);
     markCallEnded(partnerId);
     sendWs({ type: 'call_hangup', to: partnerId });
     if (mountedRef.current) setCallState('ended');
-  }, [partnerId, notifyCallEnded, markCallEnded, sendWs]);
+  }, [partnerId, endActiveCall, notifyCallEnded, markCallEnded, sendWs]);
 
   useEffect(() => { acceptCallRef.current = acceptCall; }, [acceptCall]);
   useEffect(() => { hangupRef.current     = hangup; },     [hangup]);
@@ -587,14 +597,24 @@ export const CallScreen: React.FC = () => {
 
       {/* Top bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.topName}>{partnerName}</Text>
-        <Text style={styles.topStatus}>
-          {callState === 'ringing'
-            ? (isIncoming ? 'Connexion en cours…' : 'Appel en cours…')
-            : callState === 'connected'
-            ? formatElapsed(elapsed)
-            : 'Appel terminé'}
-        </Text>
+        {callState === 'connected' ? (
+          <TouchableOpacity style={styles.minimizeBtn} onPress={minimize} activeOpacity={0.8}>
+            <Icon name="chevron-down" size={22} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={styles.topName}>{partnerName}</Text>
+          <Text style={styles.topStatus}>
+            {callState === 'ringing'
+              ? (isIncoming ? 'Connexion en cours…' : 'Appel en cours…')
+              : callState === 'connected'
+              ? formatElapsed(elapsed)
+              : 'Appel terminé'}
+          </Text>
+        </View>
+        <View style={{ width: 36 }} />
       </View>
 
       {/* Avatar (voice ou vidéo en attente) */}
@@ -789,10 +809,16 @@ const styles = StyleSheet.create({
 
   // ── Outgoing/connected top ───────────────────────────────────────────────────
   topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     zIndex: 10,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
+  },
+  minimizeBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   topName: {
     fontSize: 26,

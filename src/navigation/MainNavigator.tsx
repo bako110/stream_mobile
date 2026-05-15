@@ -1,8 +1,8 @@
-import React, { useEffect, useCallback } from 'react';
-import { Platform, PermissionsAndroid } from 'react-native';
+import React, { useEffect, useCallback, useRef } from 'react';
+import { Platform, PermissionsAndroid, BackHandler, ToastAndroid } from 'react-native';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useNavigation }              from '@react-navigation/native';
+import { useNavigation, useNavigationState, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -13,6 +13,8 @@ import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
 import { UploadProgressBanner } from '../components/common/UploadProgressBanner';
+import { ActiveCallBar }        from '../components/call/ActiveCallBar';
+import { ActiveCallProvider }   from '../context/ActiveCallContext';
 
 // ── Écrans stack ──────────────────────────────────────────────────────────────
 import { FeedScreen }            from '../screens/Main/FeedScreen';
@@ -249,6 +251,43 @@ const Tabs: React.FC<{ onLogout: () => void }> = ({ onLogout }) => (
   </Tab.Navigator>
 );
 
+// ── ExitHandler — doit être rendu à l'intérieur du NavigationContainer ───────
+// Utilise useNavigationState qui nécessite d'être dans un navigator.
+
+const ExitHandler: React.FC = () => {
+  const navigation    = useNavigation<MainNav>();
+  const backPressedAt = useRef<number>(0);
+  const routeIndex    = useNavigationState(s => s?.index ?? 0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const handler = () => {
+      if (routeIndex > 0) {
+        navigation.dispatch(
+          CommonActions.reset({ index: 0, routes: [{ name: 'Tabs' }] }),
+        );
+        return true;
+      }
+
+      const now = Date.now();
+      if (now - backPressedAt.current < 2000) {
+        BackHandler.exitApp();
+        return true;
+      }
+
+      backPressedAt.current = now;
+      ToastAndroid.show('Appuyez encore pour quitter', ToastAndroid.SHORT);
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', handler);
+    return () => sub.remove();
+  }, [routeIndex, navigation]);
+
+  return null;
+};
+
 // ── MainNavigator ─────────────────────────────────────────────────────────────
 
 export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
@@ -267,9 +306,9 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
   );
 
   return (
-    <>
+    <ActiveCallProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Tabs"           children={() => <Tabs onLogout={onLogout} />} />
+        <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} /></>} />
         <Stack.Screen name="Feed"           component={FeedScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateEvent"    component={CreateEventWrapper}    options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateConcert"  component={CreateConcertWrapper}  options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
@@ -361,6 +400,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
       </Stack.Navigator>
       <UploadProgressBanner />
       <NotificationToast />
-    </>
+      <ActiveCallBar />
+    </ActiveCallProvider>
   );
 };
