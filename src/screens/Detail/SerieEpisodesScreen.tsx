@@ -118,8 +118,9 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const handlePlay = async (ep: Episode) => {
-    // Un épisode gratuit reste accessible même si la série est premium
-    if (item.is_premium && !hasAccess && !ep.is_free) {
+    // video_url null = backend a masqué l'URL (série premium non achetée)
+    const isPremiumLocked = (item.is_premium === true && !hasAccess && !ep.is_free) || (!ep.is_free && !ep.video_url);
+    if (isPremiumLocked) {
       setShowPaywall(true);
       return;
     }
