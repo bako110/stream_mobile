@@ -454,47 +454,29 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                 </Text>
               </View>
             }
-            renderItem={({ item, index }) => {
-              const isConvSelected = convSelectedIds.has(item.partner_id);
-              return (
-                <Animated.View entering={FadeInDown.delay(index * 35).springify()}>
-                  <TouchableOpacity
-                    activeOpacity={convSelectMode ? 0.6 : 1}
-                    onLongPress={() => { setConvSelectMode(true); toggleConvSelect(item.partner_id); }}
-                    onPress={convSelectMode ? () => toggleConvSelect(item.partner_id) : undefined}
-                    delayLongPress={350}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      {convSelectMode && (
-                        <View style={{ paddingLeft: 12 }}>
-                          <View style={[
-                            sst.checkbox,
-                            isConvSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
-                            !isConvSelected && { borderColor: colors.textTertiary },
-                          ]}>
-                            {isConvSelected && <Icon name="check" size={13} color="#fff" />}
-                          </View>
-                        </View>
-                      )}
-                      <View style={{ flex: 1, opacity: convSelectMode && !isConvSelected ? 0.5 : 1 }}>
-                        <ConversationRow
-                          conv={item}
-                          colors={colors}
-                          onPress={convSelectMode ? () => toggleConvSelect(item.partner_id) : () => nav.navigate('Chat' as any, {
-                            partnerId:   item.partner_id,
-                            partnerName: item.partner?.full_name ?? item.partner?.username ?? item.partner_id,
-                            avatarUrl:   item.partner?.avatar_url,
-                            isOnline:    item.partner?.is_online,
-                            lastSeen:    item.partner?.last_seen_at,
-                          })}
-                          onAvatarPress={convSelectMode ? () => toggleConvSelect(item.partner_id) : () => nav.navigate('UserProfile' as any, { userId: item.partner_id })}
-                        />
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                </Animated.View>
-              );
-            }}
+            renderItem={({ item, index }) => (
+              <Animated.View entering={FadeInDown.delay(index * 35).springify()}>
+                <ConversationRow
+                  conv={item}
+                  colors={colors}
+                  selectMode={convSelectMode}
+                  isSelected={convSelectedIds.has(item.partner_id)}
+                  onLongPress={() => { setConvSelectMode(true); toggleConvSelect(item.partner_id); }}
+                  onPress={convSelectMode
+                    ? () => toggleConvSelect(item.partner_id)
+                    : () => nav.navigate('Chat' as any, {
+                        partnerId:   item.partner_id,
+                        partnerName: item.partner?.full_name ?? item.partner?.username ?? item.partner_id,
+                        avatarUrl:   item.partner?.avatar_url,
+                        isOnline:    item.partner?.is_online,
+                        lastSeen:    item.partner?.last_seen_at,
+                      })}
+                  onAvatarPress={convSelectMode
+                    ? () => toggleConvSelect(item.partner_id)
+                    : () => nav.navigate('UserProfile' as any, { userId: item.partner_id })}
+                />
+              </Animated.View>
+            )}
           />
         )
       ) : (
@@ -591,29 +573,56 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
 // â”€â”€ ConversationRow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const ConversationRow: React.FC<{ conv: ConversationSummary; colors: any; onPress: () => void; onAvatarPress: () => void }> = ({ conv, colors, onPress, onAvatarPress }) => {
-  const unread = (conv.unread_count ?? 0) > 0;
-  const name   = conv.partner?.full_name ?? conv.partner?.username ?? conv.partner_id;
-  const accent = accentFor(conv.partner_id);
+const ConversationRow: React.FC<{
+  conv:          ConversationSummary;
+  colors:        any;
+  onPress:       () => void;
+  onLongPress:   () => void;
+  onAvatarPress: () => void;
+  selectMode:    boolean;
+  isSelected:    boolean;
+}> = ({ conv, colors, onPress, onLongPress, onAvatarPress, selectMode, isSelected }) => {
+  const unread   = (conv.unread_count ?? 0) > 0;
+  const name     = conv.partner?.full_name ?? conv.partner?.username ?? conv.partner_id;
+  const accent   = accentFor(conv.partner_id);
   const isOnline = conv.partner?.is_online === true;
 
   return (
     <TouchableOpacity
       style={[styles.row, {
         borderBottomColor: colors.divider,
-        backgroundColor:   unread ? colors.primary + '08' : 'transparent',
+        backgroundColor:   isSelected ? colors.primary + '15' : unread ? colors.primary + '08' : 'transparent',
       }]}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
       activeOpacity={0.75}
     >
-      <TouchableOpacity style={styles.avatarWrap} onPress={onAvatarPress} activeOpacity={0.8}>
+      {/* Checkbox overlay en mode s\u00e9lection */}
+      {selectMode && (
+        <View style={{ paddingRight: 8 }}>
+          <View style={[
+            sst.checkbox,
+            isSelected  && { backgroundColor: colors.primary, borderColor: colors.primary },
+            !isSelected && { borderColor: colors.textTertiary },
+          ]}>
+            {isSelected && <Icon name="check" size={13} color="#fff" />}
+          </View>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.avatarWrap, { opacity: selectMode && !isSelected ? 0.5 : 1 }]}
+        onPress={selectMode ? onPress : onAvatarPress}
+        activeOpacity={0.8}
+      >
         <View style={[styles.avatar, { backgroundColor: accent + '22' }]}>
           <Text style={[styles.avatarText, { color: accent }]}>{getInitials(name)}</Text>
         </View>
-        {isOnline && <View style={styles.onlineDot} />}
+        {isOnline && !selectMode && <View style={styles.onlineDot} />}
       </TouchableOpacity>
 
-      <View style={styles.rowContent}>
+      <View style={[styles.rowContent, { opacity: selectMode && !isSelected ? 0.5 : 1 }]}>
         <View style={styles.rowTop}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
             <Text style={[styles.convName, { color: colors.textPrimary, fontWeight: unread ? '800' : '600' }]} numberOfLines={1}>
@@ -632,15 +641,15 @@ const ConversationRow: React.FC<{ conv: ConversationSummary; colors: any; onPres
           >
             {conv.last_message ?? '\u2026'}
           </Text>
-          {unread ? (
+          {unread && !selectMode ? (
             <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
               <Text style={styles.unreadText}>{conv.unread_count > 99 ? '99+' : conv.unread_count}</Text>
             </View>
-          ) : (
+          ) : !selectMode ? (
             <Text style={[styles.lastSeenText, { color: isOnline ? '#36D9A0' : colors.textDisabled }]}>
               {isOnline ? 'En ligne' : formatLastSeen(conv.partner?.last_seen_at)}
             </Text>
-          )}
+          ) : null}
         </View>
       </View>
     </TouchableOpacity>

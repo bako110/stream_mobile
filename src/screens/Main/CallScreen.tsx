@@ -24,7 +24,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
-import { callHistoryService } from '../../services/callHistoryService';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_H * 0.15;
@@ -81,9 +80,7 @@ export const CallScreen: React.FC = () => {
   const remoteStreamRef   = useRef<MediaStream | null>(null);
   const localStreamRef    = useRef<MediaStream | null>(null);
   const mountedRef        = useRef(true);
-  const callSavedRef      = useRef(false);
   const connectedAtRef    = useRef<number | null>(null);
-  const startedAtRef      = useRef<string>(new Date().toISOString());
   const iInitiatedEndRef  = useRef(false);
 
   const pulseAnim  = useRef(new Animated.Value(1)).current;
@@ -139,20 +136,6 @@ export const CallScreen: React.FC = () => {
     drainCallBuffer,
   } = useWs();
 
-  const saveCallRecord = useCallback((direction: 'incoming' | 'outgoing' | 'missed') => {
-    if (callSavedRef.current) return;
-    callSavedRef.current = true;
-    const durationSec = connectedAtRef.current
-      ? Math.round((Date.now() - connectedAtRef.current) / 1000)
-      : 0;
-    callHistoryService.add({
-      partnerId, partnerName,
-      avatarUrl:   partnerAvatar ?? undefined,
-      callType, direction,
-      startedAt:   startedAtRef.current,
-      durationSec,
-    }).catch(() => {});
-  }, [partnerId, partnerName, partnerAvatar, callType]);
 
   useEffect(() => { stateRef.current = callState; }, [callState]);
 
@@ -302,18 +285,12 @@ export const CallScreen: React.FC = () => {
 
   const hangup = useCallback(() => {
     if (stateRef.current === 'ended') return;
-    const wasConnected = !!connectedAtRef.current;
-    // missed = seulement si on était le receveur et qu'on n'a pas répondu avant de couper
-    const dir = wasConnected
-      ? (isIncoming ? 'incoming' : 'outgoing')
-      : (isIncoming ? 'missed'   : 'outgoing');
     iInitiatedEndRef.current = true;
-    saveCallRecord(dir);
     notifyCallEnded(partnerId);
     markCallEnded(partnerId);
     sendWs({ type: 'call_hangup', to: partnerId });
     if (mountedRef.current) setCallState('ended');
-  }, [partnerId, isIncoming, saveCallRecord, notifyCallEnded, markCallEnded, sendWs]);
+  }, [partnerId, notifyCallEnded, markCallEnded, sendWs]);
 
   useEffect(() => { acceptCallRef.current = acceptCall; }, [acceptCall]);
   useEffect(() => { hangupRef.current     = hangup; },     [hangup]);
@@ -420,12 +397,7 @@ export const CallScreen: React.FC = () => {
 
       if (payload.type === 'call_hangup') {
         const wasConnected = !!connectedAtRef.current;
-        // missed = seulement si on était le receveur (incoming) et qu'on n'a pas répondu
-        const dir = wasConnected
-          ? (isIncoming ? 'incoming' : 'outgoing')
-          : (isIncoming ? 'missed'   : 'outgoing');
         if (!wasConnected && !isIncoming) playRejected();
-        saveCallRecord(dir);
         notifyCallEnded(partnerId);
         markCallEnded(partnerId);
         if (mountedRef.current) setCallState('ended');
@@ -437,7 +409,7 @@ export const CallScreen: React.FC = () => {
       .filter(p => p.type !== 'call_hangup')
       .forEach(p => handler(p));
     return () => removeListener(handler);
-  }, [partnerId, isVideo, isIncoming, addListener, removeListener, sendWs, flushPendingCandidates, notifyCallConnected, notifyCallEnded, markCallEnded, drainCallBuffer, saveCallRecord]);
+  }, [partnerId, isVideo, isIncoming, addListener, removeListener, sendWs, flushPendingCandidates, notifyCallConnected, notifyCallEnded, markCallEnded, drainCallBuffer]);
 
   useEffect(() => {
     if (callState === 'connected') {
