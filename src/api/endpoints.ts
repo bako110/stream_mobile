@@ -56,13 +56,17 @@ export const Endpoints = {
     dashboard:    `${V1}/content/dashboard`,
     allAdmin:     `${V1}/content/all`,
     // Films
-    films:        `${V1}/content/films`,
-    filmById:     (id: string) => `${V1}/content/films/${id}`,
-    publishFilm:  (id: string) => `${V1}/content/films/${id}/publish`,
+    films:           `${V1}/content/films`,
+    filmById:        (id: string) => `${V1}/content/films/${id}`,
+    publishFilm:     (id: string) => `${V1}/content/films/${id}/publish`,
+    filmPurchase:    (id: string) => `${V1}/content/films/${id}/purchase`,
+    filmAccess:      (id: string) => `${V1}/content/films/${id}/access`,
     // Séries
-    series:       `${V1}/content/series`,
-    serieById:    (id: string) => `${V1}/content/series/${id}`,
-    publishSerie: (id: string) => `${V1}/content/series/${id}/publish`,
+    series:          `${V1}/content/series`,
+    serieById:       (id: string) => `${V1}/content/series/${id}`,
+    publishSerie:    (id: string) => `${V1}/content/series/${id}/publish`,
+    seriePurchase:   (id: string) => `${V1}/content/series/${id}/purchase`,
+    serieAccess:     (id: string) => `${V1}/content/series/${id}/access`,
   },
 
   // ── Seasons (prefix: /api/v1/content) ─────────────────────────────────────
@@ -102,6 +106,7 @@ export const Endpoints = {
     buyTicket:       (concertId: string) => `${V1}/concerts/${concertId}/tickets`,
     myTickets:       `${V1}/concerts/tickets/me`,
     validateTicket:  (ticketId: string)  => `${V1}/concerts/tickets/${ticketId}/validate`,
+    myTicketPdf:     (concertId: string) => `${V1}/concerts/${concertId}/tickets/me/pdf`,
   },
 
   // ── Streaming LiveKit (prefix: /api/v1/stream) ─────────────────────────────
@@ -130,6 +135,8 @@ export const Endpoints = {
     validateTicket: (ticketId: string) => `${V1}/events/tickets/${ticketId}/validate`,
     attendees:      (eventId: string)  => `${V1}/events/${eventId}/attendees`,
     attendeesCsv:   (eventId: string)  => `${V1}/events/${eventId}/attendees/export`,
+    attendeesPdf:   (eventId: string)  => `${V1}/events/${eventId}/attendees/export/pdf`,
+    myTicketPdf:    (eventId: string)  => `${V1}/events/${eventId}/tickets/me/pdf`,
     scanTicket:     (eventId: string, accessCode: string) => `${V1}/events/${eventId}/scan/${accessCode}`,
     validateByQr:   (eventId: string, accessCode: string) => `${V1}/events/${eventId}/scan/${accessCode}/validate`,
   },

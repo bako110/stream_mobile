@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, Dimensions, StatusBar, ActivityIndicator, InteractionManager,
+  Modal, Alert,
 } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -9,6 +10,8 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
+import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
 import type { VideoMeta } from '../../types';
 import type { FilmItem } from '../Main/FilmsScreen';
 
@@ -77,9 +80,70 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [videosLoading, setVideosLoading] = useState(true);
   const [synExpand, setSynExpand]         = useState(false);
 
+  // Accès premium
+  const [hasAccess, setHasAccess]         = useState(!item.is_premium);
+  const [accessLoading, setAccessLoading] = useState(item.is_premium);
+  const [showPaywall, setShowPaywall]     = useState(false);
+  const [walletCoins, setWalletCoins]     = useState<number | null>(null);
+  const [purchasing, setPurchasing]       = useState(false);
+
   const isSerie  = item.type === 'serie';
   const banner   = item.banner_url || item.thumbnail_url;
   const synopsis = item.synopsis || item.short_synopsis;
+  const coinsRequired = item.is_premium && item.price ? Math.round(item.price * 200) : 0;
+
+  // Vérifier l'accès + solde wallet si contenu premium
+  useEffect(() => {
+    if (!item.is_premium) return;
+    const task = InteractionManager.runAfterInteractions(async () => {
+      try {
+        const endpoint = isSerie
+          ? Endpoints.content.serieAccess(item.id)
+          : Endpoints.content.filmAccess(item.id);
+        const [accessRes, walletRes] = await Promise.all([
+          apiClient.get<{ has_access: boolean }>(endpoint),
+          apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance),
+        ]);
+        setHasAccess(accessRes.data.has_access);
+        setWalletCoins(walletRes.data.coins_balance);
+      } catch {
+        setHasAccess(false);
+      } finally {
+        setAccessLoading(false);
+      }
+    });
+    return () => task.cancel();
+  }, [item.id, item.is_premium, isSerie]);
+
+  const handlePurchase = useCallback(async () => {
+    setPurchasing(true);
+    try {
+      const endpoint = isSerie
+        ? Endpoints.content.seriePurchase(item.id)
+        : Endpoints.content.filmPurchase(item.id);
+      const res = await apiClient.post<{ coins_paid: number; new_balance: number }>(endpoint);
+      setHasAccess(true);
+      setWalletCoins(res.data.new_balance);
+      setShowPaywall(false);
+      Alert.alert('Acces accordé', `Vous pouvez maintenant regarder "${item.title}".`);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail ?? e?.message ?? 'Erreur inconnue';
+      if (detail.includes('insuffisant')) {
+        Alert.alert(
+          'Solde insuffisant',
+          `Il vous manque des coins. Rechargez votre wallet pour continuer.`,
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Recharger', onPress: () => { setShowPaywall(false); navigation.navigate('BuyCoins' as any, {}); } },
+          ],
+        );
+      } else {
+        Alert.alert('Erreur', detail);
+      }
+    } finally {
+      setPurchasing(false);
+    }
+  }, [item.id, item.title, isSerie, navigation]);
 
   // Charger les vidéos du film après la transition
   useEffect(() => {
@@ -97,6 +161,10 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const hasVideo     = !!defaultVideo?.hls_url;
 
   const handleWatch = () => {
+    if (item.is_premium && !hasAccess) {
+      setShowPaywall(true);
+      return;
+    }
     if (isSerie) {
       navigation.navigate('SerieEpisodes', { item });
     } else if (hasVideo) {
@@ -230,25 +298,34 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <TouchableOpacity
               activeOpacity={0.88}
               onPress={handleWatch}
-              disabled={!isSerie && !hasVideo && !videosLoading}
+              disabled={(!isSerie && !hasVideo && !videosLoading) || accessLoading}
               style={s.ctaPrimaryOuter}
             >
               <LinearGradient
                 colors={
-                  hasVideo || isSerie
+                  item.is_premium && !hasAccess
+                    ? ['#E8501A', '#C93D10']
+                    : hasVideo || isSerie
                     ? [colors.gradientStart ?? '#7B3FF2', colors.gradientEnd ?? '#5B8DEF']
                     : ['#555', '#444']
                 }
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={s.ctaPrimary}
               >
-                {videosLoading && !isSerie ? (
+                {accessLoading || (videosLoading && !isSerie) ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Icon name={hasVideo || isSerie ? 'play' : 'lock'} size={17} color="#fff" />
+                  <Icon
+                    name={item.is_premium && !hasAccess ? 'lock' : hasVideo || isSerie ? 'play' : 'lock'}
+                    size={17} color="#fff"
+                  />
                 )}
                 <Text style={s.ctaPrimaryText}>
-                  {isSerie
+                  {accessLoading
+                    ? 'Chargement…'
+                    : item.is_premium && !hasAccess
+                    ? `Acheter — ${coinsRequired} coins (${item.price} €)`
+                    : isSerie
                     ? 'Voir les épisodes'
                     : videosLoading
                     ? 'Chargement…'
@@ -330,6 +407,89 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
         <View style={{ height: insets.bottom + 40 }} />
       </ScrollView>
+
+      {/* ── Modal Paywall ── */}
+      <Modal visible={showPaywall} transparent animationType="slide" onRequestClose={() => setShowPaywall(false)}>
+        <View style={pw.overlay}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowPaywall(false)} />
+          <View style={[pw.sheet, { backgroundColor: colors.surface }]}>
+
+            {/* En-tête */}
+            <View style={pw.header}>
+              <View style={pw.lockCircle}>
+                <Icon name="lock" size={28} color="#fff" />
+              </View>
+              <Text style={[pw.title, { color: colors.textPrimary }]}>Contenu Premium</Text>
+              <Text style={[pw.subtitle, { color: colors.textSecondary }]}>
+                {item.title}
+              </Text>
+            </View>
+
+            {/* Prix */}
+            <View style={[pw.priceRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[pw.priceLabel, { color: colors.textTertiary }]}>Prix d'accès</Text>
+                <Text style={[pw.priceValue, { color: colors.textPrimary }]}>
+                  {coinsRequired} coins
+                  <Text style={[pw.priceEur, { color: colors.textSecondary }]}> ({item.price} €)</Text>
+                </Text>
+              </View>
+              <Icon name="zap" size={22} color="#F59E0B" />
+            </View>
+
+            {/* Solde wallet */}
+            <View style={[pw.balanceRow, { borderColor: colors.border }]}>
+              <Icon name="credit-card" size={15} color={colors.textTertiary} />
+              <Text style={[pw.balanceTxt, { color: colors.textSecondary }]}>
+                Votre solde : <Text style={{ color: walletCoins !== null && walletCoins >= coinsRequired ? '#10B981' : '#EF4444', fontWeight: '700' }}>
+                  {walletCoins ?? '…'} coins
+                </Text>
+              </Text>
+              {walletCoins !== null && walletCoins < coinsRequired && (
+                <Text style={pw.balanceShort}> — insuffisant</Text>
+              )}
+            </View>
+
+            {/* Accès à vie */}
+            <View style={pw.infoRow}>
+              <Icon name="check-circle" size={14} color="#10B981" />
+              <Text style={[pw.infoTxt, { color: colors.textSecondary }]}>Accès permanent, regardez quand vous voulez</Text>
+            </View>
+            <View style={pw.infoRow}>
+              <Icon name="check-circle" size={14} color="#10B981" />
+              <Text style={[pw.infoTxt, { color: colors.textSecondary }]}>Lié à votre compte FoliX</Text>
+            </View>
+
+            {/* Boutons */}
+            {walletCoins !== null && walletCoins < coinsRequired ? (
+              <TouchableOpacity
+                style={pw.btnRecharge}
+                onPress={() => { setShowPaywall(false); navigation.navigate('BuyCoins' as any, {}); }}
+              >
+                <Icon name="plus-circle" size={18} color="#fff" />
+                <Text style={pw.btnTxt}>Recharger mon wallet</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={pw.btnBuy}
+                onPress={handlePurchase}
+                disabled={purchasing}
+              >
+                {purchasing
+                  ? <ActivityIndicator color="#fff" />
+                  : <><Icon name="zap" size={18} color="#fff" /><Text style={pw.btnTxt}>Confirmer l'achat — {coinsRequired} coins</Text></>
+                }
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity style={pw.btnCancel} onPress={() => setShowPaywall(false)}>
+              <Text style={[pw.cancelTxt, { color: colors.textTertiary }]}>Annuler</Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -366,4 +526,32 @@ const s = StyleSheet.create({
   synExpand:    { fontSize: 13, fontWeight: '700' },
 
   infoBlock:    { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, overflow: 'hidden' },
+});
+
+const pw = StyleSheet.create({
+  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36, gap: 14 },
+
+  header:       { alignItems: 'center', gap: 10, marginBottom: 4 },
+  lockCircle:   { width: 60, height: 60, borderRadius: 30, backgroundColor: '#E8501A', alignItems: 'center', justifyContent: 'center' },
+  title:        { fontSize: 20, fontWeight: '900' },
+  subtitle:     { fontSize: 13, textAlign: 'center' },
+
+  priceRow:     { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
+  priceLabel:   { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
+  priceValue:   { fontSize: 18, fontWeight: '900' },
+  priceEur:     { fontSize: 14, fontWeight: '500' },
+
+  balanceRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  balanceTxt:   { fontSize: 13, fontWeight: '500', flex: 1 },
+  balanceShort: { fontSize: 12, color: '#EF4444', fontWeight: '700' },
+
+  infoRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoTxt:      { fontSize: 13 },
+
+  btnBuy:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#E8501A', borderRadius: 14, padding: 16 },
+  btnRecharge:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#7B3FF2', borderRadius: 14, padding: 16 },
+  btnTxt:       { color: '#fff', fontSize: 15, fontWeight: '800' },
+  btnCancel:    { alignItems: 'center', paddingVertical: 10 },
+  cancelTxt:    { fontSize: 14, fontWeight: '600' },
 });
