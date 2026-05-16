@@ -508,9 +508,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   const clearUnreadNotifications = useCallback(() => setUnreadNotifications(0), []);
   const clearMissedCalls         = useCallback(() => setMissedCallCount(0), []);
 
-  const sendMessage = useCallback((payload: object) => {
+  const sendMessage = useCallback((payload: object, _retryMs = 0) => {
+    const p = payload as any;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      const p = payload as any;
       // Enregistrer AVANT d'envoyer pour bloquer l'écho immédiat du serveur
       if (p.type === 'call_offer' && isMounted.current) {
         outgoingCallIds.current.add(p.to);
@@ -523,6 +523,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
         );
       }
       wsRef.current.send(JSON.stringify(payload));
+      return;
+    }
+    // WS pas encore OPEN — retry jusqu'a 8s pour les messages critiques d'appel
+    if (p.type && ['call_offer', 'call_answer', 'call_ice'].includes(p.type) && _retryMs < 8000) {
+      setTimeout(() => sendMessage(payload, _retryMs + 200), 200);
     }
   }, [registerPendingCall]);
 

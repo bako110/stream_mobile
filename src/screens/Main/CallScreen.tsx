@@ -131,26 +131,13 @@ export const CallScreen: React.FC = () => {
 
   const {
     sendMessage: sendWs,
-    isConnected: wsConnected,
     addListener, removeListener,
     notifyCallConnected, notifyCallEnded,
     markCallAccepted, markCallEnded,
     drainCallBuffer,
   } = useWs();
 
-  const wsConnectedRef = useRef(wsConnected);
-  useEffect(() => { wsConnectedRef.current = wsConnected; }, [wsConnected]);
-
-  // Envoyer un message WS en attendant que la connexion soit etablie (max 5s)
-  const sendWsReady = useCallback((payload: object) => {
-    if (wsConnectedRef.current) { sendWs(payload); return; }
-    let waited = 0;
-    const iv = setInterval(() => {
-      waited += 100;
-      if (wsConnectedRef.current) { clearInterval(iv); sendWs(payload); return; }
-      if (waited >= 5000) clearInterval(iv);
-    }, 100);
-  }, [sendWs]);
+  // sendWs gere deja le retry en interne (WebSocketContext)
 
   const { startCall, minimizeCall, endCall: endActiveCall } = useActiveCall();
 
@@ -302,10 +289,10 @@ export const CallScreen: React.FC = () => {
         await flushPendingCandidates(pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        sendWsReady({ type: 'call_answer', to: partnerId, sdp: answer });
+        sendWs({ type: 'call_answer', to: partnerId, sdp: answer });
       }
     } catch { hangupRef.current?.(); }
-  }, [offer, partnerId, isVideo, getLocalStream, createPC, flushPendingCandidates, sendWsReady, markCallAccepted]);
+  }, [offer, partnerId, isVideo, getLocalStream, createPC, flushPendingCandidates, sendWs, markCallAccepted]);
 
   const minimize = useCallback(() => {
     minimizeCall();
@@ -342,7 +329,7 @@ export const CallScreen: React.FC = () => {
             isVideo ? { offerToReceiveVideo: true, offerToReceiveAudio: true } : { offerToReceiveAudio: true }
           );
           await pc.setLocalDescription(offerDesc);
-          sendWsReady({ type: 'call_offer', to: partnerId, to_name: partnerName, to_avatar: partnerAvatar ?? null, call_type: callType, sdp: offerDesc });
+          sendWs({ type: 'call_offer', to: partnerId, to_name: partnerName, to_avatar: partnerAvatar ?? null, call_type: callType, sdp: offerDesc });
         } catch {}
       } else if (autoAccept) {
         markCallAccepted(partnerId);
@@ -359,7 +346,7 @@ export const CallScreen: React.FC = () => {
             await flushPendingCandidates(pc);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            sendWsReady({ type: 'call_answer', to: partnerId, sdp: answer });
+            sendWs({ type: 'call_answer', to: partnerId, sdp: answer });
           }
         } catch {}
       } else {
@@ -426,7 +413,7 @@ export const CallScreen: React.FC = () => {
           await flushPendingCandidates(pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          sendWsReady({ type: 'call_answer', to: partnerId, sdp: answer });
+          sendWs({ type: 'call_answer', to: partnerId, sdp: answer });
         } catch {}
         return;
       }
@@ -445,7 +432,7 @@ export const CallScreen: React.FC = () => {
       .filter(p => p.type !== 'call_hangup')
       .forEach(p => handler(p));
     return () => removeListener(handler);
-  }, [partnerId, isVideo, isIncoming, addListener, removeListener, sendWsReady, flushPendingCandidates, notifyCallConnected, notifyCallEnded, markCallEnded, drainCallBuffer]);
+  }, [partnerId, isVideo, isIncoming, addListener, removeListener, sendWs, flushPendingCandidates, notifyCallConnected, notifyCallEnded, markCallEnded, drainCallBuffer]);
 
   useEffect(() => {
     if (callState === 'connected') {
