@@ -1,94 +1,198 @@
-import React from 'react';
+/**
+ * Barre d'envoi globale — style WhatsApp/Facebook.
+ * Affichée en bas, au-dessus de la tab bar, pendant qu'un upload tourne.
+ * Reste visible 3s après la fin pour confirmer "En ligne !".
+ */
+import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Platform,
+  View, Text, StyleSheet, Animated, TouchableOpacity,
 } from 'react-native';
-import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import { useTheme } from '../../hooks/useTheme';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import type { UploadJob } from '../../services/backgroundUploadService';
 
+const TYPE_ICON: Record<string, string> = {
+  reel:    'film',
+  post:    'image',
+  event:   'calendar',
+  concert: 'music',
+};
+
 const STATUS_LABEL: Record<UploadJob['status'], string> = {
   queued:      'En attente…',
-  compressing: 'Compression…',
-  uploading:   'Envoi…',
-  done:        'En ligne !',
-  error:       'Erreur',
+  compressing: 'Compression vidéo…',
+  uploading:   'Envoi en cours…',
+  done:        'Publication en ligne !',
+  error:       'Échec de la publication',
 };
 
-const JobRow: React.FC<{ job: UploadJob; colors: any }> = ({ job, colors }) => {
-  const isDone  = job.status === 'done';
-  const isError = job.status === 'error';
-  const accent  = isDone ? '#36D9A0' : isError ? '#FF4444' : colors.primary;
+// ── Un seul job affiché (le plus récent actif, sinon le plus récent done/error)
+function pickJob(jobs: UploadJob[]): UploadJob | null {
+  if (jobs.length === 0) return null;
+  const active = jobs.filter(j => j.status !== 'done' && j.status !== 'error');
+  if (active.length > 0) return active[active.length - 1];
+  return jobs[jobs.length - 1];
+}
 
-  return (
-    <View style={[row.wrap, { backgroundColor: colors.surface, borderLeftColor: accent }]}>
-      <View style={row.info}>
-        <Text style={[row.label, { color: colors.textPrimary }]} numberOfLines={1}>
-          {job.label}
-        </Text>
-        <Text style={[row.status, { color: accent }]}>
-          {STATUS_LABEL[job.status]}
-          {!isDone && !isError && job.progress > 0 ? ` ${job.progress}%` : ''}
-        </Text>
-      </View>
+// ── Composant barre
+const BAR_H = 58;
 
-      {isDone ? (
-        <Icon name="check-circle" size={18} color="#36D9A0" />
-      ) : isError ? (
-        <Icon name="alert-circle" size={18} color="#FF4444" />
-      ) : (
-        <View style={[row.barWrap, { backgroundColor: colors.backgroundSecondary }]}>
-          <View style={[row.barFill, { width: `${job.progress}%` as any, backgroundColor: colors.primary }]} />
-        </View>
-      )}
-    </View>
-  );
-};
+export const UploadProgressBar: React.FC<{ bottomOffset?: number }> = ({ bottomOffset = 0 }) => {
+  const insets = useSafeAreaInsets();
+  const { visibleJobs } = useBackgroundUpload();
+  const job = pickJob(visibleJobs);
 
-const row = StyleSheet.create({
-  wrap:    {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderLeftWidth: 3, marginHorizontal: 12, marginBottom: 6,
-    borderRadius: 10,
-    elevation: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12, shadowRadius: 4,
-  },
-  info:   { flex: 1 },
-  label:  { fontSize: 13, fontWeight: '600' },
-  status: { fontSize: 11, marginTop: 1 },
-  barWrap:{ height: 4, width: 60, borderRadius: 2, overflow: 'hidden' },
-  barFill:{ height: 4, borderRadius: 2 },
-});
+  const slideY = useRef(new Animated.Value(BAR_H + 20)).current;
+  const prevJobId = useRef<string | null>(null);
 
-export const UploadProgressBanner: React.FC = () => {
-  const { theme } = useTheme();
-  const { colors } = theme;
-  const { activeJobs } = useBackgroundUpload();
+  useEffect(() => {
+    if (job && job.id !== prevJobId.current) {
+      prevJobId.current = job.id;
+      Animated.spring(slideY, {
+        toValue:  0,
+        useNativeDriver: true,
+        friction: 9,
+        tension:  60,
+      }).start();
+    }
+    if (!job) {
+      Animated.timing(slideY, {
+        toValue:  BAR_H + 20,
+        useNativeDriver: true,
+        duration: 250,
+      }).start(() => { prevJobId.current = null; });
+    }
+  }, [job?.id, !!job]);
 
-  if (activeJobs.length === 0) return null;
+  if (!job && prevJobId.current === null) return null;
+
+  const isDone   = job?.status === 'done';
+  const isError  = job?.status === 'error';
+  const progress = job?.progress ?? 0;
+  const accent   = isError ? '#ef4444' : isDone ? '#10b981' : '#7B3FF2';
+  const icon     = TYPE_ICON[job?.type ?? 'post'] ?? 'upload-cloud';
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(250)}
-      exiting={FadeOutUp.duration(200)}
-      style={[banner.container, { top: Platform.OS === 'android' ? 56 : 100 }]}
-      pointerEvents="none"
+      style={[
+        styles.wrapper,
+        {
+          bottom: bottomOffset + insets.bottom + 60,
+          transform: [{ translateY: slideY }],
+        },
+      ]}
+      pointerEvents="box-none"
     >
-      {activeJobs.map(job => (
-        <JobRow key={job.id} job={job} colors={colors} />
-      ))}
+      <View style={[styles.card, { borderColor: accent + '40' }]}>
+        {/* Icône type */}
+        <View style={[styles.iconBox, { backgroundColor: accent + '22' }]}>
+          <Icon name={isDone ? 'check-circle' : isError ? 'alert-circle' : icon} size={17} color={accent} />
+        </View>
+
+        {/* Texte */}
+        <View style={styles.textBox}>
+          <Text style={styles.label} numberOfLines={1}>
+            {job?.label ?? ''}
+          </Text>
+          <Text style={[styles.statusTxt, { color: accent }]}>
+            {job ? STATUS_LABEL[job.status] : ''}
+            {!isDone && !isError && progress > 0 ? `  ${progress}%` : ''}
+          </Text>
+        </View>
+
+        {/* Indicateur droit */}
+        {isDone && <Icon name="check" size={16} color="#10b981" />}
+        {isError && (
+          <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="refresh-cw" size={15} color="#ef4444" />
+          </TouchableOpacity>
+        )}
+        {!isDone && !isError && (
+          <Text style={[styles.pct, { color: accent }]}>{progress}%</Text>
+        )}
+      </View>
+
+      {/* Track de progression */}
+      {!isDone && !isError && (
+        <View style={styles.track}>
+          <Animated.View
+            style={[
+              styles.fill,
+              {
+                backgroundColor: accent,
+                width: `${progress}%` as any,
+              },
+            ]}
+          />
+        </View>
+      )}
     </Animated.View>
   );
 };
 
-const banner = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 9999,
+// Alias pour rétrocompatibilité
+export const UploadProgressBanner = UploadProgressBar;
+
+const styles = StyleSheet.create({
+  wrapper: {
+    position:  'absolute',
+    left:      12,
+    right:     12,
+    zIndex:    9999,
+    elevation: 20,
+  },
+  card: {
+    flexDirection:    'row',
+    alignItems:       'center',
+    gap:              10,
+    backgroundColor:  '#12101F',
+    borderWidth:      1,
+    borderRadius:     16,
+    paddingVertical:  11,
+    paddingHorizontal: 13,
+    shadowColor:      '#000',
+    shadowOpacity:    0.35,
+    shadowOffset:     { width: 0, height: 6 },
+    shadowRadius:     14,
+  },
+  iconBox: {
+    width:          36,
+    height:         36,
+    borderRadius:   18,
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexShrink:     0,
+  },
+  textBox: {
+    flex: 1,
+    gap:  2,
+  },
+  label: {
+    color:      '#F0EFF8',
+    fontSize:   13,
+    fontWeight: '700',
+  },
+  statusTxt: {
+    fontSize:   11,
+    fontWeight: '600',
+  },
+  pct: {
+    fontSize:   13,
+    fontWeight: '800',
+    minWidth:   36,
+    textAlign:  'right',
+  },
+  track: {
+    height:           3,
+    backgroundColor:  '#2A2840',
+    borderRadius:     2,
+    marginTop:        5,
+    marginHorizontal: 2,
+    overflow:         'hidden',
+  },
+  fill: {
+    height:       3,
+    borderRadius: 2,
   },
 });
