@@ -30,14 +30,15 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
   const [loading,     setLoading]     = useState(true);
   const { addListener, removeListener } = useWs();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forceRefresh = false) => {
     try {
-      const data = await storyService.getFeed();
+      const data = await storyService.getFeed({ forceRefresh });
       setGroups(data);
-      // Précharger les médias des 5 premiers groupes en arrière-plan
-      data.slice(0, 5).forEach(g => {
+      // Precharger medias des 10 premiers groupes (2 stories chacun)
+      data.slice(0, 10).forEach(g => {
         g.stories.slice(0, 2).forEach(st => {
-          if (st.media_url) Image.prefetch(st.media_url).catch(() => {});
+          if (st.thumbnail_url) Image.prefetch(st.thumbnail_url).catch(() => {});
+          else if (st.media_url && st.media_type === 'image') Image.prefetch(st.media_url).catch(() => {});
         });
       });
     } catch (e) {
@@ -45,11 +46,12 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(false); }, []);
 
   useEffect(() => {
     const onWs = (payload: any) => {
-      if (payload.type === 'new_story' || payload.type === 'story_added') load();
+      // Nouvelle story arrivee — forcer un refresh reseau (invalide le cache)
+      if (payload.type === 'new_story' || payload.type === 'story_added') load(true);
     };
     addListener(onWs);
     return () => removeListener(onWs);
@@ -204,7 +206,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           groups={allGroups}
           initialGroupIndex={viewerGroup}
           currentUserId={currentUser?.id}
-          onClose={() => { setViewerOpen(false); load(); }}
+          onClose={() => { setViewerOpen(false); load(false); }}
           onNavigateToChat={onNavigateToChat}
           onNavigateToCall={onNavigateToCall}
         />
@@ -213,7 +215,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
       <StoryCreator
         visible={creatorOpen}
         onClose={() => setCreatorOpen(false)}
-        onCreated={() => { setCreatorOpen(false); load(); }}
+        onCreated={() => { setCreatorOpen(false); load(true); }}
       />
     </>
   );

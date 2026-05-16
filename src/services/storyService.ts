@@ -2,14 +2,41 @@ import { apiClient, Endpoints } from '../api';
 import type { Story, StoryGroup, StoryCreate, StoryUpdate, StoryViewerUser } from '../types/story';
 import { uploadService } from './uploadService';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import {
+  getCachedFeed, setCachedFeed, applyLocalViewsToFeed, markStoryViewedLocally, invalidateFeedCache,
+} from './storyCacheService';
 
 export const storyService = {
 
-  // ── Feed groupé (style WhatsApp) ──────────────────────────────────────────
+  // ── Feed groupé (style WhatsApp) — stale-while-revalidate ────────────────
 
-  async getFeed(): Promise<StoryGroup[]> {
-    const res = await apiClient.get<StoryGroup[]>(Endpoints.stories.feed);
-    return Array.isArray(res.data) ? res.data : [];
+  async getFeed(opts?: { forceRefresh?: boolean }): Promise<StoryGroup[]> {
+    // 1. Servir le cache immediatement si disponible et non force
+    const cached = !opts?.forceRefresh ? getCachedFeed() : null;
+    if (cached) {
+      // Rafraichir silencieusement en arriere-plan (sans attendre)
+      storyService._refreshFeedInBackground();
+      return applyLocalViewsToFeed(cached);
+    }
+    // 2. Pas de cache — fetch bloquant
+    return storyService._fetchAndCache();
+  },
+
+  async _fetchAndCache(): Promise<StoryGroup[]> {
+    try {
+      const res = await apiClient.get<StoryGroup[]>(Endpoints.stories.feed);
+      const groups = Array.isArray(res.data) ? res.data : [];
+      setCachedFeed(groups);
+      return applyLocalViewsToFeed(groups);
+    } catch (e) {
+      // Reseau KO — retourner le cache expire plutot que vide
+      const stale = getCachedFeed();
+      return stale ? applyLocalViewsToFeed(stale) : [];
+    }
+  },
+
+  _refreshFeedInBackground(): void {
+    storyService._fetchAndCache().catch(() => {});
   },
 
   // ── Mes stories ───────────────────────────────────────────────────────────
@@ -23,6 +50,7 @@ export const storyService = {
 
   async create(data: StoryCreate): Promise<Story> {
     const res = await apiClient.post<Story>(Endpoints.stories.create, data);
+    invalidateFeedCache();
     return res.data;
   },
 
@@ -63,7 +91,8 @@ export const storyService = {
   // ── Marquer comme vue ─────────────────────────────────────────────────────
 
   async markViewed(storyId: string): Promise<void> {
-    await apiClient.post(Endpoints.stories.view(storyId)).catch(() => {});
+    markStoryViewedLocally(storyId); // local immediatement (persiste hors-ligne)
+    apiClient.post(Endpoints.stories.view(storyId)).catch(() => {}); // API fire-and-forget
   },
 
   // ── Viewers d'une story ───────────────────────────────────────────────────
@@ -104,5 +133,6 @@ export const storyService = {
 
   async delete(storyId: string): Promise<void> {
     await apiClient.delete(Endpoints.stories.delete(storyId));
+    invalidateFeedCache();
   },
 };
