@@ -267,14 +267,19 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
     navigate('Messages', { initialTab: 'calls' });
   } else if (type === 'message') {
     navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
-  } else if (
-    type === 'wallet_transfer' ||
-    type === 'wallet_gift' ||
-    type === 'wallet_purchase' ||
-    type === 'wallet_boost' ||
-    type === 'wallet_withdrawal'
-  ) {
-    navigate('Wallet', undefined);
+  } else if (type === 'notification') {
+    const notifType = data.notification_type ?? '';
+    if (
+      notifType === 'wallet_gift_received' ||
+      notifType === 'wallet_transfer_received' ||
+      notifType === 'wallet_purchase' ||
+      notifType === 'wallet_boost' ||
+      notifType === 'wallet_withdrawal'
+    ) {
+      navigate('Wallet', undefined);
+    } else {
+      navigate('Notifications', undefined);
+    }
   } else {
     navigate('Notifications', undefined);
   }
