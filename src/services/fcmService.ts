@@ -267,6 +267,14 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
     navigate('Messages', { initialTab: 'calls' });
   } else if (type === 'message') {
     navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
+  } else if (
+    type === 'wallet_transfer' ||
+    type === 'wallet_gift' ||
+    type === 'wallet_purchase' ||
+    type === 'wallet_boost' ||
+    type === 'wallet_withdrawal'
+  ) {
+    navigate('Wallet', undefined);
   } else {
     navigate('Notifications', undefined);
   }

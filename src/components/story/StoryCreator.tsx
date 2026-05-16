@@ -23,6 +23,7 @@ import { apiClient, Endpoints } from '../../api';
 import type { StoryMediaType, StoryAudienceType } from '../../types/story';
 import { compressVideo, cleanupTempVideos } from '../../services/videoCompressService';
 import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
+import { storyUploadState } from '../../services/storyUploadState';
 import { VideoTrimmer } from './VideoTrimmer';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -399,69 +400,79 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   // ── Publish ───────────────────────────────────────────────────────────────
 
-  const handlePublish = async () => {
-    setUploading(true);
-    setUploadPct(0);
-    try {
-      let media_url: string | undefined;
-      let media_type: StoryMediaType = 'image';
-      let thumbnail_url: string | undefined;
-      let audio_url: string | undefined;
-      let duration_sec = 5;
-      let background_color: string | undefined;
+  const handlePublish = () => {
+    // Capturer les valeurs avant de fermer le modal
+    const _mode        = mode;
+    const _localUri    = localUri;
+    const _audioUri    = audioUri;
+    const _caption     = caption;
+    const _bgColor     = bgColor;
+    const _fontStyleKey= fontStyleKey;
+    const _audienceType= audienceType;
+    const _selectedUsers = selectedUsers;
+    const _tempFiles   = [...tempFilesRef.current];
+    tempFilesRef.current = [];
 
-      switch (mode) {
-        case 'text':
-          media_type = 'text'; background_color = bgColor;
-          break;
-        case 'image':
-          media_url = await doUploadImage(localUri!);
-          media_type = 'image'; thumbnail_url = media_url;
-          break;
-        case 'video': {
-          const v = await doUploadVideo(localUri!);
-          media_url = v.url; media_type = 'video';
-          duration_sec = Math.min(Math.ceil(v.duration), 60);
-          thumbnail_url = v.thumbnailUrl;
-          break;
+    // Fermer immediatement — l'utilisateur peut naviguer
+    onCreated();
+    resetAndClose();
+
+    // Upload en arriere-plan
+    storyUploadState.setUploading(true);
+    (async () => {
+      try {
+        let media_url: string | undefined;
+        let media_type: StoryMediaType = 'image';
+        let thumbnail_url: string | undefined;
+        let audio_url: string | undefined;
+        let duration_sec = 5;
+        let background_color: string | undefined;
+
+        switch (_mode) {
+          case 'text':
+            media_type = 'text'; background_color = _bgColor;
+            break;
+          case 'image':
+            media_url = await doUploadImage(_localUri!);
+            media_type = 'image'; thumbnail_url = media_url;
+            break;
+          case 'video': {
+            const v = await doUploadVideo(_localUri!);
+            media_url = v.url; media_type = 'video';
+            duration_sec = Math.min(Math.ceil(v.duration), 60);
+            thumbnail_url = v.thumbnailUrl;
+            break;
+          }
+          case 'voice': {
+            const au = _audioUri!;
+            audio_url = (au.startsWith('http') ? au : await doUploadAudio(au));
+            media_type = 'voice'; background_color = '#1A237E'; duration_sec = 15;
+            break;
+          }
         }
-        case 'voice': {
-          const au = audioUri!;
-          setUploadStep('Upload vocal…'); setUploadPct(20);
-          audio_url = (au.startsWith('http') ? au : await doUploadAudio(au));
-          media_type = 'voice'; background_color = '#1A237E'; duration_sec = 15;
-          break;
+
+        if (_audioUri && _mode !== 'voice') {
+          audio_url = _audioUri.startsWith('http') ? _audioUri : await doUploadAudio(_audioUri);
+          if (_mode === 'text') { media_type = 'audio'; background_color = background_color ?? _bgColor; }
+          duration_sec = 15;
         }
+
+        await storyService.create({
+          media_url, media_type, thumbnail_url,
+          caption: _caption.trim() || undefined,
+          duration_sec, background_color, audio_url,
+          font_style: _mode === 'text' ? _fontStyleKey : undefined,
+          audience_type: _audienceType,
+          audience_user_ids: _audienceType !== 'everyone' ? _selectedUsers : [],
+        });
+
+        await cleanupTempVideos(_tempFiles);
+      } catch {
+        await cleanupTempVideos(_tempFiles);
+      } finally {
+        storyUploadState.setUploading(false);
       }
-
-      if (audioUri && mode !== 'voice') {
-        setUploadStep('Upload son…'); setUploadPct(80);
-        audio_url = audioUri.startsWith('http') ? audioUri : await doUploadAudio(audioUri);
-        if (mode === 'text') { media_type = 'audio'; background_color = background_color ?? bgColor; }
-        duration_sec = 15;
-      }
-
-      await storyService.create({
-        media_url, media_type, thumbnail_url,
-        caption: caption.trim() || undefined,
-        duration_sec, background_color, audio_url,
-        font_style: mode === 'text' ? fontStyleKey : undefined,
-        audience_type: audienceType,
-        audience_user_ids: audienceType !== 'everyone' ? selectedUsers : [],
-      });
-
-      await cleanupTempVideos(tempFilesRef.current);
-      tempFilesRef.current = [];
-
-      setUploading(false);
-      setShowSuccess(true);
-      setTimeout(() => { onCreated(); resetAndClose(); }, 2400);
-    } catch (e: any) {
-      await cleanupTempVideos(tempFilesRef.current);
-      tempFilesRef.current = [];
-      setUploading(false);
-      Alert.alert('Erreur', e?.message ?? 'Impossible de publier');
-    }
+    })();
   };
 
   const selectMode = (m: StoryMode) => {
@@ -818,7 +829,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             <TouchableOpacity
               style={[s.publishBtn, (mode === 'text' && !caption.trim()) && { opacity: 0.4 }]}
               onPress={handlePublish}
-              disabled={uploading || (mode === 'text' && !caption.trim())}
+              disabled={mode === 'text' && !caption.trim()}
               activeOpacity={0.85}
             >
               <LinearGradient
@@ -826,22 +837,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={s.publishBtnInner}
               >
-                {uploading ? (
-                  <View style={{ alignItems: 'center', minWidth: 100 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <ActivityIndicator size={12} color="#fff" />
-                      <Text style={[s.publishLabel, { fontSize: 11 }]}>{uploadStep}</Text>
-                    </View>
-                    <View style={{ width: 100, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }}>
-                      <View style={{ width: `${uploadPct}%` as any, height: 3, backgroundColor: '#fff', borderRadius: 2 }} />
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    <Icon name="send" size={14} color="#fff" />
-                    <Text style={s.publishLabel}>Publier</Text>
-                  </>
-                )}
+                <Icon name="send" size={14} color="#fff" />
+                <Text style={s.publishLabel}>Publier</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>

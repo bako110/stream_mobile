@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
-  ActivityIndicator, StyleSheet, Alert, ScrollView,
+  StyleSheet, Alert, ScrollView,
   KeyboardAvoidingView, Platform, StatusBar, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +39,6 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const [localUris,     setLocalUris]     = useState<string[]>([]);
   const [videoUri,      setVideoUri]      = useState<string | null>(null);
   const [showFeelings,  setShowFeelings]  = useState(false);
-  const [posting,       setPosting]       = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 200); }, []);
@@ -98,54 +97,48 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
 
   // ── Publier ─────────────────────────────────────────────────────────────────
 
-  const handlePost = async () => {
+  const handlePost = () => {
     if (!canPost) return;
 
-    // Cas simple : texte seul ou images seules (pas de vidéo) → upload sync rapide
-    if (!videoUri) {
-      setPosting(true);
-      try {
-        let image_url: string | undefined;
-        let image_urls: string[] | undefined;
-
-        if (localUris.length === 1) {
-          const r = await uploadImageFromUri(localUris[0], 'posts', `p_${Date.now()}.jpg`);
-          image_url = r.url;
-        } else if (localUris.length > 1) {
-          const results = await Promise.all(
-            localUris.map((uri, i) => uploadImageFromUri(uri, 'posts', `p_${Date.now()}_${i}.jpg`))
-          );
-          image_urls = results.map(r => r.url);
-          image_url  = image_urls[0];
-        }
-
-        await postService.create({
-          body: body.trim() || undefined,
-          image_url,
-          image_urls,
-          feeling,
-        });
-        onPostCreated();
-      } catch {
-        Alert.alert('Erreur', 'Impossible de publier.');
-      } finally {
-        setPosting(false);
-      }
-      return;
-    }
-
-    // Cas vidéo → compression + upload en arrière-plan
     const capturedBody    = body.trim();
     const capturedFeeling = feeling;
     const capturedVideo   = videoUri;
     const capturedImages  = [...localUris];
 
-    // On ferme l'écran immédiatement
+    // Fermer l'écran immédiatement dans tous les cas
     onPostCreated();
 
-    const hasImages = capturedImages.length > 0;
+    if (!capturedVideo) {
+      // Texte seul ou images seules → upload en arrière-plan (pas de compression)
+      (async () => {
+        try {
+          let image_url: string | undefined;
+          let image_urls: string[] | undefined;
 
-    if (hasImages) {
+          if (capturedImages.length === 1) {
+            const r = await uploadImageFromUri(capturedImages[0], 'posts', `p_${Date.now()}.jpg`);
+            image_url = r.url;
+          } else if (capturedImages.length > 1) {
+            const results = await Promise.all(
+              capturedImages.map((uri, i) => uploadImageFromUri(uri, 'posts', `p_${Date.now()}_${i}.jpg`))
+            );
+            image_urls = results.map(r => r.url);
+            image_url  = image_urls[0];
+          }
+
+          await postService.create({
+            body: capturedBody || undefined,
+            image_url,
+            image_urls,
+            feeling: capturedFeeling,
+          });
+        } catch {}
+      })();
+      return;
+    }
+
+    // Vidéo → compression + upload en arrière-plan
+    if (capturedImages.length > 0) {
       backgroundUploadService.enqueueVideoWithImages({
         videoUri:    capturedVideo,
         imageUris:   capturedImages,
@@ -270,25 +263,13 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         <TouchableOpacity
           style={[s.publishBtn, { backgroundColor: canPost ? colors.primary : colors.primary + '44' }]}
           onPress={handlePost}
-          disabled={!canPost || posting}
+          disabled={!canPost}
           activeOpacity={0.8}
         >
-          {posting
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={s.publishBtnText}>{videoUri ? 'Envoyer' : 'Publier'}</Text>
-          }
+          <Text style={s.publishBtnText}>Publier</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Hint arrière-plan (si vidéo sélectionnée) */}
-      {videoUri && (
-        <View style={[s.bgHint, { backgroundColor: colors.primary + '18', borderBottomColor: colors.primary + '33' }]}>
-          <Icon name="upload-cloud" size={14} color={colors.primary} />
-          <Text style={[s.bgHintText, { color: colors.primary }]}>
-            La compression et l'envoi se feront en arrière-plan
-          </Text>
-        </View>
-      )}
 
       <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
 

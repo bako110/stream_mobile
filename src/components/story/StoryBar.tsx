@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Image, StyleSheet,
+  Image, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -10,6 +10,7 @@ import { StoryViewer } from './StoryViewer';
 import { StoryCreator } from './StoryCreator';
 import { VerifiedBadge } from '../common';
 import { storyService } from '../../services/storyService';
+import { storyUploadState } from '../../services/storyUploadState';
 import { useWs } from '../../context/WebSocketContext';
 import type { StoryGroup } from '../../types/story';
 import type { User } from '../../types/user';
@@ -28,6 +29,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
   const [viewerGroup, setViewerGroup] = useState(0);
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [loading,     setLoading]     = useState(true);
+  const [isUploading, setIsUploading] = useState(storyUploadState.uploading);
   const { addListener, removeListener } = useWs();
 
   const load = useCallback(async (forceRefresh = false) => {
@@ -47,6 +49,13 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
   }, []);
 
   useEffect(() => { load(false); }, []);
+
+  useEffect(() => {
+    return storyUploadState.subscribe((uploading) => {
+      setIsUploading(uploading);
+      if (!uploading) load(true);
+    });
+  }, [load]);
 
   useEffect(() => {
     const onWs = (payload: any) => {
@@ -86,7 +95,23 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
               }
             >
               <View style={s.myWrap}>
-                {myGroup ? (
+                {isUploading ? (
+                  <View style={[s.ring, s.ringEmpty, { borderColor: 'transparent' }]}>
+                    <View style={s.avatarInner}>
+                      {currentUser?.avatar_url
+                        ? <Image source={{ uri: currentUser.avatar_url }} style={[s.avatar, { opacity: 0.5 }]} />
+                        : <View style={[s.avatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]}>
+                            <Text style={[s.avatarInitial, { color: colors.primary ?? '#7B3FF2' }]}>{initials}</Text>
+                          </View>
+                      }
+                    </View>
+                    <ActivityIndicator
+                      size={RING_SIZE + 4}
+                      color="#7B3FF2"
+                      style={{ position: 'absolute' }}
+                    />
+                  </View>
+                ) : myGroup ? (
                   <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.ring}>
                     <View style={s.avatarInner}>
                       {currentUser?.avatar_url
