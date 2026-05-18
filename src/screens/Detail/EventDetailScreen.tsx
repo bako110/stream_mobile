@@ -7,6 +7,8 @@ import {
 } from 'react-native';
 
 const { width: SW } = Dimensions.get('window');
+const HERO_H = SW * 0.72;
+
 import Animated, {
   FadeInDown, FadeIn,
   useSharedValue, useAnimatedStyle,
@@ -25,6 +27,7 @@ import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { StyleSheet } from 'react-native';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -39,8 +42,6 @@ const EVENT_CONFIG: Record<string, { icon: string; label: string; color: string 
   other:      { icon: 'calendar', label: 'Autre',        color: '#9390AB' },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 const getInitials = (name?: string | null) =>
   name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '?';
 
@@ -50,23 +51,17 @@ const formatDate = (iso: string) =>
 const formatDateShort = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
-// ── VideoModal — player plein écran ouvert depuis le bouton vidéo ─────────────
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+// ── VideoModal ────────────────────────────────────────────────────────────────
 
 const VideoModal: React.FC<{ uri: string; onClose: () => void }> = ({ uri, onClose }) => {
-  const player = useVideoPlayer({ uri }, p => {
-    p.muted = false;
-    p.play();
-  });
-
+  const player = useVideoPlayer({ uri }, p => { p.muted = false; p.play(); });
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
-        <VideoView
-          player={player}
-          style={{ width: SW, height: SW * 0.62 }}
-          resizeMode="contain"
-          controls
-        />
+        <VideoView player={player} style={{ width: SW, height: SW * 0.62 }} resizeMode="contain" controls />
         <TouchableOpacity onPress={onClose}
           style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, right: 16,
             width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.6)',
@@ -78,15 +73,17 @@ const VideoModal: React.FC<{ uri: string; onClose: () => void }> = ({ uri, onClo
   );
 };
 
-// ── BannerCarousel ────────────────────────────────────────────────────────────
+// ── HeroCarousel ──────────────────────────────────────────────────────────────
 
-const BannerCarousel: React.FC<{ images: string[]; fallbackIcon: string; accent: string; colors: AppColors }> =
-  ({ images, fallbackIcon, accent, colors }) => {
+const HeroCarousel: React.FC<{
+  images: string[]; fallbackIcon: string; accent: string;
+  title: string; eventType: string; isFree: boolean; isOnline: boolean;
+  organizerName?: string; hasVideo: boolean; onVideoPress: () => void;
+  colors: AppColors;
+}> = ({ images, fallbackIcon, accent, title, eventType, isFree, isOnline,
+        organizerName, hasVideo, onVideoPress, colors }) => {
   const [activeIdx, setActiveIdx] = useState(0);
-  const [lightboxIdx, setLightboxIdx] = useState(0);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
   const flatRef = useRef<FlatList>(null);
-  const H = SW * 0.62;
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -96,31 +93,12 @@ const BannerCarousel: React.FC<{ images: string[]; fallbackIcon: string; accent:
         flatRef.current?.scrollToIndex({ index: next, animated: true });
         return next;
       });
-    }, 3500);
+    }, 4000);
     return () => clearInterval(t);
   }, [images.length]);
 
   return (
-    <View style={{ width: SW, height: H }}>
-      <Modal visible={lightboxOpen} transparent animationType="fade" onRequestClose={() => setLightboxOpen(false)}>
-        <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
-          <FlatList
-            horizontal pagingEnabled data={images}
-            initialScrollIndex={lightboxIdx}
-            getItemLayout={(_, i) => ({ length: SW, offset: SW * i, index: i })}
-            keyExtractor={(u, i) => u + i}
-            showsHorizontalScrollIndicator={false}
-            renderItem={({ item: url }) => (
-              <Image source={{ uri: url }} style={{ width: SW, height: '100%' }} resizeMode="contain" />
-            )}
-          />
-          <TouchableOpacity onPress={() => setLightboxOpen(false)}
-            style={{ position: 'absolute', top: 52, right: 20, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 }}>
-            <Icon name="x" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
-
+    <View style={{ width: SW, height: HERO_H }}>
       {images.length > 0 ? (
         <FlatList
           ref={flatRef} horizontal pagingEnabled data={images}
@@ -129,37 +107,264 @@ const BannerCarousel: React.FC<{ images: string[]; fallbackIcon: string; accent:
           onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) =>
             setActiveIdx(Math.round(e.nativeEvent.contentOffset.x / SW))}
           scrollEventThrottle={16}
-          renderItem={({ item: url, index }) => (
-            <TouchableOpacity activeOpacity={0.95} onPress={() => { setLightboxIdx(index); setLightboxOpen(true); }}>
-              <Image source={{ uri: url }} style={{ width: SW, height: H }} resizeMode="cover" />
-            </TouchableOpacity>
+          renderItem={({ item: url }) => (
+            <Image source={{ uri: url }} style={{ width: SW, height: HERO_H }} resizeMode="cover" />
           )}
         />
       ) : (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundSecondary }}>
-          <Icon name={fallbackIcon} size={56} color={colors.textTertiary} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundTertiary }}>
+          <Icon name={fallbackIcon} size={72} color={colors.textTertiary} />
         </View>
       )}
 
+      {/* Dégradé profond bas → titre */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.25)', 'rgba(0,0,0,0.7)']}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.5 }}
+        colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.65)', 'rgba(0,0,0,0.88)']}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HERO_H * 0.7 }}
         pointerEvents="none"
       />
 
-      {images.length > 1 && (
-        <View style={{ position: 'absolute', bottom: 52, alignSelf: 'center', flexDirection: 'row', gap: 5 }}>
-          {images.map((_, i) => (
-            <View key={i} style={{
-              width: i === activeIdx ? 18 : 6, height: 6, borderRadius: 3,
-              backgroundColor: i === activeIdx ? accent : 'rgba(255,255,255,0.4)',
-            }} />
-          ))}
+      {/* Badges haut */}
+      <View style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, left: 64, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+        <View style={{ backgroundColor: accent + 'EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+          <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>{eventType.toUpperCase()}</Text>
         </View>
+        {isFree && (
+          <View style={{ backgroundColor: '#36D9A0EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>GRATUIT</Text>
+          </View>
+        )}
+        {isOnline && (
+          <View style={{ backgroundColor: '#3B82F6EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>EN LIGNE</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Bouton vidéo */}
+      {hasVideo && (
+        <TouchableOpacity onPress={onVideoPress}
+          style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, right: 16,
+            flexDirection: 'row', alignItems: 'center', gap: 5,
+            backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 }}>
+          <Icon name="play-circle" size={14} color="#fff" />
+          <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>Vidéo</Text>
+        </TouchableOpacity>
       )}
+
+      {/* Titre + organisateur en bas du hero */}
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 20, gap: 8 }}>
+        <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', lineHeight: 32, letterSpacing: -0.3 }} numberOfLines={2}>
+          {title}
+        </Text>
+        {organizerName && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <LinearGradient colors={[accent, accent + '88']}
+              style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '900', color: '#fff' }}>{getInitials(organizerName)}</Text>
+            </LinearGradient>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>{organizerName}</Text>
+          </View>
+        )}
+        {images.length > 1 && (
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            {images.map((_, i) => (
+              <View key={i} style={{
+                width: i === activeIdx ? 16 : 5, height: 4, borderRadius: 2,
+                backgroundColor: i === activeIdx ? '#fff' : 'rgba(255,255,255,0.35)',
+              }} />
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   );
 };
+
+// ── SectionHeader ─────────────────────────────────────────────────────────────
+
+const SectionHeader: React.FC<{ label: string; colors: AppColors }> = ({ label, colors }) => (
+  <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: colors.textTertiary, marginBottom: 10, textTransform: 'uppercase' }}>
+    {label}
+  </Text>
+);
+
+// ── InfoCard ──────────────────────────────────────────────────────────────────
+
+interface InfoRowProps {
+  icon: string; label: string; value: string;
+  color: string; colors: AppColors;
+  divider?: boolean; onPress?: () => void;
+  rightBadge?: string;
+}
+
+const InfoRow: React.FC<InfoRowProps> = ({ icon, label, value, color, colors, divider, onPress, rightBadge }) => {
+  const inner = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 }}>
+      {divider && <View style={{ position: 'absolute', top: 0, left: 16, right: 16, height: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />}
+      <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: color + '15' }}>
+        <Icon name={icon} size={17} color={color} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 11, color: colors.textTertiary, fontWeight: '500' }}>{label}</Text>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: onPress ? color : colors.textPrimary, lineHeight: 18 }}>{value}</Text>
+      </View>
+      {rightBadge && (
+        <View style={{ backgroundColor: color + '15', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color }}>{rightBadge}</Text>
+        </View>
+      )}
+      {onPress && <Icon name="chevron-right" size={15} color={color} />}
+    </View>
+  );
+  return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.7}>{inner}</TouchableOpacity> : inner;
+};
+
+// ── SocialBar ─────────────────────────────────────────────────────────────────
+
+interface SocialBarProps {
+  liked: boolean; likeCount: number; saved: boolean;
+  onLike: () => void; onComment: () => void; onShare: () => void; onSave: () => void;
+  heartStyle: any; saveStyle: any; colors: AppColors;
+}
+
+const SocialBar: React.FC<SocialBarProps> = ({
+  liked, likeCount, saved, onLike, onComment, onShare, onSave,
+  heartStyle, saveStyle, colors,
+}) => (
+  <View style={{ flexDirection: 'row', marginHorizontal: 16,
+    backgroundColor: colors.backgroundSecondary, borderRadius: 18, overflow: 'hidden' }}>
+    <TouchableOpacity style={ss.socialBtn} onPress={onLike} activeOpacity={0.75}>
+      <Animated.View style={heartStyle}>
+        <Icon name="heart" size={18} color={liked ? '#F0365A' : colors.textTertiary} />
+      </Animated.View>
+      <Text style={{ fontSize: 12, fontWeight: '700', color: liked ? '#F0365A' : colors.textTertiary }}>
+        {likeCount > 0 ? likeCount.toLocaleString('fr') : 'J\'aime'}
+      </Text>
+    </TouchableOpacity>
+
+    <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />
+
+    <TouchableOpacity style={ss.socialBtn} onPress={onComment} activeOpacity={0.75}>
+      <Icon name="message-circle" size={18} color={colors.textTertiary} />
+      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }}>Commenter</Text>
+    </TouchableOpacity>
+
+    <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />
+
+    <TouchableOpacity style={ss.socialBtn} onPress={onShare} activeOpacity={0.75}>
+      <Icon name="share-2" size={18} color={colors.textTertiary} />
+      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }}>Partager</Text>
+    </TouchableOpacity>
+
+    <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />
+
+    <TouchableOpacity style={{ paddingHorizontal: 14, paddingVertical: 12 }} onPress={onSave} activeOpacity={0.75}>
+      <Animated.View style={saveStyle}>
+        <Icon name="bookmark" size={18} color={saved ? '#7B3FF2' : colors.textTertiary} />
+      </Animated.View>
+    </TouchableOpacity>
+  </View>
+);
+
+// ── TicketTiersGrid ───────────────────────────────────────────────────────────
+
+interface TierItem {
+  key: 'simple' | 'vip' | 'vvip' | 'vvvip';
+  label: string; icon: string; color: string;
+  price: number | null | undefined;
+  sub?: string;
+}
+
+interface TicketTiersGridProps {
+  tiers: TierItem[];
+  selected: TierItem['key'];
+  onSelect: (k: TierItem['key']) => void;
+  colors: AppColors;
+}
+
+const TicketTiersGrid: React.FC<TicketTiersGridProps> = ({ tiers, selected, onSelect, colors }) => {
+  const visible = tiers.filter(t => typeof t.price === 'number' && t.price > 0);
+  if (visible.length === 0) return null;
+
+  const effectiveSelected = visible.find(t => t.key === selected) ? selected : visible[0].key;
+
+  if (visible.length === 1) {
+    const tier = visible[0];
+    return (
+      <Animated.View entering={FadeInDown.delay(200).springify()} style={{ marginHorizontal: 16, marginBottom: 4 }}>
+        <SectionHeader label="Billet" colors={colors} />
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 12,
+          backgroundColor: colors.backgroundSecondary,
+          borderRadius: 14, borderWidth: 1.5, borderColor: tier.color + '40',
+          paddingVertical: 14, paddingHorizontal: 16,
+        }}>
+          <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: tier.color + '18', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={tier.icon} size={18} color={tier.color} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.textPrimary }}>{tier.label}</Text>
+            {tier.sub && <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 1 }}>{tier.sub}</Text>}
+          </View>
+          <View style={{ backgroundColor: tier.color + '18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 }}>
+            <Text style={{ fontSize: 16, fontWeight: '900', color: tier.color }}>{tier.price} €</Text>
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  return (
+    <Animated.View entering={FadeInDown.delay(200).springify()} style={{ marginHorizontal: 16, marginBottom: 4 }}>
+      <SectionHeader label="Catégorie de billet" colors={colors} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {visible.map(tier => {
+          const active = effectiveSelected === tier.key;
+          return (
+            <TouchableOpacity
+              key={tier.key}
+              onPress={() => onSelect(tier.key)}
+              activeOpacity={0.8}
+              style={{
+                flex: visible.length <= 2 ? 1 : undefined,
+                minWidth: (SW - 48) / 2 - 4,
+                borderRadius: 14, borderWidth: 1.5,
+                backgroundColor: active ? tier.color + '15' : colors.backgroundSecondary,
+                borderColor: active ? tier.color : colors.border,
+                padding: 14, gap: 8,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10,
+                  backgroundColor: tier.color + (active ? '28' : '14'),
+                  alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={tier.icon} size={15} color={tier.color} />
+                </View>
+                {active && (
+                  <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: tier.color, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="check" size={11} color="#fff" />
+                  </View>
+                )}
+              </View>
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? tier.color : colors.textSecondary, letterSpacing: 0.3 }}>
+                  {tier.label}
+                </Text>
+                <Text style={{ fontSize: 17, fontWeight: '900', color: active ? tier.color : colors.textPrimary, marginTop: 2 }}>
+                  {tier.price} €
+                </Text>
+                {tier.sub && <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 1 }}>{tier.sub}</Text>}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </Animated.View>
+  );
+};
+
+
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -179,18 +384,16 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const [liked,        setLiked]        = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
   const [saved,        setSaved]        = useState(false);
-  const [showVideo,      setShowVideo]      = useState(false);
-  const [showComments,   setShowComments]   = useState(false);
-  const [reminded,       setReminded]       = useState(false);
-  const [remindLoading,  setRemindLoading]  = useState(false);
-  const [hidden,         setHidden]         = useState(false);
-  const [paySheetOpen,   setPaySheetOpen]   = useState(false);
-  const [ticketLoading,  setTicketLoading]  = useState(false);
-  const [selectedTier,   setSelectedTier]   = useState<'simple' | 'vip' | 'vvip' | 'vvvip'>('simple');
+  const [reminded,     setReminded]     = useState(false);
+  const [remindLoading,setRemindLoading]= useState(false);
+  const [showVideo,    setShowVideo]    = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [paySheetOpen, setPaySheetOpen] = useState(false);
+  const [ticketLoading,setTicketLoading]= useState(false);
+  const [selectedTier, setSelectedTier] = useState<'simple' | 'vip' | 'vvip' | 'vvvip'>('simple');
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
-
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
   const saveStyle  = useAnimatedStyle(() => ({ transform: [{ scale: saveScale.value }] }));
 
@@ -203,14 +406,17 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         const user = await authService.getMe();
         setIsOwner(user?.id === data.organizer?.id);
         const tickets = await eventService.getMyTickets();
-        const found = tickets.find((t: any) => t.event_id === eventId) ?? null;
-        setIsRegistered(!!found);
+        setIsRegistered(!!(tickets as any[]).find((t: any) => t.event_id === eventId));
       } catch { /**/ }
       try {
         const counts = await socialService.getReactionCounts({ event_id: eventId });
         setLikeCount(counts.likes ?? 0);
         const myR = await socialService.getMyReaction({ event_id: eventId });
         setLiked(myR.reaction_type === 'like');
+      } catch { /**/ }
+      try {
+        const r = await eventService.getRemindStatus(eventId);
+        setReminded(r.active);
       } catch { /**/ }
     } catch { /**/ }
     finally { setLoading(false); }
@@ -221,40 +427,45 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     return () => task.cancel();
   }, [loadEvent]);
 
-  const openComments  = () => setShowComments(true);
-  const closeComments = () => setShowComments(false);
-
   const handleLike = () => {
     heartScale.value = withSequence(withSpring(1.4, { damping: 5, stiffness: 300 }), withSpring(1, { damping: 10 }));
-    const newLiked = !liked;
-    setLiked(newLiked);
-    setLikeCount(prev => newLiked ? prev + 1 : Math.max(0, prev - 1));
+    const n = !liked;
+    setLiked(n);
+    setLikeCount(prev => n ? prev + 1 : Math.max(0, prev - 1));
     socialService.toggleReaction({ reaction_type: 'like', event_id: eventId }).catch(() => {
-      setLiked(!newLiked);
-      setLikeCount(prev => newLiked ? Math.max(0, prev - 1) : prev + 1);
+      setLiked(!n);
+      setLikeCount(prev => n ? Math.max(0, prev - 1) : prev + 1);
     });
   };
 
   const handleSave = () => {
     saveScale.value = withSequence(withSpring(1.3, { damping: 6 }), withSpring(1));
     if (!event) return;
-    const newSaved = !saved;
-    setSaved(newSaved);
-    if (newSaved) {
-      favoriteService.save({ target_type: 'event', target_id: eventId, target_title: event.title, target_subtitle: event.venue_city ?? event.location, target_thumbnail: event.thumbnail_url ?? event.cover_url })
-        .then(() => console.log('[Fav] event saved ok'))
-        .catch((e) => console.warn('[Fav] event save error:', e));
+    const n = !saved;
+    setSaved(n);
+    if (n) {
+      favoriteService.save({ target_type: 'event', target_id: eventId, target_title: event.title,
+        target_subtitle: event.venue_city ?? undefined, target_thumbnail: event.thumbnail_url ?? undefined })
+        .catch(() => setSaved(false));
     } else {
-      favoriteService.unsave('event', eventId).catch((e) => console.warn('[Fav] event unsave error:', e));
+      favoriteService.unsave('event', eventId).catch(() => setSaved(true));
     }
   };
 
-  const shareText = event
-    ? `🎪 ${event.title} — ${formatDateShort(event.starts_at)} à ${event.venue_city ?? 'FoliX'}\nVia FoliX`
-    : 'Découvre cet événement sur FoliX';
-  const handleNativeShare = async () => {
+  const handleRemind = async () => {
+    setRemindLoading(true);
     try {
-      await Share.share({ title: event?.title ?? 'Événement FoliX', message: shareText });
+      const r = await eventService.toggleRemind(eventId);
+      setReminded(r.active);
+    } catch { /**/ }
+    finally { setRemindLoading(false); }
+  };
+
+  const handleNativeShare = async () => {
+    if (!event) return;
+    try {
+      await Share.share({ title: event.title,
+        message: `${event.title} — ${formatDateShort(event.starts_at)} à ${event.venue_city ?? 'FoliX'}\nVia FoliX` });
       socialService.share({ platform: 'native', event_id: eventId }).catch(() => {});
     } catch { /**/ }
   };
@@ -263,14 +474,9 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     setTicketLoading(true);
     try {
       const tickets = await eventService.getMyTickets();
-      const fresh = tickets.find((t: any) => t.event_id === eventId);
-      if (fresh) {
-        const full = fresh.event ? fresh : { ...fresh, event };
-        nav.navigate('MyTicket' as any, { ticket: full });
-      }
-    } catch { /**/ } finally {
-      setTicketLoading(false);
-    }
+      const fresh = (tickets as any[]).find((t: any) => t.event_id === eventId);
+      if (fresh) nav.navigate('MyTicket' as any, { ticket: fresh.event ? fresh : { ...fresh, event } });
+    } catch { /**/ } finally { setTicketLoading(false); }
   };
 
   const handleBuyTicket = () => {
@@ -284,29 +490,21 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
 
   const handleEdit   = () => nav.navigate('CreateEvent' as any, { eventId });
   const handleDelete = () => {
-    Alert.alert('Supprimer l\'événement', 'Cette action est irréversible.', [
+    Alert.alert('Supprimer', 'Cette action est irréversible.', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
-        try { await eventService.delete(eventId); Alert.alert('Supprimé'); onBack?.(); }
+        try { await eventService.delete(eventId); onBack?.(); }
         catch (e: any) { Alert.alert('Erreur', e?.message ?? 'Impossible de supprimer.'); }
       }},
     ]);
   };
 
-  // ── Loading / Error ───────────────────────────────────────────────────────
-
-  if (loading) return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SkeletonDetail />
-    </View>
-  );
+  if (loading) return <View style={{ flex: 1, backgroundColor: colors.background }}><SkeletonDetail /></View>;
 
   if (!event) return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <Icon name="alert-circle" size={48} color={colors.textTertiary} />
-        <Text style={{ color: colors.textTertiary }}>Événement introuvable</Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <Icon name="alert-circle" size={48} color={colors.textTertiary} />
+      <Text style={{ color: colors.textTertiary, fontSize: 15 }}>Événement introuvable</Text>
     </View>
   );
 
@@ -322,211 +520,166 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const capacityPct = event.max_attendees && event.max_attendees > 0
     ? Math.min(event.current_attendees / event.max_attendees, 1) : 0;
 
+  const allTiers = [
+    { key: 'simple' as const, label: 'Simple', icon: 'tag',   color: accent,     price: event.ticket_price,         sub: 'Accès standard' },
+    { key: 'vip'    as const, label: 'VIP',    icon: 'star',  color: '#F59E0B',  price: event.ticket_price_vip,     sub: 'Accès prioritaire' },
+    { key: 'vvip'   as const, label: 'VVIP',   icon: 'award', color: '#8B5CF6',  price: event.ticket_price_vvip,    sub: 'Expérience premium' },
+    { key: 'vvvip'  as const, label: 'VVVIP',  icon: 'zap',   color: '#EF4444',  price: event.ticket_price_vvvip,   sub: 'All-inclusive' },
+  ].filter(t => typeof t.price === 'number' && t.price > 0);
+
+  const activeTier = allTiers.find(t => t.key === selectedTier) ?? allTiers[0];
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Bouton retour flottant */}
-      <TouchableOpacity
-        onPress={onBack}
-        style={{
-          position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36,
-          left: 16, zIndex: 100,
-          width: 38, height: 38, borderRadius: 19,
-          backgroundColor: 'rgba(0,0,0,0.45)',
-          alignItems: 'center', justifyContent: 'center',
-        }}
-      >
+      {/* Bouton retour */}
+      <TouchableOpacity onPress={onBack}
+        style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, left: 16, zIndex: 100,
+          width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)',
+          alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="arrow-left" size={20} color="#fff" />
       </TouchableOpacity>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 
-        {/* ── Hero : toujours les photos ───────────────────────────────── */}
-        <Animated.View entering={FadeIn.duration(250)}>
-          <BannerCarousel images={galleryImages} fallbackIcon={cfg.icon} accent={accent} colors={colors} />
-
-          {/* Badges */}
-          <View style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, left: 64, flexDirection: 'row', gap: 6 }}>
-            <View style={{ backgroundColor: accent + 'EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>{cfg.label.toUpperCase()}</Text>
-            </View>
-            {isFree && (
-              <View style={{ backgroundColor: '#36D9A0EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>GRATUIT</Text>
-              </View>
-            )}
-            {event.is_online && (
-              <View style={{ backgroundColor: '#3B82F6EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>EN LIGNE</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Bouton vidéo pub */}
-          {hasVideo && (
-            <TouchableOpacity
-              onPress={() => setShowVideo(true)}
-              style={{ position: 'absolute', bottom: 56, right: 16,
-                flexDirection: 'row', alignItems: 'center', gap: 6,
-                backgroundColor: 'rgba(0,0,0,0.65)',
-                paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 }}>
-              <Icon name="play-circle" size={16} color="#fff" />
-              <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>Vidéo pub</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Organisateur */}
-          {organizerName && (
-            <View style={{ position: 'absolute', bottom: 14, left: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]}
-                style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{getInitials(organizerName)}</Text>
-              </LinearGradient>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{organizerName}</Text>
-            </View>
-          )}
+        {/* ── Hero ─────────────────────────────────────────────────── */}
+        <Animated.View entering={FadeIn.duration(300)}>
+          <HeroCarousel
+            images={galleryImages} fallbackIcon={cfg.icon} accent={accent}
+            title={event.title} eventType={cfg.label}
+            isFree={isFree} isOnline={!!event.is_online}
+            organizerName={organizerName ?? undefined} hasVideo={hasVideo}
+            onVideoPress={() => setShowVideo(true)}
+            colors={colors}
+          />
         </Animated.View>
 
-        {/* Modal vidéo pub */}
-        {showVideo && hasVideo && (
-          <VideoModal uri={event.video_url!} onClose={() => setShowVideo(false)} />
-        )}
+        {showVideo && hasVideo && <VideoModal uri={event.video_url!} onClose={() => setShowVideo(false)} />}
 
-        {/* ── Titre + date + prix ──────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(80).springify()}
-          style={{ paddingHorizontal: 16, paddingTop: 18, gap: 10 }}>
-          <Text style={{ fontSize: 24, fontWeight: '900', color: colors.textPrimary, lineHeight: 30 }}>
-            {event.title}
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
-              backgroundColor: accent + '18', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-              <Icon name="calendar" size={11} color={accent} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: accent }}>{formatDateShort(event.starts_at)}</Text>
-            </View>
-            {isInviteOnly && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
-                backgroundColor: colors.warning + '22', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                <Icon name="lock" size={11} color={colors.warning} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>Sur invitation</Text>
-              </View>
-            )}
+        {/* ── Date + Actions rapides ───────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(60).springify()}
+          style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ gap: 2 }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: accent }}>
+              {formatDate(event.starts_at)}
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.textTertiary }}>
+              {formatTime(event.starts_at)}{event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}
+            </Text>
           </View>
-        </Animated.View>
-
-        {/* ── Barre sociale ────────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(110).springify()}
-          style={{ flexDirection: 'row', marginHorizontal: 16, marginTop: 16,
-            backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden' }}>
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 5, paddingVertical: 12 }} onPress={handleLike} activeOpacity={0.8}>
-            <Animated.View style={heartStyle}>
-              <Icon name="heart" size={17} color={liked ? colors.error : colors.textTertiary} />
-            </Animated.View>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: liked ? colors.error : colors.textTertiary }}>
-              {likeCount > 0 ? likeCount.toLocaleString('fr') : 'J\'aime'}
+          {/* Bouton rappel */}
+          <TouchableOpacity onPress={handleRemind} disabled={remindLoading}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+              backgroundColor: reminded ? accent + '18' : colors.backgroundSecondary,
+              borderWidth: 1, borderColor: reminded ? accent : colors.border,
+              paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 }}>
+            {remindLoading
+              ? <ActivityIndicator size="small" color={accent} />
+              : <Icon name="bell" size={14} color={reminded ? accent : colors.textTertiary} />}
+            <Text style={{ fontSize: 12, fontWeight: '700', color: reminded ? accent : colors.textTertiary }}>
+              {reminded ? 'Rappel actif' : 'Me rappeler'}
             </Text>
           </TouchableOpacity>
-
-          <View style={{ width: 1, backgroundColor: colors.divider }} />
-
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 5, paddingVertical: 12 }} onPress={openComments} activeOpacity={0.8}>
-            <Icon name="message-circle" size={17} color={colors.textTertiary} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }}>Commenter</Text>
-          </TouchableOpacity>
-
-          <View style={{ width: 1, backgroundColor: colors.divider }} />
-
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 5, paddingVertical: 12 }} onPress={handleNativeShare} activeOpacity={0.8}>
-            <Icon name="share-2" size={17} color={colors.textTertiary} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }}>Partager</Text>
-          </TouchableOpacity>
-
-          <View style={{ width: 1, backgroundColor: colors.divider }} />
-
-          <TouchableOpacity style={{ paddingHorizontal: 16, paddingVertical: 12 }} onPress={handleSave} activeOpacity={0.8}>
-            <Animated.View style={saveStyle}>
-              <Icon name="bookmark" size={17} color={saved ? colors.primary : colors.textTertiary} />
-            </Animated.View>
-          </TouchableOpacity>
         </Animated.View>
 
-        {/* ── Description ──────────────────────────────────────────────── */}
+        {/* ── Barre sociale ────────────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(90).springify()}>
+          <SocialBar
+            liked={liked} likeCount={likeCount} saved={saved}
+            onLike={handleLike} onComment={() => setShowComments(true)}
+            onShare={handleNativeShare} onSave={handleSave}
+            heartStyle={heartStyle} saveStyle={saveStyle} colors={colors}
+          />
+        </Animated.View>
+
+        {/* ── Description ──────────────────────────────────────────── */}
         {event.description ? (
-          <Animated.View entering={FadeInDown.delay(140).springify()}
-            style={{ paddingHorizontal: 16, paddingTop: 20, gap: 8 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textTertiary }}>À PROPOS</Text>
+          <Animated.View entering={FadeInDown.delay(120).springify()}
+            style={{ paddingHorizontal: 16, paddingTop: 22, gap: 8 }}>
+            <SectionHeader label="À propos" colors={colors} />
             <ExpandableText
-              text={event.description}
-              maxLines={4}
+              text={event.description} maxLines={4}
               textStyle={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}
-              primaryColor={colors.primary}
+              primaryColor={accent}
             />
           </Animated.View>
         ) : null}
 
-        {/* ── Infos clés (card) ─────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(170).springify()}
-          style={{ marginHorizontal: 16, marginTop: 20,
-            backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden' }}>
-          <InfoRow icon="calendar" label="Début" value={formatDate(event.starts_at)} color={accent} colors={colors} />
-          {event.ends_at && <InfoRow icon="clock" label="Fin" value={formatDate(event.ends_at)} color={colors.textTertiary} colors={colors} divider />}
-          <InfoRow
-            icon={event.is_online ? 'wifi' : 'map-pin'}
-            label="Lieu"
-            value={event.is_online
-              ? (event.online_url ?? 'En ligne')
-              : [event.venue_name, event.venue_city, event.venue_country].filter(Boolean).join(', ')}
-            color={colors.accentOrange}
-            colors={colors}
-            divider
-            onPress={!event.is_online && event.venue_city ? () => {
-              const q = encodeURIComponent([event.venue_name, event.venue_city, event.venue_country].filter(Boolean).join(', '));
-              const url = Platform.OS === 'ios' ? `maps:?q=${q}` : `geo:0,0?q=${q}`;
-              Linking.canOpenURL(url).then(ok =>
-                Linking.openURL(ok ? url : `https://www.google.com/maps/search/?api=1&query=${q}`));
-            } : undefined}
-          />
+        {/* ── Infos pratiques ──────────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(150).springify()}
+          style={{ marginHorizontal: 16, marginTop: 22 }}>
+          <SectionHeader label="Infos pratiques" colors={colors} />
+          <View style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden' }}>
+            <InfoRow icon="calendar" label="Date de début" value={formatDate(event.starts_at)}
+              color={accent} colors={colors} />
+            {event.ends_at && (
+              <InfoRow icon="clock" label="Date de fin" value={formatDate(event.ends_at)}
+                color={colors.textTertiary} colors={colors} divider />
+            )}
+            <InfoRow
+              icon={event.is_online ? 'wifi' : 'map-pin'} label="Lieu"
+              value={event.is_online
+                ? (event.online_url ?? 'En ligne')
+                : [event.venue_name, event.venue_city, event.venue_country].filter(Boolean).join(', ')}
+              color={colors.accentOrange} colors={colors} divider
+              onPress={!event.is_online && event.venue_city ? () => {
+                const q = encodeURIComponent([event.venue_name, event.venue_city, event.venue_country].filter(Boolean).join(', '));
+                const url = Platform.OS === 'ios' ? `maps:?q=${q}` : `geo:0,0?q=${q}`;
+                Linking.canOpenURL(url).then(ok =>
+                  Linking.openURL(ok ? url : `https://www.google.com/maps/search/?api=1&query=${q}`));
+              } : undefined}
+            />
+            {isInviteOnly && (
+              <InfoRow icon="lock" label="Accès" value="Sur invitation uniquement"
+                color={colors.warning} colors={colors} divider />
+            )}
+          </View>
         </Animated.View>
 
-        {/* ── Paliers de billets ───────────────────────────────────────── */}
+        {/* ── Billets ───────────────────────────────────────────────── */}
         {!isFree && !isInviteOnly && (
-          <TicketTiersGrid
-            tiers={[
-              { key: 'simple', label: 'Simple', icon: 'tag',   color: '#6B7280', price: event.ticket_price },
-              { key: 'vip',    label: 'VIP',    icon: 'star',  color: '#F59E0B', price: (event as any).ticket_price_vip },
-              { key: 'vvip',   label: 'VVIP',   icon: 'award', color: '#8B5CF6', price: (event as any).ticket_price_vvip },
-              { key: 'vvvip',  label: 'VVVIP',  icon: 'zap',   color: '#EF4444', price: (event as any).ticket_price_vvvip },
-            ]}
-            selected={selectedTier}
-            onSelect={setSelectedTier}
-            colors={colors}
-          />
-        )}
-
-        {/* ── Capacité ─────────────────────────────────────────────────── */}
-        {event.max_attendees != null && event.max_attendees > 0 && (
-          <Animated.View entering={FadeInDown.delay(200).springify()}
-            style={{ marginHorizontal: 16, marginTop: 12,
-              backgroundColor: colors.backgroundSecondary, borderRadius: 16, padding: 16, gap: 10 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textTertiary }}>PARTICIPANTS</Text>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: accent }}>
-                {event.current_attendees} / {event.max_attendees}
-              </Text>
-            </View>
-            <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.backgroundTertiary, overflow: 'hidden' }}>
-              <View style={{ height: '100%', borderRadius: 4, width: `${capacityPct * 100}%`, backgroundColor: accent }} />
-            </View>
-            <Text style={{ fontSize: 12, color: colors.textTertiary }}>
-              {Math.round(capacityPct * 100)}% des places occupées
-            </Text>
+          <Animated.View entering={FadeInDown.delay(180).springify()}
+            style={{ paddingHorizontal: 16, marginTop: 22 }}>
+            <TicketTiersGrid
+              tiers={[
+                { key: 'simple', label: 'Simple', icon: 'tag',   color: accent,    price: event.ticket_price,       sub: 'Accès standard' },
+                { key: 'vip',    label: 'VIP',    icon: 'star',  color: '#F59E0B', price: event.ticket_price_vip,   sub: 'Accès prioritaire' },
+                { key: 'vvip',   label: 'VVIP',   icon: 'award', color: '#8B5CF6', price: event.ticket_price_vvip,  sub: 'Expérience premium' },
+                { key: 'vvvip',  label: 'VVVIP',  icon: 'zap',   color: '#EF4444', price: event.ticket_price_vvvip, sub: 'All-inclusive' },
+              ]}
+              selected={selectedTier} onSelect={setSelectedTier} colors={colors}
+            />
           </Animated.View>
         )}
 
+        {/* ── Capacité ─────────────────────────────────────────────── */}
+        {event.max_attendees != null && event.max_attendees > 0 && (
+          <Animated.View entering={FadeInDown.delay(210).springify()}
+            style={{ marginHorizontal: 16, marginTop: 22 }}>
+            <SectionHeader label="Places disponibles" colors={colors} />
+            <View style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 16, padding: 16, gap: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Icon name="users" size={14} color={accent} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                    {event.current_attendees.toLocaleString('fr')} inscrits
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textTertiary }}>
+                  sur {event.max_attendees.toLocaleString('fr')} places
+                </Text>
+              </View>
+              <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.backgroundTertiary, overflow: 'hidden' }}>
+                <View style={{ height: '100%', borderRadius: 3, width: `${capacityPct * 100}%`, backgroundColor: accent }} />
+              </View>
+              <Text style={{ fontSize: 12, color: capacityPct > 0.9 ? colors.error : colors.textTertiary, fontWeight: '600' }}>
+                {capacityPct >= 1 ? 'Complet' : `${Math.round((1 - capacityPct) * event.max_attendees)} place${(1 - capacityPct) * event.max_attendees > 1 ? 's' : ''} restante${(1 - capacityPct) * event.max_attendees > 1 ? 's' : ''}`}
+              </Text>
+            </View>
+          </Animated.View>
+        )}
 
       </ScrollView>
 
@@ -541,228 +694,73 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
               onPress={() => nav.navigate('Attendees' as any, { eventId, eventTitle: event.title })}
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 6, paddingVertical: 14, borderRadius: 14, backgroundColor: '#10B98118' }}>
+              style={[ss.ctaSecondary, { flex: 1, backgroundColor: '#10B98114' }]}>
               <Icon name="users" size={16} color="#10B981" />
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>
-                Inscrits {event.current_attendees > 0 ? `(${event.current_attendees})` : ''}
+                Inscrits{event.current_attendees > 0 ? ` (${event.current_attendees})` : ''}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleEdit}
-              style={{ paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary + '18',
-                flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              style={[ss.ctaSecondary, { paddingHorizontal: 18, backgroundColor: colors.primary + '14' }]}>
               <Icon name="edit-2" size={16} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity onPress={handleDelete}
-              style={{ paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.error + '18',
-                flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              style={[ss.ctaSecondary, { paddingHorizontal: 18, backgroundColor: colors.error + '14' }]}>
               <Icon name="trash-2" size={16} color={colors.error} />
             </TouchableOpacity>
           </View>
         ) : isRegistered ? (
-          /* Inscrit — appel API pour récupérer le ticket frais */
           <TouchableOpacity onPress={handleViewTicket} disabled={ticketLoading} activeOpacity={0.85}>
-            <LinearGradient
-              colors={['#10B981', '#059669']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 8, paddingVertical: 16, borderRadius: 14 }}>
-              {ticketLoading
-                ? <ActivityIndicator color="#fff" />
-                : <Icon name="credit-card" size={20} color="#fff" />}
-              <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Voir mon billet</Text>
+            <LinearGradient colors={['#10B981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={ss.ctaGradient}>
+              {ticketLoading ? <ActivityIndicator color="#fff" /> : <Icon name="credit-card" size={20} color="#fff" />}
+              <Text style={ss.ctaText}>Voir mon billet</Text>
             </LinearGradient>
           </TouchableOpacity>
-        ) : (() => {
-          const allTiers = [
-            { key: 'simple' as const, label: 'Simple', price: event.ticket_price },
-            { key: 'vip'    as const, label: 'VIP',    price: (event as any).ticket_price_vip },
-            { key: 'vvip'   as const, label: 'VVIP',   price: (event as any).ticket_price_vvip },
-            { key: 'vvvip'  as const, label: 'VVVIP',  price: (event as any).ticket_price_vvvip },
-          ].filter(t => typeof t.price === 'number' && t.price > 0);
-          const activeTier = allTiers.find(t => t.key === selectedTier) ?? allTiers[0];
-          const tierPrice = activeTier?.price ?? null;
-          const tierLabel = activeTier?.label ?? '';
-          const hasTiersEvent = allTiers.length > 1;
-          return (
-            <TouchableOpacity onPress={handleBuyTicket} activeOpacity={0.85}>
-              <LinearGradient
-                colors={[accent, accent + 'BB']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                  gap: 8, paddingVertical: 16, borderRadius: 14 }}>
-                <Icon name={isFree ? 'check-circle' : isInviteOnly ? 'lock' : 'tag'} size={20} color="#fff" />
-                <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>
-                  {isFree ? 'S\'inscrire gratuitement' : isInviteOnly ? 'Accès sur invitation'
-                    : hasTiersEvent ? `Billet ${tierLabel}` : 'Acheter un billet'}
-                </Text>
-                {!isFree && !isInviteOnly && tierPrice != null && (
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' }}>{tierPrice} €</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          );
-        })()}
+        ) : (
+          <TouchableOpacity onPress={handleBuyTicket} activeOpacity={0.85}>
+            <LinearGradient colors={[accent, accent + 'CC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={ss.ctaGradient}>
+              <Icon name={isFree ? 'check-circle' : isInviteOnly ? 'lock' : 'tag'} size={20} color="#fff" />
+              <Text style={ss.ctaText}>
+                {isFree ? 'S\'inscrire gratuitement' : isInviteOnly ? 'Accès sur invitation'
+                  : allTiers.length > 1 ? `Billet ${activeTier?.label ?? ''}` : 'Acheter un billet'}
+              </Text>
+              {!isFree && !isInviteOnly && activeTier?.price != null && (
+                <View style={{ marginLeft: 'auto', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}>{activeTier.price} €</Text>
+                </View>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </Animated.View>
 
-      {/* ── Sheet paiement billet ────────────────────────────────────── */}
+      {/* Sheets */}
       {event && (
         <TicketPaymentSheet
-          visible={paySheetOpen}
-          onClose={() => setPaySheetOpen(false)}
+          visible={paySheetOpen} onClose={() => setPaySheetOpen(false)}
           onSuccess={(ticket) => {
             setIsRegistered(true);
-            if (ticket) {
-              const full = ticket.event ? ticket : { ...ticket, event };
-              nav.navigate('MyTicket' as any, { ticket: full });
-            }
+            if (ticket) nav.navigate('MyTicket' as any, { ticket: ticket.event ? ticket : { ...ticket, event } });
           }}
-          itemId={eventId}
-          title={event.title}
+          itemId={eventId} title={event.title}
           accessType={event.access_type as any}
           ticketPrice={event.ticket_price ?? null}
           thumbnail={event.thumbnail_url ?? null}
-          kind="event"
-          onBuy={() => eventService.buyTicket(eventId)}
+          kind="event" onBuy={() => eventService.buyTicket(eventId)}
         />
       )}
-
-      {/* ── Sheet commentaires ────────────────────────────────────────── */}
-      <CommentsBottomSheet
-        visible={showComments}
-        onClose={closeComments}
-        eventId={eventId}
-      />
+      <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} eventId={eventId} />
     </View>
   );
 };
 
-// ── InfoRow ───────────────────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────────
 
-import { StyleSheet } from 'react-native';
-
-interface InfoRowProps {
-  icon: string; label: string; value: string;
-  color: string; colors: AppColors;
-  divider?: boolean; onPress?: () => void;
-}
-
-const InfoRow: React.FC<InfoRowProps> = ({ icon, label, value, color, colors, divider, onPress }) => {
-  const inner = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 }}>
-      {divider && <View style={{ position: 'absolute', top: 0, left: 14, right: 14, height: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />}
-      <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: color + '18' }}>
-        <Icon name={icon} size={16} color={color} />
-      </View>
-      <View style={{ flex: 1, gap: 1 }}>
-        <Text style={{ fontSize: 11, color: colors.textTertiary }}>{label}</Text>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: onPress ? color : colors.textPrimary }}>{value}</Text>
-      </View>
-      {onPress && <Icon name="external-link" size={14} color={color} />}
-    </View>
-  );
-  return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.7}>{inner}</TouchableOpacity> : inner;
-};
-
-// ── TicketTiersGrid ───────────────────────────────────────────────────────────
-
-interface TierItem {
-  key: 'simple' | 'vip' | 'vvip' | 'vvvip';
-  label: string;
-  icon: string;
-  color: string;
-  price: number | null | undefined;
-}
-
-interface TicketTiersGridProps {
-  tiers: TierItem[];
-  selected: TierItem['key'];
-  onSelect: (k: TierItem['key']) => void;
-  colors: AppColors;
-}
-
-const TicketTiersGrid: React.FC<TicketTiersGridProps> = ({ tiers, selected, onSelect, colors }) => {
-  // `!= null` en JS laisse passer `undefined` — on filtre strictement
-  const visible = tiers.filter(t => typeof t.price === 'number' && t.price > 0);
-  if (visible.length === 0) return null;
-
-  // Si le tier sélectionné n'est pas dans les visibles, on force le premier
-  const effectiveSelected = visible.find(t => t.key === selected) ? selected : visible[0].key;
-
-  // Un seul tier avec prix → pas besoin d'afficher la grille de sélection,
-  // on affiche juste un badge prix simple
-  if (visible.length === 1) {
-    const tier = visible[0];
-    return (
-      <Animated.View entering={FadeInDown.delay(185).springify()}
-        style={{ marginHorizontal: 16, marginTop: 14 }}>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', gap: 8,
-          backgroundColor: colors.backgroundSecondary,
-          borderRadius: 12, borderWidth: 1.5, borderColor: colors.border,
-          paddingVertical: 12, paddingHorizontal: 14,
-        }}>
-          <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="tag" size={15} color={colors.primary} />
-          </View>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary, flex: 1 }}>
-            Billet d'accès
-          </Text>
-          <View style={{ backgroundColor: colors.primary + '18', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>{tier.price} €</Text>
-          </View>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  return (
-    <Animated.View entering={FadeInDown.delay(185).springify()}
-      style={{ marginHorizontal: 16, marginTop: 16 }}>
-      <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textTertiary, marginBottom: 10 }}>
-        CATÉGORIE DE BILLET
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {visible.map(tier => {
-          const active = effectiveSelected === tier.key;
-          return (
-            <TouchableOpacity
-              key={tier.key}
-              onPress={() => onSelect(tier.key)}
-              activeOpacity={0.8}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 8,
-                paddingVertical: 12, paddingHorizontal: 12,
-                borderRadius: 12, borderWidth: 1.5, minWidth: 130,
-                backgroundColor: active ? tier.color + '1A' : colors.backgroundSecondary,
-                borderColor: active ? tier.color : colors.border,
-                flex: visible.length === 2 ? 1 : undefined,
-              }}
-            >
-              <View style={{
-                width: 32, height: 32, borderRadius: 8,
-                backgroundColor: tier.color + (active ? '30' : '18'),
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Icon name={tier.icon} size={14} color={tier.color} />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? tier.color : colors.textPrimary }}>
-                  {tier.label}
-                </Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: active ? tier.color : colors.textSecondary }}>
-                  {tier.price} €
-                </Text>
-              </View>
-              {active && (
-                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: tier.color, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="check" size={11} color="#fff" />
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </Animated.View>
-  );
-};
+const ss = StyleSheet.create({
+  socialBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 13 },
+  ctaGradient: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16 },
+  ctaText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  ctaSecondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 14 },
+});
