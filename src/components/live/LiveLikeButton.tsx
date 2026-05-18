@@ -17,6 +17,8 @@ const HEARTS = ['❤️', '🧡', '💛', '💜', '💙', '🩷'];
 
 export interface LiveLikeButtonRef {
   trigger: () => void;
+  // Anime un coeur venant d'un autre utilisateur (sans déclencher onLike)
+  triggerRemote: () => void;
 }
 
 interface Props {
@@ -26,7 +28,9 @@ interface Props {
 
 export const LiveLikeButton = forwardRef<LiveLikeButtonRef, Props>(({ total, onLike }, ref) => {
   const [hearts, setHearts] = useState<FloatingHeart[]>([]);
-  const [displayCount, setDisplayCount] = useState(total);
+  // displayCount suit total (source de vérité WS) + bump optimiste local
+  const [bump, setBump] = useState(0);
+  const displayCount = total + bump;
   const counterAnim = useRef(new Animated.Value(1)).current;
   const nextId = useRef(0);
 
@@ -54,14 +58,24 @@ export const LiveLikeButton = forwardRef<LiveLikeButtonRef, Props>(({ total, onL
   }, []);
 
   const trigger = useCallback(() => {
-    setDisplayCount(c => c + 1);
+    // Bump optimiste : +1 local en attendant la confirmation WS
+    setBump(b => b + 1);
     counterAnim.setValue(1.4);
     Animated.spring(counterAnim, { toValue: 1, friction: 4, useNativeDriver: true }).start();
     spawnHeart();
     onLike();
   }, [spawnHeart, onLike, counterAnim]);
 
-  useImperativeHandle(ref, () => ({ trigger }), [trigger]);
+  const triggerRemote = useCallback(() => {
+    // WS recu d'un autre viewer : total sera incrémenté par le parent, pas de bump
+    // On remet bump à 0 si on était en avance (WS confirme notre propre like)
+    setBump(b => Math.max(0, b - 1));
+    counterAnim.setValue(1.3);
+    Animated.spring(counterAnim, { toValue: 1, friction: 4, useNativeDriver: true }).start();
+    spawnHeart();
+  }, [spawnHeart, counterAnim]);
+
+  useImperativeHandle(ref, () => ({ trigger, triggerRemote }), [trigger, triggerRemote]);
 
   return (
     <View style={st.root} pointerEvents="box-none">

@@ -734,7 +734,7 @@ const SuggestionCard: React.FC<{
 // ── BOOST SCREEN ───────────────────────────────────────────────────────────
 
 export default function BoostScreen() {
-  const { theme: { colors } } = useTheme();
+  const { theme: { colors }, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? '';
@@ -900,26 +900,22 @@ export default function BoostScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#7B3FF2" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <LinearGradient
-        colors={['#7B3FF2', '#E0389A']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={s.header}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[s.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
+          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerTitle}>Booster</Text>
-          <Text style={s.headerSub}>Abonnes · Reels · Posts · Events · Live</Text>
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Booster</Text>
+          <Text style={[s.headerSub, { color: colors.textTertiary }]}>Abonnes · Reels · Posts · Events · Live</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('BuyCoins')} style={s.balancePill}>
+        <TouchableOpacity onPress={() => navigation.navigate('BuyCoins')} style={[s.balancePill, { backgroundColor: colors.backgroundSecondary }]}>
           <Icon name="zap" size={12} color="#FFD700" />
           <Text style={s.balanceText}>{balance.toLocaleString('fr-FR')}</Text>
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
 
       {/* Tabs */}
       <View style={[s.tabsBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -1377,11 +1373,11 @@ const cp = StyleSheet.create({
 
 const s = StyleSheet.create({
   root:        { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, gap: 12 },
-  backBtn:     { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  headerSub:   { color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 2 },
-  balancePill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.25)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  header:      { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  backBtn:     { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '800' },
+  headerSub:   { fontSize: 11, marginTop: 2 },
+  balancePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   balanceText: { color: '#FFD700', fontWeight: '700', fontSize: 13 },
 
   tabsBar:     { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },

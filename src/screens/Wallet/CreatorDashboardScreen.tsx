@@ -139,7 +139,7 @@ const statStyles = (colors: any) => StyleSheet.create({
 
 // ── Main ───────────────────────────────────────────────────────────────────
 const CreatorDashboardScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<any>();
 
@@ -224,7 +224,7 @@ const CreatorDashboardScreen: React.FC = () => {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
       <View style={s.header}>

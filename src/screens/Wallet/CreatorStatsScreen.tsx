@@ -306,6 +306,7 @@ type ContentDetail =
 function ContentDetailScreen({ detail, colors, onBack }: {
   detail: ContentDetail; colors: AppColors; onBack: () => void;
 }) {
+  const { isDark } = useTheme();
   const accent =
     detail.type === 'reel' ? '#7B3FF2' :
     detail.type === 'post' ? '#10B981' :
@@ -373,17 +374,17 @@ function ContentDetailScreen({ detail, colors, onBack }: {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <LinearGradient colors={['#1a0533', accent]} style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
+          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           {detail.type.charAt(0).toUpperCase() + detail.type.slice(1)} — stats
         </Text>
         <View style={{ width: 38 }} />
-      </LinearGradient>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -444,7 +445,7 @@ function ContentDetailScreen({ detail, colors, onBack }: {
 
 export function CreatorStatsScreen() {
   const nav = useNavigation<any>();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const colors = theme.colors;
 
   const [stats, setStats] = useState<CreatorStats | null>(null);
@@ -531,15 +532,15 @@ export function CreatorStatsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <LinearGradient colors={['#1a0533', '#7B3FF2']} style={styles.header}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity onPress={() => nav.goBack()} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
+          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes statistiques</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Mes statistiques</Text>
         <View style={{ width: 38 }} />
-      </LinearGradient>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -670,9 +671,9 @@ const styles = StyleSheet.create({
   errorText:    { fontSize: 14, textAlign: 'center', marginTop: 8 },
   retryBtn:     { marginTop: 8, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#7B3FF2', borderRadius: 20 },
   retryTxt:     { color: '#fff', fontWeight: '600' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16 },
-  backBtn:      { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ffffff22', alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { fontSize: 17, fontWeight: '700', color: '#fff', flex: 1, textAlign: 'center' },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:  { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
   scroll:       { paddingHorizontal: 16, paddingTop: 16 },
   hero:         { borderRadius: 16, borderWidth: 1, padding: 20, marginBottom: 20 },
   heroRow:      { flexDirection: 'row', alignItems: 'center' },

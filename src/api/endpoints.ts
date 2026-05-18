@@ -306,6 +306,9 @@ export const Endpoints = {
     boostsPurchase:    `${V1}/wallet/boosts/purchase`,
     boostCancel:       (id: string) => `${V1}/wallet/boosts/${id}`,
     boostSuggestions:  `${V1}/wallet/boosts/suggestions`,
+    // CinetPay
+    cinetpayInit:   `${V1}/wallet/purchase/cinetpay/init`,
+    cinetpayStatus: (merchantTxId: string) => `${V1}/wallet/purchase/cinetpay/${merchantTxId}/status`,
   },
 
   // ── Lives simples (spontanés) ─────────────────────────────────────────────

@@ -355,15 +355,25 @@ export const HomeScreen: React.FC = () => {
   }, [filter]);
 
   useEffect(() => {
+    console.log('[HomeScreen] userLocation:', userLocation);
     if (userLocation && !locationLoadedRef.current) {
       locationLoadedRef.current = true;
       load(filter, { reset: true });
     }
     if (userLocation) {
+      console.log('[HomeScreen] fetching nearby events...');
       eventService.list({
         limit: 8, lat: userLocation.lat, lon: userLocation.lon,
         radius_km: 20, status: 'published', noCache: true,
-      }).then(data => setNearbyEvents(Array.isArray(data) ? data : [])).catch(() => {});
+      }).then(data => {
+        console.log('[HomeScreen] nearbyEvents count:', data?.length);
+        setNearbyEvents(Array.isArray(data) ? data : []);
+      }).catch((e) => console.warn('[HomeScreen] nearbyEvents error:', e));
+
+      // Sans radius pour voir si des events existent tout court
+      eventService.list({ limit: 5, status: 'published', noCache: true })
+        .then(data => console.log('[HomeScreen] all events count:', data?.length))
+        .catch(() => {});
     }
   }, [userLocation]);
 

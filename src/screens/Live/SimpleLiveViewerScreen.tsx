@@ -225,7 +225,7 @@ const RoomContent: React.FC<{
   onLeave:      () => void;
   onBanUser:    (userId: string, name: string) => void;
   onDemoteUser: (identity: string, name: string) => void;
-  onDeleteMsg:  (id: string) => void;
+  onDeleteMsg:  (id: string) => void | Promise<void>;
   onEditMsg:    (id: string, newText: string) => void;
   giftNotifs:   GiftNotif[];
   onGiftNotifShown: (id: string) => void;
@@ -233,13 +233,14 @@ const RoomContent: React.FC<{
   giftHistory:  GiftTick[];
   likeCount:    number;
   onLike:       () => void;
+  likeRef:      React.RefObject<LiveLikeButtonRef | null>;
   elapsed:      number;
   goOnStageRef:  { current: (() => void) | null };
   leaveStageRef: { current: (() => void) | null };
 }> = ({
   live, liveId, myIdentity, isHost, viewerCount, messages, chatInput, setChatInput,
   sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, onDeleteMsg, onEditMsg,
-  giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike,
+  giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike, likeRef,
   elapsed, goOnStageRef, leaveStageRef,
 }) => {
   const { localParticipant } = useLocalParticipant();
@@ -250,7 +251,6 @@ const RoomContent: React.FC<{
   const [showInput,  setShowInput]  = useState(false);
   const [showGifts,  setShowGifts]  = useState(false);
   const [editTarget, setEditTarget] = useState<{ id: string; text: string } | null>(null);
-  const likeRef = useRef<LiveLikeButtonRef>(null);
   const giftRef = useRef<LiveGiftOverlayRef>(null);
 
   const hostId   = live?.user_id ?? '';
@@ -333,6 +333,13 @@ const RoomContent: React.FC<{
         onTap={() => likeRef.current?.trigger()}
       />
 
+      {/* Zone de tap coeur — absoluteFill sous tous les overlays (zIndex 1).
+          Les overlays (header zIndex 10, chat, sidebar) sont au-dessus et
+          interceptent leurs propres taps. Les zones vides déclenchent le coeur. */}
+      <TouchableWithoutFeedback onPress={() => likeRef.current?.trigger()}>
+        <View style={[StyleSheet.absoluteFill, { zIndex: 1 }]} />
+      </TouchableWithoutFeedback>
+
       {/* Gradients */}
       <LinearGradient colors={['rgba(0,0,0,0.72)', 'transparent']} style={st.gradTop} pointerEvents="none" />
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={st.gradBottom} pointerEvents="none" />
@@ -393,7 +400,7 @@ const RoomContent: React.FC<{
       )}
 
       {/* ── CHAT (bas gauche) ─────────────────────────────────────────── */}
-      <View style={st.chatZone} pointerEvents="box-none">
+      <View style={st.chatZone}>
         <FlatList
           ref={chatRef}
           data={messages}
@@ -406,51 +413,76 @@ const RoomContent: React.FC<{
                 </Animated.View>
               );
             }
-            const isMine = item.isLocal === true;
-            const canModerate = isHost && item.userId && item.userId !== myIdentity;
+            const isMine      = item.isLocal === true || (!!myIdentity && item.userId === myIdentity);
+            const canModerate = isHost && !!item.userId && item.userId !== myIdentity;
             return (
               <Animated.View entering={FadeIn.duration(200)} style={st.chatRow}>
                 {item.avatar
                   ? <Image source={{ uri: item.avatar }} style={st.chatAvatar} />
                   : <Av name={item.user} size={24} />
                 }
-                <TouchableOpacity
-                  style={[st.chatBubble, isMine && st.chatBubbleMine]}
-                  activeOpacity={(isMine || canModerate) ? 0.7 : 1}
-                  onLongPress={() => {
-                    if (isMine) {
-                      Alert.alert('Mon message', item.text, [
-                        { text: 'Annuler', style: 'cancel' },
-                        {
-                          text: 'Modifier', onPress: () => {
-                            setEditTarget({ id: item.id, text: item.text });
-                            setChatInput(item.text);
-                            setShowInput(true);
+                <View style={{ flex: 1 }}>
+                  <TouchableOpacity
+                    style={[st.chatBubble, isMine && st.chatBubbleMine]}
+                    activeOpacity={(isMine || canModerate) ? 0.7 : 1}
+                    onLongPress={() => {
+                      if (isMine) {
+                        Alert.alert('Mon message', item.text, [
+                          { text: 'Annuler', style: 'cancel' },
+                          {
+                            text: 'Modifier', onPress: () => {
+                              setEditTarget({ id: item.id, text: item.text });
+                              setChatInput(item.text);
+                              setShowInput(true);
+                            },
                           },
-                        },
-                        { text: 'Supprimer', style: 'destructive', onPress: () => onDeleteMsg(item.id) },
-                      ]);
-                      return;
-                    }
-                    if (!canModerate) return;
-                    Alert.alert(item.user, 'Action de modération', [
-                      { text: 'Annuler', style: 'cancel' },
-                      { text: 'Faire descendre de scène', onPress: () => onDemoteUser(item.userId!, item.user) },
-                      { text: 'Exclure du live', style: 'destructive', onPress: () => onBanUser(item.userId!, item.user) },
-                    ]);
-                  }}
-                  delayLongPress={400}
-                >
-                  <Text style={st.chatUser}>{item.user} </Text>
-                  <Text style={st.chatText}>{item.text}{item.edited ? ' ✏' : ''}</Text>
-                </TouchableOpacity>
+                          { text: 'Supprimer', style: 'destructive', onPress: () => onDeleteMsg(item.id) },
+                        ]);
+                        return;
+                      }
+                    }}
+                    delayLongPress={400}
+                  >
+                    <Text style={st.chatUser}>{item.user} </Text>
+                    <Text style={st.chatText}>{item.text}{item.edited ? ' ✏' : ''}</Text>
+                  </TouchableOpacity>
+
+                  {/* Boutons modération host — inline sous le message */}
+                  {canModerate && (
+                    <View style={st.modRow}>
+                      <TouchableOpacity
+                        style={st.modBtn}
+                        onPress={() => onDeleteMsg(item.id)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Icon name="trash-2" size={11} color="#F0365A" />
+                        <Text style={st.modBtnText}>Supprimer</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={st.modBtn}
+                        onPress={() => onDemoteUser(item.userId!, item.user)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Icon name="arrow-down-circle" size={11} color="#FFD700" />
+                        <Text style={[st.modBtnText, { color: '#FFD700' }]}>Descendre</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={st.modBtn}
+                        onPress={() => onBanUser(item.userId!, item.user)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Icon name="slash" size={11} color="#F0365A" />
+                        <Text style={st.modBtnText}>Bannir</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </Animated.View>
             );
           }}
           style={st.chatList}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ justifyContent: 'flex-end' }}
-          pointerEvents="none"
+          contentContainerStyle={{ paddingBottom: 4 }}
         />
 
         {showInput ? (
@@ -521,7 +553,7 @@ const RoomContent: React.FC<{
               <Icon name="star" size={20} color="#FFD700" />
               <View style={st.giftBadge}><Text style={st.giftBadgeText}>{giftHistory.length}</Text></View>
             </View>
-            <Text style={[st.sideBtnLabel, { color: '#FFD700' }]}>Reçus</Text>
+            <Text style={[st.sideBtnLabel, { color: '#FFD700' }]}>Envoye</Text>
           </TouchableOpacity>
         )}
 
@@ -571,7 +603,7 @@ const RoomContent: React.FC<{
       {showGifts && (
         <Animated.View entering={SlideInUp.duration(280)} exiting={SlideOutDown.duration(220)} style={gp.panel}>
           <View style={gp.header}>
-            <Text style={gp.title}>Cadeaux reçus ({giftHistory.length})</Text>
+            <Text style={gp.title}>Cadeaux envoyes ({giftHistory.length})</Text>
             <TouchableOpacity onPress={() => setShowGifts(false)} style={gp.closeBtn}>
               <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
@@ -616,6 +648,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [token,       setToken]       = useState<string | null>(null);
   const [wsUrl,       setWsUrl]       = useState<string | null>(null);
   const [ended,       setEnded]       = useState(false);
+  const [kicked,      setKicked]      = useState<'kicked' | 'banned' | null>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [messages,    setMessages]    = useState<ChatMsg[]>([]);
   const [chatInput,   setChatInput]   = useState('');
@@ -634,8 +667,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const likeThrottle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingLikes = useRef(0);
   // Refs vers les fonctions de RoomContent pour réagir aux WS
-  const goOnStageRef  = useRef<(() => void) | null>(null);
-  const leaveStageRef = useRef<(() => void) | null>(null);
+  const goOnStageRef      = useRef<(() => void) | null>(null);
+  const leaveStageRef     = useRef<(() => void) | null>(null);
+  // Ref vers le bouton coeur pour déclencher l'animation depuis le WS
+  const remoteLikeRef     = useRef<import('../../components/live/LiveLikeButton').LiveLikeButtonRef | null>(null);
 
   const { currentUser } = useUser();
   const { lastLiveEnded, lastLiveViewersUpdated, addListener, removeListener } = useWs();
@@ -715,14 +750,33 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 
         if (d.type === 'comment_added' && d.comment) {
           const c = d.comment;
-          setMessages(prev => [...prev.slice(-149), {
-            id:     c.id ?? String(Date.now()),
-            user:   c.author?.display_name ?? c.author?.username ?? 'Anonyme',
-            userId: c.author?.id,
-            avatar: c.author?.avatar_url ?? null,
-            text:   c.body,
-          }]);
+          const incomingText   = c.body;
+          const incomingUserId = c.author?.id ? String(c.author.id) : undefined;
+          setMessages(prev => {
+            // Remplacer le message local optimiste correspondant (même texte + même auteur)
+            const localIdx = prev.findIndex(
+              m => m.isLocal && m.text === incomingText && m.userId === incomingUserId,
+            );
+            const newMsg = {
+              id:     c.id ?? String(Date.now()),
+              user:   c.author?.display_name ?? c.author?.username ?? 'Anonyme',
+              userId: incomingUserId,
+              avatar: c.author?.avatar_url ?? null,
+              text:   incomingText,
+            };
+            if (localIdx !== -1) {
+              const updated = [...prev];
+              updated[localIdx] = newMsg;
+              return updated;
+            }
+            return [...prev.slice(-149), newMsg];
+          });
           setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+        }
+
+        if (d.type === 'comment_deleted') {
+          const deletedId = d.comment_id ?? d.id;
+          if (deletedId) setMessages(prev => prev.filter(m => m.id !== deletedId));
         }
 
         if (d.type === 'gift_received' && d.gift) {
@@ -745,7 +799,36 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         }
 
         if (d.type === 'like_added') {
-          setLikeCount(c => c + (d.count ?? 1));
+          const count = d.count ?? 1;
+          setLikeCount(c => c + count);
+          // Animer le coeur pour tout le monde (sans re-envoyer au serveur)
+          for (let i = 0; i < Math.min(count, 3); i++) {
+            setTimeout(() => remoteLikeRef.current?.triggerRemote(), i * 120);
+          }
+        }
+
+        // Kick temporaire du live — ciblé par identity (= userId)
+        if (
+          d.type === 'viewer_kicked' &&
+          d.live_id === liveId &&
+          d.identity === myIdentity
+        ) {
+          setKicked('kicked');
+          setEnded(true);
+          setToken(null);
+          try { ws.close(); } catch {}
+        }
+
+        // Ban global — ciblé par identity (= userId)
+        if (
+          d.type === 'live_user_globally_banned' &&
+          d.live_id === liveId &&
+          d.identity === myIdentity
+        ) {
+          setKicked('banned');
+          setEnded(true);
+          setToken(null);
+          try { ws.close(); } catch {}
         }
       } catch {}
     };
@@ -782,8 +865,11 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     nav.goBack();
   }, [nav]);
 
-  const handleDeleteMsg = useCallback((id: string) => {
+  const handleDeleteMsg = useCallback(async (id: string) => {
+    // Suppression optimiste locale immédiate
     setMessages(prev => prev.filter(m => m.id !== id));
+    // Suppression persistante côté serveur (les autres viewers reçoivent comment_deleted via WS)
+    try { await apiClient.delete(Endpoints.social.commentById(id)); } catch {}
   }, []);
 
   const handleEditMsg = useCallback((id: string, newText: string) => {
@@ -834,7 +920,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 
   const handleLike = useCallback(() => {
     pendingLikes.current += 1;
-    setLikeCount(c => c + 1);
+    // Pas de setLikeCount ici — le WS like_added est la source de vérité
+    // (évite le double comptage : local + broadcast)
     if (likeThrottle.current) return;
     likeThrottle.current = setTimeout(async () => {
       const batch = pendingLikes.current;
@@ -850,13 +937,31 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   }
 
   if (ended) {
+    const isKicked = kicked === 'kicked';
+    const isBanned = kicked === 'banned';
     return (
       <View style={[st.root, st.center]}>
         <StatusBar barStyle="light-content" backgroundColor="#000" />
         <View style={st.endedCard}>
-          <Icon name="radio" size={44} color="rgba(255,255,255,0.3)" />
-          <Text style={st.endedTitle}>Live terminé</Text>
-          <Text style={st.endedSub}>{live?.title ?? ''}</Text>
+          <Icon
+            name={isBanned ? 'slash' : isKicked ? 'user-x' : 'radio'}
+            size={44}
+            color={isBanned || isKicked ? '#F0365A' : 'rgba(255,255,255,0.3)'}
+          />
+          <Text style={st.endedTitle}>
+            {isBanned
+              ? 'Tu as été banni'
+              : isKicked
+              ? 'Tu as été exclu du live'
+              : 'Live terminé'}
+          </Text>
+          <Text style={st.endedSub}>
+            {isBanned
+              ? 'Le créateur t\'a interdit d\'accès à ses lives.'
+              : isKicked
+              ? 'Le créateur t\'a retiré de ce live.'
+              : (live?.title ?? '')}
+          </Text>
           <TouchableOpacity style={st.endedBtn} onPress={handleLeave}>
             <Text style={st.endedBtnText}>Retour</Text>
           </TouchableOpacity>
@@ -899,6 +1004,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         giftHistory={giftHistory}
         likeCount={likeCount}
         onLike={handleLike}
+        likeRef={remoteLikeRef}
         elapsed={elapsed}
         goOnStageRef={goOnStageRef}
         leaveStageRef={leaveStageRef}
@@ -1030,6 +1136,9 @@ const st = StyleSheet.create({
   giftBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
   sysRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4, alignSelf: 'flex-start' },
   sysText:  { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+  modRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, paddingLeft: 2 },
+  modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.15)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
+  modBtnText: { color: '#F0365A', fontSize: 10, fontWeight: '700' as const },
   giftMsg:  { backgroundColor: 'rgba(255,215,0,0.18)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 4, alignSelf: 'flex-start' },
   giftText: { color: '#FFD700', fontSize: 12, fontWeight: '700' },
   chatPlaceholder: {

@@ -29,6 +29,13 @@ import type { Post } from '../../types/post';
 
 const { width: W } = Dimensions.get('window');
 
+// Friend cards dimensions
+const FRIEND_GAP    = 10;
+const FRIEND_H_PAD  = 16;
+const FRIEND_CARD_W = (W - FRIEND_H_PAD * 2 - FRIEND_GAP * 2) / 3;
+const FRIEND_COVER  = FRIEND_CARD_W * 0.5;
+const FRIEND_AVT    = FRIEND_CARD_W * 0.44;
+
 type ContentTab = 'publications' | 'reels' | 'about';
 
 interface Props {
@@ -432,39 +439,71 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         {friends.length > 0 && (
           <View style={[styles.friendsSection, { backgroundColor: colors.surface }]}>
             <View style={styles.friendsHeader}>
-              <Text style={[styles.friendsTitle, { color: colors.textPrimary }]}>
-                Amis · <Text style={{ color: colors.textTertiary }}>{profile.following_count}</Text>
-              </Text>
+              <View>
+                <Text style={[styles.friendsTitle, { color: colors.textPrimary }]}>Amis</Text>
+                <Text style={[styles.friendsCount, { color: colors.textTertiary }]}>
+                  {profile.following_count} abonnement{profile.following_count > 1 ? 's' : ''}
+                </Text>
+              </View>
               <TouchableOpacity onPress={() => openList('following')} activeOpacity={0.7}>
                 <Text style={[styles.friendsSeeAll, { color: colors.primary }]}>Voir tout</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendsScroll}>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.friendsScroll}
+            >
               {friends.map(f => {
-                const name = f.display_name || f.username || '?';
+                const name     = f.display_name || f.username || 'Utilisateur';
                 const initials2 = name[0]?.toUpperCase() ?? '?';
                 return (
                   <TouchableOpacity
                     key={f.id}
-                    style={styles.friendItem}
-                    activeOpacity={0.75}
+                    style={[styles.friendCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.divider }]}
+                    activeOpacity={0.85}
                     onPress={() => navigation.push('UserProfile', { userId: f.id })}
                   >
-                    <View style={styles.friendAvatarWrap}>
+                    {/* Cover gradient */}
+                    <LinearGradient
+                      colors={[colors.primary + 'CC', colors.primary + '44']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={styles.friendCover}
+                    >
+                      {f.is_online && (
+                        <View style={[styles.friendOnline, { borderColor: colors.surfaceElevated }]} />
+                      )}
+                    </LinearGradient>
+
+                    {/* Avatar chevauchant */}
+                    <View style={[styles.friendAvtWrap, { borderColor: colors.surface, marginTop: -(FRIEND_AVT / 2) }]}>
                       {f.avatar_url ? (
-                        <Image source={{ uri: f.avatar_url }} style={styles.friendAvatar} />
+                        <Image source={{ uri: f.avatar_url }} style={styles.friendAvtImg} />
                       ) : (
-                        <View style={[styles.friendAvatar, styles.friendAvatarFallback, { backgroundColor: colors.primary + '22' }]}>
-                          <Text style={[styles.friendInitial, { color: colors.primary }]}>{initials2}</Text>
-                        </View>
+                        <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={styles.friendAvtImg}>
+                          <Text style={[styles.friendInitial, { fontSize: FRIEND_AVT * 0.38 }]}>{initials2}</Text>
+                        </LinearGradient>
                       )}
                       {f.is_verified && (
-                        <View style={[styles.friendVerified, { backgroundColor: colors.primary }]}>
+                        <View style={[styles.friendVerified, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
                           <Icon name="check" size={7} color="#fff" />
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.friendName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+
+                    {/* Nom */}
+                    <View style={styles.friendCardBody}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, justifyContent: 'center' }}>
+                        <Text style={[styles.friendName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+                        {f.is_verified && <VerifiedBadge size={11} />}
+                      </View>
+                      {f.username && (
+                        <Text style={[styles.friendHandle, { color: colors.textTertiary }]} numberOfLines={1}>
+                          @{f.username}
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -865,16 +904,23 @@ const styles = StyleSheet.create({
 
   friendsSection:  { marginTop: 10, paddingTop: 14, paddingBottom: 16 },
   friendsHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
-  friendsTitle:    { fontSize: 15, fontWeight: '700' },
-  friendsSeeAll:   { fontSize: 13, fontWeight: '600' },
-  friendsScroll:   { paddingHorizontal: 16, gap: 14 },
-  friendItem:      { alignItems: 'center', width: 66, position: 'relative' },
-  friendAvatarWrap: { position: 'relative' },
-  friendAvatar:    { width: 60, height: 60, borderRadius: 30 },
-  friendAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  friendInitial:   { fontSize: 22, fontWeight: '700' },
-  friendVerified:  { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fff' },
-  friendName:      { fontSize: 11, marginTop: 5, textAlign: 'center', fontWeight: '500' },
+  friendsTitle:    { fontSize: 16, fontWeight: '800' },
+  friendsCount:    { fontSize: 11, marginTop: 2 },
+  friendsSeeAll:   { fontSize: 13, fontWeight: '700' },
+  friendsScroll:   { paddingHorizontal: 16, gap: FRIEND_GAP, paddingBottom: 4 },
+
+  friendCard:      { width: FRIEND_CARD_W, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  friendCover:     { width: '100%', height: FRIEND_COVER },
+  friendOnline:    { position: 'absolute', bottom: 8, right: 8, width: 9, height: 9, borderRadius: 5, backgroundColor: '#22c55e', borderWidth: 2 },
+
+  friendAvtWrap:   { width: FRIEND_AVT + 4, height: FRIEND_AVT + 4, borderRadius: (FRIEND_AVT + 4) / 2, borderWidth: 3, overflow: 'hidden', alignSelf: 'center' },
+  friendAvtImg:    { width: FRIEND_AVT, height: FRIEND_AVT, borderRadius: FRIEND_AVT / 2, alignItems: 'center', justifyContent: 'center' },
+  friendInitial:   { color: '#fff', fontWeight: '800' },
+  friendVerified:  { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+
+  friendCardBody:  { alignItems: 'center', paddingHorizontal: 6, paddingBottom: 10, paddingTop: FRIEND_AVT / 2 + 5, gap: 2 },
+  friendName:      { fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  friendHandle:    { fontSize: 10, textAlign: 'center' },
   followBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 11, borderRadius: 10, borderWidth: 1,

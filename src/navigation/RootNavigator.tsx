@@ -23,6 +23,33 @@ async function requestContactsPermission() {
   } catch {}
 }
 
+async function requestLocationPermission() {
+  try {
+    if (Platform.OS === 'android') {
+      const { PermissionsAndroid } = require('react-native');
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Localisation',
+          message: 'FoliX utilise votre position pour vous afficher les événements près de chez vous.',
+          buttonPositive: 'Autoriser',
+          buttonNegative: 'Plus tard',
+        },
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } else {
+      const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+      if (status === RESULTS.DENIED) {
+        const result = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+        return result === RESULTS.GRANTED;
+      }
+      return status === RESULTS.GRANTED;
+    }
+  } catch {
+    return false;
+  }
+}
+
 type AppState = 'splash' | 'onboarding' | 'auth' | 'main';
 
 const NAV_THEME_LIGHT: Theme = {
@@ -107,6 +134,7 @@ export const RootNavigator: React.FC = () => {
       setAppState('main');
       setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       requestContactsPermission();
+      requestLocationPermission();
       navigatePendingUrl();
     } catch {
       // getMe a echoue — tenter le refresh
@@ -115,6 +143,7 @@ export const RootNavigator: React.FC = () => {
         setAppState('main');
         setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
         requestContactsPermission();
+        requestLocationPermission();
         navigatePendingUrl();
       } catch {
         // Refresh aussi echoue — session completement expiree
@@ -134,6 +163,7 @@ export const RootNavigator: React.FC = () => {
     console.log('[FCM] calling setupFCM from login...');
     setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
     requestContactsPermission();
+    requestLocationPermission();
     navigatePendingUrl();
   };
   const handleLogout = () => {

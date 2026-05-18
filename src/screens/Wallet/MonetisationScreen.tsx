@@ -3,7 +3,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -44,20 +43,20 @@ const SECTIONS: { title: string; accent: string; rows: RowItem[] }[] = [
 
 export function MonetisationScreen() {
   const nav = useNavigation<any>();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { colors } = theme;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <LinearGradient colors={['#1a0533', '#7B3FF2']} style={styles.header}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity onPress={() => nav.goBack()} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
+          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Monétisation</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monétisation</Text>
         <View style={{ width: 38 }} />
-      </LinearGradient>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {SECTIONS.map(sec => (
@@ -97,9 +96,9 @@ export function MonetisationScreen() {
 }
 
 const styles = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16 },
-  backBtn:      { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ffffff22', alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { fontSize: 17, fontWeight: '700', color: '#fff' },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:  { fontSize: 17, fontWeight: '700' },
   scroll:       { padding: 16 },
   section:      { marginBottom: 8 },
   sectionHeader:{ borderLeftWidth: 3, paddingLeft: 10, marginBottom: 8, marginTop: 8 },

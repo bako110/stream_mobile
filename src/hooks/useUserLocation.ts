@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Platform, PermissionsAndroid } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
 
 export interface UserCoords {
   lat: number;
@@ -12,7 +13,7 @@ export function useUserLocation(): UserCoords | null {
   useEffect(() => {
     let cancelled = false;
 
-    const fetch = async () => {
+    const run = async () => {
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
@@ -26,7 +27,7 @@ export function useUserLocation(): UserCoords | null {
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
       }
 
-      navigator.geolocation.getCurrentPosition(
+      Geolocation.getCurrentPosition(
         pos => {
           if (!cancelled) {
             setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
@@ -37,7 +38,7 @@ export function useUserLocation(): UserCoords | null {
       );
     };
 
-    fetch();
+    run();
     return () => { cancelled = true; };
   }, []);
 

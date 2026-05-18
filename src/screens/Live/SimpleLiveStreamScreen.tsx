@@ -28,7 +28,7 @@ import {
   useTracks,
   VideoTrack,
 } from '@livekit/react-native';
-import { Track, RoomEvent, RemoteParticipant } from 'livekit-client';
+import { Track, RoomEvent, RemoteParticipant, Room } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -43,6 +43,7 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
+import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { useUser } from '../../context/UserContext';
 import { useWs } from '../../context/WebSocketContext';
 
@@ -50,10 +51,11 @@ type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveStream'>;
 
 interface ChatMsg {
-  id:     string;
-  user:   string;
+  id:      string;
+  user:    string;
+  userId?: string;
   avatar?: string | null;
-  text:   string;
+  text:    string;
   isJoin?: boolean;
   isGift?: boolean;
   isSys?:  boolean;
@@ -92,7 +94,9 @@ const HostVideoView: React.FC<{
   onGift:        (id: string, name: string) => void;
   onDemote:      (id: string, name: string) => void;
   onBan:         (id: string, name: string) => void;
-}> = ({ mirror, liveId, hostName, hostAvatarUrl, onStage, onGift, onDemote, onBan }) => {
+  isMuted:       boolean;
+  isVideoOff:    boolean;
+}> = ({ mirror, hostName, hostAvatarUrl, onStage, onGift, onDemote, onBan, isMuted, isVideoOff }) => {
   const allTracks       = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const { localParticipant } = useLocalParticipant();
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
@@ -115,7 +119,7 @@ const HostVideoView: React.FC<{
   }
 
   // Connecté mais caméra off — afficher avatar style TikTok
-  if (!localCamOn && allTracks.filter(t => !t.participant.isLocal).length === 0) {
+  if ((!localCamOn || isVideoOff) && allTracks.filter(t => !t.participant.isLocal).length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noCamBg]}>
         {hostAvatarUrl
@@ -123,9 +127,19 @@ const HostVideoView: React.FC<{
           : <Av name={hostName} size={100} />
         }
         <Text style={mv.noCamName}>{hostName}</Text>
-        <View style={mv.noCamMicRow}>
-          <Icon name="mic" size={14} color="rgba(255,255,255,0.7)" />
-          <Text style={mv.noCamMicText}>Micro actif · Caméra désactivée</Text>
+
+        {/* Badges état micro + caméra */}
+        <View style={mv.noCamBadgeRow}>
+          <View style={[mv.noCamBadge, isMuted && mv.noCamBadgeOff]}>
+            <Icon name={isMuted ? 'mic-off' : 'mic'} size={13} color={isMuted ? '#F0365A' : 'rgba(255,255,255,0.9)'} />
+            <Text style={[mv.noCamBadgeText, isMuted && { color: '#F0365A' }]}>
+              {isMuted ? 'Micro coupé' : 'Micro actif'}
+            </Text>
+          </View>
+          <View style={[mv.noCamBadge, mv.noCamBadgeOff]}>
+            <Icon name="video-off" size={13} color="#F0365A" />
+            <Text style={[mv.noCamBadgeText, { color: '#F0365A' }]}>Caméra désactivée</Text>
+          </View>
         </View>
       </View>
     );
@@ -286,7 +300,10 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   const [joinToasts,   setJoinToasts]   = useState<{ id: string; name: string }[]>([]);
   const [giftNotifs,   setGiftNotifs]   = useState<GiftNotif[]>([]);
   const [giftTicker,   setGiftTicker]   = useState<GiftTick[]>([]);
+  const [giftHistory,  setGiftHistory]  = useState<GiftTick[]>([]);
+  const [showGifts,    setShowGifts]    = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
+  const likeRef = useRef<LiveLikeButtonRef>(null);
   // Modération
   const [handRequests, setHandRequests] = useState<HandRequest[]>([]);
   const [showRequests, setShowRequests] = useState(false);
@@ -375,12 +392,27 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
         // ── Messages chat en temps réel
         if (d.type === 'comment_added' && d.comment) {
           const c = d.comment;
-          setMessages(prev => [...prev.slice(-149), {
+          const incoming = {
             id:     c.id ?? String(Date.now()),
             user:   c.author?.display_name ?? c.author?.username ?? 'Anonyme',
+            userId: c.author?.id ? String(c.author.id) : undefined,
             avatar: c.author?.avatar_url ?? null,
             text:   c.body,
-          }]);
+          };
+          setMessages(prev => {
+            // Remplacer le message optimiste local (même texte + même user) au lieu d'ajouter
+            const localIdx = prev.findIndex(
+              m => m.id.startsWith('local-') && m.text === incoming.text && m.user === incoming.user,
+            );
+            if (localIdx !== -1) {
+              const next = [...prev];
+              next[localIdx] = incoming;
+              return next;
+            }
+            // Pas de doublon — ajouter normalement
+            if (prev.some(m => m.id === incoming.id)) return prev;
+            return [...prev.slice(-149), incoming];
+          });
           setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
         }
 
@@ -400,12 +432,17 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
             emoji: tick.emoji, giftName: tick.giftName, coins: tick.coins,
           }]);
           setGiftTicker(prev => [...prev.slice(-2), tick]);
+          setGiftHistory(prev => [tick, ...prev.slice(0, 49)]);
           setTimeout(() => setGiftTicker(prev => prev.filter(t => t.id !== tick.id)), 5000);
         }
 
         // ── Likes
         if (d.type === 'like_added') {
-          setLikeCount(c => c + (d.count ?? 1));
+          const count = d.count ?? 1;
+          setLikeCount(c => c + count);
+          for (let i = 0; i < Math.min(count, 3); i++) {
+            setTimeout(() => likeRef.current?.triggerRemote(), i * 120);
+          }
         }
       } catch {}
     };
@@ -542,25 +579,74 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
     finally { setSending(false); }
   }, [chatInput, sending, liveId, currentUser]);
 
-  const toggleMute = useCallback(() => {
+  const toggleMute = useCallback(async () => {
     const next = !muted;
-    localParticipant.setMicrophoneEnabled(!next).catch(() => {});
     setMuted(next);
+    try {
+      const micPub = localParticipant.getTrackPublication(Track.Source.Microphone);
+      const track  = micPub?.track;
+      if (track) {
+        // mute/unmute sur la track existante — ne ferme pas la peer connection
+        next ? await track.mute() : await track.unmute();
+      } else {
+        // Pas encore de track — activer le micro
+        await localParticipant.setMicrophoneEnabled(true);
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('[toggleMute]', e);
+      setMuted(!next);
+    }
   }, [muted, localParticipant]);
 
-  const toggleVideo = useCallback(() => {
+  const toggleVideo = useCallback(async () => {
     const next = !videoOff;
-    localParticipant.setCameraEnabled(!next).catch(() => {});
     setVideoOff(next);
+    try {
+      const camPub = localParticipant.getTrackPublication(Track.Source.Camera);
+      const track  = camPub?.track;
+      if (track) {
+        // mute/unmute sur la track existante — ne ferme pas la peer connection
+        next ? await track.mute() : await track.unmute();
+      } else {
+        // Pas encore de track — activer la caméra
+        await localParticipant.setCameraEnabled(true);
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('[toggleVideo]', e);
+      setVideoOff(!next);
+    }
   }, [videoOff, localParticipant]);
 
   const flipCam = useCallback(async () => {
-    const next = !camFront; setCamFront(next);
+    const next = !camFront;
+    setCamFront(next);
     try {
-      await localParticipant.setCameraEnabled(false);
-      await localParticipant.setCameraEnabled(true, { facingMode: next ? 'user' : 'environment' });
-    } catch {}
-  }, [camFront, localParticipant]);
+      // Sur React Native, facingMode ne fonctionne pas — on passe par deviceId
+      const devices: { deviceId: string; label: string }[] = await (room as any).getLocalDevices?.('videoinput')
+        ?? await Room.getLocalDevices('videoinput').catch(() => []);
+
+      // Trouver la caméra correspondant au côté voulu
+      const keyword = next ? 'front' : 'back';
+      const match   = devices.find(d =>
+        d.label.toLowerCase().includes(keyword) ||
+        d.label.toLowerCase().includes(next ? 'facing front' : 'facing back'),
+      ) ?? devices.find(d => d.deviceId !== room.getActiveDevice('videoinput'));
+
+      if (match) {
+        await room.switchActiveDevice('videoinput', match.deviceId);
+      } else {
+        // Fallback : restart track avec facingMode (marche sur iOS)
+        const camPub = localParticipant.getTrackPublication(Track.Source.Camera);
+        const track  = camPub?.track as any;
+        if (track?.restartTrack) {
+          await track.restartTrack({ facingMode: next ? 'user' : 'environment' });
+        }
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('[flipCam]', e);
+      setCamFront(!next);
+    }
+  }, [camFront, localParticipant, room]);
 
   const askEnd = useCallback(() => {
     Alert.alert('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
@@ -587,6 +673,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
         onGift={(id, name) => giftRef.current?.openGift(id, name)}
         onDemote={handleDemote}
         onBan={handleBan}
+        isMuted={muted}
+        isVideoOff={videoOff}
       />
 
       {/* Gradients */}
@@ -630,7 +718,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
         </View>
 
         <View style={{ flex: 1 }} />
-        <LiveLikeButton total={likeCount} onLike={() => {}} />
+        <LiveLikeButton ref={likeRef} total={likeCount} onLike={() => {}} />
       </View>
 
       {/* ── GIFT TICKER ──────────────────────────────────────────────── */}
@@ -654,7 +742,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
       </View>
 
       {/* ── CHAT bas gauche ──────────────────────────────────────────── */}
-      <View style={st.chatZone} pointerEvents="box-none">
+      <View style={st.chatZone}>
         <FlatList
           ref={chatRef}
           data={messages}
@@ -674,15 +762,60 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
                 </Animated.View>
               );
             }
+            const myId = currentUser?.id ? String(currentUser.id) : null;
+            const canMod = !!item.userId && item.userId !== myId;
             return (
               <Animated.View entering={FadeIn.duration(200)} style={st.chatBubble}>
                 {item.avatar
                   ? <Image source={{ uri: item.avatar }} style={st.chatAvatar} />
                   : <Av name={item.user} size={24} />
                 }
-                <View style={st.chatBubbleInner}>
-                  <Text style={st.chatUser}>{item.user}</Text>
-                  <Text style={st.chatText}>{item.text}</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={st.chatBubbleInner}>
+                    <Text style={st.chatUser}>{item.user}</Text>
+                    <Text style={st.chatText}>{item.text}</Text>
+                  </View>
+                  {canMod && (
+                    <View style={st.modRow}>
+                      <TouchableOpacity
+                        style={st.modBtn}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        onPress={async () => {
+                          setMessages(prev => prev.filter(m => m.id !== item.id));
+                          try { await apiClient.delete(Endpoints.social.commentById(item.id)); } catch {}
+                        }}
+                      >
+                        <Icon name="trash-2" size={11} color="#F0365A" />
+                        <Text style={st.modBtnText}>Supprimer</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={st.modBtn}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        onPress={() => {
+                          Alert.alert(item.user, 'Choisir une action', [
+                            { text: 'Annuler', style: 'cancel' },
+                            {
+                              text: 'Exclure du live',
+                              onPress: async () => {
+                                try { await apiClient.post(Endpoints.lives.ban(liveId, item.userId!)); }
+                                catch { Alert.alert('Erreur', 'Impossible d\'exclure.'); }
+                              },
+                            },
+                            {
+                              text: 'Bannir définitivement', style: 'destructive',
+                              onPress: async () => {
+                                try { await apiClient.post(Endpoints.lives.globalBan(liveId, item.userId!)); }
+                                catch { Alert.alert('Erreur', 'Impossible de bannir.'); }
+                              },
+                            },
+                          ]);
+                        }}
+                      >
+                        <Icon name="slash" size={11} color="#F0365A" />
+                        <Text style={st.modBtnText}>Bannir</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </Animated.View>
             );
@@ -690,7 +823,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           style={st.chatList}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ justifyContent: 'flex-end' }}
-          pointerEvents="none"
         />
 
         {showInput ? (
@@ -744,12 +876,16 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           </TouchableOpacity>
         )}
 
-        {/* Flip */}
-        <TouchableOpacity style={st.sideBtn} onPress={flipCam} activeOpacity={0.8}>
-          <View style={st.sideBtnCircle}>
-            <Icon name="refresh-cw" size={20} color="#fff" />
+        {/* Flip — grisé si caméra off */}
+        <TouchableOpacity
+          style={[st.sideBtn, videoOff && { opacity: 0.35 }]}
+          onPress={videoOff ? undefined : flipCam}
+          activeOpacity={0.8}
+        >
+          <View style={[st.sideBtnCircle, videoOff && st.sideBtnOff]}>
+            <Icon name="refresh-cw" size={20} color={videoOff ? '#F0365A' : '#fff'} />
           </View>
-          <Text style={st.sideBtnLabel}>Flip</Text>
+          <Text style={[st.sideBtnLabel, videoOff && { color: '#F0365A' }]}>Flip</Text>
         </TouchableOpacity>
 
         {/* Micro */}
@@ -757,7 +893,9 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           <View style={[st.sideBtnCircle, muted && st.sideBtnOff]}>
             <Icon name={muted ? 'mic-off' : 'mic'} size={20} color={muted ? '#F0365A' : '#fff'} />
           </View>
-          <Text style={st.sideBtnLabel}>{muted ? 'Muet' : 'Micro'}</Text>
+          <Text style={[st.sideBtnLabel, muted && { color: '#F0365A' }]}>
+            {muted ? 'Muet' : 'Micro'}
+          </Text>
         </TouchableOpacity>
 
         {/* Caméra */}
@@ -765,8 +903,21 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           <View style={[st.sideBtnCircle, videoOff && st.sideBtnOff]}>
             <Icon name={videoOff ? 'video-off' : 'video'} size={20} color={videoOff ? '#F0365A' : '#fff'} />
           </View>
-          <Text style={st.sideBtnLabel}>{videoOff ? 'Cam off' : 'Cam'}</Text>
+          <Text style={[st.sideBtnLabel, videoOff && { color: '#F0365A' }]}>
+            {videoOff ? 'Cam off' : 'Cam'}
+          </Text>
         </TouchableOpacity>
+
+        {/* Cadeaux reçus */}
+        {giftHistory.length > 0 && (
+          <TouchableOpacity style={st.sideBtn} onPress={() => setShowGifts(v => !v)} activeOpacity={0.8}>
+            <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(255,215,0,0.15)', borderColor: 'rgba(255,215,0,0.5)' }]}>
+              <Icon name="gift" size={20} color="#FFD700" />
+              <View style={st.badge}><Text style={st.badgeText}>{giftHistory.length}</Text></View>
+            </View>
+            <Text style={[st.sideBtnLabel, { color: '#FFD700' }]}>Recu</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Fin */}
         <TouchableOpacity style={st.sideBtn} onPress={askEnd} activeOpacity={0.8}>
@@ -785,6 +936,33 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           onRefuse={handleRefuse}
           onClose={() => setShowRequests(false)}
         />
+      )}
+
+      {/* ── PANEL CADEAUX REÇUS ─────────────────────────────────────── */}
+      {showGifts && giftHistory.length > 0 && (
+        <Animated.View entering={SlideInRight.duration(280)} exiting={SlideOutRight.duration(220)} style={os.panel}>
+          <View style={os.header}>
+            <Text style={os.title}>Cadeaux recu ({giftHistory.length})</Text>
+            <TouchableOpacity onPress={() => setShowGifts(false)} style={os.closeBtn}>
+              <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          </View>
+          <Text style={{ color: '#FFD700', fontSize: 12, paddingHorizontal: 14, paddingBottom: 6 }}>
+            Total : {giftHistory.reduce((s, t) => s + t.coins, 0)} 🪙
+          </Text>
+          <View style={{ paddingHorizontal: 14, gap: 8 }}>
+            {giftHistory.slice(0, 20).map((t, i) => (
+              <View key={`${t.id}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 22 }}>{t.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{t.senderName}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{t.giftName}</Text>
+                </View>
+                <Text style={{ color: '#FFD700', fontSize: 12, fontWeight: '700' }}>{t.coins} 🪙</Text>
+              </View>
+            ))}
+          </View>
+        </Animated.View>
       )}
 
       {/* ── PANEL SUR SCÈNE ──────────────────────────────────────────── */}
@@ -935,6 +1113,10 @@ const mv = StyleSheet.create({
   noCamName:    { color: '#fff', fontSize: 18, fontWeight: '800' },
   noCamMicRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   noCamMicText: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  noCamBadgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 16 },
+  noCamBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  noCamBadgeOff: { backgroundColor: 'rgba(240,54,90,0.15)' },
+  noCamBadgeText:{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
   spotName:     { color: '#fff', fontSize: 16, fontWeight: '700' },
   pip: {
     position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, right: 12,
@@ -1057,6 +1239,9 @@ const st = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#000',
   },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  modRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, paddingLeft: 2 },
+  modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.15)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
+  modBtnText: { color: '#F0365A', fontSize: 10, fontWeight: '700' as const },
 });
 
 // ── Styles panel "Sur scène" ──────────────────────────────────────────────────

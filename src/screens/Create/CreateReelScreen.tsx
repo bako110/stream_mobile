@@ -19,7 +19,7 @@ const VIDEO_H = Math.round(SCREEN_W * 9 / 16);
 interface Props { onBack: () => void }
 
 export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { colors } = theme;
 
   const [caption,       setCaption]       = useState('');
@@ -88,29 +88,25 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={s.header}
-      >
-        <TouchableOpacity onPress={() => { videoPlayer.pause(); onBack(); }} style={s.backBtn} activeOpacity={0.7}>
-          <Icon name="x" size={22} color="#fff" />
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity onPress={() => { videoPlayer.pause(); onBack(); }} style={[s.backBtn, { backgroundColor: colors.backgroundSecondary }]} activeOpacity={0.7}>
+          <Icon name="x" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
 
-        <Text style={s.headerTitle}>Nouveau Reel</Text>
+        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Nouveau Reel</Text>
 
         <TouchableOpacity
           onPress={handlePublish}
           disabled={!canPublish}
-          style={[s.publishBtn, { opacity: canPublish ? 1 : 0.45 }]}
+          style={[s.publishBtn, { backgroundColor: colors.backgroundSecondary, opacity: canPublish ? 1 : 0.45 }]}
           activeOpacity={0.8}
         >
-          <Text style={s.publishBtnText}>Envoyer</Text>
+          <Text style={[s.publishBtnText, { color: colors.textPrimary }]}>Envoyer</Text>
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
 
       {/* Hint arrière-plan */}
       {videoLocalUri && (
@@ -210,11 +206,12 @@ const s = StyleSheet.create({
     paddingBottom:     16,
     paddingHorizontal: 16,
     gap:               12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn:        { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:    { flex: 1, fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
-  publishBtn:     { paddingHorizontal: 18, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 8 },
-  publishBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  backBtn:        { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:    { flex: 1, fontSize: 20, fontWeight: '800', letterSpacing: 0.3 },
+  publishBtn:     { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 8 },
+  publishBtnText: { fontWeight: '800', fontSize: 14 },
 
   bgHint:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   bgHintText: { fontSize: 12, fontWeight: '500', flex: 1 },

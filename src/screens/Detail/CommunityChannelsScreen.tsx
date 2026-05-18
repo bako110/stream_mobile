@@ -296,10 +296,7 @@ export const CommunityChannelsScreen: React.FC = () => {
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <LinearGradient
-        colors={[colors.surface, colors.surface]}
-        style={[S.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}
-      >
+      <View style={[S.header, { backgroundColor: colors.surface, paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
         <TouchableOpacity onPress={() => nav.goBack()} style={S.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -312,7 +309,7 @@ export const CommunityChannelsScreen: React.FC = () => {
             <Icon name="plus" size={18} color="#fff" />
           </TouchableOpacity>
         )}
-      </LinearGradient>
+      </View>
 
       {/* Liste */}
       {loading ? (

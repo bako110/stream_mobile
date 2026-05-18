@@ -35,6 +35,8 @@ export const setAuthToken = (token: string | null) => {
   authToken = token;
 };
 
+export const getAuthToken = (): string | null => authToken;
+
 export const setRefreshTokenFn = (fn: () => Promise<string>) => {
   _refreshTokenFn = fn;
 };

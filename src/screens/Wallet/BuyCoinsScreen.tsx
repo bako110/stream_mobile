@@ -5,7 +5,7 @@
  * - Mock Stripe → POST /wallet/purchase
  * - Animation succès
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,11 +19,13 @@ import {
   ActivityIndicator,
   StatusBar,
   Dimensions,
+  Linking,
+  AppState,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -209,26 +211,33 @@ const cardStyles = (colors: any) => StyleSheet.create({
 
 // ── Main ───────────────────────────────────────────────────────────────────
 const BuyCoinsScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<any>();
 
-  const [packages, setPackages]     = useState<CoinPackage[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [balance, setBalance]       = useState<number>(0);
-  const [selected, setSelected]     = useState<CoinPackage | null>(null);
-  const [modalVisible, setModal]    = useState(false);
-  const [purchasing, setPurchasing] = useState(false);
-  const [success, setSuccess]       = useState(false);
+  const [packages, setPackages]         = useState<CoinPackage[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [balance, setBalance]           = useState<number>(0);
+  const [selected, setSelected]         = useState<CoinPackage | null>(null);
+  const [modalVisible, setModal]        = useState(false);
+  const [purchasing, setPurchasing]     = useState(false);
+  const [success, setSuccess]           = useState(false);
   const [successCoins, setSuccessCoins] = useState(0);
-  const [customEur, setCustomEur]   = useState('');
-  const [customMode, setCustomMode] = useState(false);
+  const [customEur, setCustomEur]       = useState('');
+  const [customMode, setCustomMode]     = useState(false);
+  // CinetPay — suivi de la transaction en cours
+  const [cpMerchantTxId, setCpMerchantTxId]   = useState<string | null>(null);
+  const [cpPaymentUrl, setCpPaymentUrl]         = useState<string | null>(null);
+  const [cpPolling, setCpPolling]               = useState(false);
+  const [cpStatusMsg, setCpStatusMsg]           = useState('');
+  const cpPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const appStateRef  = useRef(AppState.currentState);
 
-  const EUR_TO_COINS = 200; // 1 EUR = 200 coins
+  const EUR_TO_COINS = 200;
   const customCoins  = Math.floor(parseFloat(customEur || '0') * EUR_TO_COINS);
   const customValid  = customCoins >= 100 && parseFloat(customEur || '0') >= 0.5;
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     Promise.allSettled([
       apiClient.get<CoinPackage[]>(Endpoints.wallet.packages),
       apiClient.get<WalletBalance>(Endpoints.wallet.balance),
@@ -238,52 +247,132 @@ const BuyCoinsScreen: React.FC = () => {
     }).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { loadData(); }, [loadData]);
+
   const handleSelect = (pkg: CoinPackage) => {
     setSelected(pkg);
     setModal(true);
   };
 
+  // ── Polling statut CinetPay ──────────────────────────────────────────────
+  const stopPolling = useCallback(() => {
+    if (cpPollingRef.current) {
+      clearInterval(cpPollingRef.current);
+      cpPollingRef.current = null;
+    }
+    setCpPolling(false);
+  }, []);
+
+  const pollStatus = useCallback(async (merchantTxId: string, coinsToAdd: number) => {
+    try {
+      const res = await apiClient.get<any>(Endpoints.wallet.cinetpayStatus(merchantTxId));
+      const data = res.data;
+      const st = data?.status ?? '';
+      setCpStatusMsg(data?.message ?? '');
+
+      if (st === 'SUCCESS') {
+        stopPolling();
+        setModal(false);
+        setCpPaymentUrl(null);
+        setCpMerchantTxId(null);
+        setSuccessCoins(coinsToAdd);
+        setSuccess(true);
+        // Rafraîchir le solde
+        apiClient.get<WalletBalance>(Endpoints.wallet.balance)
+          .then(r => setBalance(r.data?.coins_balance ?? 0))
+          .catch(() => {});
+      } else if (st === 'FAILED') {
+        stopPolling();
+        setCpPaymentUrl(null);
+        setCpMerchantTxId(null);
+        Alert.alert('Paiement échoué', data?.message ?? 'Le paiement a échoué. Veuillez réessayer.');
+        setPurchasing(false);
+      }
+    } catch {
+      // Silencieux — on continue à poller
+    }
+  }, [stopPolling]);
+
+  // Reprendre le polling quand l'app revient au premier plan (après WebView externe)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        if (cpMerchantTxId && cpPollingRef.current === null) {
+          const coinsToAdd = selected ? (selected.coins + (selected.bonus_coins ?? selected.bonus ?? 0)) : 0;
+          setCpPolling(true);
+          cpPollingRef.current = setInterval(() => pollStatus(cpMerchantTxId, coinsToAdd), 3000);
+        }
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
+  }, [cpMerchantTxId, selected, pollStatus]);
+
+  // Nettoyage au démontage
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // ── Lancement du paiement CinetPay ──────────────────────────────────────
   const handlePurchase = async () => {
     if (!selected) return;
     setPurchasing(true);
+    setCpStatusMsg('Initialisation du paiement...');
     try {
-      // Simulate Stripe payment intent creation
-      Alert.alert(
-        'Paiement simulé',
-        `Stripe (sandbox) — ${parseFloat(String(selected.price_eur)).toFixed(2)} €\nLe paiement sera traité en production.`,
-        [
-          { text: 'Annuler', style: 'cancel', onPress: () => setPurchasing(false) },
-          {
-            text: 'Confirmer', onPress: async () => {
-              try {
-                if (selected.id === 'custom') {
-                  await apiClient.post(Endpoints.wallet.purchaseCustom, {
-                    amount_eur: parseFloat(String(selected.price_eur)),
-                    stripe_payment_intent_id: `pi_mock_${Date.now()}`,
-                  });
-                } else {
-                  await apiClient.post(Endpoints.wallet.purchase, {
-                    package_id: selected.id,
-                    stripe_payment_intent_id: `pi_mock_${Date.now()}`,
-                  });
-                }
-                setModal(false);
-                setSuccessCoins(selected.coins + (selected.bonus_coins ?? selected.bonus ?? 0));
-                setSuccess(true);
-                setBalance(prev => prev + selected.coins + selected.bonus);
-              } catch (e: any) {
-                Alert.alert('Erreur', e?.message ?? 'Achat échoué');
-              } finally {
-                setPurchasing(false);
-              }
-            },
-          },
-        ],
-      );
-    } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Achat échoué');
+      const res = await apiClient.post<any>(Endpoints.wallet.cinetpayInit, {
+        package_id: selected.id === 'custom' ? undefined : selected.id,
+        direct_pay: false,
+      });
+      const data = res.data;
+      const merchantTxId = data?.merchant_transaction_id;
+      const paymentUrl   = data?.payment_url;
+      const status       = data?.status ?? 'INITIATED';
+      const coinsToAdd   = selected.coins + (selected.bonus_coins ?? selected.bonus ?? 0);
+
+      if (status === 'SUCCESS') {
+        // Paiement direct déjà confirmé
+        setModal(false);
+        setCpPaymentUrl(null);
+        setSuccessCoins(coinsToAdd);
+        setSuccess(true);
+        apiClient.get<WalletBalance>(Endpoints.wallet.balance)
+          .then(r => setBalance(r.data?.coins_balance ?? 0))
+          .catch(() => {});
+        setPurchasing(false);
+        return;
+      }
+
+      if (!merchantTxId) {
+        throw new Error('Réponse CinetPay invalide — merchant_transaction_id manquant');
+      }
+
+      setCpMerchantTxId(merchantTxId);
+      setCpPaymentUrl(paymentUrl ?? null);
+      setCpStatusMsg(data?.message ?? 'En attente du paiement...');
       setPurchasing(false);
+
+      // Démarrer le polling
+      setCpPolling(true);
+      cpPollingRef.current = setInterval(() => pollStatus(merchantTxId, coinsToAdd), 3000);
+
+      // Ouvrir l'URL de paiement dans le navigateur
+      if (paymentUrl && data?.must_be_redirected !== false) {
+        Linking.openURL(paymentUrl).catch(() =>
+          Alert.alert('Erreur', 'Impossible d\'ouvrir la page de paiement.')
+        );
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail ?? e?.message ?? 'Achat échoué';
+      Alert.alert('Erreur', msg);
+      setPurchasing(false);
+      setCpStatusMsg('');
     }
+  };
+
+  const handleCancelPolling = () => {
+    stopPolling();
+    setCpPaymentUrl(null);
+    setCpMerchantTxId(null);
+    setCpStatusMsg('');
+    setPurchasing(false);
   };
 
   const s = styles(colors);
@@ -298,7 +387,7 @@ const BuyCoinsScreen: React.FC = () => {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
       <View style={s.header}>
@@ -405,57 +494,101 @@ const BuyCoinsScreen: React.FC = () => {
       </ScrollView>
 
       {/* Confirmation Modal */}
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModal(false)}>
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => { if (!cpPolling) setModal(false); }}>
         <View style={s.modalOverlay}>
           <View style={s.modalSheet}>
             <View style={s.modalHandle} />
-            <Text style={s.modalTitle}>Confirmer l'achat</Text>
 
-            {selected && (
-              <View style={s.modalPkgRow}>
-                <LinearGradient colors={['#9B65F5', '#E85DAD']} style={s.modalPkgIcon}>
-                  <MaterialCommunityIcons name="bitcoin" size={28} color="#FFD700" />
-                </LinearGradient>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.modalPkgName}>{selected.name}</Text>
-                  <Text style={s.modalPkgCoins}>
-                    {(selected.coins + (selected.bonus_coins ?? selected.bonus ?? 0)).toLocaleString('fr-FR')} coins
-                    {(selected.bonus_coins ?? selected.bonus ?? 0) > 0 && (
-                      <Text style={{ color: colors.success }}> (+{selected.bonus_coins ?? selected.bonus} bonus)</Text>
-                    )}
+            {/* ── État polling — en attente du paiement ── */}
+            {cpPolling || cpPaymentUrl ? (
+              <>
+                <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 24, gap: 16 }}>
+                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                  </View>
+                  <Text style={[s.modalTitle, { marginTop: 0 }]}>En attente du paiement</Text>
+                  <Text style={{ fontSize: 13, color: colors.textTertiary, textAlign: 'center', paddingHorizontal: 16 }}>
+                    {cpStatusMsg || 'Finalisez le paiement dans votre navigateur puis revenez ici.'}
                   </Text>
+                  {cpPaymentUrl && (
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(cpPaymentUrl).catch(() => {})}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={['#7B3FF2', '#E0389A']}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                        style={{ borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                      >
+                        <Icon name="external-link" size={16} color="#fff" />
+                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Ouvrir la page de paiement</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={handleCancelPolling} style={s.cancelBtn}>
+                    <Text style={s.cancelText}>Annuler</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={s.modalPrice}>{parseFloat(String(selected.price_eur)).toFixed(2)} €</Text>
-              </View>
+              </>
+            ) : (
+              /* ── Confirmation initiale ── */
+              <>
+                <Text style={s.modalTitle}>Confirmer l'achat</Text>
+
+                {selected && (
+                  <View style={s.modalPkgRow}>
+                    <LinearGradient colors={['#9B65F5', '#E85DAD']} style={s.modalPkgIcon}>
+                      <MaterialCommunityIcons name="bitcoin" size={28} color="#FFD700" />
+                    </LinearGradient>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.modalPkgName}>{selected.name}</Text>
+                      <Text style={s.modalPkgCoins}>
+                        {(selected.coins + (selected.bonus_coins ?? selected.bonus ?? 0)).toLocaleString('fr-FR')} coins
+                        {(selected.bonus_coins ?? selected.bonus ?? 0) > 0 && (
+                          <Text style={{ color: colors.success }}> (+{selected.bonus_coins ?? selected.bonus} bonus)</Text>
+                        )}
+                      </Text>
+                    </View>
+                    <Text style={s.modalPrice}>{parseFloat(String(selected.price_eur)).toFixed(2)} €</Text>
+                  </View>
+                )}
+
+                {/* Badge CinetPay */}
+                <View style={s.modalPayRow}>
+                  <Icon name="smartphone" size={18} color={colors.textSecondary} />
+                  <Text style={s.modalPayText}>Mobile Money via CinetPay</Text>
+                  <View style={[s.stripeBadge, { backgroundColor: '#10B98118' }]}>
+                    <Text style={[s.stripeText, { color: '#10B981' }]}>LIVE</Text>
+                  </View>
+                </View>
+
+                <Text style={{ fontSize: 12, color: colors.textTertiary, paddingHorizontal: 4, marginBottom: 12, lineHeight: 17 }}>
+                  Orange Money, Wave, MTN, Moov et plus — vous serez redirigé vers la page de paiement sécurisée CinetPay.
+                </Text>
+
+                <TouchableOpacity
+                  onPress={handlePurchase}
+                  disabled={purchasing}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={['#9B65F5', '#E85DAD']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={s.confirmBtn}
+                  >
+                    {purchasing
+                      ? <ActivityIndicator color="#FFF" />
+                      : <Text style={s.confirmText}>Payer {parseFloat(String(selected?.price_eur ?? 0)).toFixed(2)} €</Text>
+                    }
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setModal(false)} style={s.cancelBtn}>
+                  <Text style={s.cancelText}>Annuler</Text>
+                </TouchableOpacity>
+              </>
             )}
-
-            <View style={s.modalPayRow}>
-              <Icon name="credit-card" size={18} color={colors.textSecondary} />
-              <Text style={s.modalPayText}>Stripe (Sandbox)</Text>
-              <View style={s.stripeBadge}><Text style={s.stripeText}>TEST</Text></View>
-            </View>
-
-            <TouchableOpacity
-              onPress={handlePurchase}
-              disabled={purchasing}
-              activeOpacity={0.85}
-            >
-              <LinearGradient
-                colors={['#9B65F5', '#E85DAD']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={s.confirmBtn}
-              >
-                {purchasing
-                  ? <ActivityIndicator color="#FFF" />
-                  : <Text style={s.confirmText}>Payer {parseFloat(String(selected?.price_eur ?? 0)).toFixed(2)} €</Text>
-                }
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => setModal(false)} style={s.cancelBtn}>
-              <Text style={s.cancelText}>Annuler</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>

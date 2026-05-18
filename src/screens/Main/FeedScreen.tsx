@@ -22,6 +22,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
+import { useUserLocation } from '../../hooks/useUserLocation';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText } from '../../components/common';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
@@ -145,6 +146,7 @@ export const FeedScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated } = useWs();
   const { currentUser } = useUser();
+  const userLocation = useUserLocation();
 
   const [filter,      setFilter]      = useState<FeedFilter>('all');
   const [items,       setItems]       = useState<FeedItem[]>([]);
@@ -157,11 +159,13 @@ export const FeedScreen: React.FC = () => {
   const [fabOpen,        setFabOpen]        = useState(false);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
+  const [nearbyEvents,    setNearbyEvents]    = useState<Event[]>([]);
   const [trendingComm,    setTrendingComm]    = useState<CommunityData[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchFilter, setSearchFilter] = useState<'all'|'users'|'events'|'concerts'|'reels'|'films'>('all');
   const searchBarWidth = useSharedValue(0);
   const searchBarOpacity = useSharedValue(0);
   const liveDotOpacity = useSharedValue(1);
@@ -224,6 +228,7 @@ export const FeedScreen: React.FC = () => {
     setTimeout(() => setSearchOpen(false), 180);
     setSearchQuery('');
     setSearchResults(null);
+    setSearchFilter('all');
   }, []);
 
   const animatedSearchBar = useAnimatedStyle(() => ({
@@ -495,6 +500,19 @@ export const FeedScreen: React.FC = () => {
   // Recharge quand le filtre change
   useEffect(() => { setLoading(true); load(filter); }, [filter]);
 
+  // Près de toi — chargé dès que la position est disponible
+  useEffect(() => {
+    console.log('[FeedScreen] userLocation:', userLocation);
+    if (!userLocation) return;
+    eventService.list({
+      limit: 8, lat: userLocation.lat, lon: userLocation.lon,
+      radius_km: 20, status: 'published', noCache: true,
+    }).then(data => {
+      console.log('[FeedScreen] nearbyEvents:', data?.length);
+      setNearbyEvents(Array.isArray(data) ? data : []);
+    }).catch((e) => console.warn('[FeedScreen] nearbyEvents error:', e));
+  }, [userLocation]);
+
   // Charger les lives en direct (appelé aussi depuis load('all') via Promise.all)
   const loadLive = useCallback(async () => {
     try {
@@ -557,6 +575,14 @@ export const FeedScreen: React.FC = () => {
       setFeedFocused(false);
       setActiveReelId(null);
       setActivePostId(null);
+      // Vider la recherche quand on quitte le tab
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      setSearchQuery('');
+      setSearchResults(null);
+      setSearchOpen(false);
+      setSearchFilter('all');
+      searchBarWidth.value = 0;
+      searchBarOpacity.value = 0;
     };
   }, [filter]));
 
@@ -957,174 +983,303 @@ export const FeedScreen: React.FC = () => {
         </TouchableOpacity>
       )}
 
-      {searchResults ? (
-        /* ── Résultats de recherche ─────────────────────────────────────── */
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
-
+      {searchOpen ? (
+        /* ── Overlay recherche plein écran ──────────────────────────────── */
+        <Animated.View entering={FadeInDown.duration(180)} style={{ flex: 1, backgroundColor: colors.background }}>
           {(() => {
-            const hasAny =
-              (searchResults.users?.length ?? 0) > 0 ||
-              (searchResults.films?.length ?? 0) > 0 ||
-              (searchResults.series?.length ?? 0) > 0 ||
-              (searchResults.concerts?.length ?? 0) > 0 ||
-              (searchResults.events?.length ?? 0) > 0 ||
-              (searchResults.reels?.length ?? 0) > 0;
+            const CATS: { key: 'all'|'users'|'events'|'concerts'|'reels'|'films'; label: string; icon: string; accent: string }[] = [
+              { key: 'all',      label: 'Tout',        icon: 'grid',     accent: colors.primary },
+              { key: 'users',    label: 'Personnes',   icon: 'users',    accent: '#7B3FF2' },
+              { key: 'events',   label: 'Événements',  icon: 'calendar', accent: '#0EA5E9' },
+              { key: 'concerts', label: 'Concerts',    icon: 'music',    accent: '#E0389A' },
+              { key: 'reels',    label: 'Reels',       icon: 'video',    accent: '#10B981' },
+              { key: 'films',    label: 'Films',       icon: 'film',     accent: '#F59E0B' },
+            ];
 
-            if (!hasAny) return (
-              <View style={{ alignItems: 'center', paddingTop: 80, gap: 10 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="search" size={24} color={colors.textTertiary} />
-                </View>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textSecondary }}>Aucun résultat</Text>
-                <Text style={{ fontSize: 13, color: colors.textTertiary }}>pour "{searchQuery}"</Text>
-              </View>
-            );
-
-            const SectionHeader = ({ icon, label, count, accent }: { icon: string; label: string; count: number; accent: string }) => (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10 }}>
-                <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: accent }} />
-                <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: accent + '18', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={icon} size={14} color={accent} />
-                </View>
-                <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, letterSpacing: -0.2 }}>{label}</Text>
-                <View style={{ backgroundColor: accent + '18', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: accent }}>{count}</Text>
-                </View>
-              </View>
-            );
-
-            const Thumb = ({ uri, icon, accent }: { uri?: string | null; icon: string; accent: string }) =>
+            const SrThumb = ({ uri, icon, accent, round }: { uri?: string | null; icon: string; accent: string; round?: boolean }) =>
               uri ? (
-                <Image source={{ uri }} style={{ width: 46, height: 46, borderRadius: 10 }} />
+                <Image source={{ uri }} style={{ width: 52, height: 52, borderRadius: round ? 26 : 12 }} />
               ) : (
-                <View style={{ width: 46, height: 46, borderRadius: 10, backgroundColor: accent + '18', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={icon} size={18} color={accent} />
+                <View style={{ width: 52, height: 52, borderRadius: round ? 26 : 12, backgroundColor: accent + '20', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={icon} size={20} color={accent} />
                 </View>
               );
 
-            const Row = ({ onPress, children }: { onPress?: () => void; children: React.ReactNode }) => (
+            const SrRow = ({ onPress, children, last }: { onPress?: () => void; children: React.ReactNode; last?: boolean }) => (
               <TouchableOpacity
                 onPress={onPress}
                 activeOpacity={0.7}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 14,
+                  paddingHorizontal: 16, paddingVertical: 12,
+                  borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth,
+                  borderBottomColor: colors.divider,
+                }}
               >
                 {children}
               </TouchableOpacity>
             );
 
+            const SrSection = ({ icon, label, count, accent }: { icon: string; label: string; count: number; accent: string }) => (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 }}>
+                <LinearGradient colors={[accent, accent + 'AA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={icon} size={13} color="#fff" />
+                </LinearGradient>
+                <Text style={{ flex: 1, fontSize: 13, fontWeight: '800', color: colors.textPrimary, letterSpacing: 0.2, textTransform: 'uppercase' }}>{label}</Text>
+                <View style={{ backgroundColor: accent + '18', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: accent }}>{count}</Text>
+                </View>
+              </View>
+            );
+
+            // État idle — pas encore de query
+            if (!searchQuery.trim() && !searchResults) return (
+              <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                {/* Catégories rapides */}
+                <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 14 }}>Explorer</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                    {[
+                      { icon: 'calendar', label: 'Événements', accent: '#0EA5E9', nav: 'Events' },
+                      { icon: 'music',    label: 'Concerts',   accent: '#E0389A', nav: 'Concerts' },
+                      { icon: 'video',    label: 'Reels',      accent: '#10B981', nav: 'Reels' },
+                      { icon: 'film',     label: 'Films',      accent: '#F59E0B', nav: 'Films' },
+                      { icon: 'trending-up', label: 'Tendances', accent: '#6366F1', nav: 'Trending' },
+                      { icon: 'users',    label: 'Communautés', accent: '#7B3FF2', nav: 'Communities' },
+                    ].map(({ icon, label, accent, nav: navTarget }) => (
+                      <TouchableOpacity
+                        key={label}
+                        activeOpacity={0.75}
+                        onPress={() => { closeSearch(); (nav as any).navigate(navTarget); }}
+                        style={{
+                          flexDirection: 'row', alignItems: 'center', gap: 8,
+                          paddingHorizontal: 14, paddingVertical: 10,
+                          borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
+                          borderColor: colors.divider,
+                          backgroundColor: colors.surface,
+                        }}
+                      >
+                        <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: accent + '18', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon name={icon} size={14} color={accent} />
+                        </View>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Astuce */}
+                <View style={{ marginHorizontal: 16, marginTop: 28, borderRadius: 16, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="zap" size={18} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>Recherche instantanée</Text>
+                    <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>Tape un nom, un lieu ou un titre</Text>
+                  </View>
+                </View>
+              </ScrollView>
+            );
+
+            // Chargement
+            if (searching) return (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ fontSize: 14, color: colors.textTertiary }}>Recherche en cours...</Text>
+              </View>
+            );
+
+            // Aucun résultat
+            const hasAny = searchResults && (
+              (searchResults.users?.length ?? 0) > 0 ||
+              (searchResults.films?.length ?? 0) > 0 ||
+              (searchResults.series?.length ?? 0) > 0 ||
+              (searchResults.concerts?.length ?? 0) > 0 ||
+              (searchResults.events?.length ?? 0) > 0 ||
+              (searchResults.reels?.length ?? 0) > 0
+            );
+
+            if (!hasAny) return (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 }}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                  <Icon name="search" size={30} color={colors.textTertiary} />
+                </View>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' }}>Aucun résultat</Text>
+                <Text style={{ fontSize: 14, color: colors.textTertiary, textAlign: 'center', lineHeight: 20 }}>Rien trouvé pour "{searchQuery}". Essaie un autre mot-clé.</Text>
+              </View>
+            );
+
+            // Filtres chips
+            const totalCounts: Record<string, number> = {
+              all:      (searchResults!.users?.length ?? 0) + (searchResults!.events?.length ?? 0) + (searchResults!.concerts?.length ?? 0) + (searchResults!.reels?.length ?? 0) + (searchResults!.films?.length ?? 0) + (searchResults!.series?.length ?? 0),
+              users:    searchResults!.users?.length ?? 0,
+              events:   searchResults!.events?.length ?? 0,
+              concerts: searchResults!.concerts?.length ?? 0,
+              reels:    searchResults!.reels?.length ?? 0,
+              films:    (searchResults!.films?.length ?? 0) + (searchResults!.series?.length ?? 0),
+            };
+
             return (
               <>
-                {/* Utilisateurs */}
-                {(searchResults.users?.length ?? 0) > 0 && (
-                  <View>
-                    <SectionHeader icon="user" label="Utilisateurs" count={searchResults.users!.length} accent="#7B3FF2" />
-                    {searchResults.users!.map((u: any) => (
-                      <Row key={u.id} onPress={() => (nav as any).navigate('UserProfile', { userId: u.id })}>
-                        {u.avatar_url ? (
-                          <Image source={{ uri: u.avatar_url }} style={{ width: 46, height: 46, borderRadius: 23 }} />
-                        ) : (
-                          <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#7B3FF2' + '20', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontSize: 17, fontWeight: '700', color: '#7B3FF2' }}>{((u.display_name ?? u.username) as string)[0].toUpperCase()}</Text>
+                {/* Chips filtre */}
+                <ScrollView
+                  horizontal showsHorizontalScrollIndicator={false}
+                  style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
+                  contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}
+                >
+                  {CATS.filter(c => c.key === 'all' || totalCounts[c.key] > 0).map(cat => {
+                    const active = searchFilter === cat.key;
+                    return (
+                      <TouchableOpacity
+                        key={cat.key}
+                        onPress={() => setSearchFilter(cat.key)}
+                        activeOpacity={0.75}
+                        style={{
+                          flexDirection: 'row', alignItems: 'center', gap: 6,
+                          paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                          backgroundColor: active ? cat.accent : colors.backgroundSecondary,
+                          borderWidth: active ? 0 : StyleSheet.hairlineWidth,
+                          borderColor: colors.divider,
+                        }}
+                      >
+                        <Icon name={cat.icon} size={13} color={active ? '#fff' : colors.textSecondary} />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{cat.label}</Text>
+                        {totalCounts[cat.key] > 0 && (
+                          <View style={{ backgroundColor: active ? 'rgba(255,255,255,0.25)' : cat.accent + '22', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: active ? '#fff' : cat.accent }}>{totalCounts[cat.key]}</Text>
                           </View>
                         )}
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{u.display_name ?? u.username}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }}>@{u.username}</Text>
-                        </View>
-                        <Icon name="chevron-right" size={16} color={colors.textDisabled} />
-                      </Row>
-                    ))}
-                  </View>
-                )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
 
-                {/* Concerts */}
-                {(searchResults.concerts?.length ?? 0) > 0 && (
-                  <View>
-                    <SectionHeader icon="music" label="Concerts" count={searchResults.concerts.length} accent="#E0389A" />
-                    {searchResults.concerts.map((c: any) => (
-                      <Row key={c.id} onPress={() => (nav as any).navigate('ConcertDetail', { concertId: c.id })}>
-                        <Thumb uri={c.thumbnail_url} icon="music" accent="#E0389A" />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>{[c.genre, c.venue_city].filter(Boolean).join(' · ') || 'Concert'}</Text>
-                        </View>
-                        <Icon name="chevron-right" size={16} color={colors.textDisabled} />
-                      </Row>
-                    ))}
-                  </View>
-                )}
-
-                {/* Événements */}
-                {(searchResults.events?.length ?? 0) > 0 && (
-                  <View>
-                    <SectionHeader icon="calendar" label="Événements" count={searchResults.events.length} accent="#0EA5E9" />
-                    {searchResults.events.map((e: any) => (
-                      <Row key={e.id} onPress={() => (nav as any).navigate('EventDetail', { eventId: e.id })}>
-                        <Thumb uri={e.thumbnail_url} icon="calendar" accent="#0EA5E9" />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{e.title}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>{[e.type ?? e.event_type, e.venue_city].filter(Boolean).join(' · ')}</Text>
-                        </View>
-                        <Icon name="chevron-right" size={16} color={colors.textDisabled} />
-                      </Row>
-                    ))}
-                  </View>
-                )}
-
-                {/* Reels */}
-                {(searchResults.reels?.length ?? 0) > 0 && (
-                  <View>
-                    <SectionHeader icon="video" label="Reels" count={searchResults.reels.length} accent="#10B981" />
-                    {searchResults.reels.map((r: any) => (
-                      <Row key={r.id}>
-                        <Thumb uri={r.thumbnail_url} icon="video" accent="#10B981" />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={2}>{r.caption ?? 'Reel'}</Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                            <Icon name="eye" size={11} color={colors.textTertiary} />
-                            <Text style={{ fontSize: 12, color: colors.textTertiary }}>{r.view_count ?? 0} vues</Text>
+                <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                  {/* Utilisateurs */}
+                  {(searchFilter === 'all' || searchFilter === 'users') && (searchResults!.users?.length ?? 0) > 0 && (
+                    <View>
+                      <SrSection icon="users" label="Personnes" count={searchResults!.users!.length} accent="#7B3FF2" />
+                      {searchResults!.users!.map((u: any, i: number) => (
+                        <SrRow key={u.id} onPress={() => { closeSearch(); (nav as any).navigate('UserProfile', { userId: u.id }); }} last={i === searchResults!.users!.length - 1}>
+                          {u.avatar_url ? (
+                            <Image source={{ uri: u.avatar_url }} style={{ width: 52, height: 52, borderRadius: 26 }} />
+                          ) : (
+                            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#7B3FF2' + '20', alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ fontSize: 20, fontWeight: '800', color: '#7B3FF2' }}>{((u.display_name ?? u.username) as string)[0].toUpperCase()}</Text>
+                            </View>
+                          )}
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{u.display_name ?? u.username}</Text>
+                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>@{u.username}</Text>
                           </View>
-                        </View>
-                      </Row>
-                    ))}
-                  </View>
-                )}
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="chevron-right" size={14} color={colors.textDisabled} />
+                          </View>
+                        </SrRow>
+                      ))}
+                    </View>
+                  )}
 
-                {/* Films */}
-                {(searchResults.films?.length ?? 0) > 0 && (
-                  <View>
-                    <SectionHeader icon="film" label="Films" count={searchResults.films.length} accent="#F59E0B" />
-                    {searchResults.films.map((c: any) => (
-                      <Row key={c.id}>
-                        <Thumb uri={c.thumbnail_url} icon="film" accent="#F59E0B" />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }}>{c.year ?? 'Film'}</Text>
-                        </View>
-                      </Row>
-                    ))}
-                  </View>
-                )}
+                  {/* Événements */}
+                  {(searchFilter === 'all' || searchFilter === 'events') && (searchResults!.events?.length ?? 0) > 0 && (
+                    <View>
+                      <SrSection icon="calendar" label="Événements" count={searchResults!.events!.length} accent="#0EA5E9" />
+                      {searchResults!.events!.map((e: any, i: number) => (
+                        <SrRow key={e.id} onPress={() => { closeSearch(); (nav as any).navigate('EventDetail', { eventId: e.id }); }} last={i === searchResults!.events!.length - 1}>
+                          <SrThumb uri={e.thumbnail_url} icon="calendar" accent="#0EA5E9" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{e.title}</Text>
+                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>{[e.type ?? e.event_type, e.venue_city].filter(Boolean).join(' · ') || 'Événement'}</Text>
+                          </View>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#0EA5E918', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="calendar" size={13} color="#0EA5E9" />
+                          </View>
+                        </SrRow>
+                      ))}
+                    </View>
+                  )}
 
-                {/* Séries */}
-                {(searchResults.series?.length ?? 0) > 0 && (
-                  <View>
-                    <SectionHeader icon="tv" label="Séries" count={searchResults.series.length} accent="#6366F1" />
-                    {searchResults.series.map((c: any) => (
-                      <Row key={c.id}>
-                        <Thumb uri={c.thumbnail_url} icon="tv" accent="#6366F1" />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }}>Série{c.year ? ` · ${c.year}` : ''}</Text>
-                        </View>
-                      </Row>
-                    ))}
-                  </View>
-                )}
+                  {/* Concerts */}
+                  {(searchFilter === 'all' || searchFilter === 'concerts') && (searchResults!.concerts?.length ?? 0) > 0 && (
+                    <View>
+                      <SrSection icon="music" label="Concerts" count={searchResults!.concerts!.length} accent="#E0389A" />
+                      {searchResults!.concerts!.map((c: any, i: number) => (
+                        <SrRow key={c.id} onPress={() => { closeSearch(); (nav as any).navigate('ConcertDetail', { concertId: c.id }); }} last={i === searchResults!.concerts!.length - 1}>
+                          <SrThumb uri={c.thumbnail_url} icon="music" accent="#E0389A" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
+                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>{[c.genre, c.venue_city].filter(Boolean).join(' · ') || 'Concert'}</Text>
+                          </View>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#E0389A18', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="music" size={13} color="#E0389A" />
+                          </View>
+                        </SrRow>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Reels */}
+                  {(searchFilter === 'all' || searchFilter === 'reels') && (searchResults!.reels?.length ?? 0) > 0 && (
+                    <View>
+                      <SrSection icon="video" label="Reels" count={searchResults!.reels!.length} accent="#10B981" />
+                      {searchResults!.reels!.map((r: any, i: number) => (
+                        <SrRow key={r.id} last={i === searchResults!.reels!.length - 1}>
+                          <SrThumb uri={r.thumbnail_url} icon="video" accent="#10B981" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={2}>{r.caption ?? 'Reel'}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                              <Icon name="eye" size={11} color={colors.textTertiary} />
+                              <Text style={{ fontSize: 12, color: colors.textTertiary }}>{(r.view_count ?? 0).toLocaleString('fr')} vues</Text>
+                            </View>
+                          </View>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#10B98118', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="play" size={13} color="#10B981" />
+                          </View>
+                        </SrRow>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Films + Séries */}
+                  {(searchFilter === 'all' || searchFilter === 'films') && (searchResults!.films?.length ?? 0) > 0 && (
+                    <View>
+                      <SrSection icon="film" label="Films" count={searchResults!.films!.length} accent="#F59E0B" />
+                      {searchResults!.films!.map((c: any, i: number) => (
+                        <SrRow key={c.id} last={i === searchResults!.films!.length - 1}>
+                          <SrThumb uri={c.thumbnail_url} icon="film" accent="#F59E0B" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
+                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.year ?? 'Film'}</Text>
+                          </View>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#F59E0B18', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="film" size={13} color="#F59E0B" />
+                          </View>
+                        </SrRow>
+                      ))}
+                    </View>
+                  )}
+                  {(searchFilter === 'all' || searchFilter === 'films') && (searchResults!.series?.length ?? 0) > 0 && (
+                    <View>
+                      <SrSection icon="tv" label="Séries" count={searchResults!.series!.length} accent="#6366F1" />
+                      {searchResults!.series!.map((c: any, i: number) => (
+                        <SrRow key={c.id} last={i === searchResults!.series!.length - 1}>
+                          <SrThumb uri={c.thumbnail_url} icon="tv" accent="#6366F1" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
+                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>Série{c.year ? ` · ${c.year}` : ''}</Text>
+                          </View>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#6366F118', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="tv" size={13} color="#6366F1" />
+                          </View>
+                        </SrRow>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
               </>
             );
           })()}
-        </ScrollView>
+        </Animated.View>
       ) : loading ? (
         <SkeletonFeedScreen />
       ) : (
@@ -1281,7 +1436,77 @@ export const FeedScreen: React.FC = () => {
                 </View>
               )}
 
+              {/* ── Près de toi ──────────────────────────────────────── */}
+              {nearbyEvents.length > 0 && (
+                <View style={[nbS.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
+                  <View style={nbS.header}>
+                    <View>
+                      <Text style={[nbS.title, { color: colors.textPrimary }]}>Dans ton quartier</Text>
+                      <Text style={[nbS.subtitle, { color: colors.textTertiary }]}>Des événements proches de toi</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => nav.navigate('NearbyEvents' as any)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Text style={[nbS.seeAll, { color: colors.primary }]}>Voir tout</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={nbS.list}>
+                    {nearbyEvents.map(ev => {
+                      const dist = (ev as any).distance_km as number | null | undefined;
+                      const distLabel = dist != null ? (dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`) : null;
+                      const typeColor = EVENT_COLORS[ev.event_type ?? 'other'] ?? colors.primary;
+                      const typeIcon  = EVENT_ICONS[ev.event_type ?? 'other'] ?? 'calendar';
+                      const NCARD_W   = Dimensions.get('window').width * 0.45;
+                      const NCOVER_H  = NCARD_W * 0.5;
+                      return (
+                        <View key={ev.id} style={[nbS.card, { width: NCARD_W, backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                          {/* Cover */}
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => nav.navigate('EventDetail', { eventId: ev.id })}>
+                            {ev.thumbnail_url ? (
+                              <Image source={{ uri: ev.thumbnail_url }} style={{ width: NCARD_W, height: NCOVER_H }} resizeMode="cover" />
+                            ) : (
+                              <LinearGradient colors={[typeColor + 'DD', typeColor + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: NCARD_W, height: NCOVER_H, alignItems: 'center', justifyContent: 'center' }}>
+                                <Icon name={typeIcon} size={28} color="rgba(255,255,255,0.7)" />
+                              </LinearGradient>
+                            )}
+                            {/* Badge distance */}
+                            {distLabel && (
+                              <View style={{ position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
+                                <Icon name="map-pin" size={9} color="#fff" />
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{distLabel}</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
 
+                          {/* Icône type chevauchante */}
+                          <View style={[nbS.iconWrap, { borderColor: colors.background, backgroundColor: typeColor, marginTop: -18 }]}>
+                            <Icon name={typeIcon} size={14} color="#fff" />
+                          </View>
+
+                          {/* Body */}
+                          <View style={[nbS.cardBody, { paddingTop: 14 }]}>
+                            <TouchableOpacity onPress={() => nav.navigate('EventDetail', { eventId: ev.id })} activeOpacity={0.8} style={{ alignItems: 'center', width: '100%' }}>
+                              <Text style={[nbS.name, { color: colors.textPrimary }]} numberOfLines={1}>{ev.title}</Text>
+                              {ev.starts_at && (
+                                <Text style={[nbS.handle, { color: colors.textTertiary }]}>
+                                  {new Date(ev.starts_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                  {ev.venue_city ? ` · ${ev.venue_city}` : ''}
+                                </Text>
+                              )}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[nbS.goBtn, { backgroundColor: typeColor }]}
+                              activeOpacity={0.8}
+                              onPress={() => nav.navigate('EventDetail', { eventId: ev.id })}
+                            >
+                              <Icon name="arrow-right" size={14} color="#fff" />
+                              <Text style={nbS.goBtnText}>Y aller</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
 
             </>
           }
@@ -1309,7 +1534,7 @@ export const FeedScreen: React.FC = () => {
       )}
 
       {/* ── FAB Créer ──────────────────────────────────────────────────── */}
-      {!searchOpen && !searchResults && (
+      {!searchOpen && (
         <>
           {/* Overlay pour fermer le menu */}
           {fabOpen && (
@@ -2623,6 +2848,22 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 });
 
 const { width: SW, height: SH } = Dimensions.get('window');
+
+const nbS = StyleSheet.create({
+  wrap:     { paddingVertical: 14, marginBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
+  title:    { fontSize: 16, fontWeight: '800' },
+  subtitle: { fontSize: 11, marginTop: 2 },
+  seeAll:   { fontSize: 13, fontWeight: '700' },
+  list:     { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
+  card:     { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  iconWrap: { width: 36, height: 36, borderRadius: 18, borderWidth: 3, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+  cardBody: { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, gap: 3 },
+  name:     { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  handle:   { fontSize: 10, textAlign: 'center' },
+  goBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, borderRadius: 8, paddingVertical: 9, width: '100%' },
+  goBtnText:{ fontSize: 13, fontWeight: '700', color: '#fff' },
+});
 
 const mnu = StyleSheet.create({
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },

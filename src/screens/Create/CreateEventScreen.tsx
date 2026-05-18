@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import Geolocation from '@react-native-community/geolocation';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, PermissionsAndroid, Linking,
+  TextInput, Alert, ActivityIndicator, Linking,
+  KeyboardAvoidingView, Platform, PermissionsAndroid,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Animated, {
@@ -79,6 +79,10 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
   const [venueAddr,    setVenueAddr]    = useState('');
   const [country,      setCountry]      = useState('Burkina Faso');
   const [isOnline,     setIsOnline]     = useState(false);
+
+  // Position géocodée confirmée { lat, lon, label }
+  const [geoCoords,    setGeoCoords]    = useState<{ lat: number; lon: number; label: string } | null>(null);
+  const [geocoding,    setGeocoding]    = useState(false);
   const [onlineUrl,    setOnlineUrl]    = useState('');
   const [startDate,    setStartDate]    = useState<Date | null>(null);
   const [startTime,    setStartTime]    = useState<Date | null>(null);
@@ -132,7 +136,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
       .finally(() => setLoadingData(false));
   }, [eventId]);
 
-  // ── GPS ───────────────────────────────────────────────────────────────────
+  // ── GPS : reverse geocoding ───────────────────────────────────────────────
   const handleGetLocation = async () => {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
@@ -149,24 +153,55 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
       async (pos) => {
         try {
           const { latitude, longitude } = pos.coords;
-          const mapsUrl = Platform.OS === 'ios'
-            ? `maps:?ll=${latitude},${longitude}&z=16`
-            : `geo:${latitude},${longitude}?z=16`;
-          const canOpen = await Linking.canOpenURL(mapsUrl);
-          Linking.openURL(canOpen ? mapsUrl : `https://www.google.com/maps?q=${latitude},${longitude}&z=16`);
-          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`, { headers: { 'Accept-Language': 'fr' } });
+          const res  = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+            { headers: { 'Accept-Language': 'fr', 'User-Agent': 'FoliX-App/1.0' } },
+          );
           const data = await res.json();
           const addr = data.address ?? {};
-          setVenueCity(addr.city ?? addr.town ?? addr.village ?? addr.county ?? '');
-          setCountry(addr.country ?? '');
-          if (addr.road) setVenueName(addr.road);
-          if (addr.road || addr.suburb) setVenueAddr([addr.house_number, addr.road, addr.suburb].filter(Boolean).join(' '));
-        } catch { Alert.alert('Erreur', 'Impossible de récupérer la position.'); }
-        finally  { setLocating(false); }
+          const city    = addr.city ?? addr.town ?? addr.village ?? addr.county ?? '';
+          const ctry    = addr.country ?? '';
+          const road    = addr.road ?? '';
+          const addrStr = [addr.house_number, road, addr.suburb].filter(Boolean).join(' ');
+          const label   = data.display_name ?? [addrStr, city, ctry].filter(Boolean).join(', ');
+          setVenueCity(city);
+          setCountry(ctry);
+          if (road)    setVenueName(road);
+          if (addrStr) setVenueAddr(addrStr);
+          setGeoCoords({ lat: latitude, lon: longitude, label });
+        } catch {
+          Alert.alert('Erreur', 'Impossible de récupérer la position.');
+        } finally {
+          setLocating(false);
+        }
       },
       () => { setLocating(false); Alert.alert('Erreur GPS', 'Position introuvable.'); },
       { enableHighAccuracy: true, timeout: 10000 },
     );
+  };
+
+  // ── Forward geocoding : quand l'adresse est saisie manuellement ───────────
+  const handleForwardGeocode = async () => {
+    const query = [venueAddr, venueCity, country].filter(Boolean).join(', ');
+    if (!query.trim()) return;
+    setGeocoding(true);
+    try {
+      const res  = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'fr', 'User-Agent': 'FoliX-App/1.0' } },
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        setGeoCoords({ lat: parseFloat(lat), lon: parseFloat(lon), label: display_name });
+      } else {
+        setGeoCoords(null);
+      }
+    } catch {
+      setGeoCoords(null);
+    } finally {
+      setGeocoding(false);
+    }
   };
 
   // ── Validation par étape ──────────────────────────────────────────────────
@@ -508,17 +543,63 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                   <Field label="Lien de diffusion" placeholder="https://..." value={onlineUrl} onChangeText={setOnlineUrl} keyboardType="url" colors={colors} />
                 ) : (
                   <>
+                    {/* Bouton GPS */}
                     <TouchableOpacity
                       onPress={handleGetLocation} disabled={locating}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: colors.primary + '18', borderWidth: 1.5, borderColor: colors.primary + '55', marginBottom: 12 }}
                     >
                       {locating ? <ActivityIndicator size="small" color={colors.primary} /> : <Icon name="map-pin" size={16} color={colors.primary} />}
-                      <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{locating ? 'Localisation...' : 'Utiliser ma position GPS'}</Text>
+                      <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{locating ? 'Localisation en cours...' : 'Utiliser ma position GPS'}</Text>
                     </TouchableOpacity>
-                    <Field label="Nom du lieu"  placeholder="Salle, stade..."       value={venueName} onChangeText={setVenueName} colors={colors} />
-                    <Field label="Adresse"      placeholder="123 rue de la Paix"    value={venueAddr} onChangeText={setVenueAddr} colors={colors} />
-                    <Field label="Ville *"      placeholder="Paris"                 value={venueCity} onChangeText={setVenueCity} colors={colors} />
-                    <Field label="Pays"         placeholder="France"                value={country}   onChangeText={setCountry}   colors={colors} />
+
+                    {/* Champs adresse — onBlur déclenche le forward geocoding */}
+                    <Field label="Nom du lieu"  placeholder="Salle, stade..."    value={venueName} onChangeText={v => { setVenueName(v); setGeoCoords(null); }} colors={colors} />
+                    <Field label="Adresse"      placeholder="123 rue de la Paix" value={venueAddr} onChangeText={v => { setVenueAddr(v); setGeoCoords(null); }} onBlur={handleForwardGeocode} colors={colors} />
+                    <Field label="Ville *"      placeholder="Paris"              value={venueCity} onChangeText={v => { setVenueCity(v); setGeoCoords(null); }} onBlur={handleForwardGeocode} colors={colors} />
+                    <Field label="Pays"         placeholder="France"             value={country}   onChangeText={v => { setCountry(v);   setGeoCoords(null); }} onBlur={handleForwardGeocode} colors={colors} />
+
+                    {/* Indicateur de position géocodée */}
+                    {geocoding && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, backgroundColor: colors.backgroundSecondary, marginTop: 4 }}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={{ fontSize: 12, color: colors.textTertiary }}>Recherche de la position...</Text>
+                      </View>
+                    )}
+                    {!geocoding && geoCoords && (
+                      <View style={{ marginTop: 4, borderRadius: 12, borderWidth: 1.5, borderColor: '#10B981', backgroundColor: '#10B98110', overflow: 'hidden' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 12 }}>
+                          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#10B98122', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                            <Icon name="check-circle" size={16} color="#10B981" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#10B981', marginBottom: 2 }}>Position trouvée</Text>
+                            <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16 }} numberOfLines={2}>
+                              {geoCoords.label}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 3 }}>
+                              {geoCoords.lat.toFixed(5)}, {geoCoords.lon.toFixed(5)}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const url = `https://www.google.com/maps?q=${geoCoords.lat},${geoCoords.lon}&z=16`;
+                              Linking.openURL(url);
+                            }}
+                            style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#10B98122', borderWidth: 1, borderColor: '#10B98155' }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#10B981' }}>Voir</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+                    {!geocoding && !geoCoords && (venueCity.trim() || venueAddr.trim()) && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, backgroundColor: colors.backgroundSecondary, marginTop: 4, borderWidth: 1, borderColor: colors.border }}>
+                        <Icon name="alert-circle" size={14} color={colors.textTertiary} />
+                        <Text style={{ fontSize: 11, color: colors.textTertiary, flex: 1 }}>
+                          Position non confirmée — quitte un champ pour vérifier l'adresse.
+                        </Text>
+                      </View>
+                    )}
                   </>
                 )}
               </View>
@@ -641,16 +722,17 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
 interface FieldProps {
   label: string; placeholder: string; value: string;
   onChangeText: (t: string) => void;
+  onBlur?: () => void;
   multiline?: boolean;
   keyboardType?: 'default' | 'decimal-pad' | 'number-pad' | 'url' | 'email-address';
   colors: any;
 }
-const Field: React.FC<FieldProps> = ({ label, placeholder, value, onChangeText, multiline, keyboardType = 'default', colors }) => {
+const Field: React.FC<FieldProps> = ({ label, placeholder, value, onChangeText, onBlur, multiline, keyboardType = 'default', colors }) => {
   const [focused, setFocused] = useState(false);
   return (
     <View style={[s.fieldWrap, { backgroundColor: colors.inputBg, borderColor: focused ? colors.primary : colors.inputBorder }]}>
       <Text style={[s.fieldLabel, { color: focused ? colors.primary : colors.textTertiary }]}>{label}</Text>
-      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textDisabled} multiline={multiline} keyboardType={keyboardType} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} style={[s.fieldInput, multiline && s.fieldInputMulti, { color: colors.textPrimary }]} />
+      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textDisabled} multiline={multiline} keyboardType={keyboardType} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); onBlur?.(); }} style={[s.fieldInput, multiline && s.fieldInputMulti, { color: colors.textPrimary }]} />
     </View>
   );
 };
