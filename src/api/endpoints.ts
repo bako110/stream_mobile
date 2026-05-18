@@ -314,6 +314,8 @@ export const Endpoints = {
     // CinetPay
     cinetpayInit:   `${V1}/wallet/purchase/cinetpay/init`,
     cinetpayStatus: (merchantTxId: string) => `${V1}/wallet/purchase/cinetpay/${merchantTxId}/status`,
+    // Creator subscriptions
+    subscribeToCreator: (creatorId: string) => `${V1}/wallet/creators/${creatorId}/subscribe`,
   },
 
   // ── Lives simples (spontanés) ─────────────────────────────────────────────

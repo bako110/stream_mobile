@@ -130,8 +130,7 @@ export interface CommunityMemberProfile {
   role: 'admin' | 'moderator' | 'member';
   joined_at: string | null;
   bio: string | null;
-  xp: number;
-  level: number;
+  coins_total: number;
   badges: string[];
   posts_count: number;
   reactions_given: number;

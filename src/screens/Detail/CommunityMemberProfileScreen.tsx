@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  Animated,
   Alert,
   ActivityIndicator,
   Image,
@@ -65,8 +64,6 @@ const BADGE_META: Record<string, { emoji: string; label: string; desc: string }>
   newcomer:        { emoji: '🌱', label: 'Nouveau',          desc: 'Vient de rejoindre la communauté'     },
 };
 
-const XP_THRESHOLDS = [0, 500, 1000, 2000, 3500, 6000, 9999];
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -92,37 +89,6 @@ function formatLastSeen(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
 
-function getXpProgress(xp: number, level: number) {
-  const idx = Math.min(level - 1, XP_THRESHOLDS.length - 2);
-  const low  = XP_THRESHOLDS[idx]     ?? 0;
-  const high = XP_THRESHOLDS[idx + 1] ?? 9999;
-  const xpForLevel = high - low;
-  const xpToNext = Math.max(0, high - xp);
-  const progress = Math.min((xp - low) / (high - low), 1);
-  return { progress, xpToNext, xpForLevel };
-}
-
-// ---------------------------------------------------------------------------
-// Animated XP bar
-// ---------------------------------------------------------------------------
-
-interface AnimatedXpBarProps { progress: number; color: string; height?: number }
-
-function AnimatedXpBar({ progress, color, height = 8 }: AnimatedXpBarProps) {
-  const anim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(anim, { toValue: progress, duration: 900, useNativeDriver: false }).start();
-  }, [progress]);
-
-  const width = anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
-
-  return (
-    <View style={[styles.xpTrack, { height, borderRadius: height / 2 }]}>
-      <Animated.View style={[styles.xpFill, { width, height, borderRadius: height / 2, backgroundColor: color }]} />
-    </View>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Main screen
@@ -178,8 +144,6 @@ export function CommunityMemberProfileScreen({ route }: Props) {
 
   const gradientColors = ROLE_GRADIENT[member.role] ?? ROLE_GRADIENT.member;
   const roleColor      = ROLE_COLOR[member.role] ?? '#7B3FF2';
-  const { progress, xpToNext, xpForLevel } = getXpProgress(member.xp ?? 0, member.level ?? 1);
-  const xpDone = xpForLevel - xpToNext;
 
   const handleViewFullProfile = () => {
     navigation.navigate('UserProfile', { userId: member.user_id });
@@ -276,8 +240,8 @@ export function CommunityMemberProfileScreen({ route }: Props) {
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
               <Icon name="zap" size={16} color="#F59E0B" />
-              <Text style={[styles.statValue, { color: colors.textPrimary }]}>{(member.xp ?? 0).toLocaleString()}</Text>
-              <Text style={[styles.statLabel, { color: colors.textTertiary }]}>XP</Text>
+              <Text style={[styles.statValue, { color: colors.textPrimary }]}>{(member.coins_total ?? 0).toLocaleString()}</Text>
+              <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Coins</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
@@ -293,33 +257,6 @@ export function CommunityMemberProfileScreen({ route }: Props) {
             </View>
           </View>
 
-          {/* XP progression */}
-          {(member.xp !== undefined || member.level !== undefined) && (
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={styles.xpHeader}>
-                <View style={styles.xpTitleRow}>
-                  <View style={[styles.xpLevelBadge, { backgroundColor: colors.primary + '22', borderColor: colors.primary + '55' }]}>
-                    <Text style={[styles.xpLevelText, { color: colors.primary }]}>Niv. {member.level ?? 1}</Text>
-                  </View>
-                  <Text style={[styles.xpTitle, { color: colors.textPrimary }]}>Progression XP</Text>
-                </View>
-                <Text style={[styles.xpNextLabel, { color: colors.textTertiary }]}>
-                  {xpToNext > 0 ? `${xpToNext} XP avant niveau ${(member.level ?? 1) + 1}` : 'Niveau max !'}
-                </Text>
-              </View>
-
-              <AnimatedXpBar progress={progress} color={colors.primary} height={10} />
-
-              <View style={styles.xpFooter}>
-                <Text style={[styles.xpCountText, { color: colors.textTertiary }]}>
-                  {xpDone} / {xpForLevel} XP
-                </Text>
-                <Text style={[styles.xpPercentText, { color: colors.primary }]}>
-                  {Math.round(progress * 100)}%
-                </Text>
-              </View>
-            </View>
-          )}
 
           {/* Badges */}
           {member.badges && member.badges.length > 0 && (
@@ -572,17 +509,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  xpHeader: { marginBottom: 12, gap: 4 },
-  xpTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  xpLevelBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
-  xpLevelText: { fontSize: 12, fontWeight: '800' },
-  xpTitle: { fontSize: 15, fontWeight: '700' },
-  xpNextLabel: { fontSize: 12, marginTop: 2 },
-  xpTrack: { backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  xpFill: { position: 'absolute', left: 0, top: 0 },
-  xpFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  xpCountText: { fontSize: 11, fontWeight: '500' },
-  xpPercentText: { fontSize: 12, fontWeight: '700' },
 
   badgesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   badgeCard: {
