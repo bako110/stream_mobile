@@ -119,7 +119,10 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
       setOnlineUrl(ev.online_url ?? '');
       setMaxAttendees(ev.max_attendees != null ? String(ev.max_attendees) : '');
       // Prix legacy → simple
-      if (ev.ticket_price != null) setPriceSimple(String(ev.ticket_price));
+      if (ev.ticket_price      != null) setPriceSimple(String(ev.ticket_price));
+      if (ev.ticket_price_vip  != null) setPriceVip(String(ev.ticket_price_vip));
+      if (ev.ticket_price_vvip != null) setPriceVvip(String(ev.ticket_price_vvip));
+      if (ev.ticket_price_vvvip != null) setPriceVvvip(String(ev.ticket_price_vvvip));
       if (ev.starts_at) { const d = new Date(ev.starts_at); setStartDate(d); setStartTime(d); }
       if (ev.ends_at)   { const d = new Date(ev.ends_at);   setEndDate(d);   setEndTime(d);   }
       const imgs = [ev.thumbnail_url, ev.banner_url, ...(ev.gallery_urls ?? [])].filter(Boolean) as string[];

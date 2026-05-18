@@ -574,16 +574,16 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             </LinearGradient>
           </TouchableOpacity>
         ) : (() => {
-          const tierPrice = selectedTier === 'simple' ? event.ticket_price
-            : selectedTier === 'vip'   ? (event as any).ticket_price_vip
-            : selectedTier === 'vvip'  ? (event as any).ticket_price_vvip
-            :                            (event as any).ticket_price_vvvip;
-          const tierLabel = selectedTier === 'simple' ? 'Simple'
-            : selectedTier === 'vip'  ? 'VIP'
-            : selectedTier === 'vvip' ? 'VVIP' : 'VVVIP';
-          const hasTiersEvent = (event as any).ticket_price_vip != null
-            || (event as any).ticket_price_vvip != null
-            || (event as any).ticket_price_vvvip != null;
+          const allTiers = [
+            { key: 'simple' as const, label: 'Simple', price: event.ticket_price },
+            { key: 'vip'    as const, label: 'VIP',    price: (event as any).ticket_price_vip },
+            { key: 'vvip'   as const, label: 'VVIP',   price: (event as any).ticket_price_vvip },
+            { key: 'vvvip'  as const, label: 'VVVIP',  price: (event as any).ticket_price_vvvip },
+          ].filter(t => typeof t.price === 'number' && t.price > 0);
+          const activeTier = allTiers.find(t => t.key === selectedTier) ?? allTiers[0];
+          const tierPrice = activeTier?.price ?? null;
+          const tierLabel = activeTier?.label ?? '';
+          const hasTiersEvent = allTiers.length > 1;
           return (
             <TouchableOpacity onPress={handleBuyTicket} activeOpacity={0.85}>
               <LinearGradient
@@ -682,8 +682,40 @@ interface TicketTiersGridProps {
 }
 
 const TicketTiersGrid: React.FC<TicketTiersGridProps> = ({ tiers, selected, onSelect, colors }) => {
-  const visible = tiers.filter(t => t.price != null);
+  // `!= null` en JS laisse passer `undefined` — on filtre strictement
+  const visible = tiers.filter(t => typeof t.price === 'number' && t.price > 0);
   if (visible.length === 0) return null;
+
+  // Si le tier sélectionné n'est pas dans les visibles, on force le premier
+  const effectiveSelected = visible.find(t => t.key === selected) ? selected : visible[0].key;
+
+  // Un seul tier avec prix → pas besoin d'afficher la grille de sélection,
+  // on affiche juste un badge prix simple
+  if (visible.length === 1) {
+    const tier = visible[0];
+    return (
+      <Animated.View entering={FadeInDown.delay(185).springify()}
+        style={{ marginHorizontal: 16, marginTop: 14 }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          backgroundColor: colors.backgroundSecondary,
+          borderRadius: 12, borderWidth: 1.5, borderColor: colors.border,
+          paddingVertical: 12, paddingHorizontal: 14,
+        }}>
+          <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="tag" size={15} color={colors.primary} />
+          </View>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary, flex: 1 }}>
+            Billet d'accès
+          </Text>
+          <View style={{ backgroundColor: colors.primary + '18', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>{tier.price} €</Text>
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View entering={FadeInDown.delay(185).springify()}
       style={{ marginHorizontal: 16, marginTop: 16 }}>
@@ -692,39 +724,39 @@ const TicketTiersGrid: React.FC<TicketTiersGridProps> = ({ tiers, selected, onSe
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {visible.map(tier => {
-          const active = selected === tier.key;
+          const active = effectiveSelected === tier.key;
           return (
             <TouchableOpacity
               key={tier.key}
               onPress={() => onSelect(tier.key)}
               activeOpacity={0.8}
               style={{
-                flexDirection: 'row', alignItems: 'center', gap: 7,
-                paddingVertical: 10, paddingHorizontal: 14,
-                borderRadius: 12, borderWidth: 1.5,
-                backgroundColor: active ? tier.color + '18' : colors.backgroundSecondary,
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+                paddingVertical: 12, paddingHorizontal: 12,
+                borderRadius: 12, borderWidth: 1.5, minWidth: 130,
+                backgroundColor: active ? tier.color + '1A' : colors.backgroundSecondary,
                 borderColor: active ? tier.color : colors.border,
-                flex: visible.length <= 2 ? 1 : undefined,
+                flex: visible.length === 2 ? 1 : undefined,
               }}
             >
               <View style={{
-                width: 28, height: 28, borderRadius: 7,
-                backgroundColor: tier.color + (active ? '33' : '18'),
+                width: 32, height: 32, borderRadius: 8,
+                backgroundColor: tier.color + (active ? '30' : '18'),
                 alignItems: 'center', justifyContent: 'center',
               }}>
-                <Icon name={tier.icon} size={13} color={tier.color} />
+                <Icon name={tier.icon} size={14} color={tier.color} />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, gap: 2 }}>
                 <Text style={{ fontSize: 12, fontWeight: '800', color: active ? tier.color : colors.textPrimary }}>
                   {tier.label}
                 </Text>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? tier.color : colors.textSecondary }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: active ? tier.color : colors.textSecondary }}>
                   {tier.price} €
                 </Text>
               </View>
               {active && (
-                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: tier.color, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="check" size={10} color="#fff" />
+                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: tier.color, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="check" size={11} color="#fff" />
                 </View>
               )}
             </TouchableOpacity>

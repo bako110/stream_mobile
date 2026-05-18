@@ -110,10 +110,10 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
       setCountry(c.venue_country ?? 'Burkina Faso');
       setMaxViewers(c.max_viewers != null ? String(c.max_viewers) : '');
       setDurationMin(c.duration_min != null ? String(c.duration_min) : '');
-      if (c.ticket_price != null) setPriceSimple(String(c.ticket_price));
-      if ((c as any).ticket_price_vip  != null) setPriceVip(String((c as any).ticket_price_vip));
-      if ((c as any).ticket_price_vvip != null) setPriceVvip(String((c as any).ticket_price_vvip));
-      if ((c as any).ticket_price_vvvip != null) setPriceVvvip(String((c as any).ticket_price_vvvip));
+      if (c.ticket_price      != null) setPriceSimple(String(c.ticket_price));
+      if (c.ticket_price_vip  != null) setPriceVip(String(c.ticket_price_vip));
+      if (c.ticket_price_vvip != null) setPriceVvip(String(c.ticket_price_vvip));
+      if (c.ticket_price_vvvip != null) setPriceVvvip(String(c.ticket_price_vvvip));
       if (c.scheduled_at) {
         const d = new Date(c.scheduled_at);
         setSchedDate(d); setSchedTime(d);
@@ -218,12 +218,10 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
       return d.toISOString();
     })(),
     duration_min:  durationMin ? Number(durationMin) : undefined,
-    ticket_price:  accessType === 'ticket' ? Number(priceSimple) : undefined,
-    ...(accessType === 'ticket' ? {
-      ticket_price_vip:   priceVip   ? Number(priceVip)   : undefined,
-      ticket_price_vvip:  priceVvip  ? Number(priceVvip)  : undefined,
-      ticket_price_vvvip: priceVvvip ? Number(priceVvvip) : undefined,
-    } as any : {}),
+    ticket_price:       accessType === 'ticket' && priceSimple ? Number(priceSimple) : undefined,
+    ticket_price_vip:   accessType === 'ticket' && priceVip   ? Number(priceVip)    : undefined,
+    ticket_price_vvip:  accessType === 'ticket' && priceVvip  ? Number(priceVvip)   : undefined,
+    ticket_price_vvvip: accessType === 'ticket' && priceVvvip ? Number(priceVvvip)  : undefined,
     max_viewers:   maxViewers ? Number(maxViewers) : undefined,
     thumbnail_url: galleryUrls[0] ?? (thumbnailUrl || undefined),
     banner_url:    bannerUrl || galleryUrls[1] || undefined,
