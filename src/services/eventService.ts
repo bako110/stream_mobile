@@ -65,8 +65,8 @@ export const eventService = {
 
   // ── Billets ───────────────────────────────────────────────────────────────
 
-  async buyTicket(eventId: string): Promise<EventTicket> {
-    const res = await apiClient.post<EventTicket>(Endpoints.events.buyTicket(eventId));
+  async buyTicket(eventId: string, tierKey?: string): Promise<EventTicket> {
+    const res = await apiClient.post<EventTicket>(Endpoints.events.buyTicket(eventId), tierKey ? { tier: tierKey } : undefined);
     return res.data;
   },
 

@@ -2,13 +2,22 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, Image, TextInput, Platform, StatusBar,
-  Alert, Linking,
+  Alert,
 } from 'react-native';
+
+const TIER_COLORS: Record<string, string> = {
+  simple: '#7B3FF2', vip: '#F59E0B', vvip: '#8B5CF6', vvvip: '#EF4444',
+};
+const TIER_LABELS: Record<string, string> = {
+  simple: 'STD', vip: 'VIP', vvip: 'VVIP', vvvip: 'VVVIP',
+};
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useTheme } from '../../hooks/useTheme';
 import { eventService } from '../../services';
-import { apiClient, Endpoints } from '../../api';
+import { Endpoints, getAuthToken } from '../../api';
+import { API_BASE_URL } from '../../utils/constants';
 import type { EventAttendee } from '../../types/event';
 
 interface Props {
@@ -62,20 +71,23 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
     setFiltered(list);
   }, [attendees, tab, query]);
 
-  const handleExportCsv = async () => {
+  const handleExportPdf = async () => {
     setExporting(true);
     try {
-      // On récupère un token d'export depuis l'API puis on ouvre dans le navigateur
-      const res = await apiClient.get<{ url: string }>(Endpoints.events.attendeesCsv(eventId));
-      const url = res.data?.url ?? Endpoints.events.attendeesCsv(eventId);
-      await Linking.openURL(url);
-    } catch {
-      // Fallback : ouvrir l'endpoint directement
-      try {
-        await Linking.openURL(Endpoints.events.attendeesCsv(eventId));
-      } catch {
-        Alert.alert('Export', 'Impossible d\'exporter la liste pour le moment.');
+      const token = getAuthToken();
+      const url   = `${API_BASE_URL}${Endpoints.events.attendeesPdf(eventId)}`;
+      const dest  = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/inscrits_${eventId}.pdf`;
+
+      const res = await ReactNativeBlobUtil.config({ path: dest })
+        .fetch('GET', url, token ? { Authorization: `Bearer ${token}` } : {});
+
+      if (Platform.OS === 'ios') {
+        await ReactNativeBlobUtil.ios.presentOptionsMenu(res.path());
+      } else {
+        await ReactNativeBlobUtil.android.actionViewIntent(res.path(), 'application/pdf');
       }
+    } catch {
+      Alert.alert('Export', 'Impossible d\'exporter la liste pour le moment.');
     } finally {
       setExporting(false);
     }
@@ -103,7 +115,18 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
         <Text style={[at.sub, { color: colors.textTertiary }]} numberOfLines={1}>
           {item.username ? `@${item.username}` : ''}{item.email ? ` · ${item.email}` : ''}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+          {/* Badge tier */}
+          {(() => {
+            const tk = (item.ticket_tier ?? 'simple') as string;
+            const tc = TIER_COLORS[tk] ?? TIER_COLORS.simple;
+            const tl = TIER_LABELS[tk] ?? tk.toUpperCase();
+            return (
+              <View style={{ backgroundColor: tc + '18', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: tc + '40' }}>
+                <Text style={{ fontSize: 10, fontWeight: '900', color: tc }}>{tl}</Text>
+              </View>
+            );
+          })()}
           <Text style={[at.price, { color: colors.textTertiary }]}>
             {(Number(item.price_paid) || 0) === 0 ? 'Gratuit' : `${(Number(item.price_paid)).toFixed(2)} €`}
           </Text>
@@ -153,7 +176,7 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          onPress={handleExportCsv}
+          onPress={handleExportPdf}
           disabled={exporting}
           style={[at.exportBtn, { opacity: exporting ? 0.6 : 1 }]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

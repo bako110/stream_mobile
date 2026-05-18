@@ -26,13 +26,21 @@ const formatDate = (iso: string) =>
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
+const TIER_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
+  simple: { label: 'Standard',  icon: 'tag',   color: '#7B3FF2' },
+  vip:    { label: 'VIP',       icon: 'star',  color: '#F59E0B' },
+  vvip:   { label: 'VVIP',      icon: 'award', color: '#8B5CF6' },
+  vvvip:  { label: 'VVVIP',     icon: 'zap',   color: '#EF4444' },
+};
+
 export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
   const { theme: { colors } } = useTheme();
   const event = ticket.event;
   const [downloading, setDownloading] = useState(false);
 
-  // is_used : compatibilité avec l'ancien champ + le nouveau champ status
   const isUsed = ticket.status === 'used' || ticket.is_used === true;
+  const tierKey = (ticket.ticket_tier ?? 'simple') as keyof typeof TIER_CONFIG;
+  const tier = TIER_CONFIG[tierKey] ?? TIER_CONFIG.simple;
 
   // QR encode access_code + event_id — le scanner appelle GET /events/{e}/scan/{ac}
   const qrData = JSON.stringify({
@@ -115,6 +123,20 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
             <Text style={[st.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>
               {event?.title ?? 'Événement'}
             </Text>
+
+            {/* Badge catégorie de billet */}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              backgroundColor: tier.color + '18', borderRadius: 10,
+              paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start',
+              borderWidth: 1, borderColor: tier.color + '40',
+            }}>
+              <Icon name={tier.icon} size={12} color={tier.color} />
+              <Text style={{ fontSize: 11, fontWeight: '900', color: tier.color, letterSpacing: 0.5 }}>
+                {tier.label.toUpperCase()}
+              </Text>
+            </View>
+
             {event?.starts_at && (
               <View style={st.metaRow}>
                 <Icon name="calendar" size={13} color={colors.primary} />
@@ -180,6 +202,11 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
               <Text style={[st.footValue, { color: colors.textPrimary }]} numberOfLines={1}>
                 #{(ticket.access_code ?? ticket.id ?? '').slice(0, 8).toUpperCase()}
               </Text>
+            </View>
+            <View style={[st.footDivider, { backgroundColor: colors.divider }]} />
+            <View style={st.footItem}>
+              <Text style={[st.footLabel, { color: colors.textTertiary }]}>Catégorie</Text>
+              <Text style={[st.footValue, { color: tier.color }]}>{tier.label}</Text>
             </View>
             <View style={[st.footDivider, { backgroundColor: colors.divider }]} />
             <View style={st.footItem}>

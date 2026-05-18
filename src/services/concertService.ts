@@ -77,8 +77,8 @@ export const concertService = {
     await apiClient.post(Endpoints.streaming.stop(id));
   },
 
-  async buyTicket(concertId: string): Promise<unknown> {
-    const res = await apiClient.post(Endpoints.concerts.buyTicket(concertId));
+  async buyTicket(concertId: string, tierKey?: string): Promise<unknown> {
+    const res = await apiClient.post(Endpoints.concerts.buyTicket(concertId), tierKey ? { tier: tierKey } : undefined);
     return res.data;
   },
 

@@ -177,6 +177,10 @@ const InfoRow: React.FC<InfoRowProps> = ({ icon, label, value, color, colors, di
   return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.7}>{inner}</TouchableOpacity> : inner;
 };
 
+// ── Ticket / fees ─────────────────────────────────────────────────────────────
+
+const FEES_RATE = 0.10;
+
 // ── TicketTiersGrid ───────────────────────────────────────────────────────────
 
 interface TierItem {
@@ -185,6 +189,64 @@ interface TierItem {
   price: number | null | undefined;
   sub?: string;
 }
+
+const TierCard: React.FC<{
+  tier: TierItem & { price: number };
+  active: boolean;
+  onPress: () => void;
+  colors: AppColors;
+}> = ({ tier, active, onPress, colors }) => {
+  const fees = Math.round(tier.price * FEES_RATE);
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.78}
+      style={{
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: active ? tier.color + '12' : colors.backgroundSecondary,
+        borderRadius: 16, borderWidth: 1.5,
+        borderColor: active ? tier.color : colors.border,
+        paddingVertical: 14, paddingHorizontal: 14,
+        marginBottom: 8,
+      }}
+    >
+      <View style={{
+        width: 4, minHeight: 48, borderRadius: 4,
+        backgroundColor: active ? tier.color : tier.color + '40',
+        marginRight: 12, alignSelf: 'stretch',
+      }} />
+      <View style={{
+        width: 44, height: 44, borderRadius: 13,
+        backgroundColor: tier.color + (active ? '22' : '14'),
+        alignItems: 'center', justifyContent: 'center', marginRight: 12,
+      }}>
+        <Icon name={tier.icon} size={19} color={tier.color} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 13, fontWeight: '900', color: active ? tier.color : colors.textPrimary, letterSpacing: 0.2 }}>
+          {tier.label.toUpperCase()}
+        </Text>
+        {tier.sub && (
+          <Text style={{ fontSize: 11, color: colors.textTertiary, fontWeight: '500' }}>{tier.sub}</Text>
+        )}
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 2 }}>
+        <Text style={{ fontSize: 17, fontWeight: '900', color: active ? tier.color : colors.textPrimary }}>
+          {tier.price.toLocaleString('fr')} €
+        </Text>
+        <Text style={{ fontSize: 10, color: colors.textTertiary, fontWeight: '500' }}>
+          + {fees.toLocaleString('fr')} frais
+        </Text>
+      </View>
+      {active && (
+        <View style={{
+          width: 22, height: 22, borderRadius: 11, backgroundColor: tier.color,
+          alignItems: 'center', justifyContent: 'center', marginLeft: 10,
+        }}>
+          <Icon name="check" size={12} color="#fff" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
 
 const TicketTiersGrid: React.FC<{
   tiers: TierItem[];
@@ -198,75 +260,18 @@ const TicketTiersGrid: React.FC<{
 
   const effectiveSelected = visible.find(t => t.key === selected) ? selected : visible[0].key;
 
-  if (visible.length === 1) {
-    const tier = visible[0];
-    return (
-      <Animated.View entering={FadeInDown.delay(220).springify()} style={{ marginBottom: 4 }}>
-        <SectionHeader label="Billet" colors={colors} />
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', gap: 12,
-          backgroundColor: colors.backgroundSecondary,
-          borderRadius: 14, borderWidth: 1.5, borderColor: tier.color + '40',
-          paddingVertical: 14, paddingHorizontal: 16,
-        }}>
-          <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: tier.color + '18', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={tier.icon} size={18} color={tier.color} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.textPrimary }}>{tier.label}</Text>
-            {tier.sub && <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 1 }}>{tier.sub}</Text>}
-          </View>
-          <View style={{ backgroundColor: tier.color + '18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 }}>
-            <Text style={{ fontSize: 16, fontWeight: '900', color: tier.color }}>{tier.price} €</Text>
-          </View>
-        </View>
-      </Animated.View>
-    );
-  }
-
   return (
     <Animated.View entering={FadeInDown.delay(220).springify()} style={{ marginBottom: 4 }}>
-      <SectionHeader label="Catégorie de billet" colors={colors} />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {visible.map(tier => {
-          const active = effectiveSelected === tier.key;
-          return (
-            <TouchableOpacity
-              key={tier.key} onPress={() => onSelect(tier.key)} activeOpacity={0.8}
-              style={{
-                flex: visible.length <= 2 ? 1 : undefined,
-                minWidth: (SW - 48) / 2 - 4,
-                borderRadius: 14, borderWidth: 1.5,
-                backgroundColor: active ? tier.color + '15' : colors.backgroundSecondary,
-                borderColor: active ? tier.color : colors.border,
-                padding: 14, gap: 8,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ width: 36, height: 36, borderRadius: 10,
-                  backgroundColor: tier.color + (active ? '28' : '14'),
-                  alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={tier.icon} size={15} color={tier.color} />
-                </View>
-                {active && (
-                  <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: tier.color, alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name="check" size={11} color="#fff" />
-                  </View>
-                )}
-              </View>
-              <View>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? tier.color : colors.textSecondary, letterSpacing: 0.3 }}>
-                  {tier.label}
-                </Text>
-                <Text style={{ fontSize: 17, fontWeight: '900', color: active ? tier.color : colors.textPrimary, marginTop: 2 }}>
-                  {tier.price} €
-                </Text>
-                {tier.sub && <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 1 }}>{tier.sub}</Text>}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <SectionHeader label={visible.length === 1 ? 'Billet' : 'Catégorie de billet'} colors={colors} />
+      {visible.map(tier => (
+        <TierCard
+          key={tier.key}
+          tier={tier}
+          active={effectiveSelected === tier.key}
+          onPress={() => onSelect(tier.key)}
+          colors={colors}
+        />
+      ))}
     </Animated.View>
   );
 };
@@ -627,8 +632,11 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
                   : 'Acheter un billet'}
               </Text>
               {!isRegistered && !isFree && activeTier?.price != null && (
-                <View style={{ marginLeft: 'auto', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}>{activeTier.price} €</Text>
+                <View style={{ marginLeft: 'auto', alignItems: 'flex-end', gap: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}>
+                    {(activeTier.price + Math.round(activeTier.price * FEES_RATE)).toLocaleString('fr')} €
+                  </Text>
+                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>frais inclus</Text>
                 </View>
               )}
             </LinearGradient>
@@ -644,7 +652,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         accessType={concert.access_type as any}
         ticketPrice={concert.ticket_price ?? null}
         thumbnail={concert.thumbnail_url ?? null}
-        kind="concert" onBuy={() => concertService.buyTicket(concertId)}
+        kind="concert"
+        tiers={allTiers}
+        selectedTierKey={selectedTier}
+        onBuy={(tierKey) => concertService.buyTicket(concertId, tierKey)}
       />
       <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} concertId={concertId} />
     </View>

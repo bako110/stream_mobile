@@ -47,6 +47,7 @@ export interface EventTicket {
   user_id: string;
   event_id: string;
   status: TicketStatus;
+  ticket_tier?: string | null;
   price_paid: number;
   currency: string;
   access_code: string;
@@ -66,6 +67,7 @@ export interface EventAttendee {
   display_name: string | null;
   avatar_url: string | null;
   email?: string | null;
+  ticket_tier?: string | null;
   price_paid: number;
   status: TicketStatus;
   used_at: string | null;
@@ -78,6 +80,7 @@ export interface TicketScanResult {
   access_code: string;
   status: TicketStatus;
   is_valid: boolean;
+  ticket_tier?: string | null;
   price_paid: number;
   currency: string;
   used_at: string | null;
