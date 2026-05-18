@@ -192,7 +192,8 @@ const TicketTiersGrid: React.FC<{
   onSelect: (k: TierItem['key']) => void;
   colors: AppColors;
 }> = ({ tiers, selected, onSelect, colors }) => {
-  const visible = tiers.filter(t => typeof t.price === 'number' && t.price > 0);
+  const _p2 = (v: any) => { const n = Number(v); return isFinite(n) && n > 0 ? n : null; };
+  const visible = tiers.map(t => ({ ...t, price: _p2(t.price) })).filter(t => t.price !== null) as (TierItem & { price: number })[];
   if (visible.length === 0) return null;
 
   const effectiveSelected = visible.find(t => t.key === selected) ? selected : visible[0].key;
@@ -387,12 +388,13 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     live: 'Live uniquement', replay: 'Replay uniquement', live_replay: 'Live + Replay',
   };
 
+  const _p = (v: any) => { const n = Number(v); return isFinite(n) && n > 0 ? n : null; };
   const allTiers = [
-    { key: 'simple' as const, label: 'Simple', icon: 'tag',   color: colors.primary,  price: concert.ticket_price,       sub: 'Accès standard' },
-    { key: 'vip'    as const, label: 'VIP',    icon: 'star',  color: '#F59E0B',        price: concert.ticket_price_vip,   sub: 'Accès prioritaire' },
-    { key: 'vvip'   as const, label: 'VVIP',   icon: 'award', color: '#8B5CF6',        price: concert.ticket_price_vvip,  sub: 'Expérience premium' },
-    { key: 'vvvip'  as const, label: 'VVVIP',  icon: 'zap',   color: '#EF4444',        price: concert.ticket_price_vvvip, sub: 'All-inclusive' },
-  ].filter(t => typeof t.price === 'number' && t.price > 0);
+    { key: 'simple' as const, label: 'Simple', icon: 'tag',   color: colors.primary,  price: _p(concert.ticket_price),       sub: 'Accès standard' },
+    { key: 'vip'    as const, label: 'VIP',    icon: 'star',  color: '#F59E0B',        price: _p(concert.ticket_price_vip),   sub: 'Accès prioritaire' },
+    { key: 'vvip'   as const, label: 'VVIP',   icon: 'award', color: '#8B5CF6',        price: _p(concert.ticket_price_vvip),  sub: 'Expérience premium' },
+    { key: 'vvvip'  as const, label: 'VVVIP',  icon: 'zap',   color: '#EF4444',        price: _p(concert.ticket_price_vvvip), sub: 'All-inclusive' },
+  ].filter(t => t.price !== null) as { key: 'simple'|'vip'|'vvip'|'vvvip'; label: string; icon: string; color: string; price: number; sub: string }[];
 
   const activeTier = allTiers.find(t => t.key === selectedTier) ?? allTiers[0];
 
@@ -570,10 +572,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             style={{ paddingHorizontal: 16, marginTop: 22 }}>
             <TicketTiersGrid
               tiers={[
-                { key: 'simple', label: 'Simple', icon: 'tag',   color: colors.primary, price: concert.ticket_price,       sub: 'Accès standard' },
-                { key: 'vip',    label: 'VIP',    icon: 'star',  color: '#F59E0B',      price: concert.ticket_price_vip,   sub: 'Accès prioritaire' },
-                { key: 'vvip',   label: 'VVIP',   icon: 'award', color: '#8B5CF6',      price: concert.ticket_price_vvip,  sub: 'Expérience premium' },
-                { key: 'vvvip',  label: 'VVVIP',  icon: 'zap',   color: '#EF4444',      price: concert.ticket_price_vvvip, sub: 'All-inclusive' },
+                { key: 'simple', label: 'Simple', icon: 'tag',   color: colors.primary, price: _p(concert.ticket_price),       sub: 'Accès standard' },
+                { key: 'vip',    label: 'VIP',    icon: 'star',  color: '#F59E0B',      price: _p(concert.ticket_price_vip),   sub: 'Accès prioritaire' },
+                { key: 'vvip',   label: 'VVIP',   icon: 'award', color: '#8B5CF6',      price: _p(concert.ticket_price_vvip),  sub: 'Expérience premium' },
+                { key: 'vvvip',  label: 'VVVIP',  icon: 'zap',   color: '#EF4444',      price: _p(concert.ticket_price_vvvip), sub: 'All-inclusive' },
               ]}
               selected={selectedTier} onSelect={setSelectedTier} colors={colors}
             />
