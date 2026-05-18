@@ -11,6 +11,7 @@ export interface Event {
   id: string;
   organizer_id: string;
   title: string;
+  distance_km?: number | null;
   description: string | null;
   event_type: EventType;
   status: EventStatus;

@@ -36,6 +36,7 @@ import { CommunitiesScreen }     from '../screens/Main/CommunitiesScreen';
 import { CommunityChatScreen }   from '../screens/Main/CommunityChatScreen';
 import { CallScreen }            from '../screens/Main/CallScreen';
 import { EventsScreen }          from '../screens/Main/EventsScreen';
+import { NearbyEventsScreen }    from '../screens/Main/NearbyEventsScreen';
 import { ConcertsScreen }        from '../screens/Main/ConcertsScreen';
 import { BlockedUsersScreen }    from '../screens/Main/BlockedUsersScreen';
 import { WatchHistoryScreen }    from '../screens/Main/WatchHistoryScreen';
@@ -154,6 +155,7 @@ export type MainStackParamList = {
   CommunityChannelChat:        { communityId: string; communityName: string; channelId: string; channelName: string; channelAvatar?: string | null; myRole: string | null; isAnnouncement?: boolean };
   CommunityChannelSettings:    { communityId: string; communityName: string; channelId: string; channelName: string; myRole: string | null };
   Events:                  undefined;
+  NearbyEvents:            undefined;
   Concerts:        undefined;
   BlockedUsers:    undefined;
   LiveList:          undefined;
@@ -341,6 +343,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Planning"       component={PlanningScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityDetail" component={CommunityDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Events"         component={EventsScreen}          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="NearbyEvents"   component={NearbyEventsScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Concerts"       component={ConcertsScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="BlockedUsers"   component={BlockedUsersScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="LiveList"          component={LiveListScreen}          options={{ animation: 'slide_from_right' }} />

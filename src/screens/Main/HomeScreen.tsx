@@ -119,6 +119,7 @@ export const HomeScreen: React.FC = () => {
   const [suggestLoading, setSuggestLoading] = useState(true);
   const [contactIds,     setContactIds]     = useState<string[]>([]);
   const [contactsReady,  setContactsReady]  = useState(false);
+  const [nearbyEvents,   setNearbyEvents]   = useState<Event[]>([]);
   const [page,           setPage]           = useState(1);
   const [hasMore,        setHasMore]        = useState(true);
   const [loadingMore,    setLoadingMore]    = useState(false);
@@ -358,6 +359,12 @@ export const HomeScreen: React.FC = () => {
       locationLoadedRef.current = true;
       load(filter, { reset: true });
     }
+    if (userLocation) {
+      eventService.list({
+        limit: 8, lat: userLocation.lat, lon: userLocation.lon,
+        radius_km: 20, status: 'published', noCache: true,
+      }).then(data => setNearbyEvents(Array.isArray(data) ? data : [])).catch(() => {});
+    }
   }, [userLocation]);
 
   useFocusEffect(useCallback(() => {
@@ -517,6 +524,61 @@ export const HomeScreen: React.FC = () => {
         </View>
       )}
 
+      {/* ── Près de toi ─────────────────────────────────────────────────── */}
+      {nearbyEvents.length > 0 && (
+        <View style={{ marginTop: 4, marginBottom: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="map-pin" size={14} color={colors.primary} />
+              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.textPrimary }}>Près de toi</Text>
+            </View>
+            <TouchableOpacity onPress={() => nav.navigate('NearbyEvents')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Voir tout</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 14, gap: 10 }}>
+            {nearbyEvents.map(ev => {
+              const dist = (ev as any).distance_km as number | null | undefined;
+              const distLabel = dist != null ? (dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`) : null;
+              return (
+                <TouchableOpacity
+                  key={ev.id}
+                  style={{ width: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
+                  activeOpacity={0.85}
+                  onPress={() => nav.navigate('EventDetail', { eventId: ev.id })}
+                >
+                  <View style={{ height: 88 }}>
+                    {ev.thumbnail_url ? (
+                      <Image source={{ uri: ev.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                    ) : (
+                      <LinearGradient
+                        colors={[EVENT_COLORS[ev.event_type ?? 'other'] + 'CC', EVENT_COLORS[ev.event_type ?? 'other'] + '44']}
+                        style={StyleSheet.absoluteFill}
+                      />
+                    )}
+                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={StyleSheet.absoluteFill} />
+                    {distLabel && (
+                      <View style={{ position: 'absolute', bottom: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Icon name="map-pin" size={9} color="#fff" />
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff' }}>{distLabel}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ padding: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: colors.textPrimary, lineHeight: 16 }} numberOfLines={2}>{ev.title}</Text>
+                    {ev.starts_at && (
+                      <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 3 }}>
+                        {new Date(ev.starts_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Filtres */}
       <ScrollView
         horizontal
@@ -563,7 +625,7 @@ export const HomeScreen: React.FC = () => {
         })}
       </ScrollView>
     </Animated.View>
-  ), [colors, filter, liveConcerts, spontLives]);
+  ), [colors, filter, liveConcerts, spontLives, nearbyEvents]);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
 

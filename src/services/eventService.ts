@@ -8,16 +8,18 @@ export const eventService = {
     event_type?: string; city?: string; status?: string;
     noCache?: boolean;
     lat?: number; lon?: number;
+    radius_km?: number;
     contact_ids?: string[];
   }): Promise<Event[]> {
     const q = new URLSearchParams({
       page:  String(params?.page  ?? 1),
       limit: String(params?.limit ?? DEFAULT_PAGE_LIMIT),
-      ...(params?.event_type    ? { event_type:  params.event_type }              : {}),
-      ...(params?.city          ? { city:        params.city }                    : {}),
-      ...(params?.status        ? { status:      params.status }                  : {}),
-      ...(params?.lat != null   ? { lat:         String(params.lat) }             : {}),
-      ...(params?.lon != null   ? { lon:         String(params.lon) }             : {}),
+      ...(params?.event_type       ? { event_type:  params.event_type }              : {}),
+      ...(params?.city             ? { city:        params.city }                    : {}),
+      ...(params?.status           ? { status:      params.status }                  : {}),
+      ...(params?.lat != null      ? { lat:         String(params.lat) }             : {}),
+      ...(params?.lon != null      ? { lon:         String(params.lon) }             : {}),
+      ...(params?.radius_km != null ? { radius_km:  String(params.radius_km) }      : {}),
       ...(params?.contact_ids?.length ? { contact_ids: params.contact_ids.join(',') } : {}),
     }).toString();
     const res = await apiClient.get<Event[]>(
