@@ -19,6 +19,9 @@ export interface Concert {
   access_type: AccessType;
   status: ConcertStatus;
   ticket_price: number | null;
+  ticket_price_vip: number | null;
+  ticket_price_vvip: number | null;
+  ticket_price_vvvip: number | null;
   max_viewers: number | null;
   current_viewers: number;
   view_count: number;
@@ -45,6 +48,9 @@ export interface ConcertCreate {
   concert_type: ConcertType;
   access_type: AccessType;
   ticket_price?: number;
+  ticket_price_vip?: number;
+  ticket_price_vvip?: number;
+  ticket_price_vvvip?: number;
   max_viewers?: number;
   thumbnail_url?: string;
   banner_url?: string;

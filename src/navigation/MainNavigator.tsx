@@ -104,7 +104,7 @@ import { SettingsVerificationScreen }         from '../screens/Settings/Settings
 export type MainTabParamList = {
   Home:        undefined;
   Communities: undefined;
-  Reels:       { initialReelId?: string } | undefined;
+  Reels:       { initialReelId?: string; initialReel?: any } | undefined;
   Profile:     undefined;
 };
 

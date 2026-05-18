@@ -11,8 +11,8 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { useUser } from '../../context/UserContext';
 import { communityService } from '../../services/communityService';
-import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
@@ -107,6 +107,7 @@ export const CommunityChatScreen: React.FC = () => {
   const insets   = useSafeAreaInsets();
   const STATUS_H = insets.top;
   const { theme } = useTheme();
+  const { currentUser } = useUser();
   const { colors } = theme;
   const nav = useNavigation<any>();
   const route = useRoute();
@@ -312,24 +313,21 @@ export const CommunityChatScreen: React.FC = () => {
     try { setPinnedMsgs((await communityService.getPinnedMessages(communityId)) as CommunityMessage[]); } catch {}
   }, [communityId]);
 
+  // Synchronise myId depuis le contexte global (pas de requete reseau)
   useEffect(() => {
-    authService.getMe().then(async u => {
-      const uid = String(u.id);
-      setMyId(uid);
-      try {
-        const role = await communityService.getMyRole(communityId);
-        if (!role) {
-          // not a member — redirect immediately without showing messages
-          nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
-          return;
-        }
-        setMyRole(role);
-      } catch {
-        // if the API returns 403/404, treat as non-member
+    if (currentUser?.id) setMyId(String(currentUser.id));
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    communityService.getMyRole(communityId).then(role => {
+      if (!role) {
         nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
         return;
       }
-    }).catch(() => {});
+      setMyRole(role);
+    }).catch(() => {
+      nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+    });
     communityService.getById(communityId).then(c => setCommunityVerified(c.is_verified)).catch(() => {});
     loadMessages(1, false, 'discussion');
     loadPinned();

@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   Modal, Share, Alert, Platform, Linking,
   Dimensions, StyleSheet, StatusBar, InteractionManager,
-  NativeScrollEvent, NativeSyntheticEvent,
 } from 'react-native';
 import Animated, {
   FadeInDown, FadeIn,
@@ -28,13 +27,6 @@ const { width: SW } = Dimensions.get('window');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const SOCIAL_NETWORKS = [
-  { key: 'facebook',  label: 'Facebook',   icon: 'facebook',       color: '#1877F2', buildUrl: (_t: string, u: string) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(u)}` },
-  { key: 'twitter',   label: 'X',          icon: 'twitter',        color: '#000',    buildUrl: (t: string, u: string) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(t)}&url=${encodeURIComponent(u)}` },
-  { key: 'whatsapp',  label: 'WhatsApp',   icon: 'message-circle', color: '#25D366', buildUrl: (t: string, u: string) => `whatsapp://send?text=${encodeURIComponent(`${t}\n${u}`)}` },
-  { key: 'tiktok',    label: 'TikTok',     icon: 'music',          color: '#010101', buildUrl: (_t: string, u: string) => `https://www.tiktok.com/share?url=${encodeURIComponent(u)}` },
-  { key: 'instagram', label: 'Instagram',  icon: 'instagram',      color: '#E1306C', buildUrl: () => 'instagram://app' },
-];
 
 const getInitials = (name?: string | null) =>
   name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '?';
@@ -134,6 +126,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [saved,        setSaved]        = useState(false);
   const [showVideo,    setShowVideo]    = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<'simple' | 'vip' | 'vvip' | 'vvvip'>('simple');
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
@@ -196,22 +189,11 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const shareText = concert
     ? `🎵 ${concert.title} — ${formatDateShort(concert.scheduled_at)} à ${concert.venue_city ?? 'FoliX'}\nVia FoliX`
     : 'Découvre ce concert sur FoliX';
-  const shareUrl = `https://folix.app/concerts/${concertId}`;
-
   const handleNativeShare = async () => {
     try {
       await Share.share({ title: concert?.title ?? 'Concert FoliX', message: shareText });
       socialService.share({ platform: 'native', concert_id: concertId }).catch(() => {});
     } catch { /**/ }
-  };
-
-  const handleSocialShare = async (net: typeof SOCIAL_NETWORKS[0]) => {
-    const url = net.buildUrl(shareText, shareUrl);
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      canOpen ? await Linking.openURL(url) : await handleNativeShare();
-      socialService.share({ platform: net.key, concert_id: concertId }).catch(() => {});
-    } catch { Alert.alert('Partage', 'Impossible d\'ouvrir cette application.'); }
   };
 
   const handleBuyTicket = () => {
@@ -249,8 +231,6 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const isFree     = concert.access_type === 'free';
   const artistName = concert.artist?.display_name ?? concert.artist?.username;
   const hasVideo   = !!concert.video_url;
-  const galleryImages = [concert.thumbnail_url, concert.banner_url].filter(Boolean) as string[];
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -355,13 +335,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <View style={{ backgroundColor: '#36D9A022', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#36D9A0' }}>GRATUIT</Text>
               </View>
-            ) : concert.ticket_price != null && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
-                backgroundColor: colors.primary + '18', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                <Icon name="tag" size={11} color={colors.primary} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>{concert.ticket_price} €</Text>
-              </View>
-            )}
+            ) : null}
           </View>
         </Animated.View>
 
@@ -440,21 +414,20 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           />
         </Animated.View>
 
-        {/* ── Partage réseaux ──────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(220).springify()}
-          style={{ paddingHorizontal: 16, paddingTop: 20, gap: 10 }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textTertiary }}>PARTAGER SUR</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {SOCIAL_NETWORKS.map(net => (
-              <TouchableOpacity key={net.key} onPress={() => handleSocialShare(net)} activeOpacity={0.75}
-                style={{ alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 10,
-                  borderRadius: 12, borderWidth: 1.5, borderColor: net.color + '55', backgroundColor: net.color + '12' }}>
-                <Icon name={net.icon} size={20} color={net.color} />
-                <Text style={{ fontSize: 10, fontWeight: '700', color: net.color }}>{net.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animated.View>
+        {/* ── Paliers de billets ───────────────────────────────────────── */}
+        {!isFree && (
+          <TicketTiersGrid
+            tiers={[
+              { key: 'simple', label: 'Simple', icon: 'tag',   color: '#6B7280', price: concert.ticket_price },
+              { key: 'vip',    label: 'VIP',    icon: 'star',  color: '#F59E0B', price: (concert as any).ticket_price_vip },
+              { key: 'vvip',   label: 'VVIP',   icon: 'award', color: '#8B5CF6', price: (concert as any).ticket_price_vvip },
+              { key: 'vvvip',  label: 'VVVIP',  icon: 'zap',   color: '#EF4444', price: (concert as any).ticket_price_vvvip },
+            ]}
+            selected={selectedTier}
+            onSelect={setSelectedTier}
+            colors={colors}
+          />
+        )}
 
       </ScrollView>
 
@@ -490,24 +463,37 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.error }}>Supprimer</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <TouchableOpacity onPress={isRegistered ? undefined : handleBuyTicket}
-            disabled={isRegistered} activeOpacity={isRegistered ? 1 : 0.85} style={{ flex: 1 }}>
-            <LinearGradient
-              colors={isRegistered ? ['#555', '#444'] : [colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 8, paddingVertical: 16, borderRadius: 14 }}>
-              <Icon name={isRegistered ? 'check' : isFree ? 'check-circle' : 'tag'} size={20} color="#fff" />
-              <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>
-                {isRegistered ? 'Déjà inscrit' : isFree ? 'S\'inscrire gratuitement' : 'Acheter un billet'}
-              </Text>
-              {!isRegistered && !isFree && concert.ticket_price != null && (
-                <Text style={{ fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' }}>{concert.ticket_price} €</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+        ) : (() => {
+          const tierPrice = selectedTier === 'simple' ? concert.ticket_price
+            : selectedTier === 'vip'   ? (concert as any).ticket_price_vip
+            : selectedTier === 'vvip'  ? (concert as any).ticket_price_vvip
+            :                            (concert as any).ticket_price_vvvip;
+          const tierLabel = selectedTier === 'simple' ? 'Simple'
+            : selectedTier === 'vip'  ? 'VIP'
+            : selectedTier === 'vvip' ? 'VVIP' : 'VVVIP';
+          const hasTiers = (concert as any).ticket_price_vip != null
+            || (concert as any).ticket_price_vvip != null
+            || (concert as any).ticket_price_vvvip != null;
+          return (
+            <TouchableOpacity onPress={isRegistered ? undefined : handleBuyTicket}
+              disabled={isRegistered} activeOpacity={isRegistered ? 1 : 0.85} style={{ flex: 1 }}>
+              <LinearGradient
+                colors={isRegistered ? ['#555', '#444'] : [colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, paddingVertical: 16, borderRadius: 14 }}>
+                <Icon name={isRegistered ? 'check' : isFree ? 'check-circle' : 'tag'} size={20} color="#fff" />
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>
+                  {isRegistered ? 'Déjà inscrit' : isFree ? 'S\'inscrire gratuitement'
+                    : hasTiers ? `Billet ${tierLabel}` : 'Acheter un billet'}
+                </Text>
+                {!isRegistered && !isFree && tierPrice != null && (
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' }}>{tierPrice} €</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          );
+        })()}
       </Animated.View>
 
       {/* ── Sheet paiement billet ────────────────────────────────────── */}
@@ -515,6 +501,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         visible={paySheetOpen}
         onClose={() => setPaySheetOpen(false)}
         onSuccess={(_ticket) => setIsRegistered(true)}
+        itemId={concertId}
         title={concert.title}
         accessType={concert.access_type as any}
         ticketPrice={concert.ticket_price ?? null}
@@ -556,4 +543,75 @@ const InfoRow: React.FC<InfoRowProps> = ({ icon, label, value, color, colors, di
     </View>
   );
   return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.7}>{inner}</TouchableOpacity> : inner;
+};
+
+// ── TicketTiersGrid ───────────────────────────────────────────────────────────
+
+interface TierItem {
+  key: 'simple' | 'vip' | 'vvip' | 'vvvip';
+  label: string;
+  icon: string;
+  color: string;
+  price: number | null | undefined;
+}
+
+interface TicketTiersGridProps {
+  tiers: TierItem[];
+  selected: TierItem['key'];
+  onSelect: (k: TierItem['key']) => void;
+  colors: AppColors;
+}
+
+const TicketTiersGrid: React.FC<TicketTiersGridProps> = ({ tiers, selected, onSelect, colors }) => {
+  const visible = tiers.filter(t => t.price != null);
+  if (visible.length === 0) return null;
+  return (
+    <Animated.View entering={FadeInDown.delay(220).springify()}
+      style={{ marginHorizontal: 16, marginTop: 16, marginBottom: 8 }}>
+      <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textTertiary, marginBottom: 10 }}>
+        CATÉGORIE DE BILLET
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {visible.map(tier => {
+          const active = selected === tier.key;
+          return (
+            <TouchableOpacity
+              key={tier.key}
+              onPress={() => onSelect(tier.key)}
+              activeOpacity={0.8}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 7,
+                paddingVertical: 10, paddingHorizontal: 14,
+                borderRadius: 12, borderWidth: 1.5,
+                backgroundColor: active ? tier.color + '18' : colors.backgroundSecondary,
+                borderColor: active ? tier.color : colors.border,
+                flex: visible.length <= 2 ? 1 : undefined,
+              }}
+            >
+              <View style={{
+                width: 28, height: 28, borderRadius: 7,
+                backgroundColor: tier.color + (active ? '33' : '18'),
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon name={tier.icon} size={13} color={tier.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? tier.color : colors.textPrimary }}>
+                  {tier.label}
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? tier.color : colors.textSecondary }}>
+                  {tier.price} €
+                </Text>
+              </View>
+              {active && (
+                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: tier.color, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="check" size={10} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </Animated.View>
+  );
 };

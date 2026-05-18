@@ -24,6 +24,9 @@ export interface Event {
   starts_at: string;
   ends_at: string | null;
   ticket_price: number | null;
+  ticket_price_vip: number | null;
+  ticket_price_vvip: number | null;
+  ticket_price_vvvip: number | null;
   max_attendees: number | null;
   current_attendees: number;
   thumbnail_url: string | null;
@@ -115,6 +118,9 @@ export interface EventCreate {
   starts_at: string;
   ends_at?: string;
   ticket_price?: number;
+  ticket_price_vip?: number;
+  ticket_price_vvip?: number;
+  ticket_price_vvvip?: number;
   max_attendees?: number;
   thumbnail_url?: string;
   banner_url?: string;

@@ -146,10 +146,12 @@ export const FeedScreen: React.FC = () => {
   const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated } = useWs();
   const { currentUser } = useUser();
 
-  const [filter,     setFilter]     = useState<FeedFilter>('all');
-  const [items,      setItems]      = useState<FeedItem[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [filter,      setFilter]      = useState<FeedFilter>('all');
+  const [items,       setItems]       = useState<FeedItem[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [networkError, setNetworkError] = useState(false);
+  const lastLoadedAtRef = useRef<number>(0);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [filterDropOpen, setFilterDropOpen] = useState(false); // conservé pour éviter les refs cassées
   const [fabOpen,        setFabOpen]        = useState(false);
@@ -305,7 +307,8 @@ export const FeedScreen: React.FC = () => {
     }
   }, [followingSet]);
 
-  const load = useCallback(async (f: FeedFilter) => {
+  const load = useCallback(async (f: FeedFilter, silent = false) => {
+    if (!silent) setNetworkError(false);
     try {
       if (f === 'all') {
         const [feedResult, reelsResult, postsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
@@ -472,8 +475,17 @@ export const FeedScreen: React.FC = () => {
         const results: FeedItem[] = liveConc.map(c => ({ kind: 'concert' as const, id: c.id, data: c }));
         setItems(results);
       }
+      lastLoadedAtRef.current = Date.now();
+      setNetworkError(false);
     } catch (err) {
       if (__DEV__) { console.warn('[FeedScreen] load error:', err); }
+      // En mode silent (retour sur l'ecran), on garde l'ancien contenu et on affiche juste la banniere
+      if (silent) {
+        setNetworkError(true);
+      } else {
+        // Chargement initial ou pull-to-refresh : on signale l'erreur mais on garde les items existants
+        setNetworkError(true);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -529,12 +541,16 @@ export const FeedScreen: React.FC = () => {
     return () => removeListener(handler);
   }, [filter, load, addListener, removeListener]);
 
-  // Focus : reprise vidéo + rechargement au retour depuis CreatePost
+  // Focus : reprise vidéo + rechargement silencieux au retour (stale-while-revalidate)
   const didMountRef = useRef(false);
   useFocusEffect(useCallback(() => {
     setFeedFocused(true);
     if (didMountRef.current) {
-      load(filter);
+      const age = Date.now() - lastLoadedAtRef.current;
+      if (age > 60_000) {
+        // Rechargement background : pas de spinner, on garde l'ancien contenu visible
+        load(filter, true);
+      }
     }
     didMountRef.current = true;
     return () => {
@@ -668,7 +684,7 @@ export const FeedScreen: React.FC = () => {
         <ReelRowCard
           reels={item.data}
           colors={colors}
-          onPressReel={(reelId) => (nav as any).navigate('Reels', { initialReelId: reelId })}
+          onPressReel={(reelId, reelData) => (nav as any).navigate('Reels', { initialReelId: reelId, initialReel: reelData })}
         />
       );
     }
@@ -919,6 +935,27 @@ export const FeedScreen: React.FC = () => {
         )}
 
       </View>
+
+      {/* ── Banniere erreur réseau (silencieuse, disparait au prochain succès) */}
+      {networkError && !loading && !refreshing && (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => { setNetworkError(false); setLoading(items.length === 0); load(filter, items.length > 0); }}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            paddingHorizontal: 16, paddingVertical: 8,
+            backgroundColor: '#FF3B3011',
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: '#FF3B3030',
+          }}
+        >
+          <Icon name="wifi-off" size={14} color="#FF3B30" />
+          <Text style={{ flex: 1, fontSize: 12, color: '#FF3B30', fontWeight: '500' }}>
+            {items.length > 0 ? 'Contenu peut ne pas etre a jour — appuyer pour reessayer' : 'Impossible de charger le feed — appuyer pour reessayer'}
+          </Text>
+          <Icon name="refresh-cw" size={13} color="#FF3B30" />
+        </TouchableOpacity>
+      )}
 
       {searchResults ? (
         /* ── Résultats de recherche ─────────────────────────────────────── */
@@ -1460,7 +1497,7 @@ export const FeedScreen: React.FC = () => {
 const ReelRowCard: React.FC<{
   reels: any[];
   colors: AppColors;
-  onPressReel: (reelId: string) => void;
+  onPressReel: (reelId: string, reelData: any) => void;
 }> = React.memo(({ reels, colors, onPressReel }) => {
   const { width: SW, height: SH } = Dimensions.get('window');
   const HERO_W  = SW - 24;
@@ -1485,7 +1522,7 @@ const ReelRowCard: React.FC<{
     return (
       <TouchableOpacity
         activeOpacity={0.88}
-        onPress={() => onPressReel(reel.id)}
+        onPress={() => onPressReel(reel.id, reel)}
         style={[rrS.thumb, { width: w, height: h }]}
       >
         {reel.thumbnail_url ? (

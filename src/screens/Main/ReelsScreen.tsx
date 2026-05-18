@@ -24,7 +24,7 @@ import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
 import {
-  CommentsBottomSheet, SkeletonReels, VerifiedBadge, ReportModal,
+  CommentsBottomSheet, VerifiedBadge, ReportModal,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -70,7 +70,7 @@ export const ReelsScreen: React.FC = () => {
   const { colors }        = theme;
   const nav    = useNavigation<Nav>();
   const route  = useRoute();
-  const params = (route.params ?? {}) as { initialReelId?: string; reelPublished?: boolean };
+  const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean };
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const listRef          = useRef<FlatList>(null);
@@ -86,13 +86,18 @@ export const ReelsScreen: React.FC = () => {
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 });
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const [reels,         setReels]         = useState<Reel[]>([]);
+  const lastLoadedAtRef = useRef<number>(0);
+
+  // Si un reel est passé depuis le feed, on l'affiche immédiatement (pas de skeleton)
+  const seedReel = params.initialReel && params.initialReel.video_url ? [params.initialReel as Reel] : [];
+
+  const [reels,         setReels]         = useState<Reel[]>(seedReel);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
   const [editCaption,   setEditCaption]   = useState('');
   const [editSaving,    setEditSaving]    = useState(false);
-  const [loading,       setLoading]       = useState(true);
+  const [loading,       setLoading]       = useState(seedReel.length === 0);
   const [loadingMore,   setLoadingMore]   = useState(false);
   const [hasMore,       setHasMore]       = useState(true);
   const [tab,           setTab]           = useState<'feed' | 'mine'>('feed');
@@ -138,16 +143,18 @@ export const ReelsScreen: React.FC = () => {
     // Start tracking the new one
     currentReelRef.current = { id: cur.id, startTime: Date.now() };
 
-    // Prefetch next thumbnails
-    list.slice(currentIndex + 1, currentIndex + 3).forEach(r => {
+    // Prefetch thumbnails : 1 en arrière + 4 en avance
+    list.slice(Math.max(0, currentIndex - 1), currentIndex + 5).forEach(r => {
       if (r.thumbnail_url) Image.prefetch(r.thumbnail_url).catch(() => {});
     });
   }, [currentIndex, sendViewForCurrent]);
 
   // ── Load ──────────────────────────────────────────────────────────────────
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!mountedRef.current) return;
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     pageRef.current = 1;
     isLoadingMoreRef.current = false;
 
@@ -160,20 +167,34 @@ export const ReelsScreen: React.FC = () => {
       if (!mountedRef.current) return;
 
       const filtered = (data.items ?? []).filter((r: Reel) => !!r.video_url);
-      setReels(filtered);
-      setHasMore(data.has_more);
-      setMyId(String(me.id));
-      viewedReelsRef.current = new Set(); // Reset vus à chaque rechargement
 
+      // Si on a démarré avec un seed reel, s'assurer qu'il est dans le feed final
+      // et placer l'index dessus — sans sauter visuellement
+      let finalReels = filtered;
+      let targetIdx  = 0;
       if (params.initialReelId) {
         const idx = filtered.findIndex((r: Reel) => r.id === params.initialReelId);
-        if (idx > 0) {
-          currentIdxRef.current = idx;
-          setCurrentIndex(idx);
-          setTimeout(() => {
-            listRef.current?.scrollToIndex({ index: idx, animated: false });
-          }, 150);
+        if (idx >= 0) {
+          targetIdx = idx;
+        } else if (params.initialReel) {
+          // Le reel cliqué n'est pas dans le feed (trop récent, filtré…) — on l'injecte en tête
+          finalReels = [params.initialReel as Reel, ...filtered];
+          targetIdx  = 0;
         }
+      }
+
+      setReels(finalReels);
+      setHasMore(data.has_more);
+      setMyId(String(me.id));
+      viewedReelsRef.current = new Set();
+      lastLoadedAtRef.current = Date.now();
+
+      if (targetIdx > 0) {
+        currentIdxRef.current = targetIdx;
+        setCurrentIndex(targetIdx);
+        setTimeout(() => {
+          listRef.current?.scrollToIndex({ index: targetIdx, animated: false });
+        }, 150);
       }
 
       userService.getUserReels(String(me.id))
@@ -182,7 +203,8 @@ export const ReelsScreen: React.FC = () => {
         })
         .catch(() => {});
     } catch {
-      if (mountedRef.current) setReels([]);
+      // En mode silent on garde l'ancien contenu, sinon on vide
+      if (mountedRef.current && !silent) setReels([]);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -271,7 +293,9 @@ export const ReelsScreen: React.FC = () => {
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
-    load();
+    // Si on a un seed reel (navigation depuis le feed), le feed complet charge en silent
+    // — le reel joue immédiatement pendant ce temps
+    load(seedReel.length > 0);
     return () => {
       mountedRef.current = false;
       if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -280,12 +304,19 @@ export const ReelsScreen: React.FC = () => {
     };
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  const didFocusOnceRef = useRef(false);
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
     if (params.reelPublished) {
       nav.setParams({ reelPublished: undefined } as any);
-      load();
+      load(); // nouveau reel publie : rechargement complet avec spinner
+    } else if (didFocusOnceRef.current) {
+      const age = Date.now() - lastLoadedAtRef.current;
+      if (age > 60_000) {
+        load(true); // retour sur l'ecran : silent, garde le reel actuel visible
+      }
     }
+    didFocusOnceRef.current = true;
     return () => {
       setScreenFocused(false);
       sendViewForCurrent();
@@ -372,13 +403,13 @@ export const ReelsScreen: React.FC = () => {
     [sendViewForCurrent],
   );
 
-  // ── Render: loading ───────────────────────────────────────────────────────
-  if (loading) {
+  // ── Render: chargement initial — spinner minimal style TikTok
+  if (loading && reels.length === 0) {
     return (
-      <>
+      <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <SkeletonReels />
-      </>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
     );
   }
 
@@ -710,12 +741,18 @@ export const ReelsScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Préchargement silencieux des 2 prochains reels */}
+      {/* Préchargement silencieux : 1 en arrière + 3 en avance */}
+      {reels[currentIndex - 1]?.video_url && (
+        <VideoPreloader key={`pre_${reels[currentIndex - 1].id}`} uri={reels[currentIndex - 1].video_url!} />
+      )}
       {reels[currentIndex + 1]?.video_url && (
-        <VideoPreloader key={reels[currentIndex + 1].id} uri={reels[currentIndex + 1].video_url!} />
+        <VideoPreloader key={`pre_${reels[currentIndex + 1].id}`} uri={reels[currentIndex + 1].video_url!} />
       )}
       {reels[currentIndex + 2]?.video_url && (
-        <VideoPreloader key={reels[currentIndex + 2].id} uri={reels[currentIndex + 2].video_url!} />
+        <VideoPreloader key={`pre_${reels[currentIndex + 2].id}`} uri={reels[currentIndex + 2].video_url!} />
+      )}
+      {reels[currentIndex + 3]?.video_url && (
+        <VideoPreloader key={`pre_${reels[currentIndex + 3].id}`} uri={reels[currentIndex + 3].video_url!} />
       )}
 
       {loadingMore && (
@@ -773,12 +810,34 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const likedRef       = useRef(reel.user_reaction === 'like');
   const mountedRef     = useRef(true);
   const retryTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef  = useRef(0);
+  const stallTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const MAX_RETRIES    = 3;
+  const STALL_TIMEOUT  = 8_000; // ms sans progression avant retry forcé
 
   const isOwnReel = !!(currentUserId && reel.author?.id && currentUserId === String(reel.author.id));
 
+  // Source avec buffer agressif : 30s en avance (Android) / 20s (iOS)
+  const videoSource = reel.video_url
+    ? {
+        uri: reel.video_url,
+        bufferConfig: {
+          // Android — ExoPlayer
+          minBufferMs:                    5_000,  // commence à jouer dès 5s buffered
+          maxBufferMs:                    30_000, // charge jusqu'à 30s en avance
+          bufferForPlaybackMs:            1_500,  // reprend la lecture après rebuffer dès 1.5s
+          bufferForPlaybackAfterRebufferMs: 3_000,
+          backBufferDurationMs:           5_000,  // garde 5s derrière pour seek rapide
+          // iOS — AVPlayer
+          preferredForwardBufferDurationMs: 20_000, // charge 20s en avance
+        },
+      }
+    : 'about:blank';
+
   // ── Player ────────────────────────────────────────────────────────────────
   const player = useVideoPlayer(
-    reel.video_url ?? 'about:blank',
+    videoSource,
     p => {
       p.loop   = false;
       p.muted  = muted;
@@ -792,6 +851,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     return () => {
       mountedRef.current = false;
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
+      if (playTimerRef.current)  clearTimeout(playTimerRef.current);
       try {
         player.pause();
         player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {});
@@ -809,80 +870,127 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     );
   }, [reel.thumbnail_url]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Retry helper ──────────────────────────────────────────────────────────
-  const retryLoad = useCallback(() => {
+  // ── Stall timer : si buffering bloqué > STALL_TIMEOUT, on force un retry ──
+  const clearStall = useCallback(() => {
+    if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
+  }, []);
+
+  const armStall = useCallback(() => {
+    clearStall();
+    stallTimerRef.current = setTimeout(() => {
+      if (mountedRef.current && !pausedRef.current) doRetry(); // eslint-disable-line @typescript-eslint/no-use-before-define
+    }, STALL_TIMEOUT);
+  }, [clearStall]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Retry avec backoff exponentiel (silencieux jusqu'au dernier essai) ────
+  const doRetry = useCallback(() => {
     if (!mountedRef.current || !reel.video_url) return;
-    setVideoError(false);
-    setVideoLoaded(false);
-    setBuffering(true);
-    try {
-      player.replaceSourceAsync({ uri: reel.video_url }).then(() => {
-        if (mountedRef.current && !pausedRef.current) player.play();
-      }).catch(() => {
-        if (mountedRef.current) setVideoError(true);
-      });
-    } catch {
-      if (mountedRef.current) setVideoError(true);
+    clearStall();
+    const attempt = retryCountRef.current;
+    if (attempt >= MAX_RETRIES) {
+      // Tous les retries épuisés → on affiche l'erreur
+      if (mountedRef.current) { setVideoError(true); setBuffering(false); }
+      return;
     }
-  }, [player, reel.video_url]);
+    retryCountRef.current += 1;
+    // Silencieux : on cache l'erreur, on montre juste le buffering
+    if (mountedRef.current) { setVideoError(false); setVideoLoaded(false); setBuffering(true); }
+    const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = setTimeout(() => {
+      if (!mountedRef.current || !reel.video_url) return;
+      try {
+        player.replaceSourceAsync(videoSource as any).then(() => {
+          if (mountedRef.current && !pausedRef.current) {
+            player.play();
+            armStall();
+          }
+        }).catch(() => { if (mountedRef.current) doRetry(); });
+      } catch { if (mountedRef.current) doRetry(); }
+    }, delay);
+  }, [player, reel.video_url, clearStall, armStall]);
+
+  // Retry manuel depuis le bouton "Réessayer" — remet le compteur à zéro
+  const retryLoad = useCallback(() => {
+    retryCountRef.current = 0;
+    doRetry();
+  }, [doRetry]);
 
   // ── Événements player ─────────────────────────────────────────────────────
   useEffect(() => {
     const subEnd = player.addEventListener('onEnd', () => {
+      clearStall();
       if (isActive) onEnd();
     });
     const subBuf = player.addEventListener('onBuffer', (val: boolean) => {
-      if (mountedRef.current) setBuffering(val);
+      if (!mountedRef.current) return;
+      setBuffering(val);
+      if (val && isActive && !pausedRef.current) {
+        // Video en train de buffer : arme le stall timer
+        armStall();
+      } else {
+        clearStall();
+      }
     });
     const subLoad = player.addEventListener('onLoad', (data: any) => {
       if (!mountedRef.current) return;
       setVideoLoaded(true);
       setVideoError(false);
       setBuffering(false);
+      retryCountRef.current = 0;
+      clearStall();
       if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
+      // Garantit la lecture si isActive était true avant que le player soit prêt
+      if (isActive && !pausedRef.current) player.play();
     });
     const subErr = player.addEventListener('onError', () => {
       if (!mountedRef.current) return;
-      setVideoError(true);
       setBuffering(false);
-      // Retry automatique une seule fois après 2 s
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = setTimeout(() => {
-        if (mountedRef.current && isActive) retryLoad();
-      }, 2000);
+      clearStall();
+      // Retry silencieux si on est sur ce reel, sinon on ignore
+      if (isActive) doRetry();
     });
     return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subErr.remove(); };
-  }, [isActive, onEnd, player, retryLoad]);
+  }, [isActive, onEnd, player, doRetry, armStall, clearStall]);
 
   // ── Play/Pause selon isActive ─────────────────────────────────────────────
+  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!reel.video_url) return;
+    if (playTimerRef.current) clearTimeout(playTimerRef.current);
+
     if (isActive && !pausedRef.current) {
       if (activePlayerRef) {
         (activePlayerRef as React.MutableRefObject<{ pause: () => void } | null>).current = {
           pause: () => player.pause(),
         };
       }
-      player.play();
+      // Petit délai pour laisser le player natif s'initialiser avant play()
+      // Nécessaire quand le slide devient actif immédiatement au montage (seed reel)
+      playTimerRef.current = setTimeout(() => {
+        if (mountedRef.current && !pausedRef.current) player.play();
+      }, 50);
     } else {
       player.pause();
     }
+
+    return () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); };
   }, [isActive, player]); // `paused` géré via pausedRef
 
   // Réinitialiser états quand on quitte le slide
   useEffect(() => {
     if (!isActive) {
       pausedRef.current = false;
+      retryCountRef.current = 0;
       if (mountedRef.current) {
         setPaused(false);
         setVideoError(false);
       }
-      if (retryTimerRef.current) {
-        clearTimeout(retryTimerRef.current);
-        retryTimerRef.current = null;
-      }
+      if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+      clearStall();
     }
-  }, [isActive]);
+  }, [isActive, clearStall]);
 
   // ── Mute ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1275,17 +1383,28 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
 // ─── VideoPreloader ───────────────────────────────────────────────────────────
 
-// Lance la lecture silencieuse pour remplir le buffer réseau, puis met en pause
-// après BUFFER_SECS secondes. Quand l'utilisateur arrive sur ce reel, le player
-// de VideoSlide reprend depuis un buffer déjà chargé.
-const BUFFER_SECS = 8;
+// Lance la lecture silencieuse pour remplir le buffer réseau, puis met en pause.
+// 15s = assez pour buffer ~50% d'un reel court sur 3G avant que l'user y arrive.
+const BUFFER_SECS = 15;
 
 const VideoPreloader: React.FC<{ uri: string }> = memo(({ uri }) => {
-  const player = useVideoPlayer(uri, p => {
-    p.muted  = true;
-    p.volume = 0;
-    p.loop   = false;
-  });
+  const player = useVideoPlayer(
+    {
+      uri,
+      bufferConfig: {
+        minBufferMs:                      5_000,
+        maxBufferMs:                      30_000,
+        bufferForPlaybackMs:              1_500,
+        bufferForPlaybackAfterRebufferMs: 3_000,
+        preferredForwardBufferDurationMs: 20_000,
+      },
+    },
+    p => {
+      p.muted  = true;
+      p.volume = 0;
+      p.loop   = false;
+    },
+  );
 
   useEffect(() => {
     let pauseTimer: ReturnType<typeof setTimeout> | null = null;

@@ -948,6 +948,16 @@ const PostCard: React.FC<PostCardProps> = ({ item, colors, isDark, onPress, onCo
   const accessType = concert?.access_type ?? event?.access_type ?? null;
   const price      = concert?.ticket_price ?? event?.ticket_price ?? null;
 
+  // Prix minimum toutes catégories confondues (badge "à partir de")
+  const allPrices = [
+    concert?.ticket_price ?? event?.ticket_price,
+    concert?.ticket_price_vip ?? event?.ticket_price_vip,
+    concert?.ticket_price_vvip ?? event?.ticket_price_vvip,
+    concert?.ticket_price_vvvip ?? event?.ticket_price_vvvip,
+  ].filter((p): p is number => p != null && p > 0);
+  const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : price;
+  const hasTiers = allPrices.length > 1;
+
   const date = concert
     ? formatDate(concert.scheduled_at, true)
     : event ? formatDate(event.starts_at) : '';
@@ -1136,9 +1146,12 @@ const PostCard: React.FC<PostCardProps> = ({ item, colors, isDark, onPress, onCo
               <Text style={s.postBadgeText}>GRATUIT</Text>
             </View>
           )}
-          {accessType === 'ticket' && price != null && (
+          {accessType === 'ticket' && minPrice != null && (
             <View style={[s.postBadge, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
-              <Text style={s.postBadgeText}>{price} €</Text>
+              <Icon name="tag" size={8} color="#fff" />
+              <Text style={s.postBadgeText}>
+                {hasTiers ? `dès ${minPrice} €` : `${minPrice} €`}
+              </Text>
             </View>
           )}
         </View>
