@@ -6,7 +6,7 @@ import {
   View, Text, StyleSheet, FlatList, Dimensions,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
   Share, Platform, Alert, Modal, TextInput,
-  KeyboardAvoidingView, Keyboard,
+  KeyboardAvoidingView, Keyboard, AppState,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle,
@@ -845,14 +845,32 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     },
   );
 
-  // ── Cleanup ───────────────────────────────────────────────────────────────
+  // ── Cleanup + AppState (arrière-plan) ────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
+
+    const clearAllTimers = () => {
+      if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+      if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
+      if (playTimerRef.current)  { clearTimeout(playTimerRef.current);  playTimerRef.current  = null; }
+    };
+
+    const handleAppState = (state: string) => {
+      if (state === 'background' || state === 'inactive') {
+        // Stopper tous les timers dès que l'app passe en arrière-plan
+        clearAllTimers();
+        if (isActive) {
+          try { player.pause(); } catch {}
+        }
+      }
+    };
+
+    const appStateSub = AppState.addEventListener('change', handleAppState);
+
     return () => {
       mountedRef.current = false;
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
-      if (playTimerRef.current)  clearTimeout(playTimerRef.current);
+      appStateSub.remove();
+      clearAllTimers();
       try {
         player.pause();
         player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {});

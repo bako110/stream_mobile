@@ -325,11 +325,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
       retryCount.current = 0;
       setIsConnected(true);
       authService.getMe().then(u => {
+        if (!isMounted.current) return;
         const id = String(u.id);
         myIdRef.current = id;
         storage.setItem(STORAGE_KEYS.LAST_USER_ID, id);
       }).catch(() => {});
-      refreshUnreadRef.current();
+      if (isMounted.current) refreshUnreadRef.current();
       favoriteService.syncFromServer().catch(() => {});
       if (pingTimer.current) clearInterval(pingTimer.current);
       pingTimer.current = setInterval(() => {
@@ -364,6 +365,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           const fromSelf    = (myIdRef.current && payload.from === myIdRef.current)
                            || outgoingCallIds.current.has(payload.to);
           const alreadyLive = acceptedCalls.current.has(payload.from);
+          console.log('[WS] call_offer recu from=', payload.from, 'myId=', myIdRef.current, 'fromSelf=', fromSelf, 'alreadyLive=', alreadyLive);
           if (!fromSelf && !alreadyLive) {
             callEventBuffer.current.delete(payload.from);
             __DEV__ && console.log('[WS] Incoming call from', payload.from_name ?? payload.from);
@@ -483,9 +485,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     isMounted.current = true;
     connect();
     const handleAppState = (next: AppStateStatus) => {
-      if (next === 'active') {
-        // L'app revient au premier plan — forcer reconnexion si WS mort
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      if (next === 'background' || next === 'inactive') {
+        // Arrière-plan : on coupe le ping pour éviter les erreurs réseau silencieuses
+        if (pingTimer.current) { clearInterval(pingTimer.current); pingTimer.current = null; }
+      } else if (next === 'active') {
+        // Premier plan : forcer reconnexion si WS mort ou fermé
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED || wsRef.current.readyState === WebSocket.CLOSING) {
           if (retryTimer.current) clearTimeout(retryTimer.current);
           retryCount.current = 0;
           connect();
@@ -510,7 +515,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
 
   const sendMessage = useCallback((payload: object, _retryMs = 0) => {
     const p = payload as any;
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    const readyState = wsRef.current?.readyState;
+    if (p.type?.startsWith('call_')) {
+      console.log('[WS] sendMessage', p.type, 'readyState=', readyState, 'retry=', _retryMs);
+    }
+    if (readyState === WebSocket.OPEN) {
       // Enregistrer AVANT d'envoyer pour bloquer l'écho immédiat du serveur
       if (p.type === 'call_offer' && isMounted.current) {
         outgoingCallIds.current.add(p.to);
@@ -522,7 +531,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           'outgoing',
         );
       }
-      wsRef.current.send(JSON.stringify(payload));
+      wsRef.current!.send(JSON.stringify(payload));
       return;
     }
     // WS pas encore OPEN — retry jusqu'a 8s pour les messages critiques d'appel
