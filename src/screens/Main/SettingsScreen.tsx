@@ -107,6 +107,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
 
   const SECTIONS: SectionDef[] = [
     { key: 'wallet',       icon: 'dollar-sign',    label: 'Mon Wallet',         color: '#FFD700', sub: 'Solde, achats, transferts',   onPress: () => nav.navigate('SettingsWallet') },
+    { key: 'referral',     icon: 'gift',           label: 'Parrainage',         color: '#F59E0B', sub: user?.referral_code ? `Code : ${user.referral_code}` : 'Inviter des amis, gagner des coins', onPress: () => nav.navigate('Referral') },
     { key: 'monetisation', icon: 'bar-chart-2',    label: 'Monétisation',       color: '#7B3FF2', sub: 'Dashboard, stats, revenus',   onPress: () => nav.navigate('SettingsMonetisation') },
     { key: 'abonnement',   icon: 'star',           label: 'Abonnement',         color: planColor, sub: planLabel,                     onPress: () => nav.navigate('SettingsAbonnement') },
     { key: 'verification', icon: 'shield',         label: 'Vérification FoliX', color: '#1D9BF0', sub: verifSub[verifStatus],

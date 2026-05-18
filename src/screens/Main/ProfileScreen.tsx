@@ -245,6 +245,18 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   </Text>
                 </View>
               )}
+              {user?.referral_code && (
+                <TouchableOpacity style={s.aboutRow} onPress={() => nav.navigate('Referral')} activeOpacity={0.7}>
+                  <Icon name="gift" size={16} color={colors.primary} />
+                  <Text style={[s.aboutText, { color: colors.textPrimary }]}>
+                    Code parrainage :{' '}
+                    <Text style={{ fontWeight: '800', color: colors.primary, letterSpacing: 2 }}>
+                      {user.referral_code}
+                    </Text>
+                  </Text>
+                  <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
             </View>
           </Animated.View>
 
