@@ -32,8 +32,8 @@ import { Endpoints } from '../../api/endpoints';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface CreatorProfile {
-  monetization_enabled: boolean;
-  subscription_price_eur: number;
+  is_monetized: boolean;
+  monthly_subscription_price: number;
   payout_method: 'stripe' | 'mobile_money' | null;
 }
 
@@ -41,7 +41,6 @@ interface CreatorStats {
   total_views: number;
   total_gifts_received: number;
   total_coins_earned: number;
-  coins_earned: number;
   monthly_earnings_coins: number;
   monthly_earnings_eur: number;
   current_balance: number;
@@ -164,7 +163,7 @@ const CreatorDashboardScreen: React.FC = () => {
 
       if (profRes.status === 'fulfilled') {
         setProfile(profRes.value.data);
-        setSubPrice(String(profRes.value.data.subscription_price_eur ?? ''));
+        setSubPrice(String(profRes.value.data.monthly_subscription_price ?? ''));
       }
       if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
       if (reelsRes.status === 'fulfilled') setTopReels(reelsRes.value.data ?? []);
@@ -185,8 +184,8 @@ const CreatorDashboardScreen: React.FC = () => {
   const toggleMonetization = async (value: boolean) => {
     setToggling(true);
     try {
-      await apiClient.patch(Endpoints.wallet.creatorProfile, { monetization_enabled: value });
-      setProfile(prev => prev ? { ...prev, monetization_enabled: value } : null);
+      await apiClient.patch(Endpoints.wallet.creatorProfile, { is_monetized: value });
+      setProfile(prev => prev ? { ...prev, is_monetized: value } : null);
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? 'Mise à jour échouée');
     } finally {
@@ -202,7 +201,7 @@ const CreatorDashboardScreen: React.FC = () => {
     }
     setSavingPrice(true);
     try {
-      await apiClient.patch(Endpoints.wallet.creatorProfile, { subscription_price_eur: price });
+      await apiClient.patch(Endpoints.wallet.creatorProfile, { monthly_subscription_price: price });
       Alert.alert('Succès', 'Prix d\'abonnement mis à jour');
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? 'Mise à jour échouée');
@@ -250,7 +249,7 @@ const CreatorDashboardScreen: React.FC = () => {
               <Text style={s.cardTitle}>Monétisation</Text>
             </View>
             <Text style={s.cardSubtitle}>
-              {profile?.monetization_enabled
+              {profile?.is_monetized
                 ? 'Active — vous recevez des revenus'
                 : 'Activez pour recevoir des cadeaux et abonnements'}
             </Text>
@@ -259,10 +258,10 @@ const CreatorDashboardScreen: React.FC = () => {
             ? <ActivityIndicator size="small" color={colors.primary} />
             : (
               <Switch
-                value={profile?.monetization_enabled ?? false}
+                value={profile?.is_monetized ?? false}
                 onValueChange={toggleMonetization}
                 trackColor={{ false: colors.border, true: `${colors.primary}88` }}
-                thumbColor={profile?.monetization_enabled ? colors.primary : colors.textTertiary}
+                thumbColor={profile?.is_monetized ? colors.primary : colors.textTertiary}
               />
             )
           }
@@ -285,8 +284,8 @@ const CreatorDashboardScreen: React.FC = () => {
               />
               <StatCard
                 icon="bitcoin" iconLib="mci" label="Coins gagnés"
-                value={fmtNum(stats.coins_earned)}
-                sub={`≈ ${coinsToEur(stats.coins_earned)} €`}
+                value={fmtNum(stats.total_coins_earned)}
+                sub={`≈ ${coinsToEur(stats.total_coins_earned)} €`}
                 color="#FFD700" colors={colors}
               />
               <StatCard

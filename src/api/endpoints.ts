@@ -299,6 +299,11 @@ export const Endpoints = {
     withdrawHistory:  `${V1}/wallet/withdraw/history`,
     creatorProfile:   `${V1}/wallet/creator/profile`,
     creatorStats:     `${V1}/wallet/creator/stats`,
+    creatorReels:     `${V1}/wallet/creator/top-reels`,
+    creatorGifts:     `${V1}/wallet/creator/recent-gifts`,
+    adminWithdrawals: `${V1}/wallet/admin/withdrawals`,
+    adminApproveWithdrawal: (id: string) => `${V1}/wallet/admin/withdrawals/${id}/approve`,
+    adminRejectWithdrawal:  (id: string) => `${V1}/wallet/admin/withdrawals/${id}/reject`,
     purchaseCustom:   `${V1}/wallet/purchase/custom`,
     // Boost
     boostsActive:      `${V1}/wallet/boosts/active`,
