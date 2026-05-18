@@ -85,6 +85,7 @@ import { CreatorStatsScreen }  from '../screens/Wallet/CreatorStatsScreen';
 import WithdrawScreen         from '../screens/Wallet/WithdrawScreen';
 import TransferScreen         from '../screens/Wallet/TransferScreen';
 import BoostScreen            from '../screens/Wallet/BoostScreen';
+import { ReferralScreen }     from '../screens/Wallet/ReferralScreen';
 import { WebQRScannerScreen } from '../screens/Auth/WebQRScannerScreen';
 import { SettingsWalletScreen }        from '../screens/Settings/SettingsWalletScreen';
 import { SettingsMonetisationScreen }  from '../screens/Settings/SettingsMonetisationScreen';
@@ -179,6 +180,7 @@ export type MainStackParamList = {
   Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
   Boost:                undefined;
+  Referral:             undefined;
   AdminVerification:         undefined;
   WebQRScanner:              undefined;
   SettingsWallet:            undefined;
@@ -369,6 +371,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Withdraw"       component={WithdrawScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Boost"             component={BoostScreen}             options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Referral"          component={ReferralScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="AdminVerification"       component={AdminVerificationScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityMembers"        component={CommunityMembersScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityStats"          component={CommunityStatsScreen}          options={{ animation: 'slide_from_right' }} />

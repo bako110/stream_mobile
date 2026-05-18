@@ -27,6 +27,7 @@ export interface User {
   verification_status?: VerificationStatus;
   verification_note?: string | null;
   verification_requested_at?: string | null;
+  referral_code?: string | null;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
@@ -38,12 +39,13 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest {
-  first_name: string;
-  last_name:  string;
-  email?:     string;
-  phone?:     string;
-  password:   string;
-  username?:  string;
+  first_name:    string;
+  last_name:     string;
+  email?:        string;
+  phone?:        string;
+  password:      string;
+  username?:     string;
+  referral_code?: string;
 }
 
 export interface OAuthLoginRequest {

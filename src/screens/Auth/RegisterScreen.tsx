@@ -28,15 +28,16 @@ interface Props {
 type AuthMethod = 'email' | 'phone';
 
 interface StepData {
-  firstName:  string;
-  lastName:   string;
-  authMethod: AuthMethod;
-  email:      string;
-  phone:      string;
-  country:    Country;
-  username:   string;
-  password:   string;
-  confirm:    string;
+  firstName:    string;
+  lastName:     string;
+  authMethod:   AuthMethod;
+  email:        string;
+  phone:        string;
+  country:      Country;
+  username:     string;
+  password:     string;
+  confirm:      string;
+  referralCode: string;
 }
 
 const STEPS = 3;
@@ -232,7 +233,8 @@ const Step3: React.FC<{
   loading: boolean;
   colors: any;
 }> = ({ data, onChange, errors, onSubmit, loading, colors }) => {
-  const confirmRef = useRef<TextInput>(null);
+  const confirmRef    = useRef<TextInput>(null);
+  const referralRef   = useRef<TextInput>(null);
 
   const strength = [
     data.password.length >= 8,
@@ -294,8 +296,22 @@ const Step3: React.FC<{
           value={data.confirm}
           onChangeText={v => onChange('confirm', v)}
           error={errors.confirm}
+          returnKeyType="next"
+          onSubmitEditing={() => referralRef.current?.focus()}
+        />
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(310).springify()} style={{ marginTop: 14 }}>
+        <Input
+          ref={referralRef}
+          label="Code de parrainage (optionnel)"
+          leftIcon="gift"
+          value={data.referralCode}
+          onChangeText={v => onChange('referralCode', v.toUpperCase())}
+          autoCapitalize="characters"
           returnKeyType="done"
           onSubmitEditing={onSubmit}
+          placeholder="Ex: AB3X9KZW"
         />
       </Animated.View>
 
@@ -334,7 +350,7 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
   const [data, setData] = useState<StepData>({
     firstName: '', lastName: '', authMethod: 'email',
     email: '', phone: '', country: DEFAULT_COUNTRY,
-    username: '', password: '', confirm: '',
+    username: '', password: '', confirm: '', referralCode: '',
   });
 
   const onChange = useCallback((key: keyof StepData, value: string) => {
@@ -392,12 +408,13 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
     setGlobalError('');
     try {
       await authService.register({
-        first_name: data.firstName.trim(),
-        last_name:  data.lastName.trim(),
-        email:      data.authMethod === 'email' ? data.email.trim().toLowerCase() : undefined,
-        phone:      data.authMethod === 'phone' ? `${data.country.dial}${data.phone.trim()}` : undefined,
-        password:   data.password,
-        username:   data.username.trim() || undefined,
+        first_name:    data.firstName.trim(),
+        last_name:     data.lastName.trim(),
+        email:         data.authMethod === 'email' ? data.email.trim().toLowerCase() : undefined,
+        phone:         data.authMethod === 'phone' ? `${data.country.dial}${data.phone.trim()}` : undefined,
+        password:      data.password,
+        username:      data.username.trim() || undefined,
+        referral_code: data.referralCode.trim() || undefined,
       });
       onRegisterSuccess();
     } catch (e: any) {

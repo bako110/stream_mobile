@@ -343,6 +343,7 @@ const WalletScreen: React.FC = () => {
             { icon: 'send',          label: 'Transférer', color: '#7B3FF2', screen: 'Transfer' },
             { icon: 'bar-chart-2',   label: 'Créateur',  color: '#E85DAD', screen: 'CreatorDashboard' },
             { icon: 'arrow-up-right',label: 'Retirer',   color: '#3FEDB6', screen: 'Withdraw' },
+            { icon: 'gift',          label: 'Parrainage', color: '#F59E0B', screen: 'Referral' },
           ].map(a => (
             <TouchableOpacity
               key={a.screen}
