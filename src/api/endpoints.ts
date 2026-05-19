@@ -336,6 +336,7 @@ export const Endpoints = {
     ban:        (id: string, identity: string) => `${V1}/lives/${id}/ban/${identity}`,
     globalBan:  (id: string, userId: string)   => `${V1}/lives/${id}/global-ban/${userId}`,
     like:       (id: string) => `${V1}/lives/${id}/like`,
+    react:      (id: string) => `${V1}/lives/${id}/react`,
     handRaise:  (id: string, identity: string) => `${V1}/lives/${id}/hand-raise/${identity}`,
     invite:     (id: string, identity: string) => `${V1}/lives/${id}/invite/${identity}`,
     demote:     (id: string, identity: string) => `${V1}/lives/${id}/demote/${identity}`,

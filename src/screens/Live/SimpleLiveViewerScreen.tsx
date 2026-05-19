@@ -42,6 +42,8 @@ import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
+import { LiveReactionPicker } from '../../components/live/LiveReactionPicker';
+import type { LiveReactionPickerRef } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
@@ -234,6 +236,8 @@ const RoomContent: React.FC<{
   likeCount:    number;
   onLike:       () => void;
   likeRef:      React.RefObject<LiveLikeButtonRef | null>;
+  reactionRef:  React.RefObject<LiveReactionPickerRef | null>;
+  onReact:      (emoji: string) => void;
   elapsed:      number;
   goOnStageRef:  { current: (() => void) | null };
   leaveStageRef: { current: (() => void) | null };
@@ -241,6 +245,7 @@ const RoomContent: React.FC<{
   live, liveId, myIdentity, isHost, viewerCount, messages, chatInput, setChatInput,
   sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, onDeleteMsg, onEditMsg,
   giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike, likeRef,
+  reactionRef, onReact,
   elapsed, goOnStageRef, leaveStageRef,
 }) => {
   const { localParticipant } = useLocalParticipant();
@@ -373,6 +378,9 @@ const RoomContent: React.FC<{
         </View>
         <View style={st.likeWrap}>
           <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
+        </View>
+        <View style={st.reactionWrap}>
+          <LiveReactionPicker ref={reactionRef} onReact={onReact} />
         </View>
       </View>
 
@@ -671,6 +679,9 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const leaveStageRef     = useRef<(() => void) | null>(null);
   // Ref vers le bouton coeur pour déclencher l'animation depuis le WS
   const remoteLikeRef     = useRef<import('../../components/live/LiveLikeButton').LiveLikeButtonRef | null>(null);
+  // Ref vers le picker de réactions pour déclencher les emojis flottants depuis le WS
+  const remoteReactionRef = useRef<LiveReactionPickerRef | null>(null);
+  const reactionThrottle  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { currentUser } = useUser();
   const { lastLiveEnded, lastLiveViewersUpdated, addListener, removeListener } = useWs();
@@ -801,9 +812,14 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         if (d.type === 'like_added') {
           const count = d.count ?? 1;
           setLikeCount(c => c + count);
-          // Animer le coeur pour tout le monde (sans re-envoyer au serveur)
           for (let i = 0; i < Math.min(count, 3); i++) {
             setTimeout(() => remoteLikeRef.current?.triggerRemote(), i * 120);
+          }
+        }
+
+        if (d.type === 'reaction_added' && d.emoji) {
+          for (let i = 0; i < Math.min(d.count ?? 1, 3); i++) {
+            setTimeout(() => remoteReactionRef.current?.triggerRemote(d.emoji), i * 150);
           }
         }
 
@@ -932,6 +948,16 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     }, 500);
   }, [liveId]);
 
+  const handleReact = useCallback((emoji: string) => {
+    // Throttle 500ms pour éviter le spam
+    if (reactionThrottle.current) return;
+    reactionThrottle.current = setTimeout(() => {
+      reactionThrottle.current = null;
+    }, 500);
+    try { apiClient.post(Endpoints.lives.react(liveId), { emoji }); }
+    catch {}
+  }, [liveId]);
+
   if (loading) {
     return <View style={[st.root, st.center]}><ActivityIndicator size="large" color="#F0365A" /></View>;
   }
@@ -1005,6 +1031,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         likeCount={likeCount}
         onLike={handleLike}
         likeRef={remoteLikeRef}
+        reactionRef={remoteReactionRef}
+        onReact={handleReact}
         elapsed={elapsed}
         goOnStageRef={goOnStageRef}
         leaveStageRef={leaveStageRef}
@@ -1093,7 +1121,8 @@ const st = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4,
   },
   viewerCount: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  likeWrap:    { marginLeft: 4 },
+  likeWrap:     { marginLeft: 4 },
+  reactionWrap: { marginLeft: 4 },
 
   // Badge "sur scène"
   onStageBadge: {
