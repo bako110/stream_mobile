@@ -1,46 +1,46 @@
 /**
  * VideoTrimmer — style WhatsApp
- * Barre de "frames" avec deux poignées gauche/droite glissables.
- * La vidéo joue en boucle le segment sélectionné.
- * onConfirm passe (uri, startSec, endSec) au parent — découpe côté backend.
+ * Poignées glissables sur barre de frames → coupe locale via FFmpeg.
+ * onConfirm reçoit l'URI du fichier déjà coupé.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
   PanResponder, Dimensions, Platform,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
-const { width: W } = Dimensions.get('window');
-const MAX_DURATION  = 90;           // 1m30s
-const BAR_H         = 56;           // hauteur de la barre frames
-const HANDLE_W      = 20;           // largeur de chaque poignée
-const BAR_PADDING   = 20;           // padding horizontal écran
-const BAR_W         = W - BAR_PADDING * 2; // largeur utile de la barre
+const { width: W }  = Dimensions.get('window');
+const MAX_DURATION  = 90;
+const BAR_H         = 56;
+const HANDLE_W      = 20;
+const BAR_PADDING   = 20;
+const BAR_W         = W - BAR_PADDING * 2;
 
 interface Props {
   uri:       string;
   duration:  number;
-  onConfirm: (uri: string, startSec: number, endSec: number) => void;
+  onConfirm: (trimmedUri: string, startSec: number, endSec: number) => void;
   onCancel:  () => void;
 }
 
 export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCancel }) => {
   const clampedEnd = Math.min(duration, MAX_DURATION);
 
-  // startRatio / endRatio : position 0→1 dans toute la vidéo
   const [startRatio, setStartRatio] = useState(0);
   const [endRatio,   setEndRatio]   = useState(clampedEnd / duration);
   const [isPlaying,  setIsPlaying]  = useState(false);
-  const [playRatio,  setPlayRatio]  = useState(0); // position du curseur 0→1
+  const [playRatio,  setPlayRatio]  = useState(0);
+  const [cutting,    setCutting]    = useState(false);
+  const [cutError,   setCutError]   = useState('');
 
-  // refs pour les pan responders (valeurs instantanées sans re-render)
-  const startRef   = useRef(0);
-  const endRef     = useRef(clampedEnd / duration);
-  const dragging   = useRef<'start' | 'end' | null>(null);
-  const seekTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startRef  = useRef(0);
+  const endRef    = useRef(clampedEnd / duration);
+  const seekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const player = useVideoPlayer({ uri }, p => {
     p.loop  = false;
@@ -55,12 +55,10 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
     return () => sub.remove();
   }, [player]);
 
-  // ── Progression de lecture ────────────────────────────────────────────────
+  // Progression de lecture — reboucle sur le segment
   useEffect(() => {
     const sub = player.addEventListener('onProgress', ({ currentTime: t }: { currentTime: number }) => {
-      const ratio = duration > 0 ? t / duration : 0;
-      setPlayRatio(ratio);
-      // Fin du segment → reboucle
+      setPlayRatio(duration > 0 ? t / duration : 0);
       if (isPlaying && t >= endRef.current * duration) {
         player.currentTime = startRef.current * duration;
       }
@@ -68,7 +66,6 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
     return () => sub.remove();
   }, [player, isPlaying, duration]);
 
-  // ── Démarrer lecture en boucle sur le segment ─────────────────────────────
   const play = useCallback(() => {
     player.currentTime = startRef.current * duration;
     player.play();
@@ -83,62 +80,94 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
 
   const togglePlay = () => { isPlaying ? pause() : play(); };
 
-  // ── Seek après déplacement d'une poignée ─────────────────────────────────
   const seekToStart = useCallback(() => {
     if (seekTimer.current) clearTimeout(seekTimer.current);
     seekTimer.current = setTimeout(() => {
-      player.currentTime = startRef.current * duration;
+      try { player.currentTime = startRef.current * duration; } catch {}
     }, 80);
   }, [player, duration]);
 
-  // ── PanResponder : poignée gauche ─────────────────────────────────────────
+  // ── PanResponder poignée gauche ───────────────────────────────────────────
   const leftPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: () => { dragging.current = 'start'; },
       onPanResponderMove: (_, g) => {
         const newRatio = Math.max(0, Math.min(
           startRef.current + g.dx / BAR_W,
-          endRef.current - 1 / duration,          // au moins 1s avant la fin
+          endRef.current - 1 / duration,
         ));
-        // Contrainte MAX_DURATION
-        const minEnd = Math.min(newRatio + MAX_DURATION / duration, 1);
-        if (endRef.current > minEnd) {
-          endRef.current = minEnd;
-          setEndRatio(minEnd);
-        }
+        const maxEnd = Math.min(newRatio + MAX_DURATION / duration, 1);
+        if (endRef.current > maxEnd) { endRef.current = maxEnd; setEndRatio(maxEnd); }
         startRef.current = newRatio;
         setStartRatio(newRatio);
       },
-      onPanResponderRelease: () => {
-        dragging.current = null;
-        seekToStart();
-        if (isPlaying) { pause(); }
-      },
+      onPanResponderRelease: () => { seekToStart(); pause(); },
     })
   ).current;
 
-  // ── PanResponder : poignée droite ─────────────────────────────────────────
+  // ── PanResponder poignée droite ───────────────────────────────────────────
   const rightPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: () => { dragging.current = 'end'; },
       onPanResponderMove: (_, g) => {
-        const newRatio = Math.min(1, Math.max(
+        const maxEnd  = Math.min(startRef.current + MAX_DURATION / duration, 1);
+        const newRatio = Math.min(maxEnd, Math.max(
           endRef.current + g.dx / BAR_W,
           startRef.current + 1 / duration,
         ));
-        // Contrainte MAX_DURATION
-        const maxEnd = Math.min(startRef.current + MAX_DURATION / duration, 1);
-        const clamped = Math.min(newRatio, maxEnd);
-        endRef.current = clamped;
-        setEndRatio(clamped);
+        endRef.current = newRatio;
+        setEndRatio(newRatio);
       },
-      onPanResponderRelease: () => { dragging.current = null; },
+      onPanResponderRelease: () => { pause(); },
     })
   ).current;
+
+  // ── Coupe locale FFmpeg ───────────────────────────────────────────────────
+  const handleConfirm = async () => {
+    const startSec = startRef.current * duration;
+    const endSec   = endRef.current   * duration;
+    const trimSec  = endSec - startSec;
+
+    setCutting(true);
+    setCutError('');
+    pause();
+
+    try {
+      // Normaliser l'URI source (content:// → file:// sur Android)
+      let srcUri = uri;
+      if (Platform.OS === 'android' && uri.startsWith('content://')) {
+        const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/trim_src_${Date.now()}.mp4`;
+        try { await ReactNativeBlobUtil.fs.cp(uri, dest); }
+        catch {
+          const data = await ReactNativeBlobUtil.fs.readFile(uri, 'base64');
+          await ReactNativeBlobUtil.fs.writeFile(dest, data, 'base64');
+        }
+        srcUri = `file://${dest}`;
+      }
+
+      const outPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/trimmed_${Date.now()}.mp4`;
+      // -ss avant -i = seek rapide (keyframe), -t = durée du segment, -c copy = sans ré-encodage
+      const cmd = `-ss ${startSec.toFixed(3)} -i "${srcUri.replace('file://', '')}" -t ${trimSec.toFixed(3)} -c copy -avoid_negative_ts make_zero "${outPath}"`;
+
+      const session = await FFmpegKit.execute(cmd);
+      const rc      = await session.getReturnCode();
+
+      if (ReturnCode.isSuccess(rc)) {
+        onConfirm(`file://${outPath}`, startSec, endSec);
+      } else {
+        const logs = await session.getAllLogsAsString();
+        setCutError('Erreur lors de la coupe. Réessaie.');
+        console.warn('FFmpeg error:', logs);
+      }
+    } catch (e: any) {
+      setCutError('Erreur inattendue.');
+      console.warn('Trim error:', e);
+    } finally {
+      setCutting(false);
+    }
+  };
 
   // ── Dérivés ───────────────────────────────────────────────────────────────
   const startSec    = startRatio * duration;
@@ -148,38 +177,29 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
   const tooShort    = trimDuration < 1;
   const invalid     = tooLong || tooShort;
 
+  const selLeft  = startRatio * BAR_W;
+  const selWidth = (endRatio - startRatio) * BAR_W;
+  const cursorX  = playRatio * BAR_W;
+
   const fmt = (s: number) => {
-    const m   = Math.floor(s / 60);
+    const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${String(sec).padStart(2, '0')}`;
   };
-
-  // ── Layout de la barre ────────────────────────────────────────────────────
-  // Zone sélectionnée en pixels sur la barre
-  const selLeft  = startRatio * BAR_W;
-  const selWidth = (endRatio - startRatio) * BAR_W;
-
-  // Curseur de lecture
-  const cursorX = playRatio * BAR_W;
 
   return (
     <View style={s.root}>
 
       {/* ── Vidéo ── */}
       <View style={s.videoWrap}>
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          resizeMode="contain"
-          controls={false}
-        />
+        <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls={false} />
 
         <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent']} style={s.gradTop} pointerEvents="none" />
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={s.gradBottom} pointerEvents="none" />
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={onCancel} style={s.headerBtn}>
+          <TouchableOpacity onPress={onCancel} style={s.headerBtn} disabled={cutting}>
             <Icon name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
           <View style={s.badge}>
@@ -189,8 +209,8 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Bouton play centré */}
-        <TouchableOpacity style={s.playBtn} onPress={togglePlay} activeOpacity={0.8}>
+        {/* Bouton play */}
+        <TouchableOpacity style={s.playBtn} onPress={togglePlay} activeOpacity={0.8} disabled={cutting}>
           <View style={s.playBtnInner}>
             <Icon name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" />
           </View>
@@ -198,67 +218,49 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
 
         {/* Timestamps */}
         <View style={s.timesRow}>
-          <View style={s.timeBadge}>
-            <Text style={s.timeText}>{fmt(startSec)}</Text>
-          </View>
+          <View style={s.timeBadge}><Text style={s.timeText}>{fmt(startSec)}</Text></View>
           <View style={[s.durationBadge, tooLong && s.durationBadgeErr]}>
             <Text style={[s.durationText, tooLong && { color: '#EF4444' }]}>{fmt(trimDuration)}</Text>
             <Text style={s.durationSub}> / 1m30s</Text>
           </View>
-          <View style={s.timeBadge}>
-            <Text style={s.timeText}>{fmt(endSec)}</Text>
-          </View>
+          <View style={s.timeBadge}><Text style={s.timeText}>{fmt(endSec)}</Text></View>
         </View>
       </View>
 
-      {/* ── Barre de trim style WhatsApp ── */}
+      {/* ── Barre de trim ── */}
       <View style={s.trimArea}>
-
-        {/* Zone sombre = non sélectionnée */}
         <View style={s.frameBar}>
-          {/* Frames simulées (blocs colorés dégradés) */}
           {Array.from({ length: 16 }).map((_, i) => (
             <View key={i} style={[s.frameBlock, { opacity: 0.55 + (i % 3) * 0.15 }]} />
           ))}
-
-          {/* Overlay sombre hors sélection */}
           <View style={[s.dimOverlay, { left: 0, width: selLeft }]} />
           <View style={[s.dimOverlay, { left: selLeft + selWidth, right: 0 }]} />
-
-          {/* Bordure de sélection */}
-          <View style={[
-            s.selBorder,
-            { left: selLeft, width: selWidth },
-            tooLong && { borderColor: '#EF4444' },
-          ]} />
-
-          {/* Curseur de lecture */}
-          {isPlaying && (
-            <View style={[s.cursor, { left: cursorX - 1 }]} />
-          )}
+          <View style={[s.selBorder, { left: selLeft, width: selWidth }, tooLong && { borderColor: '#EF4444' }]} />
+          {isPlaying && <View style={[s.cursor, { left: cursorX - 1 }]} />}
 
           {/* Poignée gauche */}
-          <View
-            style={[s.handle, s.handleLeft, { left: selLeft }]}
-            {...leftPan.panHandlers}
-          >
+          <View style={[s.handle, s.handleLeft, { left: selLeft }]} {...leftPan.panHandlers}>
             <View style={s.handleBar} />
           </View>
-
           {/* Poignée droite */}
-          <View
-            style={[s.handle, s.handleRight, { left: selLeft + selWidth - HANDLE_W }]}
-            {...rightPan.panHandlers}
-          >
+          <View style={[s.handle, s.handleRight, { left: selLeft + selWidth - HANDLE_W }]} {...rightPan.panHandlers}>
             <View style={s.handleBar} />
           </View>
         </View>
 
+        {/* Erreur FFmpeg */}
+        {cutError ? (
+          <View style={s.errorRow}>
+            <Icon name="alert-triangle" size={13} color="#EF4444" />
+            <Text style={s.errorText}>{cutError}</Text>
+          </View>
+        ) : null}
+
         {/* Bouton confirmer */}
         <TouchableOpacity
-          style={[s.confirmBtn, invalid && { opacity: 0.4 }]}
-          onPress={() => onConfirm(uri, startSec, endSec)}
-          disabled={invalid}
+          style={[s.confirmBtn, (invalid || cutting) && { opacity: 0.5 }]}
+          onPress={handleConfirm}
+          disabled={invalid || cutting}
           activeOpacity={0.85}
         >
           <LinearGradient
@@ -266,12 +268,21 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.confirmInner}
           >
-            <Icon name="check" size={16} color="#fff" />
-            <Text style={s.confirmText}>
-              {invalid
-                ? (tooShort ? 'Segment trop court' : 'Trop long — max 1m30s')
-                : 'Utiliser ce segment'}
-            </Text>
+            {cutting ? (
+              <>
+                <ActivityIndicator size={16} color="#fff" />
+                <Text style={s.confirmText}>Découpe en cours…</Text>
+              </>
+            ) : (
+              <>
+                <Icon name="check" size={16} color="#fff" />
+                <Text style={s.confirmText}>
+                  {invalid
+                    ? (tooShort ? 'Segment trop court' : 'Trop long — max 1m30s')
+                    : 'Utiliser ce segment'}
+                </Text>
+              </>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -282,7 +293,6 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
 
-  // ── Video ────────────────────────────────────────────────────────────────
   videoWrap:  { flex: 1, position: 'relative' },
   gradTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 100 },
   gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 },
@@ -306,8 +316,7 @@ const s = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
   playBtn: {
-    position: 'absolute',
-    top: '50%', left: '50%',
+    position: 'absolute', top: '50%', left: '50%',
     marginTop: -28, marginLeft: -28,
   },
   playBtnInner: {
@@ -325,8 +334,8 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
   },
-  timeText: { color: '#fff', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  durationBadge: {
+  timeText:     { color: '#fff', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  durationBadge:{
     flexDirection: 'row', alignItems: 'baseline',
     backgroundColor: 'rgba(123,63,242,0.7)',
     paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12,
@@ -335,48 +344,36 @@ const s = StyleSheet.create({
   durationText: { color: '#fff', fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
   durationSub:  { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
 
-  // ── Zone de trim ─────────────────────────────────────────────────────────
   trimArea: {
     backgroundColor: '#0A0A0A',
     paddingHorizontal: BAR_PADDING,
     paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 28,
-    gap: 20,
+    gap: 16,
   },
 
   frameBar: {
-    height: BAR_H,
-    borderRadius: 6,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    position: 'relative',
+    height: BAR_H, borderRadius: 6, overflow: 'hidden',
+    flexDirection: 'row', position: 'relative',
     backgroundColor: '#1C1C1C',
   },
   frameBlock: {
-    flex: 1,
-    height: BAR_H,
+    flex: 1, height: BAR_H,
     backgroundColor: '#3A3A4A',
-    borderRightWidth: 1,
-    borderRightColor: '#0A0A0A',
+    borderRightWidth: 1, borderRightColor: '#0A0A0A',
   },
-
   dimOverlay: {
     position: 'absolute', top: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    zIndex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1,
   },
-
   selBorder: {
     position: 'absolute', top: 0, bottom: 0,
     borderWidth: 2.5, borderColor: '#FFD60A',
     borderRadius: 4, zIndex: 2,
   },
-
   cursor: {
     position: 'absolute', top: 0, bottom: 0,
-    width: 2, backgroundColor: '#fff',
-    zIndex: 5,
+    width: 2, backgroundColor: '#fff', zIndex: 5,
   },
-
   handle: {
     position: 'absolute', top: 0, bottom: 0,
     width: HANDLE_W, zIndex: 6,
@@ -385,12 +382,15 @@ const s = StyleSheet.create({
   },
   handleLeft:  { borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
   handleRight: { borderTopRightRadius: 4, borderBottomRightRadius: 4 },
-  handleBar: {
-    width: 3, height: 20, borderRadius: 2,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
+  handleBar:   { width: 3, height: 20, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.5)' },
 
-  // ── Bouton confirmer ──────────────────────────────────────────────────────
+  errorRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
+  },
+  errorText: { color: '#EF4444', fontSize: 12, flex: 1 },
+
   confirmBtn:   { borderRadius: 28, overflow: 'hidden' },
   confirmInner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

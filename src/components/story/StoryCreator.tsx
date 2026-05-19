@@ -179,8 +179,6 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [uploadPct,     setUploadPct]     = useState(0);
   const [showTrimmer,   setShowTrimmer]   = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
-  const [trimStart,     setTrimStart]     = useState(0);
-  const [trimEnd,       setTrimEnd]       = useState(0);
   const tempFilesRef = useRef<string[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [recording,     setRecording]     = useState(false);
@@ -210,7 +208,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setCaption(''); setBgColor(TEXT_BG_COLORS[0]); setFontStyleKey('classic');
     setShowTextInput(false); setUploading(false); setRecording(false);
     setRecordTime('00:00'); setShowSuccess(false);
-    setShowTrimmer(false); setVideoDuration(0); setTrimStart(0); setTrimEnd(0);
+    setShowTrimmer(false); setVideoDuration(0);
     setAudienceType('everyone'); setSelectedUsers([]);
     stopAudioPreview();
     onClose();
@@ -414,9 +412,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     const _fontStyleKey= fontStyleKey;
     const _audienceType= audienceType;
     const _selectedUsers = selectedUsers;
-    const _tempFiles    = [...tempFilesRef.current];
-    const _trimStart    = trimStart;
-    const _trimEnd      = trimEnd;
+    const _tempFiles = [...tempFilesRef.current];
     tempFilesRef.current = [];
 
     // Fermer immediatement — l'utilisateur peut naviguer
@@ -470,8 +466,6 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           font_style: _mode === 'text' ? _fontStyleKey : undefined,
           audience_type: _audienceType,
           audience_user_ids: _audienceType !== 'everyone' ? _selectedUsers : [],
-          trim_start_sec: _mode === 'video' && _trimEnd > 0 ? _trimStart : undefined,
-          trim_end_sec:   _mode === 'video' && _trimEnd > 0 ? _trimEnd   : undefined,
         });
 
         await cleanupTempVideos(_tempFiles);
@@ -675,10 +669,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         <VideoTrimmer
           uri={localUri}
           duration={videoDuration}
-          onConfirm={(trimmedUri, startSec, endSec) => {
+          onConfirm={(trimmedUri) => {
             setLocalUri(trimmedUri);
-            setTrimStart(startSec);
-            setTrimEnd(endSec);
+            tempFilesRef.current.push(trimmedUri); // nettoyé après upload
             setShowTrimmer(false);
             setStep('preview');
           }}
@@ -1277,7 +1270,7 @@ const s = StyleSheet.create({
 
   // ── Audience bottom sheet ─────────────────────────────────────────────────────
   audOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.45)',
     zIndex: 10,
   },
