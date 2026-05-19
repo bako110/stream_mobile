@@ -2,13 +2,16 @@
  * Cache local des stories — stale-while-revalidate.
  * Le feed est servi instantanement depuis MMKV, puis rafraichi en fond.
  * Les IDs vus sont persistes pour eviter un rechargement de la BD.
+ * Les stories vues sont stockees en entier pour relecture hors-ligne.
  */
 import { localCache, storage } from '../utils/storage';
-import type { StoryGroup } from '../types/story';
+import type { Story, StoryGroup } from '../types/story';
 
-const FEED_CACHE_KEY  = 'story_feed';
-const VIEWED_KEY      = 'story_viewed_ids';
-const FEED_TTL_MS     = 5 * 60 * 1000; // 5 min — au-dela, on rafraichit obligatoirement
+const FEED_CACHE_KEY    = 'story_feed';
+const VIEWED_KEY        = 'story_viewed_ids';
+const VIEWED_STORIES_KEY = 'story_viewed_data'; // stories completes vues
+const FEED_TTL_MS       = 5 * 60 * 1000; // 5 min
+const MAX_VIEWED_STORED = 200;            // max stories completes en local
 
 // ── Feed cache ────────────────────────────────────────────────────────────────
 
@@ -47,12 +50,13 @@ function getViewedIds(): Set<string> {
   return _viewedIds;
 }
 
-export function markStoryViewedLocally(storyId: string): void {
+/** Retourne true si la story était déjà marquée vue, false si c'est la première fois. */
+export function markStoryViewedLocally(storyId: string): boolean {
   const ids = getViewedIds();
-  if (!ids.has(storyId)) {
-    ids.add(storyId);
-    saveViewedIds(ids);
-  }
+  if (ids.has(storyId)) return true;
+  ids.add(storyId);
+  saveViewedIds(ids);
+  return false;
 }
 
 export function isStoryViewedLocally(storyId: string): boolean {
@@ -73,4 +77,63 @@ export function applyLocalViewsToFeed(groups: StoryGroup[]): StoryGroup[] {
     const has_unseen = stories.some(st => !st.viewed_by_me);
     return { ...group, stories, has_unseen };
   });
+}
+
+// ── Stories vues en entier (relecture hors-ligne) ─────────────────────────────
+
+function loadViewedStories(): Story[] {
+  try {
+    const raw = storage.getItem(VIEWED_STORIES_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Story[];
+  } catch { return []; }
+}
+
+function saveViewedStoriesRaw(stories: Story[]): void {
+  try {
+    storage.setItem(VIEWED_STORIES_KEY, JSON.stringify(stories));
+  } catch {}
+}
+
+/**
+ * Sauvegarde la story complete lors du visionnage.
+ * Déduplique par ID, limite à MAX_VIEWED_STORED, trie du plus récent.
+ */
+export function saveViewedStory(story: Story): void {
+  const existing = loadViewedStories().filter(s => s.id !== story.id);
+  const updated  = [story, ...existing].slice(0, MAX_VIEWED_STORED);
+  saveViewedStoriesRaw(updated);
+}
+
+/**
+ * Retourne les stories vues localement, en excluant celles expirées.
+ * Si une story supprimée (plus dans le feed) a expires_at depassé, elle est purgée.
+ */
+export function getViewedStories(): Story[] {
+  const now    = Date.now();
+  const stored = loadViewedStories();
+  const valid  = stored.filter(s => !s.expires_at || new Date(s.expires_at).getTime() > now);
+  // Si des stories ont été purgées, on persiste la version nettoyée
+  if (valid.length !== stored.length) saveViewedStoriesRaw(valid);
+  return valid;
+}
+
+/**
+ * Supprime une story du cache local (appelé quand l'utilisateur la supprime côté serveur).
+ */
+export function removeViewedStoryLocally(storyId: string): void {
+  const stories = loadViewedStories().filter(s => s.id !== storyId);
+  saveViewedStoriesRaw(stories);
+}
+
+/**
+ * Purge toutes les stories expirées du cache local.
+ * A appeler au démarrage ou au chargement du feed.
+ */
+export function purgeExpiredViewedStories(): void {
+  const now   = Date.now();
+  const valid = loadViewedStories().filter(
+    s => !s.expires_at || new Date(s.expires_at).getTime() > now,
+  );
+  saveViewedStoriesRaw(valid);
 }

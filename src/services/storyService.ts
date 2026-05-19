@@ -3,7 +3,15 @@ import type { Story, StoryGroup, StoryCreate, StoryUpdate, StoryViewerUser } fro
 import { uploadService } from './uploadService';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import {
-  getCachedFeed, setCachedFeed, applyLocalViewsToFeed, markStoryViewedLocally, invalidateFeedCache,
+  getCachedFeed, setCachedFeed, applyLocalViewsToFeed,
+  markStoryViewedLocally, invalidateFeedCache,
+  saveViewedStory, purgeExpiredViewedStories,
+  removeViewedStoryLocally,
+} from './storyCacheService';
+
+export {
+  getViewedStories,
+  removeViewedStoryLocally as removeViewedStory,
 } from './storyCacheService';
 
 export const storyService = {
@@ -27,6 +35,8 @@ export const storyService = {
       const res = await apiClient.get<StoryGroup[]>(Endpoints.stories.feed);
       const groups = Array.isArray(res.data) ? res.data : [];
       setCachedFeed(groups);
+      // Purge des stories expirées à chaque refresh réseau réussi
+      purgeExpiredViewedStories();
       return applyLocalViewsToFeed(groups);
     } catch (e) {
       // Reseau KO — retourner le cache expire plutot que vide
@@ -90,9 +100,12 @@ export const storyService = {
 
   // ── Marquer comme vue ─────────────────────────────────────────────────────
 
-  async markViewed(storyId: string): Promise<void> {
-    markStoryViewedLocally(storyId); // local immediatement (persiste hors-ligne)
-    apiClient.post(Endpoints.stories.view(storyId)).catch(() => {}); // API fire-and-forget
+  async markViewed(storyId: string, story?: Story): Promise<void> {
+    const alreadySeen = markStoryViewedLocally(storyId); // retourne true si déjà connu
+    if (story) saveViewedStory(story); // story complète pour relecture locale
+    if (!alreadySeen) {
+      apiClient.post(Endpoints.stories.view(storyId)).catch(() => {}); // fire-and-forget, 1 seule fois
+    }
   },
 
   // ── Viewers d'une story ───────────────────────────────────────────────────
@@ -134,5 +147,6 @@ export const storyService = {
   async delete(storyId: string): Promise<void> {
     await apiClient.delete(Endpoints.stories.delete(storyId));
     invalidateFeedCache();
+    removeViewedStoryLocally(storyId); // retire aussi du cache local
   },
 };

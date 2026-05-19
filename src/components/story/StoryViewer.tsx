@@ -331,7 +331,9 @@ export const StoryViewer: React.FC<Props> = ({
   // ── Mark viewed ────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (story && !story.viewed_by_me && !isOwn) storyService.markViewed(story.id);
+    // Sauvegarde toujours la story complète localement (relecture hors-ligne)
+    // markViewed n'appelle l'API que si pas encore vue
+    if (story && !isOwn) storyService.markViewed(story.id, story);
   }, [story?.id]);
 
   // ── Saved state ────────────────────────────────────────────────────────────
