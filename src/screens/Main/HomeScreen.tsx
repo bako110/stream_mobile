@@ -125,7 +125,9 @@ export const HomeScreen: React.FC = () => {
   const [loadingMore,    setLoadingMore]    = useState(false);
   const contactsAskedRef  = useRef(false);
   const loadingMoreRef    = useRef(false);
-  const currentLoadRef    = useRef<number>(0); // anti-race: identifiant de la requête courante
+  const currentLoadRef    = useRef<number>(0);
+  const lastLoadedAtRef   = useRef<number>(0);
+  const didMountRef       = useRef(false);
 
   const searchRef         = useRef<TextInput>(null);
   const locationLoadedRef = useRef(false);
@@ -287,6 +289,7 @@ export const HomeScreen: React.FC = () => {
       if (loadId === currentLoadRef.current) {
         setLoading(false);
         setRefreshing(false);
+        lastLoadedAtRef.current = Date.now();
       }
     }
   }, [userLocation, contactIds]);
@@ -378,8 +381,19 @@ export const HomeScreen: React.FC = () => {
   }, [userLocation]);
 
   useFocusEffect(useCallback(() => {
-    load(filter, { noCache: true, reset: true });
-    loadLive();
+    if (!didMountRef.current) {
+      // Premier montage : chargement complet
+      didMountRef.current = true;
+      load(filter, { noCache: true, reset: true });
+      loadLive();
+      return;
+    }
+    // Retour sur l'écran : refresh silencieux si données > 60s
+    const age = Date.now() - lastLoadedAtRef.current;
+    if (age > 60_000) {
+      load(filter, { noCache: true, reset: false });
+      loadLive();
+    }
   }, [filter, load, loadLive]));
 
   // ── Recherche ────────────────────────────────────────────────────────────────

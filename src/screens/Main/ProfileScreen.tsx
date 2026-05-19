@@ -43,12 +43,15 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
   const [followingCount, setFollowingCount] = useState(0);
   const [showQR, setShowQR] = useState(false);
 
-  const load = useCallback(async () => {
+  const lastLoadedAtRef = useRef<number>(0);
+  const didMountRef     = useRef(false);
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const me = await refreshUser();
       if (!me) return;
 
-      // Compteurs via profil public (1 seul appel au lieu de 2)
       const [profile, evts, res] = await Promise.allSettled([
         userService.getPublicProfile(me.id),
         eventService.getMyEvents(),
@@ -60,13 +63,21 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
       }
       if (evts.status === 'fulfilled') setMyEvents(evts.value);
       if (res.status  === 'fulfilled') setMyConcerts(res.value);
+      lastLoadedAtRef.current = Date.now();
     } catch (err) {
       if (__DEV__) { console.warn('[ProfileScreen]', err); }
     } finally { setLoading(false); }
   }, [refreshUser]);
 
-  // useFocusEffect seul suffit — il se déclenche aussi au montage initial
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      load();
+      return;
+    }
+    const age = Date.now() - lastLoadedAtRef.current;
+    if (age > 60_000) load(true);
+  }, [load]));
 
   const displayName = user
     ? (user.display_name

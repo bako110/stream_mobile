@@ -59,19 +59,17 @@ export const FavoritesScreen: React.FC = () => {
   const tabRef = useRef(tab);
   tabRef.current = tab;
 
-  const mountedRef = useRef(false);
+  const lastLoadedAtRef = useRef<number>(0);
+  const didMountRef     = useRef(false);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const favs = await favoriteService.list(TAB_TO_TYPE[tabRef.current]);
-      console.log('[Favorites] raw favs:', JSON.stringify(favs)?.slice(0, 300));
-      console.log('[Favorites] isArray:', Array.isArray(favs), 'length:', (favs as any)?.length);
       const mapped = Array.isArray(favs) ? favs.map(fromApi) : [];
-      console.log('[Favorites] mapped:', mapped.length);
       setData(mapped);
-    } catch (e) {
-      console.log('[Favorites] error:', e);
+      lastLoadedAtRef.current = Date.now();
+    } catch {
       setData([]);
     } finally {
       setLoading(false);
@@ -79,12 +77,17 @@ export const FavoritesScreen: React.FC = () => {
   }, []);
 
   useFocusEffect(useCallback(() => {
-    mountedRef.current = true;
-    refresh();
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      refresh();
+      return;
+    }
+    const age = Date.now() - lastLoadedAtRef.current;
+    if (age > 60_000) refresh(true);
   }, [refresh]));
 
   useEffect(() => {
-    if (!mountedRef.current) return;
+    if (!didMountRef.current) return;
     refresh();
   }, [tab]);
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, Modal,
   StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput,
-  ScrollView, KeyboardAvoidingView, Platform, Dimensions, Animated,
+  ScrollView, KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -17,7 +17,7 @@ import { apiClient, Endpoints } from '../../api';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
-const { width: W } = Dimensions.get('window');
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -395,7 +395,8 @@ export const CommunitiesScreen: React.FC = () => {
     setCreateBannerUri(null);
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = tab === 'mine'
         ? await communityService.mine()
@@ -405,7 +406,11 @@ export const CommunitiesScreen: React.FC = () => {
     finally { setLoading(false); setRefreshing(false); }
   }, [tab]);
 
-  useEffect(() => { setLoading(true); load(); }, [load, isFocused]);
+  // Rechargement complet au changement de tab
+  useEffect(() => { load(); }, [load]);
+
+  // Refresh silencieux au retour sur l'écran (pas de skeleton)
+  useEffect(() => { if (isFocused) load(true); }, [isFocused]);
 
   const communities = query.trim()
     ? all.filter(c =>
