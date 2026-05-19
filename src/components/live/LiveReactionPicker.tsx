@@ -75,8 +75,8 @@ export const LiveReactionPicker = forwardRef<LiveReactionPickerRef, Props>(
       const y       = new Animated.Value(0);
       const opacity = new Animated.Value(1);
       const scale   = new Animated.Value(0);
-      // Légère variation horizontale autour du bord droit
-      const driftX  = (Math.random() - 0.5) * 40;
+      // Légère variation horizontale autour du centre
+      const driftX  = (Math.random() - 0.5) * 80;
       const driftY  = -(SH * 0.55 + Math.random() * SH * 0.2);
       const size    = 28 + Math.random() * 12;
 
@@ -175,12 +175,12 @@ export const LiveReactionPicker = forwardRef<LiveReactionPickerRef, Props>(
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  // Couche absoluteFill pour les emojis flottants — coordonnées écran réel
+  // Couche absoluteFill — ancrée centre-bas de l'écran, les emojis montent au centre
   floatLayer: {
     position: 'absolute',
-    bottom: SH * 0.15,   // 15% du bas de l'écran, s'adapte à toutes tailles
-    right: 16,
-    width: 1,            // point d'ancrage minimal, les emojis débordent via translate
+    bottom: SH * 0.12,
+    left: SW / 2 - 30,   // centré horizontalement
+    width: 60,
     height: 1,
     zIndex: 999,
     overflow: 'visible',
@@ -188,7 +188,7 @@ const st = StyleSheet.create({
   floater: {
     position: 'absolute',
     bottom: 0,
-    right: 0,
+    left: 0,
     zIndex: 999,
   },
 
