@@ -379,9 +379,6 @@ const RoomContent: React.FC<{
         <View style={st.likeWrap}>
           <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
         </View>
-        <View style={st.reactionWrap}>
-          <LiveReactionPicker ref={reactionRef} onReact={onReact} />
-        </View>
       </View>
 
       {/* ── GIFT TICKER (bas gauche, au-dessus du chat) ───────────────── */}
@@ -546,6 +543,12 @@ const RoomContent: React.FC<{
 
       {/* ── CONTRÔLES DROITE ──────────────────────────────────────────── */}
       <View style={st.sideControls}>
+        {/* Réactions emoji */}
+        <View style={[st.sideBtn, { zIndex: 30, overflow: 'visible' }]}>
+          <LiveReactionPicker ref={reactionRef} onReact={onReact} />
+          <Text style={st.sideBtnLabel}>Réagir</Text>
+        </View>
+
         {/* Cadeau — envoyer */}
         <TouchableOpacity style={st.sideBtn} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
           <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' }]}>
@@ -1121,8 +1124,7 @@ const st = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4,
   },
   viewerCount: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  likeWrap:     { marginLeft: 4 },
-  reactionWrap: { marginLeft: 4 },
+  likeWrap: { marginLeft: 4 },
 
   // Badge "sur scène"
   onStageBadge: {
@@ -1189,6 +1191,7 @@ const st = StyleSheet.create({
     position: 'absolute', right: 12,
     bottom: Platform.OS === 'ios' ? 80 : 60,
     alignItems: 'center', gap: 14, zIndex: 20,
+    overflow: 'visible',
   },
   sideBtn:       { alignItems: 'center', gap: 4 },
   sideBtnCircle: {
