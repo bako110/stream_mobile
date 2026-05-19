@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
@@ -129,11 +129,10 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
           {/* ── Avatar & identité ───────────────────────────────────────── */}
-          <Animated.View entering={FadeInDown.delay(60).springify()} style={s.avatarSection}>
-            <LinearGradient
-              colors={[colors.gradientStart + '25', colors.gradientEnd + '15']}
-              style={StyleSheet.absoluteFill}
-            />
+          <Animated.View
+            entering={FadeInDown.delay(60).springify()}
+            style={[s.avatarSection, { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider }]}
+          >
             <View style={[s.avatarCircle, { borderColor: colors.primary + '50' }]}>
               {user?.avatar_url ? (
                 <Image source={{ uri: user.avatar_url }} style={{ width: '100%', height: '100%' }} />
@@ -225,7 +224,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
           )}
 
           {/* ── À propos ─────────────────────────────────────────────── */}
-          <Animated.View entering={FadeInDown.delay(130).springify()} style={s.section}>
+          <Animated.View entering={FadeInDown.delay(130).springify()} style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
             <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>À PROPOS</Text>
             <View style={s.aboutList}>
               {user?.location ? (
@@ -273,7 +272,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
 
 
           {/* ── Publications récentes ─────────────────────────────────── */}
-          <Animated.View entering={FadeInDown.delay(190).springify()} style={s.section}>
+          <Animated.View entering={FadeInDown.delay(190).springify()} style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
             <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>PUBLICATIONS</Text>
             {recentPublished.length > 0 ? (
               <View style={{ gap: 10, marginTop: 4 }}>
@@ -350,7 +349,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
 
           {/* ── Mes créations / Brouillons (artistes) ─────────────────── */}
           {isCreator && draftsList.length > 0 && (
-            <Animated.View entering={FadeInDown.delay(220).springify()} style={s.section}>
+            <Animated.View entering={FadeInDown.delay(220).springify()} style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
               <View style={s.sectionHeaderRow}>
                 <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>BROUILLONS</Text>
                 <View style={s.tabSwitch}>
