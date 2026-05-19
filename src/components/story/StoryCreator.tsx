@@ -356,7 +356,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const doUploadImage = async (uri: string) => {
     setUploadStep('Upload image…'); setUploadPct(30);
     const normalized = await normalizeUri(uri);
-    const result = await uploadImageFromUri(normalized, 'stories', `s_${Date.now()}.jpg`, 'image/jpeg');
+    const result = await uploadImageFromUri(normalized, 'stories', `s_${Date.now()}.jpg`);
     setUploadPct(100);
     return result.url;
   };
@@ -380,7 +380,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     if (compressed.thumbnailUri) {
       try {
         setUploadStep('Thumbnail…'); setUploadPct(90);
-        const thumbResult = await uploadImageFromUri(compressed.thumbnailUri, 'stories', `st_${Date.now()}.jpg`, 'image/jpeg');
+        const thumbResult = await uploadImageFromUri(compressed.thumbnailUri, 'stories', `st_${Date.now()}.jpg`);
         thumbnailUrl = thumbResult.url;
       } catch { /* thumbnail optionnel */ }
     }
