@@ -7,7 +7,7 @@ import { Row, Card, PageHeader } from './_shared';
 import type { Subscription } from '../../types';
 
 const PLAN_LABELS: Record<string, string> = { free: 'Gratuit', basic: 'Basic', premium: 'Premium', family: 'Family' };
-const PLAN_COLORS: Record<string, string> = { free: '#9390AB', basic: '#3B82F6', premium: '#7B3FF2', family: '#E0389A' };
+const PLAN_COLORS: Record<string, string> = { free: '#9390AB', basic: '#3B82F6', premium: '#7B3FF2',  family: '#E0389A' };
 
 export const SettingsAbonnementScreen: React.FC = () => {
   const nav = useNavigation<any>();

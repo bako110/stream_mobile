@@ -182,10 +182,13 @@ export const Endpoints = {
 
   // ── Subscriptions (prefix: /api/v1) ───────────────────────────────────────
   subscriptions: {
-    plans:      `${V1}/plans`,
-    me:         `${V1}/subscriptions/me`,
-    subscribe:  `${V1}/subscriptions`,
-    cancel:     `${V1}/subscriptions/me`,
+    plans:         `${V1}/plans`,
+    me:            `${V1}/subscriptions/me`,
+    subscribe:     `${V1}/subscriptions`,
+    subscribeWallet: `${V1}/subscriptions/wallet`,
+    walletCheck:   `${V1}/subscriptions/wallet-check`,
+    cancel:        `${V1}/subscriptions/me`,
+    history:       `${V1}/subscriptions/history`,
   },
 
   // ── Payments (prefix: /api/v1/payments) ───────────────────────────────────

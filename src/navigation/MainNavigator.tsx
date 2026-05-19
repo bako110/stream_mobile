@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useRef } from 'react';
-import { Platform, PermissionsAndroid, BackHandler, ToastAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, BackHandler, ToastAndroid, InteractionManager } from 'react-native';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation, useNavigationState, CommonActions } from '@react-navigation/native';
@@ -173,7 +173,7 @@ export type MainStackParamList = {
   PostDetail:      { postId: string; initialPost?: any };
   CreatePost:      undefined;
   Wallet:          undefined;
-  BuyCoins:        undefined;
+  BuyCoins:        { reason?: string; missingCoins?: number; returnTo?: keyof MainStackParamList } | undefined;
   CreatorDashboard: undefined;
   CreatorStats:     undefined;
   Monetisation:     undefined;
@@ -296,12 +296,14 @@ const ExitHandler: React.FC = () => {
 
 export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   useEffect(() => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS !== 'android') return;
+    const task = InteractionManager.runAfterInteractions(() => {
       PermissionsAndroid.requestMultiple([
         PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
         PermissionsAndroid.PERMISSIONS.CAMERA,
       ]).catch(() => {});
-    }
+    });
+    return () => task.cancel();
   }, []);
 
   const SettingsWrapper = useCallback(

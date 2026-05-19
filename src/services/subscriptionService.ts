@@ -1,6 +1,14 @@
 import { apiClient, Endpoints } from '../api';
 import type { Subscription, Payment, Ticket, PlanType } from '../types';
 
+export interface WalletCheck {
+  plan: PlanType;
+  coins_required: number;
+  balance: number;
+  sufficient: boolean;
+  missing: number;
+}
+
 export const subscriptionService = {
   async getMyCurrent(): Promise<Subscription | null> {
     try {
@@ -11,18 +19,33 @@ export const subscriptionService = {
     }
   },
 
+  async walletCheck(plan: PlanType): Promise<WalletCheck> {
+    const res = await apiClient.get<WalletCheck>(
+      `${Endpoints.subscriptions.walletCheck}?plan=${plan}`,
+    );
+    return res.data;
+  },
+
+  async subscribeViaWallet(plan: PlanType): Promise<Subscription> {
+    const res = await apiClient.post<Subscription>(
+      `${Endpoints.subscriptions.subscribeWallet}?plan=${plan}`,
+    );
+    return res.data;
+  },
+
   async subscribe(plan: PlanType): Promise<Subscription> {
     const res = await apiClient.post<Subscription>(Endpoints.subscriptions.subscribe, { plan });
     return res.data;
   },
 
-  async cancel(): Promise<void> {
-    await apiClient.delete(Endpoints.subscriptions.cancel);
+  async cancel(): Promise<Subscription> {
+    const res = await apiClient.delete<Subscription>(Endpoints.subscriptions.cancel);
+    return res.data;
   },
 
   async getHistory(): Promise<Subscription[]> {
     try {
-      const res = await apiClient.get<Subscription[]>(`${Endpoints.subscriptions.me}/history`);
+      const res = await apiClient.get<Subscription[]>(Endpoints.subscriptions.history);
       return Array.isArray(res.data) ? res.data : [];
     } catch {
       return [];

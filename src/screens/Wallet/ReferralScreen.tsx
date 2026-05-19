@@ -71,17 +71,13 @@ export const ReferralScreen: React.FC = () => {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       {/* Header */}
-      <LinearGradient
-        colors={[colors.primary + 'EE', colors.gradientEnd + 'CC']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={s.header}
-      >
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.backBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
+          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Parrainage</Text>
+        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Parrainage</Text>
         <View style={{ width: 40 }} />
-      </LinearGradient>
+      </View>
 
       {loading ? (
         <View style={s.center}>
@@ -203,7 +199,7 @@ const s = StyleSheet.create({
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16 },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerTitle:  { fontSize: 18, fontWeight: '700' },
   scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40, gap: 16 },
 
   heroCard:     { borderRadius: 16, padding: 20, borderWidth: 1 },

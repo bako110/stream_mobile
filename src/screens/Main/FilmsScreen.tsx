@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Animated, {
   FadeInDown, FadeIn,
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+  useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -61,11 +61,12 @@ export interface FilmItem {
 const HeroCarousel: React.FC<{
   items: FilmItem[];
   purchasedIds: Set<string>;
+  hasActiveSub: boolean;
   onPress: (item: FilmItem) => void;
-}> = ({ items, purchasedIds, onPress }) => {
+}> = ({ items, purchasedIds, hasActiveSub, onPress }) => {
   const [idx, setIdx] = useState(0);
   const ref = useRef<FlatList>(null);
-  const timer = useRef<ReturnType<typeof setInterval>>();
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const slides = items.slice(0, HERO_N);
 
   const advance = useCallback(() => {
@@ -99,7 +100,7 @@ const HeroCarousel: React.FC<{
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScrollEnd}
         getItemLayout={(_, i) => ({ length: SW, offset: SW * i, index: i })}
-        renderItem={({ item }) => <HeroSlide item={item} purchased={purchasedIds.has(item.id)} onPress={() => onPress(item)} />}
+        renderItem={({ item }) => <HeroSlide item={item} purchased={purchasedIds.has(item.id) || (hasActiveSub && !!item.is_premium)} onPress={() => onPress(item)} />}
       />
 
       {/* Indicateurs — en bas à gauche */}
@@ -430,12 +431,18 @@ export const FilmsScreen: React.FC = () => {
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
+  const [hasActiveSub, setHasActiveSub] = useState(false);
 
-  // Charger les accès PPV une seule fois
+  // Charger accès PPV + abonnement actif en parallèle
   useEffect(() => {
-    apiClient.get<{ access_ids: string[] }>(Endpoints.content.myAccesses)
-      .then(r => setPurchasedIds(new Set(r.data?.access_ids ?? [])))
-      .catch(() => {});
+    Promise.all([
+      apiClient.get<{ access_ids: string[] }>(Endpoints.content.myAccesses)
+        .then(r => setPurchasedIds(new Set(r.data?.access_ids ?? [])))
+        .catch(() => {}),
+      apiClient.get<{ is_active?: boolean } | null>(Endpoints.subscriptions.me)
+        .then(r => setHasActiveSub(!!(r.data?.is_active)))
+        .catch(() => {}),
+    ]);
   }, []);
 
   const load = useCallback(async () => {
@@ -487,7 +494,7 @@ export const FilmsScreen: React.FC = () => {
         {loading ? (
           <View style={{ height: HERO_H, backgroundColor: colors.backgroundSecondary }} />
         ) : items.length > 0 ? (
-          <HeroCarousel items={items} purchasedIds={purchasedIds} onPress={goDetail} />
+          <HeroCarousel items={items} purchasedIds={purchasedIds} hasActiveSub={hasActiveSub} onPress={goDetail} />
         ) : (
           <View style={{ height: HERO_H * 0.5, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name={tab === 'film' ? 'film' : 'tv'} size={48} color={colors.textTertiary} />
@@ -515,9 +522,9 @@ export const FilmsScreen: React.FC = () => {
           <View style={ss.grid}>
             {rows.map(([a, b], ri) => (
               <View key={ri} style={ss.row}>
-                <Card item={a} index={ri * 2}     tab={tab} colors={colors} purchased={purchasedIds.has(a.id)} onPress={() => goDetail(a)} />
+                <Card item={a} index={ri * 2}     tab={tab} colors={colors} purchased={purchasedIds.has(a.id) || (hasActiveSub && !!a.is_premium)} onPress={() => goDetail(a)} />
                 {b ? (
-                  <Card item={b} index={ri * 2 + 1} tab={tab} colors={colors} purchased={purchasedIds.has(b.id)} onPress={() => goDetail(b)} />
+                  <Card item={b} index={ri * 2 + 1} tab={tab} colors={colors} purchased={purchasedIds.has(b.id) || (hasActiveSub && !!b.is_premium)} onPress={() => goDetail(b)} />
                 ) : (
                   <View style={{ width: CARD_W }} />
                 )}
