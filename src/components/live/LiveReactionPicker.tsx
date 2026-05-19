@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 
-const { height: SH } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get('window');
 
 // ── Réactions disponibles ────────────────────────────────────────────────────
 
@@ -175,15 +175,15 @@ export const LiveReactionPicker = forwardRef<LiveReactionPickerRef, Props>(
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  // Couche absoluteFill pour les emojis flottants — indépendante du bouton
+  // Couche absoluteFill pour les emojis flottants — coordonnées écran réel
   floatLayer: {
     position: 'absolute',
-    // Ancré en bas à droite de l'écran, les emojis montent
-    bottom: 120,
-    right: 20,
-    width: 60,
-    height: 60,
+    bottom: SH * 0.15,   // 15% du bas de l'écran, s'adapte à toutes tailles
+    right: 16,
+    width: 1,            // point d'ancrage minimal, les emojis débordent via translate
+    height: 1,
     zIndex: 999,
+    overflow: 'visible',
   },
   floater: {
     position: 'absolute',
@@ -204,7 +204,7 @@ const st = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
     gap: 6,
-    width: 104,       // 2 colonnes × 44px + gaps
+    width: Math.min(104, SW * 0.28),
     backgroundColor: 'rgba(18,18,18,0.92)',
     borderRadius: 22,
     paddingHorizontal: 8,
