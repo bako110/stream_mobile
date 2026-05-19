@@ -286,12 +286,14 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       });
       if (res.didCancel || !res.assets?.[0]?.uri) return;
       const asset    = res.assets[0];
-      const uri      = await normalizeUri(asset.uri!);
+      const rawUri   = asset.uri!;
       const duration = (asset.duration ?? 0) / 1000; // ms → s
-      setLocalUri(uri);
+
+      // Ouvrir immédiatement avec l'URI brut — normalisation faite plus tard à l'upload
+      setLocalUri(rawUri);
       setVideoDuration(duration);
       if (duration > 90) {
-        setShowTrimmer(true); // affiche le trimmer
+        setShowTrimmer(true);
       } else {
         setStep('preview');
       }

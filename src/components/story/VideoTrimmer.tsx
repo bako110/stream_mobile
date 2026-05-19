@@ -6,7 +6,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet,
   PanResponder, Dimensions, Platform,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
@@ -33,7 +33,6 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
   // startRatio / endRatio : position 0→1 dans toute la vidéo
   const [startRatio, setStartRatio] = useState(0);
   const [endRatio,   setEndRatio]   = useState(clampedEnd / duration);
-  const [isReady,    setIsReady]    = useState(false);
   const [isPlaying,  setIsPlaying]  = useState(false);
   const [playRatio,  setPlayRatio]  = useState(0); // position du curseur 0→1
 
@@ -48,14 +47,10 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
     p.muted = false;
   });
 
-  // ── Prêt ──────────────────────────────────────────────────────────────────
+  // Empêche l'auto-play au chargement
   useEffect(() => {
     const sub = player.addEventListener('onStatusChange', (status: string) => {
-      if (status === 'readyToPlay') {
-        setIsReady(true);
-        player.pause();
-        player.currentTime = 0;
-      }
+      if (status === 'readyToPlay') { player.pause(); player.currentTime = 0; }
     });
     return () => sub.remove();
   }, [player]);
@@ -179,14 +174,6 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
           controls={false}
         />
 
-        {/* Overlay chargement */}
-        {!isReady && (
-          <View style={s.loadingOverlay}>
-            <ActivityIndicator size="large" color="#7B3FF2" />
-            <Text style={s.loadingText}>Chargement…</Text>
-          </View>
-        )}
-
         <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent']} style={s.gradTop} pointerEvents="none" />
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={s.gradBottom} pointerEvents="none" />
 
@@ -202,30 +189,26 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Bouton play centré + durée */}
-        {isReady && (
-          <TouchableOpacity style={s.playBtn} onPress={togglePlay} activeOpacity={0.8}>
-            <View style={s.playBtnInner}>
-              <Icon name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" />
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* Timestamps au-dessus de la barre */}
-        {isReady && (
-          <View style={s.timesRow}>
-            <View style={s.timeBadge}>
-              <Text style={s.timeText}>{fmt(startSec)}</Text>
-            </View>
-            <View style={[s.durationBadge, tooLong && s.durationBadgeErr]}>
-              <Text style={[s.durationText, tooLong && { color: '#EF4444' }]}>{fmt(trimDuration)}</Text>
-              <Text style={s.durationSub}> / 1m30s</Text>
-            </View>
-            <View style={s.timeBadge}>
-              <Text style={s.timeText}>{fmt(endSec)}</Text>
-            </View>
+        {/* Bouton play centré */}
+        <TouchableOpacity style={s.playBtn} onPress={togglePlay} activeOpacity={0.8}>
+          <View style={s.playBtnInner}>
+            <Icon name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" />
           </View>
-        )}
+        </TouchableOpacity>
+
+        {/* Timestamps */}
+        <View style={s.timesRow}>
+          <View style={s.timeBadge}>
+            <Text style={s.timeText}>{fmt(startSec)}</Text>
+          </View>
+          <View style={[s.durationBadge, tooLong && s.durationBadgeErr]}>
+            <Text style={[s.durationText, tooLong && { color: '#EF4444' }]}>{fmt(trimDuration)}</Text>
+            <Text style={s.durationSub}> / 1m30s</Text>
+          </View>
+          <View style={s.timeBadge}>
+            <Text style={s.timeText}>{fmt(endSec)}</Text>
+          </View>
+        </View>
       </View>
 
       {/* ── Barre de trim style WhatsApp ── */}
@@ -273,9 +256,9 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
 
         {/* Bouton confirmer */}
         <TouchableOpacity
-          style={[s.confirmBtn, (invalid || !isReady) && { opacity: 0.4 }]}
+          style={[s.confirmBtn, invalid && { opacity: 0.4 }]}
           onPress={() => onConfirm(uri, startSec, endSec)}
-          disabled={invalid || !isReady}
+          disabled={invalid}
           activeOpacity={0.85}
         >
           <LinearGradient
@@ -303,13 +286,6 @@ const s = StyleSheet.create({
   videoWrap:  { flex: 1, position: 'relative' },
   gradTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 100 },
   gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 },
-
-  loadingOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    alignItems: 'center', justifyContent: 'center', gap: 14, zIndex: 10,
-  },
-  loadingText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
 
   header: {
     position: 'absolute', top: Platform.OS === 'android' ? 44 : 56,
