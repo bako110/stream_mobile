@@ -243,10 +243,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             {profile.banner_url ? (
               <Image source={{ uri: profile.banner_url }} style={styles.banner} />
             ) : (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                style={styles.banner}
-              />
+              <View style={[styles.banner, { backgroundColor: colors.backgroundSecondary }]} />
             )}
           </TouchableOpacity>
           <View style={styles.headerOverlay}>
@@ -281,8 +278,8 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* ── Nom + Bio ───────────────────────────────────────────────── */}
-        <View style={styles.infoSection}>
+        {/* ── Nom + Bio + Détails ─────────────────────────────────────── */}
+        <View style={[styles.infoSection, { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
             <Text style={[styles.displayName, { color: colors.textPrimary }]}>{displayName}</Text>
             {profile.is_verified && <VerifiedBadge size={20} />}
@@ -299,38 +296,40 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           {profile.bio && (
             <Text style={[styles.bio, { color: colors.textSecondary }]}>{profile.bio}</Text>
           )}
-        </View>
 
-        {/* ── Détails (localisation, site, membre depuis) ──────────── */}
-        <View style={styles.detailsSection}>
-          {profile.location ? (
-            <View style={styles.detailRow}>
-              <Icon name="map-pin" size={14} color={colors.textTertiary} />
-              <Text style={[styles.detailText, { color: colors.textPrimary }]}>
-                Habite à <Text style={{ fontWeight: '700' }}>{profile.location}</Text>
-              </Text>
+          {/* Détails inline dans le même bloc */}
+          {(profile.location || profile.website || profile.phone || profile.created_at) && (
+            <View style={styles.detailsSection}>
+              {profile.location ? (
+                <View style={styles.detailRow}>
+                  <Icon name="map-pin" size={14} color={colors.textTertiary} />
+                  <Text style={[styles.detailText, { color: colors.textPrimary }]}>
+                    Habite à <Text style={{ fontWeight: '700' }}>{profile.location}</Text>
+                  </Text>
+                </View>
+              ) : null}
+              {profile.website ? (
+                <View style={styles.detailRow}>
+                  <Icon name="link" size={14} color={colors.primary} />
+                  <Text style={[styles.detailText, { color: colors.primary }]}>{profile.website}</Text>
+                </View>
+              ) : null}
+              {profile.phone ? (
+                <View style={styles.detailRow}>
+                  <Icon name="phone" size={14} color={colors.textTertiary} />
+                  <Text style={[styles.detailText, { color: colors.textPrimary }]}>{profile.phone}</Text>
+                </View>
+              ) : null}
+              {profile.created_at ? (
+                <View style={styles.detailRow}>
+                  <Icon name="clock" size={14} color={colors.textTertiary} />
+                  <Text style={[styles.detailText, { color: colors.textPrimary }]}>
+                    Membre depuis <Text style={{ fontWeight: '700' }}>{formatDate(profile.created_at)}</Text>
+                  </Text>
+                </View>
+              ) : null}
             </View>
-          ) : null}
-          {profile.website ? (
-            <View style={styles.detailRow}>
-              <Icon name="link" size={14} color={colors.primary} />
-              <Text style={[styles.detailText, { color: colors.primary }]}>{profile.website}</Text>
-            </View>
-          ) : null}
-          {profile.phone ? (
-            <View style={styles.detailRow}>
-              <Icon name="phone" size={14} color={colors.textTertiary} />
-              <Text style={[styles.detailText, { color: colors.textPrimary }]}>{profile.phone}</Text>
-            </View>
-          ) : null}
-          {profile.created_at ? (
-            <View style={styles.detailRow}>
-              <Icon name="clock" size={14} color={colors.textTertiary} />
-              <Text style={[styles.detailText, { color: colors.textPrimary }]}>
-                Membre depuis <Text style={{ fontWeight: '700' }}>{formatDate(profile.created_at)}</Text>
-              </Text>
-            </View>
-          ) : null}
+          )}
         </View>
 
         {/* ── Stats ───────────────────────────────────────────────────── */}
@@ -877,7 +876,10 @@ const styles = StyleSheet.create({
   avatarInitial: { color: '#fff', fontSize: 28, fontWeight: '800' },
   verifiedBadge: { position: 'absolute', bottom: 2, right: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
 
-  infoSection: { alignItems: 'center', paddingHorizontal: 20, marginTop: 10, gap: 4 },
+  infoSection: {
+    alignItems: 'center', marginHorizontal: 16, marginTop: 10,
+    borderRadius: 16, padding: 16, gap: 4,
+  },
   displayName: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
   username: { fontSize: 14 },
   bio: { fontSize: 14, textAlign: 'center', marginTop: 4, lineHeight: 20 },
@@ -886,7 +888,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
   },
 
-  detailsSection: { paddingHorizontal: 20, marginTop: 10, gap: 6 },
+  detailsSection: { marginTop: 10, gap: 6, alignSelf: 'stretch' },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailText: { fontSize: 13 },
 

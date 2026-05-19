@@ -1,30 +1,26 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
-import ReactNativeBlobUtil from 'react-native-blob-util';
 
-const { width: W, height: H } = Dimensions.get('window');
-const MAX_DURATION = 60;
+const MAX_DURATION = 90; // 1m30s max
 
 interface Props {
-  uri:        string;
-  duration:   number; // durée réelle en secondes
-  onConfirm:  (trimmedUri: string, startSec: number, endSec: number) => void;
-  onCancel:   () => void;
+  uri:       string;
+  duration:  number; // durée réelle en secondes
+  // trimmedUri est identique à uri — le vrai découpage se fait côté backend via trim_start/end_sec
+  onConfirm: (uri: string, startSec: number, endSec: number) => void;
+  onCancel:  () => void;
 }
 
 export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCancel }) => {
-  const [startSec, setStartSec]   = useState(0);
-  const [endSec,   setEndSec]     = useState(Math.min(duration, MAX_DURATION));
-  const [trimming, setTrimming]   = useState(false);
-  const [seeking,  setSeeking]    = useState(false);
+  const [startSec, setStartSec] = useState(0);
+  const [endSec,   setEndSec]   = useState(Math.min(duration, MAX_DURATION));
+  const [applying, setApplying] = useState(false);
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const player = useVideoPlayer({ uri }, p => {
@@ -42,31 +38,21 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
 
   const trimDuration = endSec - startSec;
 
-  const handleConfirm = async () => {
-    setTrimming(true);
-    try {
-      const outPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/trimmed_${Date.now()}.mp4`;
-      const cmd = `-y -ss ${startSec.toFixed(2)} -t ${trimDuration.toFixed(2)} -i "${uri.replace('file://', '')}" -c:v libx264 -crf 23 -preset fast -vf "scale='min(1280,iw)':-2" -c:a aac -b:a 128k -movflags +faststart "${outPath}"`;
-
-      const session = await FFmpegKit.execute(cmd);
-      const rc      = await session.getReturnCode();
-
-      if (!ReturnCode.isSuccess(rc)) {
-        const logs = await session.getAllLogsAsString();
-        throw new Error(`Trim error: ${logs?.slice(-200)}`);
-      }
-
-      onConfirm(`file://${outPath}`, startSec, endSec);
-    } catch (e: any) {
-      setTrimming(false);
-    }
+  const handleConfirm = () => {
+    setApplying(true);
+    // Pas de découpe locale — on passe les timestamps au backend
+    onConfirm(uri, startSec, endSec);
   };
 
   const fmt = (s: number) => {
-    const m = Math.floor(s / 60);
+    const m   = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${String(sec).padStart(2, '0')}`;
   };
+
+  const tooLong = trimDuration > MAX_DURATION;
+  const tooShort = trimDuration < 1;
+  const invalid = tooLong || tooShort;
 
   return (
     <View style={s.root}>
@@ -96,7 +82,7 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
           </TouchableOpacity>
           <View style={s.badge}>
             <Icon name="scissors" size={12} color="#fff" />
-            <Text style={s.badgeText}>Rogner la vidéo</Text>
+            <Text style={s.badgeText}>Choisir un segment</Text>
           </View>
           <View style={{ width: 40 }} />
         </View>
@@ -104,21 +90,21 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
         {/* Durée sélectionnée */}
         <View style={s.durationBadge}>
           <Text style={s.durationText}>{fmt(trimDuration)}</Text>
-          <Text style={s.durationSub}>/ {MAX_DURATION}s max</Text>
+          <Text style={s.durationSub}>/ 1m30s max</Text>
         </View>
       </View>
 
       {/* Contrôles trim */}
       <View style={s.controls}>
-        {/* Barre timeline */}
+        {/* Barre timeline visuelle */}
         <View style={s.timeline}>
           <View style={s.timelineTrack}>
-            {/* Zone sélectionnée */}
             <View style={[
               s.timelineSelected,
               {
                 left:  `${(startSec / duration) * 100}%` as any,
                 width: `${(trimDuration / duration) * 100}%` as any,
+                backgroundColor: tooLong ? '#EF4444' : '#7B3FF2',
               },
             ]} />
           </View>
@@ -170,21 +156,25 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
         </View>
 
         {/* Info durée */}
-        <View style={s.infoRow}>
-          <Icon name="info" size={13} color="rgba(255,255,255,0.5)" />
-          <Text style={s.infoText}>
-            {trimDuration > MAX_DURATION
-              ? `⚠️ Sélection trop longue — max ${MAX_DURATION}s`
-              : `Durée sélectionnée : ${fmt(trimDuration)}`
+        <View style={[s.infoRow, tooLong && { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
+          <Icon
+            name={tooLong ? 'alert-triangle' : 'info'}
+            size={13}
+            color={tooLong ? '#EF4444' : 'rgba(255,255,255,0.5)'}
+          />
+          <Text style={[s.infoText, tooLong && { color: '#EF4444' }]}>
+            {tooLong
+              ? `Trop long — max 1m30s (${fmt(MAX_DURATION)})`
+              : `Segment sélectionné : ${fmt(startSec)} → ${fmt(endSec)}`
             }
           </Text>
         </View>
 
         {/* Bouton confirmer */}
         <TouchableOpacity
-          style={[s.confirmBtn, (trimDuration > MAX_DURATION || trimDuration < 1) && { opacity: 0.4 }]}
+          style={[s.confirmBtn, invalid && { opacity: 0.4 }]}
           onPress={handleConfirm}
-          disabled={trimming || trimDuration > MAX_DURATION || trimDuration < 1}
+          disabled={applying || invalid}
           activeOpacity={0.85}
         >
           <LinearGradient
@@ -192,10 +182,10 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.confirmInner}
           >
-            {trimming ? (
+            {applying ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <ActivityIndicator size={16} color="#fff" />
-                <Text style={s.confirmText}>Découpe en cours…</Text>
+                <Text style={s.confirmText}>Application…</Text>
               </View>
             ) : (
               <>
@@ -255,7 +245,7 @@ const s = StyleSheet.create({
   },
   timelineSelected: {
     position: 'absolute', top: 0, bottom: 0,
-    backgroundColor: '#7B3FF2', borderRadius: 3,
+    borderRadius: 3,
   },
 
   sliderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },

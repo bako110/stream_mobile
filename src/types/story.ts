@@ -48,6 +48,8 @@ export interface StoryCreate {
   font_style?: string;
   audience_type?: StoryAudienceType;
   audience_user_ids?: string[];
+  trim_start_sec?: number; // segment sélectionné — découpé côté backend
+  trim_end_sec?: number;
 }
 
 export interface StoryUpdate {

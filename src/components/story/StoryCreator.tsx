@@ -65,7 +65,7 @@ interface ModeOption {
 const MODE_OPTIONS: ModeOption[] = [
   { key: 'text',        icon: 'format-text',          iconLib: 'material', label: 'Texte',        sub: 'Message sur fond coloré',      accent: '#7B3FF2', gradient: ['#7B3FF2', '#9B65F5'] },
   { key: 'image',       icon: 'image',                iconLib: 'feather',  label: 'Photo',        sub: 'Depuis la galerie ou caméra',   accent: '#2196F3', gradient: ['#1565C0', '#2196F3'] },
-  { key: 'video',       icon: 'video',                iconLib: 'feather',  label: 'Video',        sub: 'Clip jusqu\'a 60 secondes',     accent: '#E91E63', gradient: ['#AD1457', '#E91E63'] },
+  { key: 'video',       icon: 'video',                iconLib: 'feather',  label: 'Video',        sub: 'Clip jusqu\'a 1m30s',           accent: '#E91E63', gradient: ['#AD1457', '#E91E63'] },
   { key: 'voice',       icon: 'microphone',           iconLib: 'material', label: 'Vocal',        sub: 'Message vocal direct',          accent: '#00BCD4', gradient: ['#00838F', '#00BCD4'] },
 ];
 
@@ -179,6 +179,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [uploadPct,     setUploadPct]     = useState(0);
   const [showTrimmer,   setShowTrimmer]   = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [trimStart,     setTrimStart]     = useState(0);
+  const [trimEnd,       setTrimEnd]       = useState(0);
   const tempFilesRef = useRef<string[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [recording,     setRecording]     = useState(false);
@@ -208,7 +210,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setCaption(''); setBgColor(TEXT_BG_COLORS[0]); setFontStyleKey('classic');
     setShowTextInput(false); setUploading(false); setRecording(false);
     setRecordTime('00:00'); setShowSuccess(false);
-    setShowTrimmer(false); setVideoDuration(0);
+    setShowTrimmer(false); setVideoDuration(0); setTrimStart(0); setTrimEnd(0);
     setAudienceType('everyone'); setSelectedUsers([]);
     stopAudioPreview();
     onClose();
@@ -288,7 +290,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       const duration = (asset.duration ?? 0) / 1000; // ms → s
       setLocalUri(uri);
       setVideoDuration(duration);
-      if (duration > 60) {
+      if (duration > 90) {
         setShowTrimmer(true); // affiche le trimmer
       } else {
         setStep('preview');
@@ -363,7 +365,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     // Étape 1 — compression
     setUploadStep('Compression…'); setUploadPct(0);
     const compressed = await compressVideo(uri, {
-      maxDurationSec: 60,
+      maxDurationSec: 90,
       crf: 23,
       onProgress: p => setUploadPct(Math.round(p * 0.6)),
     });
@@ -410,7 +412,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     const _fontStyleKey= fontStyleKey;
     const _audienceType= audienceType;
     const _selectedUsers = selectedUsers;
-    const _tempFiles   = [...tempFilesRef.current];
+    const _tempFiles    = [...tempFilesRef.current];
+    const _trimStart    = trimStart;
+    const _trimEnd      = trimEnd;
     tempFilesRef.current = [];
 
     // Fermer immediatement — l'utilisateur peut naviguer
@@ -439,7 +443,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           case 'video': {
             const v = await doUploadVideo(_localUri!);
             media_url = v.url; media_type = 'video';
-            duration_sec = Math.min(Math.ceil(v.duration), 60);
+            duration_sec = Math.min(Math.ceil(v.duration), 90);
             thumbnail_url = v.thumbnailUrl;
             break;
           }
@@ -464,6 +468,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           font_style: _mode === 'text' ? _fontStyleKey : undefined,
           audience_type: _audienceType,
           audience_user_ids: _audienceType !== 'everyone' ? _selectedUsers : [],
+          trim_start_sec: _mode === 'video' && _trimEnd > 0 ? _trimStart : undefined,
+          trim_end_sec:   _mode === 'video' && _trimEnd > 0 ? _trimEnd   : undefined,
         });
 
         await cleanupTempVideos(_tempFiles);
@@ -667,9 +673,10 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         <VideoTrimmer
           uri={localUri}
           duration={videoDuration}
-          onConfirm={(trimmedUri) => {
+          onConfirm={(trimmedUri, startSec, endSec) => {
             setLocalUri(trimmedUri);
-            tempFilesRef.current.push(trimmedUri);
+            setTrimStart(startSec);
+            setTrimEnd(endSec);
             setShowTrimmer(false);
             setStep('preview');
           }}
