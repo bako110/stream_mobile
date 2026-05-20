@@ -113,6 +113,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
     month: 'long', year: 'numeric',
   }) : '';
 
+  // Styles locaux pour les boutons icône+label
+  const _btnCol: object  = { alignItems: 'center', gap: 4 };
+  const _btnIcon: object = { width: 42, height: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' };
+  const _btnLabel: object = { fontSize: 10, fontWeight: '600' };
+
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <QRCodeScreen visible={showQR} onClose={() => setShowQR(false)} />
@@ -166,33 +171,73 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
 
             {/* Boutons d'action */}
             <View style={s.actionRow}>
+              {/* Modifier le profil */}
               <TouchableOpacity
                 style={[s.editBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
                 onPress={onEditProfile}
               >
                 <Icon name="edit-2" size={13} color="#fff" />
-                <Text style={[s.editBtnText, { color: '#fff' }]}>Modifier le profil</Text>
+                <Text style={[s.editBtnText, { color: '#fff' }]}>Modifier</Text>
               </TouchableOpacity>
+
+              {/* Wallet */}
               <TouchableOpacity
-                style={[s.shareProfileBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                style={[_btnCol]}
+                onPress={() => nav.navigate('Wallet')}
+                activeOpacity={0.75}
+              >
+                <View style={[_btnIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                  <Icon name="credit-card" size={16} color={colors.textSecondary} />
+                </View>
+                <Text style={[_btnLabel, { color: colors.textTertiary }]}>Wallet</Text>
+              </TouchableOpacity>
+
+              {/* Story */}
+              <TouchableOpacity
+                style={[_btnCol]}
                 onPress={() => nav.navigate('MyStories')}
+                activeOpacity={0.75}
               >
-                <Icon name="camera" size={15} color={colors.textSecondary} />
+                <View style={[_btnIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                  <Icon name="camera" size={16} color={colors.textSecondary} />
+                </View>
+                <Text style={[_btnLabel, { color: colors.textTertiary }]}>Story</Text>
               </TouchableOpacity>
+
+              {/* QR Code */}
               <TouchableOpacity
-                style={[s.shareProfileBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-                onPress={() => {}}
-              >
-                <Icon name="share" size={15} color={colors.textSecondary} />
-              </TouchableOpacity>
-              {/* Bouton QR */}
-              <TouchableOpacity
-                style={[s.shareProfileBtn, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '40' }]}
+                style={[_btnCol]}
                 onPress={() => setShowQR(true)}
+                activeOpacity={0.75}
               >
-                <Icon name="maximize" size={15} color={colors.primary} />
+                <View style={[_btnIcon, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '40' }]}>
+                  <Icon name="grid" size={16} color={colors.primary} />
+                </View>
+                <Text style={[_btnLabel, { color: colors.primary }]}>QR Code</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Boutons artiste — créer événement / concert */}
+            {isCreator && (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, paddingHorizontal: 4 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: '#E0389A' + '60', backgroundColor: '#E0389A' + '10' }}
+                  onPress={onCreateEvent}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="calendar" size={13} color="#E0389A" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#E0389A' }}>Créer un événement</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: '#7B3FF2' + '60', backgroundColor: '#7B3FF2' + '10' }}
+                  onPress={onCreateConcert}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="music" size={13} color="#7B3FF2" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#7B3FF2' }}>Créer un concert</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </Animated.View>
 
           {/* ── Stats (Followers / Following / Publications) ───────────── */}
@@ -267,30 +312,33 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   <Icon name="chevron-right" size={14} color={colors.textTertiary} />
                 </TouchableOpacity>
               )}
-              {user?.folix_id && (
-                <TouchableOpacity
-                  style={[s.aboutRow, { backgroundColor: colors.primary + '12', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }]}
-                  activeOpacity={0.75}
-                  onPress={() => {
-                    Clipboard.setString(user.folix_id!);
-                    if (Platform.OS === 'android') {
-                      ToastAndroid.show('FoliX ID copié !', ToastAndroid.SHORT);
-                    } else {
-                      Alert.alert('Copié', 'FoliX ID copié dans le presse-papier.');
-                    }
-                  }}
-                >
-                  <Icon name="at-sign" size={16} color={colors.primary} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>FoliX ID</Text>
-                    <Text style={{ fontSize: 15, fontWeight: '900', color: colors.primary, letterSpacing: 2 }}>{user.folix_id}</Text>
-                  </View>
+              <TouchableOpacity
+                style={[s.aboutRow, { backgroundColor: colors.primary + '12', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }]}
+                activeOpacity={user?.folix_id ? 0.75 : 1}
+                onPress={() => {
+                  if (!user?.folix_id) return;
+                  Clipboard.setString(user.folix_id!);
+                  if (Platform.OS === 'android') {
+                    ToastAndroid.show('FoliX ID copié !', ToastAndroid.SHORT);
+                  } else {
+                    Alert.alert('Copié', 'FoliX ID copié dans le presse-papier.');
+                  }
+                }}
+              >
+                <Icon name="at-sign" size={16} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>FoliX ID</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '900', color: user?.folix_id ? colors.primary : colors.textTertiary, letterSpacing: 2 }}>
+                    {user?.folix_id ?? 'En cours de génération...'}
+                  </Text>
+                </View>
+                {user?.folix_id ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                     <Icon name="copy" size={13} color={colors.primary} />
                     <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Copier</Text>
                   </View>
-                </TouchableOpacity>
-              )}
+                ) : null}
+              </TouchableOpacity>
             </View>
           </Animated.View>
 
@@ -351,22 +399,6 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 <Text style={{ fontSize: 13, color: colors.textTertiary }}>
                   Aucune publication pour le moment
                 </Text>
-                {isCreator && (
-                  <TouchableOpacity
-                    onPress={onCreateEvent}
-                    style={[s.createCta, { overflow: 'hidden' }]}
-                  >
-                    <LinearGradient
-                      colors={[colors.gradientStart, colors.gradientEnd]}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                    <Icon name="plus" size={14} color={colors.textOnBrand} />
-                    <Text style={[s.createCtaText, { color: colors.textOnBrand }]}>
-                      Créer un événement
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </View>
             )}
           </Animated.View>
