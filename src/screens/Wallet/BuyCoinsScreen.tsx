@@ -317,10 +317,10 @@ const BuyCoinsScreen: React.FC = () => {
     setPurchasing(true);
     setCpStatusMsg('Initialisation du paiement...');
     try {
-      const res = await apiClient.post<any>(Endpoints.wallet.cinetpayInit, {
-        package_id: selected.id === 'custom' ? undefined : selected.id,
-        direct_pay: false,
-      });
+      const res = await apiClient.post<any>(Endpoints.wallet.cinetpayInit, selected.id === 'custom'
+        ? { custom_amount_eur: parseFloat(String(selected.price_eur)), direct_pay: false }
+        : { package_id: selected.id, direct_pay: false }
+      );
       const data = res.data;
       const merchantTxId = data?.merchant_transaction_id;
       const paymentUrl   = data?.payment_url;
