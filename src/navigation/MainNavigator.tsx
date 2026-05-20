@@ -3,6 +3,7 @@ import { Platform, PermissionsAndroid, BackHandler, ToastAndroid, InteractionMan
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation, useNavigationState, CommonActions } from '@react-navigation/native';
+import { navigate as navRefNavigate } from './navigationRef';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useWs } from '../context/WebSocketContext';
 
@@ -296,14 +297,13 @@ const ExitHandler: React.FC = () => {
 // ── IncomingCallHandler — écoute pendingIncomingCall et navigue dans le bon contexte ─
 
 const IncomingCallHandler: React.FC = () => {
-  const navigation = useNavigation<MainNav>();
   const { pendingIncomingCall, clearPendingIncomingCall } = useWs();
 
   useEffect(() => {
     if (!pendingIncomingCall) return;
     clearPendingIncomingCall();
     console.log('[NAV] navigating to Call from IncomingCallHandler', pendingIncomingCall.partnerId);
-    navigation.navigate('Call', {
+    navRefNavigate('Call', {
       partnerId:     pendingIncomingCall.partnerId,
       partnerName:   pendingIncomingCall.partnerName,
       partnerAvatar: pendingIncomingCall.partnerAvatar,
@@ -311,7 +311,7 @@ const IncomingCallHandler: React.FC = () => {
       isIncoming:    true,
       offer:         pendingIncomingCall.offer,
     });
-  }, [pendingIncomingCall, clearPendingIncomingCall, navigation]);
+  }, [pendingIncomingCall, clearPendingIncomingCall]);
 
   return null;
 };

@@ -507,17 +507,15 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     isMounted.current = true;
     connect();
     const handleAppState = (next: AppStateStatus) => {
-      if (next === 'background' || next === 'inactive') {
-        // Arrière-plan : on coupe le ping pour éviter les erreurs réseau silencieuses
-        if (pingTimer.current) { clearInterval(pingTimer.current); pingTimer.current = null; }
-      } else if (next === 'active') {
-        // Premier plan : forcer reconnexion si WS mort ou fermé
+      if (next === 'active' || next === 'inactive') {
+        // Retour au premier plan (ou transition) : reconnecter si WS mort
         if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED || wsRef.current.readyState === WebSocket.CLOSING) {
           if (retryTimer.current) clearTimeout(retryTimer.current);
           retryCount.current = 0;
           connect();
         }
       }
+      // Ne pas couper le ping en background — le WS doit rester vivant pour recevoir les appels
     };
     const sub = AppState.addEventListener('change', handleAppState);
     return () => {
