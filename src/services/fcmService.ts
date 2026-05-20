@@ -192,20 +192,38 @@ export async function handleBackgroundFCM(
   const body  = (data.body  as string) ?? '';
 
   if (type === 'call_offer') {
-    // Stocker les infos d'appel dans MMKV — l'app les lira au retour au foreground
+    const callerId   = (data.caller_id    as string) ?? '';
+    const callerName = (data.caller_name  as string) ?? 'Appel';
+    const callerAvatar = (data.caller_avatar as string) || '';
+    const callType   = (data.call_type as string) === 'video' ? 'video' : 'voice';
+
+    // Récupérer le SDP complet depuis le backend (le headless task peut faire fetch)
+    let offer: any = null;
+    try {
+      const { API_BASE_URL } = require('../utils/constants');
+      const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      if (token) {
+        const res = await fetch(`${API_BASE_URL}/api/v1/messages/call/pending`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const payload = await res.json();
+          offer = payload.sdp ?? null;
+        }
+      }
+    } catch {}
+
+    // Stocker dans MMKV — l'app lira ça au retour au foreground
     storage.setItem('pending_incoming_call', JSON.stringify({
-      caller_id:    (data.caller_id    as string) ?? '',
-      caller_name:  (data.caller_name  as string) ?? 'Appel',
-      caller_avatar: (data.caller_avatar as string) || '',
-      call_type:    (data.call_type    as string) === 'video' ? 'video' : 'voice',
+      caller_id:    callerId,
+      caller_name:  callerName,
+      caller_avatar: callerAvatar,
+      call_type:    callType,
+      offer,
       received_at:  Date.now(),
     }));
-    await showIncomingCallNotification(
-      (data.caller_id    as string) ?? '',
-      (data.caller_name  as string) ?? 'Appel',
-      (data.caller_avatar as string) || null,
-      ((data.call_type   as string) === 'video' ? 'video' : 'voice'),
-    );
+
+    await showIncomingCallNotification(callerId, callerName, callerAvatar || null, callType);
     return;
   }
 
@@ -429,37 +447,19 @@ export async function setupFCM(): Promise<void> {
     _handleNotificationOpen(initialNotifee.notification.data as Record<string, string>);
   }
 
-  // Appel entrant reçu en background via FCM — l'afficher si < 60s
-  const pendingIncomingRaw = storage.getItem('pending_incoming_call');
-  if (pendingIncomingRaw) {
-    storage.removeItem('pending_incoming_call');
-    try {
-      const p = JSON.parse(pendingIncomingRaw);
-      const age = Date.now() - (p.received_at ?? 0);
-      if (age < 60_000 && p.caller_id) {
-        // Naviguer vers CallScreen — le buffer resend WS fournira le SDP
-        navigate('Call', {
-          partnerId:    p.caller_id,
-          partnerName:  p.caller_name ?? 'Inconnu',
-          partnerAvatar: p.caller_avatar || null,
-          callType:     p.call_type ?? 'voice',
-          isIncoming:   true,
-          autoAccept:   false,
-          offer:        undefined,
-        });
-      }
-    } catch {}
-  }
-
-  // Acceptation depuis background — lire l'intention stockée dans MMKV
+  // Acceptation depuis background (bouton "Accepter" sur la notification)
   const pendingRaw = storage.getItem('pending_call_accept');
   if (pendingRaw) {
     storage.removeItem('pending_call_accept');
     try {
       const pending = JSON.parse(pendingRaw);
-      const sdpRaw  = storage.getItem('pending_call_offer_sdp');
-      const offer   = sdpRaw ? JSON.parse(sdpRaw) : undefined;
-      if (sdpRaw) storage.removeItem('pending_call_offer_sdp');
+      // Récupérer l'offer depuis pending_incoming_call si dispo
+      let offer: any = null;
+      const incomingRaw = storage.getItem('pending_incoming_call');
+      if (incomingRaw) {
+        storage.removeItem('pending_incoming_call');
+        try { offer = JSON.parse(incomingRaw).offer ?? null; } catch {}
+      }
       navigate('Call', {
         partnerId:    pending.caller_id,
         partnerName:  pending.caller_name ?? 'Inconnu',

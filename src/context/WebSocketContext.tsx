@@ -17,7 +17,7 @@ import { authService } from '../services/authService';
 import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { favoriteService } from '../services/favoriteService';
-import { cancelCallNotification, showIncomingCallNotification } from '../services/fcmService';
+import { cancelCallNotification } from '../services/fcmService';
 import {
   createWsEventHandler,
   type NewFollowerPayload,
@@ -360,9 +360,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
       try {
         const raw = typeof event.data === 'string' ? event.data : String(event.data);
         const payload: WsPayload = JSON.parse(raw);
-        if (payload.type !== 'pong') {
-          console.log('[WS] onmessage type=', payload.type, 'from=', payload.from, 'to=', payload.to);
-        }
         if (payload.type === 'pong') return;
 
         if (payload.type === 'account_blocked' && isMounted.current) {
@@ -370,7 +367,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           return;
         }
 
-        // ── Compteurs non-lus ──────────────────────────────────────────────
         if (payload.type === 'message' && isMounted.current) {
           const fromSelf       = payload.sender_id && payload.sender_id === myIdRef.current;
           const fromActiveChat = activeChatRef.current && payload.sender_id === activeChatRef.current;
@@ -382,13 +378,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
         if (payload.type === 'activity'     && isMounted.current) setUnreadActivity(prev => prev + 1);
         if (payload.type === 'notification' && isMounted.current) setUnreadNotifications(prev => prev + 1);
 
-        // ── Appel entrant — ignorer si c'est notre propre appel ou déjà accepté ─
         if (payload.type === 'call_offer') {
-          // N'utiliser myIdRef que si on a déjà confirmé l'ID via getMe() (myIdConfirmed)
           const fromSelf    = (myIdConfirmedRef.current && payload.from === myIdRef.current)
                            || outgoingCallIds.current.has(payload.from);
           const alreadyLive = acceptedCalls.current.has(payload.from);
-          console.log('[WS] call_offer recu mounted=', isMounted.current, 'from=', payload.from, 'myId=', myIdRef.current, 'confirmed=', myIdConfirmedRef.current, 'fromSelf=', fromSelf, 'alreadyLive=', alreadyLive);
           if (!fromSelf && !alreadyLive && isMounted.current) {
             callEventBuffer.current.delete(payload.from);
             registerPendingCallRef.current(
@@ -398,9 +391,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
               payload.call_type ?? 'voice',
               'incoming',
             );
-            const appState = AppState.currentState;
-            console.log('[WS] incoming call appState=', appState);
-            if (appState === 'active' || appState === 'inactive') {
+            // App au premier plan → naviguer directement
+            if (AppState.currentState === 'active' || AppState.currentState === 'inactive') {
               setPendingIncomingCall({
                 partnerId:     payload.from,
                 partnerName:   payload.from_name ?? 'Inconnu',
@@ -408,21 +400,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
                 callType:      payload.call_type ?? 'voice',
                 offer:         payload.sdp ?? null,
               });
-            } else {
-              if (payload.sdp) {
-                storage.setItem('pending_call_offer_sdp', JSON.stringify(payload.sdp));
-              }
-              showIncomingCallNotification(
-                payload.from,
-                payload.from_name ?? 'Appel',
-                payload.from_avatar ?? null,
-                payload.call_type === 'video' ? 'video' : 'voice',
-              ).catch(() => {});
             }
+            // App en background → FCM + MMKV gèrent le réveil (handleBackgroundFCM)
           }
         }
 
-        // ── L'autre a décroché (appel sortant accepté) ─────────────────────
         if (payload.type === 'call_answer' && isMounted.current) {
           const pending = pendingCalls.current.get(payload.from ?? payload.to);
           if (pending) {
@@ -435,18 +417,15 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           }
         }
 
-        // Annuler la notification Notifee si l'appel est raccroché avant réponse
         if (payload.type === 'call_hangup' && isMounted.current) {
           const fromId = payload.from ?? payload.sender_id;
           if (fromId) cancelCallNotification(fromId).catch(() => {});
         }
 
-        // Appel manqué enregistre cote backend → incrémenter le badge
         if (payload.type === 'missed_call' && isMounted.current) {
           setMissedCallCount(c => c + 1);
         }
 
-        // ── Buffer les events call si CallScreen pas encore monté ─────────
         if ((payload.type === 'call_ice' || payload.type === 'call_answer' || payload.type === 'call_hangup') && isMounted.current) {
           const fromId = payload.from ?? payload.sender_id;
           if (fromId) {
@@ -456,10 +435,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           }
         }
 
-        // Ne pas broadcaster call_offer si c'est notre propre appel
         if (payload.type === 'call_offer') {
-          const fromSelf = (myIdRef.current && payload.from === myIdRef.current)
-                        || outgoingCallIds.current.has(payload.to);
+          const fromSelf = (myIdConfirmedRef.current && payload.from === myIdRef.current)
+                        || outgoingCallIds.current.has(payload.from);
           if (!fromSelf) {
             listeners.current.forEach(fn => { try { fn(payload); } catch {} });
           }
@@ -527,7 +505,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
                 partnerName:   p.caller_name ?? 'Inconnu',
                 partnerAvatar: p.caller_avatar || null,
                 callType:      p.call_type ?? 'voice',
-                offer:         null, // le buffer resend WS fournira le SDP
+                offer:         p.offer ?? null,
               });
             }
           } catch {}
