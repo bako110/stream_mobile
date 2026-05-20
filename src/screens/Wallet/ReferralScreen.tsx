@@ -32,12 +32,16 @@ export const ReferralScreen: React.FC = () => {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      // Génère le code si absent
-      await apiClient.get(Endpoints.wallet.referralMe);
-      const res = await apiClient.get<ReferralStats>(Endpoints.wallet.referralStats);
-      setStats(res.data);
-    } catch {
-      // silencieux
+      const [meRes, statsRes] = await Promise.all([
+        apiClient.get<{ referral_code: string }>(Endpoints.wallet.referralMe),
+        apiClient.get<ReferralStats>(Endpoints.wallet.referralStats),
+      ]);
+      setStats({
+        ...statsRes.data,
+        referral_code: meRes.data.referral_code ?? statsRes.data.referral_code,
+      });
+    } catch (e: any) {
+      console.log('[Referral] erreur:', e?.message, e?.response?.status);
     } finally {
       setLoading(false);
       setRefreshing(false);
