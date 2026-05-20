@@ -26,8 +26,7 @@ export const authService = {
   },
 
   async register(payload: RegisterRequest): Promise<{ user: User } & AuthToken> {
-    const regRes = await apiClient.post<User>(Endpoints.auth.register, payload);
-    const user = regRes.data;
+    await apiClient.post<User>(Endpoints.auth.register, payload);
     // Auto-login après inscription — identifier = email ou phone
     const loginRes = await apiClient.post<{ access_token: string; refresh_token: string; token_type: string; user: User }>(Endpoints.auth.login, {
       identifier: payload.email ?? payload.phone,
@@ -35,9 +34,9 @@ export const authService = {
     });
     const { access_token, refresh_token, token_type } = loginRes.data;
     authService._saveTokens({ access_token, refresh_token, token_type });
-    _cachedUser = loginRes.data.user ?? user;
-    _cachedAt = Date.now();
-    return { access_token, refresh_token, token_type, user: _cachedUser! };
+    // Force un /auth/me pour avoir toutes les données (folix_id, referral_code, etc.)
+    const freshUser = await authService.getMe(true);
+    return { access_token, refresh_token, token_type, user: freshUser };
   },
 
   async logout(): Promise<void> {
