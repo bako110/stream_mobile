@@ -235,6 +235,26 @@ export async function handleBackgroundFCM(
     return;
   }
 
+  if (type === 'event_reminder') {
+    await notifee.displayNotification({
+      title: (data.title as string) || "Votre evenement s'approche",
+      body:  body,
+      android: {
+        channelId:        CHANNEL_NOTIFS,
+        importance:       AndroidImportance.HIGH,
+        sound:            'notification_sound',
+        vibrationPattern: [300, 200, 300],
+        smallIcon:        'ic_notification',
+        pressAction:      { id: 'default', launchActivity: 'default' },
+      },
+      ios: {
+        sound: 'notification_sound.wav',
+      },
+      data: data as Record<string, string>,
+    });
+    return;
+  }
+
   // Generic notification (follow, reaction, comment, etc.)
   await notifee.displayNotification({
     title,
@@ -267,6 +287,16 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
     navigate('Messages', { initialTab: 'calls' });
   } else if (type === 'message') {
     navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
+  } else if (type === 'event_reminder') {
+    const refType = data.ref_type ?? '';
+    const refId   = data.ref_id   ?? '';
+    if (refType === 'concert' && refId) {
+      navigate('ConcertDetail', { concertId: refId });
+    } else if (refType === 'event' && refId) {
+      navigate('EventDetail', { eventId: refId });
+    } else {
+      navigate('Notifications', undefined);
+    }
   } else if (type === 'notification') {
     const notifType = data.notification_type ?? '';
     if (
