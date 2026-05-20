@@ -322,6 +322,8 @@ export const Endpoints = {
     // Affiliation / Parrainage
     referralMe:    `${V1}/wallet/referral/me`,
     referralStats: `${V1}/wallet/referral/stats`,
+    // FoliX ID
+    resolveFlixId: (folixId: string) => `${V1}/wallet/resolve/${folixId}`,
   },
 
   // ── Lives simples (spontanés) ─────────────────────────────────────────────

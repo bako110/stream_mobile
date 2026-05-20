@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  ActivityIndicator, StyleSheet,
+  ActivityIndicator, StyleSheet, Clipboard, ToastAndroid, Platform, Alert,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -265,6 +265,30 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                     </Text>
                   </Text>
                   <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
+              {user?.folix_id && (
+                <TouchableOpacity
+                  style={[s.aboutRow, { backgroundColor: colors.primary + '12', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }]}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    Clipboard.setString(user.folix_id!);
+                    if (Platform.OS === 'android') {
+                      ToastAndroid.show('FoliX ID copié !', ToastAndroid.SHORT);
+                    } else {
+                      Alert.alert('Copié', 'FoliX ID copié dans le presse-papier.');
+                    }
+                  }}
+                >
+                  <Icon name="at-sign" size={16} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>FoliX ID</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '900', color: colors.primary, letterSpacing: 2 }}>{user.folix_id}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                    <Icon name="copy" size={13} color={colors.primary} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Copier</Text>
+                  </View>
                 </TouchableOpacity>
               )}
             </View>
