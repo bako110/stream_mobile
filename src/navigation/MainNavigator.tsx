@@ -338,7 +338,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
   return (
     <ActiveCallProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><IncomingCallHandler /><Tabs onLogout={onLogout} /></>} />
+        <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} /></>} />
         <Stack.Screen name="Feed"           component={FeedScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateEvent"    component={CreateEventWrapper}    options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateConcert"  component={CreateConcertWrapper}  options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
@@ -433,6 +433,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
       <UploadProgressBanner />
       <NotificationToast />
       <ActiveCallBar />
+      <IncomingCallHandler />
     </ActiveCallProvider>
   );
 };
