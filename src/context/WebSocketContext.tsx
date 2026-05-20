@@ -507,12 +507,30 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     isMounted.current = true;
     connect();
     const handleAppState = (next: AppStateStatus) => {
-      if (next === 'active' || next === 'inactive') {
-        // Retour au premier plan (ou transition) : reconnecter si WS mort
+      if (next === 'active') {
+        // Retour au premier plan : reconnecter si WS mort
         if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED || wsRef.current.readyState === WebSocket.CLOSING) {
           if (retryTimer.current) clearTimeout(retryTimer.current);
           retryCount.current = 0;
           connect();
+        }
+        // Appel entrant reçu via FCM pendant qu'on était en background
+        const raw = storage.getItem('pending_incoming_call');
+        if (raw) {
+          storage.removeItem('pending_incoming_call');
+          try {
+            const p = JSON.parse(raw);
+            const age = Date.now() - (p.received_at ?? 0);
+            if (age < 60_000 && p.caller_id && isMounted.current) {
+              setPendingIncomingCall({
+                partnerId:     p.caller_id,
+                partnerName:   p.caller_name ?? 'Inconnu',
+                partnerAvatar: p.caller_avatar || null,
+                callType:      p.call_type ?? 'voice',
+                offer:         null, // le buffer resend WS fournira le SDP
+              });
+            }
+          } catch {}
         }
       }
       // Ne pas couper le ping en background — le WS doit rester vivant pour recevoir les appels
