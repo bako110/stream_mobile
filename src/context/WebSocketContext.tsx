@@ -368,7 +368,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           console.log('[WS] call_offer recu from=', payload.from, 'myId=', myIdRef.current, 'fromSelf=', fromSelf, 'alreadyLive=', alreadyLive);
           if (!fromSelf && !alreadyLive) {
             callEventBuffer.current.delete(payload.from);
-            __DEV__ && console.log('[WS] Incoming call from', payload.from_name ?? payload.from);
+            console.log('[WS] Incoming call from', payload.from_name ?? payload.from, 'appState=', AppState.currentState);
             registerPendingCallRef.current(
               payload.from,
               payload.from_name ?? 'Inconnu',
@@ -377,7 +377,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
               'incoming',
             );
             const appState = AppState.currentState;
-            if (appState === 'active') {
+            // 'inactive' = transition sur Android — traiter comme 'active'
+            if (appState === 'active' || appState === 'inactive') {
+              console.log('[WS] navigating to Call screen...');
               navigate('Call', {
                 partnerId:     payload.from,
                 partnerName:   payload.from_name ?? 'Inconnu',
@@ -387,6 +389,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
                 offer:         payload.sdp ?? undefined,
               });
             } else {
+              console.log('[WS] app in background, showing notification');
               if (payload.sdp) {
                 storage.setItem('pending_call_offer_sdp', JSON.stringify(payload.sdp));
               }
