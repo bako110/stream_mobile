@@ -235,6 +235,26 @@ export async function handleBackgroundFCM(
     return;
   }
 
+  if (type === 'subscription_expired') {
+    await notifee.displayNotification({
+      title: (data.title as string) || 'Votre abonnement a expire',
+      body:  body,
+      android: {
+        channelId:        CHANNEL_NOTIFS,
+        importance:       AndroidImportance.HIGH,
+        sound:            'notification_sound',
+        vibrationPattern: [300, 200, 300],
+        smallIcon:        'ic_notification',
+        pressAction:      { id: 'default', launchActivity: 'default' },
+      },
+      ios: {
+        sound: 'notification_sound.wav',
+      },
+      data: data as Record<string, string>,
+    });
+    return;
+  }
+
   if (type === 'event_reminder') {
     await notifee.displayNotification({
       title: (data.title as string) || "Votre evenement s'approche",
@@ -287,6 +307,10 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
     navigate('Messages', { initialTab: 'calls' });
   } else if (type === 'message') {
     navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
+  } else if (type === 'subscription_expired') {
+    const missingCoins = parseInt(data.missing_coins ?? '0', 10);
+    const missingEur   = parseFloat(data.missing_eur ?? '0');
+    navigate('BuyCoins', { neededCoins: missingCoins, neededEur: missingEur });
   } else if (type === 'event_reminder') {
     const refType = data.ref_type ?? '';
     const refId   = data.ref_id   ?? '';
