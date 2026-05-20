@@ -18,7 +18,6 @@ import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { favoriteService } from '../services/favoriteService';
 import { cancelCallNotification, showIncomingCallNotification } from '../services/fcmService';
-import { navigate } from '../navigation/navigationRef';
 import {
   createWsEventHandler,
   type NewFollowerPayload,
@@ -61,6 +60,14 @@ export interface CallLogEntry {
   startedAt:   string;
 }
 
+export interface IncomingCallPayload {
+  partnerId:     string;
+  partnerName:   string;
+  partnerAvatar: string | null;
+  callType:      'voice' | 'video';
+  offer:         any;
+}
+
 interface WebSocketContextValue {
   sendMessage:              (payload: object) => void;
   isConnected:              boolean;
@@ -83,6 +90,9 @@ interface WebSocketContextValue {
   isOutgoingCall:      (partnerId: string) => boolean;
   // Buffer: events arrivés avant que CallScreen soit monté
   drainCallBuffer:     (partnerId: string) => WsPayload[];
+  // Appel entrant en attente de navigation
+  pendingIncomingCall:      IncomingCallPayload | null;
+  clearPendingIncomingCall: () => void;
   // Events temps-réel enrichis
   lastNewFollower:          NewFollowerPayload | null;
   lastCoinTransfer:         CoinTransferPayload | null;
@@ -119,6 +129,8 @@ const Ctx = createContext<WebSocketContextValue>({
   markCallEnded:            () => {},
   isOutgoingCall:           () => false,
   drainCallBuffer:          () => [],
+  pendingIncomingCall:      null,
+  clearPendingIncomingCall: () => {},
   lastNewFollower:          null,
   lastCoinTransfer:         null,
   lastGiftReceived:         null,
@@ -161,6 +173,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   const [unreadActivity,      setUnreadActivity]      = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [missedCallCount,     setMissedCallCount]     = useState(0);
+  const [pendingIncomingCall, setPendingIncomingCall] = useState<IncomingCallPayload | null>(null);
+
+  const clearPendingIncomingCall = useCallback(() => setPendingIncomingCall(null), []);
 
   // États des événements enrichis
   const [lastNewFollower,       setLastNewFollower]       = useState<NewFollowerPayload | null>(null);
@@ -340,7 +355,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
 
     ws.onmessage = (event) => {
       try {
-        const payload: WsPayload = JSON.parse(event.data as string);
+        const raw = typeof event.data === 'string' ? event.data : String(event.data);
+        const payload: WsPayload = JSON.parse(raw);
+        if (payload.type !== 'pong') {
+          console.log('[WS] onmessage type=', payload.type, 'from=', payload.from, 'to=', payload.to);
+        }
         if (payload.type === 'pong') return;
 
         if (payload.type === 'account_blocked' && isMounted.current) {
@@ -377,17 +396,18 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
               'incoming',
             );
             const appState = AppState.currentState;
-            // 'inactive' = transition sur Android — traiter comme 'active'
+            console.log('[WS] appState=', appState);
             if (appState === 'active' || appState === 'inactive') {
-              console.log('[WS] navigating to Call screen...');
-              navigate('Call', {
-                partnerId:     payload.from,
-                partnerName:   payload.from_name ?? 'Inconnu',
-                partnerAvatar: payload.from_avatar ?? null,
-                callType:      payload.call_type ?? 'voice',
-                isIncoming:    true,
-                offer:         payload.sdp ?? undefined,
-              });
+              // Déclenche la navigation via state React — plus fiable que navigationRef impératif
+              if (isMounted.current) {
+                setPendingIncomingCall({
+                  partnerId:     payload.from,
+                  partnerName:   payload.from_name ?? 'Inconnu',
+                  partnerAvatar: payload.from_avatar ?? null,
+                  callType:      payload.call_type ?? 'voice',
+                  offer:         payload.sdp ?? null,
+                });
+              }
             } else {
               console.log('[WS] app in background, showing notification');
               if (payload.sdp) {
@@ -564,6 +584,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     markCallEnded,
     isOutgoingCall,
     drainCallBuffer,
+    pendingIncomingCall,
+    clearPendingIncomingCall,
     lastNewFollower,
     lastCoinTransfer,
     lastGiftReceived,
@@ -583,6 +605,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     setActiveChat, missedCallCount, clearMissedCalls,
     notifyCallConnected, notifyCallEnded, markCallAccepted, markCallEnded,
     isOutgoingCall, drainCallBuffer,
+    pendingIncomingCall, clearPendingIncomingCall,
     lastNewFollower, lastCoinTransfer, lastGiftReceived, lastStoryAdded,
     lastStoryView,
     lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate, lastConcertLive,

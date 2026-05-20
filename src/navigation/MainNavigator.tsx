@@ -4,6 +4,7 @@ import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation, useNavigationState, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useWs } from '../context/WebSocketContext';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 import { FeedScreen as HomeScreen } from '../screens/Main/FeedScreen';
@@ -138,7 +139,7 @@ export type MainStackParamList = {
   ChangePassword:  undefined;
   Privacy:         undefined;
   Chat:            { partnerId: string; partnerName: string; avatarUrl?: string };
-  Call:            { partnerId: string; partnerName: string; callType: 'voice' | 'video'; isIncoming: boolean; offer?: any };
+  Call:            { partnerId: string; partnerName: string; partnerAvatar?: string | null; callType: 'voice' | 'video'; isIncoming: boolean; offer?: any };
   NewConversation: undefined;
   NewCall:         undefined;
   Following:       { userId?: string; tab?: 'followers' | 'following' } | undefined;
@@ -292,6 +293,29 @@ const ExitHandler: React.FC = () => {
   return null;
 };
 
+// ── IncomingCallHandler — écoute pendingIncomingCall et navigue dans le bon contexte ─
+
+const IncomingCallHandler: React.FC = () => {
+  const navigation = useNavigation<MainNav>();
+  const { pendingIncomingCall, clearPendingIncomingCall } = useWs();
+
+  useEffect(() => {
+    if (!pendingIncomingCall) return;
+    clearPendingIncomingCall();
+    console.log('[NAV] navigating to Call from IncomingCallHandler', pendingIncomingCall.partnerId);
+    navigation.navigate('Call', {
+      partnerId:     pendingIncomingCall.partnerId,
+      partnerName:   pendingIncomingCall.partnerName,
+      partnerAvatar: pendingIncomingCall.partnerAvatar,
+      callType:      pendingIncomingCall.callType,
+      isIncoming:    true,
+      offer:         pendingIncomingCall.offer,
+    });
+  }, [pendingIncomingCall, clearPendingIncomingCall, navigation]);
+
+  return null;
+};
+
 // ── MainNavigator ─────────────────────────────────────────────────────────────
 
 export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
@@ -314,7 +338,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
   return (
     <ActiveCallProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} /></>} />
+        <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><IncomingCallHandler /><Tabs onLogout={onLogout} /></>} />
         <Stack.Screen name="Feed"           component={FeedScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateEvent"    component={CreateEventWrapper}    options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateConcert"  component={CreateConcertWrapper}  options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />

@@ -289,9 +289,11 @@ export const CallScreen: React.FC = () => {
         await flushPendingCandidates(pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        sendWs({ type: 'call_answer', to: partnerId, sdp: answer });
+        const answerPayload = (answer as any).toJSON ? (answer as any).toJSON() : { type: answer.type, sdp: answer.sdp };
+        console.log('[CALL] sending call_answer to=', partnerId);
+        sendWs({ type: 'call_answer', to: partnerId, sdp: answerPayload });
       }
-    } catch { hangupRef.current?.(); }
+    } catch (e) { console.log('[CALL] acceptCall error', e); hangupRef.current?.(); }
   }, [offer, partnerId, isVideo, getLocalStream, createPC, flushPendingCandidates, sendWs, markCallAccepted]);
 
   const minimize = useCallback(() => {
@@ -329,8 +331,10 @@ export const CallScreen: React.FC = () => {
             isVideo ? { offerToReceiveVideo: true, offerToReceiveAudio: true } : { offerToReceiveAudio: true }
           );
           await pc.setLocalDescription(offerDesc);
-          sendWs({ type: 'call_offer', to: partnerId, to_name: partnerName, to_avatar: partnerAvatar ?? null, call_type: callType, sdp: offerDesc });
-        } catch {}
+          const sdpPayload = (offerDesc as any).toJSON ? (offerDesc as any).toJSON() : { type: offerDesc.type, sdp: offerDesc.sdp };
+          console.log('[CALL] sending call_offer to=', partnerId, 'sdp type=', sdpPayload.type);
+          sendWs({ type: 'call_offer', to: partnerId, to_name: partnerName, to_avatar: partnerAvatar ?? null, call_type: callType, sdp: sdpPayload });
+        } catch (e) { console.log('[CALL] outgoing start error', e); }
       } else if (autoAccept) {
         markCallAccepted(partnerId);
         stopIncoming();
@@ -346,7 +350,8 @@ export const CallScreen: React.FC = () => {
             await flushPendingCandidates(pc);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            sendWs({ type: 'call_answer', to: partnerId, sdp: answer });
+            const ans2 = (answer as any).toJSON ? (answer as any).toJSON() : { type: answer.type, sdp: answer.sdp };
+            sendWs({ type: 'call_answer', to: partnerId, sdp: ans2 });
           }
         } catch {}
       } else {
@@ -413,8 +418,9 @@ export const CallScreen: React.FC = () => {
           await flushPendingCandidates(pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          sendWs({ type: 'call_answer', to: partnerId, sdp: answer });
-        } catch {}
+          const ans3 = (answer as any).toJSON ? (answer as any).toJSON() : { type: answer.type, sdp: answer.sdp };
+          sendWs({ type: 'call_answer', to: partnerId, sdp: ans3 });
+        } catch (e) { console.log('[CALL] re-offer answer error', e); }
         return;
       }
 
