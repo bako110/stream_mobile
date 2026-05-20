@@ -380,14 +380,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
         if (payload.type === 'notification' && isMounted.current) setUnreadNotifications(prev => prev + 1);
 
         // ── Appel entrant — ignorer si c'est notre propre appel ou déjà accepté ─
-        if (payload.type === 'call_offer' && isMounted.current) {
+        if (payload.type === 'call_offer') {
           const fromSelf    = (myIdRef.current && payload.from === myIdRef.current)
                            || outgoingCallIds.current.has(payload.to);
           const alreadyLive = acceptedCalls.current.has(payload.from);
-          console.log('[WS] call_offer recu from=', payload.from, 'myId=', myIdRef.current, 'fromSelf=', fromSelf, 'alreadyLive=', alreadyLive);
-          if (!fromSelf && !alreadyLive) {
+          console.log('[WS] call_offer recu mounted=', isMounted.current, 'from=', payload.from, 'myId=', myIdRef.current, 'fromSelf=', fromSelf, 'alreadyLive=', alreadyLive);
+          if (!fromSelf && !alreadyLive && isMounted.current) {
             callEventBuffer.current.delete(payload.from);
-            console.log('[WS] Incoming call from', payload.from_name ?? payload.from, 'appState=', AppState.currentState);
             registerPendingCallRef.current(
               payload.from,
               payload.from_name ?? 'Inconnu',
@@ -396,20 +395,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
               'incoming',
             );
             const appState = AppState.currentState;
-            console.log('[WS] appState=', appState);
+            console.log('[WS] incoming call appState=', appState);
             if (appState === 'active' || appState === 'inactive') {
-              // Déclenche la navigation via state React — plus fiable que navigationRef impératif
-              if (isMounted.current) {
-                setPendingIncomingCall({
-                  partnerId:     payload.from,
-                  partnerName:   payload.from_name ?? 'Inconnu',
-                  partnerAvatar: payload.from_avatar ?? null,
-                  callType:      payload.call_type ?? 'voice',
-                  offer:         payload.sdp ?? null,
-                });
-              }
+              setPendingIncomingCall({
+                partnerId:     payload.from,
+                partnerName:   payload.from_name ?? 'Inconnu',
+                partnerAvatar: payload.from_avatar ?? null,
+                callType:      payload.call_type ?? 'voice',
+                offer:         payload.sdp ?? null,
+              });
             } else {
-              console.log('[WS] app in background, showing notification');
               if (payload.sdp) {
                 storage.setItem('pending_call_offer_sdp', JSON.stringify(payload.sdp));
               }
