@@ -158,7 +158,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   const listeners       = useRef<Set<WsListener>>(new Set());
   const isMounted       = useRef(true);
   // Initialise immédiatement depuis MMKV — pas besoin d'attendre getMe()
-  const myIdRef         = useRef<string | null>(storage.getItem(STORAGE_KEYS.LAST_USER_ID));
+  const myIdRef           = useRef<string | null>(storage.getItem(STORAGE_KEYS.LAST_USER_ID));
+  // true uniquement après confirmation via getMe() — évite les faux positifs fromSelf
+  const myIdConfirmedRef  = useRef<boolean>(false);
   const activeChatRef   = useRef<string | null>(null);
   const pendingCalls    = useRef<Map<string, PendingCall>>(new Map());
   // Buffer des events call (ice/answer) arrivés avant que CallScreen soit monté
@@ -342,7 +344,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
       authService.getMe().then(u => {
         if (!isMounted.current) return;
         const id = String(u.id);
-        myIdRef.current = id;
+        myIdRef.current          = id;
+        myIdConfirmedRef.current = true;
         storage.setItem(STORAGE_KEYS.LAST_USER_ID, id);
       }).catch(() => {});
       if (isMounted.current) refreshUnreadRef.current();
@@ -381,10 +384,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
 
         // ── Appel entrant — ignorer si c'est notre propre appel ou déjà accepté ─
         if (payload.type === 'call_offer') {
-          const fromSelf    = (myIdRef.current && payload.from === myIdRef.current)
-                           || outgoingCallIds.current.has(payload.to);
+          // N'utiliser myIdRef que si on a déjà confirmé l'ID via getMe() (myIdConfirmed)
+          const fromSelf    = (myIdConfirmedRef.current && payload.from === myIdRef.current)
+                           || outgoingCallIds.current.has(payload.from);
           const alreadyLive = acceptedCalls.current.has(payload.from);
-          console.log('[WS] call_offer recu mounted=', isMounted.current, 'from=', payload.from, 'myId=', myIdRef.current, 'fromSelf=', fromSelf, 'alreadyLive=', alreadyLive);
+          console.log('[WS] call_offer recu mounted=', isMounted.current, 'from=', payload.from, 'myId=', myIdRef.current, 'confirmed=', myIdConfirmedRef.current, 'fromSelf=', fromSelf, 'alreadyLive=', alreadyLive);
           if (!fromSelf && !alreadyLive && isMounted.current) {
             callEventBuffer.current.delete(payload.from);
             registerPendingCallRef.current(
