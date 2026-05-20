@@ -3,7 +3,7 @@
  * Permet de propager les changements (avatar, nom, etc.) partout dans l'app.
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { authService } from '../services/authService';
+import { authService, invalidateUserCache } from '../services/authService';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
 import type { User } from '../types/user';
@@ -30,6 +30,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = useCallback(async (): Promise<User | null> => {
     try {
+      invalidateUserCache();
       const me = await authService.getMe(true);
       setCurrentUser(me);
       if (me?.id) storage.setItem(STORAGE_KEYS.LAST_USER_ID, String(me.id));
