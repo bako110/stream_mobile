@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AppHeader, SkeletonProfile } from '../../components/common';
 import { userService, eventService, concertService } from '../../services';
+import { apiClient, Endpoints } from '../../api';
 import type { User } from '../../types';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
@@ -33,7 +34,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<any>();
-  const { currentUser: user, refreshUser } = useUser();
+  const { currentUser: user, refreshUser, setCurrentUser } = useUser();
 
   const [loading,    setLoading]    = useState(true);
   const [myEvents,   setMyEvents]   = useState<Event[]>([]);
@@ -49,11 +50,18 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const me = await refreshUser();
+      let me = await refreshUser();
       if (!me) return;
+      if (!me.folix_id) {
+        try {
+          const r = await apiClient.post<User>(Endpoints.users.generateFolixId);
+          me = r.data;
+          setCurrentUser(r.data);
+        } catch {}
+      }
 
       const [profile, evts, res] = await Promise.allSettled([
-        userService.getPublicProfile(me.id),
+        userService.getPublicProfile(me!.id),
         eventService.getMyEvents(),
         concertService.getMyConcerts(),
       ]);

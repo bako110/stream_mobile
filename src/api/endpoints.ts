@@ -27,6 +27,7 @@ export const Endpoints = {
   users: {
     me:             `${V1}/users/me`,
     updateMe:       `${V1}/users/me`,
+    generateFolixId: `${V1}/users/me/generate-folix-id`,
     watchHistory:   `${V1}/users/me/history`,
     publicProfile:  (id: string) => `${V1}/users/${id}/profile`,
     userReels:      (id: string) => `${V1}/users/${id}/reels`,
