@@ -406,9 +406,43 @@ export async function setupFCM(): Promise<void> {
 
   onTokenRefresh(m, _registerToken);
 
-  // Foreground FCM — tout ignoré : WebSocket + toast custom gèrent appels et messages
-  onMessage(m, async (_remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-    // Rien — le WebSocket déclenche le toast pour les appels et messages en foreground
+  // Foreground FCM — fallback si le WS n'a pas livré le call_offer
+  // (ex: multi-instance backend, Redis down, WS flap)
+  onMessage(m, async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
+    const data = remoteMessage?.data;
+    if (!data || data.type !== 'call_offer') return;
+    const callerId    = (data.caller_id    as string) ?? '';
+    const callerName  = (data.caller_name  as string) ?? 'Appel';
+    const callerAvatar = (data.caller_avatar as string) || '';
+    const callType    = (data.call_type as string) === 'video' ? 'video' : 'voice';
+    // Attendre 1s — si le WS a livré, il a déjà navigué. Sinon on prend le relais.
+    await new Promise<void>(r => setTimeout(() => r(), 1000));
+    // Vérifier si CallScreen est déjà ouvert (navigationRef)
+    const { navigationRef: navRef } = require('../navigation/navigationRef');
+    const currentRoute = navRef.getCurrentRoute?.();
+    if (currentRoute?.name === 'Call') return;
+    let offer: any = null;
+    try {
+      const { API_BASE_URL } = require('../utils/constants');
+      const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      if (token) {
+        const res = await fetch(`${API_BASE_URL}/api/v1/messages/call/pending`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const payload = await res.json();
+          offer = payload.sdp ?? null;
+        }
+      }
+    } catch {}
+    navigate('Call', {
+      partnerId:    callerId,
+      partnerName:  callerName,
+      partnerAvatar: callerAvatar || null,
+      callType,
+      isIncoming:   true,
+      offer,
+    });
   });
 
   // App opened from background notification tap
