@@ -148,6 +148,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
         }
       }
     }
+    return () => { setSearch(''); };
   }, [loadAndSubscribe, sendWsMessage]));
 
   // Reconnexion WS : re-souscrire présence sans recharger si données récentes
@@ -370,11 +371,9 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
           ) : (
             // ── Mode normal ──
             <>
-              {onBack ? (
-                <TouchableOpacity style={styles.iconBtn} onPress={onBack}>
-                  <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-                </TouchableOpacity>
-              ) : <View style={{ width: 40 }} />}
+              <TouchableOpacity style={styles.iconBtn} onPress={onBack ?? (() => nav.goBack())}>
+                <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+              </TouchableOpacity>
 
               <View style={styles.headerCenter}>
                 <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>

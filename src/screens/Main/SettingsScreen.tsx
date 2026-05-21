@@ -126,7 +126,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader title="Paramètres" variant="default" />
+      <AppHeader title="Paramètres" variant="default" onBack={() => nav.goBack()} />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 

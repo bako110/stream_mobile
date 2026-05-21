@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   RefreshControl, Image, StyleSheet,
@@ -8,26 +8,56 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonFeed, VerifiedBadge } from '../../components/common';
 import { planningService } from '../../services/planningService';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
-import type { PlanningItem, PlanningInvite } from '../../services/planningService';
+import type { PlanningItem } from '../../services/planningService';
 import type { UserPublic } from '../../types/user';
 import type { AppColors } from '../../theme/colors';
 import { Spacing, BorderRadius } from '../../theme';
+import { useWs } from '../../context/WebSocketContext';
+
+// ── Types de statut temporel ──────────────────────────────────────────────────
+
+type TimeStatus = 'ongoing' | 'upcoming' | 'past';
+type FilterTab  = 'all' | 'upcoming' | 'ongoing' | 'past';
+
+function getTimeStatus(item: PlanningItem): TimeStatus {
+  const now      = Date.now();
+  const start    = item.date    ? new Date(item.date).getTime()    : null;
+  const end      = item.end_date ? new Date(item.end_date).getTime() : null;
+
+  if (!start) return 'upcoming';
+
+  if (end) {
+    if (now >= start && now <= end) return 'ongoing';
+    if (now > end)                  return 'past';
+    return 'upcoming';
+  }
+  // Pas de end_date : "en cours" dans la fenêtre de 2h autour du début
+  if (now >= start && now <= start + 2 * 3600_000) return 'ongoing';
+  if (now > start + 2 * 3600_000)                  return 'past';
+  return 'upcoming';
+}
+
+const TIME_STATUS_CONFIG: Record<TimeStatus, { label: string; color: string; bg: string }> = {
+  ongoing:  { label: 'En cours',  color: '#36D9A0', bg: '#36D9A018' },
+  upcoming: { label: 'À venir',   color: '#3B82F6', bg: '#3B82F618' },
+  past:     { label: 'Passé',     color: '#888',    bg: '#88888818' },
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const TYPE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
-  concert:    { icon: 'music',    label: 'Concert',      color: '#7B3FF2' },
-  event:      { icon: 'calendar', label: 'Événement',    color: '#E0389A' },
-  my_concert: { icon: 'music',    label: 'Mon Concert',  color: '#FF7A2F' },
-  my_event:   { icon: 'calendar', label: 'Mon Événement', color: '#36D9A0' },
-  personal:   { icon: 'edit-3',   label: 'Perso',        color: '#3B82F6' },
-  invited:    { icon: 'user-plus', label: 'Invitation',  color: '#F59E0B' },
+  concert:    { icon: 'music',     label: 'Concert',       color: '#7B3FF2' },
+  event:      { icon: 'calendar',  label: 'Événement',     color: '#E0389A' },
+  my_concert: { icon: 'music',     label: 'Mon Concert',   color: '#FF7A2F' },
+  my_event:   { icon: 'calendar',  label: 'Mon Événement', color: '#36D9A0' },
+  personal:   { icon: 'edit-3',    label: 'Perso',         color: '#3B82F6' },
+  invited:    { icon: 'user-plus', label: 'Invitation',    color: '#F59E0B' },
 };
 
 const INVITE_STATUS_CONFIG = {
@@ -38,30 +68,58 @@ const INVITE_STATUS_CONFIG = {
 
 const COLOR_PALETTE = ['#3B82F6', '#7B3FF2', '#E0389A', '#FF7A2F', '#36D9A0', '#FF4757', '#F59E0B', '#9B65F5'];
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-}
-
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null | undefined): string {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
-function groupByDate(items: PlanningItem[]): { date: string; items: PlanningItem[] }[] {
-  const map = new Map<string, PlanningItem[]>();
+function getInitial(name?: string | null) {
+  return (name ?? '?')[0]?.toUpperCase() ?? '?';
+}
+
+// ── Groupement par section temporelle ─────────────────────────────────────────
+
+type SectionKey = 'ongoing' | 'today' | 'tomorrow' | 'this_week' | 'later' | 'past';
+
+const SECTION_LABELS: Record<SectionKey, string> = {
+  ongoing:   'En cours',
+  today:     'Aujourd\'hui',
+  tomorrow:  'Demain',
+  this_week: 'Cette semaine',
+  later:     'Plus tard',
+  past:      'Passés',
+};
+
+const SECTION_ORDER: SectionKey[] = ['ongoing', 'today', 'tomorrow', 'this_week', 'later', 'past'];
+
+function getSectionKey(item: PlanningItem): SectionKey {
+  const ts = getTimeStatus(item);
+  if (ts === 'ongoing') return 'ongoing';
+  if (ts === 'past')    return 'past';
+
+  if (!item.date) return 'later';
+  const d   = new Date(item.date);
+  const now = new Date();
+  const startOfToday    = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTomorrow = new Date(startOfToday.getTime() + 86400_000);
+  const startOfNextWeek = new Date(startOfToday.getTime() + 7 * 86400_000);
+
+  if (d < startOfTomorrow)  return 'today';
+  if (d < new Date(startOfTomorrow.getTime() + 86400_000)) return 'tomorrow';
+  if (d < startOfNextWeek)  return 'this_week';
+  return 'later';
+}
+
+function groupBySections(items: PlanningItem[]): { key: SectionKey; label: string; items: PlanningItem[] }[] {
+  const map = new Map<SectionKey, PlanningItem[]>();
   for (const item of items) {
-    const key = item.date
-      ? new Date(item.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-      : 'Date inconnue';
+    const key = getSectionKey(item);
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(item);
   }
-  return Array.from(map, ([date, items]) => ({ date, items }));
-}
-
-function getInitial(name?: string | null) {
-  return (name ?? '?')[0]?.toUpperCase() ?? '?';
+  return SECTION_ORDER
+    .filter(k => map.has(k))
+    .map(k => ({ key: k, label: SECTION_LABELS[k], items: map.get(k)! }));
 }
 
 // ── ContactPicker ─────────────────────────────────────────────────────────────
@@ -75,13 +133,12 @@ interface ContactPickerProps {
 }
 
 const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onToggle, onClose, colors }) => {
-  const [query, setQuery]         = useState('');
-  const [results, setResults]     = useState<UserPublic[]>([]);
+  const [query, setQuery]             = useState('');
+  const [results, setResults]         = useState<UserPublic[]>([]);
   const [suggestions, setSuggestions] = useState<UserPublic[]>([]);
-  const [loading, setLoading]     = useState(false);
+  const [loading, setLoading]         = useState(false);
   const [loadingSugg, setLoadingSugg] = useState(false);
 
-  // Charger les suggestions dès l'ouverture
   useEffect(() => {
     if (!visible) { setQuery(''); setResults([]); return; }
     setLoadingSugg(true);
@@ -91,12 +148,10 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
       .finally(() => setLoadingSugg(false));
   }, [visible]);
 
-  // Recherche debounced
   useEffect(() => {
     const trimmed = query.trim();
     if (trimmed.length < 2) { setResults([]); setLoading(false); return; }
     const t = setTimeout(async () => {
-      if (trimmed.length < 2) return;
       setLoading(true);
       try {
         const res = await apiClient.get<UserPublic[]>(
@@ -109,9 +164,9 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
     return () => clearTimeout(t);
   }, [query]);
 
-  const isSelected = (u: UserPublic) => selected.some(s => s.id === u.id);
-  const displayList = query.trim().length >= 2 ? results : suggestions;
-  const isEmpty = displayList.length === 0 && !loading && !loadingSugg;
+  const isSelected   = (u: UserPublic) => selected.some(s => s.id === u.id);
+  const displayList  = query.trim().length >= 2 ? results : suggestions;
+  const isEmpty      = displayList.length === 0 && !loading && !loadingSugg;
 
   const renderUser = ({ item: u }: { item: UserPublic }) => {
     const sel = isSelected(u);
@@ -135,14 +190,9 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
             </Text>
             {u.is_verified && <VerifiedBadge size={13} />}
           </View>
-          {u.username && (
-            <Text style={[cp.handle, { color: colors.textTertiary }]}>@{u.username}</Text>
-          )}
+          {u.username && <Text style={[cp.cpHandle, { color: colors.textTertiary }]}>@{u.username}</Text>}
         </View>
-        <View style={[cp.checkbox, {
-          backgroundColor: sel ? colors.primary : 'transparent',
-          borderColor: sel ? colors.primary : colors.border,
-        }]}>
+        <View style={[cp.checkbox, { backgroundColor: sel ? colors.primary : 'transparent', borderColor: sel ? colors.primary : colors.border }]}>
           {sel && <Icon name="check" size={12} color="#fff" />}
         </View>
       </TouchableOpacity>
@@ -162,8 +212,6 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
               </Text>
             </TouchableOpacity>
           </View>
-
-          {/* Search */}
           <View style={[cp.searchBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
             <Icon name="search" size={16} color={colors.textTertiary} />
             <TextInput
@@ -173,16 +221,12 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
               value={query}
               onChangeText={setQuery}
             />
-            {(loading || loadingSugg) ? (
-              <Icon name="loader" size={14} color={colors.textTertiary} />
-            ) : query.length > 0 ? (
-              <TouchableOpacity onPress={() => setQuery('')}>
-                <Icon name="x" size={14} color={colors.textTertiary} />
-              </TouchableOpacity>
-            ) : null}
+            {(loading || loadingSugg)
+              ? <Icon name="loader" size={14} color={colors.textTertiary} />
+              : query.length > 0
+                ? <TouchableOpacity onPress={() => setQuery('')}><Icon name="x" size={14} color={colors.textTertiary} /></TouchableOpacity>
+                : null}
           </View>
-
-          {/* Selected chips */}
           {selected.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={cp.chips}>
               {selected.map(u => (
@@ -191,21 +235,15 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
                   style={[cp.chip, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
                   onPress={() => onToggle(u)}
                 >
-                  <Text style={[cp.chipText, { color: colors.primary }]}>
-                    {u.display_name ?? u.username}
-                  </Text>
+                  <Text style={[cp.chipText, { color: colors.primary }]}>{u.display_name ?? u.username}</Text>
                   <Icon name="x" size={12} color={colors.primary} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
           )}
-
-          {/* Section label */}
           <Text style={[cp.sectionLabel, { color: colors.textTertiary }]}>
             {query.trim().length >= 2 ? 'Résultats' : 'Suggestions'}
           </Text>
-
-          {/* Results */}
           <FlatList
             data={displayList}
             keyExtractor={u => u.id}
@@ -227,61 +265,72 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
 };
 
 const cp = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
-  sheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%', paddingBottom: 30 },
-  handle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
-  header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
-  title:   { fontSize: 17, fontWeight: '700' },
-  doneBtn: { paddingVertical: 6, paddingHorizontal: 4 },
-  doneTxt: { fontSize: 15, fontWeight: '700' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
-  searchInput: { flex: 1, fontSize: 15 },
-  chips: { paddingHorizontal: 16, marginBottom: 8, flexGrow: 0 },
-  chip:  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 8 },
-  chipText: { fontSize: 13, fontWeight: '600' },
+  overlay:      { flex: 1, justifyContent: 'flex-end' },
+  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%', paddingBottom: 30 },
+  handle:       { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
+  title:        { fontSize: 17, fontWeight: '700' },
+  doneBtn:      { paddingVertical: 6, paddingHorizontal: 4 },
+  doneTxt:      { fontSize: 15, fontWeight: '700' },
+  searchBox:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
+  searchInput:  { flex: 1, fontSize: 15 },
+  chips:        { paddingHorizontal: 16, marginBottom: 8, flexGrow: 0 },
+  chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 8 },
+  chipText:     { fontSize: 13, fontWeight: '600' },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 4 },
-  list:  { flexGrow: 1, maxHeight: 320 },
-  empty: { textAlign: 'center', marginTop: 30, fontSize: 14 },
-  row:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
-  name:  { fontSize: 15, fontWeight: '600' },
-  handle: { fontSize: 12, marginTop: 1 },
-  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  list:         { flexGrow: 1, maxHeight: 320 },
+  empty:        { textAlign: 'center', marginTop: 30, fontSize: 14 },
+  row:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  avatar:       { width: 44, height: 44, borderRadius: 22 },
+  name:         { fontSize: 15, fontWeight: '600' },
+  cpHandle:     { fontSize: 12, marginTop: 1 },
+  checkbox:     { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });
+
+// ── Filter tabs ───────────────────────────────────────────────────────────────
+
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: 'all',      label: 'Tout' },
+  { key: 'ongoing',  label: 'En cours' },
+  { key: 'upcoming', label: 'À venir' },
+  { key: 'past',     label: 'Passés' },
+];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export const PlanningScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
-  const nav = useNavigation();
+  const nav = useNavigation<any>();
+  const { addListener, removeListener } = useWs();
 
-  const [items, setItems]         = useState<PlanningItem[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [items, setItems]             = useState<PlanningItem[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
   // Create modal
-  const [showCreate, setShowCreate]           = useState(false);
-  const [formTitle, setFormTitle]             = useState('');
-  const [formDesc, setFormDesc]               = useState('');
-  const [formDate, setFormDate]               = useState(new Date());
-  const [formEndDate, setFormEndDate]         = useState<Date | null>(null);
-  const [formLocation, setFormLocation]       = useState('');
-  const [formColor, setFormColor]             = useState('#3B82F6');
-  const [formInviteMsg, setFormInviteMsg]     = useState('');
-  const [selectedContacts, setSelectedContacts] = useState<UserPublic[]>([]);
+  const [showCreate, setShowCreate]               = useState(false);
+  const [formTitle, setFormTitle]                 = useState('');
+  const [formDesc, setFormDesc]                   = useState('');
+  const [formDate, setFormDate]                   = useState(new Date());
+  const [formEndDate, setFormEndDate]             = useState<Date | null>(null);
+  const [formLocation, setFormLocation]           = useState('');
+  const [formColor, setFormColor]                 = useState('#3B82F6');
+  const [formInviteMsg, setFormInviteMsg]         = useState('');
+  const [selectedContacts, setSelectedContacts]   = useState<UserPublic[]>([]);
   const [showContactPicker, setShowContactPicker] = useState(false);
-  const [showDatePicker, setShowDatePicker]   = useState(false);
-  const [showTimePicker, setShowTimePicker]   = useState(false);
+  const [showDatePicker, setShowDatePicker]       = useState(false);
+  const [showTimePicker, setShowTimePicker]       = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [creating, setCreating]               = useState(false);
+  const [creating, setCreating]                   = useState(false);
 
   const load = useCallback(async () => {
     try {
       const data = await planningService.getFeed();
-      const arr = Array.isArray(data) ? data : [];
+      const arr  = Array.isArray(data) ? data : [];
       setItems(arr);
       setPendingCount(arr.filter(i => i.type === 'invited' && i.invite_status === 'pending').length);
     } catch (err) {
@@ -292,14 +341,50 @@ export const PlanningScreen: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { setLoading(true); load(); }, []);
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    load();
+  }, [load]));
+
+  // Écouter les rappels WS pour rafraîchir
+  useEffect(() => {
+    const handler = (payload: any) => {
+      if (payload.type === 'planning_reminder') load();
+    };
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [addListener, removeListener, load]);
+
+  // Filtrage
+  const filteredItems = useMemo(() => {
+    if (activeFilter === 'all') return items;
+    return items.filter(item => {
+      const ts = getTimeStatus(item);
+      if (activeFilter === 'ongoing')  return ts === 'ongoing';
+      if (activeFilter === 'upcoming') return ts === 'upcoming';
+      if (activeFilter === 'past')     return ts === 'past';
+      return true;
+    });
+  }, [items, activeFilter]);
+
+  // Compteurs par filtre
+  const counts = useMemo(() => {
+    const c = { ongoing: 0, upcoming: 0, past: 0 };
+    for (const item of items) {
+      const ts = getTimeStatus(item);
+      c[ts]++;
+    }
+    return c;
+  }, [items]);
+
+  const sections = useMemo(() => groupBySections(filteredItems), [filteredItems]);
 
   const handlePress = (item: PlanningItem) => {
-    if (item.type === 'personal') return;
+    if (item.type === 'personal' || item.type === 'invited') return;
     if (item.type === 'concert' || item.type === 'my_concert') {
-      (nav as any).navigate('ConcertDetail', { concertId: item.ref_id });
+      nav.navigate('ConcertDetail', { concertId: item.ref_id });
     } else if (item.type === 'event' || item.type === 'my_event') {
-      (nav as any).navigate('EventDetail', { eventId: item.ref_id });
+      nav.navigate('EventDetail', { eventId: item.ref_id });
     }
   };
 
@@ -319,26 +404,22 @@ export const PlanningScreen: React.FC = () => {
   const handleRespondInvite = async (item: PlanningItem, status: 'accepted' | 'declined') => {
     try {
       await planningService.respondToInvite(item.id, status);
-      setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, invite_status: status } : i,
-      ));
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, invite_status: status } : i));
       setPendingCount(c => Math.max(0, c - 1));
       Alert.alert(
-        status === 'accepted' ? '✅ Invitation acceptée' : '❌ Invitation refusée',
+        status === 'accepted' ? 'Invitation acceptée' : 'Invitation refusée',
         status === 'accepted'
           ? `« ${item.title} » a été ajouté à votre planning.`
           : `Vous avez refusé l'invitation à « ${item.title} ».`,
       );
     } catch {
-      Alert.alert('Erreur', 'Impossible de répondre à l\'invitation.');
+      Alert.alert('Erreur', "Impossible de répondre à l'invitation.");
     }
   };
 
   const toggleContact = (user: UserPublic) => {
     setSelectedContacts(prev =>
-      prev.some(u => u.id === user.id)
-        ? prev.filter(u => u.id !== user.id)
-        : [...prev, user],
+      prev.some(u => u.id === user.id) ? prev.filter(u => u.id !== user.id) : [...prev, user],
     );
   };
 
@@ -353,13 +434,13 @@ export const PlanningScreen: React.FC = () => {
     setCreating(true);
     try {
       const entry = await planningService.createEntry({
-        title: formTitle.trim(),
-        description: formDesc.trim() || undefined,
-        date: formDate.toISOString(),
-        end_date: formEndDate?.toISOString(),
-        location: formLocation.trim() || undefined,
-        color: formColor,
-        invitee_ids: selectedContacts.map(u => u.id),
+        title:          formTitle.trim(),
+        description:    formDesc.trim() || undefined,
+        date:           formDate.toISOString(),
+        end_date:       formEndDate?.toISOString(),
+        location:       formLocation.trim() || undefined,
+        color:          formColor,
+        invitee_ids:    selectedContacts.map(u => u.id),
         invite_message: formInviteMsg.trim() || undefined,
       });
       setItems(prev => [...prev, entry].sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999')));
@@ -369,37 +450,74 @@ export const PlanningScreen: React.FC = () => {
         Alert.alert('Créé !', `Entrée créée et ${selectedContacts.length} invitation(s) envoyée(s).`);
       }
     } catch {
-      Alert.alert('Erreur', 'Impossible de créer l\'entrée.');
+      Alert.alert('Erreur', "Impossible de créer l'entrée.");
     } finally { setCreating(false); }
   };
-
-  const sections = groupByDate(items);
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <AppHeader
         title="Planning"
-        right={pendingCount > 0 ? (
-          <View style={[s.badge, { backgroundColor: '#F59E0B' }]}>
-            <Text style={s.badgeText}>{pendingCount}</Text>
-          </View>
-        ) : undefined}
+        variant="default"
+        onBack={() => nav.goBack()}
+        rightContent={pendingCount > 0
+          ? <View style={[s.badge, { backgroundColor: '#F59E0B' }]}><Text style={s.badgeText}>{pendingCount}</Text></View>
+          : undefined
+        }
       />
+
+      {/* Filtres */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[s.filterBar, { borderBottomColor: colors.divider }]}
+        contentContainerStyle={s.filterContent}
+      >
+        {FILTER_TABS.map(tab => {
+          const active = activeFilter === tab.key;
+          const count  = tab.key !== 'all' ? counts[tab.key as keyof typeof counts] : items.length;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              onPress={() => setActiveFilter(tab.key)}
+              style={[
+                s.filterTab,
+                active && { backgroundColor: colors.primary },
+                !active && { backgroundColor: colors.backgroundSecondary },
+              ]}
+              activeOpacity={0.75}
+            >
+              <Text style={[s.filterTabTxt, { color: active ? '#fff' : colors.textSecondary }]}>
+                {tab.label}
+              </Text>
+              {count > 0 && (
+                <View style={[s.filterBadge, { backgroundColor: active ? 'rgba(255,255,255,0.3)' : colors.divider }]}>
+                  <Text style={[s.filterBadgeTxt, { color: active ? '#fff' : colors.textTertiary }]}>{count}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
       {loading ? (
         <SkeletonFeed count={5} />
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <View style={s.empty}>
           <Icon name="calendar" size={52} color={colors.textTertiary} />
-          <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Rien au planning</Text>
+          <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>
+            {activeFilter === 'all' ? 'Rien au planning' : `Aucun élément ${FILTER_TABS.find(t => t.key === activeFilter)?.label.toLowerCase()}`}
+          </Text>
           <Text style={[s.emptyText, { color: colors.textTertiary }]}>
-            Vos concerts, événements, invitations et rendez-vous personnels apparaîtront ici.
+            {activeFilter === 'all'
+              ? 'Vos concerts, événements, invitations et rendez-vous personnels apparaîtront ici.'
+              : 'Changez de filtre pour voir d\'autres entrées.'}
           </Text>
         </View>
       ) : (
         <FlatList
           data={sections}
-          keyExtractor={sec => sec.date}
+          keyExtractor={sec => sec.key}
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -407,12 +525,29 @@ export const PlanningScreen: React.FC = () => {
           }
           renderItem={({ item: section, index: sIdx }) => (
             <View>
-              <Text style={[s.dateHeader, { color: colors.textSecondary }]}>{section.date}</Text>
+              {/* Section header */}
+              <View style={s.sectionHeader}>
+                {section.key === 'ongoing' && (
+                  <View style={[s.sectionDot, { backgroundColor: '#36D9A0' }]} />
+                )}
+                <Text style={[
+                  s.sectionTitle,
+                  { color: section.key === 'past' ? colors.textTertiary : colors.textSecondary },
+                ]}>
+                  {section.label}
+                </Text>
+                <View style={[s.sectionCount, { backgroundColor: colors.backgroundSecondary }]}>
+                  <Text style={[s.sectionCountTxt, { color: colors.textTertiary }]}>{section.items.length}</Text>
+                </View>
+              </View>
+
               {section.items.map((item, idx) => (
-                <Animated.View key={item.id} entering={FadeInDown.delay((sIdx * 3 + idx) * 50).springify()}>
+                <Animated.View key={item.id} entering={FadeInDown.delay((sIdx * 3 + idx) * 40).springify()}>
                   <PlanningCard
                     item={item}
                     colors={colors}
+                    timeStatus={getTimeStatus(item)}
+                    isPast={section.key === 'past'}
                     onPress={() => handlePress(item)}
                     onDelete={item.type === 'personal' ? () => handleDelete(item) : undefined}
                     onAccept={item.type === 'invited' && item.invite_status === 'pending'
@@ -449,7 +584,6 @@ export const PlanningScreen: React.FC = () => {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
           <View style={[s.modalSheet, { backgroundColor: colors.surface }]}>
             <View style={s.modalHandle} />
-
             <View style={s.modalHeader}>
               <Text style={[s.modalTitle, { color: colors.textPrimary }]}>Nouveau rendez-vous</Text>
               <TouchableOpacity onPress={() => { setShowCreate(false); resetForm(); }}>
@@ -458,8 +592,6 @@ export const PlanningScreen: React.FC = () => {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.modalBody} keyboardShouldPersistTaps="handled">
-
-              {/* Titre */}
               <Text style={[s.label, { color: colors.textSecondary }]}>Titre *</Text>
               <TextInput
                 style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
@@ -467,7 +599,6 @@ export const PlanningScreen: React.FC = () => {
                 placeholder="Ex : Réunion projet" placeholderTextColor={colors.textTertiary} maxLength={255}
               />
 
-              {/* Description */}
               <Text style={[s.label, { color: colors.textSecondary }]}>Description</Text>
               <TextInput
                 style={[s.input, s.inputMulti, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
@@ -476,7 +607,6 @@ export const PlanningScreen: React.FC = () => {
                 multiline maxLength={500}
               />
 
-              {/* Date */}
               <Text style={[s.label, { color: colors.textSecondary }]}>Date et heure *</Text>
               <View style={s.dateRow}>
                 <TouchableOpacity style={[s.datePill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]} onPress={() => setShowDatePicker(true)}>
@@ -495,10 +625,12 @@ export const PlanningScreen: React.FC = () => {
               {showDatePicker && <DateTimePicker value={formDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(_, d) => { setShowDatePicker(Platform.OS === 'ios'); if (d) setFormDate(d); }} minimumDate={new Date()} />}
               {showTimePicker && <DateTimePicker value={formDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} is24Hour onChange={(_, d) => { setShowTimePicker(Platform.OS === 'ios'); if (d) setFormDate(d); }} />}
 
-              {/* Date de fin */}
               <Text style={[s.label, { color: colors.textSecondary }]}>Date de fin (optionnel)</Text>
               <View style={s.dateRow}>
-                <TouchableOpacity style={[s.datePill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]} onPress={() => { if (!formEndDate) setFormEndDate(new Date(formDate.getTime() + 3600_000)); setShowEndDatePicker(true); }}>
+                <TouchableOpacity
+                  style={[s.datePill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+                  onPress={() => { if (!formEndDate) setFormEndDate(new Date(formDate.getTime() + 3600_000)); setShowEndDatePicker(true); }}
+                >
                   <Icon name="calendar" size={14} color={formEndDate ? colors.primary : colors.textTertiary} />
                   <Text style={[s.datePillText, { color: formEndDate ? colors.textPrimary : colors.textTertiary }]}>
                     {formEndDate ? formEndDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Ajouter'}
@@ -519,7 +651,6 @@ export const PlanningScreen: React.FC = () => {
               {showEndDatePicker && formEndDate && <DateTimePicker value={formEndDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(_, d) => { setShowEndDatePicker(Platform.OS === 'ios'); if (d) setFormEndDate(d); }} minimumDate={formDate} />}
               {showEndTimePicker && formEndDate && <DateTimePicker value={formEndDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} is24Hour onChange={(_, d) => { setShowEndTimePicker(Platform.OS === 'ios'); if (d) setFormEndDate(d); }} />}
 
-              {/* Lieu */}
               <Text style={[s.label, { color: colors.textSecondary }]}>Lieu</Text>
               <TextInput
                 style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
@@ -527,7 +658,6 @@ export const PlanningScreen: React.FC = () => {
                 placeholder="Ex : Café de Paris" placeholderTextColor={colors.textTertiary} maxLength={255}
               />
 
-              {/* Inviter des contacts */}
               <Text style={[s.label, { color: colors.textSecondary }]}>Inviter des contacts</Text>
               <TouchableOpacity
                 style={[s.inviteBtn, { backgroundColor: colors.backgroundSecondary, borderColor: selectedContacts.length > 0 ? colors.primary : colors.divider }]}
@@ -542,18 +672,16 @@ export const PlanningScreen: React.FC = () => {
                 <Icon name="chevron-right" size={14} color={colors.textTertiary} />
               </TouchableOpacity>
 
-              {/* Aperçu contacts sélectionnés */}
               {selectedContacts.length > 0 && (
                 <View style={s.contactsPreview}>
                   {selectedContacts.map(u => (
                     <View key={u.id} style={[s.contactChip, { backgroundColor: colors.backgroundSecondary }]}>
-                      {u.avatar_url ? (
-                        <Image source={{ uri: u.avatar_url }} style={s.contactChipAvatar} />
-                      ) : (
-                        <View style={[s.contactChipAvatar, { backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
-                          <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>{getInitial(u.display_name ?? u.username)}</Text>
-                        </View>
-                      )}
+                      {u.avatar_url
+                        ? <Image source={{ uri: u.avatar_url }} style={s.contactChipAvatar} />
+                        : <View style={[s.contactChipAvatar, { backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
+                            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>{getInitial(u.display_name ?? u.username)}</Text>
+                          </View>
+                      }
                       <Text style={[s.contactChipName, { color: colors.textPrimary }]} numberOfLines={1}>
                         {u.display_name ?? u.username}
                       </Text>
@@ -565,7 +693,6 @@ export const PlanningScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* Message d'invitation */}
               {selectedContacts.length > 0 && (
                 <>
                   <Text style={[s.label, { color: colors.textSecondary }]}>Message (optionnel)</Text>
@@ -578,7 +705,6 @@ export const PlanningScreen: React.FC = () => {
                 </>
               )}
 
-              {/* Couleur */}
               <Text style={[s.label, { color: colors.textSecondary }]}>Couleur</Text>
               <View style={s.colorRow}>
                 {COLOR_PALETTE.map(c => (
@@ -588,7 +714,6 @@ export const PlanningScreen: React.FC = () => {
                 ))}
               </View>
 
-              {/* Submit */}
               <TouchableOpacity onPress={handleCreate} disabled={!formTitle.trim() || creating} activeOpacity={0.85} style={[s.submitBtn, { opacity: (!formTitle.trim() || creating) ? 0.5 : 1 }]}>
                 <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.submitBtnInner}>
                   <Icon name="check" size={18} color="#fff" />
@@ -610,51 +735,65 @@ export const PlanningScreen: React.FC = () => {
 interface PlanningCardProps {
   item: PlanningItem;
   colors: AppColors;
+  timeStatus: TimeStatus;
+  isPast: boolean;
   onPress: () => void;
   onDelete?: () => void;
   onAccept?: () => void;
   onDecline?: () => void;
 }
 
-const PlanningCard: React.FC<PlanningCardProps> = ({ item, colors, onPress, onDelete, onAccept, onDecline }) => {
+const PlanningCard: React.FC<PlanningCardProps> = ({
+  item, colors, timeStatus, isPast, onPress, onDelete, onAccept, onDecline,
+}) => {
   const isPersonal = item.type === 'personal';
   const isInvited  = item.type === 'invited';
   const cfg    = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.event;
   const accent = isPersonal ? (item.color || cfg.color) : cfg.color;
   const person = item.artist || item.organizer;
   const invSt  = item.invite_status ? INVITE_STATUS_CONFIG[item.invite_status] : null;
+  const timeSt = TIME_STATUS_CONFIG[timeStatus];
 
   const sub = isPersonal && item.description
     ? item.description
-    : person
-      ? (person.display_name || person.username)
-      : item.venue || null;
+    : person ? (person.display_name || person.username)
+    : item.venue || null;
 
   return (
     <TouchableOpacity
-      style={[s.card, { backgroundColor: colors.surfaceElevated }]}
+      style={[s.card, { backgroundColor: colors.surfaceElevated, opacity: isPast ? 0.6 : 1 }]}
       activeOpacity={0.82}
       onPress={onPress}
     >
       {/* Barre colorée gauche */}
-      <View style={[s.cardBar, { backgroundColor: accent }]} />
+      <View style={[s.cardBar, { backgroundColor: isPast ? colors.divider : accent }]} />
 
       {/* Icône type */}
-      <View style={[s.cardIcon, { backgroundColor: accent + '18' }]}>
-        <Icon name={cfg.icon} size={15} color={accent} />
+      <View style={[s.cardIcon, { backgroundColor: (isPast ? colors.divider : accent) + '18' }]}>
+        <Icon name={cfg.icon} size={15} color={isPast ? colors.textTertiary : accent} />
       </View>
 
       {/* Contenu */}
       <View style={s.cardContent}>
         <View style={s.cardRow}>
-          <Text style={[s.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+          <Text style={[s.cardTitle, { color: isPast ? colors.textTertiary : colors.textPrimary }]} numberOfLines={1}>
             {item.title}
           </Text>
+
+          {/* Badge statut temporel */}
+          <View style={[s.timeBadge, { backgroundColor: timeSt.bg }]}>
+            {timeStatus === 'ongoing' && <View style={[s.ongoingDot, { backgroundColor: timeSt.color }]} />}
+            <Text style={[s.timeBadgeTxt, { color: timeSt.color }]}>{timeSt.label}</Text>
+          </View>
+
+          {/* Badge live */}
           {item.status === 'live' && (
             <View style={[s.liveDot, { backgroundColor: colors.error }]}>
               <Text style={s.liveTxt}>LIVE</Text>
             </View>
           )}
+
+          {/* Badge invite status */}
           {invSt && (
             <View style={[s.statusDot, { backgroundColor: invSt.color + '22' }]}>
               <Text style={[s.statusTxt, { color: invSt.color }]}>{invSt.label}</Text>
@@ -665,6 +804,12 @@ const PlanningCard: React.FC<PlanningCardProps> = ({ item, colors, onPress, onDe
         <View style={s.cardMeta}>
           <Icon name="clock" size={10} color={colors.textTertiary} />
           <Text style={[s.cardMetaTxt, { color: colors.textTertiary }]}>{formatTime(item.date)}</Text>
+          {item.end_date && (
+            <>
+              <Text style={[s.cardMetaDot, { color: colors.textTertiary }]}>→</Text>
+              <Text style={[s.cardMetaTxt, { color: colors.textTertiary }]}>{formatTime(item.end_date)}</Text>
+            </>
+          )}
           {!!item.venue && !isPersonal && (
             <>
               <Text style={[s.cardMetaDot, { color: colors.textTertiary }]}>·</Text>
@@ -680,14 +825,12 @@ const PlanningCard: React.FC<PlanningCardProps> = ({ item, colors, onPress, onDe
           )}
         </View>
 
-        {/* Message invitation */}
         {isInvited && item.invite_message && (
           <Text style={[s.cardMsg, { color: colors.textTertiary }]} numberOfLines={1}>
             "{item.invite_message}"
           </Text>
         )}
 
-        {/* Invités (avatars) */}
         {isPersonal && item.invites && item.invites.length > 0 && (
           <View style={s.avatarRow}>
             {item.invites.slice(0, 5).map(inv => (
@@ -707,10 +850,9 @@ const PlanningCard: React.FC<PlanningCardProps> = ({ item, colors, onPress, onDe
           </View>
         )}
 
-        {/* Boutons accept/decline */}
         {isInvited && item.invite_status === 'pending' && onAccept && onDecline && (
           <View style={s.invActions}>
-            <TouchableOpacity style={[s.btnAccept]} onPress={onAccept} activeOpacity={0.8}>
+            <TouchableOpacity style={s.btnAccept} onPress={onAccept} activeOpacity={0.8}>
               <Icon name="check" size={11} color="#fff" />
               <Text style={s.btnAcceptTxt}>Accepter</Text>
             </TouchableOpacity>
@@ -721,7 +863,6 @@ const PlanningCard: React.FC<PlanningCardProps> = ({ item, colors, onPress, onDe
         )}
       </View>
 
-      {/* Bouton supprimer */}
       {isPersonal && onDelete && (
         <TouchableOpacity onPress={onDelete} style={s.delBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="trash-2" size={13} color={colors.textTertiary} />
@@ -734,76 +875,95 @@ const PlanningCard: React.FC<PlanningCardProps> = ({ item, colors, onPress, onDe
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  root: { flex: 1 },
-  list: { paddingHorizontal: Spacing[4], paddingTop: Spacing[2], paddingBottom: 100 },
+  root:  { flex: 1 },
+  list:  { paddingHorizontal: Spacing[4], paddingTop: Spacing[2], paddingBottom: 100 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginTop: 16 },
-  emptyText: { fontSize: 14, textAlign: 'center', marginTop: 8, lineHeight: 20 },
-  badge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  emptyText:  { fontSize: 14, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  badge:      { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  badgeText:  { color: '#fff', fontSize: 11, fontWeight: '800' },
 
-  dateHeader: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 22, marginBottom: 8, opacity: 0.5 },
+  // ── Filtres ────────────────────────────────────────────────────────────────
+  filterBar:     { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  filterContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  filterTab:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
+  filterTabTxt:  { fontSize: 13, fontWeight: '600' },
+  filterBadge:   { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  filterBadgeTxt: { fontSize: 10, fontWeight: '700' },
 
-  // ── Card ──────────────────────────────────────────────────────────────────
-  card: { flexDirection: 'row', alignItems: 'stretch', borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
-  cardBar: { width: 4 },
-  cardIcon: { width: 40, alignItems: 'center', justifyContent: 'center' },
+  // ── Section header ─────────────────────────────────────────────────────────
+  sectionHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, marginBottom: 10 },
+  sectionDot:      { width: 8, height: 8, borderRadius: 4 },
+  sectionTitle:    { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, flex: 1 },
+  sectionCount:    { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
+  sectionCountTxt: { fontSize: 10, fontWeight: '700' },
+
+  // ── Card ───────────────────────────────────────────────────────────────────
+  card:        { flexDirection: 'row', alignItems: 'stretch', borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
+  cardBar:     { width: 4 },
+  cardIcon:    { width: 40, alignItems: 'center', justifyContent: 'center' },
   cardContent: { flex: 1, paddingVertical: 10, paddingRight: 36 },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cardTitle: { flex: 1, fontSize: 14, fontWeight: '700' },
-  liveDot: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
-  liveTxt: { fontSize: 8, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
+  cardRow:     { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
+  cardTitle:   { fontSize: 14, fontWeight: '700', flexShrink: 1 },
+
+  timeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  timeBadgeTxt: { fontSize: 9, fontWeight: '700' },
+  ongoingDot:   { width: 5, height: 5, borderRadius: 3 },
+
+  liveDot:   { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
+  liveTxt:   { fontSize: 8, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
   statusDot: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   statusTxt: { fontSize: 9, fontWeight: '700' },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, flexWrap: 'wrap' },
+
+  cardMeta:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, flexWrap: 'wrap' },
   cardMetaTxt: { fontSize: 11 },
   cardMetaDot: { fontSize: 11, opacity: 0.4 },
-  cardMsg: { fontSize: 11, fontStyle: 'italic', marginTop: 3 },
+  cardMsg:     { fontSize: 11, fontStyle: 'italic', marginTop: 3 },
 
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
   invAvatar: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
-  moreInv: { fontSize: 9, fontWeight: '700' },
+  moreInv:   { fontSize: 9, fontWeight: '700' },
 
-  invActions: { flexDirection: 'row', gap: 6, marginTop: 7 },
-  btnAccept: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#36D9A0', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  invActions:   { flexDirection: 'row', gap: 6, marginTop: 7 },
+  btnAccept:    { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#36D9A0', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   btnAcceptTxt: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  btnDecline: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  btnDecline:   { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
   btnDeclineTxt: { fontSize: 11, fontWeight: '600' },
 
   delBtn: { position: 'absolute', top: 10, right: 10 },
 
-  fab: { position: 'absolute', bottom: 24, right: 20, borderRadius: BorderRadius.full, overflow: 'hidden', elevation: 8, shadowColor: '#7B3FF2', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10 },
+  fab:      { position: 'absolute', bottom: 24, right: 20, borderRadius: BorderRadius.full, overflow: 'hidden', elevation: 8, shadowColor: '#7B3FF2', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10 },
   fabInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: Spacing[4], paddingVertical: 14 },
-  fabText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  fabText:  { fontSize: 14, fontWeight: '800', color: '#fff' },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 34, maxHeight: '95%' },
-  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalBody: { paddingHorizontal: 20, paddingBottom: 20 },
+  modalSheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 34, maxHeight: '95%' },
+  modalHandle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
+  modalHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
+  modalTitle:   { fontSize: 18, fontWeight: '700' },
+  modalBody:    { paddingHorizontal: 20, paddingBottom: 20 },
 
-  label: { fontSize: 12, fontWeight: '600', marginTop: 16, marginBottom: 6 },
-  input: { fontSize: 15, borderRadius: BorderRadius.md, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
+  label:      { fontSize: 12, fontWeight: '600', marginTop: 16, marginBottom: 6 },
+  input:      { fontSize: 15, borderRadius: BorderRadius.md, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
   inputMulti: { minHeight: 70, textAlignVertical: 'top' },
 
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  datePill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: BorderRadius.md, borderWidth: 1 },
+  dateRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  datePill:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: BorderRadius.md, borderWidth: 1 },
   datePillText: { fontSize: 14 },
 
-  inviteBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: BorderRadius.md, borderWidth: 1 },
+  inviteBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: BorderRadius.md, borderWidth: 1 },
   inviteBtnText: { flex: 1, fontSize: 14 },
 
-  contactsPreview: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  contactChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.full },
+  contactsPreview:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  contactChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.full },
   contactChipAvatar: { width: 22, height: 22, borderRadius: 11 },
-  contactChipName: { fontSize: 13, fontWeight: '500', maxWidth: 100 },
+  contactChipName:   { fontSize: 13, fontWeight: '500', maxWidth: 100 },
 
-  colorRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-  colorDot: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  colorRow:      { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  colorDot:      { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   colorDotActive: { borderWidth: 3, borderColor: 'rgba(255,255,255,0.8)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 4 },
 
-  submitBtn: { marginTop: 24, borderRadius: BorderRadius.full, overflow: 'hidden' },
+  submitBtn:      { marginTop: 24, borderRadius: BorderRadius.full, overflow: 'hidden' },
   submitBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15 },
-  submitBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  submitBtnText:  { fontSize: 15, fontWeight: '800', color: '#fff' },
 });

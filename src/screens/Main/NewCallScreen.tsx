@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { BorderRadius, Spacing } from '../../theme';
 import { apiClient } from '../../api';
@@ -60,6 +60,15 @@ export const NewCallScreen: React.FC = () => {
       }
     })();
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setQuery('');
+      setSearchResult([]);
+      setEmpty(false);
+    };
+  }, []));
 
   const doSearch = useCallback((q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

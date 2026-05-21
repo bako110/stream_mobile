@@ -801,12 +801,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [reportVisible,  setReportVisible]  = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [isPortrait,     setIsPortrait]     = useState<boolean | null>(null);
+  const [ended,          setEnded]          = useState(false);
   const [refInfo, setRefInfo] = useState<{
     label: string; kind: string; thumbnail: string | null; color: string;
   } | null>(null);
 
   const likeInFlight   = useRef(false);
   const pausedRef      = useRef(false);
+  const endedRef       = useRef(false);
   const likedRef       = useRef(reel.user_reaction === 'like');
   const mountedRef     = useRef(true);
   const retryTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -938,7 +940,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   useEffect(() => {
     const subEnd = player.addEventListener('onEnd', () => {
       clearStall();
-      if (isActive) onEnd();
+      if (isActive) {
+        endedRef.current = true;
+        if (mountedRef.current) setEnded(true);
+        onEnd();
+      }
     });
     const subBuf = player.addEventListener('onBuffer', (val: boolean) => {
       if (!mountedRef.current) return;
@@ -972,22 +978,39 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   }, [isActive, onEnd, player, doRetry, armStall, clearStall]);
 
   // ── Play/Pause selon isActive ─────────────────────────────────────────────
-  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mémorise l'état "ended" au moment où isActive passe à true,
+  // avant que le reset useEffect ne l'efface.
+  const wasEndedOnActivate = useRef(false);
 
   useEffect(() => {
     if (!reel.video_url) return;
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
 
     if (isActive && !pausedRef.current) {
+      // Capturer endedRef MAINTENANT, avant que le reset ne le remette à false
+      wasEndedOnActivate.current = endedRef.current;
+
       if (activePlayerRef) {
         (activePlayerRef as React.MutableRefObject<{ pause: () => void } | null>).current = {
           pause: () => player.pause(),
         };
       }
-      // Petit délai pour laisser le player natif s'initialiser avant play()
-      // Nécessaire quand le slide devient actif immédiatement au montage (seed reel)
       playTimerRef.current = setTimeout(() => {
-        if (mountedRef.current && !pausedRef.current) player.play();
+        if (!mountedRef.current || pausedRef.current) return;
+        if (wasEndedOnActivate.current) {
+          // Vidéo était terminée : repartir du début
+          endedRef.current = false;
+          wasEndedOnActivate.current = false;
+          if (mountedRef.current) setEnded(false);
+          try { player.seekTo(0); } catch {}
+          setTimeout(() => {
+            if (!mountedRef.current || pausedRef.current) return;
+            try { player.play(); } catch {}
+          }, 80);
+        } else {
+          try { player.play(); } catch {}
+        }
       }, 50);
     } else {
       player.pause();
@@ -1000,10 +1023,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   useEffect(() => {
     if (!isActive) {
       pausedRef.current = false;
+      endedRef.current  = false;
       retryCountRef.current = 0;
       if (mountedRef.current) {
         setPaused(false);
         setVideoError(false);
+        setEnded(false);
       }
       if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
       clearStall();
@@ -1056,6 +1081,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const heartScale      = useSharedValue(0);
   const heartX          = useSharedValue(0);
   const heartY          = useSharedValue(0);
+
+  // Ripple skip gauche / droite
+  const skipLeftOpacity  = useSharedValue(0);
+  const skipLeftScale    = useSharedValue(0.5);
+  const skipRightOpacity = useSharedValue(0);
+  const skipRightScale   = useSharedValue(0.5);
+  const [skipLeftLabel,  setSkipLeftLabel]  = useState('');
+  const [skipRightLabel, setSkipRightLabel] = useState('');
 
   const playIconAnim = useAnimatedStyle(() => ({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -1142,6 +1175,50 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     } catch {}
   }, [reel]);
 
+  const doReplay = useCallback(() => {
+    try {
+      player.seekTo(0);
+      pausedRef.current = false;
+      player.play();
+      if (mountedRef.current) { setEnded(false); setPaused(false); }
+    } catch {}
+  }, [player]);
+
+  const doSkipAnim = useCallback((seconds: number) => {
+    const isLeft = seconds < 0;
+    const label  = isLeft ? `◄◄ ${Math.abs(seconds)}s` : `${seconds}s ►►`;
+    if (isLeft) {
+      setSkipLeftLabel(label);
+      skipLeftOpacity.value  = 0;
+      skipLeftScale.value    = 0.6;
+      skipLeftOpacity.value  = withSequence(
+        withTiming(1,   { duration: 80  }),
+        withTiming(0.8, { duration: 250 }),
+        withTiming(0,   { duration: 150 }),
+      );
+      skipLeftScale.value    = withSequence(
+        withTiming(1.15, { duration: 80  }),
+        withTiming(1.0,  { duration: 250 }),
+        withTiming(0.6,  { duration: 150 }),
+      );
+    } else {
+      setSkipRightLabel(label);
+      skipRightOpacity.value = 0;
+      skipRightScale.value   = 0.6;
+      skipRightOpacity.value = withSequence(
+        withTiming(1,   { duration: 80  }),
+        withTiming(0.8, { duration: 250 }),
+        withTiming(0,   { duration: 150 }),
+      );
+      skipRightScale.value   = withSequence(
+        withTiming(1.15, { duration: 80  }),
+        withTiming(1.0,  { duration: 250 }),
+        withTiming(0.6,  { duration: 150 }),
+      );
+    }
+    try { player.seekBy(seconds); } catch {}
+  }, [player, skipLeftOpacity, skipLeftScale, skipRightOpacity, skipRightScale]);
+
   const handleFocusBar = useCallback((focused: boolean) => {
     if (mountedRef.current) setBarFocused(focused);
     if (focused) {
@@ -1166,28 +1243,40 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     finally { if (mountedRef.current) setSending(false); }
   }, [commentText, reel.id, sending]);
 
-  // ── Gestes ────────────────────────────────────────────────────────────────
-  const singleTap = Gesture.Tap()
-    .maxDuration(250)
-    .runOnJS(true)
-    .onEnd(doPause);
+  // ── Animated styles for skip ripples ─────────────────────────────────────
+  const skipLeftAnim = useAnimatedStyle(() => ({
+    opacity:   skipLeftOpacity.value,
+    transform: [{ scale: skipLeftScale.value }],
+  }));
+  const skipRightAnim = useAnimatedStyle(() => ({
+    opacity:   skipRightOpacity.value,
+    transform: [{ scale: skipRightScale.value }],
+  }));
 
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDuration(250)
-    .runOnJS(true)
+  // ── Gestes — 3 zones style Facebook ──────────────────────────────────────
+  // Zone gauche (30%): double-tap = rewind 10s, simple tap = pause
+  const leftDoubleTap = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true)
+    .onEnd(() => doSkipAnim(-10));
+  const leftSingleTap = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
+  const leftGesture   = Gesture.Exclusive(leftDoubleTap, leftSingleTap);
+
+  // Zone centre (40%): double-tap = like, simple tap = pause
+  const centerDoubleTap = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true)
     .onEnd(e => doLike(e.x, e.y));
+  const centerSingleTap = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
+  const centerGesture   = Gesture.Exclusive(centerDoubleTap, centerSingleTap);
 
-  // Pan horizontal (pour éviter que le parent pan vertical n'absorbe les gestes horizontaux)
+  // Zone droite (30%): double-tap = forward 10s, simple tap = pause
+  const rightDoubleTap = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true)
+    .onEnd(() => doSkipAnim(10));
+  const rightSingleTap = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
+  const rightGesture   = Gesture.Exclusive(rightDoubleTap, rightSingleTap);
+
+  // Pan horizontal fail-guard (empêche le pan vertical d'absorber les gestes)
   const hPanFail = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .failOffsetY([-10, 10])
     .minDistance(10);
-
-  const tapGesture = Gesture.Simultaneous(
-    hPanFail,
-    Gesture.Exclusive(doubleTap, singleTap),
-  );
 
   const safeBottom    = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
   const COMMENT_BAR_H = 76;
@@ -1234,14 +1323,41 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
       )}
 
-      {/* Zone de tap (exclut le panel d'actions et la barre de commentaire) */}
-      <GestureDetector gesture={tapGesture}>
+      {/* Zones de tap style Facebook (gauche 30% / centre 40% / droite 30%) */}
+      {/* Exclut le panel d'actions (right 80) et la barre de commentaire */}
+      <GestureDetector gesture={Gesture.Simultaneous(hPanFail, leftGesture)}>
         <View style={{
           position: 'absolute', top: 0, left: 0,
+          width: (screenW - 80) * 0.3,
+          bottom: safeBottom + COMMENT_BAR_H,
+        }} />
+      </GestureDetector>
+      <GestureDetector gesture={Gesture.Simultaneous(hPanFail, centerGesture)}>
+        <View style={{
+          position: 'absolute', top: 0,
+          left: (screenW - 80) * 0.3,
+          width: (screenW - 80) * 0.4,
+          bottom: safeBottom + COMMENT_BAR_H,
+        }} />
+      </GestureDetector>
+      <GestureDetector gesture={Gesture.Simultaneous(hPanFail, rightGesture)}>
+        <View style={{
+          position: 'absolute', top: 0,
+          left: (screenW - 80) * 0.7,
           right: 80,
           bottom: safeBottom + COMMENT_BAR_H,
         }} />
       </GestureDetector>
+
+      {/* Ripple skip gauche */}
+      <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleLeft, skipLeftAnim]}>
+        <Text style={s.skipRippleTxt}>{skipLeftLabel}</Text>
+      </Animated.View>
+
+      {/* Ripple skip droite */}
+      <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleRight, skipRightAnim]}>
+        <Text style={s.skipRippleTxt}>{skipRightLabel}</Text>
+      </Animated.View>
 
       {/* Icône play/pause animée */}
       <Animated.View style={playIconAnim} pointerEvents="none">
@@ -1255,7 +1371,15 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         <Icon name="heart" size={88} color="#E0389A" />
       </Animated.View>
 
-
+      {/* Overlay replay (vidéo terminée) */}
+      {ended && (
+        <View style={s.replayOverlay} pointerEvents="box-none">
+          <TouchableOpacity style={s.replayBtn} onPress={doReplay} activeOpacity={0.85}>
+            <Icon name="rotate-ccw" size={32} color="#fff" />
+            <Text style={s.replayTxt}>Revoir</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Gradient bas */}
       <LinearGradient
@@ -1596,4 +1720,15 @@ commentBarWrap: { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHor
   searchEmptyIcon:  { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
   searchStateTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   searchStateText:  { color: 'rgba(255,255,255,0.35)', fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
+
+  // ── Replay overlay ──────────────────────────────────────────────────────────
+  replayOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 6 },
+  replayBtn:     { alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 28, paddingVertical: 18, borderRadius: 20 },
+  replayTxt:     { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  // ── Skip ripple (Facebook-style double-tap zones) ───────────────────────────
+  skipRipple:      { position: 'absolute', top: 0, bottom: 0, width: '30%', alignItems: 'center', justifyContent: 'center', zIndex: 8 },
+  skipRippleLeft:  { left: 0 },
+  skipRippleRight: { right: 80 },
+  skipRippleTxt:   { color: '#fff', fontSize: 15, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, overflow: 'hidden' },
 });
