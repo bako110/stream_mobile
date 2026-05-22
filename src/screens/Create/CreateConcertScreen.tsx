@@ -446,6 +446,28 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
                 </View>
               </View>
 
+              {/* Bannière info live programmé */}
+              {(concertType === 'live' || concertType === 'live_and_replay') && (
+                <View style={{
+                  marginHorizontal: 0, marginBottom: 12,
+                  borderRadius: 14, borderWidth: 1.5,
+                  borderColor: colors.accentOrange + '66',
+                  backgroundColor: colors.accentOrange + '12',
+                  padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+                }}>
+                  <Icon name="calendar" size={18} color={colors.accentOrange} style={{ marginTop: 1 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.accentOrange, marginBottom: 3 }}>
+                      Live automatique
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                      Un live sera programmé à la date et l'heure que tu choisis à l'étape suivante.
+                      Il démarrera automatiquement et sera enregistré pour le replay.
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               {/* Capacité & durée */}
               <View style={s.section}>
                 <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>PARAMÈTRES</Text>

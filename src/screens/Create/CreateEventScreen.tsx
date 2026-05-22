@@ -539,8 +539,27 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                     <Animated.View style={[s.toggleThumb, { backgroundColor: colors.textOnBrand, left: isOnline ? 20 : 2 }]} />
                   </TouchableOpacity>
                 </View>
+                {isOnline && (
+                  <View style={{
+                    marginBottom: 10, borderRadius: 14, borderWidth: 1.5,
+                    borderColor: colors.primary + '66',
+                    backgroundColor: colors.primary + '10',
+                    padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+                  }}>
+                    <Icon name="video" size={18} color={colors.primary} style={{ marginTop: 1 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary, marginBottom: 3 }}>
+                        Live automatique
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                        Un live sera programmé à la date de début de l'événement.
+                        Il démarrera automatiquement et le replay sera disponible après.
+                      </Text>
+                    </View>
+                  </View>
+                )}
                 {isOnline ? (
-                  <Field label="Lien de diffusion" placeholder="https://..." value={onlineUrl} onChangeText={setOnlineUrl} keyboardType="url" colors={colors} />
+                  <Field label="Lien de diffusion (optionnel)" placeholder="https://..." value={onlineUrl} onChangeText={setOnlineUrl} keyboardType="url" colors={colors} />
                 ) : (
                   <>
                     {/* Bouton GPS */}
