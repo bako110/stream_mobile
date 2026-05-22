@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, ImagePickerSection, VideoPickerField } from '../../components/common';
 import { concertService } from '../../services';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
+import { apiClient } from '../../api';
 import type { ConcertType, AccessType, ConcertCreate } from '../../types';
 import { createConcertStyles as s } from '../../styles/CreateConcertScreen.styles';
 
@@ -253,6 +254,37 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
     for (let i = 0; i < STEPS.length - 1; i++) {
       const err = validateStep(i);
       if (err) { Alert.alert(`Étape ${i + 1} incomplète`, err); setStep(i); return; }
+    }
+
+    const needsLive = (concertType === 'live' || concertType === 'live_and_replay') && !isEditing;
+    if (needsLive) {
+      try {
+        const cost = await apiClient.get('/api/v1/lives/cost');
+        const { cost_coins, balance, sufficient } = cost;
+        if (!sufficient) {
+          Alert.alert(
+            'Solde insuffisant',
+            `Il faut ${cost_coins} coins pour programmer un live.\nTon solde : ${balance} coins.\n\nRecharge ton wallet pour continuer.`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Recharger', onPress: () => onBack?.() },
+            ],
+          );
+          return;
+        }
+        await new Promise<void>((resolve, reject) =>
+          Alert.alert(
+            'Programmer un live',
+            `${cost_coins} coins seront débités de ton wallet (solde : ${balance} coins) pour programmer ce live.\n\nConfirmer ?`,
+            [
+              { text: 'Annuler', style: 'cancel', onPress: () => reject() },
+              { text: 'Confirmer', onPress: () => resolve() },
+            ],
+          )
+        );
+      } catch {
+        return;
+      }
     }
 
     Alert.alert(

@@ -16,6 +16,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, ImagePickerSection, VideoPickerField } from '../../components/common';
 import { eventService } from '../../services';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
+import { apiClient } from '../../api';
 import type { EventType, EventAccessType, EventCreate } from '../../types';
 import { createEventStyles as s } from '../../styles/CreateEventScreen.styles';
 
@@ -307,6 +308,38 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
       const err = validateStep(i as Step);
       if (err) { Alert.alert('Champs manquants', err); return; }
     }
+
+    const needsLive = isOnline && !isEditing;
+    if (needsLive) {
+      try {
+        const cost = await apiClient.get('/api/v1/lives/cost');
+        const { cost_coins, balance, sufficient } = cost;
+        if (!sufficient) {
+          Alert.alert(
+            'Solde insuffisant',
+            `Il faut ${cost_coins} coins pour programmer un live.\nTon solde : ${balance} coins.\n\nRecharge ton wallet pour continuer.`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Recharger', onPress: () => onBack?.() },
+            ],
+          );
+          return;
+        }
+        await new Promise<void>((resolve, reject) =>
+          Alert.alert(
+            'Programmer un live',
+            `${cost_coins} coins seront débités de ton wallet (solde : ${balance} coins) pour programmer ce live.\n\nConfirmer ?`,
+            [
+              { text: 'Annuler', style: 'cancel', onPress: () => reject() },
+              { text: 'Confirmer', onPress: () => resolve() },
+            ],
+          )
+        );
+      } catch {
+        return;
+      }
+    }
+
     Alert.alert(
       isEditing ? 'Enregistrer et publier ?' : "Publier l'événement ?",
       'Tout le monde pourra voir et rejoindre cet événement.',
