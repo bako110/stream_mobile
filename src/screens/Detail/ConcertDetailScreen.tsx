@@ -5,7 +5,7 @@ import {
   Dimensions, StyleSheet, StatusBar, InteractionManager, ActivityIndicator,
 } from 'react-native';
 import Animated, {
-  FadeInDown, FadeIn,
+  FadeIn,
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence,
 } from 'react-native-reanimated';
@@ -261,7 +261,7 @@ const TicketTiersGrid: React.FC<{
   const effectiveSelected = visible.find(t => t.key === selected) ? selected : visible[0].key;
 
   return (
-    <Animated.View entering={FadeInDown.delay(220).springify()} style={{ marginBottom: 4 }}>
+    <View style={{ marginBottom: 4 }}>
       <SectionHeader label={visible.length === 1 ? 'Billet' : 'Catégorie de billet'} colors={colors} />
       {visible.map(tier => (
         <TierCard
@@ -272,7 +272,7 @@ const TicketTiersGrid: React.FC<{
           colors={colors}
         />
       ))}
-    </Animated.View>
+    </View>
   );
 };
 
@@ -473,8 +473,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         {showVideo && hasVideo && <VideoModal uri={concert.video_url!} onClose={() => setShowVideo(false)} />}
 
         {/* ── Bouton principal : Live / Replay / Programmé ─────────── */}
-        <Animated.View entering={FadeInDown.delay(60).springify()}
-          style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 4, gap: 10 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 4, gap: 10 }}>
 
           {/* Live en cours */}
           {isLive && (
@@ -530,11 +529,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <Text style={{ fontSize: 14, color: colors.textTertiary }}>Replay non disponible</Text>
             </View>
           )}
-        </Animated.View>
+        </View>
 
         {/* ── Date + Lieu résumé ────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(80).springify()}
-          style={{ paddingHorizontal: 16, paddingTop: 18, flexDirection: 'row', gap: 10 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 18, flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, borderRadius: 14,
             padding: 14, alignItems: 'center', gap: 4 }}>
             <Icon name="calendar" size={18} color={colors.primary} />
@@ -563,11 +561,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <Text style={{ fontSize: 11, color: colors.textTertiary }}>Durée</Text>
             </View>
           )}
-        </Animated.View>
+        </View>
 
         {/* ── Barre sociale ────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(100).springify()}
-          style={{ flexDirection: 'row', marginHorizontal: 16, marginTop: 16,
+        <View style={{ flexDirection: 'row', marginHorizontal: 16, marginTop: 16,
             backgroundColor: colors.backgroundSecondary, borderRadius: 18, overflow: 'hidden' }}>
           <TouchableOpacity style={ss.socialBtn} onPress={handleLike} activeOpacity={0.75}>
             <Animated.View style={heartStyle}>
@@ -593,24 +590,22 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <Icon name="bookmark" size={18} color={saved ? colors.primary : colors.textTertiary} />
             </Animated.View>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
 
         {/* ── Description ──────────────────────────────────────────── */}
         {concert.description ? (
-          <Animated.View entering={FadeInDown.delay(130).springify()}
-            style={{ paddingHorizontal: 16, paddingTop: 22, gap: 8 }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 22, gap: 8 }}>
             <SectionHeader label="À propos" colors={colors} />
             <ExpandableText
               text={concert.description} maxLines={4}
               textStyle={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}
               primaryColor={colors.primary}
             />
-          </Animated.View>
+          </View>
         ) : null}
 
         {/* ── Infos détaillées ─────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(160).springify()}
-          style={{ marginHorizontal: 16, marginTop: 22 }}>
+        <View style={{ marginHorizontal: 16, marginTop: 22 }}>
           <SectionHeader label="Infos pratiques" colors={colors} />
           <View style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden' }}>
             <InfoRow icon="calendar" label="Date du concert" value={formatDate(concert.scheduled_at)}
@@ -638,12 +633,11 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
                 color={colors.accentGreen} colors={colors} divider />
             )}
           </View>
-        </Animated.View>
+        </View>
 
         {/* ── Billets ───────────────────────────────────────────────── */}
         {!isFree && (
-          <Animated.View entering={FadeInDown.delay(190).springify()}
-            style={{ paddingHorizontal: 16, marginTop: 22 }}>
+          <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
             <TicketTiersGrid
               tiers={[
                 { key: 'simple', label: 'Simple', icon: 'tag',   color: colors.primary, price: _p(concert.ticket_price),       sub: 'Accès standard' },
@@ -653,14 +647,13 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               ]}
               selected={selectedTier} onSelect={setSelectedTier} colors={colors}
             />
-          </Animated.View>
+          </View>
         )}
 
       </ScrollView>
 
       {/* ── CTA flottant ─────────────────────────────────────────────── */}
-      <Animated.View entering={FadeInDown.delay(50).springify()}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
           paddingHorizontal: 16, paddingTop: 12,
           paddingBottom: Platform.OS === 'ios' ? 34 : 16,
           backgroundColor: colors.surface,
@@ -711,7 +704,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             </LinearGradient>
           </TouchableOpacity>
         )}
-      </Animated.View>
+      </View>
 
       {/* Sheets */}
       <TicketPaymentSheet

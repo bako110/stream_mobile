@@ -3,7 +3,6 @@ import {
   View, Text, FlatList, TouchableOpacity,
   Image, StyleSheet, Alert, ActivityIndicator, Platform,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
@@ -102,8 +101,7 @@ export const BlockedUsersScreen: React.FC = () => {
             </View>
           }
           renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 40).springify()}>
-              <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {item.avatar_url ? (
                   <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
                 ) : (
@@ -141,7 +139,6 @@ export const BlockedUsersScreen: React.FC = () => {
                   )}
                 </TouchableOpacity>
               </View>
-            </Animated.View>
           )}
         />
       )}

@@ -4,7 +4,6 @@ import {
   RefreshControl, Image, StyleSheet, SectionList,
 } from 'react-native';
 import Animated, {
-  FadeInDown, FadeInRight,
   useSharedValue, useAnimatedStyle, withSpring,
   interpolateColor, withTiming,
 } from 'react-native-reanimated';
@@ -246,18 +245,16 @@ export const ActivityScreen: React.FC = () => {
               <View style={[s.sectionLine, { backgroundColor: colors.divider }]} />
             </View>
           )}
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 35).springify()}>
-              <ActivityCard
-                item={item}
-                colors={colors}
-                isRead={readIds.has(item.id)}
-                isFollowing={following.has(item.actor?.id ?? '')}
-                onPress={() => handlePress(item)}
-                onAvatarPress={() => item.actor && nav.navigate('UserProfile', { userId: item.actor.id })}
-                onFollow={() => item.actor && handleFollow(item.actor.id)}
-              />
-            </Animated.View>
+          renderItem={({ item }) => (
+            <ActivityCard
+              item={item}
+              colors={colors}
+              isRead={readIds.has(item.id)}
+              isFollowing={following.has(item.actor?.id ?? '')}
+              onPress={() => handlePress(item)}
+              onAvatarPress={() => item.actor && nav.navigate('UserProfile', { userId: item.actor.id })}
+              onFollow={() => item.actor && handleFollow(item.actor.id)}
+            />
           )}
         />
       )}

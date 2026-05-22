@@ -6,7 +6,6 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Animated, {
-  FadeInDown,
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
@@ -84,10 +83,7 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
   const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : null;
 
   return (
-    <Animated.View
-      entering={FadeInDown.delay(Math.min(index * 60, 400)).springify().damping(18)}
-      style={animStyle}
-    >
+    <Animated.View style={animStyle}>
       <TouchableOpacity
         activeOpacity={1}
         onPressIn={() => { scale.value = withSpring(0.97); }}

@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity,
   Image, RefreshControl, Alert, TextInput, Keyboard,
 } from 'react-native';
-import Animated, { FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -138,15 +138,13 @@ export const ConcertsScreen: React.FC = () => {
             />
           }
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 55).springify()}>
-              <ConcertCard
-                concert={item}
-                colors={colors}
-                onPress={() => (nav as any).navigate('ConcertDetail', { concertId: item.id })}
-                onDelete={() => handleDeleteConcert(item.id)}
-              />
-            </Animated.View>
+          renderItem={({ item }) => (
+            <ConcertCard
+              concert={item}
+              colors={colors}
+              onPress={() => (nav as any).navigate('ConcertDetail', { concertId: item.id })}
+              onDelete={() => handleDeleteConcert(item.id)}
+            />
           )}
         />
       )}

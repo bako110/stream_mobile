@@ -4,7 +4,6 @@ import {
   RefreshControl, Image, StyleSheet,
   Modal, TextInput, ScrollView, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -542,20 +541,19 @@ export const PlanningScreen: React.FC = () => {
               </View>
 
               {section.items.map((item, idx) => (
-                <Animated.View key={item.id} entering={FadeInDown.delay((sIdx * 3 + idx) * 40).springify()}>
-                  <PlanningCard
-                    item={item}
-                    colors={colors}
-                    timeStatus={getTimeStatus(item)}
-                    isPast={section.key === 'past'}
-                    onPress={() => handlePress(item)}
-                    onDelete={item.type === 'personal' ? () => handleDelete(item) : undefined}
-                    onAccept={item.type === 'invited' && item.invite_status === 'pending'
-                      ? () => handleRespondInvite(item, 'accepted') : undefined}
-                    onDecline={item.type === 'invited' && item.invite_status === 'pending'
-                      ? () => handleRespondInvite(item, 'declined') : undefined}
-                  />
-                </Animated.View>
+                <PlanningCard
+                  key={item.id}
+                  item={item}
+                  colors={colors}
+                  timeStatus={getTimeStatus(item)}
+                  isPast={section.key === 'past'}
+                  onPress={() => handlePress(item)}
+                  onDelete={item.type === 'personal' ? () => handleDelete(item) : undefined}
+                  onAccept={item.type === 'invited' && item.invite_status === 'pending'
+                    ? () => handleRespondInvite(item, 'accepted') : undefined}
+                  onDecline={item.type === 'invited' && item.invite_status === 'pending'
+                    ? () => handleRespondInvite(item, 'declined') : undefined}
+                />
               ))}
             </View>
           )}

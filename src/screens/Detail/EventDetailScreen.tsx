@@ -10,7 +10,7 @@ const { width: SW } = Dimensions.get('window');
 const HERO_H = SW * 0.72;
 
 import Animated, {
-  FadeInDown, FadeIn,
+  FadeIn,
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence,
 } from 'react-native-reanimated';
@@ -361,7 +361,7 @@ const TicketTiersGrid: React.FC<TicketTiersGridProps> = ({ tiers, selected, onSe
   const effectiveSelected = visible.find(t => t.key === selected) ? selected : visible[0].key;
 
   return (
-    <Animated.View entering={FadeInDown.delay(200).springify()} style={{ marginHorizontal: 16, marginBottom: 4 }}>
+    <View style={{ marginHorizontal: 16, marginBottom: 4 }}>
       <SectionHeader label={visible.length === 1 ? 'Billet' : 'Catégorie de billet'} colors={colors} />
       {visible.map(tier => (
         <TierCard
@@ -372,7 +372,7 @@ const TicketTiersGrid: React.FC<TicketTiersGridProps> = ({ tiers, selected, onSe
           colors={colors}
         />
       ))}
-    </Animated.View>
+    </View>
   );
 };
 
@@ -596,8 +596,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
 
         {/* ── Bouton Live / Replay (evenement en ligne) ────────────── */}
         {(isLiveNow || isScheduled || hasReplay || (isCompleted && event.live_id && !hasReplay)) && (
-          <Animated.View entering={FadeInDown.delay(55).springify()}
-            style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 10 }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 10 }}>
             {isLiveNow && (
               <TouchableOpacity activeOpacity={0.88}
                 onPress={() => nav.navigate('LiveViewer' as any, { liveId: event.live_id })}>
@@ -651,12 +650,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
                 <Text style={{ fontSize: 14, color: colors.textTertiary }}>Replay non disponible</Text>
               </View>
             )}
-          </Animated.View>
+          </View>
         )}
 
         {/* ── Date + Actions rapides ───────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(60).springify()}
-          style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16,
+        <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16,
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ gap: 2 }}>
             <Text style={{ fontSize: 13, fontWeight: '800', color: accent }}>
@@ -679,34 +677,30 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               {reminded ? 'Rappel actif' : 'Me rappeler'}
             </Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
 
         {/* ── Barre sociale ────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(90).springify()}>
-          <SocialBar
+        <SocialBar
             liked={liked} likeCount={likeCount} saved={saved}
             onLike={handleLike} onComment={() => setShowComments(true)}
             onShare={handleNativeShare} onSave={handleSave}
             heartStyle={heartStyle} saveStyle={saveStyle} colors={colors}
           />
-        </Animated.View>
 
         {/* ── Description ──────────────────────────────────────────── */}
         {event.description ? (
-          <Animated.View entering={FadeInDown.delay(120).springify()}
-            style={{ paddingHorizontal: 16, paddingTop: 22, gap: 8 }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 22, gap: 8 }}>
             <SectionHeader label="À propos" colors={colors} />
             <ExpandableText
               text={event.description} maxLines={4}
               textStyle={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}
               primaryColor={accent}
             />
-          </Animated.View>
+          </View>
         ) : null}
 
         {/* ── Infos pratiques ──────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(150).springify()}
-          style={{ marginHorizontal: 16, marginTop: 22 }}>
+        <View style={{ marginHorizontal: 16, marginTop: 22 }}>
           <SectionHeader label="Infos pratiques" colors={colors} />
           <View style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden' }}>
             <InfoRow icon="calendar" label="Date de début" value={formatDate(event.starts_at)}
@@ -733,12 +727,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
                 color={colors.warning} colors={colors} divider />
             )}
           </View>
-        </Animated.View>
+        </View>
 
         {/* ── Billets ───────────────────────────────────────────────── */}
         {!isFree && !isInviteOnly && (
-          <Animated.View entering={FadeInDown.delay(180).springify()}
-            style={{ paddingHorizontal: 16, marginTop: 22 }}>
+          <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
             <TicketTiersGrid
               tiers={[
                 { key: 'simple', label: 'Simple', icon: 'tag',   color: accent,    price: _p(event.ticket_price),       sub: 'Accès standard' },
@@ -748,13 +741,12 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               ]}
               selected={selectedTier} onSelect={setSelectedTier} colors={colors}
             />
-          </Animated.View>
+          </View>
         )}
 
         {/* ── Capacité ─────────────────────────────────────────────── */}
         {event.max_attendees != null && event.max_attendees > 0 && (
-          <Animated.View entering={FadeInDown.delay(210).springify()}
-            style={{ marginHorizontal: 16, marginTop: 22 }}>
+          <View style={{ marginHorizontal: 16, marginTop: 22 }}>
             <SectionHeader label="Places disponibles" colors={colors} />
             <View style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 16, padding: 16, gap: 12 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -775,14 +767,13 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
                 {capacityPct >= 1 ? 'Complet' : `${Math.round((1 - capacityPct) * event.max_attendees)} place${(1 - capacityPct) * event.max_attendees > 1 ? 's' : ''} restante${(1 - capacityPct) * event.max_attendees > 1 ? 's' : ''}`}
               </Text>
             </View>
-          </Animated.View>
+          </View>
         )}
 
       </ScrollView>
 
       {/* ── CTA flottant ─────────────────────────────────────────────── */}
-      <Animated.View entering={FadeInDown.delay(50).springify()}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
           paddingHorizontal: 16, paddingTop: 12,
           paddingBottom: Platform.OS === 'ios' ? 34 : 16,
           backgroundColor: colors.surface,
@@ -834,7 +825,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             </LinearGradient>
           </TouchableOpacity>
         )}
-      </Animated.View>
+      </View>
 
       {/* Sheets */}
       {event && (

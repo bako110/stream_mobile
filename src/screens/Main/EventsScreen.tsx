@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity,
   ScrollView, RefreshControl, Image, Alert, TextInput, Keyboard,
 } from 'react-native';
-import Animated, { FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, CommonActions } from '@react-navigation/native';
@@ -151,15 +151,13 @@ export const EventsScreen: React.FC = () => {
               tintColor={colors.primary}
             />
           }
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 55).springify()}>
-              <EventCard
-                event={item}
-                colors={colors}
-                onPress={() => (nav as any).navigate('EventDetail', { eventId: item.id })}
-                onDelete={() => handleDelete(item.id)}
-              />
-            </Animated.View>
+          renderItem={({ item }) => (
+            <EventCard
+              event={item}
+              colors={colors}
+              onPress={() => (nav as any).navigate('EventDetail', { eventId: item.id })}
+              onDelete={() => handleDelete(item.id)}
+            />
           )}
         />
       )}

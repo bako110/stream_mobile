@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { SkeletonUserProfile, VerifiedBadge } from '../../components/common';
@@ -563,18 +562,17 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               <>
                 {/* ── Posts ── */}
                 {userPosts.map((post, idx) => (
-                  <Animated.View key={`post-${post.id}`} entering={FadeInDown.delay(idx * 40).springify()}>
-                    <PostCard
-                      post={post}
-                      colors={colors}
-                      currentUserId={myId ?? undefined}
-                      onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
-                      onAuthorPress={() => {
-                        const aid = post.author?.id;
-                        if (aid && aid !== userId) navigation.navigate('UserProfile', { userId: aid });
-                      }}
-                    />
-                  </Animated.View>
+                  <PostCard
+                    key={`post-${post.id}`}
+                    post={post}
+                    colors={colors}
+                    currentUserId={myId ?? undefined}
+                    onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
+                    onAuthorPress={() => {
+                      const aid = post.author?.id;
+                      if (aid && aid !== userId) navigation.navigate('UserProfile', { userId: aid });
+                    }}
+                  />
                 ))}
 
                 {/* ── Événements & Concerts ── */}
@@ -593,15 +591,15 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                       const typeLabel = isEvent ? 'Événement' : 'Concert';
                       const accent = isEvent ? '#E0389A' : '#7B3FF2';
                       return (
-                        <Animated.View key={`${pub.kind}-${item.id}`} entering={FadeInDown.delay((userPosts.length + idx) * 40).springify()}>
-                          <TouchableOpacity
-                            style={[styles.pubCard, { backgroundColor: colors.surfaceElevated }]}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                              if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
-                              else navigation.navigate('ConcertDetail', { concertId: item.id });
-                            }}
-                          >
+                        <TouchableOpacity
+                          key={`${pub.kind}-${item.id}`}
+                          style={[styles.pubCard, { backgroundColor: colors.surfaceElevated }]}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
+                            else navigation.navigate('ConcertDetail', { concertId: item.id });
+                          }}
+                        >
                             {thumbUrl ? (
                               <Image source={{ uri: thumbUrl }} style={styles.pubThumb} />
                             ) : (
@@ -641,7 +639,6 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                               </View>
                             </View>
                           </TouchableOpacity>
-                        </Animated.View>
                       );
                     })}
                   </>

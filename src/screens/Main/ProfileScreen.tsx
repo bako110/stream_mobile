@@ -4,7 +4,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, Image,
   ActivityIndicator, StyleSheet, Clipboard, ToastAndroid, Platform, Alert,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -142,8 +141,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
           {/* ── Avatar & identité ───────────────────────────────────────── */}
-          <Animated.View
-            entering={FadeInDown.delay(60).springify()}
+          <View
             style={[s.avatarSection, { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider }]}
           >
             <View style={[s.avatarCircle, { borderColor: colors.primary + '50' }]}>
@@ -176,6 +174,25 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               <Icon name={roleIcon} size={12} color={colors.primary} />
               <Text style={[s.roleText, { color: colors.primary }]}>{roleLabel}</Text>
             </View>
+
+            {/* Bouton test FoliX ID */}
+            {!user?.folix_id && (
+              <TouchableOpacity
+                style={{ marginTop: 10, backgroundColor: '#FF6B00', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20, alignSelf: 'center' }}
+                onPress={async () => {
+                  try {
+                    console.log('[TEST] Appel generate-folix-id...', Endpoints.users.generateFolixId);
+                    const r = await apiClient.post<User>(Endpoints.users.generateFolixId);
+                    console.log('[TEST] Réponse:', JSON.stringify(r.data?.folix_id));
+                    setCurrentUser(r.data);
+                  } catch (e: any) {
+                    console.log('[TEST] Erreur:', e?.message, e?.response?.status, JSON.stringify(e?.response?.data));
+                  }
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Générer FoliX ID</Text>
+              </TouchableOpacity>
+            )}
 
             {/* Boutons d'action */}
             <View style={s.actionRow}>
@@ -246,11 +263,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 </TouchableOpacity>
               </View>
             )}
-          </Animated.View>
+          </View>
 
           {/* ── Stats (Followers / Following / Publications) ───────────── */}
           {user && (
-            <Animated.View entering={FadeInDown.delay(100).springify()} style={s.statsRow}>
+            <View style={s.statsRow}>
               <TouchableOpacity
                 style={[s.statCard, { backgroundColor: colors.surfaceElevated }]}
                 onPress={() => nav.navigate('Following', { userId: user.id, tab: 'followers' })}
@@ -273,11 +290,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   <Text style={[s.statLabel, { color: colors.textTertiary }]}>Publications</Text>
                 </View>
               )}
-            </Animated.View>
+            </View>
           )}
 
           {/* ── À propos ─────────────────────────────────────────────── */}
-          <Animated.View entering={FadeInDown.delay(130).springify()} style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
+          <View style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
             <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>À PROPOS</Text>
             <View style={s.aboutList}>
               {user?.location ? (
@@ -348,11 +365,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 ) : null}
               </TouchableOpacity>
             </View>
-          </Animated.View>
+          </View>
 
 
           {/* ── Publications récentes ─────────────────────────────────── */}
-          <Animated.View entering={FadeInDown.delay(190).springify()} style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
+          <View style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
             <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>PUBLICATIONS</Text>
             {recentPublished.length > 0 ? (
               <View style={{ gap: 10, marginTop: 4 }}>
@@ -409,11 +426,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 </Text>
               </View>
             )}
-          </Animated.View>
+          </View>
 
           {/* ── Mes créations / Brouillons (artistes) ─────────────────── */}
           {isCreator && draftsList.length > 0 && (
-            <Animated.View entering={FadeInDown.delay(220).springify()} style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
+            <View style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
               <View style={s.sectionHeaderRow}>
                 <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>BROUILLONS</Text>
                 <View style={s.tabSwitch}>
@@ -452,7 +469,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   />
                 ))}
               </ScrollView>
-            </Animated.View>
+            </View>
           )}
         </ScrollView>
       )}

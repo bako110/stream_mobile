@@ -8,7 +8,6 @@ import {
   TextInput, StyleSheet, Platform, StatusBar,
   RefreshControl, ActivityIndicator, Image,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -484,9 +483,8 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                 </Text>
               </View>
             }
-            renderItem={({ item, index }) => (
-              <Animated.View entering={FadeInDown.delay(index * 35).springify()}>
-                <ConversationRow
+            renderItem={({ item }) => (
+              <ConversationRow
                   conv={item}
                   colors={colors}
                   selectMode={convSelectMode}
@@ -505,7 +503,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                     ? () => toggleConvSelect(item.partner_id)
                     : () => nav.navigate('UserProfile' as any, { userId: item.partner_id })}
                 />
-              </Animated.View>
             )}
           />
         )
@@ -537,11 +534,10 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
               <Text style={[styles.emptyText, { color: colors.textTertiary, fontSize: 13, marginTop: 6 }]}>Vos appels vocaux et vidéo{'\n'}apparaîtront ici</Text>
             </View>
           }
-          renderItem={({ item, index }) => {
+          renderItem={({ item }) => {
             const isSelected = selectedIds.has(item.id);
             return (
-              <Animated.View entering={FadeInDown.delay(index * 35).springify()}>
-                <TouchableOpacity
+              <TouchableOpacity
                   activeOpacity={selectMode ? 0.6 : 1}
                   onLongPress={() => { setSelectMode(true); toggleSelect(item.id); }}
                   onPress={selectMode ? () => toggleSelect(item.id) : undefined}
@@ -579,7 +575,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                     </View>
                   </View>
                 </TouchableOpacity>
-              </Animated.View>
             );
           }}
         />

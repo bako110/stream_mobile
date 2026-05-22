@@ -4,7 +4,7 @@ import {
   TextInput, StyleSheet, Platform, StatusBar,
   ActivityIndicator, KeyboardAvoidingView, Image,
 } from 'react-native';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
@@ -185,14 +185,12 @@ export const NewCallScreen: React.FC = () => {
             </View>
           }
           renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 35).springify()}>
-              <UserCallRow
-                user={item}
-                colors={colors}
-                onVoiceCall={() => startCall({ id: item.id, name: item.display ?? item.full_name ?? item.username, avatarUrl: item.avatar_url }, 'voice')}
-                onVideoCall={() => startCall({ id: item.id, name: item.display ?? item.full_name ?? item.username, avatarUrl: item.avatar_url }, 'video')}
-              />
-            </Animated.View>
+            <UserCallRow
+              user={item}
+              colors={colors}
+              onVoiceCall={() => startCall({ id: item.id, name: item.display ?? item.full_name ?? item.username, avatarUrl: item.avatar_url }, 'voice')}
+              onVideoCall={() => startCall({ id: item.id, name: item.display ?? item.full_name ?? item.username, avatarUrl: item.avatar_url }, 'video')}
+            />
           )}
         />
       )}

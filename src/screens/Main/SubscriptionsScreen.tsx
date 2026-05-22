@@ -3,7 +3,6 @@ import {
   View, Text, FlatList, TouchableOpacity, Modal,
   StyleSheet, RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -86,8 +85,7 @@ const ActiveCard: React.FC<{
   const isCancelled = sub.status === 'cancelled';
 
   return (
-    <Animated.View entering={FadeInDown.springify()}>
-      <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.card}>
+    <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.card}>
         {/* En-tête plan */}
         <View style={s.cardTop}>
           <View>
@@ -155,7 +153,6 @@ const ActiveCard: React.FC<{
           </View>
         )}
       </LinearGradient>
-    </Animated.View>
   );
 };
 
@@ -177,7 +174,7 @@ const ConfirmModal: React.FC<{
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={confirming ? undefined : onClose}>
       <View style={s.modalOverlay}>
-        <Animated.View entering={FadeInDown.springify()} style={[s.modalCard, { backgroundColor: colors.surface }]}>
+        <View style={[s.modalCard, { backgroundColor: colors.surface }]}>
           {/* Header plan */}
           <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.modalHeader}>
             <Text style={s.modalPlanName}>{PLAN_LABELS[plan]}</Text>
@@ -246,7 +243,7 @@ const ConfirmModal: React.FC<{
           <TouchableOpacity onPress={onClose} style={s.cancelLink} disabled={confirming}>
             <Text style={[s.cancelLinkText, { color: confirming ? colors.divider : colors.textTertiary }]}>Annuler</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </View>
     </Modal>
   );
@@ -261,7 +258,7 @@ const PlanPicker: React.FC<{
   const { colors, fontSize } = theme;
 
   return (
-    <Animated.View entering={FadeInDown.springify()} style={[s.noSubCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+    <View style={[s.noSubCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
       <Icon name="zap" size={32} color={colors.primary} />
       <Text style={[s.noSubTitle, { color: colors.textPrimary }]}>Choisissez votre plan</Text>
       <Text style={[s.noSubSub, { color: colors.textSecondary }]}>
@@ -271,7 +268,7 @@ const PlanPicker: React.FC<{
       {PAID_PLANS.map((p, idx) => {
         const grad = PLAN_COLORS[p];
         return (
-          <Animated.View key={p} entering={FadeInDown.delay(idx * 80).springify()} style={{ width: '100%' }}>
+          <View key={p} style={{ width: '100%' }}>
             <TouchableOpacity
               style={[s.planCard, { borderColor: grad[0] + '60', backgroundColor: grad[0] + '10' }]}
               activeOpacity={0.8}
@@ -297,10 +294,10 @@ const PlanPicker: React.FC<{
                 : <Icon name="chevron-right" size={18} color={grad[0]} />
               }
             </TouchableOpacity>
-          </Animated.View>
+          </View>
         );
       })}
-    </Animated.View>
+    </View>
   );
 };
 
@@ -469,8 +466,7 @@ export const SubscriptionsScreen: React.FC = () => {
           const p = item.plan as string;
           const col = PLAN_COLORS[p]?.[0] ?? colors.primary;
           return (
-            <Animated.View entering={FadeInDown.delay(index * 30).springify()}>
-              <View style={[s.histRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            <View style={[s.histRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
                 <View style={[s.histDot, { backgroundColor: col }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.sm }}>
@@ -486,7 +482,7 @@ export const SubscriptionsScreen: React.FC = () => {
                   </Text>
                 </View>
               </View>
-            </Animated.View>
+            </View>
           );
         }}
         ListEmptyComponent={

@@ -4,7 +4,7 @@ import {
   StyleSheet, Dimensions, ScrollView, StatusBar, FlatList,
 } from 'react-native';
 import Animated, {
-  FadeInDown, FadeIn,
+  FadeIn,
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -292,7 +292,6 @@ const Card: React.FC<{
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 50).duration(400)}
       style={[{ width: CARD_W }, anim]}
     >
       <TouchableOpacity
@@ -478,6 +477,21 @@ export const FilmsScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* ── BOUTON RETOUR flottant ── */}
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={{
+          position: 'absolute', zIndex: 20,
+          top: insets.top + 8, left: 16,
+          width: 36, height: 36, borderRadius: 18,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          alignItems: 'center', justifyContent: 'center',
+        }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Icon name="arrow-left" size={20} color="#fff" />
+      </TouchableOpacity>
 
       <ScrollView
         showsVerticalScrollIndicator={false}

@@ -6,7 +6,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Image, RefreshControl,
   StyleSheet, StatusBar, Platform, Dimensions,
 } from 'react-native';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -54,7 +54,7 @@ export const SimpleLiveListScreen: React.FC = () => {
     }
   };
 
-  const renderCard = ({ item, index }: { item: LiveStream; index: number }) => {
+  const renderCard = ({ item }: { item: LiveStream }) => {
     const user = item.user;
     const name = user?.display_name ?? user?.username ?? 'Utilisateur';
     const initial = name[0]?.toUpperCase() ?? '?';
@@ -64,8 +64,7 @@ export const SimpleLiveListScreen: React.FC = () => {
       : `${Math.floor(elapsed / 3600)}h`;
 
     return (
-      <Animated.View entering={FadeInDown.delay(index * 80).springify()}>
-        <TouchableOpacity
+      <TouchableOpacity
           style={[st.card, { backgroundColor: colors.surface }]}
           activeOpacity={0.85}
           onPress={() => handlePress(item)}
@@ -122,7 +121,6 @@ export const SimpleLiveListScreen: React.FC = () => {
             </View>
           </View>
         </TouchableOpacity>
-      </Animated.View>
     );
   };
 

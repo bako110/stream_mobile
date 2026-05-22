@@ -3,7 +3,6 @@ import {
   View, Text, FlatList, TouchableOpacity,
   Image, StyleSheet, StatusBar, ActivityIndicator,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -191,12 +190,11 @@ export const FavoritesScreen: React.FC = () => {
           const title = getTitle(item);
           const sub   = getSub(item);
           return (
-            <Animated.View entering={FadeInDown.delay(index * 40).springify()}>
-              <TouchableOpacity
-                style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={() => handlePress(item)}
-                activeOpacity={0.8}
-              >
+            <TouchableOpacity
+              style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => handlePress(item)}
+              activeOpacity={0.8}
+            >
                 {/* Thumbnail */}
                 {thumb ? (
                   <Image source={{ uri: thumb }} style={styles.thumb} resizeMode="cover" />
@@ -226,8 +224,7 @@ export const FavoritesScreen: React.FC = () => {
                 >
                   <Icon name="bookmark" size={16} color={colors.primary} />
                 </TouchableOpacity>
-              </TouchableOpacity>
-            </Animated.View>
+            </TouchableOpacity>
           );
         }}
       />

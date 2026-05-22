@@ -3,7 +3,6 @@ import {
   View, Text, FlatList, TouchableOpacity, Image,
   RefreshControl, StyleSheet, Dimensions,
 } from 'react-native';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -126,7 +125,7 @@ export const TrendingScreen: React.FC = () => {
 // ── Hero banner ───────────────────────────────────────────────────────────────
 
 const HeroBanner: React.FC<{ count: number; label: string }> = ({ count, label }) => (
-  <Animated.View entering={FadeInDown.springify()} style={[s.heroBanner]}>
+  <View style={[s.heroBanner]}>
     <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.heroBannerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
       <Icon name="trending-up" size={28} color="#fff" />
       <View style={{ marginLeft: 12 }}>
@@ -134,7 +133,7 @@ const HeroBanner: React.FC<{ count: number; label: string }> = ({ count, label }
         <Text style={s.heroSub}>{count} {label} populaires</Text>
       </View>
     </LinearGradient>
-  </Animated.View>
+  </View>
 );
 
 // ── Empty state ───────────────────────────────────────────────────────────────
@@ -160,7 +159,7 @@ const ContentCard: React.FC<{ item: any; index: number; colors: any; onPress: ()
   const fmtViews = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 50).springify()} style={{ width: CARD_W }}>
+    <View style={{ width: CARD_W }}>
       <TouchableOpacity style={[s.contentCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onPress} activeOpacity={0.85}>
         {/* Rank badge */}
         <View style={[s.rankBadge, { backgroundColor: index < 3 ? '#F59E0B' : colors.primary }]}>
@@ -194,7 +193,7 @@ const ContentCard: React.FC<{ item: any; index: number; colors: any; onPress: ()
           )}
         </View>
       </TouchableOpacity>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -204,7 +203,7 @@ const ReelRow: React.FC<{ item: any; index: number; colors: any; onPress: () => 
   const fmtViews = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
 
   return (
-    <Animated.View entering={FadeInRight.delay(index * 40).springify()}>
+    <View>
       <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={[s.reelRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {/* Rank */}
         <View style={[s.reelRank, { backgroundColor: index < 3 ? '#F59E0B18' : colors.backgroundSecondary }]}>
@@ -252,7 +251,7 @@ const ReelRow: React.FC<{ item: any; index: number; colors: any; onPress: () => 
 
         <Icon name="chevron-right" size={16} color={colors.textDisabled} />
       </TouchableOpacity>
-    </Animated.View>
+    </View>
   );
 };
 

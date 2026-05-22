@@ -3,7 +3,6 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator, Image,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
@@ -131,7 +130,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
         {/* Profil */}
-        <Animated.View entering={FadeInDown.springify()} style={{ marginBottom: 24 }}>
+        <View style={{ marginBottom: 24 }}>
           <TouchableOpacity
             style={[s.profileCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}
             onPress={() => nav.navigate('EditProfile')}
@@ -161,12 +160,12 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
             </View>
             <Icon name="edit-2" size={16} color={colors.textTertiary} />
           </TouchableOpacity>
-        </Animated.View>
+        </View>
 
         {/* Liste des sections */}
         <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
           {SECTIONS.map((sec, i) => (
-            <Animated.View key={sec.key} entering={FadeInDown.delay(i * 40).springify()}>
+            <View key={sec.key}>
               <TouchableOpacity
                 style={[s.sectionRow, i < SECTIONS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}
                 onPress={sec.onPress}
@@ -188,7 +187,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
                 </View>
                 <Icon name="chevron-right" size={16} color={colors.textTertiary} />
               </TouchableOpacity>
-            </Animated.View>
+            </View>
           ))}
         </View>
 

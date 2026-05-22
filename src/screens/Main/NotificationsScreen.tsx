@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Animated, {
   useAnimatedStyle, useSharedValue,
-  withTiming, runOnJS, withSpring, FadeInDown,
+  withTiming, runOnJS, withSpring,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
@@ -297,7 +297,7 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, index, colors, fontSi
   }));
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 25).springify()} style={{ marginBottom: 8 }}>
+    <Animated.View style={{ marginBottom: 8 }}>
       {/* Fond rouge derrière */}
       <Animated.View style={[StyleSheet.absoluteFill, s.deleteBack, deleteReveal]}>
         <Icon name="trash-2" size={20} color="#fff" />

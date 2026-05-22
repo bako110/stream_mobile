@@ -8,7 +8,6 @@ import {
   TextInput, StyleSheet, Platform, StatusBar,
   ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -160,9 +159,7 @@ export const NewConversationScreen: React.FC = () => {
           </View>
         }
         renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * 40).springify()}>
-            <UserRow user={item} colors={colors} onPress={() => openChat(item)} />
-          </Animated.View>
+          <UserRow user={item} colors={colors} onPress={() => openChat(item)} />
         )}
       />
     </KeyboardAvoidingView>
