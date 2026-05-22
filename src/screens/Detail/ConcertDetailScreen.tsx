@@ -298,6 +298,8 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [showVideo,    setShowVideo]    = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [selectedTier, setSelectedTier] = useState<'simple' | 'vip' | 'vvip' | 'vvvip'>('simple');
+  const [replayUrl,    setReplayUrl]    = useState<string | null>(null);
+  const [loadingReplay, setLoadingReplay] = useState(false);
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
@@ -309,6 +311,14 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
       const data = await concertService.getById(concertId);
       setConcert(data);
       favoriteService.check('concert', concertId).then(setSaved).catch(() => {});
+      // Charger le replay si le concert est termine et a un live associe
+      if (data.status === 'ended' && data.live_id) {
+        try {
+          const { apiClient } = require('../../api/client');
+          const replay = await apiClient.get(`/api/v1/lives/${data.live_id}/replay`);
+          setReplayUrl(replay?.replay_url ?? null);
+        } catch { /**/ }
+      }
       try {
         const user = await authService.getMe();
         setIsOwner(user?.id === data.artist?.id);
@@ -384,10 +394,37 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     </View>
   );
 
-  const isLive     = concert.status === 'live';
-  const isFree     = concert.access_type === 'free';
-  const artistName = concert.artist?.display_name ?? concert.artist?.username;
-  const hasVideo   = !!concert.video_url;
+  const isLive      = concert.status === 'live';
+  const isEnded     = concert.status === 'ended';
+  const isScheduled = concert.status === 'published' && !!concert.live_id && !isLive;
+  const isFree      = concert.access_type === 'free';
+  const artistName  = concert.artist?.display_name ?? concert.artist?.username;
+  const hasVideo    = !!concert.video_url;
+  const hasReplay   = isEnded && !!replayUrl;
+
+  const scheduledIn = (() => {
+    if (!isScheduled || !concert.scheduled_at) return null;
+    const diff = new Date(concert.scheduled_at).getTime() - Date.now();
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    if (h > 24) return `dans ${Math.floor(h / 24)}j`;
+    if (h > 0)  return `dans ${h}h${m > 0 ? `${m}m` : ''}`;
+    return `dans ${m}min`;
+  })();
+
+  const handleWatchLive = () => {
+    nav.navigate(isOwner ? 'LiveStream' as any : 'LiveViewer' as any, { concertId });
+  };
+
+  const handleWatchReplay = async () => {
+    if (!replayUrl) return;
+    nav.navigate('VideoPlayer' as any, {
+      url: replayUrl,
+      title: concert.title,
+      thumbnailUrl: concert.thumbnail_url ?? undefined,
+    });
+  };
 
   const CONCERT_TYPE_LABEL: Record<string, string> = {
     live: 'Live uniquement', replay: 'Replay uniquement', live_replay: 'Live + Replay',
@@ -435,32 +472,64 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
         {showVideo && hasVideo && <VideoModal uri={concert.video_url!} onClose={() => setShowVideo(false)} />}
 
-        {/* ── Bouton Regarder / Rejoindre ──────────────────────────── */}
+        {/* ── Bouton principal : Live / Replay / Programmé ─────────── */}
         <Animated.View entering={FadeInDown.delay(60).springify()}
-          style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 4 }}>
-          <TouchableOpacity onPress={() => {
-            if (isLive) {
-              nav.navigate(isOwner ? 'LiveStream' as any : 'LiveViewer' as any, { concertId });
-            } else {
-              Alert.alert('Replay', 'Le replay n\'est pas encore disponible.');
-            }
-          }} activeOpacity={0.88}>
-            <LinearGradient
-              colors={isLive ? ['#EF4444', '#DC2626'] : [colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 10, paddingVertical: 15, borderRadius: 16 }}>
-              <Icon name={isLive ? 'radio' : 'play'} size={20} color="#fff" />
-              <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: 0.2 }}>
-                {isLive ? 'Regarder en direct' : 'Regarder le replay'}
-              </Text>
-              {isLive && (
+          style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 4, gap: 10 }}>
+
+          {/* Live en cours */}
+          {isLive && (
+            <TouchableOpacity onPress={handleWatchLive} activeOpacity={0.88}>
+              <LinearGradient colors={['#EF4444', '#DC2626']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: 10, paddingVertical: 15, borderRadius: 16 }}>
+                <Icon name="radio" size={20} color="#fff" />
+                <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff' }}>Regarder en direct</Text>
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
                   <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>LIVE</Text>
                 </View>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {/* Live programmé — compte à rebours */}
+          {isScheduled && (
+            <View style={{ borderRadius: 16, borderWidth: 1.5, borderColor: colors.primary + '55',
+              backgroundColor: colors.primary + '10', paddingVertical: 14, paddingHorizontal: 20,
+              flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Icon name="clock" size={20} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>Live programmé</Text>
+                {scheduledIn && (
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    Démarre {scheduledIn} · {formatTime(concert.scheduled_at)}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Replay disponible */}
+          {hasReplay && (
+            <TouchableOpacity onPress={handleWatchReplay} activeOpacity={0.88}>
+              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: 10, paddingVertical: 15, borderRadius: 16 }}>
+                <Icon name="play" size={20} color="#fff" />
+                <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff' }}>Regarder le replay</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {/* Concert terminé sans replay */}
+          {isEnded && !hasReplay && (
+            <View style={{ borderRadius: 16, backgroundColor: colors.backgroundSecondary,
+              paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Icon name="film" size={18} color={colors.textTertiary} />
+              <Text style={{ fontSize: 14, color: colors.textTertiary }}>Replay non disponible</Text>
+            </View>
+          )}
         </Animated.View>
 
         {/* ── Date + Lieu résumé ────────────────────────────────────── */}

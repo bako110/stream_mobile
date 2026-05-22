@@ -32,6 +32,8 @@ export interface Concert {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  // live programme associé
+  live_id: string | null;
   // relation
   artist?: import('./user').User;
 }

@@ -38,6 +38,7 @@ export interface Event {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  live_id: string | null;
   organizer?: import('./user').User;
 }
 

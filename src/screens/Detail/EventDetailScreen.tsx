@@ -403,6 +403,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [ticketLoading,setTicketLoading]= useState(false);
   const [selectedTier, setSelectedTier] = useState<'simple' | 'vip' | 'vvip' | 'vvvip'>('simple');
+  const [replayUrl,    setReplayUrl]    = useState<string | null>(null);
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
@@ -414,6 +415,13 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       const data = await eventService.getById(eventId);
       setEvent(data);
       favoriteService.check('event', eventId).then(setSaved).catch(() => {});
+      if (data.status === 'completed' && data.live_id) {
+        try {
+          const { apiClient } = require('../../api/client');
+          const replay = await apiClient.get(`/api/v1/lives/${data.live_id}/replay`);
+          setReplayUrl(replay?.replay_url ?? null);
+        } catch { /**/ }
+      }
       try {
         const user = await authService.getMe();
         setIsOwner(user?.id === data.organizer?.id);
@@ -542,6 +550,22 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
 
   const activeTier = allTiers.find(t => t.key === selectedTier) ?? allTiers[0];
 
+  const isCompleted  = event.status === 'completed';
+  const isLiveNow    = event.is_online && !!event.live_id && !isCompleted;
+  const hasReplay    = isCompleted && !!replayUrl;
+  const isScheduled  = event.is_online && !!event.live_id && !isLiveNow && !isCompleted;
+
+  const scheduledIn = (() => {
+    if (!isScheduled) return null;
+    const diff = new Date(event.starts_at).getTime() - Date.now();
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    if (h > 24) return `dans ${Math.floor(h / 24)}j`;
+    if (h > 0)  return `dans ${h}h${m > 0 ? `${m}m` : ''}`;
+    return `dans ${m}min`;
+  })();
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -569,6 +593,66 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         </Animated.View>
 
         {showVideo && hasVideo && <VideoModal uri={event.video_url!} onClose={() => setShowVideo(false)} />}
+
+        {/* ── Bouton Live / Replay (evenement en ligne) ────────────── */}
+        {(isLiveNow || isScheduled || hasReplay || (isCompleted && event.live_id && !hasReplay)) && (
+          <Animated.View entering={FadeInDown.delay(55).springify()}
+            style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 10 }}>
+            {isLiveNow && (
+              <TouchableOpacity activeOpacity={0.88}
+                onPress={() => nav.navigate('LiveViewer' as any, { liveId: event.live_id })}>
+                <LinearGradient colors={['#EF4444', '#DC2626']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                    gap: 10, paddingVertical: 15, borderRadius: 16 }}>
+                  <Icon name="radio" size={20} color="#fff" />
+                  <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff' }}>Regarder en direct</Text>
+                  <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>LIVE</Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+            {isScheduled && (
+              <View style={{ borderRadius: 16, borderWidth: 1.5, borderColor: accent + '55',
+                backgroundColor: accent + '10', paddingVertical: 14, paddingHorizontal: 20,
+                flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Icon name="clock" size={20} color={accent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: accent }}>Live programmé</Text>
+                  {scheduledIn && (
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                      Démarre {scheduledIn}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+            {hasReplay && (
+              <TouchableOpacity activeOpacity={0.88}
+                onPress={() => nav.navigate('VideoPlayer' as any, {
+                  url: replayUrl,
+                  title: event.title,
+                  thumbnailUrl: event.thumbnail_url ?? undefined,
+                })}>
+                <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                    gap: 10, paddingVertical: 15, borderRadius: 16 }}>
+                  <Icon name="play" size={20} color="#fff" />
+                  <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff' }}>Regarder le replay</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+            {isCompleted && event.live_id && !hasReplay && (
+              <View style={{ borderRadius: 16, backgroundColor: colors.backgroundSecondary,
+                paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Icon name="film" size={18} color={colors.textTertiary} />
+                <Text style={{ fontSize: 14, color: colors.textTertiary }}>Replay non disponible</Text>
+              </View>
+            )}
+          </Animated.View>
+        )}
 
         {/* ── Date + Actions rapides ───────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(60).springify()}
