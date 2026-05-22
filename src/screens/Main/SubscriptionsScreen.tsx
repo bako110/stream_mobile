@@ -482,7 +482,6 @@ export const SubscriptionsScreen: React.FC = () => {
                   </Text>
                 </View>
               </View>
-            </View>
           );
         }}
         ListEmptyComponent={

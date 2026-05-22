@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
-  FadeInDown, FadeInUp,
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence, withTiming, withRepeat,
   interpolate, runOnJS,
@@ -403,7 +402,7 @@ export const FeedScreen: React.FC = () => {
   const [searchFilter, setSearchFilter] = useState<'all'|'users'|'events'|'concerts'|'reels'|'films'>('all');
   const searchBarWidth = useSharedValue(0);
   const searchBarOpacity = useSharedValue(0);
-  const liveDotOpacity = useSharedValue(1);
+
   const searchInputRef = useRef<any>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -472,22 +471,7 @@ export const FeedScreen: React.FC = () => {
     overflow: 'hidden',
   }));
 
-  const liveDotStyle = useAnimatedStyle(() => ({ opacity: liveDotOpacity.value }));
 
-  useEffect(() => {
-    const blink = () => {
-      liveDotOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0.1, { duration: 500 }),
-          withTiming(1,   { duration: 500 }),
-        ),
-        -1,
-        true,
-      );
-    };
-    const t = setTimeout(blink, 100);
-    return () => clearTimeout(t);
-  }, [liveDotOpacity]);
 
   // ── Suggestions — pool de 30, on pioche 10 au hasard à chaque inject ────────
   const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
@@ -737,15 +721,13 @@ export const FeedScreen: React.FC = () => {
 
   // Près de toi — chargé dès que la position est disponible
   useEffect(() => {
-    console.log('[FeedScreen] userLocation:', userLocation);
     if (!userLocation) return;
     eventService.list({
       limit: 8, lat: userLocation.lat, lon: userLocation.lon,
       radius_km: 20, status: 'published', noCache: true,
     }).then(data => {
-      console.log('[FeedScreen] nearbyEvents:', data?.length);
       setNearbyEvents(Array.isArray(data) ? data : []);
-    }).catch((e) => console.warn('[FeedScreen] nearbyEvents error:', e));
+    }).catch(() => {});
   }, [userLocation]);
 
   // Charger les lives en direct (appelé aussi depuis load('all') via Promise.all)
@@ -1207,7 +1189,7 @@ export const FeedScreen: React.FC = () => {
                     }}
                   >
                     {tab.key === 'live'
-                      ? <Animated.View style={[{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: active ? '#fff' : '#F0365A' }, active ? {} : liveDotStyle]} />
+                      ? <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: active ? '#fff' : '#F0365A' }} />
                       : <Icon name={tab.icon} size={14} color={active ? '#fff' : colors.textSecondary} />
                     }
                     <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>
@@ -1980,18 +1962,6 @@ const ReelFeedCard: React.FC<{
   const thumbAspectRatio = isPortrait === false ? 16 / 9 : 1 / 0.88;
 
   // Animation pulse sur le bouton play (Reanimated)
-  const pulseAnim = useSharedValue(1);
-  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulseAnim.value }] }));
-  useEffect(() => {
-    pulseAnim.value = withRepeat(
-      withSequence(
-        withTiming(1.18, { duration: 700 }),
-        withTiming(1.0,  { duration: 700 }),
-      ),
-      -1,
-      false,
-    );
-  }, []);
 
   const timeAgo = (iso: string) => {
     const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -2070,7 +2040,7 @@ const ReelFeedCard: React.FC<{
 
         {/* Bouton play animé au centre */}
         <View style={rs.playCenter} pointerEvents="none">
-          <Animated.View style={[rs.playRipple, pulseStyle]} />
+          <View style={rs.playRipple} />
           <View style={rs.playCircle}>
             <Icon name="play" size={28} color="#fff" />
           </View>

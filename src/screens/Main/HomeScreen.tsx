@@ -11,7 +11,7 @@ import Contacts from 'react-native-contacts';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { apiClient, Endpoints } from '../../api';
 import Animated, {
-  FadeInDown, FadeIn,
+  FadeIn,
   useSharedValue, useAnimatedStyle, withSpring, withSequence,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -358,25 +358,17 @@ export const HomeScreen: React.FC = () => {
   }, [filter]);
 
   useEffect(() => {
-    console.log('[HomeScreen] userLocation:', userLocation);
     if (userLocation && !locationLoadedRef.current) {
       locationLoadedRef.current = true;
       load(filter, { reset: true });
     }
     if (userLocation) {
-      console.log('[HomeScreen] fetching nearby events...');
       eventService.list({
         limit: 8, lat: userLocation.lat, lon: userLocation.lon,
         radius_km: 20, status: 'published', noCache: true,
       }).then(data => {
-        console.log('[HomeScreen] nearbyEvents count:', data?.length);
         setNearbyEvents(Array.isArray(data) ? data : []);
-      }).catch((e) => console.warn('[HomeScreen] nearbyEvents error:', e));
-
-      // Sans radius pour voir si des events existent tout court
-      eventService.list({ limit: 5, status: 'published', noCache: true })
-        .then(data => console.log('[HomeScreen] all events count:', data?.length))
-        .catch(() => {});
+      }).catch(() => {});
     }
   }, [userLocation]);
 
@@ -426,7 +418,7 @@ export const HomeScreen: React.FC = () => {
   // ── Sections feed ────────────────────────────────────────────────────────────
 
   const ListHeader = useMemo(() => (
-    <Animated.View entering={FadeInDown.delay(60).springify()}>
+    <View>
 
       {/* ── Lives spontanés ─────────────────────────────────────────────── */}
       {spontLives.length > 0 && (
@@ -648,7 +640,7 @@ export const HomeScreen: React.FC = () => {
           );
         })}
       </ScrollView>
-    </Animated.View>
+    </View>
   ), [colors, filter, liveConcerts, spontLives, nearbyEvents]);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
@@ -675,23 +667,19 @@ export const HomeScreen: React.FC = () => {
   const onNavEvent         = useCallback((id: string) => nav.navigate('EventDetail', { eventId: id }), [nav]);
   const onNavUser          = useCallback((id: string) => nav.navigate('UserProfile', { userId: id }), [nav]);
 
-  const renderHomeItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
-    const shouldAnimate = index < 8;
-    const entering = shouldAnimate ? FadeInDown.delay(index * 15).springify() : undefined;
+  const renderHomeItem = useCallback(({ item }: { item: FeedItem }) => {
     return (
-      <Animated.View entering={entering}>
-        <PostCard
-          item={item}
-          colors={colors}
-          isDark={isDark}
-          onPress={() => {
-            if (item.kind === 'concert') onNavConcert(item.id);
-            else                         onNavEvent(item.id);
-          }}
-          onComment={() => setCommentsSheet({ kind: item.kind, id: item.id })}
-          onAuthorPress={onNavUser}
-        />
-      </Animated.View>
+      <PostCard
+        item={item}
+        colors={colors}
+        isDark={isDark}
+        onPress={() => {
+          if (item.kind === 'concert') onNavConcert(item.id);
+          else                         onNavEvent(item.id);
+        }}
+        onComment={() => setCommentsSheet({ kind: item.kind, id: item.id })}
+        onAuthorPress={onNavUser}
+      />
     );
   }, [colors, isDark, onNavConcert, onNavEvent, onNavUser]);
 
