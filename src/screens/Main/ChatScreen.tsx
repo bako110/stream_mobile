@@ -848,8 +848,11 @@ export const ChatScreen: React.FC = () => {
     );
   };
 
+  // Nb de messages au premier chargement — on n'anime que les 5 premiers
+  const initialCountRef = useRef(0);
+
   // ── Render message bubble content based on type ───────────────────────────
-  const renderBubbleContent = (item: Message, mine: boolean) => {
+  const renderBubbleContent = useCallback((item: Message, mine: boolean) => {
     const textColor = mine ? '#fff' : colors.textPrimary;
     const subtextColor = mine ? 'rgba(255,255,255,0.65)' : colors.textTertiary;
     const msgType = item.message_type || 'text';
@@ -1016,7 +1019,112 @@ export const ChatScreen: React.FC = () => {
       default: // text
         return <Text style={[styles.msgText, { color: textColor }]}>{item.content}</Text>;
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colors, playingId, playAudio, playProgress, playDuration]);
+
+  const renderChatItem = useCallback(({ item, index }: { item: Message; index: number }) => {
+    const mine = !!myId && item.sender_id === myId;
+    const shouldAnimate = index < 5;
+    const enteringAnim = shouldAnimate
+      ? FadeInUp.delay(index * 20).springify()
+      : undefined;
+
+    if (item.deleted) {
+      return (
+        <Animated.View
+          entering={enteringAnim}
+          style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+        >
+          <View style={[styles.bubbleInner, { backgroundColor: colors.surface, opacity: 0.6 }]}>
+            <Text style={[styles.msgText, { color: colors.textTertiary, fontStyle: 'italic' }]}>
+              Message supprimé
+            </Text>
+            <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
+          </View>
+        </Animated.View>
+      );
+    }
+
+    return (
+      <Animated.View
+        entering={enteringAnim}
+        style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+      >
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onLongPress={() => onLongPressMessage(item)}
+          delayLongPress={400}
+        >
+          {mine ? (
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.bubbleInner}
+            >
+              {item.forwarded_from_id && (
+                <View style={styles.forwardedLabel}>
+                  <Icon name="corner-up-right" size={11} color="rgba(255,255,255,0.6)" />
+                  <Text style={[styles.forwardedText, { color: 'rgba(255,255,255,0.6)' }]}>Transféré</Text>
+                </View>
+              )}
+              {item.reply_to && (
+                <View style={[styles.replyPreview, { backgroundColor: 'rgba(255,255,255,0.15)', borderLeftColor: 'rgba(255,255,255,0.6)' }]}>
+                  <Text style={[styles.replyName, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
+                    {item.reply_to.sender_id === myId ? 'Vous' : partnerName}
+                  </Text>
+                  <Text style={[styles.replyText, { color: 'rgba(255,255,255,0.65)' }]} numberOfLines={1}>
+                    {item.reply_to.message_type !== 'text' ? `📎 ${item.reply_to.message_type}` : item.reply_to.content}
+                  </Text>
+                </View>
+              )}
+              {renderBubbleContent(item, true)}
+              <View style={styles.bubbleFooter}>
+                {item.edited_at && <Text style={[styles.editedLabel, { color: 'rgba(255,255,255,0.55)' }]}>modifié</Text>}
+                <Text style={[styles.msgTime, { color: 'rgba(255,255,255,0.65)' }]}>{formatMsgTime(item.created_at)}</Text>
+                <View style={{ marginLeft: 4 }}>
+                  {item.pending
+                    ? <Icon name="clock" size={11} color="rgba(255,255,255,0.5)" />
+                    : item.read
+                      ? <Icon name="check-circle" size={11} color="rgba(255,255,255,0.9)" />
+                      : <Icon name="check" size={11} color="rgba(255,255,255,0.65)" />
+                  }
+                </View>
+              </View>
+            </LinearGradient>
+          ) : (
+            <View style={[styles.bubbleInner, { backgroundColor: colors.surface }]}>
+              {item.forwarded_from_id && (
+                <View style={styles.forwardedLabel}>
+                  <Icon name="corner-up-right" size={11} color={colors.textTertiary} />
+                  <Text style={[styles.forwardedText, { color: colors.textTertiary }]}>Transféré</Text>
+                </View>
+              )}
+              {item.reply_to && (
+                <View style={[styles.replyPreview, { backgroundColor: colors.backgroundSecondary, borderLeftColor: colors.primary }]}>
+                  <Text style={[styles.replyName, { color: colors.primary }]} numberOfLines={1}>
+                    {item.reply_to.sender_id === myId ? 'Vous' : partnerName}
+                  </Text>
+                  <Text style={[styles.replyText, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {item.reply_to.message_type !== 'text' ? `📎 ${item.reply_to.message_type}` : item.reply_to.content}
+                  </Text>
+                </View>
+              )}
+              {renderBubbleContent(item, false)}
+              <View style={styles.bubbleFooter}>
+                {item.edited_at && <Text style={[styles.editedLabel, { color: colors.textTertiary }]}>modifié</Text>}
+                <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
+        {reactions[item.id] && (
+          <View style={[styles.reactionBadge, mine ? styles.reactionMine : styles.reactionTheirs]}>
+            <Text style={styles.reactionEmoji}>{reactions[item.id]}</Text>
+          </View>
+        )}
+      </Animated.View>
+    );
+  }, [myId, partnerName, colors, reactions, onLongPressMessage, renderBubbleContent]);
 
   return (
     <KeyboardAvoidingView
@@ -1141,105 +1249,12 @@ export const ChatScreen: React.FC = () => {
               <Text style={{ color: colors.textTertiary, marginTop: 10 }}>Démarrez la conversation</Text>
             </View>
           }
-          renderItem={({ item, index }) => {
-            const mine = !!isMine(item);
-
-            if (item.deleted) {
-              return (
-                <Animated.View
-                  entering={FadeInUp.delay(index < 10 ? index * 20 : 0).springify()}
-                  style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-                >
-                  <View style={[styles.bubbleInner, { backgroundColor: colors.surface, opacity: 0.6 }]}>
-                    <Text style={[styles.msgText, { color: colors.textTertiary, fontStyle: 'italic' }]}>
-                      Message supprimé
-                    </Text>
-                    <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
-                  </View>
-                </Animated.View>
-              );
-            }
-
-            return (
-              <Animated.View
-                entering={FadeInUp.delay(index < 10 ? index * 20 : 0).springify()}
-                style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onLongPress={() => onLongPressMessage(item)}
-                  delayLongPress={400}
-                >
-                  {mine ? (
-                    <LinearGradient
-                      colors={[colors.gradientStart, colors.gradientEnd]}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={styles.bubbleInner}
-                    >
-                      {item.forwarded_from_id && (
-                        <View style={styles.forwardedLabel}>
-                          <Icon name="corner-up-right" size={11} color="rgba(255,255,255,0.6)" />
-                          <Text style={[styles.forwardedText, { color: 'rgba(255,255,255,0.6)' }]}>Transféré</Text>
-                        </View>
-                      )}
-                      {item.reply_to && (
-                        <View style={[styles.replyPreview, { backgroundColor: 'rgba(255,255,255,0.15)', borderLeftColor: 'rgba(255,255,255,0.6)' }]}>
-                          <Text style={[styles.replyName, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
-                            {item.reply_to.sender_id === myId ? 'Vous' : partnerName}
-                          </Text>
-                          <Text style={[styles.replyText, { color: 'rgba(255,255,255,0.65)' }]} numberOfLines={1}>
-                            {item.reply_to.message_type !== 'text' ? `📎 ${item.reply_to.message_type}` : item.reply_to.content}
-                          </Text>
-                        </View>
-                      )}
-                      {renderBubbleContent(item, true)}
-                      <View style={styles.bubbleFooter}>
-                        {item.edited_at && <Text style={[styles.editedLabel, { color: 'rgba(255,255,255,0.55)' }]}>modifié</Text>}
-                        <Text style={[styles.msgTime, { color: 'rgba(255,255,255,0.65)' }]}>{formatMsgTime(item.created_at)}</Text>
-                        <View style={{ marginLeft: 4 }}>
-                          {item.pending
-                            ? <Icon name="clock" size={11} color="rgba(255,255,255,0.5)" />
-                            : item.read
-                              ? <Icon name="check-circle" size={11} color="rgba(255,255,255,0.9)" />
-                              : <Icon name="check" size={11} color="rgba(255,255,255,0.65)" />
-                          }
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  ) : (
-                    <View style={[styles.bubbleInner, { backgroundColor: colors.surface }]}>
-                      {item.forwarded_from_id && (
-                        <View style={styles.forwardedLabel}>
-                          <Icon name="corner-up-right" size={11} color={colors.textTertiary} />
-                          <Text style={[styles.forwardedText, { color: colors.textTertiary }]}>Transféré</Text>
-                        </View>
-                      )}
-                      {item.reply_to && (
-                        <View style={[styles.replyPreview, { backgroundColor: colors.backgroundSecondary, borderLeftColor: colors.primary }]}>
-                          <Text style={[styles.replyName, { color: colors.primary }]} numberOfLines={1}>
-                            {item.reply_to.sender_id === myId ? 'Vous' : partnerName}
-                          </Text>
-                          <Text style={[styles.replyText, { color: colors.textTertiary }]} numberOfLines={1}>
-                            {item.reply_to.message_type !== 'text' ? `📎 ${item.reply_to.message_type}` : item.reply_to.content}
-                          </Text>
-                        </View>
-                      )}
-                      {renderBubbleContent(item, false)}
-                      <View style={styles.bubbleFooter}>
-                        {item.edited_at && <Text style={[styles.editedLabel, { color: colors.textTertiary }]}>modifié</Text>}
-                        <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
-                      </View>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                {reactions[item.id] && (
-                  <View style={[styles.reactionBadge, mine ? styles.reactionMine : styles.reactionTheirs]}>
-                    <Text style={styles.reactionEmoji}>{reactions[item.id]}</Text>
-                  </View>
-                )}
-              </Animated.View>
-            );
-          }}
+          renderItem={renderChatItem}
+          removeClippedSubviews
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={15}
+          scrollEventThrottle={32}
         />
       )}
 

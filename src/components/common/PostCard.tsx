@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Image, StyleSheet, Alert,
   Modal, TextInput, KeyboardAvoidingView, Platform, Dimensions,
@@ -217,7 +217,7 @@ const VideoFsModal: React.FC<{
   );
 };
 
-export const PostCard: React.FC<PostCardProps> = ({
+const PostCardInner: React.FC<PostCardProps> = ({
   post, colors, currentUserId, isActive = false, onPress, onAuthorPress, onDelete,
   onToggleFollow, isFollowing = false, onHide,
 }) => {
@@ -254,7 +254,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       ? [post.image_url]
       : [];
 
-  const handleLike = () => {
+  const handleLike = useCallback(() => {
     heartScale.value = withSequence(withSpring(1.4, { damping: 6 }), withSpring(1));
     const newLiked = !liked;
     setLiked(newLiked);
@@ -263,9 +263,9 @@ export const PostCard: React.FC<PostCardProps> = ({
       setLiked(!newLiked);
       setLikeCount(c => newLiked ? Math.max(0, c - 1) : c + 1);
     });
-  };
+  }, [liked, post.id, heartScale]);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     Alert.alert('Supprimer', 'Supprimer ce post ?', [
       { text: 'Annuler', style: 'cancel' },
       {
@@ -278,9 +278,9 @@ export const PostCard: React.FC<PostCardProps> = ({
         },
       },
     ]);
-  };
+  }, [post.id, onDelete]);
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = useCallback(async () => {
     if (!editBody.trim()) return;
     setEditSaving(true);
     try {
@@ -289,7 +289,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       setEditOpen(false);
     } catch { Alert.alert('Erreur', 'Impossible de modifier.'); }
     finally { setEditSaving(false); }
-  };
+  }, [editBody, post.id]);
 
   return (
     <View style={[pc.card, { backgroundColor: colors.surface }]}>
@@ -720,6 +720,8 @@ export const PostCard: React.FC<PostCardProps> = ({
     </View>
   );
 };
+
+export const PostCard = React.memo(PostCardInner);
 
 const pc = StyleSheet.create({
   card:          { backgroundColor: '#fff' },

@@ -2,7 +2,7 @@
  * FeedScreen — fil social : événements + concerts
  * Features: like animé, commentaires, partage natif, sauvegarde locale
  */
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
@@ -93,6 +93,241 @@ const badgeS = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });
 
+
+// ── FeedListHeader — mémoïsé, ne re-rend que quand liveConcerts/spontLives/nearbyEvents changent ─
+
+interface FeedListHeaderProps {
+  liveConcerts:  Concert[];
+  spontLives:    LiveStream[];
+  nearbyEvents:  Event[];
+  colors:        AppColors;
+  isDark:        boolean;
+  currentUserId?: string;
+  onNavLiveList:        () => void;
+  onNavSpontList:       () => void;
+  onNavNearby:          () => void;
+  onNavLiveStream:      (concertId: string) => void;
+  onNavLiveViewer:      (concertId: string) => void;
+  onNavSpontStream:     (liveId: string) => void;
+  onNavSpontViewer:     (liveId: string) => void;
+  onNavEvent:           (eventId: string) => void;
+}
+
+const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
+  liveConcerts, spontLives, nearbyEvents, colors, isDark,
+  currentUserId,
+  onNavLiveList, onNavSpontList, onNavNearby,
+  onNavLiveStream, onNavLiveViewer,
+  onNavSpontStream, onNavSpontViewer,
+  onNavEvent,
+}) => {
+  if (!liveConcerts.length && !spontLives.length && !nearbyEvents.length) return null;
+  return (
+    <>
+      {/* ── En direct ───────────────────────────────────────── */}
+      {liveConcerts.length > 0 && (
+        <View style={{ marginTop: 8, marginBottom: 4 }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 }}
+            activeOpacity={0.7}
+            onPress={onNavLiveList}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>En direct</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{liveConcerts.length}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Voir tout</Text>
+              <Icon name="chevron-right" size={14} color={colors.primary} />
+            </View>
+          </TouchableOpacity>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+            {liveConcerts.map(c => {
+              const artist = c.artist;
+              const artistName = artist?.display_name ?? artist?.username ?? 'Artiste';
+              const initial = artistName[0]?.toUpperCase() ?? '?';
+              return (
+                <TouchableOpacity
+                  key={c.id}
+                  style={{ width: 130, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (currentUserId === c.artist_id) onNavLiveStream(c.id);
+                    else onNavLiveViewer(c.id);
+                  }}
+                >
+                  <View style={{ width: 130, height: 170, position: 'relative' }}>
+                    {c.thumbnail_url ? (
+                      <Image source={{ uri: c.thumbnail_url }} style={{ width: 130, height: 170 }} />
+                    ) : (
+                      <LinearGradient
+                        colors={['#7B3FF2', '#E0389A']}
+                        style={{ width: 130, height: 170, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Icon name="radio" size={28} color="#fff" />
+                      </LinearGradient>
+                    )}
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.7)']}
+                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }}
+                    />
+                    <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
+                    </View>
+                    <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                      <Icon name="eye" size={10} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{c.current_viewers ?? 0}</Text>
+                    </View>
+                    <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6 }}>
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{c.title}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        {artist?.avatar_url ? (
+                          <Image source={{ uri: artist.avatar_url }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+                        ) : (
+                          <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{initial}</Text>
+                          </View>
+                        )}
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }} numberOfLines={1}>{artistName}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── Lives spontanés ─────────────────────────────────── */}
+      {spontLives.length > 0 && (
+        <View style={{ marginTop: 8, marginBottom: 4 }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 }}
+            activeOpacity={0.7}
+            onPress={onNavSpontList}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>En direct</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{spontLives.length}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Voir tout</Text>
+              <Icon name="chevron-right" size={14} color={colors.primary} />
+            </View>
+          </TouchableOpacity>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+            {spontLives.map(live => {
+              const liveName = live.user?.display_name ?? live.user?.username ?? 'Utilisateur';
+              const liveInitial = liveName[0]?.toUpperCase() ?? '?';
+              return (
+                <TouchableOpacity
+                  key={live.id}
+                  style={{ width: 110, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (currentUserId === live.user_id) onNavSpontStream(live.id);
+                    else onNavSpontViewer(live.id);
+                  }}
+                >
+                  <View style={{ width: 110, height: 150, position: 'relative' }}>
+                    <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={{ width: 110, height: 150, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 40, fontWeight: '900' }}>{liveInitial}</Text>
+                    </LinearGradient>
+                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
+                    <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
+                    </View>
+                    <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                      <Icon name="eye" size={9} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{live.current_viewers}</Text>
+                    </View>
+                    {live.user?.avatar_url && (
+                      <Image source={{ uri: live.user.avatar_url }} style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }} />
+                    )}
+                    <View style={{ position: 'absolute', bottom: 6, left: 4, right: 4, alignItems: 'center' }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', textAlign: 'center' }} numberOfLines={1}>{liveName}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── Près de toi ──────────────────────────────────────── */}
+      {nearbyEvents.length > 0 && (
+        <View style={[nbS.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
+          <View style={nbS.header}>
+            <View>
+              <Text style={[nbS.title, { color: colors.textPrimary }]}>Dans ton quartier</Text>
+              <Text style={[nbS.subtitle, { color: colors.textTertiary }]}>Des événements proches de toi</Text>
+            </View>
+            <TouchableOpacity onPress={onNavNearby} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={[nbS.seeAll, { color: colors.primary }]}>Voir tout</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={nbS.list}>
+            {nearbyEvents.map(ev => {
+              const dist = (ev as any).distance_km as number | null | undefined;
+              const distLabel = dist != null ? (dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`) : null;
+              const typeColor = EVENT_COLORS[ev.event_type ?? 'other'] ?? colors.primary;
+              const typeIcon  = EVENT_ICONS[ev.event_type ?? 'other'] ?? 'calendar';
+              const NCARD_W   = Dimensions.get('window').width * 0.45;
+              const NCOVER_H  = NCARD_W * 0.5;
+              return (
+                <View key={ev.id} style={[nbS.card, { width: NCARD_W, backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                  <TouchableOpacity activeOpacity={0.9} onPress={() => onNavEvent(ev.id)}>
+                    {ev.thumbnail_url ? (
+                      <Image source={{ uri: ev.thumbnail_url }} style={{ width: NCARD_W, height: NCOVER_H }} resizeMode="cover" />
+                    ) : (
+                      <LinearGradient colors={[typeColor + 'DD', typeColor + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: NCARD_W, height: NCOVER_H, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={typeIcon} size={28} color="rgba(255,255,255,0.7)" />
+                      </LinearGradient>
+                    )}
+                    {distLabel && (
+                      <View style={{ position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
+                        <Icon name="map-pin" size={9} color="#fff" />
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{distLabel}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  <View style={[nbS.iconWrap, { borderColor: colors.background, backgroundColor: typeColor, marginTop: -18 }]}>
+                    <Icon name={typeIcon} size={14} color="#fff" />
+                  </View>
+                  <View style={[nbS.cardBody, { paddingTop: 14 }]}>
+                    <TouchableOpacity onPress={() => onNavEvent(ev.id)} activeOpacity={0.8} style={{ alignItems: 'center', width: '100%' }}>
+                      <Text style={[nbS.name, { color: colors.textPrimary }]} numberOfLines={1}>{ev.title}</Text>
+                      {ev.starts_at && (
+                        <Text style={[nbS.handle, { color: colors.textTertiary }]}>
+                          {new Date(ev.starts_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                          {ev.venue_city ? ` · ${ev.venue_city}` : ''}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[nbS.goBtn, { backgroundColor: typeColor }]}
+                      activeOpacity={0.8}
+                      onPress={() => onNavEvent(ev.id)}
+                    >
+                      <Icon name="arrow-right" size={14} color="#fff" />
+                      <Text style={nbS.goBtnText}>Y aller</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+    </>
+  );
+});
 
 // ── Badges isolés — ne re-rendent que le FeedScreen quand les unread changent ─
 
@@ -603,10 +838,44 @@ export const FeedScreen: React.FC = () => {
   const goToNotifs   = useCallback(() => nav.navigate('Notifications' as any), [nav]);
   const openMenu     = useCallback(() => setMenuOpen(true), []);
 
+  // ── Callbacks stables pour FeedListHeader ──────────────────────────────────
+  const onNavLiveList    = useCallback(() => nav.navigate('LiveList' as any), [nav]);
+  const onNavSpontList   = useCallback(() => nav.navigate('SimpleLiveList' as any), [nav]);
+  const onNavNearby      = useCallback(() => nav.navigate('NearbyEvents' as any), [nav]);
+  const onNavLiveStream  = useCallback((id: string) => nav.navigate('LiveStream', { concertId: id }), [nav]);
+  const onNavLiveViewer  = useCallback((id: string) => nav.navigate('LiveViewer', { concertId: id }), [nav]);
+  const onNavSpontStream = useCallback((id: string) => (nav as any).navigate('SimpleLiveStream', { liveId: id }), [nav]);
+  const onNavSpontViewer = useCallback((id: string) => (nav as any).navigate('SimpleLiveViewer', { liveId: id }), [nav]);
+  const onNavEvent       = useCallback((id: string) => nav.navigate('EventDetail', { eventId: id }), [nav]);
+
+  const feedListHeader = useMemo(() => (
+    <FeedListHeader
+      liveConcerts={liveConcerts}
+      spontLives={spontLives}
+      nearbyEvents={nearbyEvents}
+      colors={colors}
+      isDark={theme.isDark}
+      currentUserId={currentUser?.id}
+      onNavLiveList={onNavLiveList}
+      onNavSpontList={onNavSpontList}
+      onNavNearby={onNavNearby}
+      onNavLiveStream={onNavLiveStream}
+      onNavLiveViewer={onNavLiveViewer}
+      onNavSpontStream={onNavSpontStream}
+      onNavSpontViewer={onNavSpontViewer}
+      onNavEvent={onNavEvent}
+    />
+  ), [liveConcerts, spontLives, nearbyEvents, colors, theme.isDark, currentUser?.id,
+      onNavLiveList, onNavSpontList, onNavNearby, onNavLiveStream, onNavLiveViewer,
+      onNavSpontStream, onNavSpontViewer, onNavEvent]);
+
   const closeComments = useCallback(() => {
     setCommentVisible(false);
     setCommentItem(null);
   }, []);
+
+  // Pool pré-calculé (stable tant que suggestPool ne change pas)
+  const pickedSuggestions = useMemo(() => pickSuggestions(), [suggestPool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── renderItem stable ──────────────────────────────────────────────────────
 
@@ -614,7 +883,7 @@ export const FeedScreen: React.FC = () => {
     if (item.kind === 'suggestions') {
       return (
         <PeopleSuggestions
-          users={pickSuggestions()}
+          users={pickedSuggestions}
           loading={suggestLoading}
           onUserPress={id => nav.navigate('UserProfile', { userId: id })}
           onRefresh={loadSuggestions}
@@ -756,7 +1025,7 @@ export const FeedScreen: React.FC = () => {
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, activeCardId, activePostId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickSuggestions, suggestLoading, loadSuggestions]);
+  }, [colors, activeCardId, activePostId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickedSuggestions, suggestLoading, loadSuggestions]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1294,222 +1563,7 @@ export const FeedScreen: React.FC = () => {
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
           )}
-          ListHeaderComponent={
-            <>
-              {/* ── En direct ───────────────────────────────────────── */}
-              {liveConcerts.length > 0 && (
-                <View style={{ marginTop: 8, marginBottom: 4 }}>
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 }}
-                    activeOpacity={0.7}
-                    onPress={() => nav.navigate('LiveList' as any)}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>En direct</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{liveConcerts.length}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Voir tout</Text>
-                      <Icon name="chevron-right" size={14} color={colors.primary} />
-                    </View>
-                  </TouchableOpacity>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-                    {liveConcerts.map(c => {
-                      const artist = c.artist;
-                      const name = artist?.display_name ?? artist?.username ?? 'Artiste';
-                      const initial = name[0]?.toUpperCase() ?? '?';
-                      return (
-                        <TouchableOpacity
-                          key={c.id}
-                          style={{ width: 130, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
-                          activeOpacity={0.85}
-                          onPress={() => {
-                            const isOwner = currentUser?.id === c.artist_id;
-                            if (isOwner) nav.navigate('LiveStream', { concertId: c.id });
-                            else nav.navigate('LiveViewer', { concertId: c.id });
-                          }}
-                        >
-                          <View style={{ width: 130, height: 170, position: 'relative' }}>
-                            {c.thumbnail_url ? (
-                              <Image source={{ uri: c.thumbnail_url }} style={{ width: 130, height: 170 }} />
-                            ) : (
-                              <LinearGradient
-                                colors={['#7B3FF2', '#E0389A']}
-                                style={{ width: 130, height: 170, alignItems: 'center', justifyContent: 'center' }}
-                              >
-                                <Icon name="radio" size={28} color="#fff" />
-                              </LinearGradient>
-                            )}
-                            <LinearGradient
-                              colors={['transparent', 'rgba(0,0,0,0.7)']}
-                              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }}
-                            />
-                            <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                              <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
-                              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
-                            </View>
-                            <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
-                              <Icon name="eye" size={10} color="#fff" />
-                              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{c.current_viewers ?? 0}</Text>
-                            </View>
-                            <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6 }}>
-                              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{c.title}</Text>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                {artist?.avatar_url ? (
-                                  <Image source={{ uri: artist.avatar_url }} style={{ width: 14, height: 14, borderRadius: 7 }} />
-                                ) : (
-                                  <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{initial}</Text>
-                                  </View>
-                                )}
-                                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }} numberOfLines={1}>{name}</Text>
-                              </View>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* ── Lives spontanés ─────────────────────────────────── */}
-              {spontLives.length > 0 && (
-                <View style={{ marginTop: 8, marginBottom: 4 }}>
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 }}
-                    activeOpacity={0.7}
-                    onPress={() => nav.navigate('SimpleLiveList' as any)}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>En direct</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{spontLives.length}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Voir tout</Text>
-                      <Icon name="chevron-right" size={14} color={colors.primary} />
-                    </View>
-                  </TouchableOpacity>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-                    {spontLives.map(live => {
-                      const name = live.user?.display_name ?? live.user?.username ?? 'Utilisateur';
-                      const initial = name[0]?.toUpperCase() ?? '?';
-                      return (
-                        <TouchableOpacity
-                          key={live.id}
-                          style={{ width: 110, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
-                          activeOpacity={0.85}
-                          onPress={() => {
-                            if (currentUser?.id === live.user_id) {
-                              nav.navigate('SimpleLiveStream' as any, { liveId: live.id });
-                            } else {
-                              nav.navigate('SimpleLiveViewer' as any, { liveId: live.id });
-                            }
-                          }}
-                        >
-                          <View style={{ width: 110, height: 150, position: 'relative' }}>
-                            <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={{ width: 110, height: 150, alignItems: 'center', justifyContent: 'center' }}>
-                              <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 40, fontWeight: '900' }}>{initial}</Text>
-                            </LinearGradient>
-                            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
-                            <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                              <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
-                              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
-                            </View>
-                            <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
-                              <Icon name="eye" size={9} color="#fff" />
-                              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{live.current_viewers}</Text>
-                            </View>
-                            {live.user?.avatar_url && (
-                              <Image source={{ uri: live.user.avatar_url }} style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }} />
-                            )}
-                            <View style={{ position: 'absolute', bottom: 6, left: 4, right: 4, alignItems: 'center' }}>
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', textAlign: 'center' }} numberOfLines={1}>{name}</Text>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* ── Près de toi ──────────────────────────────────────── */}
-              {nearbyEvents.length > 0 && (
-                <View style={[nbS.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
-                  <View style={nbS.header}>
-                    <View>
-                      <Text style={[nbS.title, { color: colors.textPrimary }]}>Dans ton quartier</Text>
-                      <Text style={[nbS.subtitle, { color: colors.textTertiary }]}>Des événements proches de toi</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => nav.navigate('NearbyEvents' as any)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <Text style={[nbS.seeAll, { color: colors.primary }]}>Voir tout</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={nbS.list}>
-                    {nearbyEvents.map(ev => {
-                      const dist = (ev as any).distance_km as number | null | undefined;
-                      const distLabel = dist != null ? (dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`) : null;
-                      const typeColor = EVENT_COLORS[ev.event_type ?? 'other'] ?? colors.primary;
-                      const typeIcon  = EVENT_ICONS[ev.event_type ?? 'other'] ?? 'calendar';
-                      const NCARD_W   = Dimensions.get('window').width * 0.45;
-                      const NCOVER_H  = NCARD_W * 0.5;
-                      return (
-                        <View key={ev.id} style={[nbS.card, { width: NCARD_W, backgroundColor: colors.surface, borderColor: colors.divider }]}>
-                          {/* Cover */}
-                          <TouchableOpacity activeOpacity={0.9} onPress={() => nav.navigate('EventDetail', { eventId: ev.id })}>
-                            {ev.thumbnail_url ? (
-                              <Image source={{ uri: ev.thumbnail_url }} style={{ width: NCARD_W, height: NCOVER_H }} resizeMode="cover" />
-                            ) : (
-                              <LinearGradient colors={[typeColor + 'DD', typeColor + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: NCARD_W, height: NCOVER_H, alignItems: 'center', justifyContent: 'center' }}>
-                                <Icon name={typeIcon} size={28} color="rgba(255,255,255,0.7)" />
-                              </LinearGradient>
-                            )}
-                            {/* Badge distance */}
-                            {distLabel && (
-                              <View style={{ position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
-                                <Icon name="map-pin" size={9} color="#fff" />
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{distLabel}</Text>
-                              </View>
-                            )}
-                          </TouchableOpacity>
-
-                          {/* Icône type chevauchante */}
-                          <View style={[nbS.iconWrap, { borderColor: colors.background, backgroundColor: typeColor, marginTop: -18 }]}>
-                            <Icon name={typeIcon} size={14} color="#fff" />
-                          </View>
-
-                          {/* Body */}
-                          <View style={[nbS.cardBody, { paddingTop: 14 }]}>
-                            <TouchableOpacity onPress={() => nav.navigate('EventDetail', { eventId: ev.id })} activeOpacity={0.8} style={{ alignItems: 'center', width: '100%' }}>
-                              <Text style={[nbS.name, { color: colors.textPrimary }]} numberOfLines={1}>{ev.title}</Text>
-                              {ev.starts_at && (
-                                <Text style={[nbS.handle, { color: colors.textTertiary }]}>
-                                  {new Date(ev.starts_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                                  {ev.venue_city ? ` · ${ev.venue_city}` : ''}
-                                </Text>
-                              )}
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[nbS.goBtn, { backgroundColor: typeColor }]}
-                              activeOpacity={0.8}
-                              onPress={() => nav.navigate('EventDetail', { eventId: ev.id })}
-                            >
-                              <Icon name="arrow-right" size={14} color="#fff" />
-                              <Text style={nbS.goBtnText}>Y aller</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              )}
-
-            </>
-          }
+          ListHeaderComponent={feedListHeader}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

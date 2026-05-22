@@ -403,6 +403,28 @@ export const ReelsScreen: React.FC = () => {
     [sendViewForCurrent],
   );
 
+  // ── Callbacks stables pour VideoSlide (évite d'invalider memo) ─────────────
+  const onAddReel      = useCallback(() => nav.navigate('CreateReel'), [nav]);
+  const onAuthorPress  = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
+
+  const renderVideoSlide = useCallback(({ item, index }: { item: Reel; index: number }) => (
+    <VideoSlide
+      reel={item}
+      isActive={index === currentIndex && screenFocused}
+      muted={muted}
+      screenW={SCREEN_W}
+      screenH={SCREEN_H - HEADER_H}
+      insetBottom={insets.bottom}
+      colors={colors}
+      currentUserId={myId ?? undefined}
+      onToggleMute={toggleMute}
+      onAdd={onAddReel}
+      onAuthorPress={onAuthorPress}
+      onEnd={goNextReel}
+      activePlayerRef={activePlayerRef}
+    />
+  ), [currentIndex, screenFocused, muted, HEADER_H, insets.bottom, colors, myId, toggleMute, onAddReel, onAuthorPress, goNextReel, activePlayerRef]);
+
   // ── Render: chargement initial — spinner minimal style TikTok
   if (loading && reels.length === 0) {
     return (
@@ -587,23 +609,7 @@ export const ReelsScreen: React.FC = () => {
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         getItemLayout={(_, index) => ({ length: SCREEN_H - HEADER_H, offset: (SCREEN_H - HEADER_H) * index, index })}
-        renderItem={({ item, index }) => (
-          <VideoSlide
-            reel={item}
-            isActive={index === currentIndex && screenFocused}
-            muted={muted}
-            screenW={SCREEN_W}
-            screenH={SCREEN_H - HEADER_H}
-            insetBottom={insets.bottom}
-            colors={colors}
-            currentUserId={myId ?? undefined}
-            onToggleMute={toggleMute}
-            onAdd={() => nav.navigate('CreateReel')}
-            onAuthorPress={userId => nav.navigate('UserProfile', { userId })}
-            onEnd={goNextReel}
-            activePlayerRef={activePlayerRef}
-          />
-        )}
+        renderItem={renderVideoSlide}
       />
 
       {/* Header flottant */}

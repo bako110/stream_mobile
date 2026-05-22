@@ -669,6 +669,32 @@ export const HomeScreen: React.FC = () => {
     );
   }
 
+  const onNavMessages      = useCallback(() => nav.navigate('Messages'), [nav]);
+  const onNavNotifications = useCallback(() => nav.navigate('Notifications'), [nav]);
+  const onNavConcert       = useCallback((id: string) => nav.navigate('ConcertDetail', { concertId: id }), [nav]);
+  const onNavEvent         = useCallback((id: string) => nav.navigate('EventDetail', { eventId: id }), [nav]);
+  const onNavUser          = useCallback((id: string) => nav.navigate('UserProfile', { userId: id }), [nav]);
+
+  const renderHomeItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
+    const shouldAnimate = index < 8;
+    const entering = shouldAnimate ? FadeInDown.delay(index * 15).springify() : undefined;
+    return (
+      <Animated.View entering={entering}>
+        <PostCard
+          item={item}
+          colors={colors}
+          isDark={isDark}
+          onPress={() => {
+            if (item.kind === 'concert') onNavConcert(item.id);
+            else                         onNavEvent(item.id);
+          }}
+          onComment={() => setCommentsSheet({ kind: item.kind, id: item.id })}
+          onAuthorPress={onNavUser}
+        />
+      </Animated.View>
+    );
+  }, [colors, isDark, onNavConcert, onNavEvent, onNavUser]);
+
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
@@ -677,8 +703,8 @@ export const HomeScreen: React.FC = () => {
         colors={colors} search={search} setSearch={setSearch}
         searchFocused={searchFocused} setSearchFocused={setSearchFocused}
         searchRef={searchRef} isDark={isDark} user={currentUser}
-        onMessages={() => nav.navigate('Messages')}
-        onNotifications={() => nav.navigate('Notifications')}
+        onMessages={onNavMessages}
+        onNotifications={onNavNotifications}
       />
 
       {search.trim().length > 0 ? (
@@ -742,21 +768,11 @@ export const HomeScreen: React.FC = () => {
               </Text>
             </View>
           }
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(Math.min(index * 15, 150)).springify()}>
-              <PostCard
-                item={item}
-                colors={colors}
-                isDark={isDark}
-                onPress={() => {
-                  if (item.kind === 'concert') nav.navigate('ConcertDetail', { concertId: item.id });
-                  else                         nav.navigate('EventDetail',   { eventId: item.id });
-                }}
-                onComment={() => setCommentsSheet({ kind: item.kind, id: item.id })}
-                onAuthorPress={id => nav.navigate('UserProfile', { userId: id })}
-              />
-            </Animated.View>
-          )}
+          renderItem={renderHomeItem}
+          removeClippedSubviews
+          maxToRenderPerBatch={8}
+          windowSize={8}
+          initialNumToRender={6}
         />
       )}
 
@@ -1019,7 +1035,7 @@ interface PostCardProps {
   onAuthorPress:(id: string) => void;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ item, colors, isDark, onPress, onComment, onAuthorPress }) => {
+const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, onPress, onComment, onAuthorPress }) => {
   const isConcert  = item.kind === 'concert';
   const concert    = isConcert ? (item.data as Concert) : null;
   const event      = !isConcert ? (item.data as Event) : null;
@@ -1336,4 +1352,4 @@ const PostCard: React.FC<PostCardProps> = ({ item, colors, isDark, onPress, onCo
       </View>
     </TouchableOpacity>
   );
-};
+});
