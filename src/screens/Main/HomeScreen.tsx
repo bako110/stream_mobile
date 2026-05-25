@@ -278,7 +278,16 @@ export const HomeScreen: React.FC = () => {
       if (loadId !== currentLoadRef.current) return;
 
       const built = buildItems(concerts, events);
-      setItems(built);
+      // Eviter un re-render si les IDs n'ont pas changé (retour au focus silencieux)
+      if (!reset) {
+        setItems(prev => {
+          const prevIds = prev.map(i => i.id).join(',');
+          const newIds  = built.map(i => i.id).join(',');
+          return prevIds === newIds ? prev : built;
+        });
+      } else {
+        setItems(built);
+      }
       setHasMore(built.length >= 20);
       // Sauvegarde en cache local (60s TTL)
       if (!noCache) localCache.set(cacheKey, built, 60_000);
@@ -374,15 +383,14 @@ export const HomeScreen: React.FC = () => {
 
   useFocusEffect(useCallback(() => {
     if (!didMountRef.current) {
-      // Premier montage : chargement complet
       didMountRef.current = true;
       load(filter, { noCache: true, reset: true });
       loadLive();
       return;
     }
-    // Retour sur l'écran : refresh silencieux si données > 60s
+    // Retour sur l'écran : refresh silencieux seulement si données > 5 min
     const age = Date.now() - lastLoadedAtRef.current;
-    if (age > 60_000) {
+    if (age > 300_000) {
       load(filter, { noCache: true, reset: false });
       loadLive();
     }
@@ -645,7 +653,7 @@ export const HomeScreen: React.FC = () => {
 
   // ── Loading ──────────────────────────────────────────────────────────────────
 
-  if (loading) {
+  if (loading && items.length === 0) {
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />

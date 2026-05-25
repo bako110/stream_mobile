@@ -9,15 +9,19 @@ export const contentService = {
     limit?: number;
     year?: number;
     language?: string;
+    is_premium?: boolean;
+    sort?: 'recent' | 'rating' | 'year' | 'views';
   }): Promise<ContentListResponse> {
-    const query = new URLSearchParams({
+    const p: Record<string, string> = {
       page:  String(params?.page  ?? 1),
       limit: String(params?.limit ?? DEFAULT_PAGE_LIMIT),
-      ...(params?.year     ? { year:     String(params.year)     } : {}),
-      ...(params?.language ? { language: params.language          } : {}),
-    }).toString();
+    };
+    if (params?.year       != null) p.year       = String(params.year);
+    if (params?.language)           p.language   = params.language;
+    if (params?.is_premium != null) p.is_premium = String(params.is_premium);
+    if (params?.sort)               p.sort       = params.sort;
     const res = await apiClient.get<ContentListResponse>(
-      `${Endpoints.content.films}?${query}`,
+      `${Endpoints.content.films}?${new URLSearchParams(p).toString()}`,
     );
     return res.data;
   },
@@ -28,13 +32,24 @@ export const contentService = {
   },
 
   // ── Séries ───────────────────────────────────────────────────────────────
-  async listSeries(params?: { page?: number; limit?: number }): Promise<ContentListResponse> {
-    const query = new URLSearchParams({
+  async listSeries(params?: {
+    page?: number;
+    limit?: number;
+    year?: number;
+    language?: string;
+    is_premium?: boolean;
+    sort?: 'recent' | 'rating' | 'year' | 'views' | 'seasons';
+  }): Promise<ContentListResponse> {
+    const p: Record<string, string> = {
       page:  String(params?.page  ?? 1),
       limit: String(params?.limit ?? DEFAULT_PAGE_LIMIT),
-    }).toString();
+    };
+    if (params?.year       != null) p.year       = String(params.year);
+    if (params?.language)           p.language   = params.language;
+    if (params?.is_premium != null) p.is_premium = String(params.is_premium);
+    if (params?.sort)               p.sort       = params.sort;
     const res = await apiClient.get<ContentListResponse>(
-      `${Endpoints.content.series}?${query}`,
+      `${Endpoints.content.series}?${new URLSearchParams(p).toString()}`,
     );
     return res.data;
   },

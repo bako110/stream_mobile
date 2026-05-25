@@ -126,7 +126,7 @@ export const EventsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {loading && myEvents.length === 0 ? (
         <SkeletonFeed count={4} />
       ) : filteredEvents.length === 0 ? (
         <View style={s.empty}>

@@ -23,6 +23,8 @@ import { FeedScreen }            from '../screens/Main/FeedScreen';
 import { ActivityScreen }        from '../screens/Main/ActivityScreen';
 import { MessagesScreen }        from '../screens/Main/MessagesScreen';
 import { FilmsScreen }           from '../screens/Main/FilmsScreen';
+import { MoviesScreen }          from '../screens/Main/MoviesScreen';
+import { SeriesScreen }          from '../screens/Main/SeriesScreen';
 import { TrendingScreen }        from '../screens/Main/TrendingScreen';
 import { FavoritesScreen }       from '../screens/Main/FavoritesScreen';
 import { NotificationsScreen }   from '../screens/Main/NotificationsScreen';
@@ -128,6 +130,8 @@ export type MainStackParamList = {
   EditProfile:     undefined;
   Messages:        undefined;
   Films:           undefined;
+  Movies:          undefined;
+  Series:          undefined;
   FilmDetail:      { item: any };
   SerieEpisodes:   { item: any };
   WatchHistory:    undefined;
@@ -270,12 +274,12 @@ const ExitHandler: React.FC = () => {
 
     const handler = () => {
       if (routeIndex > 0) {
-        navigation.dispatch(
-          CommonActions.reset({ index: 0, routes: [{ name: 'Tabs' }] }),
-        );
+        // Remonter d'un niveau dans le stack (comportement natif standard)
+        navigation.goBack();
         return true;
       }
 
+      // Sur la racine (Tabs) : double-tap pour quitter
       const now = Date.now();
       if (now - backPressedAt.current < 2000) {
         BackHandler.exitApp();
@@ -349,6 +353,8 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CreateReel"     component={CreateReelWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="Messages"       component={MessagesScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Films"          component={FilmsScreen}           options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Movies"         component={MoviesScreen}          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Series"         component={SeriesScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="FilmDetail"     component={FilmDetailScreen}      options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SerieEpisodes"  component={SerieEpisodesScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="WatchHistory"   component={WatchHistoryScreen}    options={{ animation: 'slide_from_right' }} />

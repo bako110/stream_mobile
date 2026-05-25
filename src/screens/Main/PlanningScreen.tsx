@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   RefreshControl, Image, StyleSheet,
@@ -306,6 +306,7 @@ export const PlanningScreen: React.FC = () => {
   const [items, setItems]             = useState<PlanningItem[]>([]);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
+  const didMountRef                   = useRef(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
@@ -341,8 +342,14 @@ export const PlanningScreen: React.FC = () => {
   }, []);
 
   useFocusEffect(useCallback(() => {
-    setLoading(true);
-    load();
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      setLoading(true);
+      load();
+    } else {
+      // Retour au focus : refresh silencieux sans skeleton
+      load();
+    }
   }, [load]));
 
   // Écouter les rappels WS pour rafraîchir
@@ -499,7 +506,7 @@ export const PlanningScreen: React.FC = () => {
         })}
       </ScrollView>
 
-      {loading ? (
+      {loading && items.length === 0 ? (
         <SkeletonFeed count={5} />
       ) : filteredItems.length === 0 ? (
         <View style={s.empty}>

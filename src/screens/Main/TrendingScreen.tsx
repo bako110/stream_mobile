@@ -85,7 +85,7 @@ export const TrendingScreen: React.FC = () => {
         })}
       </View>
 
-      {loading ? (
+      {loading && trending.length === 0 && reels.length === 0 ? (
         <SkeletonTrending />
       ) : tab === 'content' ? (
         <FlatList

@@ -540,7 +540,7 @@ export const CommunitiesScreen: React.FC = () => {
 
   // ── Rendu liste ──────────────────────────────────────────────────────────────
   const renderList = () => {
-    if (loading) {
+    if (loading && all.length === 0) {
       return (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16 }}

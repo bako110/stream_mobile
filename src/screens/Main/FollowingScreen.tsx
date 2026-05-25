@@ -236,7 +236,7 @@ export const FollowingScreen: React.FC = () => {
         ))}
       </View>
 
-      {loading ? renderSkeleton() : (
+      {loading && list.length === 0 ? renderSkeleton() : (
         <FlatList
           data={list}
           keyExtractor={u => u.id}

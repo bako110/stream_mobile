@@ -82,7 +82,7 @@ export const BlockedUsersScreen: React.FC = () => {
         <View style={{ width: 40 }} />
       </View>
 
-      {loading ? (
+      {loading && users.length === 0 ? (
         <SkeletonUserList />
       ) : (
         <FlatList

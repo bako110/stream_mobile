@@ -113,7 +113,7 @@ export const ConcertsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {loading && myConcerts.length === 0 ? (
         <SkeletonFeed count={4} />
       ) : filteredConcerts.length === 0 ? (
         <View style={s.empty}>
