@@ -33,6 +33,7 @@ import { Endpoints } from '../../api/endpoints';
 // ── Types ──────────────────────────────────────────────────────────────────
 interface CreatorProfile {
   is_monetized: boolean;
+  monetization_enabled: boolean;
   monthly_subscription_price: number;
   payout_method: 'stripe' | 'mobile_money' | null;
 }
@@ -184,8 +185,8 @@ const CreatorDashboardScreen: React.FC = () => {
   const toggleMonetization = async (value: boolean) => {
     setToggling(true);
     try {
-      await apiClient.patch(Endpoints.wallet.creatorProfile, { is_monetized: value });
-      setProfile(prev => prev ? { ...prev, is_monetized: value } : null);
+      await apiClient.patch(Endpoints.wallet.creatorProfile, { monetization_enabled: value });
+      setProfile(prev => prev ? { ...prev, monetization_enabled: value } : null);
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? 'Mise à jour échouée');
     } finally {
@@ -249,19 +250,19 @@ const CreatorDashboardScreen: React.FC = () => {
               <Text style={s.cardTitle}>Monétisation</Text>
             </View>
             <Text style={s.cardSubtitle}>
-              {profile?.is_monetized
+              {profile?.monetization_enabled
                 ? 'Active — vous recevez des revenus'
-                : 'Activez pour recevoir des cadeaux et abonnements'}
+                : 'Pausee — vous ne recevez aucun revenu'}
             </Text>
           </View>
           {toggling
             ? <ActivityIndicator size="small" color={colors.primary} />
             : (
               <Switch
-                value={profile?.is_monetized ?? false}
+                value={profile?.monetization_enabled ?? true}
                 onValueChange={toggleMonetization}
                 trackColor={{ false: colors.border, true: `${colors.primary}88` }}
-                thumbColor={profile?.is_monetized ? colors.primary : colors.textTertiary}
+                thumbColor={profile?.monetization_enabled ? colors.primary : colors.textTertiary}
               />
             )
           }
