@@ -153,6 +153,7 @@ const WalletScreen: React.FC = () => {
   const [txOffset, setTxOffset]     = useState(0);
   const [txHasMore, setTxHasMore]   = useState(false);
   const [txLoadingMore, setTxLoadingMore] = useState(false);
+  const [isMonetized, setIsMonetized] = useState(false);
   const TX_LIMIT = 10;
 
   // Animated coin count-up
@@ -173,9 +174,10 @@ const WalletScreen: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const [balRes, txRes] = await Promise.all([
+      const [balRes, txRes, monetRes] = await Promise.all([
         apiClient.get<WalletBalance>(Endpoints.wallet.balance),
         apiClient.get<Transaction[]>(`${Endpoints.wallet.transactions}?limit=${TX_LIMIT}&offset=0`),
+        apiClient.get<{ status: string }>(Endpoints.monetization.status).catch(() => ({ data: { status: 'none' } })),
       ]);
       setBalance(balRes.data);
       const txList = txRes.data ?? [];
@@ -183,6 +185,7 @@ const WalletScreen: React.FC = () => {
       setTxOffset(TX_LIMIT);
       setTxHasMore(txList.length === TX_LIMIT);
       runCountUp(balRes.data?.coins_balance ?? 0);
+      setIsMonetized(monetRes.data?.status === 'approved');
     } catch (e: any) {
       setError(e?.message ?? 'Erreur de chargement');
     }
@@ -339,12 +342,12 @@ const WalletScreen: React.FC = () => {
         {/* Quick actions */}
         <View style={s.actionsRow}>
           {[
-            { icon: 'shopping-cart', label: 'Acheter',   color: '#3B82F6', screen: 'BuyCoins' },
-            { icon: 'send',          label: 'Transférer', color: '#7B3FF2', screen: 'Transfer' },
-            { icon: 'bar-chart-2',   label: 'Créateur',  color: '#E85DAD', screen: 'CreatorDashboard' },
-            { icon: 'arrow-up-right',label: 'Retirer',   color: '#3FEDB6', screen: 'Withdraw' },
-            { icon: 'gift',          label: 'Parrainage', color: '#F59E0B', screen: 'Referral' },
-          ].map(a => (
+            { icon: 'shopping-cart', label: 'Acheter',    color: '#3B82F6', screen: 'BuyCoins',          show: true },
+            { icon: 'send',          label: 'Transférer', color: '#7B3FF2', screen: 'Transfer',           show: true },
+            { icon: 'bar-chart-2',   label: 'Créateur',   color: '#E85DAD', screen: 'CreatorDashboard',   show: isMonetized },
+            { icon: 'arrow-up-right',label: 'Retirer',    color: '#3FEDB6', screen: 'Withdraw',           show: isMonetized },
+            { icon: 'gift',          label: 'Parrainage', color: '#F59E0B', screen: 'Referral',           show: true },
+          ].filter(a => a.show).map(a => (
             <TouchableOpacity
               key={a.screen}
               style={s.actionBtn}
