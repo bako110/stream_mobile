@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, ActivityIndicator,
   Animated, Alert, Modal, TextInput,
-  FlatList, Image,
+  FlatList, Image, RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -352,18 +352,43 @@ const ActiveBoostCard: React.FC<{
   const [expanded, setExpanded] = useState(false);
   const [showStop, setShowStop] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   const cat = BOOST_CATEGORIES.find(c => c.id === boost.target) ?? BOOST_CATEGORIES[0];
   const [g1, g2] = cat.gradient;
-  const pct = Math.min(1, Math.max(0, Number(boost.progress ?? 0)));
-  const dl  = daysLeft(boost.expires_at);
-  const impressions = (boost.impression_count ?? 0) > 0 ? boost.impression_count : boost.delivered_quantity;
-  const total = boost.target_quantity ?? 0;
-  const mult  = Number(boost.feed_multiplier ?? 1);
 
+  // Pour les boosts globaux (sans contenu ciblé) : progress time-based calculé côté client
+  // pour avoir un affichage fluide même entre deux refreshs
+  const isGlobal = !boost.target_content_id;
   const totalSec   = Math.max(1, (new Date(boost.expires_at).getTime() - new Date(boost.activated_at).getTime()) / 1000);
-  const elapsedSec = (Date.now() - new Date(boost.activated_at).getTime()) / 1000;
-  const refund     = (elapsedSec / totalSec) < 0.5 ? Math.round(boost.coins_spent * 0.5) : 0;
+  const elapsedSec = Math.max(0, (Date.now() - new Date(boost.activated_at).getTime()) / 1000);
+  const timePct    = Math.min(1, elapsedSec / totalSec);
+  // Utilise le max entre ce que le serveur a déjà enregistré et le calcul temps réel côté client
+  const serverPct  = Math.min(1, Math.max(0, Number(boost.progress ?? 0)));
+  const pct        = isGlobal ? Math.max(serverPct, timePct) : serverPct;
+
+  const dl  = daysLeft(boost.expires_at);
+  const total = boost.target_quantity ?? 0;
+  // Delivered : pour les boosts globaux utiliser le pct temps réel × target pour afficher quelque chose de cohérent
+  const deliveredDisplay = isGlobal && total > 0
+    ? Math.round(pct * total)
+    : ((boost.impression_count ?? 0) > 0 ? boost.impression_count : boost.delivered_quantity);
+  const deliveredLabel = isGlobal ? 'livres' : ((boost.impression_count ?? 0) > 0 ? 'impressions reelles' : 'livres');
+  const mult  = Number(boost.feed_multiplier ?? 1);
+  const refund = timePct < 0.5 ? Math.round(boost.coins_spent * 0.5) : 0;
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: pct,
+      duration: 600,
+      useNativeDriver: false,
+    }).start();
+  }, [pct]);
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   async function handleStop() {
     setStopping(true);
@@ -412,17 +437,19 @@ const ActiveBoostCard: React.FC<{
               <View style={[abc.statsBadge, { backgroundColor: g1 + '12', borderColor: g1 + '25' }]}>
                 <Icon name="trending-up" size={10} color={g1} />
                 <Text style={[abc.statsText, { color: g1 }]}>
-                  {fmtNum(impressions)} / {fmtNum(total)} {(boost.impression_count ?? 0) > 0 ? 'impressions reelles' : 'livrees'}
+                  {fmtNum(deliveredDisplay)} / {fmtNum(total)} {deliveredLabel}
                 </Text>
               </View>
             )}
 
             <View style={[abc.progressBg, { backgroundColor: colors.border }]}>
-              <LinearGradient
-                colors={[g1, g2]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={[abc.progressFill, { width: `${pct * 100}%` as any }]}
-              />
+              <Animated.View style={[abc.progressFill, { width: progressWidth }]}>
+                <LinearGradient
+                  colors={[g1, g2]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
             </View>
           </View>
 
@@ -756,7 +783,9 @@ export default function BoostScreen() {
   const [loadingActive, setLoadingActive] = useState(true);
   const [loadingHistory,setLoadingHistory]= useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [refreshingActive, setRefreshingActive] = useState(false);
   const successAnim = useRef(new Animated.Value(0)).current;
+  const activeRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const cat = BOOST_CATEGORIES[catIdx];
   const [g1, g2] = cat.gradient;
@@ -789,6 +818,34 @@ export default function BoostScreen() {
       .catch(() => {})
       .finally(() => { setLoadingHistory(false); setHistoryLoaded(true); });
   }, [tab, historyLoaded]);
+
+  const refreshActiveBoosts = useCallback(async (silent = false) => {
+    if (!silent) setRefreshingActive(true);
+    try {
+      const [boostsRes, balanceRes] = await Promise.allSettled([
+        apiClient.get<BoostRecord[]>(Endpoints.wallet.boostsActive),
+        apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance),
+      ]);
+      if (boostsRes.status === 'fulfilled')
+        setActiveBoosts(Array.isArray(boostsRes.value.data) ? boostsRes.value.data : []);
+      if (balanceRes.status === 'fulfilled')
+        setBalance(balanceRes.value.data?.coins_balance ?? 0);
+    } catch {}
+    finally { if (!silent) setRefreshingActive(false); }
+  }, []);
+
+  // Refresh immédiat + auto-refresh toutes les 30s quand l'onglet actifs est ouvert
+  useEffect(() => {
+    if (tab !== 'active') {
+      if (activeRefreshTimer.current) clearInterval(activeRefreshTimer.current);
+      return;
+    }
+    refreshActiveBoosts(true);
+    activeRefreshTimer.current = setInterval(() => refreshActiveBoosts(true), 30000);
+    return () => {
+      if (activeRefreshTimer.current) clearInterval(activeRefreshTimer.current);
+    };
+  }, [tab, refreshActiveBoosts]);
 
   function handleBoostFromSuggestion(s: BoostSuggestion) {
     if (!s.affordable || balance < s.coins) {
@@ -1181,7 +1238,18 @@ export default function BoostScreen() {
 
       {/* ── TAB: Actifs ─────────────────────────────────────────────────── */}
       {tab === 'active' && (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshingActive}
+              onRefresh={() => refreshActiveBoosts(false)}
+              tintColor="#7B3FF2"
+              colors={['#7B3FF2']}
+            />
+          }
+        >
           {loadingActive ? (
             <ActivityIndicator style={{ marginTop: 60 }} color="#7B3FF2" />
           ) : activeBoosts.length === 0 ? (

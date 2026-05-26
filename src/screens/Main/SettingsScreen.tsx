@@ -8,22 +8,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader } from '../../components/common';
 import { authService } from '../../services/authService';
-import { subscriptionService } from '../../services/subscriptionService';
 import { notificationService } from '../../services/notificationService';
 import { useNavigation } from '@react-navigation/native';
-import type { Subscription } from '../../types';
 import type { User } from '../../types/user';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type VerifStatus = 'none' | 'pending' | 'approved' | 'rejected';
-
-const PLAN_LABELS: Record<string, string> = {
-  free: 'Gratuit', basic: 'Basic', premium: 'Premium', family: 'Family',
-};
-const PLAN_COLORS: Record<string, string> = {
-  free: '#9390AB', basic: '#3B82F6', premium: '#7B3FF2', family: '#E0389A',
-};
 
 // ── Badge vérifié ─────────────────────────────────────────────────────────────
 
@@ -47,20 +35,17 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   const isDark = theme.isDark;
 
   const [user,         setUser]         = useState<User | null>(null);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [unreadCount,  setUnreadCount]  = useState(0);
   const [loadingUser,  setLoadingUser]  = useState(true);
 
   const loadData = useCallback(async () => {
     setLoadingUser(true);
     try {
-      const [u, sub, notifCount] = await Promise.allSettled([
+      const [u, notifCount] = await Promise.allSettled([
         authService.getMe(),
-        subscriptionService.getMyCurrent(),
         notificationService.getUnreadCount(),
       ]);
       if (u.status === 'fulfilled')          setUser(u.value);
-      if (sub.status === 'fulfilled')        setSubscription(sub.value);
       if (notifCount.status === 'fulfilled') setUnreadCount(notifCount.value);
     } catch {}
     finally { setLoadingUser(false); }
@@ -79,20 +64,8 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
     ]);
   };
 
-  const planKey   = subscription?.plan ?? 'free';
-  const planLabel = PLAN_LABELS[planKey] ?? planKey;
-  const planColor = PLAN_COLORS[planKey] ?? colors.primary;
-
   const displayName = user?.display_name ?? user?.username ?? '';
   const initials    = displayName ? displayName[0].toUpperCase() : '?';
-
-  const verifStatus = (user?.verification_status ?? 'none') as VerifStatus;
-  const verifSub: Record<VerifStatus, string> = {
-    none:     'Obtenir le badge bleu FoliX',
-    pending:  'Demande en cours d\'examen',
-    approved: 'Compte vérifié',
-    rejected: 'Demande refusée — réessayer',
-  };
 
   type SectionDef = {
     key: string;
@@ -104,14 +77,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
     onPress: () => void;
   };
 
-  const SECTIONS: SectionDef[] = [
-    { key: 'wallet',       icon: 'dollar-sign',    label: 'Mon Wallet',         color: '#FFD700', sub: 'Solde, achats, transferts',   onPress: () => nav.navigate('SettingsWallet') },
-    { key: 'referral',     icon: 'gift',           label: 'Parrainage',         color: '#F59E0B', sub: user?.referral_code ? `Code : ${user.referral_code}` : 'Inviter des amis, gagner des coins', onPress: () => nav.navigate('Referral') },
-    { key: 'monetisation', icon: 'bar-chart-2',    label: 'Monétisation',       color: '#7B3FF2', sub: 'Dashboard, stats, revenus',   onPress: () => nav.navigate('SettingsMonetisation') },
-    { key: 'abonnement',   icon: 'star',           label: 'Abonnement',         color: planColor, sub: planLabel,                     onPress: () => nav.navigate('SettingsAbonnement') },
-    { key: 'verification', icon: 'shield',         label: 'Vérification FoliX', color: '#1D9BF0', sub: verifSub[verifStatus],
-      badge: user?.is_verified ? <VerifiedBadge size={18} /> : undefined,
-      onPress: () => nav.navigate('SettingsVerification', { user }) },
+  const SECTION_APP: SectionDef[] = [
     { key: 'apparence',    icon: 'sun',            label: 'Apparence',          color: '#F59E0B', sub: isDark ? 'Mode sombre' : 'Mode clair', onPress: () => nav.navigate('SettingsApparence') },
     { key: 'notifications',icon: 'bell',           label: 'Notifications',      color: '#3B82F6',
       sub: unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : undefined,
@@ -123,13 +89,51 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
     { key: 'danger',       icon: 'alert-triangle', label: 'Zone dangereuse',    color: '#EF4444', onPress: () => nav.navigate('SettingsDanger') },
   ];
 
+  const SectionGroup: React.FC<{ title: string; icon: string; color: string; items: SectionDef[] }> = ({ title, icon, color, items }) => (
+    <View style={{ marginBottom: 24 }}>
+      <View style={s.groupHeader}>
+        <View style={[s.groupHeaderIcon, { backgroundColor: color + '18' }]}>
+          <Icon name={icon} size={13} color={color} />
+        </View>
+        <Text style={[s.groupHeaderText, { color: colors.textTertiary }]}>{title}</Text>
+      </View>
+      <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+        {items.map((sec, i) => (
+          <View key={sec.key}>
+            <TouchableOpacity
+              style={[s.sectionRow, i < items.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}
+              onPress={sec.onPress}
+              activeOpacity={0.7}
+            >
+              <View style={[s.iconWrap, { backgroundColor: sec.color + '18' }]}>
+                <Icon name={sec.icon} size={18} color={sec.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[s.sectionLabel, { color: sec.key === 'danger' ? '#EF4444' : colors.textPrimary }]}>
+                    {sec.label}
+                  </Text>
+                  {sec.badge}
+                </View>
+                {sec.sub ? (
+                  <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{sec.sub}</Text>
+                ) : null}
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <AppHeader title="Paramètres" variant="default" onBack={() => nav.goBack()} />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
-        {/* Profil */}
+        {/* ── Profil ──────────────────────────────────────────────────────── */}
         <View style={{ marginBottom: 24 }}>
           <TouchableOpacity
             style={[s.profileCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}
@@ -162,38 +166,17 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Liste des sections */}
-        <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
-          {SECTIONS.map((sec, i) => (
-            <View key={sec.key}>
-              <TouchableOpacity
-                style={[s.sectionRow, i < SECTIONS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}
-                onPress={sec.onPress}
-                activeOpacity={0.7}
-              >
-                <View style={[s.iconWrap, { backgroundColor: sec.color + '18' }]}>
-                  <Icon name={sec.icon} size={18} color={sec.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={[s.sectionLabel, { color: sec.key === 'danger' ? '#EF4444' : colors.textPrimary }]}>
-                      {sec.label}
-                    </Text>
-                    {sec.badge}
-                  </View>
-                  {sec.sub ? (
-                    <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{sec.sub}</Text>
-                  ) : null}
-                </View>
-                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
+        {/* ── Paramètres de l'application ──────────────────────────────────── */}
+        <SectionGroup
+          title="PARAMÈTRES"
+          icon="settings"
+          color={colors.textTertiary}
+          items={SECTION_APP}
+        />
 
-        {/* Scanner QR web */}
+        {/* ── Scanner QR web ───────────────────────────────────────────────── */}
         <TouchableOpacity
-          style={[s.logoutBtn, { borderColor: '#7B3FF2', marginTop: 16 }]}
+          style={[s.logoutBtn, { borderColor: '#7B3FF2', marginBottom: 10 }]}
           onPress={() => nav.navigate('WebQRScanner')}
           activeOpacity={0.75}
         >
@@ -205,9 +188,9 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
           <Icon name="camera" size={16} color="#7B3FF2" />
         </TouchableOpacity>
 
-        {/* Déconnexion */}
+        {/* ── Déconnexion ──────────────────────────────────────────────────── */}
         <TouchableOpacity
-          style={[s.logoutBtn, { borderColor: '#EF4444', marginTop: 10 }]}
+          style={[s.logoutBtn, { borderColor: '#EF4444' }]}
           onPress={handleLogout}
           activeOpacity={0.75}
         >
@@ -244,5 +227,16 @@ const s = StyleSheet.create({
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, borderRadius: 14, borderWidth: 1.5, paddingVertical: 14,
+  },
+  groupHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    marginBottom: 10, paddingHorizontal: 2,
+  },
+  groupHeaderIcon: {
+    width: 22, height: 22, borderRadius: 6,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  groupHeaderText: {
+    fontSize: 11, fontWeight: '800', letterSpacing: 1.1,
   },
 });

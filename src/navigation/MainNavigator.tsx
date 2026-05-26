@@ -67,6 +67,7 @@ import { CommunityChannelsScreen }        from '../screens/Detail/CommunityChann
 import { CommunityChannelChatScreen }     from '../screens/Detail/CommunityChannelChatScreen';
 import { CommunityChannelSettingsScreen } from '../screens/Detail/CommunityChannelSettingsScreen';
 import { PostDetailScreen }               from '../screens/Detail/PostDetailScreen';
+import { ImageGalleryScreen }             from '../screens/Detail/ImageGalleryScreen';
 import { MyTicketScreen }        from '../screens/Detail/MyTicketScreen';
 import { AttendeesScreen }       from '../screens/Detail/AttendeesScreen';
 import { TicketScannerScreen }   from '../screens/Detail/TicketScannerScreen';
@@ -104,6 +105,8 @@ import { SettingsDangerScreen }        from '../screens/Settings/SettingsDangerS
 import { CGUScreen }                          from '../screens/Main/CGUScreen';
 import { PolitiqueConfidentialiteScreen }     from '../screens/Main/PolitiqueConfidentialiteScreen';
 import { SettingsVerificationScreen }         from '../screens/Settings/SettingsVerificationScreen';
+import { SupportScreen }                      from '../screens/Main/SupportScreen';
+import { SupportChatScreen }                  from '../screens/Main/SupportChatScreen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -177,6 +180,7 @@ export type MainStackParamList = {
   StoryViewers:    { storyId: string; viewCount: number; myId?: string };
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
   PostDetail:      { postId: string; initialPost?: any };
+  ImageGallery:    { urls: string[]; initialIndex?: number };
   CreatePost:      undefined;
   Wallet:          undefined;
   BuyCoins:        { reason?: string; missingCoins?: number; returnTo?: keyof MainStackParamList } | undefined;
@@ -201,6 +205,8 @@ export type MainStackParamList = {
   SettingsDanger:            undefined;
   CGU:                       undefined;
   PolitiqueConfidentialite:  undefined;
+  Support:                   undefined;
+  SupportChat:               undefined;
   SettingsVerification:      { user?: any } | undefined;
 };
 
@@ -392,6 +398,15 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="UserReels"      component={UserReelsScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreatePost"     component={CreatePostWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="PostDetail"     component={PostDetailWrapper}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="ImageGallery"   options={{ presentation: 'fullScreenModal', animation: 'fade', headerShown: false }}>
+          {({ navigation, route }) => (
+            <ImageGalleryScreen
+              urls={(route.params as any).urls}
+              initialIndex={(route.params as any).initialIndex ?? 0}
+              onBack={() => navigation.goBack()}
+            />
+          )}
+        </Stack.Screen>
         <Stack.Screen name="MyTicket"       component={MyTicketWrapper}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Attendees"      component={AttendeesWrapper}      options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="TicketScanner"  component={TicketScannerWrapper}  options={{ animation: 'slide_from_right' }} />
@@ -435,6 +450,8 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="PolitiqueConfidentialite" options={{ animation: 'slide_from_right' }}>
           {({ navigation }) => <PolitiqueConfidentialiteScreen onBack={() => navigation.goBack()} />}
         </Stack.Screen>
+        <Stack.Screen name="Support"     component={SupportScreen}     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="SupportChat" component={SupportChatScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack.Navigator>
       <UploadProgressBanner />
       <NotificationToast />

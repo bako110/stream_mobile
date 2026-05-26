@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
-  ActivityIndicator, Alert, StatusBar, Modal, Dimensions, Platform,
+  ActivityIndicator, Alert, StatusBar, Dimensions, Platform,
 } from 'react-native';
 import RNBlobUtil from 'react-native-blob-util';
 import Icon from 'react-native-vector-icons/Feather';
@@ -14,11 +14,11 @@ import Animated, {
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
-import { CommentsBottomSheet, ShareBottomSheet, ExpandableText } from '../../components/common';
+import { CommentsBottomSheet, ShareBottomSheet, ExpandableText, SkeletonPostDetail, LikersBottomSheet } from '../../components/common';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import type { Post } from '../../types/post';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 
 const GAP_G    = 3;
 const RADIUS_G = 12;
@@ -189,11 +189,10 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   const [likeCount,     setLikeCount]     = useState(initialPost?.like_count ?? 0);
   const [commentCount,  setCommentCount]  = useState(initialPost?.comment_count ?? 0);
   const [commentsOpen,  setCommentsOpen]  = useState(false);
+  const [likersOpen,    setLikersOpen]    = useState(false);
   const [shareOpen,     setShareOpen]     = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [downloading,   setDownloading]   = useState(false);
-  const [imageFs,       setImageFs]       = useState(false);
-  const [imageFsIdx,    setImageFsIdx]    = useState(0);
   const [authorPosts,   setAuthorPosts]   = useState<Post[]>([]);
   const [authorPage,    setAuthorPage]    = useState(1);
   const [authorLoading, setAuthorLoading] = useState(false);
@@ -348,20 +347,24 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
     }
   }, [post]);
 
-  // ── Loading ────────────────────────────────────────────────────────────────
+  // ── Loading skeleton ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: insets.top }]}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
         <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+          <TouchableOpacity
+            onPress={onBack}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={[s.topBtn, { backgroundColor: colors.backgroundSecondary }]}
+          >
+            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
-          <View style={{ width: 36 }} />
+          <View style={[s.topBtn, { backgroundColor: 'transparent' }]} />
         </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} size="large" />
+        <View style={{ flex: 1, backgroundColor: colors.surface }}>
+          <SkeletonPostDetail />
         </View>
       </View>
     );
@@ -584,7 +587,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         {/* Images */}
         {allUrls.length > 0 && (
           <View style={[s.imagesWrap, !post.body && { marginTop: 0 }]}>
-            <ImageGrid urls={allUrls} onPress={i => { setImageFsIdx(i); setImageFs(true); }} />
+            <ImageGrid urls={allUrls} onPress={i => navigation?.navigate('ImageGallery', { urls: allUrls, initialIndex: i })} />
           </View>
         )}
 
@@ -595,14 +598,19 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           {(likeCount > 0 || commentCount > 0) && (
             <View style={s.engageCountRow}>
               {likeCount > 0 && (
-                <View style={s.engageCountItem}>
+                <TouchableOpacity
+                  style={s.engageCountItem}
+                  onPress={() => setLikersOpen(true)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
                   <View style={[s.engageCountDot, { backgroundColor: '#E0389A' }]}>
                     <Icon name="heart" size={9} color="#fff" />
                   </View>
                   <Text style={[s.engageCountTxt, { color: colors.textTertiary }]}>
                     {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
                   </Text>
-                </View>
+                </TouchableOpacity>
               )}
               {commentCount > 0 && (
                 <TouchableOpacity style={s.engageCountItem} onPress={() => setCommentsOpen(true)}>
@@ -748,6 +756,18 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         }
       />
 
+      {/* LikersBottomSheet */}
+      <LikersBottomSheet
+        visible={likersOpen}
+        onClose={() => setLikersOpen(false)}
+        postId={postId}
+        likeCount={likeCount}
+        onNavigateToProfile={userId => {
+          setLikersOpen(false);
+          onAuthorPress?.(userId);
+        }}
+      />
+
       {/* CommentsBottomSheet */}
       <CommentsBottomSheet
         visible={commentsOpen}
@@ -767,55 +787,6 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         />
       )}
 
-      {/* Image fullscreen */}
-      {allUrls.length > 0 && (
-        <Modal
-          visible={imageFs}
-          transparent
-          statusBarTranslucent
-          animationType="fade"
-          onRequestClose={() => setImageFs(false)}
-        >
-          <View style={s.fsRoot}>
-            <FlatList
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              initialScrollIndex={imageFsIdx}
-              getItemLayout={(_, i) => ({ length: W, offset: W * i, index: i })}
-              data={allUrls}
-              keyExtractor={(_, i) => String(i)}
-              renderItem={({ item: uri }) => (
-                <TouchableOpacity
-                  activeOpacity={1}
-                  onPress={() => setImageFs(false)}
-                  style={{ width: W, height: '100%', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Image source={{ uri }} style={{ width: W, height: H * 0.85 }} resizeMode="contain" />
-                </TouchableOpacity>
-              )}
-            />
-            <TouchableOpacity
-              style={[s.fsClose, { top: insets.top + 12 }]}
-              onPress={() => setImageFs(false)}
-            >
-              <View style={s.fsCloseGlass}>
-                <Icon name="x" size={19} color="#fff" />
-              </View>
-            </TouchableOpacity>
-            {allUrls.length > 1 && (
-              <View style={[s.fsDots, { bottom: insets.bottom + 24 }]}>
-                {allUrls.map((_, i) => (
-                  <View key={i} style={[s.fsDot, {
-                    width: i === imageFsIdx ? 22 : 6,
-                    backgroundColor: i === imageFsIdx ? '#fff' : 'rgba(255,255,255,0.35)',
-                  }]} />
-                ))}
-              </View>
-            )}
-          </View>
-        </Modal>
-      )}
     </View>
   );
 };

@@ -14,7 +14,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence, withTiming, withRepeat,
-  interpolate, runOnJS,
+  interpolate, runOnJS, FadeInDown,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -22,11 +22,12 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet } from '../../components/common';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
+import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
 import { favoriteService } from '../../services/favoriteService';
 import { saveService } from '../../services/saveService';
 import { liveService } from '../../services/liveService';
@@ -400,11 +401,23 @@ export const FeedScreen: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState<'all'|'users'|'events'|'concerts'|'reels'|'films'>('all');
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const searchBarWidth = useSharedValue(0);
   const searchBarOpacity = useSharedValue(0);
 
   const searchInputRef = useRef<any>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const refreshHistory = useCallback(() => {
+    setSearchHistory(searchHistoryService.getAll());
+  }, []);
+
+  // Suggestions historique filtrées en live selon le texte tapé
+  const historySuggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return searchHistory.filter(h => h.query.toLowerCase().includes(q) && h.query.toLowerCase() !== q).slice(0, 5);
+  }, [searchQuery, searchHistory]);
 
   // Reel actif dans le feed (autoplay)
   const [activeReelId,      setActiveReelId]      = useState<string | null>(null);
@@ -413,7 +426,7 @@ export const FeedScreen: React.FC = () => {
   const [feedFocused,       setFeedFocused]        = useState(true);
   const [feedScrollEnabled, setFeedScrollEnabled]  = useState(true);
 
-  const feedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const feedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 65 }).current;
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     setActiveReelId(null);
     // Activer la vidéo pub de la première carte event/concert visible
@@ -427,6 +440,19 @@ export const FeedScreen: React.FC = () => {
     );
     setActivePostId(postItem ? postItem.item.id : null);
   }).current;
+
+  // Tab underline animation
+  const TABS: { key: FeedFilter; label: string }[] = [
+    { key: 'all',       label: 'Pour toi'  },
+    { key: 'following', label: 'Suivis'    },
+    { key: 'live',      label: 'En direct' },
+  ];
+  const TAB_COUNT = TABS.length;
+  const TAB_W = Dimensions.get('window').width / TAB_COUNT;
+  const tabUnderlineX = useSharedValue(0);
+  const tabUnderlineStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tabUnderlineX.value }],
+  }));
 
   // Sheet commentaires
   const [commentItem,    setCommentItem]    = useState<FeedItem | null>(null);
@@ -450,10 +476,11 @@ export const FeedScreen: React.FC = () => {
 
   const openSearch = useCallback(() => {
     setSearchOpen(true);
+    refreshHistory();
     searchBarWidth.value  = withSpring(1, { damping: 18, stiffness: 200 });
     searchBarOpacity.value = withTiming(1, { duration: 200 });
     setTimeout(() => searchInputRef.current?.focus(), 250);
-  }, []);
+  }, [refreshHistory]);
 
   const closeSearch = useCallback(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -464,6 +491,13 @@ export const FeedScreen: React.FC = () => {
     setSearchResults(null);
     setSearchFilter('all');
   }, []);
+
+  const commitSearch = useCallback((q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    searchHistoryService.add(trimmed);
+    refreshHistory();
+  }, [refreshHistory]);
 
   const animatedSearchBar = useAnimatedStyle(() => ({
     flex: interpolate(searchBarWidth.value, [0, 1], [0, 1]),
@@ -499,13 +533,20 @@ export const FeedScreen: React.FC = () => {
   useEffect(() => { loadSuggestions(); }, []);
 
   // ── Suivi (follow) state ──────────────────────────────────────────────────
-  const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
+  const [followingSet,   setFollowingSet]   = useState<Set<string>>(new Set());
+  const [followingUsers, setFollowingUsers] = useState<UserPublic[]>([]);
+  const [followersSet,   setFollowersSet]   = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!currentUser) return;
-    userService.getFollowing(currentUser.id).then(list => {
-      setFollowingSet(new Set(list.map((u: any) => u.id)));
-    }).catch(() => {});
+    Promise.all([
+      userService.getFollowing(currentUser.id).catch(() => [] as UserPublic[]),
+      userService.getFollowers(currentUser.id).catch(() => [] as UserPublic[]),
+    ]).then(([following, followers]) => {
+      setFollowingSet(new Set(following.map((u: any) => u.id)));
+      setFollowingUsers(following);
+      setFollowersSet(new Set(followers.map((u: any) => u.id)));
+    });
   }, [currentUser]);
 
   const handleToggleFollow = useCallback(async (authorId: string) => {
@@ -515,6 +556,9 @@ export const FeedScreen: React.FC = () => {
       wasFollowing ? next.delete(authorId) : next.add(authorId);
       return next;
     });
+    if (wasFollowing) {
+      setFollowingUsers(prev => prev.filter(u => u.id !== authorId));
+    }
     try {
       if (wasFollowing) {
         await userService.unfollow(authorId);
@@ -522,14 +566,18 @@ export const FeedScreen: React.FC = () => {
         await userService.follow(authorId);
       }
     } catch {
-      // rollback
       setFollowingSet(prev => {
         const next = new Set(prev);
         wasFollowing ? next.add(authorId) : next.delete(authorId);
         return next;
       });
+      if (wasFollowing) {
+        userService.getFollowing(currentUser?.id ?? '').then(list => {
+          setFollowingUsers(list);
+        }).catch(() => {});
+      }
     }
-  }, [followingSet]);
+  }, [followingSet, currentUser]);
 
   const load = useCallback(async (f: FeedFilter, silent = false) => {
     if (!silent) setNetworkError(false);
@@ -641,50 +689,17 @@ export const FeedScreen: React.FC = () => {
 
         setItems(result);
       } else if (f === 'following') {
-        // Onglet Suivis — posts + events + concerts des comptes suivis
-        const [postsResult, feedResult, reelsResult] = await Promise.all([
-          postService.getFeed(1, 30, true).catch(() => [] as Post[]),
-          searchService.getFeed(1, 30).catch(() => ({ items: [] })),
-          reelService.getFeed().catch(() => ({ items: [], has_more: false, page: 1 })),
-        ]);
+        // Onglet Suivis — uniquement les posts des comptes suivis, triés par date
+        const postsResult = await postService.getFeed(1, 50, true).catch(() => [] as Post[]);
         const postItems: FeedItem[] = (Array.isArray(postsResult) ? postsResult : [])
           .filter((p: Post) => p.id)
           .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
-        const feedItems: FeedItem[] = (feedResult.items ?? [])
-          .filter((item: any) => item.kind !== 'reel' && item.id)
-          .map((item: any) => ({ kind: item.kind as 'event' | 'concert', id: item.id, data: item }));
-        const reelItems: FeedItem[] = (reelsResult.items ?? [])
-          .filter((r: any) => r.id)
-          .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
-        const seen = new Set<string>();
-        const merged = [...postItems, ...feedItems, ...reelItems].filter(item => {
-          const key = `${item.kind}-${item.id}`;
-          if (seen.has(key)) return false;
-          seen.add(key); return true;
+        postItems.sort((a, b) => {
+          const da = a.data?.created_at ?? '';
+          const db2 = b.data?.created_at ?? '';
+          return new Date(db2).getTime() - new Date(da).getTime();
         });
-        // Trier par date décroissante
-        merged.sort((a, b) => {
-          const getDate = (item: FeedItem) =>
-            item.data?.created_at ?? item.data?.starts_at ?? item.data?.scheduled_at ?? '';
-          return new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime();
-        });
-        // Grouper les reels en rangées
-        const allReels = merged.filter(i => i.kind === 'reel');
-        const nonReels = merged.filter(i => i.kind !== 'reel');
-        const reelRows: FeedItem[] = [];
-        for (let r = 0; r < allReels.length; r += 5) {
-          reelRows.push({ kind: 'reel_row', id: `__reel_row_f__${r}`, data: allReels.slice(r, r + 5).map(ri => ri.data) });
-        }
-        const result: FeedItem[] = [];
-        let reelRowIdx = 0;
-        nonReels.forEach((item, i) => {
-          result.push(item);
-          if (reelRowIdx < reelRows.length && (i === 2 || (i > 2 && (i - 2) % 5 === 0))) {
-            result.push(reelRows[reelRowIdx++]);
-          }
-        });
-        while (reelRowIdx < reelRows.length) result.push(reelRows[reelRowIdx++]);
-        setItems(result.length > 0 ? result : []);
+        setItems(postItems);
       } else if (f === 'live') {
         // Onglet En direct — concerts live + lives spontanés comme feed items
         const [concerts, spont] = await Promise.all([
@@ -851,6 +866,85 @@ export const FeedScreen: React.FC = () => {
       onNavLiveList, onNavSpontList, onNavNearby, onNavLiveStream, onNavLiveViewer,
       onNavSpontStream, onNavSpontViewer, onNavEvent]);
 
+  // Header "Suivis" : bande de profils style stories
+  const followingListHeader = useMemo(() => {
+    if (!followingUsers.length) return (
+      <View style={{ paddingVertical: 32, alignItems: 'center', gap: 8 }}>
+        <Icon name="users" size={32} color={colors.textTertiary} />
+        <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>Aucun suivi</Text>
+        <Text style={{ fontSize: 13, color: colors.textTertiary, textAlign: 'center', paddingHorizontal: 32 }}>
+          Suis des personnes pour voir leurs publications ici
+        </Text>
+      </View>
+    );
+    const sorted = [...followingUsers].sort((a, b) => {
+      const aMutual = followersSet.has(a.id) ? 1 : 0;
+      const bMutual = followersSet.has(b.id) ? 1 : 0;
+      return bMutual - aMutual;
+    });
+    return (
+      <View style={{ backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 18 }}
+        >
+          {sorted.map(u => {
+            const name = u.display_name ?? u.username ?? '';
+            const firstName = name.split(' ')[0];
+            const initial = firstName[0]?.toUpperCase() ?? '?';
+            const isMutual = followersSet.has(u.id);
+            return (
+              <TouchableOpacity
+                key={u.id}
+                activeOpacity={0.75}
+                onPress={() => (nav as any).navigate('UserProfile', { userId: u.id })}
+                style={{ alignItems: 'center', gap: 6, width: 58 }}
+              >
+                {/* Ring gradient pour les mutuels, simple border pour les autres */}
+                {isMutual ? (
+                  <LinearGradient
+                    colors={[colors.primary, colors.primary + '88']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ width: 58, height: 58, borderRadius: 29, padding: 2, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <View style={{ width: 54, height: 54, borderRadius: 27, overflow: 'hidden', borderWidth: 2, borderColor: colors.surface }}>
+                      {u.avatar_url ? (
+                        <Image source={{ uri: u.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                      ) : (
+                        <View style={{ flex: 1, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary }}>{initial}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </LinearGradient>
+                ) : (
+                  <View style={{ width: 58, height: 58, borderRadius: 29, padding: 2, borderWidth: 1.5, borderColor: colors.divider, alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 50, height: 50, borderRadius: 25, overflow: 'hidden' }}>
+                      {u.avatar_url ? (
+                        <Image source={{ uri: u.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                      ) : (
+                        <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.textSecondary }}>{initial}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+                <Text
+                  style={{ fontSize: 11, fontWeight: isMutual ? '700' : '500', color: isMutual ? colors.textPrimary : colors.textSecondary, textAlign: 'center' }}
+                  numberOfLines={1}
+                >
+                  {firstName}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    );
+  }, [followingUsers, followersSet, colors, nav]);
+
   const closeComments = useCallback(() => {
     setCommentVisible(false);
     setCommentItem(null);
@@ -977,6 +1071,7 @@ export const FeedScreen: React.FC = () => {
           onAuthorPress={() => {
             if (postAuthorId) (nav as any).navigate('UserProfile', { userId: postAuthorId });
           }}
+          onProfilePress={(userId) => (nav as any).navigate('UserProfile', { userId })}
           onDelete={handlePostDeleted}
           isFollowing={!!postAuthorId && followingSet.has(postAuthorId)}
           onToggleFollow={() => { if (postAuthorId) handleToggleFollow(postAuthorId); }}
@@ -1114,6 +1209,7 @@ export const FeedScreen: React.FC = () => {
                 onChangeText={(text) => { setSearchQuery(text); liveSearch(text); }}
                 onSubmitEditing={async () => {
                   if (!searchQuery.trim()) return;
+                  commitSearch(searchQuery);
                   setSearching(true);
                   try {
                     const results = await searchService.searchAll({ q: searchQuery.trim() });
@@ -1164,42 +1260,56 @@ export const FeedScreen: React.FC = () => {
           </View>
         )}
 
-        {/* ── Onglets + actions ─────────────────────────────────────────── */}
+        {/* ── Tab bar + actions ─────────────────────────────────────────── */}
         {!searchOpen && (
           <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
-            {/* Ligne 1 : onglets — répartis sur toute la largeur */}
-            <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, gap: 6 }}>
-              {([
-                { key: 'all',       label: 'Pour toi',  icon: 'home'   },
-                { key: 'following', label: 'Suivis',    icon: 'users'  },
-                { key: 'live',      label: 'En direct', icon: 'radio'  },
-              ] as { key: FeedFilter; label: string; icon: string }[]).map(tab => {
+            {/* Tab bar style Instagram — underline animée */}
+            <View style={{ flexDirection: 'row' }}>
+              {TABS.map((tab, idx) => {
                 const active = filter === tab.key;
                 return (
                   <TouchableOpacity
                     key={tab.key}
-                    onPress={() => { setFilter(tab.key); setFilterDropOpen(false); load(tab.key); }}
-                    activeOpacity={0.75}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 8,
-                      borderRadius: 20,
-                      backgroundColor: active ? colors.primary : colors.backgroundSecondary,
-                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    onPress={() => {
+                      tabUnderlineX.value = withSpring(idx * TAB_W, { damping: 18, stiffness: 200 });
+                      setFilter(tab.key);
+                      setFilterDropOpen(false);
+                      load(tab.key);
                     }}
+                    activeOpacity={0.7}
+                    style={{ flex: 1, alignItems: 'center', paddingVertical: 11 }}
                   >
-                    {tab.key === 'live'
-                      ? <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: active ? '#fff' : '#F0365A' }} />
-                      : <Icon name={tab.icon} size={14} color={active ? '#fff' : colors.textSecondary} />
-                    }
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>
-                      {tab.label}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      {tab.key === 'live' && (
+                        <View style={{
+                          width: 6, height: 6, borderRadius: 3,
+                          backgroundColor: active ? '#F0365A' : '#F0365A88',
+                        }} />
+                      )}
+                      <Text style={{
+                        fontSize: 13,
+                        fontWeight: active ? '700' : '500',
+                        color: active ? colors.textPrimary : colors.textTertiary,
+                        letterSpacing: 0.1,
+                      }}>
+                        {tab.label}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
             </View>
-            {/* Ligne 2 : icônes d'actions — réparties sur toute la largeur */}
+            {/* Underline animée */}
+            <View style={{ height: 2, backgroundColor: 'transparent' }}>
+              <Animated.View style={[{
+                position: 'absolute',
+                width: TAB_W,
+                height: 2,
+                borderRadius: 1,
+                backgroundColor: colors.primary,
+              }, tabUnderlineStyle]} />
+            </View>
+            {/* Actions */}
             <FeedHeaderBadges
               onMessages={goToMessages}
               onNotifs={goToNotifs}
@@ -1286,15 +1396,64 @@ export const FeedScreen: React.FC = () => {
             // État idle — pas encore de query
             if (!searchQuery.trim() && !searchResults) return (
               <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+
+                {/* ── Historique ── */}
+                {searchHistory.length > 0 && (
+                  <View style={{ paddingTop: 20, paddingBottom: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>Recherches récentes</Text>
+                      <TouchableOpacity
+                        onPress={() => { searchHistoryService.clear(); setSearchHistory([]); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>Tout effacer</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {searchHistory.map((h, i) => (
+                      <View
+                        key={h.query}
+                        style={{
+                          flexDirection: 'row', alignItems: 'center',
+                          paddingHorizontal: 16, paddingVertical: 11,
+                          borderBottomWidth: i < searchHistory.length - 1 ? StyleSheet.hairlineWidth : 0,
+                          borderBottomColor: colors.divider,
+                        }}
+                      >
+                        <TouchableOpacity
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            setSearchQuery(h.query);
+                            liveSearch(h.query);
+                            commitSearch(h.query);
+                          }}
+                        >
+                          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="clock" size={14} color={colors.textTertiary} />
+                          </View>
+                          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.textPrimary, flex: 1 }} numberOfLines={1}>{h.query}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => { searchHistoryService.remove(h.query); setSearchHistory(searchHistoryService.getAll()); }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Icon name="x" size={14} color={colors.textTertiary} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
                 {/* Catégories rapides */}
-                <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 }}>
+                <View style={{ paddingHorizontal: 16, paddingTop: searchHistory.length > 0 ? 20 : 24, paddingBottom: 8 }}>
                   <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 14 }}>Explorer</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                     {[
                       { icon: 'calendar', label: 'Événements', accent: '#0EA5E9', nav: 'Events' },
                       { icon: 'music',    label: 'Concerts',   accent: '#E0389A', nav: 'Concerts' },
                       { icon: 'video',    label: 'Reels',      accent: '#10B981', nav: 'Reels' },
-                      { icon: 'film',     label: 'Films',      accent: '#F59E0B', nav: 'Films' },
+                      { icon: 'film',     label: 'Films',      accent: '#3B82F6', nav: 'Movies' },
+                      { icon: 'tv',       label: 'Séries',     accent: '#7B3FF2', nav: 'Series' },
                       { icon: 'trending-up', label: 'Tendances', accent: '#6366F1', nav: 'Trending' },
                       { icon: 'users',    label: 'Communautés', accent: '#7B3FF2', nav: 'Communities' },
                     ].map(({ icon, label, accent, nav: navTarget }) => (
@@ -1332,12 +1491,33 @@ export const FeedScreen: React.FC = () => {
               </ScrollView>
             );
 
-            // Chargement
+            // Chargement — avec suggestions historique pendant l'attente API
             if (searching) return (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 }}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ fontSize: 14, color: colors.textTertiary }}>Recherche en cours...</Text>
-              </View>
+              <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                {historySuggestions.length > 0 && (
+                  <View style={{ paddingTop: 8, paddingBottom: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 6 }}>Suggestions</Text>
+                    {historySuggestions.map((h) => (
+                      <TouchableOpacity
+                        key={h.query}
+                        activeOpacity={0.7}
+                        onPress={() => { setSearchQuery(h.query); liveSearch(h.query); commitSearch(h.query); }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
+                      >
+                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon name="clock" size={14} color={colors.primary} />
+                        </View>
+                        <Text style={{ flex: 1, fontSize: 14, fontWeight: '500', color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
+                        <Icon name="arrow-up-left" size={14} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                <View style={{ alignItems: 'center', paddingTop: historySuggestions.length > 0 ? 24 : 80, gap: 12 }}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={{ fontSize: 14, color: colors.textTertiary }}>Recherche en cours...</Text>
+                </View>
+              </ScrollView>
             );
 
             // Aucun résultat
@@ -1372,6 +1552,26 @@ export const FeedScreen: React.FC = () => {
 
             return (
               <>
+                {/* Suggestions historique au-dessus des résultats */}
+                {historySuggestions.length > 0 && (
+                  <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
+                    {historySuggestions.map((h) => (
+                      <TouchableOpacity
+                        key={h.query}
+                        activeOpacity={0.7}
+                        onPress={() => { setSearchQuery(h.query); liveSearch(h.query); commitSearch(h.query); }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
+                      >
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon name="clock" size={13} color={colors.primary} />
+                        </View>
+                        <Text style={{ flex: 1, fontSize: 14, fontWeight: '500', color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
+                        <Icon name="arrow-up-left" size={13} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
                 {/* Chips filtre */}
                 <ScrollView
                   horizontal showsHorizontalScrollIndicator={false}
@@ -1545,7 +1745,7 @@ export const FeedScreen: React.FC = () => {
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
           )}
-          ListHeaderComponent={feedListHeader}
+          ListHeaderComponent={filter === 'following' ? followingListHeader : feedListHeader}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1554,12 +1754,32 @@ export const FeedScreen: React.FC = () => {
             />
           }
           ListEmptyComponent={
-            <View style={s.empty}>
-              <Icon name="inbox" size={48} color={colors.textTertiary} />
-              <Text style={[s.emptyText, { color: colors.textTertiary }]}>
-                Aucun contenu pour le moment
-              </Text>
-            </View>
+            filter === 'following' ? (
+              <View style={[s.empty, { paddingTop: 40 }]}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                  <Icon name="users" size={32} color={colors.primary} />
+                </View>
+                <Text style={[s.emptyText, { color: colors.textPrimary, fontWeight: '800', fontSize: 17 }]}>
+                  Aucun post de tes suivis
+                </Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32, marginTop: 6 }}>
+                  Les personnes que tu suis n'ont pas encore publié de post. Suis plus de gens ou reviens plus tard.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => { setFilter('all'); load('all'); }}
+                  style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 24 }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Découvrir du contenu</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.empty}>
+                <Icon name="inbox" size={48} color={colors.textTertiary} />
+                <Text style={[s.emptyText, { color: colors.textTertiary }]}>
+                  Aucun contenu pour le moment
+                </Text>
+              </View>
+            )
           }
           renderItem={renderItem}
           removeClippedSubviews
@@ -1675,12 +1895,12 @@ export const FeedScreen: React.FC = () => {
             <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>DÉCOUVRIR</Text>
             <View style={mnu.grid}>
               {([
-                { icon: 'film',        label: 'Films & Séries', color: '#3B82F6', screen: 'Films'       },
+                { icon: 'film',        label: 'Films',         color: '#3B82F6', screen: 'Movies'      },
+                { icon: 'tv',          label: 'Séries',        color: '#7B3FF2', screen: 'Series'      },
                 { icon: 'play-circle', label: 'Reels',         color: '#FF7A2F', screen: 'Reels'       },
                 { icon: 'radio',       label: 'Lives',         color: '#F0365A', screen: 'SimpleLiveList' },
-                { icon: 'music',       label: 'Concerts live', color: '#7B3FF2', screen: 'LiveList'    },
-                { icon: 'calendar',    label: 'Planning',      color: '#10B981', screen: 'Planning'    },
-                { icon: 'calendar',    label: 'Événements',    color: '#E0389A', screen: 'Events'      },
+                { icon: 'music',       label: 'Concerts live', color: '#E0389A', screen: 'LiveList'    },
+                { icon: 'calendar',    label: 'Événements',    color: '#10B981', screen: 'Events'      },
                 { icon: 'trending-up', label: 'Tendances',     color: '#F59E0B', screen: 'Trending'    },
               ] as const).map((item) => (
                 <TouchableOpacity
@@ -1723,11 +1943,14 @@ export const FeedScreen: React.FC = () => {
               </TouchableOpacity>
             ))}
 
-            {/* Liste — Compte */}
-            <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>COMPTE</Text>
+            {/* Liste — Espace personnel */}
+            <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>MON ESPACE</Text>
             {([
-              { icon: 'award',    label: 'Abonnements', sub: 'Gérer ton abonnement', color: '#14B8A6', screen: 'Subscriptions' },
-              { icon: 'settings', label: 'Paramètres',  sub: 'Confidentialité, sécurité', color: '#6B7280', screen: 'Settings'      },
+              { icon: 'credit-card',  label: 'Wallet',        sub: 'Solde, achats, transferts',      color: '#F59E0B', screen: 'Wallet'              },
+              { icon: 'gift',         label: 'Parrainage',    sub: 'Inviter des amis, gagner des coins', color: '#10B981', screen: 'Referral'         },
+              { icon: 'bar-chart-2',  label: 'Monétisation',  sub: 'Dashboard, stats, revenus',      color: '#7B3FF2', screen: 'SettingsMonetisation' },
+              { icon: 'shield',       label: 'Vérification',  sub: 'Obtenir le badge certifié',      color: '#1D9BF0', screen: 'SettingsVerification' },
+              { icon: 'award',        label: 'Abonnement',    sub: 'Gérer ton abonnement',           color: '#14B8A6', screen: 'Subscriptions'        },
             ] as const).map((item) => (
               <TouchableOpacity
                 key={item.screen}
@@ -1745,6 +1968,45 @@ export const FeedScreen: React.FC = () => {
                 <Icon name="chevron-right" size={16} color={colors.textTertiary} />
               </TouchableOpacity>
             ))}
+
+            {/* Réglages */}
+            <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>RÉGLAGES</Text>
+            {([
+              { icon: 'sliders',  label: 'Réglages',   sub: 'Apparence, notifications, compte', color: '#6B7280', screen: 'Settings' },
+            ] as const).map((item) => (
+              <TouchableOpacity
+                key={item.screen}
+                style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                activeOpacity={0.75}
+                onPress={() => { setMenuOpen(false); (nav as any).navigate(item.screen); }}
+              >
+                <View style={[mnu.listIcon, { backgroundColor: item.color + '18' }]}>
+                  <Icon name={item.icon} size={20} color={item.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>{item.label}</Text>
+                  <Text style={[mnu.listSub, { color: colors.textTertiary }]}>{item.sub}</Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+
+            {/* Section Assistance */}
+            <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>ASSISTANCE</Text>
+            <TouchableOpacity
+              style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              activeOpacity={0.75}
+              onPress={() => { setMenuOpen(false); (nav as any).navigate('Support'); }}
+            >
+              <View style={[mnu.listIcon, { backgroundColor: '#0EA5E918' }]}>
+                <Icon name="life-buoy" size={20} color="#0EA5E9" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>Assistance</Text>
+                <Text style={[mnu.listSub, { color: colors.textTertiary }]}>Centre d'aide FoliX</Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
 
           </ScrollView>
         </View>
@@ -2335,6 +2597,7 @@ const CardVideo: React.FC<{ uri: string; playing: boolean }> = ({ uri, playing }
 };
 
 const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, isActive, onToggleFollow, onComment, onPress, onAuthorPress, onHide }) => {
+  const nav = useNavigation<Nav>();
   const isEvent  = item.kind === 'event';
   const isConcert = item.kind === 'concert';
   const event    = isEvent  ? (item.data as any) : null;
@@ -2478,6 +2741,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const [cardMenuOpen,   setCardMenuOpen]   = useState(false);
   const [reportVisible,  setReportVisible]  = useState(false);
   const [shareOpen,      setShareOpen]      = useState(false);
+  const [likersOpen,     setLikersOpen]     = useState(false);
   const refType = isEvent ? 'event' : 'concert';
   const [hasReminder, setHasReminder] = useState(
     () => feedPreferenceService.hasReminder(item.id, refType)
@@ -2577,212 +2841,79 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   })();
 
   // ── Render ────────────────────────────────────────────────────────────────
+  const BANNER_H = Math.round(SW * 0.58);
+
   return (
-    <View style={[s.card, { backgroundColor: colors.surface }]}>
+    <View style={[fc.card, { backgroundColor: colors.surface }]}>
 
-      {/* ── Header auteur ─────────────────────────────────────────────── */}
-      <View style={s.cardHeader}>
-        <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={onAuthorPress}>
-          <AvatarWithBadge
-            avatarUrl={authorAvatar}
-            initials={authorInit}
-            size={40}
-            accentColor={colors.primary}
-            isVerified={!!author?.is_verified}
-            isOnline={(author as any)?.is_online ?? undefined}
-          />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[s.cardAuthorName, { color: colors.textPrimary }]} numberOfLines={1}>
-              {authorName}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={[s.cardTimeAgo, { color: colors.textTertiary }]}>{timeAgo}</Text>
-              <Text style={[s.cardTimeAgo, { color: colors.textTertiary }]}>·</Text>
-              <Icon name="globe" size={11} color={colors.textTertiary} />
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        {/* Bouton Suivre — masqué si déjà suivi */}
-        {showFollowBtn && !isFollowing && (
-          <TouchableOpacity
-            style={[s.followBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-            onPress={onToggleFollow}
-            activeOpacity={0.7}
-          >
-            <Icon name="user-plus" size={13} color="#fff" />
-            <Text style={[s.followBtnText, { color: '#fff' }]}>Suivre</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Badge type */}
-        <View style={[s.badge, { backgroundColor: accent + 'DD' }]}>
-          <Icon name={cardIcon} size={9} color="#fff" />
-          <Text style={[s.badgeText, { color: '#fff' }]}>{typeLabel}</Text>
-        </View>
-
-        {/* 3 points */}
-        <TouchableOpacity
-          style={{ padding: 6, marginLeft: 4 }}
-          onPress={() => setCardMenuOpen(true)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Icon name="more-vertical" size={18} color={colors.textTertiary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Menu contextuel ─────────────────────────────────────────────── */}
-      {cardMenuOpen && (
-        <CardContextMenu
-          item={item}
-          colors={colors}
-          isSaved={saved}
-          isFollowing={isFollowing}
-          isOwnContent={isOwnContent}
-          authorName={authorName}
-          onClose={() => setCardMenuOpen(false)}
-          onSave={handleSave}
-          onShare={handleShare}
-          onFollow={onToggleFollow}
-          onReport={() => { setCardMenuOpen(false); setReportVisible(true); }}
-          onHide={handleHide}
-          onRemind={handleRemind}
-          hasReminder={hasReminder}
-        />
-      )}
-
-      {/* ── Modal signalement ───────────────────────────────────────── */}
-      <ReportModal
-        visible={reportVisible}
-        contentType={isEvent ? 'event' : 'concert'}
-        contentId={item.id}
-        onClose={() => setReportVisible(false)}
-      />
-
-      {/* ── Titre + description ──────────────────────────────────────── */}
-      <View style={s.cardBody}>
-        <ExpandableText
-          text={title}
-          maxLines={2}
-          textStyle={[s.cardTitle, { color: colors.textPrimary }]}
-          primaryColor={colors.primary}
-        />
-        {desc ? (
-          <View style={{ marginTop: 4 }}>
-            <ExpandableText
-              text={desc}
-              maxLines={3}
-              textStyle={[s.cardDesc, { color: colors.textSecondary }]}
-              primaryColor={colors.primary}
-            />
-          </View>
-        ) : null}
-      </View>
-
-      {/* ── Accroche psychologique ───────────────────────────────────── */}
-      <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={[hk.wrap, { backgroundColor: hookPhrase.color + '15', borderLeftColor: hookPhrase.color }]}>
-        <Text style={hk.icon}>{hookPhrase.icon}</Text>
-        <Text style={[hk.text, { color: hookPhrase.color }]}>{hookPhrase.text}</Text>
-      </TouchableOpacity>
-
-      {/* ── Banner : vidéo pub autoplay ou image ────────────────────── */}
-      {/* Image plein écran */}
-      {imgFs && thumbUrl && (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setImgFs(false)} statusBarTranslucent>
-          <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-            <Image source={{ uri: thumbUrl }} style={{ width: '100%', height: '80%' }} resizeMode="contain" />
-            <TouchableOpacity
-              onPress={() => setImgFs(false)}
-              style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, right: 16,
-                width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)',
-                alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Icon name="x" size={20} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => { setImgFs(false); onPress(); }}
-              style={{ position: 'absolute', bottom: 48, paddingHorizontal: 32, paddingVertical: 14,
-                backgroundColor: colors.primary, borderRadius: 28,
-                flexDirection: 'row', alignItems: 'center', gap: 8 }}
-              activeOpacity={0.85}
-            >
-              <Icon name="arrow-right" size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>Voir les détails</Text>
-            </TouchableOpacity>
-          </View>
-        </Modal>
-      )}
-
-      <TouchableOpacity
-        onPress={() => thumbUrl && !videoUrl ? setImgFs(true) : onPress()}
-        activeOpacity={0.92}
-      >
-        <View style={s.cardBanner}>
+      {/* ── Hero banner cliquable ────────────────────────────────────────── */}
+      <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={{ position: 'relative' }}>
+        <View style={{ height: BANNER_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
           {videoUrl ? (
             <CardVideo uri={videoUrl} playing={isActive} />
           ) : thumbUrl ? (
             <Image source={{ uri: thumbUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
-            <LinearGradient
-              colors={[accent + 'CC', accent + '55']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+            <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={cardIcon} size={60} color="rgba(255,255,255,0.18)" />
+              </View>
+            </LinearGradient>
           )}
 
-          {!thumbUrl && !videoUrl && (
-            <Icon name={cardIcon} size={64} color="rgba(255,255,255,0.25)" />
-          )}
+          {/* Gradient bas */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
+            locations={[0.3, 0.65, 1]}
+            style={[StyleSheet.absoluteFill, { top: '20%' }]}
+            pointerEvents="none"
+          />
 
-          {/* Indicateur vidéo muette */}
-          {videoUrl && (
-            <View style={{ position: 'absolute', top: 10, right: 10,
-              backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14,
-              paddingHorizontal: 8, paddingVertical: 4,
-              flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Icon name="volume-x" size={11} color="#fff" />
-              <Text style={{ fontSize: 10, color: '#fff', fontWeight: '700' }}>Muet</Text>
-            </View>
-          )}
-
-          {/* Badges live / gratuit */}
-          <View style={s.badgesRow}>
+          {/* Badges haut gauche */}
+          <View style={{ position: 'absolute', top: 12, left: 12, flexDirection: 'row', gap: 6 }}>
             {isLive && (
-              <View style={[s.badge, { backgroundColor: colors.liveTag }]}>
-                <View style={[s.badgeDot, { backgroundColor: '#fff' }]} />
-                <Text style={[s.badgeText, { color: '#fff' }]}>LIVE</Text>
+              <View style={fc.liveBadge}>
+                <View style={fc.liveDot} />
+                <Text style={fc.liveBadgeText}>LIVE</Text>
               </View>
             )}
             {isFree && (
-              <View style={[s.badge, { backgroundColor: colors.accentGreen }]}>
-                <Text style={[s.badgeText, { color: '#fff' }]}>GRATUIT</Text>
+              <View style={[fc.chipBadge, { backgroundColor: '#10B981EE' }]}>
+                <Text style={fc.chipBadgeText}>GRATUIT</Text>
+              </View>
+            )}
+            {!isFree && price != null && price > 0 && (
+              <View style={[fc.chipBadge, { backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }]}>
+                <Icon name="tag" size={9} color="#fff" />
+                <Text style={fc.chipBadgeText}>dès {price} €</Text>
               </View>
             )}
           </View>
 
-          {/* Gradient + meta date/lieu en bas du banner */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.72)']}
-            style={[StyleSheet.absoluteFill, { top: '40%' }]}
-            pointerEvents="none"
-          />
-          <View style={s.bannerOverlay}>
-            <View style={s.bannerMeta}>
-              <Icon name="calendar" size={12} color="rgba(255,255,255,0.9)" />
-              <Text style={s.bannerMetaText}>{formatDate(date)}</Text>
+          {/* Badge type haut droite */}
+          <View style={[fc.typeBadge, { backgroundColor: accent + 'EE' }]}>
+            <Icon name={cardIcon} size={9} color="#fff" />
+            <Text style={fc.typeBadgeText}>{typeLabel}</Text>
+          </View>
+
+          {/* Muet si vidéo */}
+          {videoUrl && (
+            <View style={fc.mutedBadge}>
+              <Icon name="volume-x" size={10} color="#fff" />
+            </View>
+          )}
+
+          {/* Infos bas du hero */}
+          <View style={fc.heroBottom}>
+            <Text style={fc.heroTitle} numberOfLines={2}>{title}</Text>
+            <View style={fc.heroMeta}>
+              <Icon name="calendar" size={11} color="rgba(255,255,255,0.8)" />
+              <Text style={fc.heroMetaText}>{formatDate(date)}</Text>
               {city ? (
                 <>
-                  <Text style={s.bannerMetaDot}>·</Text>
-                  <Icon name="map-pin" size={12} color="rgba(255,255,255,0.9)" />
-                  <Text style={s.bannerMetaText}>{city}</Text>
-                </>
-              ) : null}
-              {!isFree && price != null && price > 0 ? (
-                <>
-                  <Text style={s.bannerMetaDot}>·</Text>
-                  <Text style={[s.bannerMetaText, { fontWeight: '800', color: colors.accentOrange }]}>
-                    {price} €
-                  </Text>
+                  <Text style={fc.heroMetaDot}>·</Text>
+                  <Icon name="map-pin" size={11} color="rgba(255,255,255,0.8)" />
+                  <Text style={fc.heroMetaText} numberOfLines={1}>{city}</Text>
                 </>
               ) : null}
             </View>
@@ -2790,88 +2921,170 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </View>
       </TouchableOpacity>
 
-      {/* ── Compteurs engagement ──────────────────────────────────── */}
+      {/* ── Header auteur ───────────────────────────────────────────────── */}
+      <View style={fc.header}>
+        <TouchableOpacity style={fc.headerLeft} activeOpacity={0.7} onPress={onAuthorPress}>
+          <AvatarWithBadge
+            avatarUrl={authorAvatar}
+            initials={authorInit}
+            size={38}
+            accentColor={accent}
+            isVerified={!!author?.is_verified}
+            isOnline={(author as any)?.is_online ?? undefined}
+          />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[fc.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{authorName}</Text>
+            <Text style={[fc.timeAgo, { color: colors.textTertiary }]}>{timeAgo}</Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {showFollowBtn && !isFollowing && (
+            <TouchableOpacity style={[fc.followChip, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]} onPress={onToggleFollow} activeOpacity={0.7}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Suivre</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => setCardMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── Description ─────────────────────────────────────────────────── */}
+      {desc ? (
+        <View style={fc.descWrap}>
+          <ExpandableText text={desc} maxLines={3} textStyle={[fc.desc, { color: colors.textSecondary }]} primaryColor={colors.primary} />
+        </View>
+      ) : null}
+
+      {/* ── Accroche psychologique ───────────────────────────────────────── */}
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85}
+        style={[fc.hook, { backgroundColor: hookPhrase.color + '12', borderLeftColor: hookPhrase.color }]}>
+        <Text style={fc.hookIcon}>{hookPhrase.icon}</Text>
+        <Text style={[fc.hookText, { color: hookPhrase.color }]}>{hookPhrase.text}</Text>
+      </TouchableOpacity>
+
+      {/* ── Compteurs ───────────────────────────────────────────────────── */}
       {(likeCount > 0 || commentCount > 0 || shareCount > 0) && (
-        <View style={[s.likeCountRow, { borderBottomColor: colors.divider }]}>
+        <View style={[fc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
-            <View style={s.countChip}>
-              <View style={[s.likeCountIcon, { backgroundColor: '#E0389A' }]}>
-                <Icon name="heart" size={10} color="#fff" />
-              </View>
-              <Text style={[s.likeCountText, { color: colors.textTertiary }]}>
-                {likeCount.toLocaleString('fr')}
-              </Text>
-            </View>
+            <TouchableOpacity onPress={() => setLikersOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={fc.likeIcon}><Icon name="heart" size={10} color="#fff" /></View>
+              <Text style={[fc.countText, { color: colors.textTertiary }]}>{likeCount.toLocaleString('fr')}</Text>
+            </TouchableOpacity>
           )}
           {commentCount > 0 && (
-            <Text style={[s.likeCountText, { color: colors.textTertiary }]}>
+            <Text style={[fc.countText, { color: colors.textTertiary }]}>
               {commentCount.toLocaleString('fr')} réaction{commentCount > 1 ? 's' : ''}
             </Text>
           )}
           {shareCount > 0 && (
-            <Text style={[s.likeCountText, { color: colors.textTertiary, marginLeft: 'auto' as any }]}>
+            <Text style={[fc.countText, { color: colors.textTertiary, marginLeft: 'auto' as any }]}>
               {shareCount} diffusion{shareCount > 1 ? 's' : ''}
             </Text>
           )}
         </View>
       )}
 
-      {/* ── Barre sociale ────────────────────────────────────────────── */}
-      <View style={[s.socialBar, { borderTopColor: colors.divider, backgroundColor: colors.surface }]}>
-        <TouchableOpacity style={s.socialBtn} onPress={handleLike} activeOpacity={0.8}>
+      {/* ── Barre d'actions ─────────────────────────────────────────────── */}
+      <View style={[fc.actionBar, { borderTopColor: colors.divider }]}>
+        <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.7}>
           <Animated.View style={heartStyle}>
-            <Icon name="heart" size={18} color={liked ? '#E0389A' : colors.textTertiary} />
+            <Icon name="heart" size={19} color={liked ? '#E0389A' : colors.textTertiary} />
           </Animated.View>
-          <Text style={[s.socialBtnText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
-            {liked ? 'Tu adores' : 'Adorer'}
+          <Text style={[fc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
+            {liked ? 'Adoré' : 'Adorer'}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.socialBtn} onPress={() => onComment((delta: number) => setCommentCount((v: number) => v + delta), (count: number) => setCommentCount((v: number) => Math.max(v, count)))} activeOpacity={0.8}>
-          <Icon name="message-circle" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-          <Text style={[s.socialBtnText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-            {commentCount > 0 ? commentCount.toLocaleString('fr') : 'Reagir'}
+        <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
+
+        <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.7}>
+          <Icon name="message-circle" size={19} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
+          <Text style={[fc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+            {commentCount > 0 ? commentCount.toLocaleString('fr') : 'Réagir'}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.socialBtn} onPress={handleShare} activeOpacity={0.8}>
-          <Icon name="share-2" size={18} color={colors.textTertiary} />
-          <Text style={[s.socialBtnText, { color: colors.textTertiary }]}>Diffuser</Text>
+        <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
+
+        <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.7}>
+          <Icon name="share-2" size={19} color={colors.textTertiary} />
+          <Text style={[fc.actionText, { color: colors.textTertiary }]}>Partager</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.saveBtn} onPress={handleSave} activeOpacity={0.8}>
+        <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
+
+        <TouchableOpacity style={[fc.actionBtn, { flex: 0, paddingHorizontal: 16 }]} onPress={handleSave} activeOpacity={0.7}>
           <Animated.View style={saveStyle}>
-            <Icon name="bookmark" size={18} color={saved ? colors.primary : colors.textTertiary} />
+            <Icon name="bookmark" size={19} color={saved ? colors.primary : colors.textTertiary} />
           </Animated.View>
         </TouchableOpacity>
       </View>
 
-      {/* Sheet partage */}
-      {shareOpen && (
-        isEvent ? (
-          <ShareBottomSheet
-            type="event"
-            event={item.data as Event}
-            visible={shareOpen}
-            onClose={() => setShareOpen(false)}
-            onShareCountChange={handleShareDone}
-          />
-        ) : (
-          <ShareBottomSheet
-            type="concert"
-            concert={item.data as Concert}
-            visible={shareOpen}
-            onClose={() => setShareOpen(false)}
-            onShareCountChange={handleShareDone}
-          />
-        )
+      {/* ── Modals / sheets ─────────────────────────────────────────────── */}
+      {cardMenuOpen && (
+        <CardContextMenu item={item} colors={colors} isSaved={saved} isFollowing={isFollowing}
+          isOwnContent={isOwnContent} authorName={authorName}
+          onClose={() => setCardMenuOpen(false)} onSave={handleSave} onShare={handleShare}
+          onFollow={onToggleFollow} onReport={() => { setCardMenuOpen(false); setReportVisible(true); }}
+          onHide={handleHide} onRemind={handleRemind} hasReminder={hasReminder} />
       )}
-
+      <ReportModal visible={reportVisible} contentType={isEvent ? 'event' : 'concert'} contentId={item.id} onClose={() => setReportVisible(false)} />
+      {shareOpen && (
+        isEvent
+          ? <ShareBottomSheet type="event" event={item.data as Event} visible={shareOpen} onClose={() => setShareOpen(false)} onShareCountChange={handleShareDone} />
+          : <ShareBottomSheet type="concert" concert={item.data as Concert} visible={shareOpen} onClose={() => setShareOpen(false)} onShareCountChange={handleShareDone} />
+      )}
+      <LikersBottomSheet visible={likersOpen} onClose={() => setLikersOpen(false)} postId={item.id} likeCount={likeCount}
+        fetchLikers={(page, limit) => isEvent ? socialService.getReactionLikers({ event_id: item.id, page, limit }) : socialService.getReactionLikers({ concert_id: item.id, page, limit })}
+        onNavigateToProfile={uid => { setLikersOpen(false); setTimeout(() => (nav as any).navigate('UserProfile', { userId: uid }), 300); }} />
     </View>
   );
 });
 
 const { width: SW, height: SH } = Dimensions.get('window');
+
+// ── FeedCard styles ───────────────────────────────────────────────────────────
+const fc = StyleSheet.create({
+  card:           { backgroundColor: '#fff', marginBottom: 8 },
+  // Hero
+  liveBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  liveDot:        { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
+  liveBadgeText:  { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
+  chipBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  chipBadgeText:  { fontSize: 9, fontWeight: '800', color: '#fff' },
+  typeBadge:      { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  typeBadgeText:  { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  mutedBadge:     { position: 'absolute', bottom: 56, right: 12, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  heroBottom:     { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 },
+  heroTitle:      { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: -0.3, lineHeight: 24, marginBottom: 6 },
+  heroMeta:       { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
+  heroMetaText:   { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
+  heroMetaDot:    { fontSize: 11, color: 'rgba(255,255,255,0.4)' },
+  // Header auteur
+  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, gap: 10 },
+  headerLeft:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
+  authorName:     { fontSize: 13, fontWeight: '700', letterSpacing: -0.1 },
+  timeAgo:        { fontSize: 11, fontWeight: '500', marginTop: 1 },
+  followChip:     { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  // Description
+  descWrap:       { paddingHorizontal: 14, paddingBottom: 10 },
+  desc:           { fontSize: 14, lineHeight: 21 },
+  // Accroche
+  hook:           { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 14, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderLeftWidth: 3 },
+  hookIcon:       { fontSize: 16 },
+  hookText:       { flex: 1, fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  // Compteurs
+  countsRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  countText:      { fontSize: 12, fontWeight: '500' },
+  likeIcon:       { width: 20, height: 20, borderRadius: 10, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' },
+  // Actions
+  actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth },
+  actionBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 },
+  actionText:     { fontSize: 12, fontWeight: '600' },
+  actionSep:      { width: StyleSheet.hairlineWidth, height: 22 },
+});
 
 const nbS = StyleSheet.create({
   wrap:     { paddingVertical: 14, marginBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },

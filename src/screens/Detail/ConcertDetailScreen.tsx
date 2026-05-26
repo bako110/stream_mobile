@@ -5,7 +5,6 @@ import {
   Dimensions, StyleSheet, StatusBar, InteractionManager, ActivityIndicator,
 } from 'react-native';
 import Animated, {
-  FadeIn,
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence,
 } from 'react-native-reanimated';
@@ -299,7 +298,6 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [showComments, setShowComments] = useState(false);
   const [selectedTier, setSelectedTier] = useState<'simple' | 'vip' | 'vvip' | 'vvvip'>('simple');
   const [replayUrl,    setReplayUrl]    = useState<string | null>(null);
-  const [loadingReplay, setLoadingReplay] = useState(false);
 
   const heartScale = useSharedValue(1);
   const saveScale  = useSharedValue(1);
@@ -444,170 +442,137 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Bouton retour */}
+      {/* Bouton retour flottant */}
       <TouchableOpacity onPress={onBack}
-        style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, left: 16, zIndex: 100,
-          width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)',
-          alignItems: 'center', justifyContent: 'center' }}>
+        style={ds.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Icon name="arrow-left" size={20} color="#fff" />
       </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 
         {/* ── Hero ─────────────────────────────────────────────────── */}
-        <Animated.View entering={FadeIn.duration(300)}>
-          <HeroConcert
-            isLive={isLive}
-            thumbnail={concert.thumbnail_url ?? concert.banner_url ?? undefined}
-            title={concert.title}
-            artistName={artistName}
-            genre={concert.genre}
-            isFree={isFree}
-            viewers={concert.current_viewers ?? 0}
-            hasVideo={hasVideo}
-            onVideoPress={() => setShowVideo(true)}
-            colors={colors}
-          />
-        </Animated.View>
+        <HeroConcert
+          isLive={isLive}
+          thumbnail={concert.thumbnail_url ?? concert.banner_url ?? undefined}
+          title={concert.title}
+          artistName={artistName}
+          genre={concert.genre}
+          isFree={isFree}
+          viewers={concert.current_viewers ?? 0}
+          hasVideo={hasVideo}
+          onVideoPress={() => setShowVideo(true)}
+          colors={colors}
+        />
 
         {showVideo && hasVideo && <VideoModal uri={concert.video_url!} onClose={() => setShowVideo(false)} />}
 
-        {/* ── Bouton principal : Live / Replay / Programmé ─────────── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 4, gap: 10 }}>
-
-          {/* Live en cours */}
-          {isLive && (
-            <TouchableOpacity onPress={handleWatchLive} activeOpacity={0.88}>
-              <LinearGradient colors={['#EF4444', '#DC2626']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                  gap: 10, paddingVertical: 15, borderRadius: 16 }}>
-                <Icon name="radio" size={20} color="#fff" />
-                <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff' }}>Regarder en direct</Text>
-                <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>LIVE</Text>
+        {/* ── Live / Replay / Schedulé ─────────────────────────────── */}
+        {(isLive || isScheduled || hasReplay || (isEnded && concert.live_id && !hasReplay)) && (
+          <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 10 }}>
+            {isLive && (
+              <TouchableOpacity onPress={handleWatchLive} activeOpacity={0.88}>
+                <LinearGradient colors={['#EF4444', '#DC2626']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={ds.ctaGradient}>
+                  <Icon name="radio" size={20} color="#fff" />
+                  <Text style={ds.ctaText}>Regarder en direct</Text>
+                  <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 'auto' as any }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>LIVE</Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+            {isScheduled && (
+              <View style={[ds.infoBanner, { borderColor: colors.primary + '55', backgroundColor: colors.primary + '10' }]}>
+                <Icon name="clock" size={20} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>Live programmé</Text>
+                  {scheduledIn && <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>Démarre {scheduledIn} · {formatTime(concert.scheduled_at)}</Text>}
                 </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          {/* Live programmé — compte à rebours */}
-          {isScheduled && (
-            <View style={{ borderRadius: 16, borderWidth: 1.5, borderColor: colors.primary + '55',
-              backgroundColor: colors.primary + '10', paddingVertical: 14, paddingHorizontal: 20,
-              flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Icon name="clock" size={20} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>Live programmé</Text>
-                {scheduledIn && (
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                    Démarre {scheduledIn} · {formatTime(concert.scheduled_at)}
-                  </Text>
-                )}
               </View>
+            )}
+            {hasReplay && (
+              <TouchableOpacity onPress={handleWatchReplay} activeOpacity={0.88}>
+                <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={ds.ctaGradient}>
+                  <Icon name="play" size={20} color="#fff" />
+                  <Text style={ds.ctaText}>Regarder le replay</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+            {isEnded && !hasReplay && concert.live_id && (
+              <View style={[ds.infoBanner, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
+                <Icon name="film" size={18} color={colors.textTertiary} />
+                <Text style={{ fontSize: 14, color: colors.textTertiary }}>Replay non disponible</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Date pill + stats ────────────────────────────────────── */}
+        <View style={ds.datePillRow}>
+          <View style={[ds.datePill, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
+            <Icon name="calendar" size={13} color={colors.primary} />
+            <View>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>
+                {formatDate(concert.scheduled_at)}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 1 }}>
+                {formatTime(concert.scheduled_at)}
+              </Text>
             </View>
-          )}
-
-          {/* Replay disponible */}
-          {hasReplay && (
-            <TouchableOpacity onPress={handleWatchReplay} activeOpacity={0.88}>
-              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                  gap: 10, paddingVertical: 15, borderRadius: 16 }}>
-                <Icon name="play" size={20} color="#fff" />
-                <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff' }}>Regarder le replay</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          {/* Concert terminé sans replay */}
-          {isEnded && !hasReplay && (
-            <View style={{ borderRadius: 16, backgroundColor: colors.backgroundSecondary,
-              paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Icon name="film" size={18} color={colors.textTertiary} />
-              <Text style={{ fontSize: 14, color: colors.textTertiary }}>Replay non disponible</Text>
-            </View>
-          )}
-        </View>
-
-        {/* ── Date + Lieu résumé ────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 18, flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, borderRadius: 14,
-            padding: 14, alignItems: 'center', gap: 4 }}>
-            <Icon name="calendar" size={18} color={colors.primary} />
-            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' }}>
-              {formatDateShort(concert.scheduled_at)}
-            </Text>
-            <Text style={{ fontSize: 11, color: colors.textTertiary }}>{formatTime(concert.scheduled_at)}</Text>
           </View>
           {concert.venue_city && (
-            <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, borderRadius: 14,
-              padding: 14, alignItems: 'center', gap: 4 }}>
-              <Icon name="map-pin" size={18} color={colors.accentOrange} />
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' }} numberOfLines={1}>
+            <View style={[ds.locationPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+              <Icon name="map-pin" size={13} color={colors.accentOrange} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>
                 {concert.venue_city}
               </Text>
-              {concert.venue_country && (
-                <Text style={{ fontSize: 11, color: colors.textTertiary }} numberOfLines={1}>{concert.venue_country}</Text>
-              )}
-            </View>
-          )}
-          {concert.duration_min && (
-            <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, borderRadius: 14,
-              padding: 14, alignItems: 'center', gap: 4 }}>
-              <Icon name="clock" size={18} color={colors.accentGreen} />
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary }}>{concert.duration_min} min</Text>
-              <Text style={{ fontSize: 11, color: colors.textTertiary }}>Durée</Text>
             </View>
           )}
         </View>
 
         {/* ── Barre sociale ────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', marginHorizontal: 16, marginTop: 16,
-            backgroundColor: colors.backgroundSecondary, borderRadius: 18, overflow: 'hidden' }}>
-          <TouchableOpacity style={ss.socialBtn} onPress={handleLike} activeOpacity={0.75}>
+        <View style={[ds.socialBar, { borderTopColor: colors.divider, borderBottomColor: colors.divider }]}>
+          <TouchableOpacity style={ds.socialBtn} onPress={handleLike} activeOpacity={0.7}>
             <Animated.View style={heartStyle}>
-              <Icon name="heart" size={18} color={liked ? '#F0365A' : colors.textTertiary} />
+              <Icon name="heart" size={20} color={liked ? '#F0365A' : colors.textTertiary} />
             </Animated.View>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: liked ? '#F0365A' : colors.textTertiary }}>
+            <Text style={[ds.socialBtnText, { color: liked ? '#F0365A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
               {likeCount > 0 ? likeCount.toLocaleString('fr') : 'J\'aime'}
             </Text>
           </TouchableOpacity>
-          <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />
-          <TouchableOpacity style={ss.socialBtn} onPress={() => setShowComments(true)} activeOpacity={0.75}>
-            <Icon name="message-circle" size={18} color={colors.textTertiary} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }}>Commenter</Text>
+          <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
+          <TouchableOpacity style={ds.socialBtn} onPress={() => setShowComments(true)} activeOpacity={0.7}>
+            <Icon name="message-circle" size={20} color={colors.textTertiary} />
+            <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>Commenter</Text>
           </TouchableOpacity>
-          <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />
-          <TouchableOpacity style={ss.socialBtn} onPress={handleNativeShare} activeOpacity={0.75}>
-            <Icon name="share-2" size={18} color={colors.textTertiary} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }}>Partager</Text>
+          <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
+          <TouchableOpacity style={ds.socialBtn} onPress={handleNativeShare} activeOpacity={0.7}>
+            <Icon name="share-2" size={20} color={colors.textTertiary} />
+            <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>Partager</Text>
           </TouchableOpacity>
-          <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />
-          <TouchableOpacity style={{ paddingHorizontal: 14, paddingVertical: 12 }} onPress={handleSave} activeOpacity={0.75}>
+          <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
+          <TouchableOpacity style={[ds.socialBtn, { flex: 0, paddingHorizontal: 18 }]} onPress={handleSave} activeOpacity={0.7}>
             <Animated.View style={saveStyle}>
-              <Icon name="bookmark" size={18} color={saved ? colors.primary : colors.textTertiary} />
+              <Icon name="bookmark" size={20} color={saved ? colors.primary : colors.textTertiary} />
             </Animated.View>
           </TouchableOpacity>
         </View>
 
-        {/* ── Description ──────────────────────────────────────────── */}
+        {/* ── À propos ─────────────────────────────────────────────── */}
         {concert.description ? (
-          <View style={{ paddingHorizontal: 16, paddingTop: 22, gap: 8 }}>
+          <View style={ds.section}>
             <SectionHeader label="À propos" colors={colors} />
-            <ExpandableText
-              text={concert.description} maxLines={4}
+            <ExpandableText text={concert.description} maxLines={4}
               textStyle={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}
-              primaryColor={colors.primary}
-            />
+              primaryColor={colors.primary} />
           </View>
         ) : null}
 
-        {/* ── Infos détaillées ─────────────────────────────────────── */}
-        <View style={{ marginHorizontal: 16, marginTop: 22 }}>
+        {/* ── Infos pratiques ──────────────────────────────────────── */}
+        <View style={ds.section}>
           <SectionHeader label="Infos pratiques" colors={colors} />
-          <View style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden' }}>
+          <View style={[ds.infoCard, { backgroundColor: colors.backgroundSecondary }]}>
             <InfoRow icon="calendar" label="Date du concert" value={formatDate(concert.scheduled_at)}
               color={colors.primary} colors={colors} />
             {concert.venue_city && (
@@ -632,12 +597,16 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <InfoRow icon="music" label="Genre" value={concert.genre}
                 color={colors.accentGreen} colors={colors} divider />
             )}
+            {concert.duration_min != null && (
+              <InfoRow icon="clock" label="Durée" value={`${concert.duration_min} min`}
+                color={colors.accentGreen} colors={colors} divider />
+            )}
           </View>
         </View>
 
         {/* ── Billets ───────────────────────────────────────────────── */}
         {!isFree && (
-          <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
+          <View style={ds.section}>
             <TicketTiersGrid
               tiers={[
                 { key: 'simple', label: 'Simple', icon: 'tag',   color: colors.primary, price: _p(concert.ticket_price),       sub: 'Accès standard' },
@@ -653,16 +622,12 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
       </ScrollView>
 
       {/* ── CTA flottant ─────────────────────────────────────────────── */}
-      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
-          paddingHorizontal: 16, paddingTop: 12,
-          paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-          backgroundColor: colors.surface,
-          borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
+      <View style={[ds.ctaBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
         {isOwner ? (
           <View style={{ flexDirection: 'row', gap: 10 }}>
             {(concert.status === 'published' || concert.status === 'live') && (
               <TouchableOpacity onPress={() => nav.navigate('LiveStream' as any, { concertId })}
-                style={[ss.ctaSecondary, { flex: 1, backgroundColor: '#EF444414' }]}>
+                style={[ds.ctaSecondary, { flex: 1, backgroundColor: '#EF444414' }]}>
                 <Icon name="radio" size={16} color="#EF4444" />
                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>
                   {concert.status === 'live' ? 'Rejoindre' : 'Go Live'}
@@ -670,12 +635,12 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={handleEdit}
-              style={[ss.ctaSecondary, { flex: 1, backgroundColor: colors.primary + '14' }]}>
+              style={[ds.ctaSecondary, { flex: 1, backgroundColor: colors.primary + '14' }]}>
               <Icon name="edit-2" size={16} color={colors.primary} />
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Modifier</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleDelete}
-              style={[ss.ctaSecondary, { paddingHorizontal: 20, backgroundColor: colors.error + '14' }]}>
+              style={[ds.ctaSecondary, { paddingHorizontal: 20, backgroundColor: colors.error + '14' }]}>
               <Icon name="trash-2" size={16} color={colors.error} />
             </TouchableOpacity>
           </View>
@@ -685,16 +650,16 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             <LinearGradient
               colors={isRegistered ? ['#555', '#444'] : [colors.gradientStart, colors.gradientEnd]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={ss.ctaGradient}>
+              style={ds.ctaGradient}>
               <Icon name={isRegistered ? 'check' : isFree ? 'check-circle' : 'tag'} size={20} color="#fff" />
-              <Text style={ss.ctaText}>
+              <Text style={ds.ctaText}>
                 {isRegistered ? 'Déjà inscrit'
                   : isFree ? 'S\'inscrire gratuitement'
                   : allTiers.length > 1 ? `Billet ${activeTier?.label ?? ''}`
                   : 'Acheter un billet'}
               </Text>
               {!isRegistered && !isFree && activeTier?.price != null && (
-                <View style={{ marginLeft: 'auto', alignItems: 'flex-end', gap: 1 }}>
+                <View style={{ marginLeft: 'auto' as any, alignItems: 'flex-end', gap: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}>
                     {(activeTier.price + Math.round(activeTier.price * FEES_RATE)).toLocaleString('fr')} €
                   </Text>
@@ -726,9 +691,62 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const ss = StyleSheet.create({
-  socialBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 13 },
-  ctaGradient: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16 },
+const ds = StyleSheet.create({
+  backBtn: {
+    position: 'absolute', zIndex: 10,
+    top: Platform.OS === 'ios' ? 52 : 36, left: 16,
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ctaBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 16, paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  ctaGradient: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16,
+  },
   ctaText: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  ctaSecondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 14 },
+  ctaSecondary: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 14, borderRadius: 14,
+  },
+  socialBar: {
+    flexDirection: 'row', alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginTop: 4, marginBottom: 4,
+  },
+  socialBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 6, paddingVertical: 13,
+  },
+  socialBtnText: { fontSize: 13, fontWeight: '600' },
+  socialSep: { width: StyleSheet.hairlineWidth, height: 22 },
+  section: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4 },
+  infoCard: { borderRadius: 16, overflow: 'hidden' },
+  datePillRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4,
+    gap: 10,
+  },
+  datePill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 10,
+  },
+  locationPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 10,
+    flexShrink: 1,
+  },
+  infoBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 14, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
 });
