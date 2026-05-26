@@ -408,7 +408,7 @@ export const SubscriptionsScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <AppHeader title="Abonnement" variant="default" />
+        <AppHeader title="Abonnement" variant="default" onBack={() => navigation.goBack()} />
         <SkeletonSubscriptions />
       </View>
     );
