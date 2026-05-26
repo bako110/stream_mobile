@@ -507,12 +507,12 @@ const ActiveBoostCard: React.FC<{
             <View style={[ms.handle, { backgroundColor: colors.border }]} />
             <Text style={[ms.title, { color: colors.textPrimary }]}>Arreter le boost ?</Text>
             <Text style={[ms.sub, { color: colors.textSecondary }]}>
-              Vous annulez dans les 30 premieres minutes. La totalite des coins vous est remboursee.
+              Vous annulez dans les 30 premieres minutes. 90% des coins vous sont rembourses (10% de frais retenus).
             </Text>
             <View style={[ms.refundBox, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
               <Icon name="gift" size={18} color="#22C55E" />
               <Text style={[ms.refundText, { color: '#22C55E' }]}>
-                +{boost.coins_spent.toLocaleString('fr-FR')} coins rembourses
+                +{Math.round(boost.coins_spent * 0.9).toLocaleString('fr-FR')} coins rembourses
               </Text>
             </View>
             <TouchableOpacity
@@ -1233,7 +1233,7 @@ export default function BoostScreen() {
           <View style={[s.infoBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Icon name="info" size={13} color={colors.textTertiary} />
             <Text style={[s.infoText, { color: colors.textTertiary }]}>
-              Coins debites immediatement. Remboursement 100% si annule dans les 30 premieres minutes. Annulation impossible ensuite.
+              Coins debites immediatement. Remboursement 90% si annule dans les 30 premieres minutes (10% de frais retenus). Annulation impossible ensuite.
             </Text>
           </View>
         </ScrollView>
@@ -1335,7 +1335,7 @@ export default function BoostScreen() {
                     { label: 'Cout',          value: `${selectedTier.coins.toLocaleString('fr-FR')} coins`, color: g1 },
                     { label: 'Solde actuel',  value: `${balance.toLocaleString('fr-FR')} coins` },
                     { label: 'Solde restant', value: `${(balance - selectedTier.coins).toLocaleString('fr-FR')} coins` },
-                    { label: 'Remboursement', value: '100% si annule dans les 30 min', color: '#22C55E' },
+                    { label: 'Remboursement', value: '90% si annule dans les 30 min', color: '#22C55E' },
                   ].map(row => (
                     <View key={row.label} style={s.modalRow}>
                       <Text style={[s.modalLabel, { color: colors.textSecondary }]}>{row.label}</Text>
