@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
+import { apiClient } from '../../api';
+import { Endpoints } from '../../api/endpoints';
+
+type MonetStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
 interface RowItem {
   icon: string;
@@ -41,10 +45,68 @@ const SECTIONS: { title: string; accent: string; rows: RowItem[] }[] = [
   },
 ];
 
+const GREEN = '#10B981';
+
+const GATE_CONFIG: Record<MonetStatus, { icon: string; title: string; message: string }> = {
+  none:     { icon: 'lock',        title: 'Monetisation non activee',    message: 'Soumettez une demande pour acceder a votre espace createur.' },
+  pending:  { icon: 'clock',       title: 'Demande en cours d\'examen',  message: 'Notre equipe examine votre dossier. Vous serez notifie des la decision.' },
+  rejected: { icon: 'x-circle',    title: 'Demande refusee',             message: 'Votre demande a ete refusee. Soumettez une nouvelle demande.' },
+  approved: { icon: 'check-circle',title: '',                            message: '' },
+};
+
 export function MonetisationScreen() {
   const nav = useNavigation<any>();
   const { theme, isDark } = useTheme();
   const { colors } = theme;
+
+  const [monetStatus, setMonetStatus] = useState<MonetStatus | null>(null);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    apiClient
+      .get<{ status: MonetStatus }>(Endpoints.monetization.status)
+      .then(res => setMonetStatus(res.data.status))
+      .catch(() => setMonetStatus('none'))
+      .finally(() => setFetching(false));
+  }, []);
+
+  if (fetching) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={GREEN} />
+      </View>
+    );
+  }
+
+  if (monetStatus !== 'approved') {
+    const cfg = GATE_CONFIG[monetStatus ?? 'none'];
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+          <TouchableOpacity onPress={() => nav.goBack()} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
+            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monetisation</Text>
+          <View style={{ width: 38 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
+          <View style={[gateStyles.iconWrap, { backgroundColor: '#EF444415' }]}>
+            <Icon name={cfg.icon} size={36} color="#EF4444" />
+          </View>
+          <Text style={[gateStyles.title, { color: colors.textPrimary }]}>{cfg.title}</Text>
+          <Text style={[gateStyles.message, { color: colors.textSecondary }]}>{cfg.message}</Text>
+          <TouchableOpacity
+            style={[gateStyles.btn, { backgroundColor: GREEN }]}
+            onPress={() => nav.navigate('SettingsMonetisation')}
+          >
+            <Icon name="bar-chart-2" size={16} color="#fff" />
+            <Text style={gateStyles.btnText}>Voir ma demande</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -94,6 +156,14 @@ export function MonetisationScreen() {
     </View>
   );
 }
+
+const gateStyles = StyleSheet.create({
+  iconWrap: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  title:    { fontSize: 20, fontWeight: '800', textAlign: 'center' },
+  message:  { fontSize: 14, textAlign: 'center', lineHeight: 21 },
+  btn:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24, marginTop: 8 },
+  btnText:  { color: '#fff', fontSize: 15, fontWeight: '700' },
+});
 
 const styles = StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },

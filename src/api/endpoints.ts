@@ -166,6 +166,7 @@ export const Endpoints = {
     toggleReaction:  `${V1}/social/reactions`,
     myReaction:      `${V1}/social/reactions/me`,
     reactionCounts:  `${V1}/social/reactions/counts`,
+    reactionUsers:   `${V1}/social/reactions/users`,
     // Partages
     share:           `${V1}/social/shares`,
     shareCounts:     `${V1}/social/shares/counts`,
@@ -178,6 +179,7 @@ export const Endpoints = {
     byId:    (id: string) => `${V1}/posts/${id}`,
     byUser:  (userId: string) => `${V1}/posts/user/${userId}`,
     react:   (id: string) => `${V1}/posts/${id}/react`,
+    likers:  (id: string) => `${V1}/posts/${id}/likes`,
     update:  (id: string) => `${V1}/posts/${id}`,
   },
 
@@ -359,6 +361,15 @@ export const Endpoints = {
     history: `${V1}/calls/`,
     byId:    (id: string) => `${V1}/calls/${id}`,
     clear:   `${V1}/calls/`,
+  },
+
+  // ── Monétisation créateur ────────────────────────────────────────────────────
+  monetization: {
+    status:       `${V1}/monetization/status`,
+    request:      `${V1}/monetization/request`,
+    adminList:    `${V1}/monetization/admin/requests`,
+    adminApprove: (id: string) => `${V1}/monetization/admin/requests/${id}/approve`,
+    adminReject:  (id: string) => `${V1}/monetization/admin/requests/${id}/reject`,
   },
 
   // ── Système ───────────────────────────────────────────────────────────────
