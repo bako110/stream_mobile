@@ -22,6 +22,8 @@ const ws = (size: number) => Math.round(size * (W / 375));
 interface Props {
   onFinish: () => void;
   onLogin?: () => void;
+  onGoCGU?: () => void;
+  onGoPrivacy?: () => void;
 }
 
 // ── Orbe lumineux animé ───────────────────────────────────────────────────────
@@ -96,7 +98,7 @@ const FeaturePill: React.FC<{
 };
 
 // ── Screen ────────────────────────────────────────────────────────────────────
-export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin }) => {
+export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, onGoPrivacy }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
@@ -235,6 +237,25 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin }) => {
             <Text style={{ color: colors.primary, fontWeight: '700' }}>Connexion</Text>
           </Text>
         </TouchableOpacity>
+
+        {/* Texte legal CGU + Confidentialite */}
+        <Text style={{ fontSize: ws(11), color: loginText, textAlign: 'center', lineHeight: ws(11) * 1.7, paddingHorizontal: ws(8) }}>
+          En continuant, vous acceptez nos{' '}
+          <Text
+            style={{ color: colors.primary, fontWeight: '600' }}
+            onPress={onGoCGU}
+          >
+            Conditions d'utilisation
+          </Text>
+          {' '}et notre{' '}
+          <Text
+            style={{ color: colors.primary, fontWeight: '600' }}
+            onPress={onGoPrivacy}
+          >
+            Politique de confidentialite
+          </Text>
+          .
+        </Text>
 
       </Animated.View>
     </View>

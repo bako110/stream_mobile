@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, StyleProp, TextStyle } from 'react-native';
 
 interface Props {
@@ -15,34 +15,46 @@ export const ExpandableText: React.FC<Props> = ({
   maxLines = 3,
   textStyle,
   primaryColor,
-  moreLabel = 'Voir plus',
-  lessLabel = 'Voir moins',
+  moreLabel = 'Lire la suite',
+  lessLabel  = 'Voir moins',
 }) => {
-  const [expanded,  setExpanded]  = useState(false);
-  const [truncated, setTruncated] = useState(false);
+  const [expanded,    setExpanded]    = useState(false);
+  const [isTruncated, setIsTruncated] = useState(false);
 
-  const toggle = () => { if (truncated || expanded) setExpanded(v => !v); };
+  const onTextLayout = useCallback((e: any) => {
+    if (!expanded && e.nativeEvent.lines.length > maxLines) {
+      setIsTruncated(true);
+    }
+  }, [expanded, maxLines]);
 
   return (
     <View>
       <Text
         style={textStyle}
         numberOfLines={expanded ? undefined : maxLines}
-        onPress={toggle}
-        onTextLayout={e => {
-          if (!expanded && e.nativeEvent.lines.length >= maxLines) setTruncated(true);
-        }}
+        ellipsizeMode="tail"
+        onTextLayout={onTextLayout}
       >
         {text}
       </Text>
-      {truncated && !expanded && (
-        <TouchableOpacity onPress={toggle} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}>
-          <Text style={[st.link, { color: primaryColor }]}>{moreLabel}</Text>
+
+      {isTruncated && !expanded && (
+        <TouchableOpacity
+          onPress={() => setExpanded(true)}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
+        >
+          <Text style={[st.toggle, { color: primaryColor }]}>{moreLabel}</Text>
         </TouchableOpacity>
       )}
+
       {expanded && (
-        <TouchableOpacity onPress={toggle} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}>
-          <Text style={[st.link, { color: primaryColor }]}>{lessLabel}</Text>
+        <TouchableOpacity
+          onPress={() => setExpanded(false)}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
+        >
+          <Text style={[st.toggle, { color: primaryColor }]}>{lessLabel}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -50,5 +62,9 @@ export const ExpandableText: React.FC<Props> = ({
 };
 
 const st = StyleSheet.create({
-  link: { fontSize: 13, fontWeight: '600', marginTop: 3 },
+  toggle: {
+    fontSize:   13,
+    fontWeight: '600',
+    marginTop:  4,
+  },
 });

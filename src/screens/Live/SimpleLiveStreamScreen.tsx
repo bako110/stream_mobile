@@ -44,8 +44,7 @@ import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
-import { LiveReactionPicker } from '../../components/live/LiveReactionPicker';
-import type { LiveReactionPickerRef } from '../../components/live/LiveReactionPicker';
+import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
 import { useWs } from '../../context/WebSocketContext';
 
@@ -305,9 +304,9 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   const [giftHistory,  setGiftHistory]  = useState<GiftTick[]>([]);
   const [showGifts,    setShowGifts]    = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
-  const likeRef        = useRef<LiveLikeButtonRef>(null);
-  const reactionRef    = useRef<LiveReactionPickerRef>(null);
-  const reactionThrottle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const likeRef             = useRef<LiveLikeButtonRef>(null);
+  const { floaters, spawn } = useReactionFloaters();
+  const reactionThrottle    = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Modération
   const [handRequests, setHandRequests] = useState<HandRequest[]>([]);
   const [showRequests, setShowRequests] = useState(false);
@@ -452,7 +451,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
         // ── Réactions emoji des viewers
         if (d.type === 'reaction_added' && d.emoji) {
           for (let i = 0; i < Math.min(d.count ?? 1, 3); i++) {
-            setTimeout(() => reactionRef.current?.triggerRemote(d.emoji), i * 150);
+            setTimeout(() => spawn(d.emoji), i * 150);
           }
         }
       } catch {}
@@ -680,6 +679,9 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
     <View style={st.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
+      {/* Emojis flottants */}
+      <ReactionFloaters floaters={floaters} />
+
       {/* Vidéo */}
       <HostVideoView
         mirror={camFront}
@@ -869,7 +871,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
 
         {/* Réactions emoji */}
         <View style={[st.sideBtn, { zIndex: 30, overflow: 'visible' }]}>
-          <LiveReactionPicker ref={reactionRef} onReact={handleReact} />
+          <LiveReactionPicker onReact={(emoji) => { spawn(emoji); handleReact(emoji); }} />
           <Text style={st.sideBtnLabel}>Réagir</Text>
         </View>
 

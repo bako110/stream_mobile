@@ -40,6 +40,7 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
   }, []);
 
   const [buffering, setBuffering] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const player = useVideoPlayer(
     {
@@ -58,8 +59,9 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 
   useEffect(() => {
-    const sub = player.addEventListener('onBuffer', (isBuffering: boolean) => setBuffering(isBuffering));
-    return () => sub.remove();
+    const subBuffer = player.addEventListener('onBuffer', (isBuffering: boolean) => setBuffering(isBuffering));
+    const subReady  = player.addEventListener('onReadyToDisplay', () => setInitialLoading(false));
+    return () => { subBuffer.remove(); subReady.remove(); };
   }, []);
 
   // Sauvegarde de la progression toutes les 15 secondes
@@ -132,9 +134,12 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
         controls
       />
 
-      {buffering && (
+      {(initialLoading || buffering) && (
         <View style={s.bufferOverlay} pointerEvents="none">
           <ActivityIndicator size="large" color="#fff" />
+          {initialLoading && (
+            <Text style={s.loadingText}>Chargement en cours…</Text>
+          )}
         </View>
       )}
 
@@ -171,5 +176,6 @@ const s = StyleSheet.create({
   downloadBtn:  { backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 24, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   row:          { flexDirection: 'row', alignItems: 'center', gap: 8 },
   downloadText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  bufferOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 5 },
+  bufferOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 5 },
+  loadingText:   { color: '#fff', fontSize: 14, fontWeight: '600', marginTop: 14, opacity: 0.85 },
 });

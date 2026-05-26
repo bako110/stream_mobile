@@ -40,4 +40,24 @@ export const postService = {
     );
     return res.data;
   },
+
+  async getLikers(id: string, page = 1, limit = 30): Promise<PostLiker[]> {
+    try {
+      const res = await apiClient.get<PostLiker[] | { data: PostLiker[] }>(
+        `${Endpoints.posts.likers(id)}?page=${page}&limit=${limit}`
+      );
+      const raw = res.data;
+      return Array.isArray(raw) ? raw : Array.isArray((raw as any)?.data) ? (raw as any).data : [];
+    } catch { return []; }
+  },
 };
+
+export interface PostLiker {
+  id: string;
+  username?: string | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  is_verified?: boolean;
+  is_following?: boolean;
+  bio?: string | null;
+}

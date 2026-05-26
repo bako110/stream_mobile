@@ -42,8 +42,7 @@ import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
-import { LiveReactionPicker } from '../../components/live/LiveReactionPicker';
-import type { LiveReactionPickerRef } from '../../components/live/LiveReactionPicker';
+import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
@@ -236,7 +235,7 @@ const RoomContent: React.FC<{
   likeCount:    number;
   onLike:       () => void;
   likeRef:      React.RefObject<LiveLikeButtonRef | null>;
-  reactionRef:  React.RefObject<LiveReactionPickerRef | null>;
+  reactionSpawnRef: React.RefObject<((emoji: string) => void) | null>;
   onReact:      (emoji: string) => void;
   elapsed:      number;
   goOnStageRef:  { current: (() => void) | null };
@@ -245,10 +244,14 @@ const RoomContent: React.FC<{
   live, liveId, myIdentity, isHost, viewerCount, messages, chatInput, setChatInput,
   sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, onDeleteMsg, onEditMsg,
   giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike, likeRef,
-  reactionRef, onReact,
+  reactionSpawnRef, onReact,
   elapsed, goOnStageRef, leaveStageRef,
 }) => {
   const { localParticipant } = useLocalParticipant();
+  const { floaters, spawn }  = useReactionFloaters();
+
+  // Exposer spawn au parent pour les réactions WS des autres
+  React.useEffect(() => { reactionSpawnRef.current = spawn; }, [spawn, reactionSpawnRef]);
   const [onStage,    setOnStage]    = useState(false);
   const [camOn,      setCamOn]      = useState(false);
   const [micOn,      setMicOn]      = useState(false);
@@ -329,6 +332,9 @@ const RoomContent: React.FC<{
   return (
     <KeyboardAvoidingView style={st.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+      {/* Emojis flottants — dans le root pour être au-dessus de tout */}
+      <ReactionFloaters floaters={floaters} />
 
       {/* Vidéo */}
       <MultiVideoView
@@ -545,7 +551,7 @@ const RoomContent: React.FC<{
       <View style={st.sideControls}>
         {/* Réactions emoji */}
         <View style={[st.sideBtn, { zIndex: 30, overflow: 'visible' }]}>
-          <LiveReactionPicker ref={reactionRef} onReact={onReact} />
+          <LiveReactionPicker onReact={(emoji) => { spawn(emoji); onReact(emoji); }} />
           <Text style={st.sideBtnLabel}>Réagir</Text>
         </View>
 
@@ -682,8 +688,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const leaveStageRef     = useRef<(() => void) | null>(null);
   // Ref vers le bouton coeur pour déclencher l'animation depuis le WS
   const remoteLikeRef     = useRef<import('../../components/live/LiveLikeButton').LiveLikeButtonRef | null>(null);
-  // Ref vers le picker de réactions pour déclencher les emojis flottants depuis le WS
-  const remoteReactionRef = useRef<LiveReactionPickerRef | null>(null);
+  const reactionSpawnRef  = useRef<((emoji: string) => void) | null>(null);
   const reactionThrottle  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { currentUser } = useUser();
@@ -822,7 +827,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 
         if (d.type === 'reaction_added' && d.emoji) {
           for (let i = 0; i < Math.min(d.count ?? 1, 3); i++) {
-            setTimeout(() => remoteReactionRef.current?.triggerRemote(d.emoji), i * 150);
+            setTimeout(() => reactionSpawnRef.current?.(d.emoji), i * 150);
           }
         }
 
@@ -952,11 +957,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   }, [liveId]);
 
   const handleReact = useCallback((emoji: string) => {
-    // Throttle 500ms pour éviter le spam
     if (reactionThrottle.current) return;
-    reactionThrottle.current = setTimeout(() => {
-      reactionThrottle.current = null;
-    }, 500);
+    reactionThrottle.current = setTimeout(() => { reactionThrottle.current = null; }, 500);
     try { apiClient.post(Endpoints.lives.react(liveId), { emoji }); }
     catch {}
   }, [liveId]);
@@ -1034,7 +1036,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         likeCount={likeCount}
         onLike={handleLike}
         likeRef={remoteLikeRef}
-        reactionRef={remoteReactionRef}
+        reactionSpawnRef={reactionSpawnRef}
         onReact={handleReact}
         elapsed={elapsed}
         goOnStageRef={goOnStageRef}

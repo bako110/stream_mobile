@@ -83,7 +83,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
       return;
     }
     const age = Date.now() - lastLoadedAtRef.current;
-    if (age > 60_000) load(true);
+    if (age > 5_000) load(true);
   }, [load]));
 
   const displayName = user
@@ -140,23 +140,58 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-          {/* ── Avatar & identité ───────────────────────────────────────── */}
-          <View
-            style={[s.avatarSection, { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider }]}
-          >
-            <View style={[s.avatarCircle, { borderColor: colors.primary + '50' }]}>
-              {user?.avatar_url ? (
-                <Image source={{ uri: user.avatar_url }} style={{ width: '100%', height: '100%' }} />
+          {/* ── Bannière + Avatar ───────────────────────────────────────── */}
+          <View style={{ backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
+            {/* Bannière */}
+            <View style={{ height: 140, width: '100%' }}>
+              {user?.banner_url ? (
+                <Image source={{ uri: user.banner_url, cache: 'reload' }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
               ) : (
                 <LinearGradient
                   colors={[colors.gradientStart, colors.gradientEnd]}
-                  style={s.avatarGrad}
-                >
-                  <Text style={[s.avatarInitials, { color: colors.textOnBrand }]}>{initials}</Text>
-                </LinearGradient>
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={{ width: '100%', height: '100%' }}
+                />
               )}
+              {/* Bouton modifier la bannière */}
+              <TouchableOpacity
+                onPress={onEditProfile}
+                style={{ position: 'absolute', bottom: 8, right: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14 }}
+                activeOpacity={0.8}
+              >
+                <Icon name="camera" size={13} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Modifier</Text>
+              </TouchableOpacity>
             </View>
 
+            {/* Avatar chevauchant */}
+            <View style={{ paddingHorizontal: 16, marginTop: -40, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 12 }}>
+              <View style={[s.avatarCircle, { borderColor: colors.surface, borderWidth: 4 }]}>
+                {user?.avatar_url ? (
+                  <Image source={{ uri: user.avatar_url, cache: 'reload' }} style={{ width: '100%', height: '100%', borderRadius: 999 }} />
+                ) : (
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    style={[s.avatarGrad, { borderRadius: 999 }]}
+                  >
+                    <Text style={[s.avatarInitials, { color: colors.textOnBrand }]}>{initials}</Text>
+                  </LinearGradient>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={onEditProfile}
+                style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.divider, backgroundColor: colors.surface }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>Modifier le profil</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ── Identité ───────────────────────────────────────── */}
+          <View
+            style={[s.avatarSection, { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, paddingTop: 4 }]}
+          >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
               <Text style={[s.profileName, { color: colors.textPrimary }]}>{displayName}</Text>
               {user?.is_verified && <VerifiedBadge size={20} />}

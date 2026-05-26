@@ -3,7 +3,6 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   Image, StyleSheet, ActivityIndicator,
 } from 'react-native';
-import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { StoryViewer } from './StoryViewer';
@@ -85,7 +84,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           contentContainerStyle={s.scroll}
         >
           {/* ── Mon avatar ── */}
-          <Animated.View entering={FadeIn.duration(300)}>
+          <View>
             <TouchableOpacity
               style={s.item}
               activeOpacity={0.8}
@@ -147,7 +146,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                 {myGroup ? 'Ma story' : 'Ajouter'}
               </Text>
             </TouchableOpacity>
-          </Animated.View>
+          </View>
 
           {/* ── Separateur ── */}
           {(otherGroups.length > 0 || loading) && (
@@ -159,51 +158,38 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
             const idx       = myGroup ? i + 1 : i;
             const user      = group.user;
             const name      = user.display_name ?? user.username;
-            const firstStory = group.stories[0];
-            const thumb     = firstStory?.thumbnail_url ?? firstStory?.media_url ?? null;
             return (
-              <Animated.View key={group.user.id} entering={FadeInRight.delay(i * 50).duration(300)}>
+              <View key={group.user.id}>
                 <TouchableOpacity style={s.item} activeOpacity={0.8} onPress={() => openViewer(idx)}>
                   <View style={s.storyWrap}>
+                    {/* Ring : gradient si non vu, gris si vu */}
                     {group.has_unseen ? (
                       <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.ring}>
                         <View style={s.avatarInner}>
-                          {thumb
-                            ? <Image source={{ uri: thumb }} style={s.avatar} resizeMode="cover" />
-                            : user.avatar_url
-                              ? <Image source={{ uri: user.avatar_url }} style={s.avatar} />
-                              : <View style={[s.avatarFallback, { backgroundColor: '#302B63' }]}>
-                                  <Text style={s.avatarInitial}>{name[0]?.toUpperCase()}</Text>
-                                </View>
+                          {user.avatar_url
+                            ? <Image source={{ uri: user.avatar_url }} style={s.avatar} />
+                            : <View style={[s.avatarFallback, { backgroundColor: '#302B63' }]}>
+                                <Text style={s.avatarInitial}>{name[0]?.toUpperCase()}</Text>
+                              </View>
                           }
                         </View>
                       </LinearGradient>
                     ) : (
                       <View style={[s.ring, s.ringEmpty, { borderColor: colors.border ?? '#ddd' }]}>
                         <View style={s.avatarInner}>
-                          {thumb
-                            ? <Image source={{ uri: thumb }} style={[s.avatar, s.avatarSeen]} resizeMode="cover" />
-                            : user.avatar_url
-                              ? <Image source={{ uri: user.avatar_url }} style={[s.avatar, s.avatarSeen]} />
-                              : <View style={[s.avatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]}>
-                                  <Text style={[s.avatarInitial, { color: colors.textSecondary, opacity: 0.6 }]}>{name[0]?.toUpperCase()}</Text>
-                                </View>
+                          {user.avatar_url
+                            ? <Image source={{ uri: user.avatar_url }} style={[s.avatar, s.avatarSeen]} />
+                            : <View style={[s.avatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]}>
+                                <Text style={[s.avatarInitial, { color: colors.textSecondary, opacity: 0.6 }]}>{name[0]?.toUpperCase()}</Text>
+                              </View>
                           }
                         </View>
                       </View>
                     )}
-                    {/* Avatar en overlay en bas à gauche */}
-                    {thumb && user.avatar_url && (
-                      <View style={s.avatarOverlay}>
-                        <Image source={{ uri: user.avatar_url }} style={s.avatarOverlayImg} />
-                      </View>
-                    )}
-                    {/* Nombre de stories si > 1 */}
-                    {group.stories.length > 1 && (
-                      <View style={[s.countBadge, { backgroundColor: colors.primary ?? '#7B3FF2' }]}>
-                        <Text style={s.countText}>{group.stories.length}</Text>
-                      </View>
-                    )}
+                    {/* Badge stories en bas à droite — style Facebook */}
+                    <View style={[s.storyBadge, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.background }]}>
+                      <Text style={s.storyBadgeText}>{group.stories.length}</Text>
+                    </View>
                   </View>
                   <View style={{ alignItems: 'center', gap: 2 }}>
                     <Text style={[s.name, { color: group.has_unseen ? colors.textPrimary : colors.textSecondary }]} numberOfLines={1}>
@@ -212,7 +198,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                     {user.is_verified && <VerifiedBadge size={11} />}
                   </View>
                 </TouchableOpacity>
-              </Animated.View>
+              </View>
             );
           })}
 
@@ -246,25 +232,27 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
   );
 };
 
-const RING_SIZE   = 52;
-const AVATAR_SIZE = RING_SIZE - 5;
+const RING_SIZE    = 54;
+const RING_RADIUS  = 16;
+const AVATAR_SIZE  = RING_SIZE - 6;
+const AVATAR_RADIUS = RING_RADIUS - 3;
 
 const s = StyleSheet.create({
   container: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    height: 80,
+    height: 88,
   },
   scroll: {
     paddingHorizontal: 12,
-    paddingVertical:   6,
-    gap:               8,
+    paddingVertical:   8,
+    gap:               10,
     alignItems:        'center',
     flexGrow: 1,
   },
   item: {
     alignItems: 'center',
-    gap:        4,
-    width:      RING_SIZE + 4,
+    gap:        5,
+    width:      RING_SIZE + 6,
   },
 
   // ── Rings ────────────────────────────────────────────────────────────────────
@@ -273,8 +261,8 @@ const s = StyleSheet.create({
   ring: {
     width:         RING_SIZE,
     height:        RING_SIZE,
-    borderRadius:  RING_SIZE / 2,
-    padding:       2.5,
+    borderRadius:  RING_RADIUS,
+    padding:       3,
     alignItems:    'center',
     justifyContent:'center',
   },
@@ -285,7 +273,7 @@ const s = StyleSheet.create({
   avatarInner: {
     width:         AVATAR_SIZE,
     height:        AVATAR_SIZE,
-    borderRadius:  AVATAR_SIZE / 2,
+    borderRadius:  AVATAR_RADIUS,
     overflow:      'hidden',
     backgroundColor: '#fff',
   },
@@ -300,11 +288,11 @@ const s = StyleSheet.create({
   // ── Add pill ─────────────────────────────────────────────────────────────────
   addPill: {
     position:      'absolute',
-    bottom:        -1,
-    right:         -1,
-    width:         18,
-    height:        18,
-    borderRadius:  9,
+    bottom:        -3,
+    right:         -3,
+    width:         20,
+    height:        20,
+    borderRadius:  6,
     alignItems:    'center',
     justifyContent:'center',
     borderWidth:   2,
@@ -330,6 +318,21 @@ const s = StyleSheet.create({
 
   // ── Separateur ───────────────────────────────────────────────────────────────
   sep: { width: 1, height: 40, borderRadius: 1, marginHorizontal: 4 },
+
+  // ── Story count badge (bas droite) ───────────────────────────────────────────
+  storyBadge: {
+    position:        'absolute',
+    bottom:          -3,
+    right:           -3,
+    minWidth:        18,
+    height:          18,
+    borderRadius:    6,
+    borderWidth:     2,
+    alignItems:      'center',
+    justifyContent:  'center',
+    paddingHorizontal: 3,
+  },
+  storyBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 
   // ── Label ────────────────────────────────────────────────────────────────────
   name: { fontSize: 10, fontWeight: '600', textAlign: 'center' },

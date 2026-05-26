@@ -50,14 +50,20 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   const toggleMute = () => {
     const next = !isMuted;
     setIsMuted(next);
-    player.muted = next;
+    player.muted  = next;
+    player.volume = next ? 0 : 1;
   };
 
-  // Pause/reprend selon visibilité dans le feed
+  // Autoplay/pause selon visibilité dans le feed
   useEffect(() => {
     if (isActive === undefined) return;
     if (isActive) {
-      if (playing) { setStarted(true); player.play(); }
+      player.muted  = true;
+      player.volume = 0;
+      setIsMuted(true);
+      setStarted(true);
+      setPlaying(true);
+      player.play();
     } else {
       player.pause();
       setPlaying(false);
@@ -93,7 +99,6 @@ export const InlineVideoPlayer: React.FC<Props> = ({
           <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : null}
 
-        {/* Player inline */}
         <VideoView
           player={player}
           style={StyleSheet.absoluteFill}
@@ -101,7 +106,7 @@ export const InlineVideoPlayer: React.FC<Props> = ({
           controls={false}
         />
 
-        {/* Overlay : tap = play/pause si pas encore démarré */}
+        {/* Overlay play/pause central */}
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
@@ -119,17 +124,32 @@ export const InlineVideoPlayer: React.FC<Props> = ({
           )}
         </TouchableOpacity>
 
-        {/* Bouton volume */}
-        {playing && (
-          <TouchableOpacity style={styles.muteBtn} onPress={toggleMute} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        {/* Bouton volume — capture le touch avant l'overlay */}
+        <View
+          style={styles.muteBtn}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={() => {
+            const next = !isMuted;
+            setIsMuted(next);
+            player.muted  = next;
+            player.volume = next ? 0 : 1;
+          }}
+        >
+          <View style={styles.muteBtnInner}>
             <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
-          </TouchableOpacity>
-        )}
+          </View>
+        </View>
 
         {/* Bouton plein écran */}
-        <TouchableOpacity style={styles.fullscreenBtn} onPress={() => setFullscreen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="maximize" size={18} color="#fff" />
-        </TouchableOpacity>
+        <View
+          style={styles.fullscreenBtn}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={() => setFullscreen(true)}
+        >
+          <View style={styles.muteBtnInner}>
+            <Icon name="maximize" size={16} color="#fff" />
+          </View>
+        </View>
 
         {/* Modal plein écran */}
         <Modal visible={fullscreen} statusBarTranslucent animationType="fade" onRequestClose={() => setFullscreen(false)}>
@@ -171,7 +191,7 @@ export const InlineVideoPlayer: React.FC<Props> = ({
         />
       ) : null}
 
-      {/* VideoView — toujours monté pour éviter un rechargement à chaque play */}
+      {/* VideoView */}
       <VideoView
         player={player}
         style={StyleSheet.absoluteFill}
@@ -179,7 +199,7 @@ export const InlineVideoPlayer: React.FC<Props> = ({
         controls={false}
       />
 
-      {/* Overlay tap — navigue vers détails si onPress fourni, sinon play/pause */}
+      {/* Overlay tap central — play/pause ou navigation */}
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
         activeOpacity={1}
@@ -188,18 +208,27 @@ export const InlineVideoPlayer: React.FC<Props> = ({
         {!playing && (
           <View style={styles.playOverlay}>
             <View style={styles.playCircle}>
-              <Icon name="play" size={28} color="#fff" style={{ marginLeft: 3 }} />
+              <Icon name="play" size={32} color="#fff" style={{ marginLeft: 4 }} />
             </View>
           </View>
         )}
       </TouchableOpacity>
 
-      {/* Bouton volume (coin bas-droit) */}
-      {playing && (
-        <TouchableOpacity style={styles.muteBtn} onPress={toggleMute} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      {/* Bouton volume — capture le touch AVANT l'overlay via onStartShouldSetResponder */}
+      <View
+        style={styles.muteBtn}
+        onStartShouldSetResponder={() => true}
+        onResponderGrant={() => {
+          const next = !isMuted;
+          setIsMuted(next);
+          player.muted = next;
+          player.volume = next ? 0 : 1;
+        }}
+      >
+        <View style={styles.muteBtnInner}>
           <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
-        </TouchableOpacity>
-      )}
+        </View>
+      </View>
     </View>
   );
 };
@@ -233,15 +262,20 @@ const styles = StyleSheet.create({
     paddingVertical:   3,
   },
   muteBtn: {
-    position:        'absolute',
-    bottom:          10,
-    right:           10,
-    width:           34,
-    height:          34,
-    borderRadius:    17,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    position: 'absolute',
+    bottom:   12,
+    right:    12,
+    zIndex:   10,
+  },
+  muteBtnInner: {
+    width:           36,
+    height:          36,
+    borderRadius:    18,
+    backgroundColor: 'rgba(0,0,0,0.62)',
     alignItems:      'center',
     justifyContent:  'center',
+    borderWidth:     1,
+    borderColor:     'rgba(255,255,255,0.18)',
   },
   fullscreenBtn: {
     position:        'absolute',

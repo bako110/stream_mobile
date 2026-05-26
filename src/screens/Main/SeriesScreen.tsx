@@ -1,11 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, Image, RefreshControl,
   StyleSheet, Dimensions, ScrollView, StatusBar, FlatList,
   TextInput,
 } from 'react-native';
 import Animated, {
-  FadeIn, useSharedValue, useAnimatedStyle, withSpring,
+  FadeIn, FadeInDown, useSharedValue, useAnimatedStyle,
+  withSpring, withTiming, interpolate, Extrapolation,
+  useAnimatedScrollHandler, runOnJS,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -18,71 +20,182 @@ import { contentService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { FilmItem } from './FilmsScreen';
+import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
 
 type NavProp = NativeStackNavigationProp<MainStackParamList>;
 
-const { width: SW } = Dimensions.get('window');
-const H_PAD  = 16;
-const GUTTER = 10;
-const CARD_W = (SW - H_PAD * 2 - GUTTER) / 2;
-const HERO_H = Math.round(SW * 0.65);
+const { width: SW, height: SH } = Dimensions.get('window');
+const H_PAD   = 14;
+const GUTTER  = 8;
+const CARD_W  = (SW - H_PAD * 2 - GUTTER) / 2;
+const CARD_W_H = Math.round(SW * 0.40);
+const HERO_H  = Math.round(SH * 0.58);
 
-type SortKey   = 'recent' | 'rating' | 'seasons';
+const PAGE_LIMIT = 20;
+const PURPLE = '#7B3FF2';
+const PURPLE_DARK = '#5B2DB0';
+
+type SortKey   = 'recent' | 'rating' | 'seasons' | 'views';
 type FilterKey = 'all' | 'premium' | 'free' | 'ongoing';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HERO BANNER (première série mise en avant)
+// SHIMMER
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ShimmerCard: React.FC<{ width: number; height: number; colors: any }> = ({ width, height, colors }) => {
+  const anim = useSharedValue(0);
+  useEffect(() => {
+    anim.value = withTiming(1, { duration: 900 });
+    const id = setInterval(() => {
+      anim.value = 0;
+      anim.value = withTiming(1, { duration: 900 });
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(anim.value, [0, 0.5, 1], [0.4, 0.8, 0.4], Extrapolation.CLAMP),
+  }));
+  return (
+    <Animated.View style={[{ width, height, borderRadius: 12, backgroundColor: colors.skeleton ?? colors.backgroundSecondary }, style]} />
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HERO BANNER — série vedette avec carousel
 // ─────────────────────────────────────────────────────────────────────────────
 
 const HeroBanner: React.FC<{
-  item: FilmItem;
-  purchased: boolean;
-  onPress: () => void;
-}> = ({ item, purchased, onPress }) => {
-  const bg = item.banner_url || item.thumbnail_url;
-  const isPremiumUnpaid = item.is_premium && !purchased;
+  items: FilmItem[];
+  purchasedIds: Set<string>;
+  hasActiveSub: boolean;
+  onPress: (item: FilmItem) => void;
+}> = ({ items, purchasedIds, hasActiveSub, onPress }) => {
+  const [idx, setIdx] = useState(0);
+  const ref   = useRef<FlatList>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const slides = items.slice(0, 5);
+
+  const advance = useCallback(() => {
+    setIdx(prev => {
+      const n = (prev + 1) % slides.length;
+      ref.current?.scrollToIndex({ index: n, animated: true });
+      return n;
+    });
+  }, [slides.length]);
+
+  useEffect(() => {
+    if (slides.length < 2) return;
+    timer.current = setInterval(advance, 6000);
+    return () => { if (timer.current) clearInterval(timer.current); };
+  }, [advance, slides.length]);
+
+  const onScrollEnd = (e: any) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / SW);
+    setIdx(i);
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(advance, 6000);
+  };
+
+  if (!slides.length) return null;
 
   return (
     <View style={{ height: HERO_H }}>
+      <FlatList
+        ref={ref}
+        data={slides}
+        keyExtractor={i => i.id}
+        horizontal pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onScrollEnd}
+        getItemLayout={(_, i) => ({ length: SW, offset: SW * i, index: i })}
+        renderItem={({ item }) => (
+          <HeroSlide
+            item={item}
+            purchased={purchasedIds.has(item.id) || (hasActiveSub && !!item.is_premium)}
+            onPress={() => onPress(item)}
+          />
+        )}
+      />
+      {slides.length > 1 && (
+        <View style={hs.dotsRow}>
+          {slides.map((_, i) => (
+            <View key={i} style={[hs.dot, i === idx ? hs.dotActive : hs.dotInactive]} />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
+const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => void }> = ({ item, purchased, onPress }) => {
+  const bg = item.banner_url || item.thumbnail_url;
+  const isPremiumUnpaid = item.is_premium && !purchased;
+  return (
+    <View style={{ width: SW, height: HERO_H }}>
       {bg
         ? <Image source={{ uri: bg }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-        : <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0d0d1a', alignItems: 'center', justifyContent: 'center' }]}><Icon name="tv" size={64} color="#333" /></View>
+        : <View style={[StyleSheet.absoluteFill, { backgroundColor: '#08050f', alignItems: 'center', justifyContent: 'center' }]}><Icon name="tv" size={64} color="#1a1a2e" /></View>
       }
+      {/* Gradient violet -> noir pour identité série */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.97)']}
-        locations={[0, 0.3, 0.65, 1]}
+        colors={[`${PURPLE}00`, `${PURPLE}11`, 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.92)', '#000']}
+        locations={[0, 0.2, 0.5, 0.78, 1]}
         style={StyleSheet.absoluteFill}
       />
-      <View style={hb.content}>
-        <View style={hb.typeBadge}>
-          <Icon name="tv" size={9} color="#7B3FF2" />
-          <Text style={hb.typeText}>SÉRIE</Text>
+      <LinearGradient
+        colors={['rgba(0,0,0,0.35)', 'transparent']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={hs.content}>
+        {/* Type badge */}
+        <View style={hs.serieTag}>
+          <Icon name="tv" size={9} color={PURPLE} />
+          <Text style={hs.serieTagText}>SÉRIE</Text>
         </View>
-        {item.is_premium && (
-          purchased
-            ? <View style={hb.accessBadge}><Icon name="check-circle" size={9} color="#10b981" /><Text style={hb.accessText}>ACCÈS</Text></View>
-            : <View style={hb.premiumBadge}><Icon name="lock" size={9} color="#fff" /><Text style={hb.premiumText}>PREMIUM</Text></View>
-        )}
-        <Text style={hb.title} numberOfLines={2}>{item.title}</Text>
-        <View style={hb.meta}>
-          {item.total_seasons ? <Text style={hb.metaText}>{item.total_seasons} saison{item.total_seasons > 1 ? 's' : ''}</Text> : null}
-          {item.total_seasons && item.year ? <Text style={hb.metaDot}>•</Text> : null}
-          {item.year ? <Text style={hb.metaText}>{item.year}</Text> : null}
-          {item.average_rating ? (
-            <><Text style={hb.metaDot}>•</Text><Icon name="star" size={10} color="#FFB800" /><Text style={[hb.metaText, { color: '#FFB800' }]}>{item.average_rating.toFixed(1)}</Text></>
+        <View style={hs.badgeRow}>
+          {item.is_premium && (
+            purchased
+              ? <View style={hs.accessBadge}><Icon name="check-circle" size={9} color="#10b981" /><Text style={hs.accessText}>ACCÈS</Text></View>
+              : <View style={hs.premiumBadge}><Icon name="zap" size={9} color="#fff" /><Text style={hs.premiumText}>PREMIUM</Text></View>
+          )}
+          {item.total_seasons ? (
+            <View style={hs.seasonTag}>
+              <Icon name="layers" size={9} color={PURPLE} />
+              <Text style={hs.seasonTagText}>{item.total_seasons} saison{item.total_seasons > 1 ? 's' : ''}</Text>
+            </View>
           ) : null}
+          {item.year ? <Text style={hs.yearTag}>{item.year}</Text> : null}
         </View>
-        {item.synopsis ? <Text style={hb.synopsis} numberOfLines={2}>{item.synopsis}</Text> : null}
-        <View style={hb.buttons}>
-          <TouchableOpacity style={[hb.btnWatch, isPremiumUnpaid && { backgroundColor: '#E8501A' }]} onPress={onPress} activeOpacity={0.88}>
-            <Icon name={isPremiumUnpaid ? 'lock' : 'play'} size={15} color={isPremiumUnpaid ? '#fff' : '#000'} />
-            <Text style={[hb.btnWatchText, isPremiumUnpaid && { color: '#fff' }]}>
-              {isPremiumUnpaid ? `Acheter · ${item.price ?? ''}€` : 'Regarder'}
-            </Text>
+        <Text style={hs.title} numberOfLines={2}>{item.title}</Text>
+        {item.average_rating ? (
+          <View style={hs.ratingRow}>
+            {[1,2,3,4,5].map(n => (
+              <Icon key={n} name="star" size={11} color={n <= Math.round(item.average_rating! / 2) ? '#FFB800' : 'rgba(255,255,255,0.2)'} />
+            ))}
+            <Text style={hs.ratingTxt}>{item.average_rating.toFixed(1)}</Text>
+          </View>
+        ) : null}
+        {item.synopsis ? <Text style={hs.synopsis} numberOfLines={2}>{item.synopsis}</Text> : null}
+        <View style={hs.buttons}>
+          <TouchableOpacity style={[hs.btnWatch, isPremiumUnpaid && { overflow: 'hidden' }]} onPress={onPress} activeOpacity={0.85}>
+            {isPremiumUnpaid ? (
+              <LinearGradient colors={['#E8501A', '#c43e14']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={hs.btnGrad}>
+                <Icon name="lock" size={15} color="#fff" />
+                <Text style={[hs.btnWatchText, { color: '#fff' }]}>Acheter · {item.price ?? ''}€</Text>
+              </LinearGradient>
+            ) : (
+              <LinearGradient colors={[PURPLE, PURPLE_DARK]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={hs.btnGrad}>
+                <Icon name="play" size={15} color="#fff" />
+                <Text style={[hs.btnWatchText, { color: '#fff' }]}>Regarder</Text>
+              </LinearGradient>
+            )}
           </TouchableOpacity>
-          <TouchableOpacity style={hb.btnMore} onPress={onPress} activeOpacity={0.88}>
-            <Icon name="info" size={15} color="#fff" />
-            <Text style={hb.btnMoreText}>Détails</Text>
+          <TouchableOpacity style={hs.btnMore} onPress={onPress} activeOpacity={0.85}>
+            <View style={hs.btnMoreInner}>
+              <Icon name="info" size={15} color="#fff" />
+              <Text style={hs.btnMoreText}>Détails</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -90,168 +203,166 @@ const HeroBanner: React.FC<{
   );
 };
 
-const hb = StyleSheet.create({
-  content:      { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 18, paddingBottom: 24 },
-  typeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#7B3FF222', borderWidth: 1, borderColor: '#7B3FF2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, marginBottom: 8 },
-  typeText:     { color: '#7B3FF2', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#E8501A', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, marginBottom: 8 },
-  premiumText:  { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  accessBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#10b98122', borderWidth: 1, borderColor: '#10b981', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, marginBottom: 8 },
-  accessText:   { color: '#10b981', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  title:        { color: '#fff', fontSize: 24, fontWeight: '900', lineHeight: 29, letterSpacing: -0.4, marginBottom: 8 },
-  meta:         { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  metaText:     { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600' },
-  metaDot:      { color: 'rgba(255,255,255,0.35)', fontSize: 10 },
-  synopsis:     { color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 19, marginBottom: 14 },
-  buttons:      { flexDirection: 'row', gap: 10 },
-  btnWatch:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fff', paddingVertical: 12, borderRadius: 10 },
-  btnWatchText: { color: '#000', fontSize: 14, fontWeight: '800' },
-  btnMore:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10 },
-  btnMoreText:  { color: '#fff', fontSize: 14, fontWeight: '700' },
+const hs = StyleSheet.create({
+  content:     { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 30 },
+  serieTag:    { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: `${PURPLE}25`, borderWidth: 1, borderColor: `${PURPLE}80`, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6, marginBottom: 10 },
+  serieTagText: { color: PURPLE, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  badgeRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
+  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8501A', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6 },
+  premiumText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  accessBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: '#10b981', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6 },
+  accessText:  { color: '#10b981', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  seasonTag:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${PURPLE}20`, borderWidth: 1, borderColor: `${PURPLE}60`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5 },
+  seasonTagText: { color: PURPLE, fontSize: 10, fontWeight: '700' },
+  yearTag:     { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5 },
+  title:       { color: '#fff', fontSize: 27, fontWeight: '900', lineHeight: 32, letterSpacing: -0.7, marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
+  ratingRow:   { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  ratingTxt:   { color: '#FFB800', fontSize: 12, fontWeight: '700', marginLeft: 4 },
+  synopsis:    { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 19, marginBottom: 18 },
+  buttons:     { flexDirection: 'row', gap: 10 },
+  btnWatch:    { flex: 1, borderRadius: 12, overflow: 'hidden' },
+  btnGrad:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
+  btnWatchText: { fontSize: 14, fontWeight: '800' },
+  btnMore:     { overflow: 'hidden', borderRadius: 12 },
+  btnMoreInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 22, paddingVertical: 13 },
+  btnMoreText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  dotsRow:     { position: 'absolute', bottom: 142, right: 20, flexDirection: 'row', gap: 5, alignItems: 'center' },
+  dot:         { height: 3, borderRadius: 2 },
+  dotActive:   { width: 20, backgroundColor: PURPLE },
+  dotInactive: { width: 5, backgroundColor: 'rgba(255,255,255,0.25)' },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FILTER BAR
+// HORIZONTAL ROW
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FilterBar: React.FC<{
-  sort: SortKey;
-  filter: FilterKey;
-  search: string;
+const HorizontalRow: React.FC<{
+  title: string;
+  items: FilmItem[];
+  purchasedIds: Set<string>;
+  hasActiveSub: boolean;
   colors: any;
-  onSort: (s: SortKey) => void;
-  onFilter: (f: FilterKey) => void;
-  onSearch: (q: string) => void;
-}> = ({ sort, filter, search, colors, onSort, onFilter, onSearch }) => {
-  const SORTS: { key: SortKey; label: string; icon: string }[] = [
-    { key: 'recent',  label: 'Récent',  icon: 'clock' },
-    { key: 'rating',  label: 'Note',    icon: 'star' },
-    { key: 'seasons', label: 'Saisons', icon: 'layers' },
-  ];
-  const FILTERS: { key: FilterKey; label: string }[] = [
-    { key: 'all',     label: 'Toutes' },
-    { key: 'ongoing', label: 'En cours' },
-    { key: 'premium', label: 'Premium' },
-    { key: 'free',    label: 'Gratuit' },
-  ];
-
+  onPress: (item: FilmItem) => void;
+  accent?: string;
+}> = ({ title, items, purchasedIds, hasActiveSub, colors, onPress, accent }) => {
+  if (!items.length) return null;
   return (
-    <View style={{ paddingHorizontal: H_PAD, gap: 10, paddingTop: 14, paddingBottom: 6 }}>
-      <View style={[fb.searchBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-        <Icon name="search" size={15} color={colors.textTertiary} />
-        <TextInput
-          style={[fb.searchInput, { color: colors.textPrimary }]}
-          placeholder="Rechercher une série..."
-          placeholderTextColor={colors.textTertiary}
-          value={search}
-          onChangeText={onSearch}
-          returnKeyType="search"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => onSearch('')}>
-            <Icon name="x" size={14} color={colors.textTertiary} />
-          </TouchableOpacity>
-        )}
+    <Animated.View entering={FadeInDown.delay(100).springify()} style={{ marginBottom: 24 }}>
+      <View style={[rh.header, { paddingHorizontal: H_PAD }]}>
+        {accent ? <View style={[rh.accentLine, { backgroundColor: accent }]} /> : null}
+        <Text style={[rh.title, { color: colors.textPrimary }]}>{title}</Text>
       </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-        {SORTS.map(s => {
-          const active = sort === s.key;
-          return (
-            <TouchableOpacity
-              key={s.key}
-              onPress={() => onSort(s.key)}
-              style={[fb.chip, { backgroundColor: active ? '#7B3FF2' : colors.backgroundSecondary, borderColor: active ? '#7B3FF2' : colors.border }]}
-              activeOpacity={0.8}
-            >
-              <Icon name={s.icon} size={12} color={active ? '#fff' : colors.textTertiary} />
-              <Text style={[fb.chipText, { color: active ? '#fff' : colors.textSecondary }]}>{s.label}</Text>
+      <FlatList
+        horizontal
+        data={items}
+        keyExtractor={i => i.id}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 10 }}
+        renderItem={({ item, index }) => (
+          <Animated.View entering={FadeInDown.delay(index * 40).springify()}>
+            <TouchableOpacity onPress={() => onPress(item)} activeOpacity={0.85}>
+              <View style={[rh.card, { backgroundColor: colors.backgroundSecondary }]}>
+                {item.thumbnail_url
+                  ? <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  : <View style={[StyleSheet.absoluteFill, rh.placeholder]}><Icon name="tv" size={24} color={colors.textTertiary} /></View>
+                }
+                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} locations={[0.4, 1]} style={rh.gradient} pointerEvents="none" />
+                {item.total_seasons ? (
+                  <View style={rh.seasonBadge}>
+                    <Icon name="layers" size={7} color={PURPLE} />
+                    <Text style={rh.seasonBadgeTxt}>{item.total_seasons}S</Text>
+                  </View>
+                ) : null}
+                {item.is_premium && (
+                  purchasedIds.has(item.id) || (hasActiveSub && !!item.is_premium)
+                    ? <View style={[rh.cornerBadge, { backgroundColor: 'rgba(16,185,129,0.9)' }]}><Icon name="check" size={7} color="#fff" /></View>
+                    : <View style={[rh.cornerBadge, { backgroundColor: '#E8501A' }]}><Icon name="zap" size={7} color="#fff" /></View>
+                )}
+                <View style={rh.overlay}>
+                  <Text style={rh.overlayTitle} numberOfLines={2}>{item.title}</Text>
+                </View>
+              </View>
             </TouchableOpacity>
-          );
-        })}
-        <View style={fb.divider} />
-        {FILTERS.map(f => {
-          const active = filter === f.key;
-          return (
-            <TouchableOpacity
-              key={f.key}
-              onPress={() => onFilter(f.key)}
-              style={[fb.chip, {
-                backgroundColor: active ? (colors.accentOrange ?? '#F97316') + 'ee' : colors.backgroundSecondary,
-                borderColor: active ? (colors.accentOrange ?? '#F97316') : colors.border,
-              }]}
-              activeOpacity={0.8}
-            >
-              <Text style={[fb.chipText, { color: active ? '#fff' : colors.textSecondary }]}>{f.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
+          </Animated.View>
+        )}
+      />
+    </Animated.View>
   );
 };
 
-const fb = StyleSheet.create({
-  searchBox:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
-  searchInput: { flex: 1, fontSize: 14, padding: 0 },
-  chip:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
-  chipText:    { fontSize: 12, fontWeight: '600' },
-  divider:     { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(128,128,128,0.3)', marginHorizontal: 2, alignSelf: 'stretch' },
+const rh = StyleSheet.create({
+  header:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  accentLine:  { width: 3, height: 16, borderRadius: 2 },
+  title:       { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  card:        { width: CARD_W_H, aspectRatio: 2 / 3, borderRadius: 10, overflow: 'hidden' },
+  placeholder: { alignItems: 'center', justifyContent: 'center' },
+  gradient:    { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
+  cornerBadge: { position: 'absolute', top: 7, right: 7, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  seasonBadge: { position: 'absolute', top: 7, left: 7, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: `${PURPLE}30`, borderWidth: 1, borderColor: `${PURPLE}80`, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
+  seasonBadgeTxt: { color: PURPLE, fontSize: 9, fontWeight: '800' },
+  overlay:     { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8 },
+  overlayTitle: { color: '#fff', fontSize: 11, fontWeight: '800', lineHeight: 14 },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CARD SÉRIE — affiche le nombre de saisons
+// GRID CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-const Card: React.FC<{
+const GridCard: React.FC<{
   item: FilmItem;
   colors: any;
   purchased: boolean;
   onPress: () => void;
-}> = ({ item, colors, purchased, onPress }) => {
+  index: number;
+}> = ({ item, colors, purchased, onPress, index }) => {
   const scale = useSharedValue(1);
   const anim  = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <Animated.View style={[{ width: CARD_W }, anim]}>
+    <Animated.View
+      style={[{ width: CARD_W }, anim]}
+      entering={FadeInDown.delay(index * 30).springify()}
+    >
       <TouchableOpacity
         activeOpacity={1}
         onPress={onPress}
-        onPressIn={() => { scale.value = withSpring(0.96, { damping: 15 }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 15 }); }}
+        onPressIn={() => { scale.value = withSpring(0.95, { damping: 12 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 12 }); }}
       >
         <View style={[cd.poster, { backgroundColor: colors.backgroundSecondary }]}>
           {item.thumbnail_url
             ? <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             : <View style={[StyleSheet.absoluteFill, cd.placeholder]}><Icon name="tv" size={32} color={colors.textTertiary} /></View>
           }
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} locations={[0.4, 1]} style={cd.gradient} pointerEvents="none" />
-
-          {/* Badge premium */}
-          {item.is_premium && (
-            purchased
-              ? <View style={[cd.badge, { backgroundColor: '#10b98133', borderWidth: 1, borderColor: '#10b981' }]}><Icon name="check" size={8} color="#10b981" /><Text style={[cd.badgeTxt, { color: '#10b981' }]}>Accès</Text></View>
-              : <View style={cd.badge}><Icon name="lock" size={8} color="#fff" /><Text style={cd.badgeTxt}>{item.price ? `${item.price}€` : 'PPV'}</Text></View>
-          )}
-
-          {/* Badge saisons */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.85)']}
+            locations={[0.35, 0.6, 1]}
+            style={cd.gradient}
+            pointerEvents="none"
+          />
+          {/* Saisons badge top-left */}
           {item.total_seasons ? (
             <View style={cd.seasonBadge}>
-              <Icon name="layers" size={8} color="#7B3FF2" />
-              <Text style={cd.seasonText}>{item.total_seasons}S</Text>
+              <Icon name="layers" size={8} color={PURPLE} />
+              <Text style={cd.seasonTxt}>{item.total_seasons}S</Text>
             </View>
           ) : null}
-
-          {/* Note */}
+          {/* Premium top-right */}
+          {item.is_premium && (
+            purchased
+              ? <View style={[cd.cornerBadge, { backgroundColor: 'rgba(16,185,129,0.9)' }]}><Icon name="check" size={8} color="#fff" /></View>
+              : <View style={[cd.cornerBadge, { backgroundColor: '#E8501A' }]}><Icon name="zap" size={8} color="#fff" /></View>
+          )}
+          {/* Rating */}
           {item.average_rating ? (
-            <View style={cd.ratingBadge}><Icon name="star" size={8} color="#FFB800" /><Text style={cd.ratingText}>{item.average_rating.toFixed(1)}</Text></View>
+            <View style={cd.ratingBadge}>
+              <Icon name="star" size={8} color="#FFB800" />
+              <Text style={cd.ratingText}>{item.average_rating.toFixed(1)}</Text>
+            </View>
           ) : null}
-
           <View style={cd.overlay}>
             <Text style={cd.overlayTitle} numberOfLines={2}>{item.title}</Text>
-            <View style={cd.overlayMeta}>
-              {item.year ? <Text style={cd.overlayMetaTxt}>{item.year}</Text> : null}
-            </View>
+            {item.year ? <Text style={cd.overlayMeta}>{item.year}</Text> : null}
           </View>
         </View>
       </TouchableOpacity>
@@ -260,36 +371,59 @@ const Card: React.FC<{
 };
 
 const cd = StyleSheet.create({
-  poster:       { width: '100%', aspectRatio: 2 / 3, borderRadius: 12, overflow: 'hidden' },
-  placeholder:  { alignItems: 'center', justifyContent: 'center' },
-  gradient:     { position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%' },
-  badge:        { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8501A', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7 },
-  badgeTxt:     { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  seasonBadge:  { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#7B3FF222', borderWidth: 1, borderColor: '#7B3FF2', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
-  seasonText:   { color: '#7B3FF2', fontSize: 10, fontWeight: '800' },
-  ratingBadge:  { position: 'absolute', bottom: 38, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
-  ratingText:   { color: '#FFB800', fontSize: 10, fontWeight: '700' },
-  overlay:      { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10 },
+  poster:      { width: '100%', aspectRatio: 2 / 3, borderRadius: 12, overflow: 'hidden' },
+  placeholder: { alignItems: 'center', justifyContent: 'center' },
+  gradient:    { position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%' },
+  cornerBadge: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  seasonBadge: { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: `${PURPLE}25`, borderWidth: 1, borderColor: `${PURPLE}70`, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
+  seasonTxt:   { color: PURPLE, fontSize: 10, fontWeight: '800' },
+  ratingBadge: { position: 'absolute', bottom: 40, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
+  ratingText:  { color: '#FFB800', fontSize: 10, fontWeight: '700' },
+  overlay:     { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10 },
   overlayTitle: { color: '#fff', fontSize: 12, fontWeight: '800', lineHeight: 16, marginBottom: 2 },
-  overlayMeta:  { flexDirection: 'row' },
-  overlayMetaTxt: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '500' },
+  overlayMeta:  { color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '500' },
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FILTER BAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SORTS: { key: SortKey; label: string; icon: string }[] = [
+  { key: 'recent',  label: 'Récent',    icon: 'clock' },
+  { key: 'rating',  label: 'Mieux noté', icon: 'star' },
+  { key: 'seasons', label: 'Saisons',   icon: 'layers' },
+  { key: 'views',   label: 'Tendance',  icon: 'trending-up' },
+];
+const FILTERS: { key: FilterKey; label: string; icon?: string }[] = [
+  { key: 'all',     label: 'Toutes' },
+  { key: 'ongoing', label: 'En cours', icon: 'activity' },
+  { key: 'premium', label: 'Premium',  icon: 'zap' },
+  { key: 'free',    label: 'Gratuit',  icon: 'gift' },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SKELETON
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SkeletonGrid: React.FC<{ colors: any }> = ({ colors }) => (
-  <View style={{ paddingHorizontal: H_PAD, gap: GUTTER }}>
-    {Array.from({ length: 3 }).map((_, ri) => (
-      <View key={ri} style={{ flexDirection: 'row', gap: GUTTER }}>
-        {[0, 1].map(ci => (
-          <View key={ci} style={{ width: CARD_W, aspectRatio: 2 / 3, borderRadius: 12, backgroundColor: colors.skeleton ?? colors.backgroundSecondary }} />
-        ))}
+const SkeletonSection: React.FC<{ colors: any }> = ({ colors }) => (
+  <View style={{ gap: 24 }}>
+    <View style={{ paddingHorizontal: H_PAD }}>
+      <View style={{ width: 140, height: 16, borderRadius: 8, backgroundColor: colors.skeleton ?? colors.backgroundSecondary, marginBottom: 14 }} />
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {[0, 1, 2].map(i => <ShimmerCard key={i} width={CARD_W_H} height={Math.round(CARD_W_H * 1.5)} colors={colors} />)}
       </View>
-    ))}
+    </View>
+    <View style={{ paddingHorizontal: H_PAD, gap: GUTTER }}>
+      {[0, 1, 2].map(ri => (
+        <View key={ri} style={{ flexDirection: 'row', gap: GUTTER }}>
+          <ShimmerCard width={CARD_W} height={Math.round(CARD_W * 1.5)} colors={colors} />
+          <ShimmerCard width={CARD_W} height={Math.round(CARD_W * 1.5)} colors={colors} />
+        </View>
+      ))}
+    </View>
   </View>
 );
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCREEN
@@ -301,15 +435,38 @@ export const SeriesScreen: React.FC = () => {
   const insets     = useSafeAreaInsets();
   const navigation = useNavigation<NavProp>();
 
-  const [items, setItems]           = useState<FilmItem[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [items, setItems]               = useState<FilmItem[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [loadingMore, setLoadingMore]   = useState(false);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [page, setPage]                 = useState(1);
+  const [hasMore, setHasMore]           = useState(true);
+  const [total, setTotal]               = useState(0);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [hasActiveSub, setHasActiveSub] = useState(false);
 
   const [sort,   setSort]   = useState<SortKey>('recent');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [search, setSearch] = useState('');
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  const [searchFocused, setSearchFocused] = useState(false);
+
+  const historySuggestions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return searchHistory.filter(h => h.query.toLowerCase().includes(q) && h.query.toLowerCase() !== q).slice(0, 5);
+  }, [search, searchHistory]);
+
+  const scrollY      = useSharedValue(0);
+  const loadMoreRef  = useRef<() => void>(() => {});
+  const onScroll     = useAnimatedScrollHandler(e => {
+    scrollY.value = e.contentOffset.y;
+    const { layoutMeasurement, contentOffset, contentSize } = e;
+    if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 300) {
+      runOnJS(loadMoreRef.current)();
+    }
+  });
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     Promise.all([
@@ -322,43 +479,87 @@ export const SeriesScreen: React.FC = () => {
     ]);
   }, []);
 
+  // Chargement page 1 — reset complet (déclenché quand sort/filter change)
   const load = useCallback(async (silent = false) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     if (!silent) setLoading(true);
     try {
       const resp = await contentService.listSeries({
         page: 1,
-        limit: 60,
+        limit: PAGE_LIMIT,
+        // "ongoing" = filtre local, pas de param backend
         is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
         sort,
       });
       const raw = Array.isArray(resp) ? resp : (resp as any)?.items ?? [];
-      // "En cours" = filtre local sur total_seasons > 0 (pas de champ status "ongoing" en backend)
+      const tot = (resp as any)?.total ?? raw.length;
       const filtered = filter === 'ongoing'
         ? raw.filter((i: any) => (i.total_seasons ?? 0) > 0)
         : raw;
       setItems(filtered);
+      setPage(1);
+      setTotal(tot);
+      setHasMore(raw.length >= PAGE_LIMIT && raw.length < tot);
     } catch {
       setItems([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      loadingRef.current = false;
     }
   }, [filter, sort]);
 
+  // Chargement page suivante
+  const loadMore = useCallback(async () => {
+    if (loadingRef.current || !hasMore || search.trim()) return;
+    loadingRef.current = true;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const resp = await contentService.listSeries({
+        page: nextPage,
+        limit: PAGE_LIMIT,
+        is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
+        sort,
+      });
+      const raw = Array.isArray(resp) ? resp : (resp as any)?.items ?? [];
+      const tot = (resp as any)?.total ?? total;
+      const filtered = filter === 'ongoing'
+        ? raw.filter((i: any) => (i.total_seasons ?? 0) > 0)
+        : raw;
+      setItems(prev => {
+        const existingIds = new Set(prev.map(i => i.id));
+        return [...prev, ...filtered.filter((i: FilmItem) => !existingIds.has(i.id))];
+      });
+      setPage(nextPage);
+      setTotal(tot);
+      setHasMore(raw.length >= PAGE_LIMIT && (items.length + raw.length) < tot);
+    } catch {
+      // silencieux
+    } finally {
+      setLoadingMore(false);
+      loadingRef.current = false;
+    }
+  }, [hasMore, page, filter, sort, search, items.length, total]);
+
+  useEffect(() => { loadMoreRef.current = loadMore; }, [loadMore]);
+
   useEffect(() => { load(); }, [load]);
 
-  // Recherche locale uniquement
   const displayed = search.trim()
     ? items.filter(i => {
         const q = search.toLowerCase();
-        return (
-          i.title.toLowerCase().includes(q) ||
-          String(i.year ?? '').includes(q)
-        );
+        return i.title.toLowerCase().includes(q) || String(i.year ?? '').includes(q);
       })
     : items;
 
-  const hero = displayed.find(i => i.banner_url || i.thumbnail_url);
+  // Rows thématiques calculées sur les items chargés (pas displayed)
+  const heroItems    = items.filter(i => i.banner_url || i.thumbnail_url);
+  const topRated     = useMemo(() => [...items].sort((a, b) => (b.average_rating ?? 0) - (a.average_rating ?? 0)).slice(0, 12), [items]);
+  const mostSeasons  = useMemo(() => [...items].filter(i => (i.total_seasons ?? 0) > 0).sort((a, b) => (b.total_seasons ?? 0) - (a.total_seasons ?? 0)).slice(0, 12), [items]);
+  const premiumItems = useMemo(() => items.filter(i => i.is_premium).slice(0, 12), [items]);
 
   const rows: [FilmItem, FilmItem | null][] = [];
   for (let i = 0; i < displayed.length; i += 2) {
@@ -371,68 +572,282 @@ export const SeriesScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Back flottant */}
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={{ position: 'absolute', zIndex: 20, top: insets.top + 8, left: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Icon name="arrow-left" size={20} color="#fff" />
-      </TouchableOpacity>
-
-      <ScrollView showsVerticalScrollIndicator={false} refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor="#7B3FF2" progressViewOffset={insets.top} />
-      }>
-        {/* HERO */}
-        {loading && items.length === 0
-          ? <View style={{ height: HERO_H, backgroundColor: colors.backgroundSecondary }} />
-          : hero
-            ? <HeroBanner item={hero} purchased={purchasedIds.has(hero.id) || (hasActiveSub && !!hero.is_premium)} onPress={() => goDetail(hero)} />
-            : <View style={{ height: HERO_H * 0.4, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}><Icon name="tv" size={48} color={colors.textTertiary} /></View>
-        }
-
-        {/* Titre section */}
-        <View style={{ paddingHorizontal: H_PAD, paddingTop: 18 }}>
-          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Séries</Text>
-          {!loading && <Text style={[s.sectionSub, { color: colors.textTertiary }]}>{displayed.length} série{displayed.length > 1 ? 's' : ''}</Text>}
+      {/* ── HEADER FIXE ─────────────────────────────────────────────────── */}
+      <View style={[hdr.wrap, { paddingTop: insets.top + 6, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        {/* Ligne 1 : back + titre TV pill + compteur */}
+        <View style={hdr.row1}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={hdr.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={[hdr.title, { color: colors.textPrimary }]}>Séries</Text>
+            <View style={[hdr.tvPill, { borderColor: `${PURPLE}70`, backgroundColor: `${PURPLE}20` }]}>
+              <Icon name="tv" size={9} color={PURPLE} />
+              <Text style={[hdr.tvPillTxt, { color: PURPLE }]}>TV</Text>
+            </View>
+          </View>
+          {!loading && total > 0 && (
+            <Text style={[hdr.sub, { color: colors.textTertiary }]}>
+              {search.trim() ? `${displayed.length} résultat${displayed.length > 1 ? 's' : ''}` : `${total} série${total > 1 ? 's' : ''}`}
+            </Text>
+          )}
         </View>
 
-        {/* Filtres */}
-        <FilterBar sort={sort} filter={filter} search={search} colors={colors} onSort={setSort} onFilter={setFilter} onSearch={setSearch} />
+        {/* Ligne 2 : recherche */}
+        <View style={[hdr.searchWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+          <Icon name="search" size={14} color={colors.textTertiary} />
+          <TextInput
+            style={[hdr.searchInput, { color: colors.textPrimary }]}
+            placeholder="Rechercher une série..."
+            placeholderTextColor={colors.textTertiary}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            onFocus={() => { setSearchFocused(true); setSearchHistory(searchHistoryService.getAll()); }}
+            onBlur={() => setSearchFocused(false)}
+            onSubmitEditing={() => { if (search.trim()) { searchHistoryService.add(search.trim()); setSearchHistory(searchHistoryService.getAll()); } }}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <View style={hdr.clearBtn}><Icon name="x" size={10} color="#fff" /></View>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {/* Grille */}
+        {/* Ligne 3 : chips sort + filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 8, paddingBottom: 10 }}>
+          {SORTS.map(s => {
+            const active = sort === s.key;
+            return (
+              <TouchableOpacity key={s.key} onPress={() => setSort(s.key)} activeOpacity={0.8}>
+                {active
+                  ? <LinearGradient colors={[PURPLE, PURPLE_DARK]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={hdr.chipActive}>
+                      <Icon name={s.icon} size={11} color="#fff" />
+                      <Text style={hdr.chipActiveTxt}>{s.label}</Text>
+                    </LinearGradient>
+                  : <View style={[hdr.chipInactive, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                      <Icon name={s.icon} size={11} color={colors.textTertiary} />
+                      <Text style={[hdr.chipInactiveTxt, { color: colors.textSecondary }]}>{s.label}</Text>
+                    </View>
+                }
+              </TouchableOpacity>
+            );
+          })}
+          <View style={{ width: 1, backgroundColor: colors.border, marginHorizontal: 4 }} />
+          {FILTERS.map(f => {
+            const active = filter === f.key;
+            const activeColor = f.key === 'ongoing' ? PURPLE : f.key === 'premium' ? '#E8501A' : '#10b981';
+            return (
+              <TouchableOpacity key={f.key} onPress={() => setFilter(f.key)} activeOpacity={0.8}>
+                {active
+                  ? <View style={[hdr.chipActive, { backgroundColor: activeColor }]}>
+                      {f.icon ? <Icon name={f.icon} size={11} color="#fff" /> : null}
+                      <Text style={hdr.chipActiveTxt}>{f.label}</Text>
+                    </View>
+                  : <View style={[hdr.chipInactive, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                      {f.icon ? <Icon name={f.icon} size={11} color={colors.textTertiary} /> : null}
+                      <Text style={[hdr.chipInactiveTxt, { color: colors.textSecondary }]}>{f.label}</Text>
+                    </View>
+                }
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* ── Panneau historique / suggestions ── */}
+      {searchFocused && (
+        <>
+          {/* Suggestions pendant la frappe */}
+          {search.trim() && historySuggestions.length > 0 && (
+            <View style={{ backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: H_PAD, paddingTop: 10, paddingBottom: 4 }}>Suggestions</Text>
+              {historySuggestions.map((h, i) => (
+                <TouchableOpacity
+                  key={h.query}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: H_PAD, paddingVertical: 10, borderTopWidth: i > 0 ? StyleSheet.hairlineWidth : 0, borderTopColor: colors.divider }}
+                  activeOpacity={0.7}
+                  onPress={() => { setSearch(h.query); searchHistoryService.add(h.query); setSearchHistory(searchHistoryService.getAll()); setSearchFocused(false); }}
+                >
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: PURPLE + '18', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="clock" size={13} color={PURPLE} />
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 14, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
+                  <Icon name="arrow-up-left" size={13} color={colors.textTertiary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Historique complet quand champ vide */}
+          {!search.trim() && searchHistory.length > 0 && (
+            <View style={{ backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: H_PAD, paddingTop: 12, paddingBottom: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>Récents</Text>
+                <TouchableOpacity onPress={() => { searchHistoryService.clear(); setSearchHistory([]); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: PURPLE }}>Effacer</Text>
+                </TouchableOpacity>
+              </View>
+              {searchHistory.slice(0, 6).map((h, i) => (
+                <TouchableOpacity
+                  key={h.query}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: H_PAD, paddingVertical: 10, borderTopWidth: i > 0 ? StyleSheet.hairlineWidth : 0, borderTopColor: colors.divider }}
+                  activeOpacity={0.7}
+                  onPress={() => { setSearch(h.query); searchHistoryService.add(h.query); setSearchHistory(searchHistoryService.getAll()); setSearchFocused(false); }}
+                >
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="clock" size={13} color={colors.textTertiary} />
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 14, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
+                  <TouchableOpacity onPress={() => { searchHistoryService.remove(h.query); setSearchHistory(searchHistoryService.getAll()); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Icon name="x" size={13} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </>
+      )}
+
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={PURPLE} />
+        }
+      >
+        {/* HERO — séries premium uniquement */}
+        {!search.trim() && (
+          loading && items.length === 0
+            ? <View style={{ height: HERO_H, backgroundColor: colors.backgroundSecondary }} />
+            : premiumItems.length > 0
+              ? <HeroBanner items={premiumItems} purchasedIds={purchasedIds} hasActiveSub={hasActiveSub} onPress={goDetail} />
+              : null
+        )}
+
         {loading && items.length === 0 ? (
-          <SkeletonGrid colors={colors} />
+          <SkeletonSection colors={colors} />
         ) : displayed.length === 0 ? (
-          <Animated.View entering={FadeIn} style={s.empty}>
+          <Animated.View entering={FadeIn} style={ms.empty}>
             <Icon name="tv" size={52} color={colors.textTertiary} />
-            <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Aucune série trouvée</Text>
-            <Text style={[s.emptySub, { color: colors.textTertiary }]}>Essaie d'autres filtres</Text>
+            <Text style={[ms.emptyTitle, { color: colors.textPrimary }]}>Aucune série trouvée</Text>
+            <Text style={[ms.emptySub, { color: colors.textTertiary }]}>Essaie d'autres filtres</Text>
           </Animated.View>
         ) : (
-          <View style={{ paddingHorizontal: H_PAD, gap: GUTTER }}>
-            {rows.map(([a, b], ri) => (
-              <View key={ri} style={{ flexDirection: 'row', gap: GUTTER }}>
-                <Card item={a} colors={colors} purchased={purchasedIds.has(a.id) || (hasActiveSub && !!a.is_premium)} onPress={() => goDetail(a)} />
-                {b
-                  ? <Card item={b} colors={colors} purchased={purchasedIds.has(b.id) || (hasActiveSub && !!b.is_premium)} onPress={() => goDetail(b)} />
-                  : <View style={{ width: CARD_W }} />
-                }
+          <>
+            {!search && topRated.length > 2 && (
+              <HorizontalRow
+                title="Mieux notées"
+                items={topRated}
+                purchasedIds={purchasedIds}
+                hasActiveSub={hasActiveSub}
+                colors={colors}
+                onPress={goDetail}
+                accent="#FFB800"
+              />
+            )}
+
+            {!search && mostSeasons.length > 1 && (
+              <HorizontalRow
+                title="Plus de saisons"
+                items={mostSeasons}
+                purchasedIds={purchasedIds}
+                hasActiveSub={hasActiveSub}
+                colors={colors}
+                onPress={goDetail}
+                accent={PURPLE}
+              />
+            )}
+
+            {!search && premiumItems.length > 1 && (
+              <HorizontalRow
+                title="Premium"
+                items={premiumItems}
+                purchasedIds={purchasedIds}
+                hasActiveSub={hasActiveSub}
+                colors={colors}
+                onPress={goDetail}
+                accent="#E8501A"
+              />
+            )}
+
+            {/* Label grille */}
+            <View style={{ paddingHorizontal: H_PAD, paddingTop: search ? 8 : 24, paddingBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: PURPLE }} />
+                <Text style={[ms.gridTitle, { color: colors.textPrimary }]}>
+                  {search ? `Résultats · ${displayed.length}` : 'Toutes les séries'}
+                </Text>
               </View>
-            ))}
+            </View>
+
+            {/* GRILLE */}
+            <View style={{ paddingHorizontal: H_PAD, gap: GUTTER }}>
+              {rows.map(([a, b], ri) => (
+                <View key={ri} style={{ flexDirection: 'row', gap: GUTTER }}>
+                  <GridCard item={a} colors={colors} purchased={purchasedIds.has(a.id) || (hasActiveSub && !!a.is_premium)} onPress={() => goDetail(a)} index={ri * 2} />
+                  {b
+                    ? <GridCard item={b} colors={colors} purchased={purchasedIds.has(b.id) || (hasActiveSub && !!b.is_premium)} onPress={() => goDetail(b)} index={ri * 2 + 1} />
+                    : <View style={{ width: CARD_W }} />
+                  }
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Footer infinite scroll */}
+        {loadingMore && (
+          <View style={ms.loadMoreRow}>
+            <View style={[ms.loadMoreDot, { backgroundColor: PURPLE }]} />
+            <View style={[ms.loadMoreDot, { backgroundColor: PURPLE, opacity: 0.6 }]} />
+            <View style={[ms.loadMoreDot, { backgroundColor: PURPLE, opacity: 0.3 }]} />
+          </View>
+        )}
+        {!loadingMore && !hasMore && items.length > 0 && !search.trim() && (
+          <View style={ms.endRow}>
+            <View style={[ms.endLine, { backgroundColor: colors.border }]} />
+            <Text style={[ms.endTxt, { color: colors.textTertiary }]}>{total} série{total > 1 ? 's' : ''} au total</Text>
+            <View style={[ms.endLine, { backgroundColor: colors.border }]} />
           </View>
         )}
 
-        <View style={{ height: insets.bottom + 32 }} />
-      </ScrollView>
+        <View style={{ height: insets.bottom + 40 }} />
+      </Animated.ScrollView>
     </View>
   );
 };
 
-const s = StyleSheet.create({
-  sectionTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
-  sectionSub:   { fontSize: 12, fontWeight: '500', marginTop: 2 },
-  empty:        { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyTitle:   { fontSize: 17, fontWeight: '800' },
-  emptySub:     { fontSize: 13, fontWeight: '500' },
+const ms = StyleSheet.create({
+  pageTitle:   { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
+  purplePill:  { backgroundColor: `${PURPLE}25`, borderWidth: 1, borderColor: `${PURPLE}70`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  purplePillTxt: { color: PURPLE, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  pageSub:     { fontSize: 12, fontWeight: '500', marginTop: 3 },
+  gridTitle:   { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  empty:       { alignItems: 'center', paddingTop: 70, gap: 10 },
+  emptyTitle:  { fontSize: 17, fontWeight: '800' },
+  emptySub:    { fontSize: 13, fontWeight: '500' },
+  loadMoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 24 },
+  loadMoreDot: { width: 7, height: 7, borderRadius: 4 },
+  endRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: H_PAD, paddingVertical: 24 },
+  endLine:     { flex: 1, height: StyleSheet.hairlineWidth },
+  endTxt:      { fontSize: 11, fontWeight: '600' },
+});
+
+const hdr = StyleSheet.create({
+  wrap:          { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 0 },
+  row1:          { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: H_PAD, paddingBottom: 10 },
+  backBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  title:         { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  tvPill:        { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  tvPillTxt:     { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  sub:           { fontSize: 11, fontWeight: '500' },
+  searchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: H_PAD, marginBottom: 10 },
+  searchInput:   { flex: 1, fontSize: 14, padding: 0 },
+  clearBtn:      { width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(128,128,128,0.5)', alignItems: 'center', justifyContent: 'center' },
+  chipActive:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20 },
+  chipActiveTxt:   { color: '#fff', fontSize: 12, fontWeight: '700' },
+  chipInactive:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
+  chipInactiveTxt: { fontSize: 12, fontWeight: '600' },
 });

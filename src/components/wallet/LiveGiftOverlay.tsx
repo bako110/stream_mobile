@@ -15,9 +15,36 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Sound from 'react-native-sound';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+
+Sound.setCategory('Ambient', true);
+
+let _giftSentSound: Sound | null = null;
+let _giftReceivedSound: Sound | null = null;
+
+function getGiftSentSound(): Sound {
+  if (!_giftSentSound) {
+    _giftSentSound = new Sound('gift_sent', null as any, () => {});
+  }
+  return _giftSentSound;
+}
+
+function getGiftReceivedSound(): Sound {
+  if (!_giftReceivedSound) {
+    _giftReceivedSound = new Sound('gift_received', null as any, () => {});
+  }
+  return _giftReceivedSound;
+}
+
+function playGiftSound(type: 'sent' | 'received') {
+  const s = type === 'sent' ? getGiftSentSound() : getGiftReceivedSound();
+  if (!s.isLoaded()) return;
+  s.setCurrentTime(0);
+  s.play();
+}
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -311,12 +338,14 @@ export const LiveGiftOverlay = React.forwardRef<LiveGiftOverlayRef, Props>((
   useEffect(() => {
     if (incomingNotifs.length > 0 && !activeNotif) {
       const next = incomingNotifs[0];
+      playGiftSound('received');
       setActiveNotif(next);
       setFloats(prev => [...prev, { id: `notif-${next.id}`, emoji: next.emoji }]);
     }
   }, [incomingNotifs, activeNotif]);
 
   const handleGiftSent = useCallback((emoji: string) => {
+    playGiftSound('sent');
     setFloats(prev => [...prev, { id: `sent-${Date.now()}`, emoji }]);
   }, []);
 
@@ -437,7 +466,7 @@ const g = StyleSheet.create({
   giftCostRowSelected: { backgroundColor: 'rgba(0,0,0,0.15)' },
   giftCost:    { color: '#FFD700', fontSize: 10, fontWeight: '700' },
   giftLockOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
   },

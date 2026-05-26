@@ -86,6 +86,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [showPaywall, setShowPaywall]     = useState(false);
   const [walletCoins, setWalletCoins]     = useState<number | null>(null);
   const [purchasing, setPurchasing]       = useState(false);
+  const [launching, setLaunching]         = useState(false);
 
   const isSerie  = item.type === 'serie';
   const banner   = item.banner_url || item.thumbnail_url;
@@ -160,14 +161,17 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const defaultVideo = videos.find(v => v.is_default) ?? videos[0] ?? null;
   const hasVideo     = !!defaultVideo?.hls_url;
 
-  const handleWatch = () => {
+  const handleWatch = async () => {
     if (item.is_premium && !hasAccess) {
       setShowPaywall(true);
       return;
     }
     if (isSerie) {
+      setLaunching(true);
       navigation.navigate('SerieEpisodes', { item });
+      setTimeout(() => setLaunching(false), 800);
     } else if (hasVideo) {
+      setLaunching(true);
       navigation.navigate('VideoPlayer', {
         url:         defaultVideo!.hls_url!,
         title:       item.title,
@@ -177,6 +181,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         thumbnailUrl: item.thumbnail_url ?? undefined,
         totalSeconds: defaultVideo!.duration_sec ?? undefined,
       });
+      setTimeout(() => setLaunching(false), 800);
     }
   };
 
@@ -304,7 +309,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <TouchableOpacity
               activeOpacity={0.88}
               onPress={handleWatch}
-              disabled={(!isSerie && !hasVideo && !videosLoading) || accessLoading}
+              disabled={(!isSerie && !hasVideo && !videosLoading) || accessLoading || launching}
               style={s.ctaPrimaryOuter}
             >
               <LinearGradient
@@ -318,7 +323,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={s.ctaPrimary}
               >
-                {accessLoading || (videosLoading && !isSerie) ? (
+                {accessLoading || (videosLoading && !isSerie) || launching ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <Icon
@@ -327,7 +332,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   />
                 )}
                 <Text style={s.ctaPrimaryText}>
-                  {accessLoading
+                  {accessLoading || launching
                     ? 'Chargement…'
                     : item.is_premium && !hasAccess
                     ? `Acheter — ${coinsRequired} coins (${item.price} €)`

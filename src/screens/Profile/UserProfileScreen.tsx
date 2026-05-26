@@ -72,35 +72,41 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       const meId = currentUser ? String(currentUser.id) : null;
       const isOwnProfile = meId !== null && meId === String(userId);
 
-      const [p, me] = await Promise.allSettled([
-        // Ne pas appeler getPublicProfile sur son propre profil → évite la notif de visite
-        isOwnProfile ? Promise.reject(new Error('own')) : userService.getPublicProfile(userId),
+      const [p, me, followersRes, followingRes] = await Promise.allSettled([
+        userService.getPublicProfile(userId),
         authService.getMe(),
+        userService.getFollowers(userId),
+        userService.getFollowing(userId),
       ]);
       if (p.status === 'fulfilled') {
         setProfile(p.value);
-      } else {
-        if (me.status === 'fulfilled') {
-          const m = me.value;
-          const fallback: UserPublicProfile = {
-            id: String(m.id),
-            username: m.username,
-            display_name: m.display_name,
-            avatar_url: m.avatar_url,
-            banner_url: m.banner_url,
-            role: m.role,
-            bio: m.bio,
-            location: m.location,
-            website: m.website,
-            first_name: m.first_name,
-            last_name: m.last_name,
-            followers_count: 0,
-            following_count: 0,
-            is_followed: false,
-            is_verified: m.is_verified,
-          };
-          setProfile(fallback);
-        }
+      } else if (me.status === 'fulfilled') {
+        // Fallback si le profil public échoue (rare)
+        const m = me.value;
+        const followersCount = followersRes.status === 'fulfilled' ? followersRes.value.length : 0;
+        const followingCount = followingRes.status === 'fulfilled' ? followingRes.value.length : 0;
+        const fallback: UserPublicProfile = {
+          id: String(m.id),
+          username: m.username,
+          display_name: m.display_name,
+          avatar_url: m.avatar_url,
+          banner_url: m.banner_url,
+          role: m.role,
+          bio: m.bio,
+          location: m.location,
+          website: m.website,
+          first_name: m.first_name,
+          last_name: m.last_name,
+          phone: m.phone,
+          date_of_birth: m.date_of_birth,
+          gender: m.gender,
+          created_at: m.created_at,
+          followers_count: followersCount,
+          following_count: followingCount,
+          is_followed: false,
+          is_verified: m.is_verified,
+        };
+        setProfile(fallback);
       }
       if (me.status === 'fulfilled') {
         setMyId(String(me.value.id));
@@ -108,18 +114,18 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
       // Charger contenu de l'utilisateur
       setContentLoading(true);
-      const [evts, ccs, reels, posts, following] = await Promise.allSettled([
+      const followingList = followingRes.status === 'fulfilled' ? followingRes.value : [];
+      const [evts, ccs, reels, posts] = await Promise.allSettled([
         userService.getUserEvents(userId),
         userService.getUserConcerts(userId),
         userService.getUserReels(userId),
         postService.getByUser(userId),
-        userService.getFollowing(userId),
       ]);
-      if (evts.status === 'fulfilled')       setUserEvents(evts.value);
-      if (ccs.status === 'fulfilled')        setUserConcerts(ccs.value);
-      if (reels.status === 'fulfilled')      setUserReels(Array.isArray(reels.value) ? reels.value : []);
-      if (posts.status === 'fulfilled')      setUserPosts(posts.value);
-      if (following.status === 'fulfilled')  setFriends(following.value.slice(0, 10));
+      if (evts.status === 'fulfilled')   setUserEvents(evts.value);
+      if (ccs.status === 'fulfilled')    setUserConcerts(ccs.value);
+      if (reels.status === 'fulfilled')  setUserReels(Array.isArray(reels.value) ? reels.value : []);
+      if (posts.status === 'fulfilled')  setUserPosts(posts.value);
+      setFriends(followingList.slice(0, 10));
       setContentLoading(false);
     } catch (e) { console.warn('[UserProfile] load error:', e); }
     finally { setLoading(false); }
@@ -242,7 +248,12 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             {profile.banner_url ? (
               <Image source={{ uri: profile.banner_url }} style={styles.banner} />
             ) : (
-              <View style={[styles.banner, { backgroundColor: colors.backgroundSecondary }]} />
+              <LinearGradient
+                colors={[colors.primary + 'CC', colors.primary + '66']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.banner}
+              />
             )}
           </TouchableOpacity>
           <View style={styles.headerOverlay}>
@@ -335,8 +346,8 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={[styles.statsRow, { backgroundColor: colors.surfaceElevated }]}>
           <TouchableOpacity
             style={styles.statItem}
-            onPress={isMe ? undefined : () => openList('followers')}
-            activeOpacity={isMe ? 1 : 0.7}
+            onPress={() => openList('followers')}
+            activeOpacity={0.7}
           >
             <Text style={[styles.statNum, { color: colors.textPrimary }]}>{profile.followers_count}</Text>
             <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Abonnés</Text>
@@ -344,8 +355,8 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={[styles.statDivider, { backgroundColor: colors.divider }]} />
           <TouchableOpacity
             style={styles.statItem}
-            onPress={isMe ? undefined : () => openList('following')}
-            activeOpacity={isMe ? 1 : 0.7}
+            onPress={() => openList('following')}
+            activeOpacity={0.7}
           >
             <Text style={[styles.statNum, { color: colors.textPrimary }]}>{profile.following_count}</Text>
             <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Abonnements</Text>
@@ -856,8 +867,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  bannerWrap: { height: 180, position: 'relative' },
-  banner: { width: '100%', height: '100%' },
+  bannerWrap: { height: 180, position: 'relative', overflow: 'hidden' },
+  banner: { width: '100%', height: '100%', resizeMode: 'cover' },
   headerOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

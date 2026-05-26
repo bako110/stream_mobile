@@ -58,6 +58,7 @@ export const authService = {
       return _cachedUser;
     }
     const res = await apiClient.get<User>(Endpoints.auth.me);
+    console.log('[getMe] folix_id=', res.data?.folix_id, 'raw keys=', Object.keys(res.data || {}));
     _cachedUser = res.data;
     _cachedAt = now;
     return _cachedUser!;

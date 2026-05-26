@@ -3,6 +3,7 @@ import type {
   Comment, CommentCreate, ReactionType,
   ReactionCounts, ShareCreate, ShareCounts,
 } from '../types';
+import type { PostLiker } from './postService';
 
 // Cache TTL 30s pour éviter le N+1 reactions/me au remount de chaque FeedCard
 const _reactionCache = new Map<string, { value: ReactionType | null; expiresAt: number }>();
@@ -116,6 +117,24 @@ export const socialService = {
   // ── Partages ──────────────────────────────────────────────────────────────
   async share(data: ShareCreate): Promise<void> {
     await apiClient.post(Endpoints.social.share, data);
+  },
+
+  async getReactionLikers(params: {
+    event_id?: string;
+    concert_id?: string;
+    reel_id?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PostLiker[]> {
+    const q = new URLSearchParams(
+      Object.entries(params)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, String(v)])
+    ).toString();
+    const res = await apiClient.get<PostLiker[] | { data: PostLiker[] }>(
+      `${Endpoints.social.reactionUsers}?${q}`
+    );
+    return Array.isArray(res.data) ? res.data : (res.data as any).data ?? [];
   },
 
   async getShareCounts(params: {

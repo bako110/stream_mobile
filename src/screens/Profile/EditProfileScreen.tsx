@@ -28,7 +28,7 @@ interface Props {
 export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
-  const { refreshUser } = useUser();
+  const { refreshUser, setCurrentUser } = useUser();
 
   const [user, setUser]             = useState<User | null>(null);
   const [loading, setLoading]       = useState(true);
@@ -63,31 +63,88 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const pickAvatar = async () => {
-    try {
-      setAvatarUploading(true);
-      const result = await uploadService.pickAndUpload('avatars', 1);
-      if (result.assets.length > 0) {
-        await userService.updateMe({ avatar_url: result.assets[0].url });
-        const me = await refreshUser();
-        if (me) setUser(me);
-      }
-    } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Upload avatar');
-    } finally { setAvatarUploading(false); }
+  const [bannerUploading, setBannerUploading] = useState(false);
+
+  const handleAvatar = () => {
+    const options: { text: string; onPress: () => void; style?: 'destructive' | 'cancel' | 'default' }[] = [
+      {
+        text: 'Changer la photo',
+        onPress: async () => {
+          try {
+            setAvatarUploading(true);
+            const result = await uploadService.pickAndUpload('avatars', 1);
+            if (result.assets.length > 0) {
+              const updated = await userService.updateMe({ avatar_url: result.assets[0].url });
+              setUser(updated);
+              setCurrentUser(updated);
+            }
+          } catch (e: any) {
+            Alert.alert('Erreur', e?.message ?? 'Upload avatar');
+          } finally { setAvatarUploading(false); }
+        },
+      },
+    ];
+    if (user?.avatar_url) {
+      options.push({
+        text: 'Supprimer la photo',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setAvatarUploading(true);
+            const updated = await userService.updateMe({ avatar_url: null } as any);
+            setUser(updated);
+            setCurrentUser(updated);
+          } catch (e: any) {
+            Alert.alert('Erreur', e?.message ?? 'Suppression échouée');
+          } finally { setAvatarUploading(false); }
+        },
+      });
+    }
+    Alert.alert('Photo de profil', undefined, [
+      ...options,
+      { text: 'Annuler', style: 'cancel', onPress: () => {} },
+    ]);
   };
 
-  const pickBanner = async () => {
-    try {
-      const result = await uploadService.pickAndUpload('avatars', 1);
-      if (result.assets.length > 0) {
-        await userService.updateMe({ banner_url: result.assets[0].url });
-        const me = await refreshUser();
-        if (me) setUser(me);
-      }
-    } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Upload bannière');
+  const handleBanner = () => {
+    const options: { text: string; onPress: () => void; style?: 'destructive' | 'cancel' | 'default' }[] = [
+      {
+        text: 'Changer la couverture',
+        onPress: async () => {
+          try {
+            setBannerUploading(true);
+            const result = await uploadService.pickAndUpload('avatars', 1);
+            if (result.assets.length > 0) {
+              const updated = await userService.updateMe({ banner_url: result.assets[0].url });
+              setUser(updated);
+              setCurrentUser(updated);
+            }
+          } catch (e: any) {
+            Alert.alert('Erreur', e?.message ?? 'Upload bannière');
+          } finally { setBannerUploading(false); }
+        },
+      },
+    ];
+    if (user?.banner_url) {
+      options.push({
+        text: 'Supprimer la couverture',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setBannerUploading(true);
+            const updated = await userService.updateMe({ banner_url: null } as any);
+            setUser(updated);
+            setCurrentUser(updated);
+          } catch (e: any) {
+            Alert.alert('Erreur', e?.message ?? 'Suppression échouée');
+          } finally { setBannerUploading(false); }
+        },
+      });
     }
+    Alert.alert('Photo de couverture', undefined, [
+      ...options,
+      { text: 'Annuler', style: 'cancel', onPress: () => {} },
+    ]);
   };
 
   const handleSave = async () => {
@@ -145,25 +202,34 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Banner */}
-        <TouchableOpacity onPress={pickBanner} activeOpacity={0.7}>
+        <TouchableOpacity onPress={handleBanner} activeOpacity={0.7}>
           <View style={styles.bannerWrap}>
-            {user?.banner_url ? (
-              <Image source={{ uri: user.banner_url }} style={styles.banner} />
+            {bannerUploading ? (
+              <View style={[styles.banner, { backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : user?.banner_url ? (
+              <Image source={{ uri: user.banner_url }} style={styles.banner} resizeMode="cover" />
             ) : (
-              <View style={[styles.banner, { backgroundColor: colors.surfaceElevated }]}>
+              <View style={[styles.banner, { backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' }]}>
                 <Icon name="image" size={32} color={colors.textTertiary} />
+                <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 6 }}>Ajouter une couverture</Text>
               </View>
             )}
-            <View style={styles.bannerOverlay}>
-              <Icon name="camera" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 12, marginLeft: 4 }}>Changer</Text>
-            </View>
+            {!bannerUploading && (
+              <View style={styles.bannerOverlay}>
+                <Icon name="camera" size={18} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 12, marginLeft: 4 }}>
+                  {user?.banner_url ? 'Modifier' : 'Ajouter'}
+                </Text>
+              </View>
+            )}
           </View>
         </TouchableOpacity>
 
         {/* Avatar */}
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={pickAvatar} activeOpacity={0.7}>
+          <TouchableOpacity onPress={handleAvatar} activeOpacity={0.7}>
             <View style={[styles.avatarRing, { borderColor: colors.background }]}>
               {avatarUploading ? (
                 <View style={[styles.avatarFallback, { backgroundColor: colors.surfaceElevated }]}>

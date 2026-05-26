@@ -161,16 +161,44 @@ export const SkeletonFeedScreen: React.FC = () => (
   <View style={{ flex: 1 }}>
     {/* Stories */}
     <View style={skStyles.storiesRow}>
-      {[0, 1, 2, 3, 4].map(i => (
+      {[0, 1, 2, 3, 4, 5].map(i => (
         <View key={i} style={{ alignItems: 'center', gap: 6 }}>
-          <SkeletonBox width={60} height={60} borderRadius={30} />
-          <SkeletonBox width={44} height={9} borderRadius={4} />
+          <SkeletonBox width={62} height={62} borderRadius={31} />
+          <SkeletonBox width={46} height={9} borderRadius={4} />
         </View>
       ))}
     </View>
-    {/* Posts */}
-    <SkeletonPostCard />
-    <SkeletonPostCard />
+    {/* Séparateur fin */}
+    <View style={{ height: 1, backgroundColor: 'transparent', marginBottom: 8 }} />
+    {/* 3 cartes post */}
+    {[0, 1, 2].map(i => (
+      <View key={i} style={{ marginBottom: i < 2 ? 10 : 0 }}>
+        {/* Auteur */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+          <SkeletonBox width={42} height={42} borderRadius={21} />
+          <View style={{ flex: 1, gap: 6 }}>
+            <SkeletonBox width={`${44 + i * 6}%`} height={13} borderRadius={6} />
+            <SkeletonBox width={`${28 + i * 4}%`} height={10} borderRadius={5} />
+          </View>
+          <SkeletonBox width={72} height={30} borderRadius={15} />
+        </View>
+        {/* Texte 1-2 lignes */}
+        {i !== 1 && (
+          <View style={{ paddingHorizontal: 14, gap: 6, paddingBottom: 10 }}>
+            <SkeletonBox width="96%" height={13} borderRadius={6} />
+            {i === 0 && <SkeletonBox width="78%" height={13} borderRadius={6} />}
+          </View>
+        )}
+        {/* Image (hauteur variable) */}
+        <SkeletonBox width="100%" height={i === 0 ? 240 : i === 1 ? 180 : 200} borderRadius={0} />
+        {/* Actions */}
+        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 12 }}>
+          <SkeletonBox width={80} height={34} borderRadius={17} />
+          <SkeletonBox width={100} height={34} borderRadius={17} />
+          <SkeletonBox width={80} height={34} borderRadius={17} />
+        </View>
+      </View>
+    ))}
   </View>
 );
 
@@ -497,6 +525,106 @@ export const SkeletonLiveList: React.FC = () => (
         </View>
       </View>
     ))}
+  </View>
+);
+
+// ── Skeleton PostDetail (écran détail publication) ───────────────────────────
+export const SkeletonPostDetail: React.FC = () => (
+  <View style={{ flex: 1 }}>
+    {/* Carte post principale */}
+    <View style={{ backgroundColor: 'transparent', marginBottom: 8 }}>
+
+      {/* Auteur */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 }}>
+        <SkeletonBox width={46} height={46} borderRadius={23} />
+        <View style={{ flex: 1, gap: 7 }}>
+          <SkeletonBox width="48%" height={13} borderRadius={6} />
+          <SkeletonBox width="32%" height={10} borderRadius={5} />
+        </View>
+        <SkeletonBox width={34} height={34} borderRadius={17} />
+      </View>
+
+      {/* Texte du post — 3 lignes */}
+      <View style={{ paddingHorizontal: 16, gap: 7, paddingBottom: 14 }}>
+        <SkeletonBox width="100%" height={14} borderRadius={6} />
+        <SkeletonBox width="88%"  height={14} borderRadius={6} />
+        <SkeletonBox width="65%"  height={14} borderRadius={6} />
+      </View>
+
+      {/* Image principale grande */}
+      <SkeletonBox width="100%" height={Math.round(SCREEN_WIDTH * 0.75)} borderRadius={0} />
+
+      {/* Barre engagement */}
+      <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8 }}>
+        {/* Compteurs */}
+        <View style={{ flexDirection: 'row', gap: 14, marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <SkeletonBox width={18} height={18} borderRadius={9} />
+            <SkeletonBox width={50} height={12} borderRadius={5} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <SkeletonBox width={18} height={18} borderRadius={9} />
+            <SkeletonBox width={80} height={12} borderRadius={5} />
+          </View>
+        </View>
+        {/* Boutons actions */}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <SkeletonBox height={42} borderRadius={10} style={{ flex: 1 }} />
+          <SkeletonBox height={42} borderRadius={10} style={{ flex: 1 }} />
+          <SkeletonBox height={42} borderRadius={10} style={{ flex: 1 }} />
+        </View>
+      </View>
+    </View>
+
+    {/* Section "Publications" */}
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+      <SkeletonBox width={120} height={14} borderRadius={7} />
+      <SkeletonBox width={36} height={22} borderRadius={11} />
+    </View>
+
+    {/* Grille 2 colonnes skeleton */}
+    {[0, 1].map(row => (
+      <View key={row} style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 8 }}>
+        {[0, 1].map(col => {
+          const cardW = (SCREEN_WIDTH - 12 * 2 - 8) / 2;
+          const cardH = Math.round(cardW * 14 / 9);
+          return (
+            <View key={col} style={{ width: cardW, gap: 6 }}>
+              <SkeletonBox width={cardW} height={cardH} borderRadius={14} />
+              <SkeletonBox width="75%" height={11} borderRadius={5} />
+            </View>
+          );
+        })}
+      </View>
+    ))}
+  </View>
+);
+
+// ── Skeleton PostCard (pour le feed — version enrichie) ───────────────────────
+export const SkeletonPostCardFeed: React.FC = () => (
+  <View style={{ marginBottom: 8 }}>
+    {/* Auteur */}
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+      <SkeletonBox width={42} height={42} borderRadius={21} />
+      <View style={{ flex: 1, gap: 6 }}>
+        <SkeletonBox width="44%" height={13} borderRadius={6} />
+        <SkeletonBox width="28%" height={10} borderRadius={5} />
+      </View>
+      <SkeletonBox width={72} height={30} borderRadius={15} />
+    </View>
+    {/* Texte */}
+    <View style={{ paddingHorizontal: 14, gap: 6, paddingBottom: 10 }}>
+      <SkeletonBox width="100%" height={13} borderRadius={6} />
+      <SkeletonBox width="82%"  height={13} borderRadius={6} />
+    </View>
+    {/* Image */}
+    <SkeletonBox width="100%" height={220} borderRadius={0} />
+    {/* Actions */}
+    <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 12 }}>
+      <SkeletonBox width={80} height={34} borderRadius={17} />
+      <SkeletonBox width={100} height={34} borderRadius={17} />
+      <SkeletonBox width={80} height={34} borderRadius={17} />
+    </View>
   </View>
 );
 

@@ -434,9 +434,7 @@ export const CallScreen: React.FC = () => {
     };
 
     addListener(handler);
-    drainCallBuffer(partnerId)
-      .filter(p => p.type !== 'call_hangup')
-      .forEach(p => handler(p));
+    drainCallBuffer(partnerId).forEach(p => handler(p));
     return () => removeListener(handler);
   }, [partnerId, isVideo, isIncoming, addListener, removeListener, sendWs, flushPendingCandidates, notifyCallConnected, notifyCallEnded, markCallEnded, drainCallBuffer]);
 

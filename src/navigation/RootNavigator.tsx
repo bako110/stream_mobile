@@ -5,6 +5,8 @@ import { SplashScreen }     from '../screens/Onboarding/SplashScreen';
 import { OnboardingScreen } from '../screens/Onboarding/OnboardingScreen';
 import { AuthNavigator }    from './AuthNavigator';
 import { MainNavigator }    from './MainNavigator';
+import { CGUScreen }                      from '../screens/Main/CGUScreen';
+import { PolitiqueConfidentialiteScreen } from '../screens/Main/PolitiqueConfidentialiteScreen';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { UserProvider }      from '../context/UserContext';
 import { navigationRef }    from './navigationRef';
@@ -81,6 +83,7 @@ const NAV_THEME_DARK: Theme = {
 export const RootNavigator: React.FC = () => {
   const { isDark } = useTheme();
   const [appState, setAppState] = useState<AppState>('splash');
+  const [legalOverlay, setLegalOverlay] = useState<'cgu' | 'privacy' | null>(null);
   const [blockedInfo, setBlockedInfo] = useState<{ reason?: string; contact?: string; blockedAt?: string } | null>(null);
   const pendingUrlRef = useRef<string | null>(null);
 
@@ -132,18 +135,22 @@ export const RootNavigator: React.FC = () => {
     try {
       await authService.getMe(true);
       setAppState('main');
-      setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
-      requestContactsPermission();
-      requestLocationPermission();
+      setTimeout(() => {
+        setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
+        requestContactsPermission();
+        requestLocationPermission();
+      }, 500);
       navigatePendingUrl();
     } catch {
       // getMe a echoue — tenter le refresh
       try {
         await authService.refresh();
         setAppState('main');
-        setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
-        requestContactsPermission();
-        requestLocationPermission();
+        setTimeout(() => {
+          setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
+          requestContactsPermission();
+          requestLocationPermission();
+        }, 500);
         navigatePendingUrl();
       } catch {
         // Refresh aussi echoue — session completement expiree
@@ -160,10 +167,11 @@ export const RootNavigator: React.FC = () => {
 
   const handleAuthSuccess = () => {
     setAppState('main');
-    console.log('[FCM] calling setupFCM from login...');
-    setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
-    requestContactsPermission();
-    requestLocationPermission();
+    setTimeout(() => {
+      setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
+      requestContactsPermission();
+      requestLocationPermission();
+    }, 500);
     navigatePendingUrl();
   };
   const handleLogout = () => {
@@ -175,7 +183,15 @@ export const RootNavigator: React.FC = () => {
     return <SplashScreen onFinish={handleSplashDone} />;
   }
   if (appState === 'onboarding') {
-    return <OnboardingScreen onFinish={handleOnboardingDone} />;
+    if (legalOverlay === 'cgu')     return <CGUScreen onBack={() => setLegalOverlay(null)} />;
+    if (legalOverlay === 'privacy') return <PolitiqueConfidentialiteScreen onBack={() => setLegalOverlay(null)} />;
+    return (
+      <OnboardingScreen
+        onFinish={handleOnboardingDone}
+        onGoCGU={() => setLegalOverlay('cgu')}
+        onGoPrivacy={() => setLegalOverlay('privacy')}
+      />
+    );
   }
 
   const linking = {

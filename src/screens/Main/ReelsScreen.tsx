@@ -808,6 +808,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [isPortrait,     setIsPortrait]     = useState<boolean | null>(null);
   const [ended,          setEnded]          = useState(false);
+  const [isFollowing,    setIsFollowing]    = useState(false);
+  const [followLoading,  setFollowLoading]  = useState(false);
   const [refInfo, setRefInfo] = useState<{
     label: string; kind: string; thumbnail: string | null; color: string;
   } | null>(null);
@@ -825,6 +827,21 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const STALL_TIMEOUT  = 8_000; // ms sans progression avant retry forcé
 
   const isOwnReel = !!(currentUserId && reel.author?.id && currentUserId === String(reel.author.id));
+
+  const handleFollow = useCallback(async () => {
+    if (!reel.author?.id || followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await userService.unfollow(String(reel.author.id));
+        setIsFollowing(false);
+      } else {
+        await userService.follow(String(reel.author.id));
+        setIsFollowing(true);
+      }
+    } catch { /* silencieux */ }
+    finally { setFollowLoading(false); }
+  }, [reel.author?.id, isFollowing, followLoading]);
 
   // Source avec buffer agressif : 30s en avance (Android) / 20s (iOS)
   const videoSource = reel.video_url
@@ -1429,10 +1446,41 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   </View>
               }
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
-              <Text style={s.authorName}>{getAuthorLabel(reel.author)}</Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}
+              style={{ flex: 1 }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Text style={s.authorName} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
+                {reel.author?.is_verified && <VerifiedBadge size={14} />}
+              </View>
             </TouchableOpacity>
-            {reel.author?.is_verified && <VerifiedBadge size={14} />}
+            {!isOwnReel && reel.author?.id && (
+              <TouchableOpacity
+                onPress={handleFollow}
+                activeOpacity={0.8}
+                disabled={followLoading}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 5,
+                  borderRadius: 20,
+                  borderWidth: 1.5,
+                  borderColor: isFollowing ? 'rgba(255,255,255,0.4)' : '#fff',
+                  backgroundColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                {followLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
+                      {isFollowing ? 'Suivi' : 'Suivre'}
+                    </Text>
+                }
+              </TouchableOpacity>
+            )}
           </View>
 
           {reel.caption ? (
