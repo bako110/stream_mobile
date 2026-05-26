@@ -121,13 +121,13 @@ const WalletSkeleton: React.FC = () => (
   <View style={{ padding: 20, gap: 16 }}>
     <SkeletonBox h={140} br={20} />
     <View style={{ flexDirection: 'row', gap: 12 }}>
-      {[1, 2, 3].map(i => <SkeletonBox key={i} w="30%" h={80} br={16} />)}
+      {[1, 2, 3].map(i => <SkeletonBox key={`act-${i}`} w="30%" h={80} br={16} />)}
     </View>
     <View style={{ flexDirection: 'row', gap: 12 }}>
-      {[1, 2, 3].map(i => <SkeletonBox key={i} w="30%" h={70} br={12} />)}
+      {[1, 2, 3].map(i => <SkeletonBox key={`stat-${i}`} w="30%" h={70} br={12} />)}
     </View>
     {[1, 2, 3, 4, 5].map(i => (
-      <View key={i} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+      <View key={`tx-${i}`} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
         <SkeletonBox w={44} h={44} br={22} />
         <View style={{ flex: 1, gap: 6 }}>
           <SkeletonBox h={14} w="60%" />
