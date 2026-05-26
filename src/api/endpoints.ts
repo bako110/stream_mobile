@@ -397,6 +397,14 @@ export const Endpoints = {
     create: `${V1}/reports`,
   },
 
+  // ── Support tickets ───────────────────────────────────────────────────────
+  support: {
+    createTicket:  `${V1}/support/tickets`,
+    listTickets:   `${V1}/support/tickets`,
+    getTicket:     (id: string) => `${V1}/support/tickets/${id}`,
+    sendMessage:   (id: string) => `${V1}/support/tickets/${id}/messages`,
+  },
+
   // ── Notifications persistantes ─────────────────────────────────────────────
   notifications: {
     list:          `${V1}/notifications`,
