@@ -376,6 +376,7 @@ const ActiveBoostCard: React.FC<{
   const deliveredLabel = isGlobal ? 'livres' : ((boost.impression_count ?? 0) > 0 ? 'impressions reelles' : 'livres');
   const mult  = Number(boost.feed_multiplier ?? 1);
   const refund = timePct < 0.5 ? Math.round(boost.coins_spent * 0.5) : 0;
+  const canCancel = elapsedSec / 60 <= 30;
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -480,14 +481,21 @@ const ActiveBoostCard: React.FC<{
             ))}
 
             {boost.status === 'active' && (
-              <TouchableOpacity
-                onPress={() => setShowStop(true)}
-                style={[abc.stopBtn, { borderColor: '#EF444440' }]}
-                activeOpacity={0.8}
-              >
-                <Icon name="square" size={13} color="#EF4444" />
-                <Text style={abc.stopText}>Arreter le boost</Text>
-              </TouchableOpacity>
+              canCancel ? (
+                <TouchableOpacity
+                  onPress={() => setShowStop(true)}
+                  style={[abc.stopBtn, { borderColor: '#EF444440' }]}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="square" size={13} color="#EF4444" />
+                  <Text style={abc.stopText}>Arreter le boost</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[abc.stopBtn, { borderColor: colors.border, opacity: 0.45 }]}>
+                  <Icon name="lock" size={13} color={colors.textTertiary} />
+                  <Text style={[abc.stopText, { color: colors.textTertiary }]}>Annulation impossible apres 30 min</Text>
+                </View>
+              )
             )}
           </View>
         )}
