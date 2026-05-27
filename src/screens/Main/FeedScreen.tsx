@@ -843,24 +843,42 @@ export const FeedScreen: React.FC = () => {
   const onNavSpontViewer = useCallback((id: string) => (nav as any).navigate('SimpleLiveViewer', { liveId: id }), [nav]);
   const onNavEvent       = useCallback((id: string) => nav.navigate('EventDetail', { eventId: id }), [nav]);
 
+  const onNavMyStories   = useCallback(() => nav.navigate('MyStories'), [nav]);
+  const onNavChat        = useCallback((partnerId: string, partnerName: string, avatarUrl?: string) =>
+    nav.navigate('Chat', { partnerId, partnerName, avatarUrl }), [nav]);
+  const onNavCall        = useCallback((partnerId: string, partnerName: string, callType: 'voice' | 'video') =>
+    nav.navigate('Call', { partnerId, partnerName, callType, isIncoming: false }), [nav]);
+
   const feedListHeader = useMemo(() => (
-    <FeedListHeader
-      liveConcerts={liveConcerts}
-      spontLives={spontLives}
-      nearbyEvents={nearbyEvents}
-      colors={colors}
-      isDark={theme.isDark}
-      currentUserId={currentUser?.id}
-      onNavLiveList={onNavLiveList}
-      onNavSpontList={onNavSpontList}
-      onNavNearby={onNavNearby}
-      onNavLiveStream={onNavLiveStream}
-      onNavLiveViewer={onNavLiveViewer}
-      onNavSpontStream={onNavSpontStream}
-      onNavSpontViewer={onNavSpontViewer}
-      onNavEvent={onNavEvent}
-    />
-  ), [liveConcerts, spontLives, nearbyEvents, colors, theme.isDark, currentUser?.id,
+    <>
+      {/* Stories scrollent avec le feed — style Instagram/WhatsApp */}
+      <StoryBar
+        currentUser={currentUser}
+        colors={colors}
+        onNavigateToMyStories={onNavMyStories}
+        onNavigateToChat={onNavChat}
+        onNavigateToCall={onNavCall}
+      />
+      <FeedListHeader
+        liveConcerts={liveConcerts}
+        spontLives={spontLives}
+        nearbyEvents={nearbyEvents}
+        colors={colors}
+        isDark={theme.isDark}
+        currentUserId={currentUser?.id}
+        onNavLiveList={onNavLiveList}
+        onNavSpontList={onNavSpontList}
+        onNavNearby={onNavNearby}
+        onNavLiveStream={onNavLiveStream}
+        onNavLiveViewer={onNavLiveViewer}
+        onNavSpontStream={onNavSpontStream}
+        onNavSpontViewer={onNavSpontViewer}
+        onNavEvent={onNavEvent}
+      />
+    </>
+  ), [liveConcerts, spontLives, nearbyEvents, colors, theme.isDark,
+      currentUser, currentUser?.id,
+      onNavMyStories, onNavChat, onNavCall,
       onNavLiveList, onNavSpontList, onNavNearby, onNavLiveStream, onNavLiveViewer,
       onNavSpontStream, onNavSpontViewer, onNavEvent]);
 
@@ -1240,22 +1258,6 @@ export const FeedScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* ── Stories ───────────────────────────────────────────────────── */}
-        {!searchOpen && (
-          <View style={{ marginTop: 5 }}>
-            <StoryBar
-              currentUser={currentUser}
-              colors={colors}
-              onNavigateToMyStories={() => nav.navigate('MyStories')}
-              onNavigateToChat={(partnerId, partnerName, avatarUrl) =>
-                nav.navigate('Chat', { partnerId, partnerName, avatarUrl })
-              }
-              onNavigateToCall={(partnerId, partnerName, callType) =>
-                nav.navigate('Call', { partnerId, partnerName, callType, isIncoming: false })
-              }
-            />
-          </View>
-        )}
 
         {/* ── Tab bar + actions ─────────────────────────────────────────── */}
         {!searchOpen && (
