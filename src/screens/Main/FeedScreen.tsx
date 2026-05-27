@@ -507,7 +507,7 @@ export const FeedScreen: React.FC = () => {
 
 
 
-  // ── Suggestions — pool de 30, on pioche 10 au hasard à chaque inject ────────
+  // ── Suggestions — pool de 30 (boosted en tête côté backend), tranches de 10 par bloc ──
   const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(true);
 
@@ -519,15 +519,13 @@ export const FeedScreen: React.FC = () => {
     finally { setSuggestLoading(false); }
   }, []);
 
-  // Pioche 10 au hasard dans le pool
-  const pickSuggestions = useCallback((): UserPublic[] => {
-    if (suggestPool.length <= 10) return suggestPool;
-    const shuffled = [...suggestPool];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled.slice(0, 10);
+  // Retourne la tranche du pool correspondant au numero de bloc (1-based)
+  // Bloc 1 → [0..9], Bloc 2 → [10..19], Bloc 3 → [20..29], au-delà → tranche finale
+  const sliceForBlock = useCallback((blockIndex: number): UserPublic[] => {
+    if (suggestPool.length === 0) return [];
+    const SLICE = 10;
+    const start = ((blockIndex - 1) * SLICE) % suggestPool.length;
+    return suggestPool.slice(start, start + SLICE);
   }, [suggestPool]);
 
   useEffect(() => { loadSuggestions(); }, []);
@@ -950,16 +948,15 @@ export const FeedScreen: React.FC = () => {
     setCommentItem(null);
   }, []);
 
-  // Pool pré-calculé (stable tant que suggestPool ne change pas)
-  const pickedSuggestions = useMemo(() => pickSuggestions(), [suggestPool]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── renderItem stable ──────────────────────────────────────────────────────
 
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     if (item.kind === 'suggestions') {
+      // Extraire le numero de bloc depuis l'id "__suggestions__N"
+      const blockNum = parseInt(item.id.split('__suggestions__')[1] ?? '1', 10) || 1;
       return (
         <PeopleSuggestions
-          users={pickedSuggestions}
+          users={sliceForBlock(blockNum)}
           loading={suggestLoading}
           onUserPress={id => nav.navigate('UserProfile', { userId: id })}
           onRefresh={loadSuggestions}
@@ -1102,7 +1099,7 @@ export const FeedScreen: React.FC = () => {
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, activeCardId, activePostId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, pickedSuggestions, suggestLoading, loadSuggestions]);
+  }, [colors, activeCardId, activePostId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, sliceForBlock, suggestLoading, loadSuggestions]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 

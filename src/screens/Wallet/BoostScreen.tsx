@@ -375,8 +375,7 @@ const ActiveBoostCard: React.FC<{
     : ((boost.impression_count ?? 0) > 0 ? boost.impression_count : boost.delivered_quantity);
   const deliveredLabel = isGlobal ? 'livres' : ((boost.impression_count ?? 0) > 0 ? 'impressions reelles' : 'livres');
   const mult  = Number(boost.feed_multiplier ?? 1);
-  const refund = timePct < 0.5 ? Math.round(boost.coins_spent * 0.5) : 0;
-  const canCancel = elapsedSec / 60 <= 30;
+  const canCancel = elapsedSec / 60 < 30;
 
   useEffect(() => {
     Animated.timing(progressAnim, {
