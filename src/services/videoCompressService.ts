@@ -45,9 +45,13 @@ export async function compressVideo(
   // On essaie d'abord avec l'URI tel quel, puis avec file:// si content://
   let thumbnailUri: string | null = null;
   try {
-    const thumbSrc = inputUri.startsWith('content://')
-      ? `file://${(await toFileUri(inputUri)).fileUri.replace('file://', '')}`
-      : inputUri.startsWith('file://') ? inputUri : `file://${inputUri}`;
+    // Normalise vers file:// sans jamais doubler le préfixe
+    let thumbSrc = inputUri;
+    if (inputUri.startsWith('content://')) {
+      thumbSrc = (await toFileUri(inputUri)).fileUri;
+    } else if (!inputUri.startsWith('file://')) {
+      thumbSrc = `file://${inputUri}`;
+    }
     const thumb = await createVideoThumbnail(thumbSrc);
     thumbnailUri = thumb.path.startsWith('file://') ? thumb.path : `file://${thumb.path}`;
   } catch {}
@@ -75,10 +79,10 @@ export async function compressVideo(
   onProgress?.(90);
 
   // Durée réelle via metadata
-  let durationSec = 60;
+  let durationSec = 0;
   try {
     const meta = await getVideoMetaData(compressed);
-    if (meta.duration) durationSec = Math.round(meta.duration);
+    if (meta.duration && meta.duration > 0) durationSec = Math.round(meta.duration);
   } catch {}
 
   // Si le thumbnail n'a pas pu être généré depuis l'original, fallback sur la vidéo compressée

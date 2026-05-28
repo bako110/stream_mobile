@@ -62,7 +62,6 @@ function getToken(): string | null {
 
 async function getPresignedUrl(folder: string, filename: string, contentType: string): Promise<{ upload_url: string; public_url: string }> {
   const token = getToken();
-  console.log('[upload] getPresignedUrl', { folder, filename, contentType, hasToken: !!token });
   const res = await ReactNativeBlobUtil.fetch(
     'POST',
     `${API_BASE_URL}/api/v1/upload/presigned`,
@@ -73,24 +72,22 @@ async function getPresignedUrl(folder: string, filename: string, contentType: st
     },
     JSON.stringify({ folder, filename, content_type: contentType }),
   );
-  console.log('[upload] presign status', res.respInfo.status, res.data);
   if (res.respInfo.status >= 300) {
-    const err = res.json();
-    throw new Error(err?.detail ?? `Presign error ${res.respInfo.status}`);
+    let detail = `Presign error ${res.respInfo.status}`;
+    try { detail = (res.json() as any)?.detail ?? detail; } catch {}
+    throw new Error(detail);
   }
   return res.json();
 }
 
 async function putToR2(uploadUrl: string, filePath: string, contentType: string): Promise<void> {
   const path = filePath.startsWith('file://') ? filePath.slice(7) : filePath;
-  console.log('[upload] putToR2', { uploadUrl: uploadUrl.slice(0, 60), path, contentType });
   const res = await ReactNativeBlobUtil.fetch(
     'PUT',
     uploadUrl,
     { 'Content-Type': contentType },
     ReactNativeBlobUtil.wrap(path) as any,
   );
-  console.log('[upload] R2 PUT status', res.respInfo.status);
   if (res.respInfo.status >= 300) {
     throw new Error(`R2 upload error ${res.respInfo.status}`);
   }
@@ -187,33 +184,38 @@ export async function uploadVideoFromUri(
       ? compressed.uri.slice(7)
       : compressed.uri;
 
-    const res = await ReactNativeBlobUtil.fetch(
-      'POST',
-      `${API_BASE_URL}/api/v1/upload/video?folder=${folder}`,
-      {
-        Accept:        'application/json',
-        'Content-Type': 'multipart/form-data',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      [{ name: 'file', filename, type: contentType, data: ReactNativeBlobUtil.wrap(filePath) as any }],
-    );
-
-    if (compressed.isTempFile) {
-      await cleanupTempVideos([compressed.uri]);
+    let res: Awaited<ReturnType<typeof ReactNativeBlobUtil.fetch>>;
+    try {
+      res = await ReactNativeBlobUtil.fetch(
+        'POST',
+        `${API_BASE_URL}/api/v1/upload/video?folder=${folder}`,
+        {
+          Accept:         'application/json',
+          'Content-Type': 'multipart/form-data',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        [{ name: 'file', filename, type: contentType, data: ReactNativeBlobUtil.wrap(filePath) as any }],
+      );
+    } finally {
+      // Nettoyage garanti même si le fetch throw
+      if (compressed.isTempFile) {
+        await cleanupTempVideos([compressed.uri]).catch(() => {});
+      }
     }
 
-    if (res.respInfo.status >= 300) {
-      const err = res.json();
-      throw new Error(err?.detail ?? `Upload error ${res.respInfo.status}`);
+    if (res!.respInfo.status >= 300) {
+      let detail = `Upload error ${res!.respInfo.status}`;
+      try { detail = (res!.json() as any)?.detail ?? detail; } catch {}
+      throw new Error(detail);
     }
 
-    const data = res.json();
+    const data = res!.json() as any;
     return {
       url:           data.url,
-      public_id:     data.public_id,
-      duration:      data.duration,
-      thumbnail_url: data.thumbnail_url,
-      hls_url:       data.hls_url ?? undefined,
+      public_id:     data.public_id ?? data.url,
+      duration:      data.duration  ?? undefined,
+      thumbnail_url: data.thumbnail_url ?? undefined,
+      hls_url:       data.hls_url   ?? undefined,
     };
   }
 
