@@ -139,6 +139,79 @@ const WalletSkeleton: React.FC = () => (
   </View>
 );
 
+// ── TxList sub-component ──────────────────────────────────────────────────
+const TxList: React.FC<{
+  transactions: Transaction[];
+  txFilter: Transaction['transaction_type'] | 'all';
+  txHasMore: boolean;
+  txLoadingMore: boolean;
+  onLoadMore: () => void;
+  onBuyCoins: () => void;
+  balance: WalletBalance | null;
+  colors: any;
+  renderTx: (tx: Transaction) => React.ReactNode;
+}> = ({ transactions, txFilter, txHasMore, txLoadingMore, onLoadMore, onBuyCoins, balance, colors, renderTx }) => {
+  const filtered = transactions.filter(tx => txFilter === 'all' || tx.transaction_type === txFilter);
+
+  if (filtered.length === 0) {
+    return (
+      <View style={[{ backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.border, padding: 24, alignItems: 'center', gap: 8 }]}>
+        <MaterialCommunityIcons name="wallet-outline" size={48} color="#7B3FF2" />
+        <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' }}>
+          {txFilter === 'all' ? 'Aucune transaction pour l\'instant' : 'Aucune transaction dans cette catégorie'}
+        </Text>
+        <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 18 }}>
+          {txFilter === 'all' ? 'Achete des coins, envoie un cadeau ou rejoins une communaute — tout apparaitra ici.' : 'Essayez un autre filtre.'}
+        </Text>
+        {txFilter === 'all' && (
+          <>
+            <View style={{ width: '100%', marginTop: 8, gap: 8 }}>
+              {[
+                { label: 'Solde actuel',        value: `${(balance?.coins_balance ?? 0).toLocaleString('fr-FR')} coins`, color: '#7B3FF2' },
+                { label: 'Equivalent EUR',       value: `${((( balance?.coins_balance ?? 0) / 100) * 0.5).toFixed(2)} EUR`, color: colors.textPrimary },
+                { label: 'Taux de conversion',   value: '100 coins = 0,50 EUR', color: colors.textPrimary },
+              ].map(row => (
+                <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+                  <Text style={{ fontSize: 13, color: colors.textSecondary }}>{row.label}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: row.color }}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={onBuyCoins}
+              style={{ marginTop: 8, backgroundColor: '#7B3FF2', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 20 }}
+              activeOpacity={0.85}
+            >
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Acheter des coins</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <View style={{ gap: 2 }}>
+        {filtered.map(renderTx)}
+      </View>
+      {txHasMore && txFilter === 'all' && (
+        <TouchableOpacity
+          onPress={onLoadMore}
+          disabled={txLoadingMore}
+          style={{ alignItems: 'center', paddingVertical: 14, marginTop: 4 }}
+          activeOpacity={0.7}
+        >
+          {txLoadingMore
+            ? <ActivityIndicator size="small" color={colors.primary} />
+            : <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Voir plus</Text>
+          }
+        </TouchableOpacity>
+      )}
+    </>
+  );
+};
+
 // ── Main ───────────────────────────────────────────────────────────────────
 const WalletScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -154,7 +227,20 @@ const WalletScreen: React.FC = () => {
   const [txHasMore, setTxHasMore]   = useState(false);
   const [txLoadingMore, setTxLoadingMore] = useState(false);
   const [isMonetized, setIsMonetized] = useState(false);
+  const [txFilter, setTxFilter]     = useState<Transaction['transaction_type'] | 'all'>('all');
   const TX_LIMIT = 10;
+
+  const TX_FILTERS: { key: Transaction['transaction_type'] | 'all'; label: string }[] = [
+    { key: 'all',                 label: 'Tout' },
+    { key: 'credit_purchase',     label: 'Achats' },
+    { key: 'gift_received',       label: 'Cadeaux' },
+    { key: 'gift_sent',           label: 'Envois' },
+    { key: 'transfer_received',   label: 'Reçus' },
+    { key: 'transfer_sent',       label: 'Envoyés' },
+    { key: 'withdrawal',          label: 'Retraits' },
+    { key: 'boost_purchase',      label: 'Boosts' },
+    { key: 'view_revenue',        label: 'Revenus' },
+  ];
 
   // Animated coin count-up
   const animatedCoins = useRef(new Animated.Value(0)).current;
@@ -379,56 +465,41 @@ const WalletScreen: React.FC = () => {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Transactions récentes</Text>
 
-          {transactions.length === 0 ? (
-            <View style={[s.emptyState, { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.border, padding: 24 }]}>
-              <MaterialCommunityIcons name="wallet-outline" size={48} color="#7B3FF2" />
-              <Text style={s.emptyTitle}>Aucune transaction pour l'instant</Text>
-              <Text style={s.emptySubtitle}>Achete des coins, envoie un cadeau ou rejoins une communaute — tout apparaitra ici.</Text>
-
-              {/* Recap solde */}
-              <View style={{ width: '100%', marginTop: 16, gap: 8 }}>
-                <View style={[s.receiptRow, { borderColor: colors.border }]}>
-                  <Text style={[s.receiptLabel, { color: colors.textSecondary }]}>Solde actuel</Text>
-                  <Text style={[s.receiptValue, { color: '#7B3FF2' }]}>{(balance?.coins_balance ?? 0).toLocaleString('fr-FR')} coins</Text>
-                </View>
-                <View style={[s.receiptRow, { borderColor: colors.border }]}>
-                  <Text style={[s.receiptLabel, { color: colors.textSecondary }]}>Equivalent EUR</Text>
-                  <Text style={[s.receiptValue, { color: colors.textPrimary }]}>{coinsToEur(balance?.coins_balance ?? 0)} EUR</Text>
-                </View>
-                <View style={[s.receiptRow, { borderColor: colors.border }]}>
-                  <Text style={[s.receiptLabel, { color: colors.textSecondary }]}>Taux de conversion</Text>
-                  <Text style={[s.receiptValue, { color: colors.textPrimary }]}>100 coins = 0,50 EUR</Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => navigation.navigate('BuyCoins')}
-                style={{ marginTop: 16, backgroundColor: '#7B3FF2', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 20 }}
-                activeOpacity={0.85}
-              >
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Acheter des coins</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <View style={s.txList}>
-                {transactions.map(renderTx)}
-              </View>
-              {txHasMore && (
+          {/* Filtre par type */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 12 }}>
+            {TX_FILTERS.map(f => {
+              const active = txFilter === f.key;
+              return (
                 <TouchableOpacity
-                  onPress={loadMoreTx}
-                  disabled={txLoadingMore}
-                  style={{ alignItems: 'center', paddingVertical: 14, marginTop: 4 }}
-                  activeOpacity={0.7}
+                  key={f.key}
+                  onPress={() => setTxFilter(f.key)}
+                  style={{
+                    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
+                    backgroundColor: active ? colors.primary : colors.surface,
+                    borderWidth: 1,
+                    borderColor: active ? colors.primary : colors.border,
+                  }}
+                  activeOpacity={0.75}
                 >
-                  {txLoadingMore
-                    ? <ActivityIndicator size="small" color={colors.primary} />
-                    : <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Voir plus</Text>
-                  }
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>
+                    {f.label}
+                  </Text>
                 </TouchableOpacity>
-              )}
-            </>
-          )}
+              );
+            })}
+          </ScrollView>
+
+          <TxList
+            transactions={transactions}
+            txFilter={txFilter}
+            txHasMore={txHasMore}
+            txLoadingMore={txLoadingMore}
+            onLoadMore={loadMoreTx}
+            onBuyCoins={() => navigation.navigate('BuyCoins')}
+            balance={balance}
+            colors={colors}
+            renderTx={renderTx}
+          />
         </View>
       </ScrollView>
     </View>

@@ -98,10 +98,10 @@ export function MonetisationScreen() {
           <Text style={[gateStyles.message, { color: colors.textSecondary }]}>{cfg.message}</Text>
           <TouchableOpacity
             style={[gateStyles.btn, { backgroundColor: GREEN }]}
-            onPress={() => nav.navigate('SettingsMonetisation')}
+            onPress={() => nav.navigate('MonetisationRequest')}
           >
             <Icon name="bar-chart-2" size={16} color="#fff" />
-            <Text style={gateStyles.btnText}>Voir ma demande</Text>
+            <Text style={gateStyles.btnText}>Faire une demande</Text>
           </TouchableOpacity>
         </View>
       </View>

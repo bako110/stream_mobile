@@ -84,9 +84,16 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [videoId, contentId, episodeId, contentType, title, thumbnailUrl, totalSeconds]);
 
   const handleDownload = async () => {
-    const ext = url.split('.').pop()?.split('?')[0] ?? 'mp4';
+    const ext = url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'mp4';
     const filename = `${title.replace(/[^a-z0-9]/gi, '_')}.${ext}`;
     const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
+    const mimeMap: Record<string, string> = {
+      mp4: 'video/mp4', mov: 'video/quicktime', avi: 'video/x-msvideo',
+      mkv: 'video/x-matroska', webm: 'video/webm', flv: 'video/x-flv',
+      wmv: 'video/x-ms-wmv', mpg: 'video/mpeg', mpeg: 'video/mpeg',
+      '3gp': 'video/3gpp',
+    };
+    const mime = mimeMap[ext] ?? 'video/mp4';
 
     setDownloading(true);
     setDownloadProgress(0);
@@ -98,7 +105,7 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
           notification: true,
           title,
           description: 'Téléchargement en cours…',
-          mime: 'video/mp4',
+          mime,
         },
       })
         .fetch('GET', url)

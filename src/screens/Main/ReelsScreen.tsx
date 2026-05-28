@@ -797,7 +797,7 @@ export const ReelsScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Préchargement silencieux : 1 en arrière + 3 en avance */}
+      {/* Préchargement silencieux : 1 en arrière + 5 en avance */}
       {reels[currentIndex - 1]?.video_url && (
         <VideoPreloader key={`pre_${reels[currentIndex - 1].id}`} uri={reels[currentIndex - 1].video_url!} />
       )}
@@ -809,6 +809,12 @@ export const ReelsScreen: React.FC = () => {
       )}
       {reels[currentIndex + 3]?.video_url && (
         <VideoPreloader key={`pre_${reels[currentIndex + 3].id}`} uri={reels[currentIndex + 3].video_url!} />
+      )}
+      {reels[currentIndex + 4]?.video_url && (
+        <VideoPreloader key={`pre_${reels[currentIndex + 4].id}`} uri={reels[currentIndex + 4].video_url!} />
+      )}
+      {reels[currentIndex + 5]?.video_url && (
+        <VideoPreloader key={`pre_${reels[currentIndex + 5].id}`} uri={reels[currentIndex + 5].video_url!} />
       )}
 
       {loadingMore && (
@@ -894,19 +900,22 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     finally { setFollowLoading(false); }
   }, [reel.author?.id, isFollowing, followLoading]);
 
-  // Source avec buffer agressif : 30s en avance (Android) / 20s (iOS)
-  const videoSource = reel.video_url
+  // HLS en priorité (progressive loading — segments de 2s),
+  // fallback sur le MP4 brut si hls_url absent (vieux reels ou transcodage en cours)
+  const videoUri = reel.hls_url ?? reel.video_url;
+
+  const videoSource = videoUri
     ? {
-        uri: reel.video_url,
+        uri: videoUri,
         bufferConfig: {
           // Android — ExoPlayer
-          minBufferMs:                    5_000,  // commence à jouer dès 5s buffered
-          maxBufferMs:                    30_000, // charge jusqu'à 30s en avance
-          bufferForPlaybackMs:            1_500,  // reprend la lecture après rebuffer dès 1.5s
-          bufferForPlaybackAfterRebufferMs: 3_000,
-          backBufferDurationMs:           5_000,  // garde 5s derrière pour seek rapide
+          minBufferMs:                      1_500,
+          maxBufferMs:                      30_000,
+          bufferForPlaybackMs:              800,
+          bufferForPlaybackAfterRebufferMs: 1_500,
+          backBufferDurationMs:             3_000,
           // iOS — AVPlayer
-          preferredForwardBufferDurationMs: 20_000, // charge 20s en avance
+          preferredForwardBufferDurationMs: 10_000,
         },
       }
     : 'about:blank';
@@ -1636,19 +1645,19 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 // ─── VideoPreloader ───────────────────────────────────────────────────────────
 
 // Lance la lecture silencieuse pour remplir le buffer réseau, puis met en pause.
-// 15s = assez pour buffer ~50% d'un reel court sur 3G avant que l'user y arrive.
-const BUFFER_SECS = 15;
+// 20s = assez pour buffer un reel court sur 4G avant que l'user y arrive.
+const BUFFER_SECS = 20;
 
 const VideoPreloader: React.FC<{ uri: string }> = memo(({ uri }) => {
   const player = useVideoPlayer(
     {
       uri,
       bufferConfig: {
-        minBufferMs:                      5_000,
+        minBufferMs:                      1_500,
         maxBufferMs:                      30_000,
-        bufferForPlaybackMs:              1_500,
-        bufferForPlaybackAfterRebufferMs: 3_000,
-        preferredForwardBufferDurationMs: 20_000,
+        bufferForPlaybackMs:              800,
+        bufferForPlaybackAfterRebufferMs: 1_500,
+        preferredForwardBufferDurationMs: 10_000,
       },
     },
     p => {

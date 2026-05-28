@@ -19,27 +19,39 @@ interface ReferralStats {
   monthly_cap:          number;
 }
 
+interface ReferredUser {
+  id:            string;
+  username:      string;
+  display_name:  string | null;
+  avatar_url:    string | null;
+  joined_at:     string;
+  coins_generated: number;
+}
+
 export const ReferralScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation();
 
-  const [stats, setStats]       = useState<ReferralStats | null>(null);
-  const [loading, setLoading]   = useState(true);
+  const [stats,      setStats]      = useState<ReferralStats | null>(null);
+  const [users,      setUsers]      = useState<ReferredUser[]>([]);
+  const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [copied, setCopied]     = useState(false);
+  const [copied,     setCopied]     = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [meRes, statsRes] = await Promise.all([
+      const [meRes, statsRes, usersRes] = await Promise.all([
         apiClient.get<{ referral_code: string }>(Endpoints.wallet.referralMe),
         apiClient.get<ReferralStats>(Endpoints.wallet.referralStats),
+        apiClient.get<ReferredUser[]>(Endpoints.wallet.referralUsers).catch(() => ({ data: [] })),
       ]);
       setStats({
         ...statsRes.data,
         referral_code: meRes.data.referral_code ?? statsRes.data.referral_code,
       });
+      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
     } catch (e: any) {
       console.log('[Referral] erreur:', e?.message, e?.response?.status);
     } finally {
@@ -192,6 +204,40 @@ export const ReferralScreen: React.FC = () => {
             ))}
           </View>
 
+          {/* Liste filleuls */}
+          {users.length > 0 && (
+            <View style={[s.usersCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[s.howTitle, { color: colors.textPrimary }]}>
+                Mes filleuls ({users.length})
+              </Text>
+              {users.map((u, i) => {
+                const name    = u.display_name ?? u.username;
+                const initial = name[0]?.toUpperCase() ?? '?';
+                const date    = new Date(u.joined_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+                return (
+                  <View key={u.id} style={[
+                    s.userRow,
+                    i < users.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+                  ]}>
+                    <View style={[s.userAvatar, { backgroundColor: colors.primary + '33' }]}>
+                      <Text style={[s.userInitial, { color: colors.primary }]}>{initial}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.userName, { color: colors.textPrimary }]}>{name}</Text>
+                      <Text style={[s.userDate, { color: colors.textTertiary }]}>Inscrit le {date}</Text>
+                    </View>
+                    {u.coins_generated > 0 && (
+                      <View style={[s.userCoins, { backgroundColor: '#FFD70018' }]}>
+                        <Text style={s.userCoinsText}>+{u.coins_generated}</Text>
+                        <Text style={s.userCoinsLabel}> coins</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
         </ScrollView>
       )}
     </View>
@@ -239,4 +285,14 @@ const s = StyleSheet.create({
   howRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
   howIcon:      { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   howText:      { flex: 1, fontSize: 13, lineHeight: 19 },
+
+  usersCard:    { borderRadius: 16, padding: 16, borderWidth: 1 },
+  userRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  userAvatar:   { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  userInitial:  { fontSize: 16, fontWeight: '800' },
+  userName:     { fontSize: 14, fontWeight: '600' },
+  userDate:     { fontSize: 11, marginTop: 2 },
+  userCoins:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  userCoinsText:  { color: '#FFD700', fontSize: 13, fontWeight: '800' },
+  userCoinsLabel: { color: '#FFD700', fontSize: 11, fontWeight: '500' },
 });

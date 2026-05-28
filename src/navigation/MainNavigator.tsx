@@ -82,15 +82,19 @@ import { SimpleLiveListScreen }    from '../screens/Live/SimpleLiveListScreen';
 import { GoLiveScreen }            from '../screens/Live/GoLiveScreen';
 import { SimpleLiveStreamScreen }  from '../screens/Live/SimpleLiveStreamScreen';
 import { SimpleLiveViewerScreen }  from '../screens/Live/SimpleLiveViewerScreen';
-import WalletScreen           from '../screens/Wallet/WalletScreen';
-import BuyCoinsScreen         from '../screens/Wallet/BuyCoinsScreen';
-import CreatorDashboardScreen from '../screens/Wallet/CreatorDashboardScreen';
-import { MonetisationScreen }  from '../screens/Wallet/MonetisationScreen';
-import { CreatorStatsScreen }  from '../screens/Wallet/CreatorStatsScreen';
-import WithdrawScreen         from '../screens/Wallet/WithdrawScreen';
-import TransferScreen         from '../screens/Wallet/TransferScreen';
-import BoostScreen            from '../screens/Wallet/BoostScreen';
-import { ReferralScreen }     from '../screens/Wallet/ReferralScreen';
+import WalletScreen                from '../screens/Wallet/WalletScreen';
+import BuyCoinsScreen              from '../screens/Wallet/BuyCoinsScreen';
+import CreatorDashboardScreen      from '../screens/Wallet/CreatorDashboardScreen';
+import { MonetisationScreen }       from '../screens/Wallet/MonetisationScreen';
+import { CreatorStatsScreen }       from '../screens/Wallet/CreatorStatsScreen';
+import WithdrawScreen              from '../screens/Wallet/WithdrawScreen';
+import TransferScreen              from '../screens/Wallet/TransferScreen';
+import BoostScreen                 from '../screens/Wallet/BoostScreen';
+import { ReferralScreen }          from '../screens/Wallet/ReferralScreen';
+import SubscriptionPlansScreen     from '../screens/Wallet/SubscriptionPlansScreen';
+import SubscriptionPaymentScreen   from '../screens/Wallet/SubscriptionPaymentScreen';
+import MySubscriptionScreen        from '../screens/Wallet/MySubscriptionScreen';
+import MonetisationRequestScreen   from '../screens/Wallet/MonetisationRequestScreen';
 import { WebQRScannerScreen } from '../screens/Auth/WebQRScannerScreen';
 import { SettingsWalletScreen }        from '../screens/Settings/SettingsWalletScreen';
 import { SettingsMonetisationScreen }  from '../screens/Settings/SettingsMonetisationScreen';
@@ -189,8 +193,12 @@ export type MainStackParamList = {
   Monetisation:     undefined;
   Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
-  Boost:                undefined;
-  Referral:             undefined;
+  Boost:                    undefined;
+  Referral:                 undefined;
+  SubscriptionPlans:        undefined;
+  SubscriptionPayment:      { plan: string; walletCheck: any };
+  MySubscription:           undefined;
+  MonetisationRequest:      undefined;
   AdminVerification:         undefined;
   WebQRScanner:              undefined;
   SettingsWallet:            undefined;
@@ -419,6 +427,10 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Boost"             component={BoostScreen}             options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Referral"          component={ReferralScreen}          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SubscriptionPlans"   component={SubscriptionPlansScreen}   options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SubscriptionPayment" component={SubscriptionPaymentScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="MySubscription"      component={MySubscriptionScreen}      options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="MonetisationRequest" component={MonetisationRequestScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="AdminVerification"       component={AdminVerificationScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityMembers"        component={CommunityMembersScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityStats"          component={CommunityStatsScreen}          options={{ animation: 'slide_from_right' }} />

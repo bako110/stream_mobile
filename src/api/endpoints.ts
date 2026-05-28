@@ -325,6 +325,7 @@ export const Endpoints = {
     // Affiliation / Parrainage
     referralMe:    `${V1}/wallet/referral/me`,
     referralStats: `${V1}/wallet/referral/stats`,
+    referralUsers: `${V1}/wallet/referral/users`,
     // FoliX ID
     resolveFlixId: (folixId: string) => `${V1}/wallet/resolve/${folixId}`,
   },
