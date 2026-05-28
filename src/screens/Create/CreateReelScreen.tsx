@@ -76,6 +76,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
       onDone: async (result) => {
         await reelService.create({
           video_url:     result.videoUrl!,
+          hls_url:       result.hlsUrl,
           caption:       capturedCaption || undefined,
           thumbnail_url: result.thumbnailUrl,
           duration_sec:  result.durationSec ? Math.round(result.durationSec) : undefined,

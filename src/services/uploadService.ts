@@ -24,6 +24,7 @@ export interface UploadedVideo {
   public_id:      string;
   duration?:      number;
   thumbnail_url?: string;
+  hls_url?:       string;
   width?:         number;
   height?:        number;
   format?:        string;
@@ -177,10 +178,49 @@ export async function uploadVideoFromUri(
 
   const contentType = mimeType ?? 'video/mp4';
   const filename    = fileName ?? `video_${Date.now()}.mp4`;
+  const token       = getToken();
+
+  // Pour les reels : upload multipart vers le backend pour que FFmpeg
+  // génère les segments HLS. Pour les autres dossiers : upload presigned direct.
+  if (folder === 'reels') {
+    const filePath = compressed.uri.startsWith('file://')
+      ? compressed.uri.slice(7)
+      : compressed.uri;
+
+    const res = await ReactNativeBlobUtil.fetch(
+      'POST',
+      `${API_BASE_URL}/api/v1/upload/video?folder=${folder}`,
+      {
+        Accept:        'application/json',
+        'Content-Type': 'multipart/form-data',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      [{ name: 'file', filename, type: contentType, data: ReactNativeBlobUtil.wrap(filePath) as any }],
+    );
+
+    if (compressed.isTempFile) {
+      await cleanupTempVideos([compressed.uri]);
+    }
+
+    if (res.respInfo.status >= 300) {
+      const err = res.json();
+      throw new Error(err?.detail ?? `Upload error ${res.respInfo.status}`);
+    }
+
+    const data = res.json();
+    return {
+      url:           data.url,
+      public_id:     data.public_id,
+      duration:      data.duration,
+      thumbnail_url: data.thumbnail_url,
+      hls_url:       data.hls_url ?? undefined,
+    };
+  }
+
+  // Autres dossiers : presigned URL directe (pas besoin de HLS)
   const { upload_url, public_url } = await getPresignedUrl(folder, filename, contentType);
   await putToR2(upload_url, compressed.uri, contentType);
 
-  // Upload du thumbnail si généré
   let thumbnailPublicUrl: string | undefined;
   if (compressed.thumbnailUri) {
     try {
@@ -189,7 +229,6 @@ export async function uploadVideoFromUri(
         await getPresignedUrl(folder, thumbFilename, 'image/jpeg');
       await putToR2(thumbUploadUrl, compressed.thumbnailUri, 'image/jpeg');
       thumbnailPublicUrl = thumbPublicUrl;
-      // Nettoyage thumbnail temp
       const thumbPath = compressed.thumbnailUri.startsWith('file://')
         ? compressed.thumbnailUri.slice(7)
         : compressed.thumbnailUri;
