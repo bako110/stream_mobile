@@ -842,12 +842,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   reel, isActive, muted, screenW, screenH, insetBottom,
   colors, currentUserId, onToggleMute, onAdd, onAuthorPress, onEnd, activePlayerRef,
 }) => {
-  const [paused,         setPaused]         = useState(false);
-  const [buffering,      setBuffering]      = useState(false);
-  const [videoLoaded,    setVideoLoaded]    = useState(false);
-  const [videoError,     setVideoError]     = useState(false);
-  // Chargement initial : visible dès l'activation jusqu'au premier onLoad
-  const [initialLoading, setInitialLoading] = useState(false);
+  const [paused,       setPaused]       = useState(false);
+  const [videoLoaded,  setVideoLoaded]  = useState(false);
+  const [videoError,   setVideoError]   = useState(false);
+  // true dès que onPlaybackStateChange signale isPlaying — éteint le spinner
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const [liked,          setLiked]          = useState(reel.user_reaction === 'like');
   const [likes,          setLikes]          = useState(reel.like_count ?? 0);
   const [commentCount,   setCommentCount]   = useState(reel.comment_count ?? 0);
@@ -983,14 +982,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     clearStall();
     const attempt = retryCountRef.current;
     if (attempt >= MAX_RETRIES) {
-      // Tous les retries épuisés → on affiche l'erreur
-      if (mountedRef.current) { setVideoError(true); setBuffering(false); }
+      if (mountedRef.current) { setVideoError(true); setVideoPlaying(false); }
       return;
     }
     retryCountRef.current += 1;
-    // Silencieux : on cache l'erreur, on montre juste le buffering
-    if (mountedRef.current) { setVideoError(false); setVideoLoaded(false); setBuffering(true); }
-    const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+    if (mountedRef.current) { setVideoError(false); setVideoLoaded(false); setVideoPlaying(false); }
+    const delay = Math.pow(2, attempt) * 1000;
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     retryTimerRef.current = setTimeout(() => {
       if (!mountedRef.current || !reel.video_url) return;
@@ -1023,9 +1020,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     });
     const subBuf = player.addEventListener('onBuffer', (val: boolean) => {
       if (!mountedRef.current) return;
-      setBuffering(val);
       if (val && isActive && !pausedRef.current) {
-        // Video en train de buffer : arme le stall timer
         armStall();
       } else {
         clearStall();
@@ -1035,32 +1030,29 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       if (!mountedRef.current) return;
       setVideoLoaded(true);
       setVideoError(false);
-      setBuffering(false);
-      setInitialLoading(false);
       retryCountRef.current = 0;
       clearStall();
       if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
-      // Garantit la lecture si isActive était true avant que le player soit prêt
       if (isActive && !pausedRef.current) player.play();
+    });
+    // Source unique de vérité : isPlaying=true → spinner off, isPlaying=false+isBuffering → spinner on
+    const subState = player.addEventListener('onPlaybackStateChange', ({ isPlaying, isBuffering }) => {
+      if (!mountedRef.current) return;
+      if (isPlaying) {
+        setVideoPlaying(true);
+        clearStall();
+      } else if (isBuffering && isActive && !pausedRef.current) {
+        setVideoPlaying(false);
+        armStall();
+      }
     });
     const subErr = player.addEventListener('onError', () => {
       if (!mountedRef.current) return;
-      setBuffering(false);
       clearStall();
-      // Retry silencieux si on est sur ce reel, sinon on ignore
       if (isActive) doRetry();
     });
-    return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subErr.remove(); };
+    return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subState.remove(); subErr.remove(); };
   }, [isActive, onEnd, player, doRetry, armStall, clearStall]);
-
-  // ── Chargement initial : armer dès l'activation, éteindre au onLoad ────────
-  useEffect(() => {
-    if (isActive && !videoLoaded) {
-      setInitialLoading(true);
-    } else {
-      setInitialLoading(false);
-    }
-  }, [isActive, videoLoaded]);
 
   // ── Play/Pause selon isActive ─────────────────────────────────────────────
   const playTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1114,8 +1106,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         setPaused(false);
         setVideoError(false);
         setEnded(false);
-        setInitialLoading(false);
-        setVideoLoaded(false); // reset pour la prochaine activation
+        setVideoLoaded(false);
+        setVideoPlaying(false);
       }
       if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
       clearStall();
@@ -1389,8 +1381,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         surfaceType="texture"
       />
 
-      {/* Chargement initial + buffering */}
-      {(initialLoading || (buffering && !videoError)) && !ended && (
+      {/* Spinner : visible seulement si la vidéo ne joue pas (chargement ou rebuffer) */}
+      {!videoPlaying && !videoError && !ended && isActive && (
         <View style={s.bufferOverlay} pointerEvents="none">
           <ActivityIndicator size="large" color="rgba(255,255,255,0.85)" />
           {!videoLoaded && <Text style={s.bufferText}>Chargement…</Text>}
