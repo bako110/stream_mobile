@@ -407,16 +407,22 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                   </>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-                onPress={() => navigation.navigate('Chat', {
-                  partnerId:   profile!.id,
-                  partnerName: profile!.display_name || profile!.username,
-                  avatarUrl:   profile!.avatar_url ?? undefined,
-                })}
-              >
-                <Icon name="message-circle" size={16} color={colors.textPrimary} />
-              </TouchableOpacity>
+              {profile.privacy_allow_messages !== false ? (
+                <TouchableOpacity
+                  style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                  onPress={() => navigation.navigate('Chat', {
+                    partnerId:   profile!.id,
+                    partnerName: profile!.display_name || profile!.username,
+                    avatarUrl:   profile!.avatar_url ?? undefined,
+                  })}
+                >
+                  <Icon name="message-circle" size={16} color={colors.textPrimary} />
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, opacity: 0.35 }]}>
+                  <Icon name="message-circle" size={16} color={colors.textDisabled} />
+                </View>
+              )}
               <TouchableOpacity
                 style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
                 onPress={() => navigation.navigate('Transfer', {

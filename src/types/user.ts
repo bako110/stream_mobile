@@ -101,15 +101,17 @@ export interface UserPublic {
 }
 
 export interface UserPublicProfile extends UserPublic {
-  followers_count:  number;
-  following_count:  number;
-  is_followed:      boolean;
-  is_verified:      boolean;
-  banner_url?:      string | null;
-  first_name?:      string | null;
-  last_name?:       string | null;
-  phone?:           string | null;
-  date_of_birth?:   string | null;
-  gender?:          Gender | null;
-  created_at?:      string | null;
+  followers_count:        number;
+  following_count:        number;
+  is_followed:            boolean;
+  is_verified:            boolean;
+  banner_url?:            string | null;
+  first_name?:            string | null;
+  last_name?:             string | null;
+  phone?:                 string | null;
+  date_of_birth?:         string | null;
+  gender?:                Gender | null;
+  created_at?:            string | null;
+  privacy_allow_messages?: boolean;
+  privacy_profile_public?: boolean;
 }
