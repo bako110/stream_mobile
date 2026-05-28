@@ -846,6 +846,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [buffering,      setBuffering]      = useState(false);
   const [videoLoaded,    setVideoLoaded]    = useState(false);
   const [videoError,     setVideoError]     = useState(false);
+  // Chargement initial : visible dès l'activation jusqu'au premier onLoad
+  const [initialLoading, setInitialLoading] = useState(false);
   const [liked,          setLiked]          = useState(reel.user_reaction === 'like');
   const [likes,          setLikes]          = useState(reel.like_count ?? 0);
   const [commentCount,   setCommentCount]   = useState(reel.comment_count ?? 0);
@@ -1034,6 +1036,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       setVideoLoaded(true);
       setVideoError(false);
       setBuffering(false);
+      setInitialLoading(false);
       retryCountRef.current = 0;
       clearStall();
       if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
@@ -1049,6 +1052,15 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     });
     return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subErr.remove(); };
   }, [isActive, onEnd, player, doRetry, armStall, clearStall]);
+
+  // ── Chargement initial : armer dès l'activation, éteindre au onLoad ────────
+  useEffect(() => {
+    if (isActive && !videoLoaded) {
+      setInitialLoading(true);
+    } else {
+      setInitialLoading(false);
+    }
+  }, [isActive, videoLoaded]);
 
   // ── Play/Pause selon isActive ─────────────────────────────────────────────
   const playTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1102,6 +1114,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         setPaused(false);
         setVideoError(false);
         setEnded(false);
+        setInitialLoading(false);
+        setVideoLoaded(false); // reset pour la prochaine activation
       }
       if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
       clearStall();
@@ -1375,11 +1389,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         surfaceType="texture"
       />
 
-      {/* Chargement / buffering */}
-      {(buffering && !videoLoaded && !videoError) && (
+      {/* Chargement initial + buffering */}
+      {(initialLoading || (buffering && !videoError)) && !ended && (
         <View style={s.bufferOverlay} pointerEvents="none">
           <ActivityIndicator size="large" color="rgba(255,255,255,0.85)" />
-          <Text style={s.bufferText}>Chargement…</Text>
+          {!videoLoaded && <Text style={s.bufferText}>Chargement…</Text>}
         </View>
       )}
 
