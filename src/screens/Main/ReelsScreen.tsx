@@ -88,8 +88,9 @@ export const ReelsScreen: React.FC = () => {
   // ── State ─────────────────────────────────────────────────────────────────
   const lastLoadedAtRef = useRef<number>(0);
 
-  // Si un reel est passé depuis le feed, on l'affiche immédiatement (pas de skeleton)
-  const seedReel = params.initialReel && params.initialReel.video_url ? [params.initialReel as Reel] : [];
+  // Si un reel est passé depuis le feed avec video_url, on l'affiche immédiatement
+  // Sinon on démarre avec une liste vide et on charge normalement (le scroll se fera après)
+  const seedReel = params.initialReel?.video_url ? [params.initialReel as Reel] : [];
 
   const [reels,         setReels]         = useState<Reel[]>(seedReel);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
@@ -97,7 +98,8 @@ export const ReelsScreen: React.FC = () => {
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
   const [editCaption,   setEditCaption]   = useState('');
   const [editSaving,    setEditSaving]    = useState(false);
-  const [loading,       setLoading]       = useState(seedReel.length === 0);
+  // Pas de skeleton si on a un seedReel OU si on a juste un initialReelId (on charge et scroll)
+  const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId);
   const [loadingMore,   setLoadingMore]   = useState(false);
   const [hasMore,       setHasMore]       = useState(true);
   const [tab,           setTab]           = useState<'feed' | 'mine'>('feed');
@@ -189,12 +191,27 @@ export const ReelsScreen: React.FC = () => {
       viewedReelsRef.current = new Set();
       lastLoadedAtRef.current = Date.now();
 
+      // Forcer un ping sur currentIndex pour que le VideoSlide démarre la lecture
+      // même quand targetIdx === 0 (onViewableItemsChanged ne se déclenche pas dans ce cas)
+      if (targetIdx === 0) {
+        currentIdxRef.current = 0;
+        setCurrentIndex(i => i === 0 ? -1 : i); // bascule temporaire
+        setTimeout(() => { if (mountedRef.current) setCurrentIndex(0); }, 30);
+      }
+
       if (targetIdx > 0) {
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
-        setTimeout(() => {
-          listRef.current?.scrollToIndex({ index: targetIdx, animated: false });
-        }, 150);
+        // Retry scroll jusqu'à ce que la FlatList soit prête
+        const tryScroll = (attempts: number) => {
+          if (!mountedRef.current) return;
+          if (listRef.current) {
+            listRef.current.scrollToIndex({ index: targetIdx, animated: false });
+          } else if (attempts > 0) {
+            setTimeout(() => tryScroll(attempts - 1), 100);
+          }
+        };
+        setTimeout(() => tryScroll(5), 100);
       }
 
       userService.getUserReels(String(me.id))
@@ -293,36 +310,55 @@ export const ReelsScreen: React.FC = () => {
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
-    // Si on a un seed reel (navigation depuis le feed), le feed complet charge en silent
-    // — le reel joue immédiatement pendant ce temps
+    setScreenFocused(true);
     load(seedReel.length > 0);
     return () => {
       mountedRef.current = false;
       if (searchTimer.current) clearTimeout(searchTimer.current);
-      // Send view for the reel that was active when unmounting
       sendViewForCurrent();
     };
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  const didFocusOnceRef = useRef(false);
+  const didFocusOnceRef    = useRef(false);
+  const lastInitialReelRef = useRef<string | undefined>(undefined);
+
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
+
+    const newInitialId = params.initialReelId;
+
     if (params.reelPublished) {
       nav.setParams({ reelPublished: undefined } as any);
-      load(); // nouveau reel publie : rechargement complet avec spinner
+      load();
+    } else if (newInitialId && newInitialId !== lastInitialReelRef.current) {
+      // Nouveau reel cliqué depuis le feed — on recharge et on scroll dessus
+      lastInitialReelRef.current = newInitialId;
+      const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
+      if (idx >= 0) {
+        // Déjà dans la liste — scroll direct
+        currentIdxRef.current = idx;
+        setCurrentIndex(idx);
+        setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
+      } else {
+        // Pas dans la liste — recharger le feed entier
+        load(false);
+      }
     } else if (didFocusOnceRef.current) {
       const age = Date.now() - lastLoadedAtRef.current;
       if (age > 60_000) {
-        load(true); // retour sur l'ecran : silent, garde le reel actuel visible
+        load(true); // retour simple : silent, garde le reel actuel visible
       }
     }
+
     didFocusOnceRef.current = true;
     return () => {
       setScreenFocused(false);
+      // Pause immédiate sans attendre le re-render
+      try { activePlayerRef.current?.pause(); } catch {}
       sendViewForCurrent();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.reelPublished]));
+  }, [params.reelPublished, params.initialReelId]));
 
   // ── Edit / Delete ─────────────────────────────────────────────────────────
   const handleDeleteReel = useCallback((reel: Reel) => {
@@ -383,7 +419,13 @@ export const ReelsScreen: React.FC = () => {
       if (!viewableItems.length) return;
       const first = viewableItems[0];
       const idx   = first.index ?? 0;
-      if (idx === currentIdxRef.current) return;
+
+      // Toujours mettre à jour screenFocused pour déclencher le play au premier render
+      if (idx === currentIdxRef.current) {
+        // Même index — forcer un re-render du VideoSlide actif pour démarrer la vidéo
+        setCurrentIndex(i => i);
+        return;
+      }
 
       // Pause le player précédent
       activePlayerRef.current?.pause();
@@ -608,7 +650,15 @@ export const ReelsScreen: React.FC = () => {
         viewabilityConfig={viewabilityConfig.current}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
+        extraData={`${currentIndex}-${screenFocused}-${muted}`}
         getItemLayout={(_, index) => ({ length: SCREEN_H - HEADER_H, offset: (SCREEN_H - HEADER_H) * index, index })}
+        onScrollToIndexFailed={({ index }) => {
+          // L'item n'est pas encore rendu — scroll au début puis retry
+          listRef.current?.scrollToOffset({ offset: 0, animated: false });
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({ index, animated: false });
+          }, 300);
+        }}
         renderItem={renderVideoSlide}
       />
 

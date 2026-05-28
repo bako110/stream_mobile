@@ -84,13 +84,15 @@ function getInitials(name?: string | null): string {
 // ── Styles badges (déclarés ici pour être disponibles avant FeedHeaderBadges) ─
 const badgeS = StyleSheet.create({
   badge: {
-    position: 'absolute', top: -4, right: -4,
-    minWidth: 18, height: 18, borderRadius: 9,
+    position: 'absolute', top: -6, right: -8,
+    minWidth: 16, height: 16, borderRadius: 8,
     backgroundColor: '#FF3B30',
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#000',
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 });
 
 
@@ -345,21 +347,25 @@ const FeedHeaderBadges: React.FC<{
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, gap: 6 }}>
       {/* Messages */}
       <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onMessages} activeOpacity={0.8}>
-        <Icon name="send" size={18} color={colors.textPrimary} />
-        {unreadMessages > 0 && (
-          <View style={badgeS.badge}>
-            <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
-          </View>
-        )}
+        <View style={{ position: 'relative' }}>
+          <Icon name="send" size={18} color={colors.textPrimary} />
+          {unreadMessages > 0 && (
+            <View style={badgeS.badge}>
+              <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
+            </View>
+          )}
+        </View>
       </TouchableOpacity>
       {/* Notifications */}
       <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onNotifs} activeOpacity={0.8}>
-        <Icon name="bell" size={18} color={colors.textPrimary} />
-        {totalNotifs > 0 && (
-          <View style={badgeS.badge}>
-            <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
-          </View>
-        )}
+        <View style={{ position: 'relative' }}>
+          <Icon name="bell" size={18} color={colors.textPrimary} />
+          {totalNotifs > 0 && (
+            <View style={badgeS.badge}>
+              <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
+            </View>
+          )}
+        </View>
       </TouchableOpacity>
       {/* Favoris */}
       <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onFavorites} activeOpacity={0.8}>
@@ -531,20 +537,13 @@ export const FeedScreen: React.FC = () => {
   useEffect(() => { loadSuggestions(); }, []);
 
   // ── Suivi (follow) state ──────────────────────────────────────────────────
-  const [followingSet,   setFollowingSet]   = useState<Set<string>>(new Set());
-  const [followingUsers, setFollowingUsers] = useState<UserPublic[]>([]);
-  const [followersSet,   setFollowersSet]   = useState<Set<string>>(new Set());
+  const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!currentUser) return;
-    Promise.all([
-      userService.getFollowing(currentUser.id).catch(() => [] as UserPublic[]),
-      userService.getFollowers(currentUser.id).catch(() => [] as UserPublic[]),
-    ]).then(([following, followers]) => {
-      setFollowingSet(new Set(following.map((u: any) => u.id)));
-      setFollowingUsers(following);
-      setFollowersSet(new Set(followers.map((u: any) => u.id)));
-    });
+    userService.getFollowing(currentUser.id)
+      .then((following: UserPublic[]) => setFollowingSet(new Set(following.map((u: any) => u.id))))
+      .catch(() => {});
   }, [currentUser]);
 
   const handleToggleFollow = useCallback(async (authorId: string) => {
@@ -554,9 +553,6 @@ export const FeedScreen: React.FC = () => {
       wasFollowing ? next.delete(authorId) : next.add(authorId);
       return next;
     });
-    if (wasFollowing) {
-      setFollowingUsers(prev => prev.filter(u => u.id !== authorId));
-    }
     try {
       if (wasFollowing) {
         await userService.unfollow(authorId);
@@ -564,16 +560,12 @@ export const FeedScreen: React.FC = () => {
         await userService.follow(authorId);
       }
     } catch {
+      // Rollback optimiste
       setFollowingSet(prev => {
         const next = new Set(prev);
         wasFollowing ? next.add(authorId) : next.delete(authorId);
         return next;
       });
-      if (wasFollowing) {
-        userService.getFollowing(currentUser?.id ?? '').then(list => {
-          setFollowingUsers(list);
-        }).catch(() => {});
-      }
     }
   }, [followingSet, currentUser]);
 
@@ -882,84 +874,6 @@ export const FeedScreen: React.FC = () => {
       onNavLiveList, onNavSpontList, onNavNearby, onNavLiveStream, onNavLiveViewer,
       onNavSpontStream, onNavSpontViewer, onNavEvent]);
 
-  // Header "Suivis" : bande de profils style stories
-  const followingListHeader = useMemo(() => {
-    if (!followingUsers.length) return (
-      <View style={{ paddingVertical: 32, alignItems: 'center', gap: 8 }}>
-        <Icon name="users" size={32} color={colors.textTertiary} />
-        <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>Aucun suivi</Text>
-        <Text style={{ fontSize: 13, color: colors.textTertiary, textAlign: 'center', paddingHorizontal: 32 }}>
-          Suis des personnes pour voir leurs publications ici
-        </Text>
-      </View>
-    );
-    const sorted = [...followingUsers].sort((a, b) => {
-      const aMutual = followersSet.has(a.id) ? 1 : 0;
-      const bMutual = followersSet.has(b.id) ? 1 : 0;
-      return bMutual - aMutual;
-    });
-    return (
-      <View style={{ backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 18 }}
-        >
-          {sorted.map(u => {
-            const name = u.display_name ?? u.username ?? '';
-            const firstName = name.split(' ')[0];
-            const initial = firstName[0]?.toUpperCase() ?? '?';
-            const isMutual = followersSet.has(u.id);
-            return (
-              <TouchableOpacity
-                key={u.id}
-                activeOpacity={0.75}
-                onPress={() => (nav as any).navigate('UserProfile', { userId: u.id })}
-                style={{ alignItems: 'center', gap: 6, width: 58 }}
-              >
-                {/* Ring gradient pour les mutuels, simple border pour les autres */}
-                {isMutual ? (
-                  <LinearGradient
-                    colors={[colors.primary, colors.primary + '88']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={{ width: 58, height: 58, borderRadius: 29, padding: 2, alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <View style={{ width: 54, height: 54, borderRadius: 27, overflow: 'hidden', borderWidth: 2, borderColor: colors.surface }}>
-                      {u.avatar_url ? (
-                        <Image source={{ uri: u.avatar_url }} style={{ width: '100%', height: '100%' }} />
-                      ) : (
-                        <View style={{ flex: 1, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary }}>{initial}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </LinearGradient>
-                ) : (
-                  <View style={{ width: 58, height: 58, borderRadius: 29, padding: 2, borderWidth: 1.5, borderColor: colors.divider, alignItems: 'center', justifyContent: 'center' }}>
-                    <View style={{ width: 50, height: 50, borderRadius: 25, overflow: 'hidden' }}>
-                      {u.avatar_url ? (
-                        <Image source={{ uri: u.avatar_url }} style={{ width: '100%', height: '100%' }} />
-                      ) : (
-                        <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.textSecondary }}>{initial}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                )}
-                <Text
-                  style={{ fontSize: 11, fontWeight: isMutual ? '700' : '500', color: isMutual ? colors.textPrimary : colors.textSecondary, textAlign: 'center' }}
-                  numberOfLines={1}
-                >
-                  {firstName}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-    );
-  }, [followingUsers, followersSet, colors, nav]);
 
   const closeComments = useCallback(() => {
     setCommentVisible(false);
@@ -1744,7 +1658,7 @@ export const FeedScreen: React.FC = () => {
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
           )}
-          ListHeaderComponent={filter === 'following' ? followingListHeader : feedListHeader}
+          ListHeaderComponent={feedListHeader}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

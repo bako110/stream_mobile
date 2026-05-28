@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, RefreshControl, Image,
+  StyleSheet, RefreshControl, Image, Alert,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle, useSharedValue,
@@ -64,12 +64,14 @@ export const NotificationsScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const { addListener, removeListener, clearUnreadNotifications } = useWs();
 
-  const [items,      setItems]      = useState<NotifItem[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [page,       setPage]       = useState(1);
-  const [hasMore,    setHasMore]    = useState(true);
-  const [filter,     setFilter]     = useState<'all' | 'unread'>('all');
+  const [items,       setItems]       = useState<NotifItem[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [page,        setPage]        = useState(1);
+  const [hasMore,     setHasMore]     = useState(true);
+  const [filter,      setFilter]      = useState<'all' | 'unread'>('all');
+  const [selectMode,  setSelectMode]  = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loadingMore = useRef(false);
 
   const load = useCallback(async (p = 1, refresh = false) => {
@@ -157,23 +159,83 @@ export const NotificationsScreen: React.FC = () => {
     load(page + 1);
   }, [hasMore, page, load]);
 
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const deleteSelected = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    Alert.alert(
+      'Supprimer les notifications',
+      `Supprimer ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer', style: 'destructive',
+          onPress: () => {
+            const ids = [...selectedIds];
+            setItems(prev => prev.filter(x => !selectedIds.has(x.id)));
+            exitSelectMode();
+            ids.forEach(id => notificationService.deleteOne(id).catch(() => {}));
+          },
+        },
+      ],
+    );
+  }, [selectedIds, exitSelectMode]);
+
   const unreadCount = items.filter(x => !x.is_read).length;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <LinearGradient colors={[colors.surface, colors.background]} style={s.header}>
+        <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Notifications</Text>
-        {unreadCount > 0 && (
+        {unreadCount > 0 && !selectMode && (
           <View style={[s.unreadBadge, { backgroundColor: colors.primary }]}>
             <Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
           </View>
         )}
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={markAllRead} style={[s.readAllBtn, { borderColor: colors.border }]}>
-            <Icon name="check" size={14} color={colors.primary} />
-            <Text style={[s.readAllText, { color: colors.primary }]}>Tout lire</Text>
-          </TouchableOpacity>
+        <View style={{ flex: 1 }} />
+        {!selectMode ? (
+          <>
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={markAllRead} style={[s.readAllBtn, { borderColor: colors.border }]}>
+                <Icon name="check" size={14} color={colors.primary} />
+                <Text style={[s.readAllText, { color: colors.primary }]}>Tout lire</Text>
+              </TouchableOpacity>
+            )}
+            {items.length > 0 && (
+              <TouchableOpacity onPress={() => setSelectMode(true)} style={[s.readAllBtn, { borderColor: colors.border, marginLeft: 6 }]}>
+                <Icon name="check-square" size={14} color={colors.textSecondary} />
+                <Text style={[s.readAllText, { color: colors.textSecondary }]}>Sélectionner</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        ) : (
+          <>
+            <TouchableOpacity onPress={deleteSelected} disabled={selectedIds.size === 0}
+              style={[s.readAllBtn, { borderColor: selectedIds.size > 0 ? '#FF3B30' : colors.border, marginLeft: 6 }]}>
+              <Icon name="trash-2" size={14} color={selectedIds.size > 0 ? '#FF3B30' : colors.textTertiary} />
+              <Text style={[s.readAllText, { color: selectedIds.size > 0 ? '#FF3B30' : colors.textTertiary }]}>
+                {selectedIds.size > 0 ? `Supprimer (${selectedIds.size})` : 'Supprimer'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={exitSelectMode} style={[s.readAllBtn, { borderColor: colors.border, marginLeft: 6 }]}>
+              <Text style={[s.readAllText, { color: colors.textSecondary }]}>Annuler</Text>
+            </TouchableOpacity>
+          </>
         )}
       </LinearGradient>
 
@@ -213,6 +275,14 @@ export const NotificationsScreen: React.FC = () => {
               tintColor={colors.primary}
             />
           }
+          ListHeaderComponent={!selectMode && items.length > 0 ? (
+            <View style={[s.swipeHint, { backgroundColor: colors.surfaceElevated }]}>
+              <Icon name="arrow-left" size={12} color={colors.textTertiary} />
+              <Text style={[s.swipeHintText, { color: colors.textTertiary }]}>
+                Glissez vers la gauche pour supprimer
+              </Text>
+            </View>
+          ) : null}
           ListEmptyComponent={
             <View style={s.empty}>
               <View style={[s.emptyIconWrap, { backgroundColor: colors.surfaceElevated }]}>
@@ -226,14 +296,15 @@ export const NotificationsScreen: React.FC = () => {
               </Text>
             </View>
           }
-          renderItem={({ item, index }) => (
+          renderItem={({ item }) => (
             <NotifCard
               key={item.id}
               item={item}
-              index={index}
               colors={colors}
               fontSize={fontSize}
-              onPress={() => handlePress(item)}
+              selectMode={selectMode}
+              selected={selectedIds.has(item.id)}
+              onPress={() => selectMode ? toggleSelect(item.id) : handlePress(item)}
               onDelete={() => removeItem(item.id)}
               onMarkRead={() => markOneRead(item.id)}
             />
@@ -247,18 +318,19 @@ export const NotificationsScreen: React.FC = () => {
 // ── NotifCard avec swipe-to-delete ────────────────────────────────────────────
 
 interface CardProps {
-  item:       NotifItem;
-  index:      number;
-  colors:     any;
-  fontSize:   any;
-  onPress:    () => void;
-  onDelete:   () => void;
-  onMarkRead: () => void;
+  item:        NotifItem;
+  colors:      any;
+  fontSize:    any;
+  selectMode:  boolean;
+  selected:    boolean;
+  onPress:     () => void;
+  onDelete:    () => void;
+  onMarkRead:  () => void;
 }
 
 const SWIPE_THRESHOLD = -80;
 
-const NotifCard: React.FC<CardProps> = React.memo(({ item, index, colors, fontSize, onPress, onDelete, onMarkRead }) => {
+const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, selectMode, selected, onPress, onDelete, onMarkRead }) => {
   const cfg    = CFG[item.notification_type] ?? DEFAULT_CFG;
   const isRead = item.is_read;
 
@@ -298,29 +370,42 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, index, colors, fontSi
 
   return (
     <Animated.View style={{ marginBottom: 8 }}>
-      {/* Fond rouge derrière */}
-      <Animated.View style={[StyleSheet.absoluteFill, s.deleteBack, deleteReveal]}>
-        <Icon name="trash-2" size={20} color="#fff" />
-        <Text style={s.deleteBackText}>Supprimer</Text>
-      </Animated.View>
+      {/* Fond rouge derrière — masqué en mode sélection */}
+      {!selectMode && (
+        <Animated.View style={[StyleSheet.absoluteFill, s.deleteBack, deleteReveal]}>
+          <Icon name="trash-2" size={20} color="#fff" />
+          <Text style={s.deleteBackText}>Supprimer</Text>
+        </Animated.View>
+      )}
 
-      <GestureDetector gesture={pan}>
-        <Animated.View style={cardStyle}>
+      <GestureDetector gesture={selectMode ? Gesture.Pan() : pan}>
+        <Animated.View style={selectMode ? { overflow: 'hidden' } : cardStyle}>
           <TouchableOpacity
             style={[
               s.card,
               {
-                backgroundColor: isRead ? colors.surface : colors.primary + '0D',
-                borderColor:     isRead ? 'transparent' : colors.primary + '30',
+                backgroundColor: selected
+                  ? colors.primary + '22'
+                  : isRead ? colors.surface : colors.primary + '0D',
+                borderColor: selected
+                  ? colors.primary
+                  : isRead ? 'transparent' : colors.primary + '30',
                 borderWidth: 1,
               },
             ]}
             activeOpacity={0.8}
             onPress={onPress}
-            onLongPress={!isRead ? onMarkRead : undefined}
+            onLongPress={!selectMode && !isRead ? onMarkRead : undefined}
           >
             {/* Dot non-lu */}
-            {!isRead && <View style={[s.dot, { backgroundColor: colors.primary }]} />}
+            {!isRead && !selectMode && <View style={[s.dot, { backgroundColor: colors.primary }]} />}
+
+            {/* Checkbox en mode sélection */}
+            {selectMode && (
+              <View style={[s.checkbox, selected && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+                {selected && <Icon name="check" size={12} color="#fff" />}
+              </View>
+            )}
 
             {/* Avatar acteur ou icône type */}
             {item.actor?.avatar_url ? (
@@ -375,7 +460,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, gap: 10,
   },
-  headerTitle:  { fontSize: 26, fontWeight: '800', flex: 1 },
+  headerTitle:  { fontSize: 26, fontWeight: '800' },
   unreadBadge:  { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
   unreadBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   readAllBtn: {
@@ -393,6 +478,24 @@ const s = StyleSheet.create({
     borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
   tabText: { fontSize: 13, fontWeight: '600' },
+
+  backBtn: {
+    marginRight: 4,
+    padding: 4,
+  },
+
+  swipeHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginBottom: 10, paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 10,
+  },
+  swipeHintText: { fontSize: 12 },
+
+  checkbox: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 2, borderColor: '#aaa',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   card: {
     flexDirection: 'row', alignItems: 'center',

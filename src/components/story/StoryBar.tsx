@@ -27,6 +27,21 @@ const CARD_W  = 76;
 const CARD_H  = 112;
 const RADIUS  = 14;
 
+// Même palette que web/MediaPlaceholder — gradient déterministe depuis le nom
+const PALETTES: [string, string, string][] = [
+  ['#1a0533', '#7B3FF2', '#E0389A'],
+  ['#0f172a', '#3B82F6', '#06B6D4'],
+  ['#0c1a0f', '#22C55E', '#36D9A0'],
+  ['#1a0f00', '#F59E0B', '#FF7A2F'],
+  ['#1a000d', '#F0365A', '#E0389A'],
+  ['#0d0d1a', '#8B5CF6', '#7B3FF2'],
+];
+function paletteBySeed(seed: string): [string, string, string] {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = ((h * 31 + seed.charCodeAt(i)) >>> 0);
+  return PALETTES[h % PALETTES.length];
+}
+
 export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToChat, onNavigateToCall, onNavigateToMyStories }) => {
   const [groups,      setGroups]      = useState<StoryGroup[]>([]);
   const [viewerOpen,  setViewerOpen]  = useState(false);
@@ -51,7 +66,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(false); }, []);
+  useEffect(() => { load(true); }, []);
 
   useEffect(() => {
     return storyUploadState.subscribe((uploading) => {
@@ -105,7 +120,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           >
             {/* Fond : thumbnail si story existante, sinon couleur secondaire */}
             {myThumb ? (
-              <Image source={{ uri: myThumb }} style={s.cardBg} resizeMode="cover" />
+              <Image source={{ uri: myThumb }} style={[s.cardBg, { width: CARD_W, height: CARD_H }]} resizeMode="cover" />
             ) : myBg ? (
               <View style={[s.cardBg, { backgroundColor: myBg }]} />
             ) : (
@@ -172,13 +187,20 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
 
           {/* ── Stories des autres ── */}
           {otherGroups.map((group, i) => {
-            const idx   = myGroup ? i + 1 : i;
-            const user  = group.user;
-            const name  = user.display_name ?? user.username;
-            const last  = group.stories[group.stories.length - 1];
-            const thumb = last?.thumbnail_url ?? last?.media_url ?? null;
-            const bg    = last?.background_color ?? null;
-            const seen  = !group.has_unseen;
+            const idx    = myGroup ? i + 1 : i;
+            const user   = group.user;
+            const name   = user.display_name ?? user.username;
+            // Toujours la dernière story publiée pour l'aperçu
+            const last   = group.stories[group.stories.length - 1];
+const thumb  = last?.thumbnail_url ?? last?.media_url ?? null;
+            const bg      = last?.background_color ?? null;
+            const caption = last?.caption ?? null;
+            const isText  = last?.media_type === 'text';
+            const isVideo = last?.media_type === 'video';
+            const seen    = !group.has_unseen;
+            const [pc0, pc1, pc2] = paletteBySeed(name);
+            const fallbackGrad: [string, string, string] = [pc0, pc1, pc2];
+            const noMedia = !thumb && !bg;
 
             const cardContent = (
               <TouchableOpacity
@@ -190,20 +212,38 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                 {thumb ? (
                   <Image
                     source={{ uri: thumb }}
-                    style={[s.cardBg, seen && { opacity: 0.65 }]}
+                    style={[s.cardBg, { width: CARD_W, height: CARD_H }, seen && { opacity: 0.65 }]}
                     resizeMode="cover"
                   />
-                ) : bg ? (
-                  <View style={[s.cardBg, { backgroundColor: bg, opacity: seen ? 0.65 : 1 }]} />
+                ) : noMedia ? (
+                  // Aucun média : gradient déterministe depuis le nom (style WhatsApp)
+                  <LinearGradient
+                    colors={seen ? ['#555', '#444', '#333'] : fallbackGrad}
+                    style={s.cardBg}
+                  />
                 ) : (
-                  <View style={[s.cardBg, { backgroundColor: colors.backgroundSecondary ?? '#e8e8e8' }]} />
+                  <View style={[s.cardBg, { backgroundColor: bg!, opacity: seen ? 0.65 : 1 }]} />
                 )}
 
-                {/* Overlay bas */}
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.6)']}
-                  style={s.cardOverlay}
-                />
+                {/* Caption pour les stories texte */}
+                {isText && caption ? (
+                  <View style={s.textStoryCaption}>
+                    <Text style={s.textStoryCaptionText} numberOfLines={4}>{caption}</Text>
+                  </View>
+                ) : isVideo && noMedia ? (
+                  // Vidéo sans thumbnail — icône play centré
+                  <View style={s.textStoryCaption}>
+                    <Icon name="play-circle" size={28} color="rgba(255,255,255,0.8)" />
+                  </View>
+                ) : null}
+
+                {/* Overlay bas (seulement si image/video pour garder lisibilité) */}
+                {!isText && (
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.6)']}
+                    style={s.cardOverlay}
+                  />
+                )}
 
                 {/* Mini avatar haut gauche */}
                 <View style={s.cardAvatarWrap}>
@@ -312,7 +352,11 @@ const s = StyleSheet.create({
     opacity: 0.85,
   },
   cardBg: {
-    ...StyleSheet.absoluteFillObject,
+    position:     'absolute',
+    top:          0,
+    left:         0,
+    width:        CARD_W,
+    height:       CARD_H,
     borderRadius: RADIUS,
   },
   cardOverlay: {
@@ -373,6 +417,25 @@ const s = StyleSheet.create({
     alignItems:    'center',
     justifyContent:'center',
     borderWidth:   2,
+  },
+
+  // ── Caption story texte (centré dans la carte) ───────────────────────────────
+  textStoryCaption: {
+    ...StyleSheet.absoluteFill,
+    alignItems:     'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical:   24,
+  },
+  textStoryCaptionText: {
+    fontSize:   10,
+    fontWeight: '700',
+    color:      '#fff',
+    textAlign:  'center',
+    lineHeight: 14,
+    textShadowColor:  'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
   // ── Texte bas de la carte ─────────────────────────────────────────────────────
