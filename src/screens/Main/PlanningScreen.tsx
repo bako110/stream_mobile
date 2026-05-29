@@ -310,8 +310,9 @@ export const PlanningScreen: React.FC = () => {
   const [pendingCount, setPendingCount] = useState(0);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
-  // Create modal
+  // Create/Edit modal
   const [showCreate, setShowCreate]               = useState(false);
+  const [editingItem, setEditingItem]             = useState<PlanningItem | null>(null);
   const [formTitle, setFormTitle]                 = useState('');
   const [formDesc, setFormDesc]                   = useState('');
   const [formDate, setFormDate]                   = useState(new Date());
@@ -385,8 +386,22 @@ export const PlanningScreen: React.FC = () => {
 
   const sections = useMemo(() => groupBySections(filteredItems), [filteredItems]);
 
+  const openEdit = (item: PlanningItem) => {
+    setEditingItem(item);
+    setFormTitle(item.title ?? '');
+    setFormDesc(item.description ?? '');
+    setFormDate(item.date ? new Date(item.date) : new Date());
+    setFormEndDate(item.end_date ? new Date(item.end_date) : null);
+    setFormLocation(item.venue ?? '');
+    setFormColor(item.color ?? '#3B82F6');
+    setFormInviteMsg('');
+    setSelectedContacts([]);
+    setShowCreate(true);
+  };
+
   const handlePress = (item: PlanningItem) => {
-    if (item.type === 'personal' || item.type === 'invited') return;
+    if (item.type === 'personal') { openEdit(item); return; }
+    if (item.type === 'invited') return;
     if (item.type === 'concert' || item.type === 'my_concert') {
       nav.navigate('ConcertDetail', { concertId: item.ref_id });
     } else if (item.type === 'event' || item.type === 'my_event') {
@@ -433,30 +448,47 @@ export const PlanningScreen: React.FC = () => {
     setFormTitle(''); setFormDesc(''); setFormDate(new Date());
     setFormEndDate(null); setFormLocation(''); setFormColor('#3B82F6');
     setFormInviteMsg(''); setSelectedContacts([]);
+    setEditingItem(null);
   };
 
   const handleCreate = async () => {
     if (!formTitle.trim()) return;
     setCreating(true);
     try {
-      const entry = await planningService.createEntry({
-        title:          formTitle.trim(),
-        description:    formDesc.trim() || undefined,
-        date:           formDate.toISOString(),
-        end_date:       formEndDate?.toISOString(),
-        location:       formLocation.trim() || undefined,
-        color:          formColor,
-        invitee_ids:    selectedContacts.map(u => u.id),
-        invite_message: formInviteMsg.trim() || undefined,
-      });
-      setItems(prev => [...prev, entry].sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999')));
-      setShowCreate(false);
-      resetForm();
-      if (selectedContacts.length > 0) {
-        Alert.alert('Créé !', `Entrée créée et ${selectedContacts.length} invitation(s) envoyée(s).`);
+      if (editingItem) {
+        // Mode edition — PATCH
+        const updated = await planningService.updateEntry(editingItem.id, {
+          title:       formTitle.trim(),
+          description: formDesc.trim() || undefined,
+          date:        formDate.toISOString(),
+          end_date:    formEndDate?.toISOString(),
+          location:    formLocation.trim() || undefined,
+          color:       formColor,
+        });
+        setItems(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...updated } : i));
+        setShowCreate(false);
+        resetForm();
+      } else {
+        // Mode creation — POST
+        const entry = await planningService.createEntry({
+          title:          formTitle.trim(),
+          description:    formDesc.trim() || undefined,
+          date:           formDate.toISOString(),
+          end_date:       formEndDate?.toISOString(),
+          location:       formLocation.trim() || undefined,
+          color:          formColor,
+          invitee_ids:    selectedContacts.map(u => u.id),
+          invite_message: formInviteMsg.trim() || undefined,
+        });
+        setItems(prev => [...prev, entry].sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999')));
+        setShowCreate(false);
+        resetForm();
+        if (selectedContacts.length > 0) {
+          Alert.alert('Créé !', `Entrée créée et ${selectedContacts.length} invitation(s) envoyée(s).`);
+        }
       }
     } catch {
-      Alert.alert('Erreur', "Impossible de créer l'entrée.");
+      Alert.alert('Erreur', editingItem ? "Impossible de modifier l'entrée." : "Impossible de créer l'entrée.");
     } finally { setCreating(false); }
   };
 
@@ -529,7 +561,7 @@ export const PlanningScreen: React.FC = () => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />
           }
-          renderItem={({ item: section, index: sIdx }) => (
+          renderItem={({ item: section }) => (
             <View>
               {/* Section header */}
               <View style={s.sectionHeader}>
@@ -547,7 +579,7 @@ export const PlanningScreen: React.FC = () => {
                 </View>
               </View>
 
-              {section.items.map((item, idx) => (
+              {section.items.map((item) => (
                 <PlanningCard
                   key={item.id}
                   item={item}
@@ -590,7 +622,9 @@ export const PlanningScreen: React.FC = () => {
           <View style={[s.modalSheet, { backgroundColor: colors.surface }]}>
             <View style={s.modalHandle} />
             <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: colors.textPrimary }]}>Nouveau rendez-vous</Text>
+              <Text style={[s.modalTitle, { color: colors.textPrimary }]}>
+                {editingItem ? 'Modifier le rendez-vous' : 'Nouveau rendez-vous'}
+              </Text>
               <TouchableOpacity onPress={() => { setShowCreate(false); resetForm(); }}>
                 <Icon name="x" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -723,7 +757,13 @@ export const PlanningScreen: React.FC = () => {
                 <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.submitBtnInner}>
                   <Icon name="check" size={18} color="#fff" />
                   <Text style={s.submitBtnText}>
-                    {creating ? 'Création…' : selectedContacts.length > 0 ? `Créer & inviter (${selectedContacts.length})` : 'Ajouter au planning'}
+                    {creating
+                      ? (editingItem ? 'Mise à jour…' : 'Création…')
+                      : editingItem
+                        ? 'Enregistrer les modifications'
+                        : selectedContacts.length > 0
+                          ? `Créer & inviter (${selectedContacts.length})`
+                          : 'Ajouter au planning'}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>

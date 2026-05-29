@@ -69,7 +69,7 @@ export const planningService = {
   },
 
   async updateEntry(id: string, data: Partial<CreatePlanningEntry>): Promise<PlanningItem> {
-    const res = await apiClient.put<PlanningItem>(Endpoints.planning.entry(id), data);
+    const res = await apiClient.patch<PlanningItem>(Endpoints.planning.entry(id), data);
     return res.data;
   },
 
