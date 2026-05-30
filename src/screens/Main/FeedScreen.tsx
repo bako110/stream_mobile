@@ -456,13 +456,21 @@ export const FeedScreen: React.FC = () => {
   const [feedScrollEnabled, setFeedScrollEnabled]  = useState(true);
 
   const feedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 65 }).current;
+  const [activeReelRowId, setActiveReelRowId] = useState<string | null>(null);
+
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     setActiveReelId(null);
-    // Activer la vidéo pub de la première carte event/concert visible
+
+    // Activer la rangée de reels visible (1 seule à la fois)
+    const reelRowItem = viewableItems.find(v => v.item?.kind === 'reel_row');
+    setActiveReelRowId(reelRowItem ? reelRowItem.item.id : null);
+
+    // Activer la vidéo de la première carte event/concert visible
     const cardItem = viewableItems.find(v =>
       (v.item?.kind === 'event' || v.item?.kind === 'concert') && v.item?.data?.video_url,
     );
     setActiveCardId(cardItem ? cardItem.item.id : null);
+
     // Activer la vidéo du premier post visible avec video_url
     const postItem = viewableItems.find(v =>
       v.item?.kind === 'post' && (v.item?.data as Post)?.video_url,
@@ -1022,6 +1030,7 @@ export const FeedScreen: React.FC = () => {
           reels={item.data}
           colors={colors}
           feedFocused={feedFocused}
+          isVisible={activeReelRowId === item.id && feedFocused}
           onPressReel={(reelId, reelData) => (nav as any).navigate('Reels', { initialReelId: reelId, initialReel: reelData })}
         />
       );
@@ -2076,9 +2085,9 @@ const MiniReelPlayer: React.FC<{
 
 const MiniReelRow: React.FC<{
   reels: any[]; itemW: number; itemH: number;
-  feedFocused: boolean;
+  feedFocused: boolean; isVisible: boolean;
   onPressReel: (id: string, data: any) => void;
-}> = React.memo(({ reels, itemW, itemH, feedFocused, onPressReel }) => {
+}> = React.memo(({ reels, itemW, itemH, feedFocused, isVisible, onPressReel }) => {
   const [activeId, setActiveId] = useState<string | null>(reels[0]?.id ?? null);
 
   // Stopper la lecture quand la rangée disparaît ou que le feed perd le focus
@@ -2118,7 +2127,7 @@ const MiniReelRow: React.FC<{
           reel={item}
           w={itemW}
           h={itemH}
-          isActive={activeId === item.id}
+          isActive={activeId === item.id && isVisible}
           feedFocused={feedFocused}
           onPress={() => onPressReel(item.id, item)}
         />
@@ -2133,9 +2142,9 @@ const HeroReelPlayer: React.FC<{
   reel: any;
   w: number;
   h: number;
-  feedFocused: boolean;
+  isVisible: boolean;
   onPress: () => void;
-}> = React.memo(({ reel, w, h, feedFocused, onPress }) => {
+}> = React.memo(({ reel, w, h, isVisible, onPress }) => {
   const [muted, setMuted] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -2154,11 +2163,11 @@ const HeroReelPlayer: React.FC<{
     };
   }, []); // eslint-disable-line
 
-  // Jouer uniquement si le feed est au premier plan
+  // Jouer seulement si visible à l'écran ET feed au premier plan
   useEffect(() => {
     if (!videoUri) return;
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (feedFocused) {
+    if (isVisible) {
       timerRef.current = setTimeout(() => { try { player.play(); } catch {} }, 200);
     } else {
       try { player.pause(); } catch {}
@@ -2167,7 +2176,7 @@ const HeroReelPlayer: React.FC<{
       if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
       try { player.pause(); } catch {}
     };
-  }, [videoUri, feedFocused]); // eslint-disable-line
+  }, [videoUri, isVisible]); // eslint-disable-line
 
   // Sync mute
   useEffect(() => {
@@ -2271,8 +2280,9 @@ const ReelRowCard: React.FC<{
   reels: any[];
   colors: AppColors;
   feedFocused: boolean;
+  isVisible: boolean;
   onPressReel: (reelId: string, reelData: any) => void;
-}> = React.memo(({ reels, colors, feedFocused, onPressReel }) => {
+}> = React.memo(({ reels, colors, feedFocused, isVisible, onPressReel }) => {
   const { width: SW, height: SH } = Dimensions.get('window');
   const HERO_W  = SW - 24;
   const HERO_H  = Math.round(SH * 0.50);
@@ -2392,7 +2402,7 @@ const ReelRowCard: React.FC<{
             reel={hero}
             w={HERO_W}
             h={HERO_H}
-            feedFocused={feedFocused}
+            isVisible={isVisible}
             onPress={() => onPressReel(hero.id, hero)}
           />
         </View>
@@ -2405,6 +2415,7 @@ const ReelRowCard: React.FC<{
           itemW={MINI_W}
           itemH={MINI_H}
           feedFocused={feedFocused}
+          isVisible={isVisible}
           onPressReel={onPressReel}
         />
       ) : null}
