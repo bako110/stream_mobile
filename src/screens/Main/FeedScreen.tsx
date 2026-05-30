@@ -2097,7 +2097,7 @@ const ReelRowCard: React.FC<{
 }> = React.memo(({ reels, colors, onPressReel }) => {
   const { width: SW, height: SH } = Dimensions.get('window');
   const HERO_W  = SW - 24;
-  const HERO_H  = Math.round(SH * 0.78);
+  const HERO_H  = Math.round(SH * 0.50);
   const MINI_W  = Math.round(SW * 0.48);
   const MINI_H  = Math.round(MINI_W * 1.7);
 
