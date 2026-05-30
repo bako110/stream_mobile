@@ -398,7 +398,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const isScheduled = concert.status === 'published' && !!concert.live_id && !isLive;
   const isFree      = concert.access_type === 'free';
   const artistName  = concert.artist?.display_name ?? concert.artist?.username;
-  const hasVideo    = !!concert.video_url;
+  const hasVideo    = !!(concert.hls_url ?? concert.video_url);
   const hasReplay   = isEnded && !!replayUrl;
 
   const scheduledIn = (() => {
@@ -465,7 +465,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           colors={colors}
         />
 
-        {showVideo && hasVideo && <VideoModal uri={concert.video_url!} onClose={() => setShowVideo(false)} />}
+        {showVideo && hasVideo && <VideoModal uri={(concert.hls_url ?? concert.video_url)!} onClose={() => setShowVideo(false)} />}
 
         {/* ── Live / Replay / Schedulé ─────────────────────────────── */}
         {(isLive || isScheduled || hasReplay || (isEnded && concert.live_id && !hasReplay)) && (

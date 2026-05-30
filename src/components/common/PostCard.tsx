@@ -245,7 +245,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
     }
   }, [saved, post]);
 
-  const hasMedia = images.length > 0 || !!post.video_url;
+  const hasMedia = images.length > 0 || !!(post.hls_url ?? post.video_url);
   const HERO_H   = Math.round(SW * 0.58);
 
   return (
@@ -255,9 +255,9 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {hasMedia && (
         <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={{ position: 'relative' }}>
           <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
-            {post.video_url && images.length === 0 ? (
+            {(post.hls_url ?? post.video_url) && images.length === 0 ? (
               <InlineVideoPlayer
-                uri={post.video_url}
+                uri={(post.hls_url ?? post.video_url)!}
                 thumbnailUri={post.thumbnail_url}
                 aspectRatio={HERO_H / SW}
                 borderRadius={0}
@@ -295,7 +295,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
             )}
 
             {/* Muet si vidéo */}
-            {post.video_url && (
+            {(post.hls_url ?? post.video_url) && (
               <View style={{ position: 'absolute', bottom: 48, right: 12,
                 width: 28, height: 28, borderRadius: 14,
                 backgroundColor: 'rgba(0,0,0,0.6)',
@@ -545,8 +545,8 @@ const PostCardInner: React.FC<PostCardProps> = ({
         onCountLoaded={n => setCommentCount(c => Math.max(c, n))} />
       <LikersBottomSheet visible={likersOpen} onClose={() => setLikersOpen(false)} postId={post.id}
         likeCount={likeCount} onNavigateToProfile={uid => { setLikersOpen(false); onProfilePress?.(uid); }} />
-      {post.video_url && videoFs && (
-        <VideoFsModal visible={videoFs} uri={post.video_url} thumbnailUri={post.thumbnail_url}
+      {(post.hls_url ?? post.video_url) && videoFs && (
+        <VideoFsModal visible={videoFs} uri={(post.hls_url ?? post.video_url)!} thumbnailUri={post.thumbnail_url}
           onClose={() => setVideoFs(false)} onViewPost={onPress} />
       )}
 

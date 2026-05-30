@@ -51,6 +51,7 @@ export interface Episode {
   duration_sec: number | null;
   thumbnail_url: string | null;
   video_url: string | null;
+  hls_url: string | null;
   is_free: boolean;
   is_published: boolean;
   view_count: number;

@@ -467,13 +467,13 @@ export const FeedScreen: React.FC = () => {
 
     // Activer la vidéo de la première carte event/concert visible
     const cardItem = viewableItems.find(v =>
-      (v.item?.kind === 'event' || v.item?.kind === 'concert') && v.item?.data?.video_url,
+      (v.item?.kind === 'event' || v.item?.kind === 'concert') && (v.item?.data?.hls_url ?? v.item?.data?.video_url),
     );
     setActiveCardId(cardItem ? cardItem.item.id : null);
 
     // Activer la vidéo du premier post visible avec video_url
     const postItem = viewableItems.find(v =>
-      v.item?.kind === 'post' && (v.item?.data as Post)?.video_url,
+      v.item?.kind === 'post' && ((v.item?.data as Post)?.hls_url ?? (v.item?.data as Post)?.video_url),
     );
     setActivePostId(postItem ? postItem.item.id : null);
   }).current;
@@ -1984,7 +1984,7 @@ const MiniReelPlayer: React.FC<{
 }> = React.memo(({ reel, w, h, isActive, feedFocused, onPress }) => {
   const [muted, setMuted] = useState(true);
 
-  const videoUri = reel.hls_url ?? reel.video_url ?? null;
+  const videoUri = reel.hls_url ?? null;
 
   const player = useVideoPlayer(
     videoUri ? { uri: videoUri } : 'about:blank',
@@ -2147,7 +2147,7 @@ const HeroReelPlayer: React.FC<{
   const [muted, setMuted] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const videoUri = reel.hls_url ?? reel.video_url ?? null;
+  const videoUri = reel.hls_url ?? null;
 
   const player = useVideoPlayer(
     videoUri ? { uri: videoUri } : 'about:blank',
@@ -2877,7 +2877,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const thumbUrl  = isEvent
     ? (event.thumbnail_url ?? event.banner_url)
     : (concert.thumbnail_url ?? concert.banner_url);
-  const videoUrl  = isEvent ? event.video_url : concert.video_url;
+  const videoUrl  = isEvent ? (event.hls_url ?? event.video_url) : (concert.hls_url ?? concert.video_url);
 
   const isFree = isEvent ? event.access_type === 'free' : concert.access_type === 'free';
   const isLive = isConcert && concert.status === 'live';

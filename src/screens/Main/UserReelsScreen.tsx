@@ -31,7 +31,7 @@ const Slide: React.FC<SlideProps> = memo(({ reel, isActive, muted, onToggleMute 
   const [paused, setPaused] = useState(false);
 
   const player = useVideoPlayer(
-    reel.video_url ? { uri: reel.video_url } : { uri: 'about:blank' },
+    reel.hls_url ? { uri: reel.hls_url } : { uri: 'about:blank' },
     p => {
       p.loop   = true;
       p.muted  = muted;
@@ -103,7 +103,7 @@ export const UserReelsScreen: React.FC = () => {
   };
 
   const buildList = (data: Reel[]) => {
-    const list = data.filter((r: Reel) => !!r.video_url);
+    const list = data.filter((r: Reel) => !!r.hls_url);
     if (initialReelId) {
       const idx = list.findIndex(r => r.id === initialReelId);
       if (idx > 0) { const [cur] = list.splice(idx, 1); list.unshift(cur); }

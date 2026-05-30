@@ -46,10 +46,11 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
     {
       uri: url,
       bufferConfig: {
-        minBufferMs:                      3000,
-        maxBufferMs:                      20000,
-        bufferForPlaybackMs:              1000,
-        bufferForPlaybackAfterRebufferMs: 2000,
+        minBufferMs:                      2000,
+        maxBufferMs:                      30000,
+        bufferForPlaybackMs:              500,
+        bufferForPlaybackAfterRebufferMs: 1500,
+        preferredForwardBufferDurationMs: 15000,
       },
     },
     p => {

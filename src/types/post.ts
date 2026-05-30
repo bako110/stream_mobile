@@ -15,6 +15,7 @@ export interface Post {
   image_urls?: string[] | null;
   media_urls?: string[] | null;
   video_url?: string | null;
+  hls_url?: string | null;
   thumbnail_url?: string | null;
   feeling?: string | null;
   like_count: number;

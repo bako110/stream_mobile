@@ -385,7 +385,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
   const renderPortraitCard = ({ item, index }: { item: Post; index: number }) => {
     const thumb    = item.image_urls?.[0] ?? item.image_url ?? item.thumbnail_url ?? null;
-    const hasVideo = !!item.video_url && !item.image_urls?.length && !item.image_url;
+    const hasVideo = !!(item.hls_url ?? item.video_url) && !item.image_urls?.length && !item.image_url;
     const imgCount = (item.image_urls?.length ?? 0) + (item.image_url && !item.image_urls?.length ? 1 : 0);
 
     return (
@@ -572,10 +572,10 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         ) : null}
 
         {/* Vidéo inline */}
-        {post.video_url && allUrls.length === 0 && (
+        {(post.hls_url ?? post.video_url) && allUrls.length === 0 && (
           <View style={[s.imagesWrap, !post.body && { marginTop: 0 }]}>
             <InlineVideoPlayer
-              uri={post.video_url}
+              uri={(post.hls_url ?? post.video_url)!}
               thumbnailUri={post.thumbnail_url}
               aspectRatio={16 / 9}
               borderRadius={12}

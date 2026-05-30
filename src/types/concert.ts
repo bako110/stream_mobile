@@ -28,6 +28,7 @@ export interface Concert {
   thumbnail_url: string | null;
   banner_url: string | null;
   video_url: string | null;
+  hls_url: string | null;
   is_featured: boolean;
   published_at: string | null;
   created_at: string;

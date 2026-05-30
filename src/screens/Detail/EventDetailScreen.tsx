@@ -486,7 +486,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const isFree       = event.access_type === 'free';
   const isInviteOnly = event.access_type === 'invite_only';
   const organizerName = event.organizer?.display_name ?? event.organizer?.username;
-  const hasVideo     = !!event.video_url;
+  const hasVideo     = !!(event.hls_url ?? event.video_url);
   const galleryImages = (event.gallery_urls ?? []).length > 0
     ? event.gallery_urls!
     : [event.banner_url, event.thumbnail_url].filter(Boolean) as string[];
@@ -541,7 +541,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           colors={colors}
         />
 
-        {showVideo && hasVideo && <VideoModal uri={event.video_url!} onClose={() => setShowVideo(false)} />}
+        {showVideo && hasVideo && <VideoModal uri={(event.hls_url ?? event.video_url)!} onClose={() => setShowVideo(false)} />}
 
         {/* ── Live / Replay ────────────────────────────────────────── */}
         {(isLiveNow || isScheduled || hasReplay || (isCompleted && event.live_id && !hasReplay)) && (

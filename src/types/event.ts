@@ -34,6 +34,7 @@ export interface Event {
   banner_url: string | null;
   gallery_urls: string[] | null;
   video_url: string | null;
+  hls_url: string | null;
   is_featured: boolean;
   published_at: string | null;
   created_at: string;

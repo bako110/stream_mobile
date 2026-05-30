@@ -90,7 +90,7 @@ export const ReelsScreen: React.FC = () => {
   const lastInitialReelRef = useRef<string | undefined>(undefined);
   // ── State ─────────────────────────────────────────────────────────────────
   const seedReel = useRef(
-    params.initialReel?.video_url ? [params.initialReel as Reel] : []
+    params.initialReel?.hls_url ? [params.initialReel as Reel] : []
   ).current;
 
   const [reels,         setReels]         = useState<Reel[]>(seedReel);
@@ -156,7 +156,7 @@ export const ReelsScreen: React.FC = () => {
       const data = await reelService.getFeed({ page: 1 });
       if (!mountedRef.current) return;
 
-      const filtered = (data.items ?? []).filter((r: Reel) => !!r.video_url);
+      const filtered = (data.items ?? []).filter((r: Reel) => !!r.hls_url);
 
       // Chercher le reel cible dans le feed chargé
       let finalReels = filtered;
@@ -165,7 +165,7 @@ export const ReelsScreen: React.FC = () => {
         const idx = filtered.findIndex((r: Reel) => r.id === targetId);
         if (idx >= 0) {
           targetIdx = idx;
-        } else if (targetReel?.video_url) {
+        } else if (targetReel?.hls_url) {
           // Pas dans le feed → l'injecter en tête
           finalReels = [targetReel, ...filtered.filter(r => r.id !== targetId)];
           targetIdx  = 0;
@@ -220,7 +220,7 @@ export const ReelsScreen: React.FC = () => {
       const nextPage = pageRef.current + 1;
       const data     = await reelService.getFeed({ page: nextPage });
       if (!mountedRef.current) return;
-      const newReels = (data.items ?? []).filter((r: Reel) => !!r.video_url);
+      const newReels = (data.items ?? []).filter((r: Reel) => !!r.hls_url);
       setReels(prev => {
         const ids = new Set(prev.map(r => r.id));
         return [...prev, ...newReels.filter((r: Reel) => !ids.has(r.id))];
@@ -322,7 +322,7 @@ export const ReelsScreen: React.FC = () => {
       } else if (newInitialId !== lastInitialReelRef.current) {
         // Nouveau reel pas encore chargé → afficher immédiatement
         lastInitialReelRef.current = newInitialId;
-        if (newReel?.video_url) {
+        if (newReel?.hls_url) {
           setReels([newReel]);
           currentIdxRef.current = 0;
           setCurrentIndex(0);
@@ -791,7 +791,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
   const isOwnReel = !!(currentUserId && reel.author?.id && currentUserId === String(reel.author.id));
 
-  const videoUri = reel.hls_url ?? reel.video_url;
+  const videoUri = reel.hls_url;
   // Mémoïsé : même URI → même objet → useVideoPlayer ne recharge pas
   const videoSource = useMemo(() => videoUri
     ? {
@@ -847,7 +847,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   }, []);
 
   const doRetry = useCallback(() => {
-    if (!mountedRef.current || !reel.video_url) return;
+    if (!mountedRef.current || !reel.hls_url) return;
     clearStall();
     const attempt = retryCountRef.current;
     if (attempt >= MAX_RETRIES) {
@@ -857,14 +857,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     retryCountRef.current += 1;
     if (mountedRef.current) { setVideoError(false); setVideoLoaded(false); setVideoPlaying(false); }
     retryTimerRef.current = setTimeout(() => {
-      if (!mountedRef.current || !reel.video_url) return;
+      if (!mountedRef.current || !reel.hls_url) return;
       try {
         player.replaceSourceAsync(videoSource as any)
           .then(() => { if (mountedRef.current && !pausedRef.current) { player.play(); } })
           .catch(() => { if (mountedRef.current) doRetry(); });
       } catch { if (mountedRef.current) doRetry(); }
     }, Math.pow(2, attempt) * 1000);
-  }, [player, reel.video_url, clearStall, videoSource]); // eslint-disable-line
+  }, [player, reel.hls_url, clearStall, videoSource]); // eslint-disable-line
 
   const armStall = useCallback(() => {
     clearStall();
@@ -914,7 +914,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
   // Play/Pause selon isActive
   useEffect(() => {
-    if (!reel.video_url) return;
+    if (!reel.hls_url) return;
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
 
     if (isActive && !pausedRef.current) {
@@ -1049,7 +1049,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
   const handleShare = useCallback(async () => {
     try {
-      await Share.share({ message: reel.caption ? `${reel.caption}\n${reel.video_url ?? ''}` : (reel.video_url ?? '') });
+      await Share.share({ message: reel.caption ? `${reel.caption}\n${reel.hls_url ?? ''}` : (reel.hls_url ?? '') });
       await socialService.share({ platform: Platform.OS, reel_id: reel.id });
       if (mountedRef.current) setShareCount(v => v + 1);
     } catch {}

@@ -93,7 +93,7 @@ const EpisodeCard: React.FC<{
     return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : m > 0 ? `${m}m${s > 0 ? ` ${s}s` : ''}` : `${s}s`;
   };
 
-  const hasVideo = !!ep.video_url;
+  const hasVideo = !!ep.hls_url || !!ep.video_url;
   const accessColor = locked ? ORANGE : ep.is_free ? '#10b981' : PURPLE;
 
   return (
@@ -313,12 +313,12 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
   const handlePlay = async (ep: Episode) => {
     const locked = item.is_premium && !hasAccess && !ep.is_free;
     if (locked) { setShowPaywall(true); return; }
-    if (!ep.video_url) return;
+    if (!ep.hls_url && !ep.video_url) return;
     setPlayingEpId(ep.id);
     try {
       const video = await contentService.getEpisodeVideo(ep.id).catch(() => null);
       navigation.navigate('VideoPlayer', {
-        url:          ep.video_url,
+        url:          video?.hls_url ?? ep.hls_url ?? ep.video_url!,
         title:        `${item.title} · E${ep.number} — ${ep.title}`,
         videoId:      video?.id ?? undefined,
         contentId:    item.id,
