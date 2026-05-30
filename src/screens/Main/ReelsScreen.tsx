@@ -174,15 +174,26 @@ export const ReelsScreen: React.FC = () => {
 
       setReels(finalReels);
       setHasMore(data.has_more);
-      viewedReelsRef.current = new Set();
       lastLoadedAtRef.current = Date.now();
 
-      // Scroll vers la cible
-      currentIdxRef.current = targetIdx;
-      setCurrentIndex(targetIdx);
-      if (targetIdx > 0) {
-        setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
+      if (!silent) {
+        // Chargement initial ou pull-to-refresh → reset complet
+        viewedReelsRef.current = new Set();
+        currentIdxRef.current = targetIdx;
+        setCurrentIndex(targetIdx);
+        if (targetIdx > 0) {
+          setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
+        }
+      } else if (targetIdx > 0 && targetId) {
+        // Silent avec cible non-visible → scroll sans perturber la lecture en cours
+        const alreadyVisible = reelsRef.current[currentIdxRef.current]?.id === targetId;
+        if (!alreadyVisible) {
+          currentIdxRef.current = targetIdx;
+          setCurrentIndex(targetIdx);
+          setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
+        }
       }
+      // Si silent sans cible → on garde simplement la liste à jour sans bouger l'index
 
       // Charger myId + mes reels en parallèle sans bloquer l'affichage
       authService.getMe().then(me => {
@@ -300,24 +311,23 @@ export const ReelsScreen: React.FC = () => {
       nav.setParams({ reelPublished: undefined } as any);
       load(false);
 
-    } else if (newInitialId && newInitialId !== lastInitialReelRef.current) {
-      // Nouveau reel cliqué depuis le feed
-      lastInitialReelRef.current = newInitialId;
-
+    } else if (newInitialId) {
+      // Reel cliqué depuis le feed — traiter à chaque focus même si même ID
       const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
       if (idx >= 0) {
-        // Déjà dans la liste → scroll immédiat, pas de rechargement
+        // Déjà dans la liste → scroll immédiat, 0 rechargement
         currentIdxRef.current = idx;
         setCurrentIndex(idx);
         setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
-      } else {
-        // Pas dans la liste → afficher immédiatement le reel cliqué
-        // puis enrichir la liste en background (silent, sans spinner)
+      } else if (newInitialId !== lastInitialReelRef.current) {
+        // Nouveau reel pas encore chargé → afficher immédiatement
+        lastInitialReelRef.current = newInitialId;
         if (newReel?.video_url) {
           setReels([newReel]);
           currentIdxRef.current = 0;
           setCurrentIndex(0);
         }
+        // Enrichir le feed en arrière-plan sans toucher au reel affiché
         load(true, newInitialId, newReel);
       }
 
