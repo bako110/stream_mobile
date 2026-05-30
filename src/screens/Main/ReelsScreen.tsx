@@ -294,15 +294,25 @@ export const ReelsScreen: React.FC = () => {
     if (params.reelPublished) {
       nav.setParams({ reelPublished: undefined } as any);
       load();
-    } else if (newInitialId && newInitialId !== lastInitialReelRef.current) {
-      lastInitialReelRef.current = newInitialId;
+    } else if (newInitialId) {
+      // Toujours traiter initialReelId au focus — peu importe si c'était déjà la valeur
       const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
       if (idx >= 0) {
+        // Reel déjà chargé → scroll direct
         currentIdxRef.current = idx;
         setCurrentIndex(idx);
         setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
-      } else {
+      } else if (newInitialId !== lastInitialReelRef.current) {
+        // Nouveau reel pas encore chargé → recharger le feed
+        lastInitialReelRef.current = newInitialId;
         load(false);
+      } else {
+        // Même reel pas dans la liste (rare) → injecter depuis params.initialReel
+        if (params.initialReel?.video_url) {
+          setReels(prev => [params.initialReel as Reel, ...prev.filter(r => r.id !== newInitialId)]);
+          currentIdxRef.current = 0;
+          setCurrentIndex(0);
+        }
       }
     } else if (didFocusOnceRef.current) {
       const age = Date.now() - lastLoadedAtRef.current;
