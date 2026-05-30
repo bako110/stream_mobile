@@ -1071,7 +1071,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
 export const SimpleLiveStreamScreen: React.FC = () => {
   const nav   = useNavigation<Nav>();
   const route = useRoute<RouteT>();
-  const { liveId, publisherToken: initialToken, livekitUrl: initialUrl, isPrivate } = route.params;
+  const { liveId, publisherToken: initialToken, livekitUrl: initialUrl, isPrivate = false } = route.params;
 
   const [token,  setToken]  = useState<string | null>(initialToken ?? null);
   const [wsUrl,  setWsUrl]  = useState<string | null>(initialUrl  ?? null);
