@@ -283,7 +283,7 @@ const JoinToast: React.FC<{ name: string }> = ({ name }) => (
 
 // ── Contenu principal ─────────────────────────────────────────────────────────
 
-const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId, onEnd }) => {
+const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: boolean }> = ({ liveId, onEnd, isPrivate = false }) => {
   const { localParticipant } = useLocalParticipant();
   const room                 = useRoomContext();
   const allParticipants      = useParticipants();
@@ -1112,7 +1112,7 @@ export const SimpleLiveStreamScreen: React.FC = () => {
 
   return (
     <LiveKitRoom serverUrl={wsUrl} token={token} connect>
-      <StreamContent liveId={liveId} onEnd={handleEnd} />
+      <StreamContent liveId={liveId} onEnd={handleEnd} isPrivate={isPrivate} />
     </LiveKitRoom>
   );
 };
