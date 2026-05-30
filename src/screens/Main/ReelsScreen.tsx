@@ -1,5 +1,5 @@
 import React, {
-  useEffect, useState, useCallback, useRef, memo,
+  useEffect, useState, useCallback, useRef, memo, useMemo,
 } from 'react';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
@@ -137,10 +137,9 @@ export const ReelsScreen: React.FC = () => {
     if (!cur) return;
     sendViewForCurrent();
     currentReelRef.current = { id: cur.id, startTime: Date.now() };
-    // Prefetch thumbnails adjacentes
-    list.slice(Math.max(0, currentIndex - 1), currentIndex + 4).forEach(r => {
-      if (r.thumbnail_url) Image.prefetch(r.thumbnail_url).catch(() => {});
-    });
+    // Prefetch uniquement le suivant — évite la cascade réseau au scroll rapide
+    const next = list[currentIndex + 1];
+    if (next?.thumbnail_url) Image.prefetch(next.thumbnail_url).catch(() => {});
   }, [currentIndex, sendViewForCurrent]);
 
   // ── Load ──────────────────────────────────────────────────────────────────
@@ -760,7 +759,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const isOwnReel = !!(currentUserId && reel.author?.id && currentUserId === String(reel.author.id));
 
   const videoUri = reel.hls_url ?? reel.video_url;
-  const videoSource = videoUri
+  // Mémoïsé : même URI → même objet → useVideoPlayer ne recharge pas
+  const videoSource = useMemo(() => videoUri
     ? {
         uri: videoUri,
         bufferConfig: {
@@ -769,7 +769,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           backBufferDurationMs: 3_000, preferredForwardBufferDurationMs: 10_000,
         },
       }
-    : 'about:blank';
+    : 'about:blank',
+  [videoUri]); // eslint-disable-line
 
   const player = useVideoPlayer(videoSource, p => {
     p.loop = false; p.muted = muted; p.volume = muted ? 0 : 1.0;
@@ -839,34 +840,44 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     }, STALL_TIMEOUT);
   }, [clearStall, doRetry]);
 
-  // Événements player
+  // Refs stables pour lire les valeurs courantes dans les listeners sans les recréer
+  const isActiveRef = useRef(isActive);
+  const onEndRef    = useRef(onEnd);
+  const doRetryRef  = useRef(doRetry);
+  const armStallRef = useRef(armStall);
+  useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
+  useEffect(() => { onEndRef.current    = onEnd;    }, [onEnd]);
+  useEffect(() => { doRetryRef.current  = doRetry;  }, [doRetry]);
+  useEffect(() => { armStallRef.current = armStall;  }, [armStall]);
+
+  // Listeners souscrits une seule fois par player — pas de re-souscription au scroll
   useEffect(() => {
     const subEnd   = player.addEventListener('onEnd', () => {
       clearStall();
-      if (isActive && mountedRef.current) { endedRef.current = true; setEnded(true); onEnd(); }
+      if (isActiveRef.current && mountedRef.current) { endedRef.current = true; setEnded(true); onEndRef.current(); }
     });
     const subBuf   = player.addEventListener('onBuffer', (val: boolean) => {
       if (!mountedRef.current) return;
-      if (val && isActive && !pausedRef.current) armStall(); else clearStall();
+      if (val && isActiveRef.current && !pausedRef.current) armStallRef.current(); else clearStall();
     });
     const subLoad  = player.addEventListener('onLoad', (data: any) => {
       if (!mountedRef.current) return;
       setVideoLoaded(true); setVideoError(false); retryCountRef.current = 0; clearStall();
       if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
-      if (isActive && !pausedRef.current) player.play();
+      if (isActiveRef.current && !pausedRef.current) player.play();
     });
     const subState = player.addEventListener('onPlaybackStateChange', ({ isPlaying, isBuffering }: any) => {
       if (!mountedRef.current) return;
       if (isPlaying) { setVideoPlaying(true); clearStall(); }
-      else if (isBuffering && isActive && !pausedRef.current) { setVideoPlaying(false); armStall(); }
+      else if (isBuffering && isActiveRef.current && !pausedRef.current) { setVideoPlaying(false); armStallRef.current(); }
     });
     const subErr   = player.addEventListener('onError', () => {
       if (!mountedRef.current) return;
       clearStall();
-      if (isActive) doRetry();
+      if (isActiveRef.current) doRetryRef.current();
     });
     return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subState.remove(); subErr.remove(); };
-  }, [isActive, onEnd, player, doRetry, armStall, clearStall]);
+  }, [player, clearStall]); // uniquement player — listeners stables
 
   // Play/Pause selon isActive
   useEffect(() => {
