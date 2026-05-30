@@ -12,6 +12,7 @@ export interface LiveStream {
   current_viewers: number;
   peak_viewers: number;
   is_featured: boolean;
+  is_private: boolean;
   started_at: string;
   ended_at?: string | null;
   user?: {
@@ -44,9 +45,17 @@ async function getById(id: string): Promise<LiveStream> {
   return r.data;
 }
 
-async function startLive(payload: { title: string; description?: string }): Promise<{ live: LiveStream; token: string; livekit_url: string }> {
+async function startLive(payload: { title: string; description?: string; is_private?: boolean }): Promise<{ live: LiveStream; token: string; livekit_url: string }> {
   const r = await apiClient.post<{ live: LiveStream; token: string; livekit_url: string }>(Endpoints.lives.start, payload);
   return r.data;
+}
+
+async function blockUserFromLives(userId: string): Promise<void> {
+  await apiClient.post(Endpoints.lives.blockUser(userId));
+}
+
+async function unblockUserFromLives(userId: string): Promise<void> {
+  await apiClient.delete(Endpoints.lives.unblockUser(userId));
 }
 
 async function stopLive(id: string): Promise<void> {
@@ -67,4 +76,4 @@ async function stopAllMine(): Promise<void> {
   await apiClient.post(`/api/v1/lives/stop_all_mine`);
 }
 
-export const liveService = { getLives, getById, startLive, stopLive, getToken, getStatus, stopAllMine };
+export const liveService = { getLives, getById, startLive, stopLive, getToken, getStatus, stopAllMine, blockUserFromLives, unblockUserFromLives };

@@ -527,7 +527,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
   }, [liveId, addSysMsg]);
 
   const handleBan = useCallback((identity: string, name: string) => {
-    Alert.alert(name, 'Choisir une action de bannissement', [
+    Alert.alert(name, 'Que veux-tu faire ?', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Exclure du live',
@@ -543,11 +543,36 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
         },
       },
       {
-        text: 'Bannir de tous mes lives', style: 'destructive',
+        text: 'Bloquer de tous mes lives',
         onPress: () => {
           Alert.alert(
-            'Bannir de tous les lives',
-            `${name} ne pourra plus rejoindre aucun de tes lives.`,
+            'Bloquer des lives',
+            `${name} ne pourra plus voir aucun de tes lives (actuel et futurs).`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Bloquer', style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await apiClient.post(Endpoints.lives.blockUser(identity));
+                    setHandRequests(prev => prev.filter(r => r.identity !== identity));
+                    setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
+                    addSysMsg(`${name} a été bloqué de tous tes lives`);
+                  } catch {
+                    Alert.alert('Erreur', 'Impossible de bloquer cet utilisateur.');
+                  }
+                },
+              },
+            ]
+          );
+        },
+      },
+      {
+        text: 'Bannir (ce live uniquement)', style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Bannir de ce live',
+            `${name} ne pourra plus rejoindre ce live.`,
             [
               { text: 'Annuler', style: 'cancel' },
               {

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
@@ -20,6 +21,7 @@ export const GoLiveScreen: React.FC = () => {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [starting, setStarting] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -44,7 +46,7 @@ export const GoLiveScreen: React.FC = () => {
     if (starting) return;
     setStarting(true);
     try {
-      const result = await liveService.startLive({ title: t, description: description.trim() || undefined });
+      const result = await liveService.startLive({ title: t, description: description.trim() || undefined, is_private: isPrivate });
       nav.replace('SimpleLiveStream', {
         liveId: result.live.id,
         publisherToken: result.token,
@@ -122,6 +124,43 @@ export const GoLiveScreen: React.FC = () => {
                 numberOfLines={3}
                 maxLength={300}
               />
+            </View>
+
+            {/* Sélecteur visibilité */}
+            <View style={st.privacyRow}>
+              <TouchableOpacity
+                style={[st.privacyBtn, !isPrivate && st.privacyBtnActive, !isPrivate && { borderColor: '#10B981' }]}
+                onPress={() => setIsPrivate(false)}
+                activeOpacity={0.8}
+              >
+                <MCIcon name="earth" size={18} color={!isPrivate ? '#10B981' : colors.textTertiary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.privacyLabel, { color: !isPrivate ? '#10B981' : colors.textSecondary }]}>
+                    Public
+                  </Text>
+                  <Text style={[st.privacySub, { color: colors.textTertiary }]}>
+                    Tout le monde peut voir
+                  </Text>
+                </View>
+                {!isPrivate && <MCIcon name="check-circle" size={18} color="#10B981" />}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[st.privacyBtn, isPrivate && st.privacyBtnActive, isPrivate && { borderColor: '#7B3FF2' }]}
+                onPress={() => setIsPrivate(true)}
+                activeOpacity={0.8}
+              >
+                <MCIcon name="lock" size={18} color={isPrivate ? '#7B3FF2' : colors.textTertiary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.privacyLabel, { color: isPrivate ? '#7B3FF2' : colors.textSecondary }]}>
+                    Abonnés seulement
+                  </Text>
+                  <Text style={[st.privacySub, { color: colors.textTertiary }]}>
+                    Uniquement tes abonnés
+                  </Text>
+                </View>
+                {isPrivate && <MCIcon name="check-circle" size={18} color="#7B3FF2" />}
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
@@ -238,6 +277,18 @@ const st = StyleSheet.create({
     backgroundColor: '#fff', opacity: 0.9,
   },
   goBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+
+  // ── Privacy selector ──────────────────────────────────────────────────────
+  privacyRow: { gap: 8, marginTop: 4 },
+  privacyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 14, borderWidth: 1.5, borderColor: 'transparent',
+    paddingHorizontal: 14, paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  privacyBtnActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
+  privacyLabel: { fontSize: 13, fontWeight: '700' },
+  privacySub:   { fontSize: 11, marginTop: 1 },
 
   // ── Concert card ───────────────────────────────────────────────────────────
   concertCard: {
