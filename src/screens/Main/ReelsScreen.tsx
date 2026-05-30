@@ -88,9 +88,14 @@ export const ReelsScreen: React.FC = () => {
   const lastLoadedAtRef   = useRef<number>(0);
   const didFocusOnceRef   = useRef(false);
   const lastInitialReelRef = useRef<string | undefined>(undefined);
+  // Snapshot des params au montage — stable, jamais recréé
+  const initialReelIdRef = useRef(params.initialReelId);
+  const initialReelRef   = useRef(params.initialReel as Reel | undefined);
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const seedReel = params.initialReel?.video_url ? [params.initialReel as Reel] : [];
+  const seedReel = useRef(
+    params.initialReel?.video_url ? [params.initialReel as Reel] : []
+  ).current;
 
   const [reels,         setReels]         = useState<Reel[]>(seedReel);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
@@ -143,59 +148,61 @@ export const ReelsScreen: React.FC = () => {
   }, [currentIndex, sendViewForCurrent]);
 
   // ── Load ──────────────────────────────────────────────────────────────────
-  const load = useCallback(async (silent = false) => {
+  // targetId : reel à afficher en priorité (peut changer à chaque navigation)
+  // silent   : garder le contenu actuel visible pendant le chargement background
+  const load = useCallback(async (silent = false, targetId?: string, targetReel?: Reel) => {
     if (!mountedRef.current) return;
     if (!silent) setLoading(true);
     pageRef.current = 1;
     isLoadingMoreRef.current = false;
 
     try {
-      const [data, me] = await Promise.all([
-        reelService.getFeed({ page: 1 }),
-        authService.getMe(),
-      ]);
+      const data = await reelService.getFeed({ page: 1 });
       if (!mountedRef.current) return;
 
       const filtered = (data.items ?? []).filter((r: Reel) => !!r.video_url);
 
+      // Chercher le reel cible dans le feed chargé
       let finalReels = filtered;
       let targetIdx  = 0;
-      if (params.initialReelId) {
-        const idx = filtered.findIndex((r: Reel) => r.id === params.initialReelId);
+      if (targetId) {
+        const idx = filtered.findIndex((r: Reel) => r.id === targetId);
         if (idx >= 0) {
           targetIdx = idx;
-        } else if (params.initialReel) {
-          finalReels = [params.initialReel as Reel, ...filtered];
+        } else if (targetReel?.video_url) {
+          // Pas dans le feed → l'injecter en tête
+          finalReels = [targetReel, ...filtered.filter(r => r.id !== targetId)];
           targetIdx  = 0;
         }
       }
 
       setReels(finalReels);
       setHasMore(data.has_more);
-      setMyId(String(me.id));
       viewedReelsRef.current = new Set();
       lastLoadedAtRef.current = Date.now();
 
+      // Scroll vers la cible
+      currentIdxRef.current = targetIdx;
+      setCurrentIndex(targetIdx);
       if (targetIdx > 0) {
-        currentIdxRef.current = targetIdx;
-        setCurrentIndex(targetIdx);
-        setTimeout(() => {
-          listRef.current?.scrollToIndex({ index: targetIdx, animated: false });
-        }, 150);
-      } else {
-        currentIdxRef.current = 0;
-        setCurrentIndex(0);
+        setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
       }
 
-      userService.getUserReels(String(me.id))
-        .then(mine => { if (mountedRef.current) setMyReels(Array.isArray(mine) ? mine : []); })
-        .catch(() => {});
+      // Charger myId + mes reels en parallèle sans bloquer l'affichage
+      authService.getMe().then(me => {
+        if (!mountedRef.current) return;
+        setMyId(String(me.id));
+        userService.getUserReels(String(me.id))
+          .then(mine => { if (mountedRef.current) setMyReels(Array.isArray(mine) ? mine : []); })
+          .catch(() => {});
+      }).catch(() => {});
+
     } catch {
       if (mountedRef.current && !silent) setReels([]);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [params.initialReelId]); // eslint-disable-line
+  }, []); // pas de dépendances sur params — targetId passé en argument
 
   // ── Load more ─────────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -277,7 +284,9 @@ export const ReelsScreen: React.FC = () => {
   useEffect(() => {
     mountedRef.current = true;
     setScreenFocused(true);
-    load(seedReel.length > 0);
+    // Charger le feed en passant le reel cible — si on a un seedReel il est déjà visible,
+    // on charge en silent pour ne pas afficher de spinner
+    load(seedReel.length > 0, initialReelIdRef.current, initialReelRef.current);
     return () => {
       mountedRef.current = false;
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -289,30 +298,39 @@ export const ReelsScreen: React.FC = () => {
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
 
-    const newInitialId = params.initialReelId;
+    // Lire les params FRAIS depuis route.params à chaque focus
+    const freshParams = (route.params ?? {}) as typeof params;
+    const newInitialId = freshParams.initialReelId;
+    const newInitialReel = freshParams.initialReel as Reel | undefined;
 
-    if (params.reelPublished) {
+    if (freshParams.reelPublished) {
       nav.setParams({ reelPublished: undefined } as any);
-      load();
+      load(false);
     } else if (newInitialId) {
-      // Toujours traiter initialReelId au focus — peu importe si c'était déjà la valeur
+      // Mettre à jour les refs pour le prochain load()
+      initialReelIdRef.current = newInitialId;
+      initialReelRef.current   = newInitialReel;
+
       const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
       if (idx >= 0) {
-        // Reel déjà chargé → scroll direct
+        // Reel déjà dans la liste → scroll immédiat sans recharger
         currentIdxRef.current = idx;
         setCurrentIndex(idx);
         setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
       } else if (newInitialId !== lastInitialReelRef.current) {
-        // Nouveau reel pas encore chargé → recharger le feed
+        // Nouveau reel pas encore chargé → afficher immédiatement + charger en background
         lastInitialReelRef.current = newInitialId;
-        load(false);
-      } else {
-        // Même reel pas dans la liste (rare) → injecter depuis params.initialReel
-        if (params.initialReel?.video_url) {
-          setReels(prev => [params.initialReel as Reel, ...prev.filter(r => r.id !== newInitialId)]);
+        if (newInitialReel?.video_url) {
+          // Affichage immédiat du reel cliqué pendant le chargement
+          setReels(prev => {
+            const exists = prev.some(r => r.id === newInitialId);
+            return exists ? prev : [newInitialReel, ...prev];
+          });
           currentIdxRef.current = 0;
           setCurrentIndex(0);
         }
+        // Charger le vrai feed en arrière-plan (silent = déjà affiché)
+        load(true, newInitialId, newInitialReel);
       }
     } else if (didFocusOnceRef.current) {
       const age = Date.now() - lastLoadedAtRef.current;
@@ -322,8 +340,10 @@ export const ReelsScreen: React.FC = () => {
     didFocusOnceRef.current = true;
     return () => {
       setScreenFocused(false);
+      // Pause immédiate — non bloquant pour le retour
       try { activePlayerRef.current?.pause(); } catch {}
-      sendViewForCurrent();
+      // sendViewForCurrent en différé pour ne pas bloquer le goBack
+      requestAnimationFrame(() => { sendViewForCurrent(); });
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.reelPublished, params.initialReelId]));
