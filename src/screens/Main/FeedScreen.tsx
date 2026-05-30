@@ -1950,6 +1950,144 @@ export const FeedScreen: React.FC = () => {
   );
 };
 
+// ── HeroReelPlayer — hero reel avec autoplay muet style Instagram ────────────
+
+const HeroReelPlayer: React.FC<{
+  reel: any;
+  w: number;
+  h: number;
+  onPress: () => void;
+}> = React.memo(({ reel, w, h, onPress }) => {
+  const [muted,   setMuted]   = useState(true);
+  const [playing, setPlaying] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const videoUri = reel.hls_url ?? reel.video_url ?? null;
+
+  const player = useVideoPlayer(
+    videoUri ? { uri: videoUri } : 'about:blank',
+    (p: any) => {
+      p.muted  = true;
+      p.volume = 0;
+      p.loop   = true;
+    },
+  );
+
+  // Démarrer la lecture dès que le player est prêt
+  useEffect(() => {
+    if (!videoUri) return;
+    const t = setTimeout(() => {
+      try { player.play(); if (mountedRef.current) setPlaying(true); } catch {}
+    }, 300);
+    return () => {
+      clearTimeout(t);
+      try { player.pause(); } catch {}
+    };
+  }, [videoUri]);
+
+  // Sync mute
+  useEffect(() => {
+    try {
+      player.muted  = muted;
+      player.volume = muted ? 0 : 1;
+    } catch {}
+  }, [muted]);
+
+  const author   = reel.author;
+  const name     = author?.display_name ?? author?.username ?? '';
+  const initials = name[0]?.toUpperCase() ?? '?';
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.92}
+      onPress={onPress}
+      style={[rrS.thumb, { width: w, height: h }]}
+    >
+      {/* Vidéo en autoplay muet */}
+      {videoUri ? (
+        <VideoView
+          player={player}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          controls={false}
+          surfaceType="texture"
+        />
+      ) : reel.thumbnail_url ? (
+        <Image source={{ uri: reel.thumbnail_url }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="cover" />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: 18 }]}>
+          <Icon name="film" size={48} color="rgba(255,255,255,0.18)" />
+        </View>
+      )}
+
+      {/* Dégradé bas */}
+      <LinearGradient
+        colors={['transparent', 'transparent', 'rgba(0,0,0,0.85)']}
+        style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
+      />
+
+      {/* Badge REEL haut gauche */}
+      <View style={rrS.reelBadge}>
+        <Icon name="play" size={9} color="#fff" />
+        <Text style={[rrS.reelBadgeTxt, { fontSize: 10 }]}>REEL</Text>
+      </View>
+
+      {/* Bouton son haut droite */}
+      {videoUri && (
+        <TouchableOpacity
+          style={rrS.muteBtn}
+          onPress={e => { e.stopPropagation(); setMuted(v => !v); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon name={muted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* Durée */}
+      {reel.duration_sec ? (
+        <View style={rrS.durationBadge}>
+          <Text style={rrS.durationTxt}>{reel.duration_sec}s</Text>
+        </View>
+      ) : null}
+
+      {/* Infos bas */}
+      <View style={rrS.thumbBottom}>
+        <View style={rrS.thumbAuthor}>
+          {author?.avatar_url ? (
+            <Image source={{ uri: author.avatar_url }} style={[rrS.thumbAvatar, rrS.thumbAvatarLarge]} />
+          ) : (
+            <View style={[rrS.thumbAvatar, rrS.thumbAvatarLarge, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{initials}</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={[rrS.thumbName, { fontSize: 14 }]} numberOfLines={1}>{name}</Text>
+          </View>
+        </View>
+        {reel.caption ? (
+          <Text style={rrS.heroCaption} numberOfLines={2}>{reel.caption}</Text>
+        ) : null}
+        <View style={rrS.thumbStats}>
+          <View style={rrS.statChip}>
+            <Icon name="eye" size={12} color="rgba(255,255,255,0.85)" />
+            <Text style={[rrS.thumbStatTxt, { fontSize: 12 }]}>{(reel.view_count ?? 0).toLocaleString()}</Text>
+          </View>
+          {(reel.like_count ?? 0) > 0 && (
+            <View style={rrS.statChip}>
+              <MCIcon name="heart" size={13} color="rgba(255,255,255,0.85)" />
+              <Text style={[rrS.thumbStatTxt, { fontSize: 12 }]}>{reel.like_count}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 // ── ReelRowCard — rangée horizontale de reels (style Facebook) ───────────────
 
 const ReelRowCard: React.FC<{
@@ -2069,10 +2207,15 @@ const ReelRowCard: React.FC<{
         </TouchableOpacity>
       </View>
 
-      {/* Grande carte hero */}
+      {/* Grande carte hero — autoplay muet style Instagram */}
       {hero ? (
         <View style={{ paddingHorizontal: 12, marginBottom: rest.length > 0 ? 12 : 0 }}>
-          <ReelThumb reel={hero} w={HERO_W} h={HERO_H} large />
+          <HeroReelPlayer
+            reel={hero}
+            w={HERO_W}
+            h={HERO_H}
+            onPress={() => onPressReel(hero.id, hero)}
+          />
         </View>
       ) : null}
 
@@ -2108,7 +2251,8 @@ const rrS = StyleSheet.create({
   reelBadge:        { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(123,63,242,0.85)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
   reelBadgeTxt:     { color: '#fff', fontWeight: '800', letterSpacing: 0.5 },
 
-  durationBadge:    { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  muteBtn:          { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  durationBadge:    { position: 'absolute', top: 52, right: 10, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
   durationTxt:      { color: '#fff', fontSize: 10, fontWeight: '700' },
 
   playBtn:          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
