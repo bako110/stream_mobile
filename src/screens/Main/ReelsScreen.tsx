@@ -66,7 +66,7 @@ export const ReelsScreen: React.FC = () => {
   const SCREEN_W = screenDims.width;
   const SCREEN_H = screenDims.height;
   const insets   = useSafeAreaInsets();
-  const HEADER_H = insets.top + 54; // hauteur du header flottant (statusBar + row)
+  const HEADER_H = insets.top + 54;
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav    = useNavigation<Nav>();
@@ -74,23 +74,22 @@ export const ReelsScreen: React.FC = () => {
   const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean };
 
   // ── Refs ─────────────────────────────────────────────────────────────────
-  const listRef          = useRef<FlatList>(null);
-  const isLoadingMoreRef = useRef(false);
-  const pageRef          = useRef(1);
-  const currentIdxRef    = useRef(0);
-  const currentReelRef   = useRef<{ id: string; startTime: number } | null>(null);
-  const viewedReelsRef   = useRef<Set<string>>(new Set());
-  const activePlayerRef  = useRef<{ pause: () => void } | null>(null);
-  const mountedRef       = useRef(true);
-  const searchTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchInputRef   = useRef<TextInput>(null);
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 });
+  const listRef           = useRef<FlatList>(null);
+  const isLoadingMoreRef  = useRef(false);
+  const pageRef           = useRef(1);
+  const currentIdxRef     = useRef(0);
+  const currentReelRef    = useRef<{ id: string; startTime: number } | null>(null);
+  const viewedReelsRef    = useRef<Set<string>>(new Set());
+  const activePlayerRef   = useRef<{ pause: () => void } | null>(null);
+  const mountedRef        = useRef(true);
+  const searchTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef    = useRef<TextInput>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 75 });
+  const lastLoadedAtRef   = useRef<number>(0);
+  const didFocusOnceRef   = useRef(false);
+  const lastInitialReelRef = useRef<string | undefined>(undefined);
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const lastLoadedAtRef = useRef<number>(0);
-
-  // Si un reel est passé depuis le feed avec video_url, on l'affiche immédiatement
-  // Sinon on démarre avec une liste vide et on charge normalement (le scroll se fera après)
   const seedReel = params.initialReel?.video_url ? [params.initialReel as Reel] : [];
 
   const [reels,         setReels]         = useState<Reel[]>(seedReel);
@@ -99,7 +98,6 @@ export const ReelsScreen: React.FC = () => {
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
   const [editCaption,   setEditCaption]   = useState('');
   const [editSaving,    setEditSaving]    = useState(false);
-  // Pas de skeleton si on a un seedReel OU si on a juste un initialReelId (on charge et scroll)
   const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId);
   const [loadingMore,   setLoadingMore]   = useState(false);
   const [hasMore,       setHasMore]       = useState(true);
@@ -113,13 +111,12 @@ export const ReelsScreen: React.FC = () => {
   const [searchResults, setSearchResults] = useState<Reel[]>([]);
   const [searching,     setSearching]     = useState(false);
 
-  // Keep refs in sync so closures don't go stale
+  // Refs stables pour éviter les closures stales
   const reelsRef   = useRef<Reel[]>([]);
   const hasMoreRef = useRef(true);
-  useEffect(() => { reelsRef.current   = reels;   }, [reels]);
-  useEffect(() => { hasMoreRef.current = hasMore;  }, [hasMore]);
+  useEffect(() => { reelsRef.current = reels; },    [reels]);
+  useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
 
-  // ── Mute ─────────────────────────────────────────────────────────────────
   const toggleMute = useCallback(() => setMuted(v => !v), []);
 
   // ── View tracking ─────────────────────────────────────────────────────────
@@ -134,20 +131,14 @@ export const ReelsScreen: React.FC = () => {
     }
   }, []);
 
-  // Called when index changes — send view for previous reel, start tracking new one
   useEffect(() => {
     const list = reelsRef.current;
     const cur  = list[currentIndex];
     if (!cur) return;
-
-    // Send view for the reel we just left
     sendViewForCurrent();
-
-    // Start tracking the new one
     currentReelRef.current = { id: cur.id, startTime: Date.now() };
-
-    // Prefetch thumbnails : 1 en arrière + 4 en avance
-    list.slice(Math.max(0, currentIndex - 1), currentIndex + 5).forEach(r => {
+    // Prefetch thumbnails adjacentes
+    list.slice(Math.max(0, currentIndex - 1), currentIndex + 4).forEach(r => {
       if (r.thumbnail_url) Image.prefetch(r.thumbnail_url).catch(() => {});
     });
   }, [currentIndex, sendViewForCurrent]);
@@ -155,9 +146,7 @@ export const ReelsScreen: React.FC = () => {
   // ── Load ──────────────────────────────────────────────────────────────────
   const load = useCallback(async (silent = false) => {
     if (!mountedRef.current) return;
-    if (!silent) {
-      setLoading(true);
-    }
+    if (!silent) setLoading(true);
     pageRef.current = 1;
     isLoadingMoreRef.current = false;
 
@@ -166,13 +155,10 @@ export const ReelsScreen: React.FC = () => {
         reelService.getFeed({ page: 1 }),
         authService.getMe(),
       ]);
-
       if (!mountedRef.current) return;
 
       const filtered = (data.items ?? []).filter((r: Reel) => !!r.video_url);
 
-      // Si on a démarré avec un seed reel, s'assurer qu'il est dans le feed final
-      // et placer l'index dessus — sans sauter visuellement
       let finalReels = filtered;
       let targetIdx  = 0;
       if (params.initialReelId) {
@@ -180,7 +166,6 @@ export const ReelsScreen: React.FC = () => {
         if (idx >= 0) {
           targetIdx = idx;
         } else if (params.initialReel) {
-          // Le reel cliqué n'est pas dans le feed (trop récent, filtré…) — on l'injecte en tête
           finalReels = [params.initialReel as Reel, ...filtered];
           targetIdx  = 0;
         }
@@ -192,53 +177,36 @@ export const ReelsScreen: React.FC = () => {
       viewedReelsRef.current = new Set();
       lastLoadedAtRef.current = Date.now();
 
-      // Forcer un ping sur currentIndex pour que le VideoSlide démarre la lecture
-      // même quand targetIdx === 0 (onViewableItemsChanged ne se déclenche pas dans ce cas)
-      if (targetIdx === 0) {
-        currentIdxRef.current = 0;
-        setCurrentIndex(i => i === 0 ? -1 : i); // bascule temporaire
-        setTimeout(() => { if (mountedRef.current) setCurrentIndex(0); }, 30);
-      }
-
       if (targetIdx > 0) {
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
-        // Retry scroll jusqu'à ce que la FlatList soit prête
-        const tryScroll = (attempts: number) => {
-          if (!mountedRef.current) return;
-          if (listRef.current) {
-            listRef.current.scrollToIndex({ index: targetIdx, animated: false });
-          } else if (attempts > 0) {
-            setTimeout(() => tryScroll(attempts - 1), 100);
-          }
-        };
-        setTimeout(() => tryScroll(5), 100);
+        setTimeout(() => {
+          listRef.current?.scrollToIndex({ index: targetIdx, animated: false });
+        }, 150);
+      } else {
+        currentIdxRef.current = 0;
+        setCurrentIndex(0);
       }
 
       userService.getUserReels(String(me.id))
-        .then(mine => {
-          if (mountedRef.current) setMyReels(Array.isArray(mine) ? mine : []);
-        })
+        .then(mine => { if (mountedRef.current) setMyReels(Array.isArray(mine) ? mine : []); })
         .catch(() => {});
     } catch {
-      // En mode silent on garde l'ancien contenu, sinon on vide
       if (mountedRef.current && !silent) setReels([]);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [SCREEN_H, params.initialReelId]);
+  }, [params.initialReelId]); // eslint-disable-line
 
   // ── Load more ─────────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
     if (isLoadingMoreRef.current || !hasMoreRef.current || !mountedRef.current) return;
     isLoadingMoreRef.current = true;
     if (mountedRef.current) setLoadingMore(true);
-
     try {
       const nextPage = pageRef.current + 1;
       const data     = await reelService.getFeed({ page: nextPage });
       if (!mountedRef.current) return;
-
       const newReels = (data.items ?? []).filter((r: Reel) => !!r.video_url);
       setReels(prev => {
         const ids = new Set(prev.map(r => r.id));
@@ -246,15 +214,13 @@ export const ReelsScreen: React.FC = () => {
       });
       pageRef.current = nextPage;
       setHasMore(data.has_more);
-    } catch {
-      // Silencieux — l'utilisateur peut toujours scroller
-    } finally {
+    } catch { /* silencieux */ }
+    finally {
       if (mountedRef.current) setLoadingMore(false);
       isLoadingMoreRef.current = false;
     }
   }, []);
 
-  // Stable ref for loadMore so gesture handler never has a stale closure
   const loadMoreRef = useRef(loadMore);
   useEffect(() => { loadMoreRef.current = loadMore; }, [loadMore]);
 
@@ -275,8 +241,8 @@ export const ReelsScreen: React.FC = () => {
 
   const onSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => runSearch(text), 350);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => runSearch(text), 350);
   }, [runSearch]);
 
   const openSearch = useCallback(() => {
@@ -287,6 +253,7 @@ export const ReelsScreen: React.FC = () => {
   }, []);
 
   const closeSearch = useCallback(() => {
+    if (searchTimerRef.current) { clearTimeout(searchTimerRef.current); searchTimerRef.current = null; }
     setSearchOpen(false);
     setSearchQuery('');
     setSearchResults([]);
@@ -304,25 +271,22 @@ export const ReelsScreen: React.FC = () => {
       setReels(prev => [r, ...prev.filter(x => x.id !== r.id)]);
       currentIdxRef.current = 0;
       setCurrentIndex(0);
-      setTimeout(() => listRef.current?.scrollToIndex({ index: 0, animated: false }), 50);
     }
   }, [closeSearch]);
 
-  // ── Effects ───────────────────────────────────────────────────────────────
+  // ── Mount / Unmount ───────────────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
     setScreenFocused(true);
     load(seedReel.length > 0);
     return () => {
       mountedRef.current = false;
-      if (searchTimer.current) clearTimeout(searchTimer.current);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       sendViewForCurrent();
     };
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const didFocusOnceRef    = useRef(false);
-  const lastInitialReelRef = useRef<string | undefined>(undefined);
-
+  // ── Focus ─────────────────────────────────────────────────────────────────
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
 
@@ -332,29 +296,23 @@ export const ReelsScreen: React.FC = () => {
       nav.setParams({ reelPublished: undefined } as any);
       load();
     } else if (newInitialId && newInitialId !== lastInitialReelRef.current) {
-      // Nouveau reel cliqué depuis le feed — on recharge et on scroll dessus
       lastInitialReelRef.current = newInitialId;
       const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
       if (idx >= 0) {
-        // Déjà dans la liste — scroll direct
         currentIdxRef.current = idx;
         setCurrentIndex(idx);
         setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
       } else {
-        // Pas dans la liste — recharger le feed entier
         load(false);
       }
     } else if (didFocusOnceRef.current) {
       const age = Date.now() - lastLoadedAtRef.current;
-      if (age > 60_000) {
-        load(true); // retour simple : silent, garde le reel actuel visible
-      }
+      if (age > 90_000) load(true);
     }
 
     didFocusOnceRef.current = true;
     return () => {
       setScreenFocused(false);
-      // Pause immédiate sans attendre le re-render
       try { activePlayerRef.current?.pause(); } catch {}
       sendViewForCurrent();
     };
@@ -402,53 +360,40 @@ export const ReelsScreen: React.FC = () => {
     }
   }, [editReel, editCaption]);
 
-  // ── Avance au reel suivant (onEnd stable, hors renderItem) ───────────────
+  // ── Navigation reel suivant ───────────────────────────────────────────────
   const goNextReel = useCallback(() => {
     const next = currentIdxRef.current + 1;
     if (next < reelsRef.current.length) {
       currentIdxRef.current = next;
       setCurrentIndex(next);
-      setTimeout(() => {
-        listRef.current?.scrollToIndex({ index: next, animated: true });
-      }, 0);
+      setTimeout(() => listRef.current?.scrollToIndex({ index: next, animated: true }), 0);
     }
   }, []);
 
-  // ── viewabilityCallbacks (FlatList natif) ────────────────────────────────
+  // ── Viewability ───────────────────────────────────────────────────────────
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<{ index: number | null; item: Reel }> }) => {
       if (!viewableItems.length) return;
-      const first = viewableItems[0];
-      const idx   = first.index ?? 0;
+      const idx = viewableItems[0].index ?? 0;
+      if (idx === currentIdxRef.current) return;
 
-      // Toujours mettre à jour screenFocused pour déclencher le play au premier render
-      if (idx === currentIdxRef.current) {
-        // Même index — forcer un re-render du VideoSlide actif pour démarrer la vidéo
-        setCurrentIndex(i => i);
-        return;
-      }
-
-      // Pause le player précédent
-      activePlayerRef.current?.pause();
+      try { activePlayerRef.current?.pause(); } catch {}
 
       currentIdxRef.current = idx;
       setCurrentIndex(idx);
 
-      // Tracker la vue
       sendViewForCurrent();
       const cur = reelsRef.current[idx];
       if (cur) currentReelRef.current = { id: cur.id, startTime: Date.now() };
 
-      // Charger plus si proche de la fin
-      const total = reelsRef.current.length;
-      if (idx >= total - 3) loadMoreRef.current();
+      if (idx >= reelsRef.current.length - 3) loadMoreRef.current();
     },
     [sendViewForCurrent],
   );
 
-  // ── Callbacks stables pour VideoSlide (évite d'invalider memo) ─────────────
-  const onAddReel      = useCallback(() => nav.navigate('CreateReel'), [nav]);
-  const onAuthorPress  = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
+  // ── Callbacks stables ─────────────────────────────────────────────────────
+  const onAddReel     = useCallback(() => nav.navigate('CreateReel'), [nav]);
+  const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
 
   const renderVideoSlide = useCallback(({ item, index }: { item: Reel; index: number }) => (
     <VideoSlide
@@ -466,9 +411,9 @@ export const ReelsScreen: React.FC = () => {
       onEnd={goNextReel}
       activePlayerRef={activePlayerRef}
     />
-  ), [currentIndex, screenFocused, muted, HEADER_H, insets.bottom, colors, myId, toggleMute, onAddReel, onAuthorPress, goNextReel, activePlayerRef]);
+  ), [currentIndex, screenFocused, muted, HEADER_H, insets.bottom, colors, myId, toggleMute, onAddReel, onAuthorPress, goNextReel]);
 
-  // ── Render: chargement initial — spinner minimal style TikTok
+  // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
     return (
       <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
@@ -478,7 +423,7 @@ export const ReelsScreen: React.FC = () => {
     );
   }
 
-  // ── Render: empty feed ────────────────────────────────────────────────────
+  // ── Render: empty ─────────────────────────────────────────────────────────
   if (reels.length === 0 && tab === 'feed') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
@@ -496,16 +441,12 @@ export const ReelsScreen: React.FC = () => {
     );
   }
 
-  // ── Render: "Mes reels" tab ───────────────────────────────────────────────
+  // ── Render: Mes reels ─────────────────────────────────────────────────────
   if (tab === 'mine') {
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={s.mineHeader}
-        >
+        <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.mineHeader}>
           <TouchableOpacity onPress={() => setTab('feed')} style={s.mineIconBtn}>
             <Icon name="arrow-left" size={22} color="#fff" />
           </TouchableOpacity>
@@ -519,10 +460,7 @@ export const ReelsScreen: React.FC = () => {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <Icon name="film" size={36} color={colors.primary} />
             <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700' }}>Aucun reel</Text>
-            <TouchableOpacity
-              style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }}
-              onPress={() => nav.navigate('CreateReel')}
-            >
+            <TouchableOpacity style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => nav.navigate('CreateReel')}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>Créer mon premier reel</Text>
             </TouchableOpacity>
           </View>
@@ -549,15 +487,11 @@ export const ReelsScreen: React.FC = () => {
                       <Text style={s.mineStatText}>{formatCount(item.view_count)}</Text>
                     </View>
                     <View style={s.mineStat}>
-                      <Icon name="heart" size={10} color="#fff" />
+                      <MCIcon name="heart" size={10} color="#fff" />
                       <Text style={s.mineStatText}>{formatCount(item.like_count)}</Text>
                     </View>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => setMenuReel(item)}
-                    style={s.mineMenuBtn}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
+                  <TouchableOpacity onPress={() => setMenuReel(item)} style={s.mineMenuBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <Icon name="more-vertical" size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
@@ -566,7 +500,6 @@ export const ReelsScreen: React.FC = () => {
           />
         )}
 
-        {/* Menu contextuel */}
         <Modal visible={!!menuReel} transparent animationType="fade" onRequestClose={() => setMenuReel(null)}>
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setMenuReel(null)}>
             <View style={[s.menuSheet, { backgroundColor: colors.backgroundSecondary }]}>
@@ -583,13 +516,9 @@ export const ReelsScreen: React.FC = () => {
           </TouchableOpacity>
         </Modal>
 
-        {/* Édition caption */}
         <Modal visible={!!editReel} transparent animationType="slide" onRequestClose={() => setEditReel(null)}>
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setEditReel(null)}>
-            <View
-              style={[s.editSheet, { backgroundColor: colors.backgroundSecondary }]}
-              onStartShouldSetResponder={() => true}
-            >
+            <View style={[s.editSheet, { backgroundColor: colors.backgroundSecondary }]} onStartShouldSetResponder={() => true}>
               <Text style={[s.editTitle, { color: colors.textPrimary }]}>Modifier la description</Text>
               <TextInput
                 value={editCaption}
@@ -598,29 +527,15 @@ export const ReelsScreen: React.FC = () => {
                 placeholderTextColor={colors.textDisabled}
                 multiline
                 maxLength={300}
-                style={[s.editInput, {
-                  backgroundColor: colors.background,
-                  color: colors.textPrimary,
-                  borderColor: colors.border,
-                }]}
+                style={[s.editInput, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
               />
               <Text style={[s.charCount, { color: colors.textTertiary }]}>{editCaption.length}/300</Text>
               <View style={s.editActions}>
-                <TouchableOpacity
-                  style={[s.editBtn, { backgroundColor: colors.border }]}
-                  onPress={() => setEditReel(null)}
-                >
+                <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.border }]} onPress={() => setEditReel(null)}>
                   <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>Annuler</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.editBtn, { backgroundColor: colors.primary }]}
-                  onPress={handleSaveEdit}
-                  disabled={editSaving}
-                >
-                  {editSaving
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <Text style={{ color: '#fff', fontWeight: '700' }}>Enregistrer</Text>
-                  }
+                <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.primary }]} onPress={handleSaveEdit} disabled={editSaving}>
+                  {editSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Enregistrer</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -654,21 +569,19 @@ export const ReelsScreen: React.FC = () => {
         extraData={`${currentIndex}-${screenFocused}-${muted}`}
         getItemLayout={(_, index) => ({ length: SCREEN_H - HEADER_H, offset: (SCREEN_H - HEADER_H) * index, index })}
         onScrollToIndexFailed={({ index }) => {
-          // L'item n'est pas encore rendu — scroll au début puis retry
           listRef.current?.scrollToOffset({ offset: 0, animated: false });
-          setTimeout(() => {
-            listRef.current?.scrollToIndex({ index, animated: false });
-          }, 300);
+          setTimeout(() => listRef.current?.scrollToIndex({ index, animated: false }), 300);
         }}
         renderItem={renderVideoSlide}
+        removeClippedSubviews
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        initialNumToRender={2}
       />
 
       {/* Header flottant */}
       <View style={[s.floatingHeader, { top: insets.top + 6 }]} pointerEvents="box-none">
-        <TouchableOpacity
-          onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)}
-          style={s.iconBtn}
-        >
+        <TouchableOpacity onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)} style={s.iconBtn}>
           <Icon name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={s.reelHeaderTitle}>Reels</Text>
@@ -678,10 +591,7 @@ export const ReelsScreen: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setTab('mine')}
-            style={[s.myReelsBtn, {
-              backgroundColor: colors.primary + '30',
-              borderColor:     colors.primary + '60',
-            }]}
+            style={[s.myReelsBtn, { backgroundColor: colors.primary + '30', borderColor: colors.primary + '60' }]}
           >
             <Icon name="user" size={14} color="#fff" />
             <Text style={s.myReelsBtnText}>Mes reels</Text>
@@ -689,7 +599,7 @@ export const ReelsScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Overlay de recherche */}
+      {/* Overlay recherche */}
       {searchOpen && (
         <View style={[s.searchOverlay, { paddingTop: insets.top }]}>
           <View style={s.searchTopBar}>
@@ -734,25 +644,13 @@ export const ReelsScreen: React.FC = () => {
               columnWrapperStyle={s.searchGridRow}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={s.searchCard}
-                  onPress={() => pickSearchResult(item)}
-                  activeOpacity={0.9}
-                >
+                <TouchableOpacity style={s.searchCard} onPress={() => pickSearchResult(item)} activeOpacity={0.9}>
                   {item.thumbnail_url
                     ? <Image source={{ uri: item.thumbnail_url }} style={s.searchThumb} resizeMode="cover" />
-                    : <View style={s.searchThumbFallback}>
-                        <Icon name="film" size={32} color="rgba(255,255,255,0.15)" />
-                      </View>
+                    : <View style={s.searchThumbFallback}><Icon name="film" size={32} color="rgba(255,255,255,0.15)" /></View>
                   }
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.92)']}
-                    locations={[0.3, 0.6, 1]}
-                    style={s.searchCardGrad}
-                  />
-                  <View style={s.searchPlayBadge}>
-                    <Icon name="play" size={10} color="#fff" />
-                  </View>
+                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.92)']} locations={[0.3, 0.6, 1]} style={s.searchCardGrad} />
+                  <View style={s.searchPlayBadge}><Icon name="play" size={10} color="#fff" /></View>
                   <View style={s.searchViewBadge}>
                     <Icon name="eye" size={10} color="#fff" />
                     <Text style={s.searchBadgeText}>{formatCount(item.view_count)}</Text>
@@ -762,20 +660,14 @@ export const ReelsScreen: React.FC = () => {
                       {item.author?.avatar_url
                         ? <Image source={{ uri: item.author.avatar_url }} style={s.searchAvatar} />
                         : <View style={[s.searchAvatar, s.searchAvatarFallback]}>
-                            <Text style={s.searchAvatarText}>
-                              {(item.author?.display_name || item.author?.username || '?')[0].toUpperCase()}
-                            </Text>
+                            <Text style={s.searchAvatarText}>{(item.author?.display_name || item.author?.username || '?')[0].toUpperCase()}</Text>
                           </View>
                       }
-                      <Text style={s.searchCardAuthor} numberOfLines={1}>
-                        {item.author?.display_name || item.author?.username || ''}
-                      </Text>
+                      <Text style={s.searchCardAuthor} numberOfLines={1}>{item.author?.display_name || item.author?.username || ''}</Text>
                     </View>
-                    {item.caption ? (
-                      <Text style={s.searchCardCaption} numberOfLines={2}>{item.caption}</Text>
-                    ) : null}
+                    {item.caption ? <Text style={s.searchCardCaption} numberOfLines={2}>{item.caption}</Text> : null}
                     <View style={s.searchCardStats}>
-                      <Icon name="heart" size={10} color="#E0389A" />
+                      <MCIcon name="heart" size={10} color="#E0389A" />
                       <Text style={s.searchCardStat}>{formatCount(item.like_count)}</Text>
                     </View>
                   </View>
@@ -796,26 +688,6 @@ export const ReelsScreen: React.FC = () => {
             </View>
           )}
         </View>
-      )}
-
-      {/* Préchargement silencieux : 1 en arrière + 5 en avance */}
-      {reels[currentIndex - 1]?.video_url && (
-        <VideoPreloader key={`pre_${reels[currentIndex - 1].id}`} uri={reels[currentIndex - 1].video_url!} />
-      )}
-      {reels[currentIndex + 1]?.video_url && (
-        <VideoPreloader key={`pre_${reels[currentIndex + 1].id}`} uri={reels[currentIndex + 1].video_url!} />
-      )}
-      {reels[currentIndex + 2]?.video_url && (
-        <VideoPreloader key={`pre_${reels[currentIndex + 2].id}`} uri={reels[currentIndex + 2].video_url!} />
-      )}
-      {reels[currentIndex + 3]?.video_url && (
-        <VideoPreloader key={`pre_${reels[currentIndex + 3].id}`} uri={reels[currentIndex + 3].video_url!} />
-      )}
-      {reels[currentIndex + 4]?.video_url && (
-        <VideoPreloader key={`pre_${reels[currentIndex + 4].id}`} uri={reels[currentIndex + 4].video_url!} />
-      )}
-      {reels[currentIndex + 5]?.video_url && (
-        <VideoPreloader key={`pre_${reels[currentIndex + 5].id}`} uri={reels[currentIndex + 5].video_url!} />
       )}
 
       {loadingMore && (
@@ -852,141 +724,94 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [paused,       setPaused]       = useState(false);
   const [videoLoaded,  setVideoLoaded]  = useState(false);
   const [videoError,   setVideoError]   = useState(false);
-  // true dès que onPlaybackStateChange signale isPlaying — éteint le spinner
   const [videoPlaying, setVideoPlaying] = useState(false);
-  const [liked,          setLiked]          = useState(reel.user_reaction === 'like');
-  const [likes,          setLikes]          = useState(reel.like_count ?? 0);
-  const [commentCount,   setCommentCount]   = useState(reel.comment_count ?? 0);
-  const [shareCount,     setShareCount]     = useState(reel.share_count ?? 0);
-  const [showComments,   setShowComments]   = useState(false);
-  const [commentText,    setCommentText]    = useState('');
-  const [sending,        setSending]        = useState(false);
-  const [barFocused,     setBarFocused]     = useState(false);
-  const [reportVisible,  setReportVisible]  = useState(false);
+  const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
+  const [likes,        setLikes]        = useState(reel.like_count ?? 0);
+  const [commentCount, setCommentCount] = useState(reel.comment_count ?? 0);
+  const [shareCount,   setShareCount]   = useState(reel.share_count ?? 0);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText,  setCommentText]  = useState('');
+  const [sending,      setSending]      = useState(false);
+  const [barFocused,   setBarFocused]   = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
-  const [isPortrait,     setIsPortrait]     = useState<boolean | null>(null);
-  const [ended,          setEnded]          = useState(false);
-  const [isFollowing,    setIsFollowing]    = useState(false);
-  const [followLoading,  setFollowLoading]  = useState(false);
-  const [refInfo, setRefInfo] = useState<{
-    label: string; kind: string; thumbnail: string | null; color: string;
-  } | null>(null);
+  const [isPortrait,   setIsPortrait]   = useState<boolean | null>(null);
+  const [ended,        setEnded]        = useState(false);
+  const [isFollowing,  setIsFollowing]  = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [refInfo, setRefInfo] = useState<{ label: string; kind: string; thumbnail: string | null; color: string } | null>(null);
+  const [skipLeftLabel,  setSkipLeftLabel]  = useState('');
+  const [skipRightLabel, setSkipRightLabel] = useState('');
 
-  const likeInFlight   = useRef(false);
-  const pausedRef      = useRef(false);
-  const endedRef       = useRef(false);
-  const likedRef       = useRef(reel.user_reaction === 'like');
-  const mountedRef     = useRef(true);
-  const retryTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryCountRef  = useRef(0);
-  const stallTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const likeInFlight  = useRef(false);
+  const pausedRef     = useRef(false);
+  const endedRef      = useRef(false);
+  const likedRef      = useRef(reel.user_reaction === 'like');
+  const mountedRef    = useRef(true);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef(0);
+  const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasEndedOnActivate = useRef(false);
 
-  const MAX_RETRIES    = 3;
-  const STALL_TIMEOUT  = 8_000; // ms sans progression avant retry forcé
+  const MAX_RETRIES   = 3;
+  const STALL_TIMEOUT = 8_000;
 
   const isOwnReel = !!(currentUserId && reel.author?.id && currentUserId === String(reel.author.id));
 
-  const handleFollow = useCallback(async () => {
-    if (!reel.author?.id || followLoading) return;
-    setFollowLoading(true);
-    try {
-      if (isFollowing) {
-        await userService.unfollow(String(reel.author.id));
-        setIsFollowing(false);
-      } else {
-        await userService.follow(String(reel.author.id));
-        setIsFollowing(true);
-      }
-    } catch { /* silencieux */ }
-    finally { setFollowLoading(false); }
-  }, [reel.author?.id, isFollowing, followLoading]);
-
-  // HLS en priorité (progressive loading — segments de 2s),
-  // fallback sur le MP4 brut si hls_url absent (vieux reels ou transcodage en cours)
   const videoUri = reel.hls_url ?? reel.video_url;
-
   const videoSource = videoUri
     ? {
         uri: videoUri,
         bufferConfig: {
-          // Android — ExoPlayer
-          minBufferMs:                      1_500,
-          maxBufferMs:                      30_000,
-          bufferForPlaybackMs:              800,
-          bufferForPlaybackAfterRebufferMs: 1_500,
-          backBufferDurationMs:             3_000,
-          // iOS — AVPlayer
-          preferredForwardBufferDurationMs: 10_000,
+          minBufferMs: 1_500, maxBufferMs: 30_000,
+          bufferForPlaybackMs: 800, bufferForPlaybackAfterRebufferMs: 1_500,
+          backBufferDurationMs: 3_000, preferredForwardBufferDurationMs: 10_000,
         },
       }
     : 'about:blank';
 
-  // ── Player ────────────────────────────────────────────────────────────────
-  const player = useVideoPlayer(
-    videoSource,
-    p => {
-      p.loop   = false;
-      p.muted  = muted;
-      p.volume = muted ? 0 : 1.0;
-    },
-  );
+  const player = useVideoPlayer(videoSource, p => {
+    p.loop = false; p.muted = muted; p.volume = muted ? 0 : 1.0;
+  });
 
-  // ── Cleanup + AppState (arrière-plan) ────────────────────────────────────
+  const clearAllTimers = useCallback(() => {
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
+    if (playTimerRef.current)  { clearTimeout(playTimerRef.current);  playTimerRef.current  = null; }
+  }, []);
+
+  // Cleanup complet au démontage
   useEffect(() => {
     mountedRef.current = true;
-
-    const clearAllTimers = () => {
-      if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
-      if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
-      if (playTimerRef.current)  { clearTimeout(playTimerRef.current);  playTimerRef.current  = null; }
-    };
-
-    const handleAppState = (state: string) => {
-      if (state === 'background' || state === 'inactive') {
-        // Stopper tous les timers dès que l'app passe en arrière-plan
+    const appSub = AppState.addEventListener('change', state => {
+      if ((state === 'background' || state === 'inactive') && isActive) {
         clearAllTimers();
-        if (isActive) {
-          try { player.pause(); } catch {}
-        }
+        try { player.pause(); } catch {}
       }
-    };
-
-    const appStateSub = AppState.addEventListener('change', handleAppState);
-
+    });
     return () => {
       mountedRef.current = false;
-      appStateSub.remove();
+      appSub.remove();
       clearAllTimers();
-      try {
-        player.pause();
-        player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {});
-      } catch {}
+      try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line
 
-  // ── Ratio depuis le thumbnail (détection rapide avant la vidéo) ─────────
+  // Ratio portrait depuis thumbnail
   useEffect(() => {
-    if (!reel.thumbnail_url) return;
+    if (!reel.thumbnail_url || isPortrait !== null) return;
     Image.getSize(
       reel.thumbnail_url,
-      (w, h) => { if (mountedRef.current && isPortrait === null) setIsPortrait(h >= w); },
-      () => { if (mountedRef.current && isPortrait === null) setIsPortrait(true); },
+      (w, h) => { if (mountedRef.current) setIsPortrait(h >= w); },
+      () => { if (mountedRef.current) setIsPortrait(true); },
     );
-  }, [reel.thumbnail_url]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reel.thumbnail_url]); // eslint-disable-line
 
-  // ── Stall timer : si buffering bloqué > STALL_TIMEOUT, on force un retry ──
   const clearStall = useCallback(() => {
     if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
   }, []);
 
-  const armStall = useCallback(() => {
-    clearStall();
-    stallTimerRef.current = setTimeout(() => {
-      if (mountedRef.current && !pausedRef.current) doRetry(); // eslint-disable-line @typescript-eslint/no-use-before-define
-    }, STALL_TIMEOUT);
-  }, [clearStall]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Retry avec backoff exponentiel (silencieux jusqu'au dernier essai) ────
   const doRetry = useCallback(() => {
     if (!mountedRef.current || !reel.video_url) return;
     clearStall();
@@ -997,66 +822,45 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     }
     retryCountRef.current += 1;
     if (mountedRef.current) { setVideoError(false); setVideoLoaded(false); setVideoPlaying(false); }
-    const delay = Math.pow(2, attempt) * 1000;
-    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     retryTimerRef.current = setTimeout(() => {
       if (!mountedRef.current || !reel.video_url) return;
       try {
-        player.replaceSourceAsync(videoSource as any).then(() => {
-          if (mountedRef.current && !pausedRef.current) {
-            player.play();
-            armStall();
-          }
-        }).catch(() => { if (mountedRef.current) doRetry(); });
+        player.replaceSourceAsync(videoSource as any)
+          .then(() => { if (mountedRef.current && !pausedRef.current) { player.play(); } })
+          .catch(() => { if (mountedRef.current) doRetry(); });
       } catch { if (mountedRef.current) doRetry(); }
-    }, delay);
-  }, [player, reel.video_url, clearStall, armStall]);
+    }, Math.pow(2, attempt) * 1000);
+  }, [player, reel.video_url, clearStall, videoSource]); // eslint-disable-line
 
-  // Retry manuel depuis le bouton "Réessayer" — remet le compteur à zéro
-  const retryLoad = useCallback(() => {
-    retryCountRef.current = 0;
-    doRetry();
-  }, [doRetry]);
+  const armStall = useCallback(() => {
+    clearStall();
+    stallTimerRef.current = setTimeout(() => {
+      if (mountedRef.current && !pausedRef.current) doRetry();
+    }, STALL_TIMEOUT);
+  }, [clearStall, doRetry]);
 
-  // ── Événements player ─────────────────────────────────────────────────────
+  // Événements player
   useEffect(() => {
-    const subEnd = player.addEventListener('onEnd', () => {
+    const subEnd   = player.addEventListener('onEnd', () => {
       clearStall();
-      if (isActive) {
-        endedRef.current = true;
-        if (mountedRef.current) setEnded(true);
-        onEnd();
-      }
+      if (isActive && mountedRef.current) { endedRef.current = true; setEnded(true); onEnd(); }
     });
-    const subBuf = player.addEventListener('onBuffer', (val: boolean) => {
+    const subBuf   = player.addEventListener('onBuffer', (val: boolean) => {
       if (!mountedRef.current) return;
-      if (val && isActive && !pausedRef.current) {
-        armStall();
-      } else {
-        clearStall();
-      }
+      if (val && isActive && !pausedRef.current) armStall(); else clearStall();
     });
-    const subLoad = player.addEventListener('onLoad', (data: any) => {
+    const subLoad  = player.addEventListener('onLoad', (data: any) => {
       if (!mountedRef.current) return;
-      setVideoLoaded(true);
-      setVideoError(false);
-      retryCountRef.current = 0;
-      clearStall();
+      setVideoLoaded(true); setVideoError(false); retryCountRef.current = 0; clearStall();
       if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
       if (isActive && !pausedRef.current) player.play();
     });
-    // Source unique de vérité : isPlaying=true → spinner off, isPlaying=false+isBuffering → spinner on
-    const subState = player.addEventListener('onPlaybackStateChange', ({ isPlaying, isBuffering }) => {
+    const subState = player.addEventListener('onPlaybackStateChange', ({ isPlaying, isBuffering }: any) => {
       if (!mountedRef.current) return;
-      if (isPlaying) {
-        setVideoPlaying(true);
-        clearStall();
-      } else if (isBuffering && isActive && !pausedRef.current) {
-        setVideoPlaying(false);
-        armStall();
-      }
+      if (isPlaying) { setVideoPlaying(true); clearStall(); }
+      else if (isBuffering && isActive && !pausedRef.current) { setVideoPlaying(false); armStall(); }
     });
-    const subErr = player.addEventListener('onError', () => {
+    const subErr   = player.addEventListener('onError', () => {
       if (!mountedRef.current) return;
       clearStall();
       if (isActive) doRetry();
@@ -1064,91 +868,65 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subState.remove(); subErr.remove(); };
   }, [isActive, onEnd, player, doRetry, armStall, clearStall]);
 
-  // ── Play/Pause selon isActive ─────────────────────────────────────────────
-  const playTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Mémorise l'état "ended" au moment où isActive passe à true,
-  // avant que le reset useEffect ne l'efface.
-  const wasEndedOnActivate = useRef(false);
-
+  // Play/Pause selon isActive
   useEffect(() => {
     if (!reel.video_url) return;
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
 
     if (isActive && !pausedRef.current) {
-      // Capturer endedRef MAINTENANT, avant que le reset ne le remette à false
       wasEndedOnActivate.current = endedRef.current;
-
       if (activePlayerRef) {
-        (activePlayerRef as React.MutableRefObject<{ pause: () => void } | null>).current = {
-          pause: () => player.pause(),
-        };
+        (activePlayerRef as any).current = { pause: () => { try { player.pause(); } catch {} } };
       }
       playTimerRef.current = setTimeout(() => {
         if (!mountedRef.current || pausedRef.current) return;
         if (wasEndedOnActivate.current) {
-          // Vidéo était terminée : repartir du début
           endedRef.current = false;
           wasEndedOnActivate.current = false;
           if (mountedRef.current) setEnded(false);
           try { player.seekTo(0); } catch {}
-          setTimeout(() => {
-            if (!mountedRef.current || pausedRef.current) return;
-            try { player.play(); } catch {}
-          }, 80);
+          setTimeout(() => { if (!mountedRef.current || pausedRef.current) return; try { player.play(); } catch {}; }, 80);
         } else {
           try { player.play(); } catch {}
         }
       }, 50);
     } else {
-      player.pause();
+      try { player.pause(); } catch {}
     }
-
     return () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); };
-  }, [isActive, player]); // `paused` géré via pausedRef
+  }, [isActive, player]); // eslint-disable-line
 
-  // Réinitialiser états quand on quitte le slide
+  // Reset états quand inactif
   useEffect(() => {
     if (!isActive) {
-      pausedRef.current = false;
-      endedRef.current  = false;
-      retryCountRef.current = 0;
-      if (mountedRef.current) {
-        setPaused(false);
-        setVideoError(false);
-        setEnded(false);
-        setVideoLoaded(false);
-        setVideoPlaying(false);
-      }
-      if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
-      clearStall();
+      pausedRef.current = false; endedRef.current = false; retryCountRef.current = 0;
+      if (mountedRef.current) { setPaused(false); setVideoError(false); setEnded(false); setVideoLoaded(false); setVideoPlaying(false); }
+      clearAllTimers(); clearStall();
     }
-  }, [isActive, clearStall]);
+  }, [isActive, clearAllTimers, clearStall]);
 
-  // ── Mute ─────────────────────────────────────────────────────────────────
+  // Mute
   useEffect(() => {
-    player.muted  = muted;
-    player.volume = muted ? 0 : 1.0;
+    try { player.muted = muted; player.volume = muted ? 0 : 1.0; } catch {}
   }, [muted, player]);
 
-  // ── Ref info (concert / event / film) ────────────────────────────────────
+  // Ref info (concert / event / film)
   useEffect(() => {
-    if (!isActive) return;
-    if (!reel.ref_concert_id && !reel.ref_event_id && !reel.ref_content_id) return;
-
+    if (!isActive || (!reel.ref_concert_id && !reel.ref_event_id && !reel.ref_content_id)) return;
     let cancelled = false;
-    const fetchRef = async () => {
+    (async () => {
       try {
         if (reel.ref_concert_id) {
           const res = await apiClient.get<any>(`/api/v1/concerts/${reel.ref_concert_id}`);
           if (!cancelled && mountedRef.current) {
             const d = res.data;
-            setRefInfo({ label: d.title ?? d.name ?? 'Concert', kind: 'Concert', thumbnail: d.thumbnail_url ?? d.poster_url ?? null, color: '#7B3FF2' });
+            setRefInfo({ label: d.title ?? 'Concert', kind: 'Concert', thumbnail: d.thumbnail_url ?? null, color: '#7B3FF2' });
           }
         } else if (reel.ref_event_id) {
           const res = await apiClient.get<any>(`/api/v1/events/${reel.ref_event_id}`);
           if (!cancelled && mountedRef.current) {
             const d = res.data;
-            setRefInfo({ label: d.title ?? d.name ?? 'Événement', kind: 'Événement', thumbnail: d.thumbnail_url ?? d.cover_url ?? null, color: '#E0389A' });
+            setRefInfo({ label: d.title ?? 'Événement', kind: 'Événement', thumbnail: d.thumbnail_url ?? null, color: '#E0389A' });
           }
         } else if (reel.ref_content_id) {
           const res = await apiClient.get<any>(`/api/v1/content/films/${reel.ref_content_id}`);
@@ -1158,82 +936,60 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           }
         }
       } catch {}
-    };
-    fetchRef();
+    })();
     return () => { cancelled = true; };
   }, [isActive, reel.ref_concert_id, reel.ref_event_id, reel.ref_content_id]);
 
-  // ── Animations ────────────────────────────────────────────────────────────
-  const playIconOpacity = useSharedValue(0);
-  const playIconScale   = useSharedValue(0.6);
-  const heartOpacity    = useSharedValue(0);
-  const heartScale      = useSharedValue(0);
-  const heartX          = useSharedValue(0);
-  const heartY          = useSharedValue(0);
-
-  // Ripple skip gauche / droite
+  // Animations
+  const playIconOpacity  = useSharedValue(0);
+  const playIconScale    = useSharedValue(0.6);
+  const heartOpacity     = useSharedValue(0);
+  const heartScale       = useSharedValue(0);
+  const heartX           = useSharedValue(0);
+  const heartY           = useSharedValue(0);
   const skipLeftOpacity  = useSharedValue(0);
   const skipLeftScale    = useSharedValue(0.5);
   const skipRightOpacity = useSharedValue(0);
   const skipRightScale   = useSharedValue(0.5);
-  const [skipLeftLabel,  setSkipLeftLabel]  = useState('');
-  const [skipRightLabel, setSkipRightLabel] = useState('');
 
   const playIconAnim = useAnimatedStyle(() => ({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center', zIndex: 5,
-    opacity: playIconOpacity.value,
-    transform: [{ scale: playIconScale.value }],
+    opacity: playIconOpacity.value, transform: [{ scale: playIconScale.value }],
   }));
-
   const heartAnim = useAnimatedStyle(() => ({
-    position: 'absolute',
-    opacity:  heartOpacity.value,
-    transform: [{ scale: heartScale.value }],
-    left: heartX.value - 44,
-    top:  heartY.value - 44,
-    zIndex: 10,
+    position: 'absolute', opacity: heartOpacity.value,
+    transform: [{ scale: heartScale.value }], left: heartX.value - 44, top: heartY.value - 44, zIndex: 10,
   }));
+  const skipLeftAnim  = useAnimatedStyle(() => ({ opacity: skipLeftOpacity.value,  transform: [{ scale: skipLeftScale.value }] }));
+  const skipRightAnim = useAnimatedStyle(() => ({ opacity: skipRightOpacity.value, transform: [{ scale: skipRightScale.value }] }));
 
-  // ── Actions ───────────────────────────────────────────────────────────────
   const showPlayIconAnim = useCallback(() => {
-    playIconScale.value   = 0.6;
-    playIconOpacity.value = 0;
-    playIconScale.value   = withSpring(1, { damping: 10, stiffness: 200 });
-    playIconOpacity.value = withSequence(
-      withTiming(1, { duration: 0 }),
-      withTiming(1, { duration: 300 }),
-      withTiming(0, { duration: 150 }),
-    );
+    playIconScale.value = 0.6; playIconOpacity.value = 0;
+    playIconScale.value = withSpring(1, { damping: 10, stiffness: 200 });
+    playIconOpacity.value = withSequence(withTiming(1, { duration: 0 }), withTiming(1, { duration: 300 }), withTiming(0, { duration: 150 }));
   }, [playIconOpacity, playIconScale]);
 
   const doPause = useCallback(() => {
     const next = !pausedRef.current;
     pausedRef.current = next;
-    if (next) { player.pause(); } else { player.play(); }
+    try { if (next) player.pause(); else player.play(); } catch {}
     if (mountedRef.current) setPaused(next);
     showPlayIconAnim();
   }, [player, showPlayIconAnim]);
 
   const doLike = useCallback((x: number, y: number) => {
     if (!likedRef.current && !likeInFlight.current) {
-      likedRef.current     = true;
-      likeInFlight.current = true;
+      likedRef.current = true; likeInFlight.current = true;
       if (mountedRef.current) { setLiked(true); setLikes(v => v + 1); }
       socialService.toggleReaction({ reaction_type: 'like' as ReactionType, reel_id: reel.id })
-        .catch(() => {})
-        .finally(() => { likeInFlight.current = false; });
+        .catch(() => {}).finally(() => { likeInFlight.current = false; });
     }
-    heartX.value = x;
-    heartY.value = y;
-    heartScale.value   = 0;
+    heartX.value = x; heartY.value = y;
+    heartScale.value = 0;
     heartOpacity.value = withTiming(1, { duration: 30 });
     heartScale.value   = withSpring(1.2, { damping: 8, stiffness: 250 });
-    heartOpacity.value = withSequence(
-      withTiming(1, { duration: 30 }),
-      withTiming(1, { duration: 350 }),
-      withTiming(0, { duration: 200 }),
-    );
+    heartOpacity.value = withSequence(withTiming(1, { duration: 30 }), withTiming(1, { duration: 350 }), withTiming(0, { duration: 200 }));
   }, [reel.id, heartOpacity, heartScale, heartX, heartY]);
 
   const handleLike = useCallback(async () => {
@@ -1242,35 +998,21 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     const wasLiked = likedRef.current;
     likedRef.current = !wasLiked;
     if (mountedRef.current) { setLiked(!wasLiked); setLikes(v => wasLiked ? v - 1 : v + 1); }
-    try {
-      await socialService.toggleReaction({ reaction_type: 'like' as ReactionType, reel_id: reel.id });
-    } catch {
-      likedRef.current = wasLiked;
-      if (mountedRef.current) { setLiked(wasLiked); setLikes(reel.like_count ?? 0); }
-    } finally {
-      likeInFlight.current = false;
-    }
+    try { await socialService.toggleReaction({ reaction_type: 'like' as ReactionType, reel_id: reel.id }); }
+    catch { likedRef.current = wasLiked; if (mountedRef.current) { setLiked(wasLiked); setLikes(reel.like_count ?? 0); } }
+    finally { likeInFlight.current = false; }
   }, [reel.id, reel.like_count]);
 
   const handleShare = useCallback(async () => {
     try {
-      await Share.share({
-        message: reel.caption
-          ? `${reel.caption}\n${reel.video_url ?? ''}`
-          : (reel.video_url ?? ''),
-      });
+      await Share.share({ message: reel.caption ? `${reel.caption}\n${reel.video_url ?? ''}` : (reel.video_url ?? '') });
       await socialService.share({ platform: Platform.OS, reel_id: reel.id });
       if (mountedRef.current) setShareCount(v => v + 1);
     } catch {}
   }, [reel]);
 
   const doReplay = useCallback(() => {
-    try {
-      player.seekTo(0);
-      pausedRef.current = false;
-      player.play();
-      if (mountedRef.current) { setEnded(false); setPaused(false); }
-    } catch {}
+    try { player.seekTo(0); pausedRef.current = false; player.play(); if (mountedRef.current) { setEnded(false); setPaused(false); } } catch {}
   }, [player]);
 
   const doSkipAnim = useCallback((seconds: number) => {
@@ -1278,43 +1020,21 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     const label  = isLeft ? `◄◄ ${Math.abs(seconds)}s` : `${seconds}s ►►`;
     if (isLeft) {
       setSkipLeftLabel(label);
-      skipLeftOpacity.value  = 0;
-      skipLeftScale.value    = 0.6;
-      skipLeftOpacity.value  = withSequence(
-        withTiming(1,   { duration: 80  }),
-        withTiming(0.8, { duration: 250 }),
-        withTiming(0,   { duration: 150 }),
-      );
-      skipLeftScale.value    = withSequence(
-        withTiming(1.15, { duration: 80  }),
-        withTiming(1.0,  { duration: 250 }),
-        withTiming(0.6,  { duration: 150 }),
-      );
+      skipLeftOpacity.value = 0; skipLeftScale.value = 0.6;
+      skipLeftOpacity.value = withSequence(withTiming(1, { duration: 80 }), withTiming(0.8, { duration: 250 }), withTiming(0, { duration: 150 }));
+      skipLeftScale.value   = withSequence(withTiming(1.15, { duration: 80 }), withTiming(1.0, { duration: 250 }), withTiming(0.6, { duration: 150 }));
     } else {
       setSkipRightLabel(label);
-      skipRightOpacity.value = 0;
-      skipRightScale.value   = 0.6;
-      skipRightOpacity.value = withSequence(
-        withTiming(1,   { duration: 80  }),
-        withTiming(0.8, { duration: 250 }),
-        withTiming(0,   { duration: 150 }),
-      );
-      skipRightScale.value   = withSequence(
-        withTiming(1.15, { duration: 80  }),
-        withTiming(1.0,  { duration: 250 }),
-        withTiming(0.6,  { duration: 150 }),
-      );
+      skipRightOpacity.value = 0; skipRightScale.value = 0.6;
+      skipRightOpacity.value = withSequence(withTiming(1, { duration: 80 }), withTiming(0.8, { duration: 250 }), withTiming(0, { duration: 150 }));
+      skipRightScale.value   = withSequence(withTiming(1.15, { duration: 80 }), withTiming(1.0, { duration: 250 }), withTiming(0.6, { duration: 150 }));
     }
     try { player.seekBy(seconds); } catch {}
   }, [player, skipLeftOpacity, skipLeftScale, skipRightOpacity, skipRightScale]);
 
   const handleFocusBar = useCallback((focused: boolean) => {
     if (mountedRef.current) setBarFocused(focused);
-    if (focused) {
-      pausedRef.current = true;
-      player.pause();
-      if (mountedRef.current) setPaused(true);
-    }
+    if (focused) { pausedRef.current = true; try { player.pause(); } catch {} if (mountedRef.current) setPaused(true); }
   }, [player]);
 
   const handleSendComment = useCallback(async () => {
@@ -1323,49 +1043,34 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     if (mountedRef.current) setSending(true);
     try {
       await socialService.createComment({ body, reel_id: reel.id });
-      if (mountedRef.current) {
-        setCommentText('');
-        setCommentCount(v => v + 1);
-        Keyboard.dismiss();
-      }
+      if (mountedRef.current) { setCommentText(''); setCommentCount(v => v + 1); Keyboard.dismiss(); }
     } catch {}
     finally { if (mountedRef.current) setSending(false); }
   }, [commentText, reel.id, sending]);
 
-  // ── Animated styles for skip ripples ─────────────────────────────────────
-  const skipLeftAnim = useAnimatedStyle(() => ({
-    opacity:   skipLeftOpacity.value,
-    transform: [{ scale: skipLeftScale.value }],
-  }));
-  const skipRightAnim = useAnimatedStyle(() => ({
-    opacity:   skipRightOpacity.value,
-    transform: [{ scale: skipRightScale.value }],
-  }));
+  const handleFollow = useCallback(async () => {
+    if (!reel.author?.id || followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) { await userService.unfollow(String(reel.author.id)); setIsFollowing(false); }
+      else             { await userService.follow(String(reel.author.id));   setIsFollowing(true);  }
+    } catch {}
+    finally { setFollowLoading(false); }
+  }, [reel.author?.id, isFollowing, followLoading]);
 
-  // ── Gestes — 3 zones style Facebook ──────────────────────────────────────
-  // Zone gauche (30%): double-tap = rewind 10s, simple tap = pause
-  const leftDoubleTap = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true)
-    .onEnd(() => doSkipAnim(-10));
-  const leftSingleTap = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
-  const leftGesture   = Gesture.Exclusive(leftDoubleTap, leftSingleTap);
+  const retryLoad = useCallback(() => { retryCountRef.current = 0; doRetry(); }, [doRetry]);
 
-  // Zone centre (40%): double-tap = like, simple tap = pause
-  const centerDoubleTap = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true)
-    .onEnd(e => doLike(e.x, e.y));
+  // Gestes — 3 zones style TikTok
+  const leftDoubleTap   = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true).onEnd(() => doSkipAnim(-10));
+  const leftSingleTap   = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
+  const leftGesture     = Gesture.Exclusive(leftDoubleTap, leftSingleTap);
+  const centerDoubleTap = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true).onEnd(e => doLike(e.x, e.y));
   const centerSingleTap = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
   const centerGesture   = Gesture.Exclusive(centerDoubleTap, centerSingleTap);
-
-  // Zone droite (30%): double-tap = forward 10s, simple tap = pause
-  const rightDoubleTap = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true)
-    .onEnd(() => doSkipAnim(10));
-  const rightSingleTap = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
-  const rightGesture   = Gesture.Exclusive(rightDoubleTap, rightSingleTap);
-
-  // Pan horizontal fail-guard (empêche le pan vertical d'absorber les gestes)
-  const hPanFail = Gesture.Pan()
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-10, 10])
-    .minDistance(10);
+  const rightDoubleTap  = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true).onEnd(() => doSkipAnim(10));
+  const rightSingleTap  = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
+  const rightGesture    = Gesture.Exclusive(rightDoubleTap, rightSingleTap);
+  const hPanFail        = Gesture.Pan().activeOffsetX([-10, 10]).failOffsetY([-10, 10]).minDistance(10);
 
   const safeBottom    = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
   const COMMENT_BAR_H = 76;
@@ -1373,16 +1078,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
 
-      {/* Thumbnail en arrière-plan uniquement pour les vidéos portrait */}
       {reel.thumbnail_url && isPortrait !== false && (
-        <Image
-          source={{ uri: reel.thumbnail_url }}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH, zIndex: -1 }}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: reel.thumbnail_url }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH, zIndex: -1 }} resizeMode="cover" />
       )}
 
-      {/* Vidéo */}
       <VideoView
         player={player}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}
@@ -1391,7 +1090,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         surfaceType="texture"
       />
 
-      {/* Spinner : visible seulement si la vidéo ne joue pas (chargement ou rebuffer) */}
       {!videoPlaying && !videoError && !ended && isActive && (
         <View style={s.bufferOverlay} pointerEvents="none">
           <ActivityIndicator size="large" color="rgba(255,255,255,0.85)" />
@@ -1399,7 +1097,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
       )}
 
-      {/* Erreur de chargement */}
       {videoError && (
         <View style={s.errorOverlay}>
           <Icon name="wifi-off" size={40} color="rgba(255,255,255,0.7)" />
@@ -1412,55 +1109,27 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
       )}
 
-      {/* Zones de tap style Facebook (gauche 30% / centre 40% / droite 30%) */}
-      {/* Exclut le panel d'actions (right 80) et la barre de commentaire */}
       <GestureDetector gesture={Gesture.Simultaneous(hPanFail, leftGesture)}>
-        <View style={{
-          position: 'absolute', top: 0, left: 0,
-          width: (screenW - 80) * 0.3,
-          bottom: safeBottom + COMMENT_BAR_H,
-        }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, width: (screenW - 80) * 0.3, bottom: safeBottom + COMMENT_BAR_H }} />
       </GestureDetector>
       <GestureDetector gesture={Gesture.Simultaneous(hPanFail, centerGesture)}>
-        <View style={{
-          position: 'absolute', top: 0,
-          left: (screenW - 80) * 0.3,
-          width: (screenW - 80) * 0.4,
-          bottom: safeBottom + COMMENT_BAR_H,
-        }} />
+        <View style={{ position: 'absolute', top: 0, left: (screenW - 80) * 0.3, width: (screenW - 80) * 0.4, bottom: safeBottom + COMMENT_BAR_H }} />
       </GestureDetector>
       <GestureDetector gesture={Gesture.Simultaneous(hPanFail, rightGesture)}>
-        <View style={{
-          position: 'absolute', top: 0,
-          left: (screenW - 80) * 0.7,
-          right: 80,
-          bottom: safeBottom + COMMENT_BAR_H,
-        }} />
+        <View style={{ position: 'absolute', top: 0, left: (screenW - 80) * 0.7, right: 80, bottom: safeBottom + COMMENT_BAR_H }} />
       </GestureDetector>
 
-      {/* Ripple skip gauche */}
-      <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleLeft, skipLeftAnim]}>
-        <Text style={s.skipRippleTxt}>{skipLeftLabel}</Text>
-      </Animated.View>
+      <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleLeft,  skipLeftAnim]}><Text style={s.skipRippleTxt}>{skipLeftLabel}</Text></Animated.View>
+      <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleRight, skipRightAnim]}><Text style={s.skipRippleTxt}>{skipRightLabel}</Text></Animated.View>
 
-      {/* Ripple skip droite */}
-      <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleRight, skipRightAnim]}>
-        <Text style={s.skipRippleTxt}>{skipRightLabel}</Text>
-      </Animated.View>
-
-      {/* Icône play/pause animée */}
       <Animated.View style={playIconAnim} pointerEvents="none">
-        <View style={s.playPauseCircle}>
-          <Icon name={paused ? 'play' : 'pause'} size={36} color="#fff" />
-        </View>
+        <View style={s.playPauseCircle}><Icon name={paused ? 'play' : 'pause'} size={36} color="#fff" /></View>
       </Animated.View>
 
-      {/* Cœur double-tap */}
       <Animated.View pointerEvents="none" style={heartAnim}>
-        <Icon name="heart" size={88} color="#E0389A" />
+        <MCIcon name="heart" size={88} color="#E0389A" />
       </Animated.View>
 
-      {/* Overlay replay (vidéo terminée) */}
       {ended && (
         <View style={s.replayOverlay} pointerEvents="box-none">
           <TouchableOpacity style={s.replayBtn} onPress={doReplay} activeOpacity={0.85}>
@@ -1470,18 +1139,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
       )}
 
-      {/* Gradient bas */}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.95)']}
-        locations={[0, 0.5, 1]}
-        style={s.bottomGradient}
-        pointerEvents="none"
-      />
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.95)']} locations={[0, 0.5, 1]} style={s.bottomGradient} pointerEvents="none" />
 
-      {/* Infos + actions */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="box-none">
 
-        {/* Infos auteur / caption */}
         <View style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H }]} pointerEvents="box-none">
           {refInfo && (
             <View style={s.refBand}>
@@ -1489,10 +1150,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
               {refInfo.thumbnail
                 ? <Image source={{ uri: refInfo.thumbnail }} style={s.refThumb} />
                 : <View style={[s.refThumb, { backgroundColor: refInfo.color + '40', alignItems: 'center', justifyContent: 'center' }]}>
-                    <Icon
-                      name={refInfo.kind === 'Concert' ? 'music' : refInfo.kind === 'Événement' ? 'calendar' : 'film'}
-                      size={12} color="#fff"
-                    />
+                    <Icon name={refInfo.kind === 'Concert' ? 'music' : refInfo.kind === 'Événement' ? 'calendar' : 'film'} size={12} color="#fff" />
                   </View>
               }
               <View style={{ flex: 1, overflow: 'hidden' }}>
@@ -1507,16 +1165,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
               {reel.author?.avatar_url
                 ? <Image source={{ uri: reel.author.avatar_url }} style={s.avatar} />
-                : <View style={[s.avatar, { backgroundColor: colors.primary }]}>
-                    <Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text>
-                  </View>
+                : <View style={[s.avatar, { backgroundColor: colors.primary }]}><Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text></View>
               }
             </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}
-              style={{ flex: 1 }}
-            >
+            <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)} style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <Text style={s.authorName} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
                 {reel.author?.is_verified && <VerifiedBadge size={14} />}
@@ -1527,63 +1179,29 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                 onPress={handleFollow}
                 activeOpacity={0.8}
                 disabled={followLoading}
-                style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 5,
-                  borderRadius: 20,
-                  borderWidth: 1.5,
-                  borderColor: isFollowing ? 'rgba(255,255,255,0.4)' : '#fff',
-                  backgroundColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
+                style={{ paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, borderWidth: 1.5, borderColor: isFollowing ? 'rgba(255,255,255,0.4)' : '#fff', backgroundColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent', flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
                 {followLoading
                   ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
-                      {isFollowing ? 'Suivi' : 'Suivre'}
-                    </Text>
+                  : <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
                 }
               </TouchableOpacity>
             )}
           </View>
 
-          {reel.caption ? (
-            <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text>
-          ) : null}
+          {reel.caption ? <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text> : null}
         </View>
 
-        {/* Boutons d'action */}
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
           <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
             <Icon name={muted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
           </TouchableOpacity>
-          <ActionBtn
-            icon="heart-outline" iconActive="heart"
-            useMCIcon
-            label={formatCount(likes)}
-            color={liked ? '#E0389A' : '#fff'}
-            onPress={handleLike}
-            active={liked}
-            activeBackground="rgba(224,56,154,0.25)"
-            activeBorder="#E0389A"
-            activeGlow="#E0389A"
-          />
-          <ActionBtn icon="message-circle" label={formatCount(commentCount)}  color="#fff" onPress={() => setShowComments(true)} />
-          <ActionBtn icon="share-2"        label={formatCount(shareCount)}    color="#fff" onPress={handleShare} />
-          <ActionBtn icon="eye"            label={formatCount(reel.view_count ?? 0)} color="#fff" />
-          {!isOwnReel && (
-            <ActionBtn
-              icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)}
-              activeBackground="rgba(255,215,0,0.18)"
-              activeBorder="rgba(255,215,0,0.5)"
-              active
-            />
-          )}
-          {!isOwnReel && (
-            <ActionBtn icon="flag" label="" color="rgba(255,255,255,0.7)" onPress={() => setReportVisible(true)} />
-          )}
+          <ActionBtn icon="heart-outline" iconActive="heart" useMCIcon label={formatCount(likes)} color={liked ? '#E0389A' : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder="#E0389A" activeGlow="#E0389A" />
+          <ActionBtn icon="message-circle" label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />
+          <ActionBtn icon="share-2" label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
+          <ActionBtn icon="eye" label={formatCount(reel.view_count ?? 0)} color="#fff" />
+          {!isOwnReel && <ActionBtn icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)} activeBackground="rgba(255,215,0,0.18)" activeBorder="rgba(255,215,0,0.5)" active />}
+          {!isOwnReel && <ActionBtn icon="flag" label="" color="rgba(255,255,255,0.7)" onPress={() => setReportVisible(true)} />}
           {onAdd && (
             <TouchableOpacity style={[s.addActionBtn, { backgroundColor: colors.primary }]} onPress={onAdd}>
               <Icon name="plus" size={20} color="#fff" />
@@ -1591,118 +1209,25 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           )}
         </View>
 
-        {/* Modals */}
-        <ReportModal
-          visible={reportVisible}
-          contentType="reel"
-          contentId={reel.id}
-          onClose={() => setReportVisible(false)}
-        />
+        <ReportModal visible={reportVisible} contentType="reel" contentId={reel.id} onClose={() => setReportVisible(false)} />
         {showGiftPicker && reel.author?.id && (
-          <GiftPickerModal
-            reelId={reel.id}
-            receiverId={String(reel.author.id)}
-            receiverName={reel.author.display_name ?? reel.author.username ?? 'Créateur'}
-            onClose={() => setShowGiftPicker(false)}
-          />
+          <GiftPickerModal reelId={reel.id} receiverId={String(reel.author.id)} receiverName={reel.author.display_name ?? reel.author.username ?? 'Créateur'} onClose={() => setShowGiftPicker(false)} />
         )}
 
-        {/* Barre de commentaire */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'position' : undefined}
-          style={[s.commentBarWrap, { bottom: safeBottom }]}
-          keyboardVerticalOffset={0}
-        >
-          <View style={[s.commentBar, {
-            backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.52)',
-            borderColor:     barFocused ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.18)',
-          }]}>
-            <TextInput
-              value={commentText}
-              onChangeText={setCommentText}
-              placeholder="Ajouter un commentaire..."
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              onFocus={() => handleFocusBar(true)}
-              onBlur={() => handleFocusBar(false)}
-              style={s.commentBarInput}
-              returnKeyType="send"
-              onSubmitEditing={handleSendComment}
-              maxLength={300}
-            />
-            <TouchableOpacity
-              onPress={handleSendComment}
-              disabled={!commentText.trim() || sending}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={[s.commentBarSend, {
-                backgroundColor: commentText.trim() ? colors.primary : 'rgba(255,255,255,0.15)',
-              }]}
-            >
-              {sending
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Icon name="send" size={15} color={commentText.trim() ? '#fff' : 'rgba(255,255,255,0.5)'} />
-              }
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : undefined} style={[s.commentBarWrap, { bottom: safeBottom }]} keyboardVerticalOffset={0}>
+          <View style={[s.commentBar, { backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.52)', borderColor: barFocused ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.18)' }]}>
+            <TextInput value={commentText} onChangeText={setCommentText} placeholder="Ajouter un commentaire..." placeholderTextColor="rgba(255,255,255,0.45)" onFocus={() => handleFocusBar(true)} onBlur={() => handleFocusBar(false)} style={s.commentBarInput} returnKeyType="send" onSubmitEditing={handleSendComment} maxLength={300} />
+            <TouchableOpacity onPress={handleSendComment} disabled={!commentText.trim() || sending} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={[s.commentBarSend, { backgroundColor: commentText.trim() ? colors.primary : 'rgba(255,255,255,0.15)' }]}>
+              {sending ? <ActivityIndicator size="small" color="#fff" /> : <MCIcon name="send" size={20} color={commentText.trim() ? '#fff' : 'rgba(255,255,255,0.5)'} />}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
 
-        {/* Commentaires */}
-        <CommentsBottomSheet
-          visible={showComments}
-          onClose={() => setShowComments(false)}
-          reelId={reel.id}
-          onCommentAdded={() => setCommentCount(v => v + 1)}
-          onCommentCountChange={delta => setCommentCount(v => v + delta)}
-        />
+        <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} reelId={reel.id} onCommentAdded={() => setCommentCount(v => v + 1)} onCommentCountChange={delta => setCommentCount(v => v + delta)} />
       </View>
     </View>
   );
 });
-
-// ─── VideoPreloader ───────────────────────────────────────────────────────────
-
-// Lance la lecture silencieuse pour remplir le buffer réseau, puis met en pause.
-// 20s = assez pour buffer un reel court sur 4G avant que l'user y arrive.
-const BUFFER_SECS = 20;
-
-const VideoPreloader: React.FC<{ uri: string }> = memo(({ uri }) => {
-  const player = useVideoPlayer(
-    {
-      uri,
-      bufferConfig: {
-        minBufferMs:                      1_500,
-        maxBufferMs:                      30_000,
-        bufferForPlaybackMs:              800,
-        bufferForPlaybackAfterRebufferMs: 1_500,
-        preferredForwardBufferDurationMs: 10_000,
-      },
-    },
-    p => {
-      p.muted  = true;
-      p.volume = 0;
-      p.loop   = false;
-    },
-  );
-
-  useEffect(() => {
-    let pauseTimer: ReturnType<typeof setTimeout> | null = null;
-    try {
-      player.play();
-      // Après BUFFER_SECS secondes de lecture silencieuse le buffer est chargé,
-      // on s'arrête pour ne pas consommer batterie/data inutilement.
-      pauseTimer = setTimeout(() => {
-        try { player.pause(); } catch {}
-      }, BUFFER_SECS * 1000);
-    } catch {}
-
-    return () => {
-      if (pauseTimer) clearTimeout(pauseTimer);
-      try { player.pause(); } catch {}
-    };
-  }, [uri, player]);
-
-  return null;
-});
-
 
 // ─── ActionBtn ────────────────────────────────────────────────────────────────
 
@@ -1720,10 +1245,7 @@ const ActionBtn: React.FC<{
         active && activeBorder     ? { borderColor: activeBorder, borderWidth: 1.5 } : {},
         active && activeGlow       ? { shadowColor: activeGlow, shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6 } : {},
       ]}>
-        {useMCIcon
-          ? <MCIcon name={iconName} size={22} color={color} />
-          : <Icon   name={iconName} size={20} color={color} />
-        }
+        {useMCIcon ? <MCIcon name={iconName} size={22} color={color} /> : <Icon name={iconName} size={20} color={color} />}
       </View>
       {!!label && <Text style={[s.actionLabel, { color }]}>{label}</Text>}
     </TouchableOpacity>
@@ -1736,104 +1258,60 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '75%' },
 
-  floatingHeader: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 20, zIndex: 10,
-  },
-  iconBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
+  floatingHeader: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
   reelHeaderTitle: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: 0.3 },
-  myReelsBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
-  },
+  myReelsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   myReelsBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
-  playPauseCircle: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  bufferOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)', zIndex: 6, gap: 10,
-  },
+  playPauseCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  bufferOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)', zIndex: 6, gap: 10 },
   bufferText: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' },
-
-  errorOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 7, gap: 10,
-  },
+  errorOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 7, gap: 10 },
   errorTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   errorSub:   { color: 'rgba(255,255,255,0.55)', fontSize: 13 },
-  retryBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6,
-    backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)', borderRadius: 22,
-    paddingHorizontal: 20, paddingVertical: 10,
-  },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 22, paddingHorizontal: 20, paddingVertical: 10 },
   retryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
-  reelInfo: { position: 'absolute', left: 16, right: 82, gap: 8, zIndex: 3 },
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#fff', overflow: 'hidden',
-  },
-  avatarText:  { color: '#fff', fontWeight: '800', fontSize: 14 },
-  authorName:  { color: '#fff', fontWeight: '800', fontSize: 15, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  caption:     { color: '#fff', fontSize: 13, lineHeight: 19, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
+  reelInfo:   { position: 'absolute', left: 16, right: 82, gap: 8, zIndex: 3 },
+  authorRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar:     { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff', overflow: 'hidden' },
+  avatarText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  authorName: { color: '#fff', fontWeight: '800', fontSize: 15, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  caption:    { color: '#fff', fontSize: 13, lineHeight: 19, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
 
-  refBand: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 12,
-    paddingHorizontal: 10, paddingVertical: 7,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-    alignSelf: 'flex-start', maxWidth: '100%',
-  },
+  refBand:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignSelf: 'flex-start', maxWidth: '100%' },
   refKindDot: { width: 7, height: 7, borderRadius: 4 },
   refThumb:   { width: 32, height: 32, borderRadius: 8, overflow: 'hidden' },
   refKind:    { color: 'rgba(255,255,255,0.55)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   refLabel:   { color: '#fff', fontSize: 12, fontWeight: '700' },
 
-  actions: { position: 'absolute', right: 12, alignItems: 'center', gap: 16, zIndex: 3 },
-  actionBtn: { alignItems: 'center', gap: 4 },
-  actionCircle: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
-  },
-  actionLabel: { fontSize: 11, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  actions:      { position: 'absolute', right: 12, alignItems: 'center', gap: 16, zIndex: 3 },
+  actionBtn:    { alignItems: 'center', gap: 4 },
+  actionCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
+  actionLabel:  { fontSize: 11, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   addActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  muteBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  muteBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 
-commentBarWrap: { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 12, paddingVertical: 8 },
-  commentBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 26, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9, gap: 10 },
+  commentBarWrap:  { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 12, paddingVertical: 8 },
+  commentBar:      { flexDirection: 'row', alignItems: 'center', borderRadius: 26, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9, gap: 10 },
   commentBarInput: { flex: 1, fontSize: 13, color: '#fff', padding: 0, maxHeight: 60 },
-  commentBarSend: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  commentBarSend:  { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
-  mineHeader:      { flexDirection: 'row', alignItems: 'center', paddingTop: 48, paddingBottom: 14, paddingHorizontal: 16, gap: 12 },
-  mineIconBtn:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
-  mineHeaderTitle: { flex: 1, color: '#fff', fontSize: 20, fontWeight: '800' },
-  mineGrid:        { padding: 8, paddingTop: 12 },
-  mineRow:         { gap: 8, marginBottom: 8 },
-  mineCard:        { flex: 1, overflow: 'hidden', borderRadius: 12 },
-  mineThumb:       { width: '100%', aspectRatio: 9 / 14 },
+  mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 48, paddingBottom: 14, paddingHorizontal: 16, gap: 12 },
+  mineIconBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
+  mineHeaderTitle:   { flex: 1, color: '#fff', fontSize: 20, fontWeight: '800' },
+  mineGrid:          { padding: 8, paddingTop: 12 },
+  mineRow:           { gap: 8, marginBottom: 8 },
+  mineCard:          { flex: 1, overflow: 'hidden', borderRadius: 12 },
+  mineThumb:         { width: '100%', aspectRatio: 9 / 14 },
   mineThumbFallback: { width: '100%', aspectRatio: 9 / 14, alignItems: 'center', justifyContent: 'center' },
-  mineOverlay:     { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.55)' },
-  mineMenuBtn:     { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)' },
-  mineStat:        { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  mineStatText:    { color: '#fff', fontSize: 11, fontWeight: '700' },
+  mineOverlay:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.55)' },
+  mineMenuBtn:       { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)' },
+  mineStat:          { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  mineStatText:      { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   menuSheet:     { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 32, paddingTop: 8 },
@@ -1847,42 +1325,40 @@ commentBarWrap: { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHor
   editActions:   { flexDirection: 'row', gap: 12 },
   editBtn:       { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 
-  searchOverlay:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0a0a', zIndex: 50 },
-  searchTopBar:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
-  searchBackBtn:  { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
+  searchOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0a0a', zIndex: 50 },
+  searchTopBar:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  searchBackBtn:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
   searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 22, height: 42, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  searchInput:    { flex: 1, fontSize: 14, color: '#fff', paddingHorizontal: 10, paddingVertical: 0 },
-  searchClearBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', marginRight: 7 },
+  searchInput:     { flex: 1, fontSize: 14, color: '#fff', paddingHorizontal: 10, paddingVertical: 0 },
+  searchClearBtn:  { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', marginRight: 7 },
 
-  searchGrid:    { padding: 10, paddingBottom: 50 },
-  searchGridRow: { gap: 8, marginBottom: 8 },
-  searchCard:    { flex: 1, borderRadius: 14, overflow: 'hidden', backgroundColor: '#161616' },
-  searchThumb:   { width: '100%', aspectRatio: 9 / 16 },
-  searchThumbFallback: { width: '100%', aspectRatio: 9 / 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1c1c1c' },
-  searchCardGrad: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '75%' },
-  searchPlayBadge: { position: 'absolute', top: 8, left: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  searchViewBadge: { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8 },
-  searchBadgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  searchCardInfo:  { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 9, gap: 4 },
-  searchCardAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  searchAvatar:    { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', overflow: 'hidden' },
+  searchGrid:           { padding: 10, paddingBottom: 50 },
+  searchGridRow:        { gap: 8, marginBottom: 8 },
+  searchCard:           { flex: 1, borderRadius: 14, overflow: 'hidden', backgroundColor: '#161616' },
+  searchThumb:          { width: '100%', aspectRatio: 9 / 16 },
+  searchThumbFallback:  { width: '100%', aspectRatio: 9 / 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1c1c1c' },
+  searchCardGrad:       { position: 'absolute', bottom: 0, left: 0, right: 0, height: '75%' },
+  searchPlayBadge:      { position: 'absolute', top: 8, left: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  searchViewBadge:      { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8 },
+  searchBadgeText:      { color: '#fff', fontSize: 10, fontWeight: '600' },
+  searchCardInfo:       { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 9, gap: 4 },
+  searchCardAuthorRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  searchAvatar:         { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', overflow: 'hidden' },
   searchAvatarFallback: { backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' },
-  searchAvatarText: { color: '#fff', fontSize: 9, fontWeight: '700' },
-  searchCardAuthor: { color: '#fff', fontSize: 12, fontWeight: '700', flex: 1 },
-  searchCardCaption: { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 15 },
-  searchCardStats:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  searchCardStat:   { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' },
-  searchCenterState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 60 },
-  searchEmptyIcon:  { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
-  searchStateTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  searchStateText:  { color: 'rgba(255,255,255,0.35)', fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
+  searchAvatarText:     { color: '#fff', fontSize: 9, fontWeight: '700' },
+  searchCardAuthor:     { color: '#fff', fontSize: 12, fontWeight: '700', flex: 1 },
+  searchCardCaption:    { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 15 },
+  searchCardStats:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  searchCardStat:       { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' },
+  searchCenterState:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 60 },
+  searchEmptyIcon:      { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
+  searchStateTitle:     { color: '#fff', fontSize: 16, fontWeight: '700' },
+  searchStateText:      { color: 'rgba(255,255,255,0.35)', fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
 
-  // ── Replay overlay ──────────────────────────────────────────────────────────
   replayOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 6 },
   replayBtn:     { alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 28, paddingVertical: 18, borderRadius: 20 },
   replayTxt:     { color: '#fff', fontSize: 15, fontWeight: '700' },
 
-  // ── Skip ripple (Facebook-style double-tap zones) ───────────────────────────
   skipRipple:      { position: 'absolute', top: 0, bottom: 0, width: '30%', alignItems: 'center', justifyContent: 'center', zIndex: 8 },
   skipRippleLeft:  { left: 0 },
   skipRippleRight: { right: 80 },
