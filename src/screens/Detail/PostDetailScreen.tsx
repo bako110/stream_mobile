@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import RNBlobUtil from 'react-native-blob-util';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
@@ -411,11 +412,11 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                   {/* Stats en overlay */}
                   <View style={s.pStats}>
                     <View style={s.pStat}>
-                      <Icon name="heart" size={11} color="#fff" />
+                      <MCIcon name="heart" size={12} color="#fff" />
                       <Text style={s.pStatTxt}>{item.like_count ?? 0}</Text>
                     </View>
                     <View style={s.pStat}>
-                      <Icon name="message-circle" size={11} color="#fff" />
+                      <MCIcon name="comment-outline" size={12} color="#fff" />
                       <Text style={s.pStatTxt}>{item.comment_count ?? 0}</Text>
                     </View>
                     {imgCount > 1 && (
@@ -456,11 +457,11 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             <View style={s.pBody}>
               <View style={s.pStatsLight}>
                 <View style={s.pStat}>
-                  <Icon name="heart" size={11} color={colors.textTertiary} />
+                  <MCIcon name="heart-outline" size={12} color={colors.textTertiary} />
                   <Text style={[s.pStatTxt, { color: colors.textTertiary }]}>{item.like_count ?? 0}</Text>
                 </View>
                 <View style={s.pStat}>
-                  <Icon name="message-circle" size={11} color={colors.textTertiary} />
+                  <MCIcon name="comment-outline" size={12} color={colors.textTertiary} />
                   <Text style={[s.pStatTxt, { color: colors.textTertiary }]}>{item.comment_count ?? 0}</Text>
                 </View>
               </View>
@@ -520,7 +521,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         {menuOpen && (
           <View style={[s.ctxMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity style={s.ctxItem} onPress={() => { setMenuOpen(false); handleShare(); }}>
-              <Icon name="share-2" size={15} color={colors.textSecondary} />
+              <MCIcon name="share-outline" size={16} color={colors.textSecondary} />
               <Text style={[s.ctxTxt, { color: colors.textSecondary }]}>Partager</Text>
             </TouchableOpacity>
             <View style={[s.ctxSep, { backgroundColor: colors.divider }]} />
@@ -605,7 +606,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <View style={[s.engageCountDot, { backgroundColor: '#E0389A' }]}>
-                    <Icon name="heart" size={9} color="#fff" />
+                    <MCIcon name="heart" size={10} color="#fff" />
                   </View>
                   <Text style={[s.engageCountTxt, { color: colors.textTertiary }]}>
                     {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
@@ -615,7 +616,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               {commentCount > 0 && (
                 <TouchableOpacity style={s.engageCountItem} onPress={() => setCommentsOpen(true)}>
                   <View style={[s.engageCountDot, { backgroundColor: colors.primary }]}>
-                    <Icon name="message-circle" size={9} color="#fff" />
+                    <MCIcon name="comment-outline" size={10} color="#fff" />
                   </View>
                   <Text style={[s.engageCountTxt, { color: colors.textTertiary }]}>
                     {commentCount} commentaire{commentCount > 1 ? 's' : ''}
@@ -640,11 +641,13 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               ]}
             >
               <Animated.View style={heartStyle}>
-                <Icon name="heart" size={17} color={liked ? '#E0389A' : colors.textSecondary} />
+                <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E0389A' : colors.textSecondary} />
               </Animated.View>
-              <Text style={[s.engageBtnTxt, { color: liked ? '#E0389A' : colors.textSecondary }]}>
-                {liked ? 'Tu adores' : 'Adorer'}
-              </Text>
+              {likeCount > 0 && (
+                <Text style={[s.engageBtnTxt, { color: liked ? '#E0389A' : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
+                  {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Commenter */}
@@ -653,8 +656,12 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               onPress={() => setCommentsOpen(true)}
               style={[s.engageBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
             >
-              <Icon name="message-circle" size={17} color={colors.textSecondary} />
-              <Text style={[s.engageBtnTxt, { color: colors.textSecondary }]}>Reagir</Text>
+              <MCIcon name="comment-outline" size={18} color={colors.textSecondary} />
+              {commentCount > 0 && (
+                <Text style={[s.engageBtnTxt, { color: colors.primary, fontWeight: '700' }]}>
+                  {commentCount > 999 ? `${(commentCount / 1000).toFixed(1)}k` : commentCount}
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Partager */}
@@ -663,8 +670,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               onPress={handleShare}
               style={[s.engageBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
             >
-              <Icon name="share-2" size={17} color={colors.textSecondary} />
-              <Text style={[s.engageBtnTxt, { color: colors.textSecondary }]}>Diffuser</Text>
+              <MCIcon name="share-outline" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
 
           </View>
@@ -728,7 +734,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={[s.topBtn, { backgroundColor: colors.backgroundSecondary }]}
         >
-          <Icon name="share-2" size={18} color={colors.textTertiary} />
+          <MCIcon name="share-outline" size={19} color={colors.textTertiary} />
         </TouchableOpacity>
       </View>
 

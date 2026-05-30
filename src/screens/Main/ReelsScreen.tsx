@@ -16,6 +16,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1558,12 +1559,27 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
             <Icon name={muted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
           </TouchableOpacity>
-          <ActionBtn icon="heart"          label={formatCount(likes)}         color={liked ? '#E0389A' : '#fff'} onPress={handleLike} />
+          <ActionBtn
+            icon="heart-outline" iconActive="heart"
+            useMCIcon
+            label={formatCount(likes)}
+            color={liked ? '#E0389A' : '#fff'}
+            onPress={handleLike}
+            active={liked}
+            activeBackground="rgba(224,56,154,0.25)"
+            activeBorder="#E0389A"
+            activeGlow="#E0389A"
+          />
           <ActionBtn icon="message-circle" label={formatCount(commentCount)}  color="#fff" onPress={() => setShowComments(true)} />
           <ActionBtn icon="share-2"        label={formatCount(shareCount)}    color="#fff" onPress={handleShare} />
           <ActionBtn icon="eye"            label={formatCount(reel.view_count ?? 0)} color="#fff" />
           {!isOwnReel && (
-            <ActionBtn icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)} />
+            <ActionBtn
+              icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)}
+              activeBackground="rgba(255,215,0,0.18)"
+              activeBorder="rgba(255,215,0,0.5)"
+              active
+            />
           )}
           {!isOwnReel && (
             <ActionBtn icon="flag" label="" color="rgba(255,255,255,0.7)" onPress={() => setReportVisible(true)} />
@@ -1691,13 +1707,28 @@ const VideoPreloader: React.FC<{ uri: string }> = memo(({ uri }) => {
 // ─── ActionBtn ────────────────────────────────────────────────────────────────
 
 const ActionBtn: React.FC<{
-  icon: string; label: string; color: string; onPress?: () => void;
-}> = ({ icon, label, color, onPress }) => (
-  <TouchableOpacity style={s.actionBtn} onPress={onPress} activeOpacity={0.7}>
-    <Icon name={icon} size={26} color={color} />
-    {!!label && <Text style={[s.actionLabel, { color }]}>{label}</Text>}
-  </TouchableOpacity>
-);
+  icon: string; iconActive?: string; label: string; color: string; onPress?: () => void;
+  active?: boolean; activeBackground?: string; activeBorder?: string; activeGlow?: string;
+  useMCIcon?: boolean;
+}> = ({ icon, iconActive, label, color, onPress, active, activeBackground, activeBorder, activeGlow, useMCIcon }) => {
+  const iconName = (active && iconActive) ? iconActive : icon;
+  return (
+    <TouchableOpacity style={s.actionBtn} onPress={onPress} activeOpacity={0.7}>
+      <View style={[
+        s.actionCircle,
+        active && activeBackground ? { backgroundColor: activeBackground } : {},
+        active && activeBorder     ? { borderColor: activeBorder, borderWidth: 1.5 } : {},
+        active && activeGlow       ? { shadowColor: activeGlow, shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6 } : {},
+      ]}>
+        {useMCIcon
+          ? <MCIcon name={iconName} size={22} color={color} />
+          : <Icon   name={iconName} size={20} color={color} />
+        }
+      </View>
+      {!!label && <Text style={[s.actionLabel, { color }]}>{label}</Text>}
+    </TouchableOpacity>
+  );
+};
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -1772,11 +1803,17 @@ const s = StyleSheet.create({
   refKind:    { color: 'rgba(255,255,255,0.55)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   refLabel:   { color: '#fff', fontSize: 12, fontWeight: '700' },
 
-  actions: { position: 'absolute', right: 12, alignItems: 'center', gap: 20, zIndex: 3 },
+  actions: { position: 'absolute', right: 12, alignItems: 'center', gap: 16, zIndex: 3 },
   actionBtn: { alignItems: 'center', gap: 4 },
-  actionLabel: { fontSize: 12, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  actionCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  actionLabel: { fontSize: 11, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   addActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  muteBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  muteBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 

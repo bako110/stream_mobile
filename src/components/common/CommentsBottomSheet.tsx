@@ -5,6 +5,7 @@ import {
   ActivityIndicator, Dimensions, Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { storage } from '../../utils/storage';
@@ -153,32 +154,22 @@ const CommentRow: React.FC<RowProps> = ({
           <View style={st.actions}>
             {/* Like */}
             <TouchableOpacity
-              style={[st.reactionBtn, liked && { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}
+              style={[st.reactionBtn, liked && { borderColor: '#E0389A', backgroundColor: '#E0389A18' }]}
               onPress={() => onLike(item, 'like')}
               activeOpacity={0.7}
             >
-              <Icon name="thumbs-up" size={13} color={liked ? colors.primary : colors.textTertiary} />
-              <Text style={[st.reactionCount, { color: liked ? colors.primary : colors.textTertiary }]}>
-                {item.like_count}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Dislike */}
-            <TouchableOpacity
-              style={[st.reactionBtn, disliked && { borderColor: '#FF3B30', backgroundColor: '#FF3B3018' }]}
-              onPress={() => onLike(item, 'dislike')}
-              activeOpacity={0.7}
-            >
-              <Icon name="thumbs-down" size={13} color={disliked ? '#FF3B30' : colors.textTertiary} />
-              <Text style={[st.reactionCount, { color: disliked ? '#FF3B30' : colors.textTertiary }]}>
-                {item.dislike_count ?? 0}
-              </Text>
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={14} color={liked ? '#E0389A' : colors.textTertiary} />
+              {(item.like_count ?? 0) > 0 && (
+                <Text style={[st.reactionCount, { color: liked ? '#E0389A' : colors.textTertiary }]}>
+                  {item.like_count}
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Répondre — seulement sur les commentaires racines */}
             {!isReply && (
               <TouchableOpacity style={st.replyBtn} onPress={() => onReply(item)} activeOpacity={0.7}>
-                <Icon name="corner-down-right" size={13} color={colors.primary} />
+                <MCIcon name="reply" size={14} color={colors.primary} />
                 <Text style={[st.replyBtnText, { color: colors.primary }]}>Répondre</Text>
               </TouchableOpacity>
             )}
@@ -546,7 +537,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
             </View>
           ) : comments.length === 0 ? (
             <View style={st.center}>
-              <Icon name="message-circle" size={38} color={colors.textTertiary} />
+              <MCIcon name="comment-outline" size={40} color={colors.textTertiary} />
               <Text style={{ color: colors.textTertiary, marginTop: 8, fontSize: 14 }}>Soyez le premier à commenter</Text>
             </View>
           ) : (
@@ -587,7 +578,10 @@ export const CommentsBottomSheet: React.FC<Props> = ({
           {/* Bannière contexte (répondre / modifier) */}
           {(replyTo || isEditMode) && (
             <View style={[st.contextBanner, { backgroundColor: colors.primary + '14', borderTopColor: colors.primary + '30' }]}>
-              <Icon name={isEditMode ? 'edit-2' : 'corner-down-right'} size={14} color={colors.primary} />
+              {isEditMode
+                ? <Icon name="edit-2" size={14} color={colors.primary} />
+                : <MCIcon name="reply" size={16} color={colors.primary} />
+              }
               <Text style={[st.contextText, { color: colors.primary }]} numberOfLines={1}>
                 {isEditMode
                   ? 'Modification en cours…'
@@ -623,7 +617,9 @@ export const CommentsBottomSheet: React.FC<Props> = ({
             >
               {(sending || editSaving)
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Icon name={isEditMode ? 'check' : 'send'} size={18} color={canSend ? '#fff' : colors.textTertiary} />
+                : isEditMode
+                  ? <Icon name="check" size={18} color={canSend ? '#fff' : colors.textTertiary} />
+                  : <MCIcon name="send" size={20} color={canSend ? '#fff' : colors.textTertiary} />
               }
             </TouchableOpacity>
           </View>

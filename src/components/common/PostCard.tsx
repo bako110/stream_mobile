@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AppColors } from '../../theme/colors';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
@@ -396,10 +397,9 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {(likeCount > 0 || commentCount > 0) && (
         <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
-            <TouchableOpacity onPress={() => setLikersOpen(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <TouchableOpacity onPress={() => setLikersOpen(true)} style={pc.countChip}>
               <View style={pc.likeCountIcon}>
-                <Icon name="heart" size={10} color="#fff" />
+                <MCIcon name="heart" size={11} color="#fff" />
               </View>
               <Text style={[pc.countText, { color: colors.textTertiary }]}>
                 {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
@@ -407,9 +407,12 @@ const PostCardInner: React.FC<PostCardProps> = ({
             </TouchableOpacity>
           )}
           {commentCount > 0 && (
-            <TouchableOpacity onPress={() => setCommentsOpen(true)} style={{ marginLeft: 'auto' as any }}>
+            <TouchableOpacity onPress={() => setCommentsOpen(true)} style={[pc.countChip, { marginLeft: 'auto' as any }]}>
+              <View style={pc.commentCountIcon}>
+                <MCIcon name="comment-outline" size={11} color="#fff" />
+              </View>
               <Text style={[pc.countText, { color: colors.textTertiary }]}>
-                {commentCount} commentaire{commentCount > 1 ? 's' : ''}
+                {commentCount > 999 ? `${(commentCount / 1000).toFixed(1)}k` : commentCount}
               </Text>
             </TouchableOpacity>
           )}
@@ -420,33 +423,36 @@ const PostCardInner: React.FC<PostCardProps> = ({
       <View style={[pc.actionBar, { borderTopColor: colors.divider }]}>
         <TouchableOpacity style={pc.actionBtn} onPress={handleLike} activeOpacity={0.7}>
           <Animated.View style={[{ alignItems: 'center', justifyContent: 'center' }, heartStyle]}>
-            <Icon name="heart" size={19} color={liked ? '#E0389A' : colors.textTertiary} />
+            <MCIcon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E0389A' : colors.textTertiary} />
           </Animated.View>
-          <Text style={[pc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
-            {liked ? 'Adoré' : 'Adorer'}
-          </Text>
+          {likeCount > 0 && (
+            <Text style={[pc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
+              {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <View style={[pc.actionSep, { backgroundColor: colors.divider }]} />
 
         <TouchableOpacity style={pc.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.7}>
-          <Icon name="message-circle" size={19} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-          <Text style={[pc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-            Commenter
-          </Text>
+          <MCIcon name="comment-outline" size={20} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
+          {commentCount > 0 && (
+            <Text style={[pc.actionText, { color: colors.primary, fontWeight: '700' }]}>
+              {commentCount > 999 ? `${(commentCount / 1000).toFixed(1)}k` : commentCount}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <View style={[pc.actionSep, { backgroundColor: colors.divider }]} />
 
         <TouchableOpacity style={pc.actionBtn} onPress={() => setShareOpen(true)} activeOpacity={0.7}>
-          <Icon name="share-2" size={19} color={colors.textTertiary} />
-          <Text style={[pc.actionText, { color: colors.textTertiary }]}>Partager</Text>
+          <MCIcon name="share-outline" size={20} color={colors.textTertiary} />
         </TouchableOpacity>
 
         <View style={[pc.actionSep, { backgroundColor: colors.divider }]} />
 
         <TouchableOpacity style={[pc.actionBtn, { flex: 0, paddingHorizontal: 16 }]} onPress={handleSave} activeOpacity={0.7}>
-          <Icon name="bookmark" size={19} color={saved ? colors.primary : colors.textTertiary} />
+          <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? colors.primary : colors.textTertiary} />
         </TouchableOpacity>
       </View>
 
@@ -606,9 +612,11 @@ const pc = StyleSheet.create({
   bodyWrap:     { paddingHorizontal: 14, paddingBottom: 10, paddingTop: 2 },
   body:         { fontSize: 15, lineHeight: 23, letterSpacing: 0.1 },
   // Compteurs
-  countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
-  countText:    { fontSize: 12, fontWeight: '500' },
-  likeCountIcon:{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' },
+  countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
+  countChip:        { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  countText:        { fontSize: 12, fontWeight: '500' },
+  likeCountIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' },
+  commentCountIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   // Action bar
   actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth },
   actionBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 },

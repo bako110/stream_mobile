@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
@@ -369,7 +370,7 @@ const FeedHeaderBadges: React.FC<{
       </TouchableOpacity>
       {/* Favoris */}
       <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onFavorites} activeOpacity={0.8}>
-        <Icon name="bookmark" size={18} color={colors.textPrimary} />
+        <MCIcon name="bookmark-outline" size={19} color={colors.textPrimary} />
       </TouchableOpacity>
       {/* Live */}
       <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: '#F0365A18' }]} onPress={onLive} activeOpacity={0.8}>
@@ -2020,7 +2021,7 @@ const ReelRowCard: React.FC<{
             </View>
             {(reel.like_count ?? 0) > 0 && (
               <View style={rrS.statChip}>
-                <Icon name="heart" size={large ? 12 : 10} color="rgba(255,255,255,0.85)" />
+                <MCIcon name="heart" size={large ? 13 : 11} color="rgba(255,255,255,0.85)" />
                 <Text style={[rrS.thumbStatTxt, large && { fontSize: 12 }]}>{reel.like_count}</Text>
               </View>
             )}
@@ -2235,7 +2236,7 @@ const ReelFeedCard: React.FC<{
               <Text style={rs.statTxt}>{(reel.view_count ?? 0).toLocaleString()}</Text>
             </View>
             <View style={rs.statItem}>
-              <Icon name="heart" size={13} color="rgba(255,255,255,0.85)" />
+              <MCIcon name="heart" size={14} color="rgba(255,255,255,0.85)" />
               <Text style={rs.statTxt}>{reel.like_count ?? 0}</Text>
             </View>
             {reel.duration_sec ? (
@@ -2881,20 +2882,22 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       {(likeCount > 0 || commentCount > 0 || shareCount > 0) && (
         <View style={[fc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
-            <TouchableOpacity onPress={() => setLikersOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <View style={fc.likeIcon}><Icon name="heart" size={10} color="#fff" /></View>
+            <TouchableOpacity onPress={() => setLikersOpen(true)} style={fc.countChip}>
+              <View style={fc.likeIcon}><MCIcon name="heart" size={11} color="#fff" /></View>
               <Text style={[fc.countText, { color: colors.textTertiary }]}>{likeCount.toLocaleString('fr')}</Text>
             </TouchableOpacity>
           )}
           {commentCount > 0 && (
-            <Text style={[fc.countText, { color: colors.textTertiary }]}>
-              {commentCount.toLocaleString('fr')} réaction{commentCount > 1 ? 's' : ''}
-            </Text>
+            <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={fc.countChip}>
+              <View style={fc.commentIcon}><MCIcon name="comment-outline" size={11} color="#fff" /></View>
+              <Text style={[fc.countText, { color: colors.textTertiary }]}>{commentCount.toLocaleString('fr')}</Text>
+            </TouchableOpacity>
           )}
           {shareCount > 0 && (
-            <Text style={[fc.countText, { color: colors.textTertiary, marginLeft: 'auto' as any }]}>
-              {shareCount} diffusion{shareCount > 1 ? 's' : ''}
-            </Text>
+            <View style={[fc.countChip, { marginLeft: 'auto' as any }]}>
+              <View style={fc.shareIcon}><MCIcon name="share-outline" size={11} color="#fff" /></View>
+              <Text style={[fc.countText, { color: colors.textTertiary }]}>{shareCount.toLocaleString('fr')}</Text>
+            </View>
           )}
         </View>
       )}
@@ -2903,34 +2906,42 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       <View style={[fc.actionBar, { borderTopColor: colors.divider }]}>
         <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.7}>
           <Animated.View style={heartStyle}>
-            <Icon name="heart" size={19} color={liked ? '#E0389A' : colors.textTertiary} />
+            <MCIcon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E0389A' : colors.textTertiary} />
           </Animated.View>
-          <Text style={[fc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
-            {liked ? 'Adoré' : 'Adorer'}
-          </Text>
+          {likeCount > 0 && (
+            <Text style={[fc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
+              {likeCount.toLocaleString('fr')}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
 
         <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.7}>
-          <Icon name="message-circle" size={19} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-          <Text style={[fc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-            {commentCount > 0 ? commentCount.toLocaleString('fr') : 'Réagir'}
-          </Text>
+          <MCIcon name="comment-outline" size={20} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
+          {commentCount > 0 && (
+            <Text style={[fc.actionText, { color: colors.primary, fontWeight: '700' }]}>
+              {commentCount.toLocaleString('fr')}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
 
         <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.7}>
-          <Icon name="share-2" size={19} color={colors.textTertiary} />
-          <Text style={[fc.actionText, { color: colors.textTertiary }]}>Partager</Text>
+          <MCIcon name="share-outline" size={20} color={colors.textTertiary} />
+          {shareCount > 0 && (
+            <Text style={[fc.actionText, { color: colors.textTertiary }]}>
+              {shareCount.toLocaleString('fr')}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
 
         <TouchableOpacity style={[fc.actionBtn, { flex: 0, paddingHorizontal: 16 }]} onPress={handleSave} activeOpacity={0.7}>
           <Animated.View style={saveStyle}>
-            <Icon name="bookmark" size={19} color={saved ? colors.primary : colors.textTertiary} />
+            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? colors.primary : colors.textTertiary} />
           </Animated.View>
         </TouchableOpacity>
       </View>
@@ -2989,9 +3000,12 @@ const fc = StyleSheet.create({
   hookIcon:       { fontSize: 16 },
   hookText:       { flex: 1, fontSize: 13, fontWeight: '600', lineHeight: 18 },
   // Compteurs
-  countsRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  countText:      { fontSize: 12, fontWeight: '500' },
-  likeIcon:       { width: 20, height: 20, borderRadius: 10, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' },
+  countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  countChip:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  countText:    { fontSize: 12, fontWeight: '500' },
+  likeIcon:     { width: 20, height: 20, borderRadius: 10, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' },
+  commentIcon:  { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  shareIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#6B7280', alignItems: 'center', justifyContent: 'center' },
   // Actions
   actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth },
   actionBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 },

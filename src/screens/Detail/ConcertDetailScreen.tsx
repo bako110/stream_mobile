@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText } from '../../components/common';
@@ -535,26 +536,26 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         <View style={[ds.socialBar, { borderTopColor: colors.divider, borderBottomColor: colors.divider }]}>
           <TouchableOpacity style={ds.socialBtn} onPress={handleLike} activeOpacity={0.7}>
             <Animated.View style={heartStyle}>
-              <Icon name="heart" size={20} color={liked ? '#F0365A' : colors.textTertiary} />
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={21} color={liked ? '#E0389A' : colors.textTertiary} />
             </Animated.View>
-            <Text style={[ds.socialBtnText, { color: liked ? '#F0365A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
-              {likeCount > 0 ? likeCount.toLocaleString('fr') : 'J\'aime'}
-            </Text>
+            {likeCount > 0 && (
+              <Text style={[ds.socialBtnText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
+                {likeCount.toLocaleString('fr')}
+              </Text>
+            )}
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={() => setShowComments(true)} activeOpacity={0.7}>
-            <Icon name="message-circle" size={20} color={colors.textTertiary} />
-            <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>Commenter</Text>
+            <MCIcon name="comment-outline" size={21} color={colors.textTertiary} />
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={handleNativeShare} activeOpacity={0.7}>
-            <Icon name="share-2" size={20} color={colors.textTertiary} />
-            <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>Partager</Text>
+            <MCIcon name="share-outline" size={21} color={colors.textTertiary} />
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={[ds.socialBtn, { flex: 0, paddingHorizontal: 18 }]} onPress={handleSave} activeOpacity={0.7}>
             <Animated.View style={saveStyle}>
-              <Icon name="bookmark" size={20} color={saved ? colors.primary : colors.textTertiary} />
+              <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={saved ? colors.primary : colors.textTertiary} />
             </Animated.View>
           </TouchableOpacity>
         </View>

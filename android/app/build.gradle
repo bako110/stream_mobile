@@ -3,9 +3,8 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
-// Only include Feather font from vector-icons
 project.ext.vectoricons = [
-    iconFontNames: [ 'Feather.ttf' ]
+    iconFontNames: [ 'Feather.ttf', 'MaterialCommunityIcons.ttf' ]
 ]
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
 

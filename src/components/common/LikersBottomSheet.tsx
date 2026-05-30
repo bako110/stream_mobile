@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
@@ -242,7 +243,7 @@ export const LikersBottomSheet: React.FC<Props> = ({
         <View style={[ls.header, { borderBottomColor: colors.divider }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View style={ls.heartWrap}>
-              <Icon name="heart" size={17} color="#E0389A" />
+              <MCIcon name="heart" size={18} color="#E0389A" />
             </View>
             <View>
               <Text style={[ls.headerTitle, { color: colors.textPrimary }]}>
@@ -276,7 +277,7 @@ export const LikersBottomSheet: React.FC<Props> = ({
           // Vide
           <View style={ls.empty}>
             <View style={[ls.emptyIconWrap, { backgroundColor: '#E0389A12' }]}>
-              <Icon name="heart" size={34} color="#E0389A" />
+              <MCIcon name="heart" size={36} color="#E0389A" />
             </View>
             <Text style={[ls.emptyTitle, { color: colors.textPrimary }]}>Aucun j'adore</Text>
             <Text style={[ls.emptySub, { color: colors.textTertiary }]}>
