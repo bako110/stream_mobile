@@ -1950,6 +1950,144 @@ export const FeedScreen: React.FC = () => {
   );
 };
 
+// ── MiniReelPlayer — mini carte reel avec autoplay muet ──────────────────────
+
+const MiniReelPlayer: React.FC<{
+  reel: any; w: number; h: number;
+  isActive: boolean; onPress: () => void;
+}> = React.memo(({ reel, w, h, isActive, onPress }) => {
+  const [muted, setMuted] = useState(true);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
+  const videoUri = reel.hls_url ?? reel.video_url ?? null;
+
+  const player = useVideoPlayer(
+    videoUri ? { uri: videoUri } : 'about:blank',
+    (p: any) => { p.muted = true; p.volume = 0; p.loop = true; },
+  );
+
+  useEffect(() => {
+    if (!videoUri) return;
+    try {
+      if (isActive) { player.play(); }
+      else          { player.pause(); }
+    } catch {}
+  }, [isActive, videoUri]);
+
+  useEffect(() => {
+    try { player.muted = muted; player.volume = muted ? 0 : 1; } catch {}
+  }, [muted]);
+
+  const author   = reel.author;
+  const name     = author?.display_name ?? author?.username ?? '';
+  const initials = name[0]?.toUpperCase() ?? '?';
+
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[rrS.thumb, { width: w, height: h }]}>
+      {videoUri ? (
+        <VideoView
+          player={player}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          controls={false}
+          surfaceType="texture"
+        />
+      ) : reel.thumbnail_url ? (
+        <Image source={{ uri: reel.thumbnail_url }} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} resizeMode="cover" />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: 14 }]}>
+          <Icon name="film" size={28} color="rgba(255,255,255,0.18)" />
+        </View>
+      )}
+
+      <LinearGradient colors={['transparent', 'transparent', 'rgba(0,0,0,0.8)']} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} />
+
+      {/* Badge REEL */}
+      <View style={rrS.reelBadge}>
+        <Icon name="play" size={8} color="#fff" />
+        <Text style={[rrS.reelBadgeTxt, { fontSize: 9 }]}>REEL</Text>
+      </View>
+
+      {/* Bouton son */}
+      {videoUri && isActive && (
+        <TouchableOpacity
+          style={rrS.muteBtnMini}
+          onPress={e => { e.stopPropagation(); setMuted(v => !v); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon name={muted ? 'volume-x' : 'volume-2'} size={13} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* Infos bas */}
+      <View style={rrS.thumbBottom}>
+        <View style={rrS.thumbAuthor}>
+          {author?.avatar_url ? (
+            <Image source={{ uri: author.avatar_url }} style={rrS.thumbAvatar} />
+          ) : (
+            <View style={[rrS.thumbAvatar, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{initials}</Text>
+            </View>
+          )}
+          <Text style={rrS.thumbName} numberOfLines={1}>{name}</Text>
+        </View>
+        <View style={rrS.thumbStats}>
+          <View style={rrS.statChip}>
+            <Icon name="eye" size={10} color="rgba(255,255,255,0.85)" />
+            <Text style={rrS.thumbStatTxt}>{(reel.view_count ?? 0).toLocaleString()}</Text>
+          </View>
+          {(reel.like_count ?? 0) > 0 && (
+            <View style={rrS.statChip}>
+              <MCIcon name="heart" size={11} color="rgba(255,255,255,0.85)" />
+              <Text style={rrS.thumbStatTxt}>{reel.like_count}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ── MiniReelRow — FlatList horizontale avec viewability tracking ──────────────
+
+const MiniReelRow: React.FC<{
+  reels: any[]; itemW: number; itemH: number;
+  onPressReel: (id: string, data: any) => void;
+}> = React.memo(({ reels, itemW, itemH, onPressReel }) => {
+  const [activeId, setActiveId] = useState<string | null>(reels[0]?.id ?? null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 });
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<{ item: any }> }) => {
+      if (viewableItems.length > 0) setActiveId(viewableItems[0].item.id);
+    },
+    [],
+  );
+
+  return (
+    <FlatList
+      data={reels}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyExtractor={r => r.id}
+      contentContainerStyle={rrS.miniList}
+      ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+      viewabilityConfig={viewabilityConfig.current}
+      onViewableItemsChanged={onViewableItemsChanged}
+      renderItem={({ item }) => (
+        <MiniReelPlayer
+          reel={item}
+          w={itemW}
+          h={itemH}
+          isActive={activeId === item.id}
+          onPress={() => onPressReel(item.id, item)}
+        />
+      )}
+    />
+  );
+});
+
 // ── HeroReelPlayer — hero reel avec autoplay muet style Instagram ────────────
 
 const HeroReelPlayer: React.FC<{
@@ -2219,16 +2357,13 @@ const ReelRowCard: React.FC<{
         </View>
       ) : null}
 
-      {/* Rangée secondaire scrollable */}
+      {/* Rangée secondaire scrollable — autoplay au scroll */}
       {rest.length > 0 ? (
-        <FlatList
-          data={rest}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(r) => r.id}
-          contentContainerStyle={rrS.miniList}
-          ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-          renderItem={({ item: reel }) => <ReelThumb reel={reel} w={MINI_W} h={MINI_H} />}
+        <MiniReelRow
+          reels={rest}
+          itemW={MINI_W}
+          itemH={MINI_H}
+          onPressReel={onPressReel}
         />
       ) : null}
     </View>
@@ -2252,6 +2387,7 @@ const rrS = StyleSheet.create({
   reelBadgeTxt:     { color: '#fff', fontWeight: '800', letterSpacing: 0.5 },
 
   muteBtn:          { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  muteBtnMini:      { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   durationBadge:    { position: 'absolute', top: 52, right: 10, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
   durationTxt:      { color: '#fff', fontSize: 10, fontWeight: '700' },
 
