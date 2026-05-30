@@ -792,13 +792,12 @@ export const FeedScreen: React.FC = () => {
     } catch { /* silencieux */ }
   }, []);
 
-  // WS : nouveau live spontané démarré
+  // WS : nouveau live spontané démarré → refetch pour respecter is_private + follow
   useEffect(() => {
     if (!lastLiveStarted) return;
-    setSpontLives(prev => {
-      if (prev.some(l => l.id === lastLiveStarted.live.id)) return prev;
-      return [lastLiveStarted.live as LiveStream, ...prev];
-    });
+    liveService.getLives()
+      .then(lives => { if (mountedRef.current) setSpontLives(Array.isArray(lives) ? lives : []); })
+      .catch(() => {});
   }, [lastLiveStarted]);
 
   // WS : live spontané terminé
