@@ -237,22 +237,43 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                   }}
                 >
                   <View style={{ width: 110, height: 150, position: 'relative' }}>
-                    <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={{ width: 110, height: 150, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 40, fontWeight: '900' }}>{liveInitial}</Text>
-                    </LinearGradient>
+                    {live.thumbnail_url ? (
+                      <Image source={{ uri: live.thumbnail_url }} style={{ width: 110, height: 150 }} resizeMode="cover" />
+                    ) : (
+                      <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={{ width: 110, height: 150, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 40, fontWeight: '900' }}>{liveInitial}</Text>
+                      </LinearGradient>
+                    )}
                     <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
-                    <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+
+                    {/* Badge LIVE */}
+                    <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0365A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                       <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
                       <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
                     </View>
+
+                    {/* Badge privé */}
+                    {live.is_private && (
+                      <View style={{ position: 'absolute', top: 22, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(123,63,242,0.85)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                        <MCIcon name="lock" size={8} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>Abonnés</Text>
+                      </View>
+                    )}
+
+                    {/* Viewers */}
                     <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
                       <Icon name="eye" size={9} color="#fff" />
                       <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{live.current_viewers}</Text>
                     </View>
-                    {live.user?.avatar_url && (
-                      <Image source={{ uri: live.user.avatar_url }} style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }} />
-                    )}
-                    <View style={{ position: 'absolute', bottom: 6, left: 4, right: 4, alignItems: 'center' }}>
+
+                    {/* Avatar centré */}
+                    {live.user?.avatar_url
+                      ? <Image source={{ uri: live.user.avatar_url }} style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }} />
+                      : <View style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' }}>
+                          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{liveInitial}</Text>
+                        </View>
+                    }
+                    <View style={{ position: 'absolute', bottom: 5, left: 4, right: 4, alignItems: 'center' }}>
                       <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', textAlign: 'center' }} numberOfLines={1}>{liveName}</Text>
                     </View>
                   </View>

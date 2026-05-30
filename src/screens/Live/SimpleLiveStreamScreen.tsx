@@ -30,6 +30,7 @@ import {
 } from '@livekit/react-native';
 import { Track, RoomEvent, RemoteParticipant, Room } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -731,10 +732,18 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
 
-        <View style={st.livePill}>
-          <View style={st.liveDot} />
-          <Text style={st.liveText}>LIVE</Text>
-          <Text style={st.timerText}>{fmt(elapsed)}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={st.livePill}>
+            <View style={st.liveDot} />
+            <Text style={st.liveText}>LIVE</Text>
+            <Text style={st.timerText}>{fmt(elapsed)}</Text>
+          </View>
+          {isPrivate && (
+            <View style={st.privatePill}>
+              <MCIcon name="lock" size={10} color="#fff" />
+              <Text style={st.privateText}>Abonnés</Text>
+            </View>
+          )}
         </View>
 
         <View style={st.viewerPill}>
@@ -1062,7 +1071,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void }> = ({ liveId
 export const SimpleLiveStreamScreen: React.FC = () => {
   const nav   = useNavigation<Nav>();
   const route = useRoute<RouteT>();
-  const { liveId, publisherToken: initialToken, livekitUrl: initialUrl } = route.params;
+  const { liveId, publisherToken: initialToken, livekitUrl: initialUrl, isPrivate } = route.params;
 
   const [token,  setToken]  = useState<string | null>(initialToken ?? null);
   const [wsUrl,  setWsUrl]  = useState<string | null>(initialUrl  ?? null);
@@ -1210,9 +1219,15 @@ const st = StyleSheet.create({
     backgroundColor: '#F0365A', borderRadius: 10,
     paddingHorizontal: 8, paddingVertical: 4,
   },
-  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  liveText:  { color: '#fff', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
-  timerText: { color: 'rgba(255,255,255,0.85)', fontSize: 11 },
+  liveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveText:    { color: '#fff', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
+  timerText:   { color: 'rgba(255,255,255,0.85)', fontSize: 11 },
+  privatePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(123,63,242,0.85)', borderRadius: 10,
+    paddingHorizontal: 7, paddingVertical: 4,
+  },
+  privateText: { color: '#fff', fontWeight: '700', fontSize: 10 },
   viewerPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12,

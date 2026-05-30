@@ -26,6 +26,7 @@ import {
 } from '@livekit/react-native';
 import { Track } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -367,10 +368,18 @@ const RoomContent: React.FC<{
             : <Av name={hostName} size={40} color="#F0365A" />
           }
           <View>
-            <View style={st.livePill}>
-              <View style={st.liveDot} />
-              <Text style={st.liveText}>LIVE</Text>
-              <Text style={st.timerText}>{fmt(elapsed)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={st.livePill}>
+                <View style={st.liveDot} />
+                <Text style={st.liveText}>LIVE</Text>
+                <Text style={st.timerText}>{fmt(elapsed)}</Text>
+              </View>
+              {live?.is_private && (
+                <View style={st.privatePill}>
+                  <MCIcon name="lock" size={9} color="#fff" />
+                  <Text style={st.privateText}>Abonnés</Text>
+                </View>
+              )}
             </View>
             <Text style={st.hostName} numberOfLines={1}>{hostName}</Text>
           </View>
@@ -1116,10 +1125,16 @@ const st = StyleSheet.create({
     backgroundColor: '#F0365A', borderRadius: 10,
     paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start',
   },
-  liveDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  liveText:   { color: '#fff', fontWeight: '800', fontSize: 10, letterSpacing: 0.5 },
-  timerText:  { color: 'rgba(255,255,255,0.85)', fontSize: 10 },
-  hostName:   { color: '#fff', fontSize: 12, fontWeight: '600' },
+  liveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveText:    { color: '#fff', fontWeight: '800', fontSize: 10, letterSpacing: 0.5 },
+  timerText:   { color: 'rgba(255,255,255,0.85)', fontSize: 10 },
+  hostName:    { color: '#fff', fontSize: 12, fontWeight: '600' },
+  privatePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(123,63,242,0.85)', borderRadius: 10,
+    paddingHorizontal: 6, paddingVertical: 3, alignSelf: 'flex-start',
+  },
+  privateText: { color: '#fff', fontWeight: '700', fontSize: 9 },
   viewerPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 12,

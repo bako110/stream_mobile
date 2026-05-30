@@ -9,6 +9,7 @@ import {
 import Animated, { FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
@@ -88,6 +89,14 @@ export const SimpleLiveListScreen: React.FC = () => {
               <View style={st.liveDot} />
               <Text style={st.liveBadgeText}>LIVE</Text>
             </View>
+
+            {/* Badge privé */}
+            {item.is_private && (
+              <View style={st.privateBadge}>
+                <MCIcon name="lock" size={9} color="#fff" />
+                <Text style={st.privateBadgeText}>Abonnés</Text>
+              </View>
+            )}
 
             {/* Viewers */}
             <View style={st.viewerBadge}>
@@ -218,6 +227,12 @@ const st = StyleSheet.create({
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
   liveBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  privateBadge: {
+    position: 'absolute', top: 32, left: 9,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(123,63,242,0.85)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6,
+  },
+  privateBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   viewerBadge: {
     position: 'absolute', top: 9, right: 9,
     flexDirection: 'row', alignItems: 'center', gap: 3,

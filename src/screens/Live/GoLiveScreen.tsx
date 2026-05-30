@@ -52,6 +52,7 @@ export const GoLiveScreen: React.FC = () => {
         publisherToken: result.token,
         livekitUrl: result.livekit_url,
         userId: result.live.user_id,
+        isPrivate: result.live.is_private,
       });
     } catch (e: any) {
       Alert.alert('Erreur', e?.response?.data?.detail || 'Impossible de démarrer le live');
