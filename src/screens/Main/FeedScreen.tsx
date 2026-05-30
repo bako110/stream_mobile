@@ -417,6 +417,7 @@ export const FeedScreen: React.FC = () => {
   const [refreshing,  setRefreshing]  = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const lastLoadedAtRef = useRef<number>(0);
+  const feedListRef     = useRef<FlatList>(null);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [filterDropOpen, setFilterDropOpen] = useState(false); // conservé pour éviter les refs cassées
   const [fabOpen,        setFabOpen]        = useState(false);
@@ -638,9 +639,13 @@ export const FeedScreen: React.FC = () => {
           seen.add(key);
           return true;
         });
-        // Mélanger aléatoirement tous les types de contenu
+        // Mélange déterministe : seed = jour courant → même ordre toute la journée
+        // Evite le scroll aléatoire au retour sur l'écran (reload silent)
+        const seed = Math.floor(Date.now() / 86_400_000); // change 1x/jour
+        let s = seed;
+        const seededRand = () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
         for (let i = deduped.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
+          const j = Math.floor(seededRand() * (i + 1));
           [deduped[i], deduped[j]] = [deduped[j], deduped[i]];
         }
         // Filtrer les contenus masqués ("Pas intéressé")
@@ -699,7 +704,17 @@ export const FeedScreen: React.FC = () => {
           reelRowIdx += 1;
         }
 
-        setItems(result);
+        // En mode silent : ne remplacer les items que si le contenu a réellement changé
+        // Evite le re-render + reset de scroll au retour sur l'écran
+        if (silent) {
+          setItems(prev => {
+            const prevIds = prev.map(i => i.id).join(',');
+            const nextIds = result.map(i => i.id).join(',');
+            return prevIds === nextIds ? prev : result;
+          });
+        } else {
+          setItems(result);
+        }
       } else if (f === 'following') {
         // Onglet Suivis — uniquement les posts des comptes suivis, triés par date
         const postsResult = await postService.getFeed(1, 50, true).catch(() => [] as Post[]);
@@ -1670,6 +1685,7 @@ export const FeedScreen: React.FC = () => {
         <SkeletonFeedScreen />
       ) : (
         <FlatList
+          ref={feedListRef}
           data={items}
           keyExtractor={item => `${item.kind}-${item.id}`}
           contentContainerStyle={s.scroll}
@@ -1677,6 +1693,7 @@ export const FeedScreen: React.FC = () => {
           scrollEnabled={feedScrollEnabled}
           onViewableItemsChanged={onFeedViewableChanged}
           viewabilityConfig={feedViewabilityConfig}
+          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
           )}
