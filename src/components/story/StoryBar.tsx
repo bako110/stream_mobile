@@ -142,7 +142,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
               />
             )}
 
-            {/* Avatar du user en haut a gauche avec ring gradient si story active */}
+            {/* Avatar du user en haut à gauche — ring gradient si story, simple sinon */}
             <View style={s.cardAvatarWrap}>
               {myGroup && !isUploading ? (
                 <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.cardAvatarRing}>
@@ -156,15 +156,14 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                   </View>
                 </LinearGradient>
               ) : (
-                <View style={[s.cardAvatarRing, { borderColor: colors.border ?? '#ddd', borderWidth: 2, padding: 2 }]}>
-                  <View style={s.cardAvatarInner}>
-                    {currentUser?.avatar_url
-                      ? <Image source={{ uri: currentUser.avatar_url }} style={s.cardAvatar} />
-                      : <View style={[s.cardAvatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#e0e0e0' }]}>
-                          <Text style={[s.cardAvatarInitial, { color: colors.primary ?? '#7B3FF2' }]}>{initials}</Text>
-                        </View>
-                    }
-                  </View>
+                // Pas de story → avatar simple sans ring
+                <View style={s.cardAvatarInner}>
+                  {currentUser?.avatar_url
+                    ? <Image source={{ uri: currentUser.avatar_url }} style={s.cardAvatar} />
+                    : <View style={[s.cardAvatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#e0e0e0' }]}>
+                        <Text style={[s.cardAvatarInitial, { color: colors.primary ?? '#7B3FF2' }]}>{initials}</Text>
+                      </View>
+                  }
                 </View>
               )}
             </View>
