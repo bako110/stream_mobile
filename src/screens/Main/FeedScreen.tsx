@@ -2056,11 +2056,20 @@ const MiniReelRow: React.FC<{
   onPressReel: (id: string, data: any) => void;
 }> = React.memo(({ reels, itemW, itemH, onPressReel }) => {
   const [activeId, setActiveId] = useState<string | null>(reels[0]?.id ?? null);
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 });
+
+  // Seuil bas (30%) + waitForInteraction:false → le 1er et le dernier sont bien détectés
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 30,
+    waitForInteraction: false,
+    minimumViewTime: 100,
+  });
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<{ item: any }> }) => {
-      if (viewableItems.length > 0) setActiveId(viewableItems[0].item.id);
+      if (viewableItems.length === 0) return;
+      // Prendre l'item le plus centré (le milieu de la liste visible)
+      const mid = Math.floor(viewableItems.length / 2);
+      setActiveId(viewableItems[mid].item.id);
     },
     [],
   );
