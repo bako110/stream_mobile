@@ -1021,6 +1021,7 @@ export const FeedScreen: React.FC = () => {
         <ReelRowCard
           reels={item.data}
           colors={colors}
+          feedFocused={feedFocused}
           onPressReel={(reelId, reelData) => (nav as any).navigate('Reels', { initialReelId: reelId, initialReel: reelData })}
         />
       );
@@ -1971,11 +1972,9 @@ export const FeedScreen: React.FC = () => {
 
 const MiniReelPlayer: React.FC<{
   reel: any; w: number; h: number;
-  isActive: boolean; onPress: () => void;
-}> = React.memo(({ reel, w, h, isActive, onPress }) => {
+  isActive: boolean; feedFocused: boolean; onPress: () => void;
+}> = React.memo(({ reel, w, h, isActive, feedFocused, onPress }) => {
   const [muted, setMuted] = useState(true);
-  const mountedRef = useRef(true);
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   const videoUri = reel.hls_url ?? reel.video_url ?? null;
 
@@ -1984,13 +1983,20 @@ const MiniReelPlayer: React.FC<{
     (p: any) => { p.muted = true; p.volume = 0; p.loop = true; },
   );
 
+  // Cleanup player au démontage — évite les players fantômes
+  useEffect(() => {
+    return () => {
+      try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
+    };
+  }, []); // eslint-disable-line
+
   useEffect(() => {
     if (!videoUri) return;
     try {
-      if (isActive) { player.play(); }
-      else          { player.pause(); }
+      if (isActive && feedFocused) { player.play(); }
+      else                         { player.pause(); }
     } catch {}
-  }, [isActive, videoUri]);
+  }, [isActive, feedFocused, videoUri]);
 
   useEffect(() => {
     try { player.muted = muted; player.volume = muted ? 0 : 1; } catch {}
@@ -2070,9 +2076,15 @@ const MiniReelPlayer: React.FC<{
 
 const MiniReelRow: React.FC<{
   reels: any[]; itemW: number; itemH: number;
+  feedFocused: boolean;
   onPressReel: (id: string, data: any) => void;
-}> = React.memo(({ reels, itemW, itemH, onPressReel }) => {
+}> = React.memo(({ reels, itemW, itemH, feedFocused, onPressReel }) => {
   const [activeId, setActiveId] = useState<string | null>(reels[0]?.id ?? null);
+
+  // Stopper la lecture quand la rangée disparaît ou que le feed perd le focus
+  useEffect(() => {
+    return () => { setActiveId(null); };
+  }, []);
 
   // Seuil bas (30%) + waitForInteraction:false → le 1er et le dernier sont bien détectés
   const viewabilityConfig = useRef({
@@ -2107,6 +2119,7 @@ const MiniReelRow: React.FC<{
           w={itemW}
           h={itemH}
           isActive={activeId === item.id}
+          feedFocused={feedFocused}
           onPress={() => onPressReel(item.id, item)}
         />
       )}
@@ -2120,45 +2133,45 @@ const HeroReelPlayer: React.FC<{
   reel: any;
   w: number;
   h: number;
+  feedFocused: boolean;
   onPress: () => void;
-}> = React.memo(({ reel, w, h, onPress }) => {
-  const [muted,   setMuted]   = useState(true);
-  const [playing, setPlaying] = useState(false);
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+}> = React.memo(({ reel, w, h, feedFocused, onPress }) => {
+  const [muted, setMuted] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const videoUri = reel.hls_url ?? reel.video_url ?? null;
 
   const player = useVideoPlayer(
     videoUri ? { uri: videoUri } : 'about:blank',
-    (p: any) => {
-      p.muted  = true;
-      p.volume = 0;
-      p.loop   = true;
-    },
+    (p: any) => { p.muted = true; p.volume = 0; p.loop = true; },
   );
 
-  // Démarrer la lecture dès que le player est prêt
+  // Cleanup complet au démontage
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
+    };
+  }, []); // eslint-disable-line
+
+  // Jouer uniquement si le feed est au premier plan
   useEffect(() => {
     if (!videoUri) return;
-    const t = setTimeout(() => {
-      try { player.play(); if (mountedRef.current) setPlaying(true); } catch {}
-    }, 300);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (feedFocused) {
+      timerRef.current = setTimeout(() => { try { player.play(); } catch {} }, 200);
+    } else {
+      try { player.pause(); } catch {}
+    }
     return () => {
-      clearTimeout(t);
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
       try { player.pause(); } catch {}
     };
-  }, [videoUri]);
+  }, [videoUri, feedFocused]); // eslint-disable-line
 
   // Sync mute
   useEffect(() => {
-    try {
-      player.muted  = muted;
-      player.volume = muted ? 0 : 1;
-    } catch {}
+    try { player.muted = muted; player.volume = muted ? 0 : 1; } catch {}
   }, [muted]);
 
   const author   = reel.author;
@@ -2257,8 +2270,9 @@ const HeroReelPlayer: React.FC<{
 const ReelRowCard: React.FC<{
   reels: any[];
   colors: AppColors;
+  feedFocused: boolean;
   onPressReel: (reelId: string, reelData: any) => void;
-}> = React.memo(({ reels, colors, onPressReel }) => {
+}> = React.memo(({ reels, colors, feedFocused, onPressReel }) => {
   const { width: SW, height: SH } = Dimensions.get('window');
   const HERO_W  = SW - 24;
   const HERO_H  = Math.round(SH * 0.50);
@@ -2378,6 +2392,7 @@ const ReelRowCard: React.FC<{
             reel={hero}
             w={HERO_W}
             h={HERO_H}
+            feedFocused={feedFocused}
             onPress={() => onPressReel(hero.id, hero)}
           />
         </View>
@@ -2389,6 +2404,7 @@ const ReelRowCard: React.FC<{
           reels={rest}
           itemW={MINI_W}
           itemH={MINI_H}
+          feedFocused={feedFocused}
           onPressReel={onPressReel}
         />
       ) : null}
