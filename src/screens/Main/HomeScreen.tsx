@@ -451,7 +451,7 @@ export const HomeScreen: React.FC = () => {
                   activeOpacity={0.88}
                   onPress={() => {
                     if (currentUser?.id === live.user_id) {
-                      nav.navigate('SimpleLiveStream', { liveId: live.id });
+                      nav.navigate('SimpleLiveStream', { liveId: live.id, isPrivate: live.is_private ?? false });
                     } else {
                       nav.navigate('SimpleLiveViewer', { liveId: live.id });
                     }

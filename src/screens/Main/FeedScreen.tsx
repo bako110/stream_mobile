@@ -875,7 +875,7 @@ export const FeedScreen: React.FC = () => {
   const onNavNearby      = useCallback(() => nav.navigate('NearbyEvents' as any), [nav]);
   const onNavLiveStream  = useCallback((id: string) => nav.navigate('LiveStream', { concertId: id }), [nav]);
   const onNavLiveViewer  = useCallback((id: string) => nav.navigate('LiveViewer', { concertId: id }), [nav]);
-  const onNavSpontStream = useCallback((id: string) => (nav as any).navigate('SimpleLiveStream', { liveId: id }), [nav]);
+  const onNavSpontStream = useCallback((id: string) => (nav as any).navigate('SimpleLiveStream', { liveId: id, isPrivate: false }), [nav]);
   const onNavSpontViewer = useCallback((id: string) => (nav as any).navigate('SimpleLiveViewer', { liveId: id }), [nav]);
   const onNavEvent       = useCallback((id: string) => nav.navigate('EventDetail', { eventId: id }), [nav]);
 

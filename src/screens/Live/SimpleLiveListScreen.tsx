@@ -49,7 +49,7 @@ export const SimpleLiveListScreen: React.FC = () => {
   const handlePress = (live: LiveStream) => {
     const isHost = currentUser?.id === live.user_id;
     if (isHost) {
-      nav.navigate('SimpleLiveStream', { liveId: live.id });
+      nav.navigate('SimpleLiveStream', { liveId: live.id, isPrivate: live.is_private ?? false });
     } else {
       nav.navigate('SimpleLiveViewer', { liveId: live.id });
     }
