@@ -41,10 +41,10 @@ export const GoLiveScreen: React.FC = () => {
   }, [pulseAnim]);
 
   async function handleStartQuickLive() {
-    const t = title.trim();
-    if (!t) { Alert.alert('Titre requis', 'Donne un titre à ton live.'); return; }
     if (starting) return;
     setStarting(true);
+    // Titre optionnel — génère un titre par défaut si vide
+    const t = title.trim() || 'Live en direct';
     try {
       const result = await liveService.startLive({ title: t, description: description.trim() || undefined, is_private: isPrivate });
       nav.replace('SimpleLiveStream', {
@@ -106,7 +106,7 @@ export const GoLiveScreen: React.FC = () => {
               <TextInput
                 value={title}
                 onChangeText={setTitle}
-                placeholder="Titre du live *"
+                placeholder="Titre du live (optionnel)"
                 placeholderTextColor={colors.textTertiary}
                 style={[st.input, { color: colors.textPrimary }]}
                 maxLength={100}
