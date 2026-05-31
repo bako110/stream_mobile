@@ -82,11 +82,10 @@ export const reelService = {
   },
 
   async create(payload: {
-    video_url:      string;
-    hls_url?:       string;
-    caption?:       string;
-    thumbnail_url?: string;
-    duration_sec?:  number;
+    hls_url:         string;
+    caption?:        string;
+    thumbnail_url?:  string;
+    duration_sec?:   number;
     ref_concert_id?: string;
     ref_event_id?:   string;
     ref_content_id?: string;

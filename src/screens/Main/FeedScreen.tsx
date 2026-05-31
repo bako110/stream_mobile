@@ -2100,7 +2100,14 @@ const MiniReelPlayer: React.FC<{
   const videoUri = reel.hls_url ?? null;
 
   const player = useVideoPlayer(
-    videoUri ? { uri: videoUri } : 'about:blank',
+    videoUri ? {
+      uri: videoUri,
+      bufferConfig: {
+        minBufferMs: 500, maxBufferMs: 15_000,
+        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 800,
+        preferredForwardBufferDurationMs: 5_000,
+      },
+    } : 'about:blank',
     (p: any) => { p.muted = true; p.volume = 0; p.loop = true; },
   );
 
@@ -2263,7 +2270,14 @@ const HeroReelPlayer: React.FC<{
   const videoUri = reel.hls_url ?? null;
 
   const player = useVideoPlayer(
-    videoUri ? { uri: videoUri } : 'about:blank',
+    videoUri ? {
+      uri: videoUri,
+      bufferConfig: {
+        minBufferMs: 500, maxBufferMs: 15_000,
+        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 800,
+        preferredForwardBufferDurationMs: 5_000,
+      },
+    } : 'about:blank',
     (p: any) => { p.muted = true; p.volume = 0; p.loop = true; },
   );
 
