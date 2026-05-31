@@ -275,6 +275,16 @@ const CommunityCard = React.memo(function CommunityCard({
             <Text style={[CS.name, { color: colors.textPrimary }]} numberOfLines={1}>
               {item.name}
             </Text>
+            {(item as any).tier === 'pro' && (
+              <View style={{ backgroundColor: '#7B3FF222', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginLeft: 4 }}>
+                <Text style={{ color: '#7B3FF2', fontSize: 9, fontWeight: '800' }}>PRO</Text>
+              </View>
+            )}
+            {(item as any).tier === 'elite' && (
+              <View style={{ backgroundColor: '#F59E0B22', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginLeft: 4 }}>
+                <Text style={{ color: '#F59E0B', fontSize: 9, fontWeight: '800' }}>ELITE</Text>
+              </View>
+            )}
           </View>
 
           {/* Créateur */}

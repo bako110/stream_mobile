@@ -8,7 +8,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
-  Modal, Dimensions, InteractionManager,
+  Modal, Dimensions, InteractionManager, Linking,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
@@ -28,6 +28,7 @@ import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
+import { apiClient } from '../../api/client';
 import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
 import { favoriteService } from '../../services/favoriteService';
 import { saveService } from '../../services/saveService';
@@ -53,7 +54,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 type FeedFilter = 'all' | 'following' | 'live';
 
 interface FeedItem {
-  kind:    'event' | 'concert' | 'reel' | 'reel_row' | 'post' | 'suggestions' | 'communities';
+  kind:    'event' | 'concert' | 'reel' | 'reel_row' | 'post' | 'suggestions' | 'communities' | 'ad';
   id:      string;
   data:    any;
 }
@@ -96,6 +97,60 @@ const badgeS = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 });
 
+
+// ── AdCard — publicité native dans le feed ────────────────────────────────────
+
+interface AdData {
+  id: string;
+  title: string;
+  description?: string;
+  cta_text?: string;
+  cta_url?: string;
+  creative_url?: string;
+  thumbnail_url?: string;
+  format: string;
+}
+
+const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (url: string) => void }> = React.memo(
+  ({ ad, colors, onImpression, onPress }) => {
+    useEffect(() => { onImpression(ad.id); }, [ad.id, onImpression]);
+    return (
+      <View style={{ backgroundColor: colors.surface, marginVertical: 4, marginHorizontal: 0 }}>
+        {ad.creative_url || ad.thumbnail_url ? (
+          <Image
+            source={{ uri: ad.creative_url ?? ad.thumbnail_url! }}
+            style={{ width: '100%', height: 180 }}
+            resizeMode="cover"
+          />
+        ) : null}
+        <View style={{ padding: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <View style={{ backgroundColor: colors.primary + '22', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+              <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>SPONSORISÉ</Text>
+            </View>
+          </View>
+          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 4 }} numberOfLines={2}>
+            {ad.title}
+          </Text>
+          {ad.description ? (
+            <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 8 }} numberOfLines={2}>
+              {ad.description}
+            </Text>
+          ) : null}
+          {ad.cta_url ? (
+            <TouchableOpacity
+              style={{ backgroundColor: colors.primary, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 8, alignSelf: 'flex-start' }}
+              onPress={() => onPress(ad.cta_url!)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{ad.cta_text ?? 'En savoir plus'}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    );
+  },
+);
 
 // ── LiveConcertCard — mémoïsé : re-rend uniquement si ses props changent ──────
 
@@ -421,6 +476,8 @@ export const FeedScreen: React.FC = () => {
   const [filter,      setFilter]      = useState<FeedFilter>('all');
   const [items,       setItems]       = useState<FeedItem[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [currentAdData, setCurrentAdData] = useState<AdData | null>(null);
+  const adInsertedRef = useRef<Set<string>>(new Set()); // évite double-injection
   const [refreshing,  setRefreshing]  = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const lastLoadedAtRef = useRef<number>(0);
@@ -682,14 +739,21 @@ export const FeedScreen: React.FC = () => {
           });
         }
 
-        // Injecter suggestions, communities et rangées de reels à intervalles réguliers
+        // Charger une pub active en arrière-plan (sans bloquer le feed)
+        apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=feed')
+          .then((res: { data: AdData | null }) => { if (res.data) setCurrentAdData(res.data); })
+          .catch(() => {});
+
+        // Injecter suggestions, communities, pub et rangées de reels à intervalles réguliers
         const SUGGEST_EVERY  = 8;
         const COMM_EVERY     = 12;
         const REEL_ROW_EVERY = 5; // une rangée de reels toutes les 5 cartes
+        const AD_EVERY       = 7; // 1 pub toutes les 7 cartes
         const result: FeedItem[] = [];
         let suggestCount = 0;
         let commCount    = 0;
         let reelRowIdx   = 0;
+        let adCount      = 0;
 
         nonReels.forEach((item, i) => {
           result.push(item);
@@ -704,6 +768,12 @@ export const FeedScreen: React.FC = () => {
           if (i === 4 || (i > 4 && (i - 4) % SUGGEST_EVERY === 0)) {
             suggestCount += 1;
             result.push({ kind: 'suggestions', id: `__suggestions__${suggestCount}`, data: null });
+          }
+
+          // Publicité : toutes les AD_EVERY cartes (placeholder, data chargée async)
+          if (i > 0 && i % AD_EVERY === 0) {
+            adCount += 1;
+            result.push({ kind: 'ad', id: `__ad__${adCount}`, data: null });
           }
 
           // Communities : première à pos 10, puis toutes les COMM_EVERY
@@ -948,6 +1018,16 @@ export const FeedScreen: React.FC = () => {
     setCommentItem(null);
   }, []);
 
+  // ── Publicité — handlers stables ──────────────────────────────────────────
+
+  const handleAdImpression = useCallback((adId: string) => {
+    apiClient.post(`/api/v1/ads/${adId}/impression`).catch(() => {});
+  }, []);
+
+  const handleAdPress = useCallback((url: string) => {
+    Linking.openURL(url).catch(() => {});
+  }, []);
+
   // ── renderItem stable ──────────────────────────────────────────────────────
 
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
@@ -1045,6 +1125,17 @@ export const FeedScreen: React.FC = () => {
             })}
           </ScrollView>
         </View>
+      );
+    }
+    if (item.kind === 'ad') {
+      if (!currentAdData) return null;
+      return (
+        <AdCard
+          ad={currentAdData}
+          colors={colors}
+          onImpression={handleAdImpression}
+          onPress={handleAdPress}
+        />
       );
     }
     if (item.kind === 'reel_row') {

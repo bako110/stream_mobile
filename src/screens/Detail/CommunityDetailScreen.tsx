@@ -740,6 +740,21 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               </View>
             </>
           )}
+          {(community as any).tier && (community as any).tier !== 'free' && (
+            <>
+              <View style={[s.infoSummarySep, { backgroundColor: colors.divider }]} />
+              <View style={s.infoSummaryRow}>
+                <Icon
+                  name="award"
+                  size={14}
+                  color={(community as any).tier === 'elite' ? '#F59E0B' : '#7B3FF2'}
+                />
+                <Text style={[s.infoSummaryTxt, { color: (community as any).tier === 'elite' ? '#F59E0B' : '#7B3FF2', fontWeight: '700' }]}>
+                  {(community as any).tier === 'elite' ? 'Elite' : 'Pro'}
+                </Text>
+              </View>
+            </>
+          )}
           {community.is_verified && (
             <>
               <View style={[s.infoSummarySep, { backgroundColor: colors.divider }]} />
