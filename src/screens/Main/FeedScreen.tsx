@@ -8,7 +8,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
-  Modal, Dimensions,
+  Modal, Dimensions, InteractionManager,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
@@ -97,6 +97,57 @@ const badgeS = StyleSheet.create({
 });
 
 
+// ── LiveConcertCard — mémoïsé : re-rend uniquement si ses props changent ──────
+
+interface LiveConcertCardProps {
+  concert: Concert;
+  isOwn: boolean;
+  surfaceColor: string;
+  onNavLiveStream: (id: string) => void;
+  onNavLiveViewer: (id: string) => void;
+}
+
+const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
+  concert: c, isOwn, surfaceColor, onNavLiveStream, onNavLiveViewer,
+}) => {
+  const artist = c.artist;
+  const artistName = artist?.display_name ?? artist?.username ?? 'Artiste';
+  const initial = artistName[0]?.toUpperCase() ?? '?';
+  const onPress = useCallback(() => {
+    if (isOwn) onNavLiveStream(c.id);
+    else onNavLiveViewer(c.id);
+  }, [isOwn, c.id, onNavLiveStream, onNavLiveViewer]);
+  return (
+    <TouchableOpacity style={{ width: 130, borderRadius: 14, overflow: 'hidden', backgroundColor: surfaceColor }} activeOpacity={0.85} onPress={onPress}>
+      <View style={{ width: 130, height: 170, position: 'relative' }}>
+        {c.thumbnail_url
+          ? <Image source={{ uri: c.thumbnail_url }} style={{ width: 130, height: 170 }} />
+          : <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ width: 130, height: 170, alignItems: 'center', justifyContent: 'center' }}><Icon name="radio" size={28} color="#fff" /></LinearGradient>
+        }
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
+        <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
+          <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
+        </View>
+        <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+          <Icon name="eye" size={10} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{c.current_viewers ?? 0}</Text>
+        </View>
+        <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6 }}>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{c.title}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            {artist?.avatar_url
+              ? <Image source={{ uri: artist.avatar_url }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+              : <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{initial}</Text></View>
+            }
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }} numberOfLines={1}>{artistName}</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 // ── FeedListHeader — mémoïsé, ne re-rend que quand liveConcerts/spontLives/nearbyEvents changent ─
 
 interface FeedListHeaderProps {
@@ -146,60 +197,16 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
             </View>
           </TouchableOpacity>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-            {liveConcerts.map(c => {
-              const artist = c.artist;
-              const artistName = artist?.display_name ?? artist?.username ?? 'Artiste';
-              const initial = artistName[0]?.toUpperCase() ?? '?';
-              return (
-                <TouchableOpacity
-                  key={c.id}
-                  style={{ width: 130, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    if (currentUserId === c.artist_id) onNavLiveStream(c.id);
-                    else onNavLiveViewer(c.id);
-                  }}
-                >
-                  <View style={{ width: 130, height: 170, position: 'relative' }}>
-                    {c.thumbnail_url ? (
-                      <Image source={{ uri: c.thumbnail_url }} style={{ width: 130, height: 170 }} />
-                    ) : (
-                      <LinearGradient
-                        colors={['#7B3FF2', '#E0389A']}
-                        style={{ width: 130, height: 170, alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <Icon name="radio" size={28} color="#fff" />
-                      </LinearGradient>
-                    )}
-                    <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.7)']}
-                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }}
-                    />
-                    <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                      <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
-                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
-                    </View>
-                    <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
-                      <Icon name="eye" size={10} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{c.current_viewers ?? 0}</Text>
-                    </View>
-                    <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6 }}>
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{c.title}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                        {artist?.avatar_url ? (
-                          <Image source={{ uri: artist.avatar_url }} style={{ width: 14, height: 14, borderRadius: 7 }} />
-                        ) : (
-                          <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{initial}</Text>
-                          </View>
-                        )}
-                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }} numberOfLines={1}>{artistName}</Text>
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            {liveConcerts.map(c => (
+              <LiveConcertCard
+                key={c.id}
+                concert={c}
+                isOwn={currentUserId === c.artist_id}
+                onNavLiveStream={onNavLiveStream}
+                onNavLiveViewer={onNavLiveViewer}
+                surfaceColor={colors.surface}
+              />
+            ))}
           </ScrollView>
         </View>
       )}
@@ -829,14 +836,31 @@ export const FeedScreen: React.FC = () => {
   const didMountRef = useRef(false);
   useFocusEffect(useCallback(() => {
     setFeedFocused(true);
-    if (didMountRef.current) {
-      const age = Date.now() - lastLoadedAtRef.current;
-      if (age > 60_000) {
-        // Rechargement background : pas de spinner, on garde l'ancien contenu visible
-        load(filter, true);
-      }
+    if (!didMountRef.current) {
+      // Premier chargement : différer après l'animation de navigation
+      const task = InteractionManager.runAfterInteractions(() => {
+        load(filter);
+      });
+      didMountRef.current = true;
+      return () => {
+        task.cancel();
+        setFeedFocused(false);
+        setActiveReelId(null);
+        setActivePostId(null);
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+        setSearchQuery('');
+        setSearchResults(null);
+        setSearchOpen(false);
+        setSearchFilter('all');
+        searchBarWidth.value = 0;
+        searchBarOpacity.value = 0;
+      };
     }
-    didMountRef.current = true;
+    // Retour : refresh silencieux si données > 60s
+    const age = Date.now() - lastLoadedAtRef.current;
+    if (age > 60_000) {
+      load(filter, true);
+    }
     return () => {
       setFeedFocused(false);
       setActiveReelId(null);

@@ -1,6 +1,7 @@
 import React, {
   useEffect, useState, useCallback, useRef, useMemo,
 } from 'react';
+import { InteractionManager } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
@@ -92,6 +93,50 @@ function normalizePhone(phone: string): string {
   return phone.replace(/[^\d+]/g, '');
 }
 
+// ── SpontLiveCard — mémoïsé pour éviter re-renders dans la map ───────────────
+
+interface SpontLiveCardProps {
+  live: LiveStream;
+  isOwn: boolean;
+  onPress: (live: LiveStream) => void;
+  styles: any;
+}
+
+const SpontLiveCard: React.FC<SpontLiveCardProps> = React.memo(({ live, isOwn, onPress, styles: s }) => {
+  const name = live.user?.display_name || live.user?.username || 'Artiste';
+  const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+  const handlePress = useCallback(() => onPress(live), [live, onPress]);
+  return (
+    <TouchableOpacity key={live.id} style={s.spontCard} activeOpacity={0.88} onPress={handlePress}>
+      <View style={s.spontThumb}>
+        <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={StyleSheet.absoluteFill} />
+        <Text style={s.spontBgInitials}>{initials}</Text>
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.82)']} style={[StyleSheet.absoluteFill, { top: '40%' }]} />
+        <View style={s.spontLivePill}>
+          <View style={s.spontLiveDotSmall} />
+          <Text style={s.spontLivePillText}>LIVE</Text>
+        </View>
+        <View style={s.spontViewersChip}>
+          <Icon name="eye" size={10} color="rgba(255,255,255,0.85)" />
+          <Text style={s.spontViewersText}>{live.current_viewers}</Text>
+        </View>
+        <View style={s.spontCardBottom}>
+          <View style={s.spontAvatarSmall}>
+            {live.user?.avatar_url
+              ? <Image source={{ uri: live.user.avatar_url }} style={{ width: '100%', height: '100%' }} />
+              : <LinearGradient colors={['#F0365A', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={s.spontAvatarSmallText}>{initials[0]}</Text></LinearGradient>
+            }
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.spontCardName} numberOfLines={1}>{name}</Text>
+            <Text style={s.spontCardTitle} numberOfLines={1}>{live.title}</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 // ── HomeScreen ─────────────────────────────────────────────────────────────────
 
 export const HomeScreen: React.FC = () => {
@@ -117,8 +162,9 @@ export const HomeScreen: React.FC = () => {
   const [commentsSheet, setCommentsSheet] = useState<{ kind: FeedKind; id: string } | null>(null);
   const [suggestions,    setSuggestions]    = useState<UserPublic[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(true);
-  const [contactIds,     setContactIds]     = useState<string[]>([]);
-  const [contactsReady,  setContactsReady]  = useState(false);
+  const [contactIds,      setContactIds]      = useState<string[]>([]);
+  const [contactsReady,   setContactsReady]   = useState(false);
+  const [contactsLoading, setContactsLoading] = useState(false);
   const [nearbyEvents,   setNearbyEvents]   = useState<Event[]>([]);
   const [page,           setPage]           = useState(1);
   const [hasMore,        setHasMore]        = useState(true);
@@ -372,26 +418,31 @@ export const HomeScreen: React.FC = () => {
       load(filter, { reset: true });
     }
     if (userLocation) {
+      let cancelled = false;
       eventService.list({
         limit: 8, lat: userLocation.lat, lon: userLocation.lon,
         radius_km: 20, status: 'published', noCache: true,
       }).then(data => {
-        setNearbyEvents(Array.isArray(data) ? data : []);
+        if (!cancelled) setNearbyEvents(Array.isArray(data) ? data : []);
       }).catch(() => {});
+      return () => { cancelled = true; };
     }
   }, [userLocation]);
 
   useFocusEffect(useCallback(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
-      load(filter, { noCache: true, reset: true });
-      loadLive();
-      return;
+      // Différer le chargement après la fin de l'animation de navigation
+      const task = InteractionManager.runAfterInteractions(() => {
+        load(filter, { noCache: true, reset: true });
+        loadLive();
+      });
+      return () => task.cancel();
     }
-    // Retour sur l'écran : refresh silencieux seulement si données > 5 min
+    // Retour sur l'écran : refresh silencieux si données > 60s
     const age = Date.now() - lastLoadedAtRef.current;
-    if (age > 300_000) {
-      load(filter, { noCache: true, reset: false });
+    if (age > 60_000) {
+      load(filter, { reset: false });
       loadLive();
     }
   }, [filter, load, loadLive]));
@@ -425,6 +476,14 @@ export const HomeScreen: React.FC = () => {
 
   // ── Sections feed ────────────────────────────────────────────────────────────
 
+  const handleSpontPress = useCallback((live: LiveStream) => {
+    if (currentUser?.id === live.user_id) {
+      nav.navigate('SimpleLiveStream', { liveId: live.id, isPrivate: live.is_private ?? false });
+    } else {
+      nav.navigate('SimpleLiveViewer', { liveId: live.id });
+    }
+  }, [currentUser?.id, nav]);
+
   const ListHeader = useMemo(() => (
     <View>
 
@@ -441,66 +500,15 @@ export const HomeScreen: React.FC = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={s.spontScroll}
           >
-            {spontLives.map(live => {
-              const name = live.user?.display_name || live.user?.username || 'Artiste';
-              const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
-              return (
-                <TouchableOpacity
-                  key={live.id}
-                  style={s.spontCard}
-                  activeOpacity={0.88}
-                  onPress={() => {
-                    if (currentUser?.id === live.user_id) {
-                      nav.navigate('SimpleLiveStream', { liveId: live.id, isPrivate: live.is_private ?? false });
-                    } else {
-                      nav.navigate('SimpleLiveViewer', { liveId: live.id });
-                    }
-                  }}
-                >
-                  {/* Thumbnail / fond */}
-                  <View style={s.spontThumb}>
-                    <LinearGradient
-                      colors={['#1a1a2e', '#2d1b3d']}
-                      style={StyleSheet.absoluteFill}
-                    />
-                    {/* Initiales en fond décoratif */}
-                    <Text style={s.spontBgInitials}>{initials}</Text>
-                    {/* Gradient bas */}
-                    <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.82)']}
-                      style={[StyleSheet.absoluteFill, { top: '40%' }]}
-                    />
-                    {/* Badge LIVE */}
-                    <View style={s.spontLivePill}>
-                      <View style={s.spontLiveDotSmall} />
-                      <Text style={s.spontLivePillText}>LIVE</Text>
-                    </View>
-                    {/* Viewers */}
-                    <View style={s.spontViewersChip}>
-                      <Icon name="eye" size={10} color="rgba(255,255,255,0.85)" />
-                      <Text style={s.spontViewersText}>{live.current_viewers}</Text>
-                    </View>
-                    {/* Infos bas */}
-                    <View style={s.spontCardBottom}>
-                      {/* Avatar */}
-                      <View style={s.spontAvatarSmall}>
-                        {live.user?.avatar_url ? (
-                          <Image source={{ uri: live.user.avatar_url }} style={{ width: '100%', height: '100%' }} />
-                        ) : (
-                          <LinearGradient colors={['#F0365A', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={s.spontAvatarSmallText}>{initials[0]}</Text>
-                          </LinearGradient>
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.spontCardName} numberOfLines={1}>{name}</Text>
-                        <Text style={s.spontCardTitle} numberOfLines={1}>{live.title}</Text>
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            {spontLives.map(live => (
+              <SpontLiveCard
+                key={live.id}
+                live={live}
+                isOwn={currentUser?.id === live.user_id}
+                onPress={handleSpontPress}
+                styles={s}
+              />
+            ))}
           </ScrollView>
         </View>
       )}
@@ -617,16 +625,22 @@ export const HomeScreen: React.FC = () => {
           return (
             <TouchableOpacity
               key={f}
+              disabled={f === 'contacts' && contactsLoading}
               onPress={async () => {
                 if (f === 'contacts' && !contactsReady) {
-                  const ids = await loadContactIdsSilent();
-                  if (ids.length) {
-                    setContactIds(ids);
-                    setContactsReady(true);
-                    setFilter('contacts');
-                    load('contacts', { ids, reset: true });
-                  } else {
-                    setFilter('contacts');
+                  setContactsLoading(true);
+                  try {
+                    const ids = await loadContactIdsSilent();
+                    if (ids.length) {
+                      setContactIds(ids);
+                      setContactsReady(true);
+                      setFilter('contacts');
+                      load('contacts', { ids, reset: true });
+                    } else {
+                      setFilter('contacts');
+                    }
+                  } finally {
+                    setContactsLoading(false);
                   }
                 } else {
                   setFilter(f);
@@ -637,7 +651,10 @@ export const HomeScreen: React.FC = () => {
                 borderColor:     active ? colors.primary : colors.border,
               }]}
             >
-              <Icon name={icon} size={13} color={active ? '#fff' : colors.textSecondary} />
+              {f === 'contacts' && contactsLoading
+                ? <ActivityIndicator size={11} color={active ? '#fff' : colors.primary} style={{ marginRight: 2 }} />
+                : <Icon name={icon} size={13} color={active ? '#fff' : colors.textSecondary} />
+              }
               <Text style={[s.filterChipText, { color: active ? '#fff' : colors.textSecondary }]}>
                 {label}
               </Text>
