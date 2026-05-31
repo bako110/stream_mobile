@@ -1,7 +1,6 @@
 import React, {
   useEffect, useState, useCallback, useRef, useMemo,
 } from 'react';
-import { InteractionManager } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
@@ -433,11 +432,11 @@ export const HomeScreen: React.FC = () => {
     if (!didMountRef.current) {
       didMountRef.current = true;
       // Différer le chargement après la fin de l'animation de navigation
-      const task = InteractionManager.runAfterInteractions(() => {
+      const timer = setTimeout(() => {
         load(filter, { noCache: true, reset: true });
         loadLive();
-      });
-      return () => task.cancel();
+      }, 16);
+      return () => clearTimeout(timer);
     }
     // Retour sur l'écran : refresh silencieux si données > 60s
     const age = Date.now() - lastLoadedAtRef.current;

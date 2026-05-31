@@ -8,7 +8,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
-  Modal, Dimensions, InteractionManager, Linking,
+  Modal, Dimensions, Linking,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
@@ -907,13 +907,11 @@ export const FeedScreen: React.FC = () => {
   useFocusEffect(useCallback(() => {
     setFeedFocused(true);
     if (!didMountRef.current) {
-      // Premier chargement : différer après l'animation de navigation
-      const task = InteractionManager.runAfterInteractions(() => {
-        load(filter);
-      });
+      // Premier chargement : différer après l'animation de navigation (16ms = 1 frame)
+      const timer = setTimeout(() => load(filter), 16);
       didMountRef.current = true;
       return () => {
-        task.cancel();
+        clearTimeout(timer);
         setFeedFocused(false);
         setActiveReelId(null);
         setActivePostId(null);
