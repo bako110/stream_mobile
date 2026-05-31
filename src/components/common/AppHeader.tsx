@@ -8,6 +8,31 @@ import { STATUS_BAR_HEIGHT, HEADER_HEIGHT } from '../../styles';
 
 export type HeaderVariant = 'home' | 'default' | 'transparent';
 
+/**
+ * BackButton — bouton retour standardisé à utiliser dans tous les headers custom.
+ * Même style que AppHeader : arrow-left 22px, fond backgroundSecondary arrondi.
+ */
+export const BackButton: React.FC<{
+  onPress: () => void;
+  color?: string;
+  transparent?: boolean;
+}> = ({ onPress, color, transparent = false }) => {
+  const { theme: { colors } } = useTheme();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      style={{
+        width: 40, height: 40, borderRadius: 20,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: transparent ? 'rgba(0,0,0,0.35)' : colors.backgroundSecondary,
+      }}
+    >
+      <Icon name="arrow-left" size={22} color={color ?? colors.textPrimary} />
+    </TouchableOpacity>
+  );
+};
+
 interface AppHeaderProps {
   title?:          string;
   variant?:        HeaderVariant;
@@ -150,6 +175,7 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     borderRadius:    20,
+    backgroundColor: 'transparent',
   },
   title: {
     flex:       1,

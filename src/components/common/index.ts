@@ -7,7 +7,7 @@ export { Input }             from './Input';
 export { PhoneInput, DEFAULT_COUNTRY } from './PhoneInput';
 export type { Country }                from './PhoneInput';
 export { SocialAuthButton }  from './SocialAuthButton';
-export { AppHeader }         from './AppHeader';
+export { AppHeader, BackButton } from './AppHeader';
 export { AppTabBar }         from './AppTabBar';
 export {
   SkeletonBox,

@@ -171,9 +171,7 @@ export const AdsScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={s2.header}>
-        <TouchableOpacity onPress={() => nav.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.title, { color: colors.textPrimary, flex: 1 }]}>Mes publicités</Text>
         <TouchableOpacity
           onPress={() => nav.navigate('CreateAd', { ad: null })}

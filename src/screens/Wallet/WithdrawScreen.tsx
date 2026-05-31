@@ -26,6 +26,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import { BackButton } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
@@ -254,9 +255,7 @@ const WithdrawScreen: React.FC = () => {
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <Text style={s.headerTitle}>Retirer des fonds</Text>
           <View style={{ width: 40 }} />
         </View>

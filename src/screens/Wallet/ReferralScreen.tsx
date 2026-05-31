@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { BackButton } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
@@ -88,9 +89,7 @@ export const ReferralScreen: React.FC = () => {
 
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Parrainage</Text>
         <View style={{ width: 40 }} />
       </View>

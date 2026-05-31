@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+import { BackButton } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, Alert, RefreshControl,
@@ -102,9 +103,7 @@ export default function MySubscriptionScreen() {
 
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={[s.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Mon abonnement</Text>
         <View style={{ width: 38 }} />
       </View>

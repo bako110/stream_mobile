@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
+import { BackButton } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator,
 } from 'react-native';
@@ -84,9 +85,7 @@ export function MonetisationScreen() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity onPress={() => nav.goBack()} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => nav.goBack()} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monetisation</Text>
           <View style={{ width: 38 }} />
         </View>

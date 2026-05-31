@@ -8,6 +8,7 @@ import {
   ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { BackButton } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -110,9 +111,7 @@ export const CreateAdScreen: React.FC = () => {
     >
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>
           {isEdit ? 'Modifier la pub' : 'Créer une pub'}
         </Text>

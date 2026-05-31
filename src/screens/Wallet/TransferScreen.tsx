@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { BackButton } from '../../components/common';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
@@ -103,9 +104,7 @@ export default function TransferScreen() {
 
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.title, { color: colors.textPrimary }]}>Transférer des coins</Text>
         {balance !== null && (
           <View style={[s.balancePill, { backgroundColor: colors.surface }]}>

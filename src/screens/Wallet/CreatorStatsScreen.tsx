@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BackButton } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, StatusBar, Image, Dimensions,
@@ -377,9 +378,7 @@ function ContentDetailScreen({ detail, colors, onBack }: {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={onBack} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           {detail.type.charAt(0).toUpperCase() + detail.type.slice(1)} — stats
         </Text>

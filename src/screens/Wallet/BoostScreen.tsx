@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { BackButton } from '../../components/common';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, ActivityIndicator,
@@ -963,9 +964,7 @@ export default function BoostScreen() {
 
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[s.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <View style={{ flex: 1 }}>
           <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Booster</Text>
           <Text style={[s.headerSub, { color: colors.textTertiary }]}>Abonnes · Reels · Posts · Events · Live</Text>
