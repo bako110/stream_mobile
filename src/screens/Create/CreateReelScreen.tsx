@@ -74,8 +74,8 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
       type:     'reel',
       label:    capturedCaption || 'Nouveau Reel',
       onDone: async (result) => {
+        if (!result.hlsUrl) return; // ne rien créer sans HLS
         await reelService.create({
-          video_url:     result.videoUrl!,
           hls_url:       result.hlsUrl,
           caption:       capturedCaption || undefined,
           thumbnail_url: result.thumbnailUrl,

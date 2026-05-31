@@ -248,14 +248,18 @@ export async function uploadVideoFromUri(
       }
     }
 
-    // Fallback : retourner l'url brute si HLS timeout ou pas de job_id
+    // Fallback : hls_url si disponible, sinon erreur (plus de MP4)
+    const fallbackHls = data.hls_url ?? undefined;
+    if (!fallbackHls) {
+      throw new Error('HLS non disponible après timeout — réessaie dans quelques minutes');
+    }
     return {
-      url:           data.url,
-      public_id:     data.public_id ?? data.url,
+      url:           fallbackHls,
+      public_id:     data.public_id ?? '',
       job_id:        jobId,
       duration:      data.duration  ?? undefined,
       thumbnail_url: data.thumbnail_url ?? undefined,
-      hls_url:       data.hls_url   ?? undefined,
+      hls_url:       fallbackHls,
     };
   }
 
