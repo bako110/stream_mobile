@@ -87,6 +87,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [pendingCount,   setPendingCount]   = useState(0);
   const [viewerUrl,      setViewerUrl]      = useState<string | null>(null);
   const [communitySaved, setCommunitySaved] = useState(false);
+  const [tierLoading,    setTierLoading]    = useState(false);
 
   // Settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -534,6 +535,48 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     );
   }
 
+  function handleUpgradeTier(tier: 'pro' | 'elite') {
+    const prices: Record<string, { eur: number; coins: number }> = {
+      pro:   { eur: 9.99,  coins: Math.ceil(9.99  * 200) },
+      elite: { eur: 24.99, coins: Math.ceil(24.99 * 200) },
+    };
+    const p = prices[tier];
+    const tierLabel = tier === 'pro' ? 'Pro' : 'Elite';
+
+    if (myCoins !== null && myCoins < p.coins) {
+      Alert.alert(
+        'Solde insuffisant',
+        `Le tier ${tierLabel} coûte ${p.coins.toLocaleString('fr-FR')} coins (${p.eur}€/mois).\nTon solde : ${myCoins.toLocaleString('fr-FR')} coins.`,
+      );
+      return;
+    }
+
+    Alert.alert(
+      `Passer en ${tierLabel}`,
+      `${p.coins.toLocaleString('fr-FR')} coins (${p.eur}€) seront débités de ton wallet pour 30 jours.\n\nAvantages ${tierLabel} : ${tier === 'pro' ? 'channels illimités, analytics, badge Pro' : 'tout Pro + priorité feed, support dédié'}.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: `Activer ${tierLabel}`, onPress: async () => {
+            setTierLoading(true);
+            try {
+              const res = await apiClient.post<{ tier: string; coins_debited: number; tier_expires_at: string }>(
+                Endpoints.communities.upgradeTier(communityId), { tier }
+              );
+              setMyCoins(prev => prev !== null ? prev - res.data.coins_debited : null);
+              setCommunity(prev => prev ? { ...prev, tier: res.data.tier as any, tier_expires_at: res.data.tier_expires_at } as any : prev);
+              Alert.alert('Activé !', `Ta communauté est maintenant en ${tierLabel} jusqu'au ${new Date(res.data.tier_expires_at).toLocaleDateString('fr-FR')}.`);
+            } catch (e: any) {
+              Alert.alert('Erreur', e?.message ?? 'Impossible d\'upgrader le tier.');
+            } finally {
+              setTierLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   function handleRequestVerification() {
     setVrReason('');
     // Charger le solde si pas encore fait
@@ -766,6 +809,30 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             </>
           )}
         </View>
+
+        {/* Boutons upgrade tier — admin uniquement */}
+        {(myRole === 'admin' || isGlobalAdmin) && (!community || (community as any).tier === 'free' || (community as any).tier == null) && (
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+            <TouchableOpacity
+              onPress={() => handleUpgradeTier('pro')}
+              disabled={tierLoading}
+              style={{ flex: 1, backgroundColor: '#7B3FF222', borderWidth: 1.5, borderColor: '#7B3FF2', borderRadius: 12, paddingVertical: 10, alignItems: 'center', gap: 4 }}
+            >
+              <Icon name="award" size={15} color="#7B3FF2" />
+              <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 12 }}>PRO</Text>
+              <Text style={{ color: '#7B3FF2', fontSize: 10, opacity: 0.8 }}>9.99€/mois</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleUpgradeTier('elite')}
+              disabled={tierLoading}
+              style={{ flex: 1, backgroundColor: '#F59E0B22', borderWidth: 1.5, borderColor: '#F59E0B', borderRadius: 12, paddingVertical: 10, alignItems: 'center', gap: 4 }}
+            >
+              <Icon name="star" size={15} color="#F59E0B" />
+              <Text style={{ color: '#F59E0B', fontWeight: '800', fontSize: 12 }}>ELITE</Text>
+              <Text style={{ color: '#F59E0B', fontSize: 10, opacity: 0.8 }}>24.99€/mois</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
       </View>
     </ScrollView>

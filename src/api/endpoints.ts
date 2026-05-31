@@ -246,6 +246,7 @@ export const Endpoints = {
     channelMessages:     (cid: string, chid: string) => `${V1}/communities/${cid}/channels/${chid}/messages`,
     channelMessage:      (cid: string, chid: string, mid: string) => `${V1}/communities/${cid}/channels/${chid}/messages/${mid}`,
     channelMembers:      (cid: string, chid: string) => `${V1}/communities/${cid}/channels/${chid}/members`,
+    upgradeTier:         (id: string) => `${V1}/communities/${id}/upgrade-tier`,
   },
 
   // ── Upload médias (Cloudinary) ────────────────────────────────────────────

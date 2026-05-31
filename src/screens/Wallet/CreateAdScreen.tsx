@@ -2,7 +2,7 @@
  * CreateAdScreen — Créer ou modifier une campagne publicitaire.
  * Accessible depuis AdsScreen.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -13,6 +13,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { adService, type Ad, type AdPlacement, type AdFormat } from '../../services/adService';
+import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
 
 const PLACEMENTS: { key: AdPlacement; label: string; icon: string; desc: string }[] = [
   { key: 'feed',    label: 'Feed principal', icon: 'home',       desc: '1 pub toutes les 7 cartes' },
@@ -52,6 +54,14 @@ export const CreateAdScreen: React.FC = () => {
   const [budgetEur,    setBudgetEur]    = useState(existingAd ? String(existingAd.budget_eur) : '10');
   const [cpmEur,       setCpmEur]       = useState(existingAd ? existingAd.cpm_eur : 2.0);
   const [saving,       setSaving]       = useState(false);
+  const [walletCoins,  setWalletCoins]  = useState<number | null>(null);
+
+  // Charger le solde wallet
+  useEffect(() => {
+    apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance)
+      .then(r => setWalletCoins(r.data?.coins_balance ?? null))
+      .catch(() => {});
+  }, []);
 
   // Estimation impressions
   const budget = parseFloat(budgetEur) || 0;
@@ -62,6 +72,16 @@ export const CreateAdScreen: React.FC = () => {
     if (budget < 1)     { Alert.alert('Erreur', 'Budget minimum : 1 €'); return; }
     if (ctaUrl && !ctaUrl.startsWith('http')) {
       Alert.alert('Erreur', 'L\'URL doit commencer par http:// ou https://');
+      return;
+    }
+
+    // Vérifier solde avant création
+    const coinsRequired = Math.ceil(budget * 200);
+    if (!isEdit && walletCoins !== null && walletCoins < coinsRequired) {
+      Alert.alert(
+        'Solde insuffisant',
+        `Tu as ${walletCoins.toLocaleString('fr-FR')} coins mais ${coinsRequired.toLocaleString('fr-FR')} sont requis pour ce budget (${budget.toFixed(2)}€).\n\nRecharge ton wallet ou réduis le budget.`,
+      );
       return;
     }
 
@@ -83,10 +103,12 @@ export const CreateAdScreen: React.FC = () => {
         await adService.update(existingAd!.id, payload);
         Alert.alert('Modifié', 'Ta campagne a été mise à jour.');
       } else {
-        await adService.create(payload);
+        const result = await adService.create(payload);
+        const coinsDebited = (result as any).coins_debited ?? Math.ceil(budget * 200);
+        setWalletCoins(prev => prev !== null ? prev - coinsDebited : null);
         Alert.alert(
-          'Campagne créée !',
-          'Ta pub est maintenant active et sera diffusée dans le feed.',
+          'Campagne créée ! 🎯',
+          `${coinsDebited.toLocaleString('fr-FR')} coins débités. Ta pub est active dans le feed.`,
         );
       }
       nav.goBack();
@@ -129,7 +151,7 @@ export const CreateAdScreen: React.FC = () => {
 
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 24 }]}>
 
-        {/* Aperçu budget */}
+        {/* Aperçu budget + solde */}
         <View style={[s.estimateCard, { backgroundColor: '#7B3FF222', borderColor: '#7B3FF244' }]}>
           <Icon name="bar-chart-2" size={20} color="#7B3FF2" />
           <View style={{ flex: 1 }}>
@@ -137,8 +159,17 @@ export const CreateAdScreen: React.FC = () => {
               ~{estimatedImpressions.toLocaleString('fr-FR')} impressions estimées
             </Text>
             <Text style={{ color: '#7B3FF2', fontSize: 12, opacity: 0.8 }}>
-              Avec {budget.toFixed(2)}€ de budget au CPM {cpmEur.toFixed(2)}€
+              Coût : {(budget * 200).toLocaleString('fr-FR')} coins ({budget.toFixed(2)}€)
             </Text>
+            {walletCoins !== null && (
+              <Text style={{
+                color: walletCoins < budget * 200 ? '#EF4444' : '#10B981',
+                fontSize: 12, fontWeight: '700', marginTop: 2,
+              }}>
+                Solde : {walletCoins.toLocaleString('fr-FR')} coins
+                {walletCoins < budget * 200 ? ' — insuffisant' : ' ✓'}
+              </Text>
+            )}
           </View>
         </View>
 
