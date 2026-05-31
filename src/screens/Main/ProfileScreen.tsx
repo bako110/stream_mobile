@@ -360,18 +360,21 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   </Text>
                 </View>
               )}
-              {user?.referral_code && (
-                <TouchableOpacity style={s.aboutRow} onPress={() => nav.navigate('Referral')} activeOpacity={0.7}>
-                  <Icon name="gift" size={16} color={colors.primary} />
-                  <Text style={[s.aboutText, { color: colors.textPrimary }]}>
-                    Code parrainage :{' '}
-                    <Text style={{ fontWeight: '800', color: colors.primary, letterSpacing: 2 }}>
-                      {user.referral_code}
-                    </Text>
+              {/* Parrainage — lien vers l'écran dédié */}
+              <TouchableOpacity style={s.aboutRow} onPress={() => nav.navigate('Referral')} activeOpacity={0.7}>
+                <Icon name="gift" size={16} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.aboutText, { color: colors.textPrimary, fontWeight: '600' }]}>
+                    Parrainage
                   </Text>
-                  <Icon name="chevron-right" size={14} color={colors.textTertiary} />
-                </TouchableOpacity>
-              )}
+                  {user?.referral_code ? (
+                    <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 1 }}>
+                      Code : <Text style={{ color: colors.primary, fontWeight: '800', letterSpacing: 1.5 }}>{user.referral_code}</Text>
+                    </Text>
+                  ) : null}
+                </View>
+                <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[s.aboutRow, { backgroundColor: colors.primary + '12', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }]}
                 activeOpacity={user?.folix_id ? 0.75 : 1}

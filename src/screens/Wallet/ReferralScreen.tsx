@@ -21,11 +21,12 @@ interface ReferralStats {
 }
 
 interface ReferredUser {
-  id:            string;
-  username:      string;
-  display_name:  string | null;
-  avatar_url:    string | null;
-  joined_at:     string;
+  id:              string;
+  username:        string;
+  display_name:    string | null;
+  avatar_url:      string | null;
+  folix_id:        string | null;
+  joined_at:       string;
   coins_generated: number;
 }
 
@@ -43,18 +44,14 @@ export const ReferralScreen: React.FC = () => {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [meRes, statsRes, usersRes] = await Promise.all([
-        apiClient.get<{ referral_code: string }>(Endpoints.wallet.referralMe),
+      const [statsRes, usersRes] = await Promise.all([
         apiClient.get<ReferralStats>(Endpoints.wallet.referralStats),
         apiClient.get<ReferredUser[]>(Endpoints.wallet.referralUsers).catch(() => ({ data: [] })),
       ]);
-      setStats({
-        ...statsRes.data,
-        referral_code: meRes.data.referral_code ?? statsRes.data.referral_code,
-      });
+      setStats(statsRes.data);
       setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
     } catch (e: any) {
-      console.log('[Referral] erreur:', e?.message, e?.response?.status);
+      console.warn('[Referral] erreur:', e?.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -223,6 +220,11 @@ export const ReferralScreen: React.FC = () => {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.userName, { color: colors.textPrimary }]}>{name}</Text>
+                      {u.folix_id ? (
+                        <Text style={[s.userDate, { color: colors.primary, fontWeight: '700', letterSpacing: 1 }]}>
+                          {u.folix_id}
+                        </Text>
+                      ) : null}
                       <Text style={[s.userDate, { color: colors.textTertiary }]}>Inscrit le {date}</Text>
                     </View>
                     {u.coins_generated > 0 && (

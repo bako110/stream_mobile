@@ -38,15 +38,17 @@ interface WalletBalance {
 }
 
 interface Transaction {
-  id: string;
-  transaction_type: 'credit_purchase' | 'gift_sent' | 'gift_received' | 'withdrawal' | 'bonus' | 'refund' | 'community_entry' | 'transfer_sent' | 'transfer_received' | 'boost_purchase' | 'community_reward' | 'view_revenue' | 'subscription_revenue';
-  coins_amount: number;
-  description: string;
-  created_at: string;
-  status: 'completed' | 'pending' | 'failed';
-  balance_after?: number;
-  reference_type?: string;
-  reference_id?: string;
+  id:               string;
+  public_id?:       string;
+  transaction_type: string;
+  coins_amount:     number;
+  eur_amount?:      number;
+  description:      string;
+  created_at:       string;
+  status:           'completed' | 'pending' | 'failed';
+  balance_after?:   number;
+  reference_type?:  string;
+  extra_data?:      Record<string, any>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -312,22 +314,24 @@ const WalletScreen: React.FC = () => {
 
   // ── Ouvre la facture détaillée d'une transaction ────────────────────────
   const openReceipt = (tx: Transaction) => {
-    const label      = txLabel(tx.transaction_type);
-    const isCredit   = tx.coins_amount > 0;
-    const absAmt     = Math.abs(tx.coins_amount);
-    const eurAmt     = ((absAmt / 100) * 0.5).toFixed(2);
-    const statusStr  = tx.status === 'completed' ? 'Confirmée' : tx.status === 'pending' ? 'En attente' : 'Échouée';
-    const balInfo    = tx.balance_after != null ? `\nSolde après : ${tx.balance_after.toLocaleString('fr-FR')} coins` : '';
+    const label     = txLabel(tx.transaction_type as any);
+    const isCredit  = tx.coins_amount > 0;
+    const absAmt    = Math.abs(tx.coins_amount);
+    const eurVal    = tx.eur_amount != null
+      ? Math.abs(tx.eur_amount).toFixed(2)
+      : ((absAmt / 100) * 0.5).toFixed(2);
+    const statusStr = tx.status === 'completed' ? 'Confirmée' : tx.status === 'pending' ? 'En attente' : 'Échouée';
 
-    Alert.alert(
-      label,
-      `${tx.description}\n\n` +
-      `Montant : ${isCredit ? '+' : '-'}${absAmt.toLocaleString('fr-FR')} coins (${isCredit ? '+' : '-'}${eurAmt} EUR)\n` +
-      `Statut : ${statusStr}\n` +
-      `Date : ${formatDate(tx.created_at)}` +
-      balInfo,
-      [{ text: 'Fermer' }],
-    );
+    let details = `${tx.description || label}\n\n`;
+    details += `Montant : ${isCredit ? '+' : '-'}${absAmt.toLocaleString('fr-FR')} coins`;
+    if (parseFloat(eurVal) > 0) details += ` (${isCredit ? '+' : '-'}${eurVal} €)`;
+    details += `\nStatut : ${statusStr}`;
+    details += `\nDate : ${formatDate(tx.created_at)}`;
+    if (tx.balance_after != null) details += `\nSolde après : ${tx.balance_after.toLocaleString('fr-FR')} coins`;
+    if (tx.public_id) details += `\n\nRéf. : ${tx.public_id}`;
+    if (tx.reference_type) details += `\nType réf. : ${tx.reference_type}`;
+
+    Alert.alert(label, details, [{ text: 'Fermer' }]);
   };
 
   // ── Render transaction item ──────────────────────────────────────────────
