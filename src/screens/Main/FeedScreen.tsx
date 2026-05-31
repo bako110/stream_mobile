@@ -2106,8 +2106,8 @@ const MiniReelPlayer: React.FC<{
     videoUri ? {
       uri: videoUri,
       bufferConfig: {
-        minBufferMs: 500, maxBufferMs: 15_000,
-        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 800,
+        minBufferMs: 2_000, maxBufferMs: 15_000,
+        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 1_000,
         preferredForwardBufferDurationMs: 5_000,
       },
     } : 'about:blank',
@@ -2276,8 +2276,8 @@ const HeroReelPlayer: React.FC<{
     videoUri ? {
       uri: videoUri,
       bufferConfig: {
-        minBufferMs: 500, maxBufferMs: 15_000,
-        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 800,
+        minBufferMs: 2_000, maxBufferMs: 15_000,
+        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 1_000,
         preferredForwardBufferDurationMs: 5_000,
       },
     } : 'about:blank',
@@ -2431,11 +2431,11 @@ const ReelRowCard: React.FC<{
   const ReelThumb = ({ reel, w, h, large = false }: { reel: any; w: number; h: number; large?: boolean }) => {
     const author   = reel.author;
     const name     = author?.display_name ?? author?.username ?? '';
-    const initials = name[0]?.toUpperCase() ?? '?';
+    const initials = (name || '?')[0].toUpperCase();
     return (
       <TouchableOpacity
         activeOpacity={0.88}
-        onPress={() => onPressReel(reel.id, reel)}
+        onPress={() => reel?.id && onPressReel(reel.id, reel)}
         style={[rrS.thumb, { width: w, height: h }]}
       >
         {reel.thumbnail_url ? (
@@ -2518,7 +2518,7 @@ const ReelRowCard: React.FC<{
           <Text style={[rrS.title, { color: colors.textPrimary }]}>Reels pour toi</Text>
           <Text style={[rrS.subtitle, { color: colors.textSecondary }]}>{reels.length} nouvelle{reels.length > 1 ? 's' : ''} vidéo{reels.length > 1 ? 's' : ''}</Text>
         </View>
-        <TouchableOpacity style={[rrS.seeAllBtn, { borderColor: colors.primary + '55' }]} onPress={() => onPressReel(reels[0]?.id)}>
+        <TouchableOpacity style={[rrS.seeAllBtn, { borderColor: colors.primary + '55' }]} onPress={() => { if (reels[0]) onPressReel(reels[0].id, reels[0]); }}>
           <Text style={[rrS.seeAllTxt, { color: colors.primary }]}>Voir tout</Text>
           <Icon name="chevron-right" size={14} color={colors.primary} />
         </TouchableOpacity>
