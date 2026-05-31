@@ -649,4 +649,48 @@ export const communityService = {
   async deleteChannelMessage(communityId: string, channelId: string, messageId: string): Promise<void> {
     await apiClient.delete(Endpoints.communities.channelMessage(communityId, channelId, messageId));
   },
+
+  // ── Community CRUD ─────────────────────────────────────────────────────────
+
+  async update(id: string, data: Partial<CreateCommunityPayload>): Promise<CommunityData> {
+    const res = await apiClient.patch<CommunityData>(`/api/v1/communities/${id}`, data);
+    return res.data;
+  },
+
+  async delete(id: string): Promise<void> {
+    await apiClient.delete(`/api/v1/communities/${id}`);
+  },
+
+  // ── Membres ────────────────────────────────────────────────────────────────
+
+  async updateMemberRole(communityId: string, userId: string, role: string): Promise<void> {
+    await apiClient.put(`/api/v1/communities/${communityId}/members/${userId}/role`, { role });
+  },
+
+  async removeMember(communityId: string, userId: string): Promise<void> {
+    await apiClient.delete(`/api/v1/communities/${communityId}/members/${userId}`);
+  },
+
+  // ── Messages réactions / épingle / sondage ─────────────────────────────────
+
+  async reactToMessage(communityId: string, messageId: string, emoji: string): Promise<{ reactions: { emoji: string; count: number; user_ids: string[] }[] }> {
+    const res = await apiClient.post<{ reactions: { emoji: string; count: number; user_ids: string[] }[] }>(
+      `/api/v1/communities/${communityId}/messages/${messageId}/react`, { emoji },
+    );
+    return res.data;
+  },
+
+  async pinMessage(communityId: string, messageId: string, pin: boolean): Promise<void> {
+    await apiClient.post(`/api/v1/communities/${communityId}/messages/${messageId}/pin?pin=${pin}`);
+  },
+
+  async createPoll(communityId: string, data: { question: string; options: string[]; allow_multiple?: boolean }): Promise<CommunityMessageData> {
+    const res = await apiClient.post<CommunityMessageData>(`/api/v1/communities/${communityId}/polls`, data);
+    return res.data;
+  },
+
+  async voteOnPoll(communityId: string, pollId: string, optionIds: string[]): Promise<unknown> {
+    const res = await apiClient.post(`/api/v1/communities/${communityId}/polls/${pollId}/vote`, { option_ids: optionIds });
+    return res.data;
+  },
 };

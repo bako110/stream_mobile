@@ -235,9 +235,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           editAvatar ? uploadImage(editAvatar) : Promise.resolve(null),
           editBanner ? uploadImage(editBanner) : Promise.resolve(null),
         ]);
-        await apiClient.patch(`/api/v1/communities/${communityId}`, {
+        await communityService.update(communityId, {
           name:        editName.trim(),
-          description: editDesc.trim() || null,
+          description: editDesc.trim() || undefined,
           ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
           ...(bannerUrl ? { banner_url: bannerUrl } : {}),
         });
@@ -254,7 +254,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       }
       setSaving(true);
       try {
-        await apiClient.patch(`/api/v1/communities/${communityId}`, {
+        await communityService.update(communityId, {
           is_private:        editPrivate,
           requires_approval: editApproval,
           members_only_chat: editMembersOnly,
@@ -298,7 +298,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   async function doChangeRole(userId: string, role: string) {
     setRoleLoading(userId);
     try {
-      await apiClient.put(`/api/v1/communities/${communityId}/members/${userId}/role`, { role });
+      await communityService.updateMemberRole(communityId, userId, role);
       await load();
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? 'Impossible de changer le rôle.');
@@ -316,7 +316,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiClient.delete(`/api/v1/communities/${communityId}/members/${member.user_id}`);
+              await communityService.removeMember(communityId, member.user_id);
               load();
             } catch { Alert.alert('Erreur', 'Impossible d\'exclure ce membre.'); }
           },
@@ -344,7 +344,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             setBlockLoading(member.user_id);
             try {
               // 1. Éjecter d'abord — envoie community_member_kicked via WS → l'utilisateur est redirigé automatiquement
-              await apiClient.delete(`/api/v1/communities/${communityId}/members/${member.user_id}`).catch(() => {});
+              await communityService.removeMember(communityId, member.user_id).catch(() => {});
               // 2. Bloquer pour l'empêcher de revenir
               await communityService.blockMember(communityId, member.user_id);
               // 3. Annonce visible dans le chat
@@ -524,7 +524,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiClient.delete(`/api/v1/communities/${communityId}`);
+              await communityService.delete(communityId);
               nav.goBack();
             } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
           },

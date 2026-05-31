@@ -8,6 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonUserList } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
+import { userService } from '../../services/userService';
 
 interface BlockedUser {
   id: string;
@@ -53,7 +54,7 @@ export const BlockedUsersScreen: React.FC = () => {
           onPress: async () => {
             setUnblocking(user.id);
             try {
-              await apiClient.delete(Endpoints.users.block(user.id));
+              await userService.unblockUser(user.id);
               setUsers(prev => prev.filter(u => u.id !== user.id));
             } catch {
               Alert.alert('Erreur', 'Impossible de débloquer cet utilisateur.');

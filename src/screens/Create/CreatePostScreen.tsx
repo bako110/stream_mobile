@@ -132,7 +132,9 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             image_urls,
             feeling: capturedFeeling,
           });
-        } catch {}
+        } catch (err: any) {
+          console.warn('[CreatePost] échec création post:', err?.message ?? err);
+        }
       })();
       return;
     }

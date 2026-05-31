@@ -334,6 +334,7 @@ export const Endpoints = {
   lives: {
     list:   `${V1}/lives`,
     me:     `${V1}/lives/me`,
+    cost:   `${V1}/lives/cost`,
     start:  `${V1}/lives/start`,
     byId:   (id: string) => `${V1}/lives/${id}`,
     stop:   (id: string) => `${V1}/lives/${id}/stop`,

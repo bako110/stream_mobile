@@ -76,4 +76,29 @@ async function stopAllMine(): Promise<void> {
   await apiClient.post(`/api/v1/lives/stop_all_mine`);
 }
 
-export const liveService = { getLives, getById, startLive, stopLive, getToken, getStatus, stopAllMine, blockUserFromLives, unblockUserFromLives };
+async function invite(liveId: string, identity: string): Promise<void> {
+  await apiClient.post(Endpoints.lives.invite(liveId, identity));
+}
+
+async function demote(liveId: string, identity: string): Promise<void> {
+  await apiClient.post(Endpoints.lives.demote(liveId, identity));
+}
+
+async function ban(liveId: string, identity: string): Promise<void> {
+  await apiClient.post(Endpoints.lives.ban(liveId, identity));
+}
+
+async function globalBan(liveId: string, identity: string): Promise<void> {
+  await apiClient.post(Endpoints.lives.globalBan(liveId, identity));
+}
+
+async function getLiveCost(): Promise<{ cost_coins: number; balance: number; sufficient: boolean }> {
+  const r = await apiClient.get<{ cost_coins: number; balance: number; sufficient: boolean }>(Endpoints.lives.cost);
+  return r.data;
+}
+
+export const liveService = {
+  getLives, getById, startLive, stopLive, getToken, getStatus, stopAllMine,
+  blockUserFromLives, unblockUserFromLives,
+  invite, demote, ban, globalBan, getLiveCost,
+};

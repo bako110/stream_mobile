@@ -23,6 +23,7 @@ import Slider from '@react-native-community/slider';
 import { useTheme } from '../../hooks/useTheme';
 import { Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
+import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { uploadAudioFile, uploadMessageImage, uploadMessageVideo, uploadFileFromUri } from '../../services/uploadService';
 import { useWs } from '../../context/WebSocketContext';
@@ -631,8 +632,7 @@ export const ChatScreen: React.FC = () => {
         {
           text: 'Bloquer', style: 'destructive', onPress: async () => {
             try {
-              const { apiClient } = require('../../api');
-              await apiClient.post(`/api/v1/users/${partnerId}/block`);
+              await userService.blockUser(partnerId);
               setIsBlocked(true);
             } catch {
               Alert.alert('Erreur', 'Impossible de bloquer cet utilisateur.');

@@ -97,6 +97,18 @@ export const userService = {
     const res = await apiClient.put<PrivacySettings>(Endpoints.users.privacy, data);
     return res.data;
   },
+  async blockUser(userId: string): Promise<void> {
+    await apiClient.post(Endpoints.users.block(userId));
+  },
+
+  async unblockUser(userId: string): Promise<void> {
+    await apiClient.delete(Endpoints.users.block(userId));
+  },
+
+  async getBlockedUsers(): Promise<UserPublic[]> {
+    const res = await apiClient.get<UserPublic[]>(Endpoints.users.blocked);
+    return res.data;
+  },
 };
 
 export interface PrivacySettings {

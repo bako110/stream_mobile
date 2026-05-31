@@ -503,7 +503,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   // ── Actions modération
   const handleAccept = useCallback(async (req: HandRequest) => {
     try {
-      await apiClient.post(Endpoints.lives.invite(liveId, req.identity));
+      await liveService.invite(liveId, req.identity);
       setOnStage(prev => new Set([...prev, req.identity]));
       setHandRequests(prev => prev.filter(r => r.identity !== req.identity));
       if (handRequests.length <= 1) setShowRequests(false);
@@ -519,7 +519,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
 
   const handleDemote = useCallback(async (identity: string, name: string) => {
     try {
-      await apiClient.post(Endpoints.lives.demote(liveId, identity));
+      await liveService.demote(liveId, identity);
       setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
       addSysMsg(`${name} a été redescendu de scène`);
     } catch {
@@ -534,7 +534,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         text: 'Exclure du live',
         onPress: async () => {
           try {
-            await apiClient.post(Endpoints.lives.ban(liveId, identity));
+            await liveService.ban(liveId, identity);
             setHandRequests(prev => prev.filter(r => r.identity !== identity));
             setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
             addSysMsg(`${name} a été exclu du live`);
@@ -555,7 +555,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
                 text: 'Bloquer', style: 'destructive',
                 onPress: async () => {
                   try {
-                    await apiClient.post(Endpoints.lives.blockUser(identity));
+                    await liveService.blockUserFromLives(identity);
                     setHandRequests(prev => prev.filter(r => r.identity !== identity));
                     setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
                     addSysMsg(`${name} a été bloqué de tous tes lives`);
@@ -580,7 +580,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
                 text: 'Confirmer', style: 'destructive',
                 onPress: async () => {
                   try {
-                    await apiClient.post(Endpoints.lives.globalBan(liveId, identity));
+                    await liveService.globalBan(liveId, identity);
                     setHandRequests(prev => prev.filter(r => r.identity !== identity));
                     setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
                     addSysMsg(`${name} a été banni de tous tes lives`);

@@ -640,21 +640,23 @@ export const CommunityChatScreen: React.FC = () => {
   const handleReact = async (msg: CommunityMessage, emoji: string) => {
     setMenuMsg(null);
     try {
-      const res = await apiClient.post<{ reactions: ReactionSummary[] }>(
-        `/api/v1/communities/${communityId}/messages/${msg.id}/react`, { emoji }
-      );
-      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, reactions: res.data.reactions } : m));
-    } catch {}
+      const res = await communityService.reactToMessage(communityId, msg.id, emoji);
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, reactions: res.reactions } : m));
+    } catch {
+      Alert.alert('Erreur', 'Impossible d\'ajouter une réaction.');
+    }
   };
 
   // ── Pin ────────────────────────────────────────────────────────────────────
   const handlePin = async (msg: CommunityMessage, pin: boolean) => {
     setMenuMsg(null);
     try {
-      await apiClient.post(`/api/v1/communities/${communityId}/messages/${msg.id}/pin?pin=${pin}`);
+      await communityService.pinMessage(communityId, msg.id, pin);
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_pinned: pin } : m));
       loadPinned();
-    } catch {}
+    } catch {
+      Alert.alert('Erreur', pin ? 'Impossible d\'épingler le message.' : 'Impossible de désépingler le message.');
+    }
   };
 
   // ── Vote sondage ───────────────────────────────────────────────────────────
@@ -666,11 +668,11 @@ export const CommunityChatScreen: React.FC = () => {
       ? current.filter(v => v !== optionId)
       : msg.poll.allow_multiple ? [...current, optionId] : [optionId];
     try {
-      const res = await apiClient.post<PollData>(
-        `/api/v1/communities/${communityId}/polls/${msg.poll.poll_id}/vote`, { option_ids: newVotes }
-      );
-      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, poll: res.data } : m));
-    } catch {}
+      const res = await communityService.voteOnPoll(communityId, msg.poll.poll_id, newVotes);
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, poll: res as PollData } : m));
+    } catch {
+      Alert.alert('Erreur', 'Impossible d\'enregistrer votre vote.');
+    }
   };
 
   // ── Créer sondage ──────────────────────────────────────────────────────────
@@ -681,10 +683,10 @@ export const CommunityChatScreen: React.FC = () => {
     }
     setSending(true); setPollModal(false);
     try {
-      const res = await apiClient.post(`/api/v1/communities/${communityId}/polls`, {
+      const res = await communityService.createPoll(communityId, {
         question: pollQ.trim(), options: pollOpts.filter(o => o.trim()), allow_multiple: pollMulti,
       });
-      setMessages(prev => [...prev, res.data as CommunityMessage]);
+      setMessages(prev => [...prev, res as CommunityMessage]);
       setPollQ(''); setPollOpts(['', '']); setPollMulti(false);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch { Alert.alert('Erreur', 'Impossible de créer le sondage'); }
@@ -1203,7 +1205,7 @@ export const CommunityChatScreen: React.FC = () => {
         key="media-grid"
         data={all}
         numColumns={3}
-        keyExtractor={(_, i) => String(i)}
+        keyExtractor={(item, i) => `${item}_${i}`}
         renderItem={({ item, index }) => (
           <TouchableOpacity onPress={() => openViewer(all, index)} activeOpacity={0.85}>
             <Image source={{ uri: item }} style={{ width: size, height: size, margin: 0.5 }} resizeMode="cover" />
