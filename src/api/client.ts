@@ -61,20 +61,32 @@ const buildHeaders = (extra?: Record<string, string>): Record<string, string> =>
   return headers;
 };
 
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_NETWORK_RETRIES = 3;
+
 async function request<T>(
   endpoint: string,
   options: RequestOptions = {},
   _retry = false,
+  _networkAttempt = 0,
 ): Promise<ApiResponse<T>> {
   const { method = 'GET', body, headers: extraHeaders, signal } = options;
+
+  // Timeout 30s — annule la requête si le serveur ne répond pas
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
+  const combinedSignal = signal
+    ? (AbortSignal as any).any?.([signal, timeoutController.signal]) ?? timeoutController.signal
+    : timeoutController.signal;
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method,
       headers: buildHeaders(extraHeaders),
       body: body ? JSON.stringify(body) : undefined,
-      signal,
+      signal: combinedSignal,
     });
+    clearTimeout(timeoutId);
 
     let json: any = null;
     if (response.status !== 204) {
@@ -118,8 +130,17 @@ async function request<T>(
 
     return { data: json?.data ?? json, status: response.status, message: json?.message };
   } catch (error) {
+    clearTimeout(timeoutId);
     if (error instanceof ApiError) throw error;
-    throw new ApiError(0, (error as Error).message ?? 'Network error');
+    // Retry automatique sur erreur réseau (pas sur erreurs HTTP)
+    const isNetworkError = (error as Error).name === 'AbortError' || (error as ApiError).status === 0;
+    if (isNetworkError && !_retry && _networkAttempt < MAX_NETWORK_RETRIES) {
+      const delay = Math.pow(2, _networkAttempt) * 500; // 500ms, 1s, 2s
+      await new Promise<void>(res => setTimeout(() => res(), delay));
+      return request<T>(endpoint, options, false, _networkAttempt + 1);
+    }
+    const msg = (error as Error).name === 'AbortError' ? 'Délai dépassé (30s)' : ((error as Error).message ?? 'Network error');
+    throw new ApiError(0, msg);
   }
 }
 

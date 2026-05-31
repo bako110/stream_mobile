@@ -22,6 +22,7 @@ export interface UploadedImage {
 export interface UploadedVideo {
   url:            string;
   public_id:      string;
+  job_id?:        string;
   duration?:      number;
   thumbnail_url?: string;
   hls_url?:       string;
@@ -177,8 +178,8 @@ export async function uploadVideoFromUri(
   const filename    = fileName ?? `video_${Date.now()}.mp4`;
   const token       = getToken();
 
-  // Pour les reels : upload multipart vers le backend pour que FFmpeg
-  // génère les segments HLS. Pour les autres dossiers : upload presigned direct.
+  // Pour les reels : upload multipart async — le backend retourne immédiatement
+  // url + job_id, le HLS est généré en background. On poll jusqu'à done.
   if (folder === 'reels') {
     const filePath = compressed.uri.startsWith('file://')
       ? compressed.uri.slice(7)
@@ -197,7 +198,6 @@ export async function uploadVideoFromUri(
         [{ name: 'file', filename, type: contentType, data: ReactNativeBlobUtil.wrap(filePath) as any }],
       );
     } finally {
-      // Nettoyage garanti même si le fetch throw
       if (compressed.isTempFile) {
         await cleanupTempVideos([compressed.uri]).catch(() => {});
       }
@@ -210,9 +210,41 @@ export async function uploadVideoFromUri(
     }
 
     const data = res!.json() as any;
+    const jobId: string | undefined = data.job_id;
+
+    // Poll le statut HLS jusqu'à done (max 3min, poll toutes les 4s)
+    if (jobId) {
+      const MAX_POLLS = 45;
+      const POLL_INTERVAL_MS = 4_000;
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise<void>(r => setTimeout(() => r(), POLL_INTERVAL_MS));
+        try {
+          const statusRes = await ReactNativeBlobUtil.fetch(
+            'GET',
+            `${API_BASE_URL}/api/v1/upload/video/status/${jobId}`,
+            { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          );
+          const status = statusRes.json() as any;
+          if (status.status === 'done') {
+            return {
+              url:           status.url  ?? data.url,
+              public_id:     data.public_id ?? data.url,
+              job_id:        jobId,
+              duration:      status.duration  ?? data.duration,
+              thumbnail_url: status.thumbnail_url ?? undefined,
+              hls_url:       status.hls_url   ?? undefined,
+            };
+          }
+          if (status.status === 'error') break;
+        } catch { /* réseau transitoire — continuer */ }
+      }
+    }
+
+    // Fallback : retourner l'url brute si HLS timeout ou pas de job_id
     return {
       url:           data.url,
       public_id:     data.public_id ?? data.url,
+      job_id:        jobId,
       duration:      data.duration  ?? undefined,
       thumbnail_url: data.thumbnail_url ?? undefined,
       hls_url:       data.hls_url   ?? undefined,

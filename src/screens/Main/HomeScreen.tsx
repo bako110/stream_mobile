@@ -766,9 +766,11 @@ export const HomeScreen: React.FC = () => {
           }
           renderItem={renderHomeItem}
           removeClippedSubviews
-          maxToRenderPerBatch={8}
-          windowSize={8}
-          initialNumToRender={6}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          initialNumToRender={4}
+          updateCellsBatchingPeriod={50}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         />
       )}
 

@@ -556,29 +556,22 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     }
   }, [registerPendingCall]);
 
-  const value = useMemo(() => ({
+  // ── Contexte stable (connexion + actions) — re-render rare ──────────────
+  const stableValue = useMemo(() => ({
     sendMessage,
     isConnected,
     addListener,
     removeListener,
-    unreadMessages,
-    unreadActivity,
-    unreadNotifications,
     refreshUnread,
-    clearUnreadMessages,
-    clearUnreadActivity,
-    clearUnreadNotifications,
     setActiveChat,
-    missedCallCount,
-    clearMissedCalls,
     notifyCallConnected,
     notifyCallEnded,
     markCallAccepted,
     markCallEnded,
     isOutgoingCall,
     drainCallBuffer,
-    pendingIncomingCall,
     clearPendingIncomingCall,
+    pendingIncomingCall,
     lastNewFollower,
     lastCoinTransfer,
     lastGiftReceived,
@@ -593,17 +586,32 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     lastLiveViewersUpdated,
   }), [
     sendMessage, isConnected, addListener, removeListener,
-    unreadMessages, unreadActivity, unreadNotifications,
-    refreshUnread, clearUnreadMessages, clearUnreadActivity, clearUnreadNotifications,
-    setActiveChat, missedCallCount, clearMissedCalls,
+    refreshUnread, setActiveChat,
     notifyCallConnected, notifyCallEnded, markCallAccepted, markCallEnded,
     isOutgoingCall, drainCallBuffer,
     pendingIncomingCall, clearPendingIncomingCall,
     lastNewFollower, lastCoinTransfer, lastGiftReceived, lastStoryAdded,
-    lastStoryView,
-    lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate, lastConcertLive,
-    lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated,
+    lastStoryView, lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate,
+    lastConcertLive, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated,
   ]);
+
+  // ── Contexte compteurs (change souvent) — isolé pour éviter re-renders ──
+  const unreadValue = useMemo(() => ({
+    unreadMessages,
+    unreadActivity,
+    unreadNotifications,
+    missedCallCount,
+    clearUnreadMessages,
+    clearUnreadActivity,
+    clearUnreadNotifications,
+    clearMissedCalls,
+  }), [
+    unreadMessages, unreadActivity, unreadNotifications, missedCallCount,
+    clearUnreadMessages, clearUnreadActivity, clearUnreadNotifications, clearMissedCalls,
+  ]);
+
+  // Merge les deux pour l'interface publique (rétrocompatibilité totale)
+  const value = useMemo(() => ({ ...stableValue, ...unreadValue }), [stableValue, unreadValue]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
