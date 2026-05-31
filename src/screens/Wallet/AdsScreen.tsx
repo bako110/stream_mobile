@@ -8,6 +8,7 @@ import {
   ActivityIndicator, Alert, RefreshControl, ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -219,7 +220,7 @@ export const AdsScreen: React.FC = () => {
           ) : null}
           ListEmptyComponent={
             <View style={s.empty}>
-              <Icon name="megaphone" size={48} color={colors.textTertiary} />
+              <MaterialCommunityIcons name="bullhorn-outline" size={48} color={colors.textTertiary} />
               <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>
                 Aucune campagne
               </Text>

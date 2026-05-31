@@ -398,8 +398,11 @@ const WalletScreen: React.FC = () => {
 
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.headerTitle}>Mon Portefeuille</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Withdraw')}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[s.headerTitle, { flex: 1, textAlign: 'center' }]}>Mon Portefeuille</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Withdraw')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="clock" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -433,7 +436,7 @@ const WalletScreen: React.FC = () => {
             { icon: 'bar-chart-2',   label: 'Créateur',   color: '#E85DAD', screen: 'CreatorDashboard',   show: isMonetized },
             { icon: 'arrow-up-right',label: 'Retirer',    color: '#3FEDB6', screen: 'Withdraw',           show: isMonetized },
             { icon: 'gift',          label: 'Parrainage', color: '#F59E0B', screen: 'Referral',           show: true },
-            { icon: 'megaphone',     label: 'Pub',        color: '#EC4899', screen: 'Ads',                show: true },
+            { icon: 'bullhorn',      label: 'Pub',        color: '#EC4899', screen: 'Ads',                show: true, mci: true },
           ].filter(a => a.show).map(a => (
             <TouchableOpacity
               key={a.screen}
@@ -441,7 +444,10 @@ const WalletScreen: React.FC = () => {
               onPress={() => navigation.navigate(a.screen)}
             >
               <View style={[s.actionIcon, { backgroundColor: `${a.color}22` }]}>
-                <Icon name={a.icon} size={22} color={a.color} />
+                {(a as any).mci
+                  ? <MaterialCommunityIcons name={a.icon} size={22} color={a.color} />
+                  : <Icon name={a.icon} size={22} color={a.color} />
+                }
               </View>
               <Text style={s.actionLabel}>{a.label}</Text>
             </TouchableOpacity>
