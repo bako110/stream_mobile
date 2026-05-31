@@ -80,7 +80,7 @@ function formatDate(iso: string): string {
 
 function getInitials(name?: string | null): string {
   if (!name) return '?';
-  return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  return name.split(' ').map(n => n?.[0] ?? '').filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
 }
 
 // ── Styles badges (déclarés ici pour être disponibles avant FeedHeaderBadges) ─
@@ -113,7 +113,7 @@ interface AdData {
 
 const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (url: string) => void }> = React.memo(
   ({ ad, colors, onImpression, onPress }) => {
-    useEffect(() => { onImpression(ad.id); }, [ad.id, onImpression]);
+    useEffect(() => { if (ad?.id) onImpression(ad.id); }, [ad?.id, onImpression]);
     return (
       <View style={{ backgroundColor: colors.surface, marginVertical: 4, marginHorizontal: 0 }}>
         {(ad.creative_url || ad.thumbnail_url) ? (
@@ -167,7 +167,7 @@ const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
 }) => {
   const artist = c.artist;
   const artistName = artist?.display_name ?? artist?.username ?? 'Artiste';
-  const initial = artistName[0]?.toUpperCase() ?? '?';
+  const initial = (artistName || 'A')[0].toUpperCase();
   const onPress = useCallback(() => {
     if (isOwn) onNavLiveStream(c.id);
     else onNavLiveViewer(c.id);
@@ -287,7 +287,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
             {spontLives.map(live => {
               const liveName = live.user?.display_name ?? live.user?.username ?? 'Utilisateur';
-              const liveInitial = liveName[0]?.toUpperCase() ?? '?';
+              const liveInitial = (liveName || 'U')[0].toUpperCase();
               return (
                 <TouchableOpacity
                   key={live.id}
@@ -389,7 +389,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                   <View style={[nbS.cardBody, { paddingTop: 14 }]}>
                     <TouchableOpacity onPress={() => onNavEvent(ev.id)} activeOpacity={0.8} style={{ alignItems: 'center', width: '100%' }}>
                       <Text style={[nbS.name, { color: colors.textPrimary }]} numberOfLines={1}>{ev.title}</Text>
-                      {ev.starts_at && (
+                      {ev.starts_at && !isNaN(new Date(ev.starts_at).getTime()) && (
                         <Text style={[nbS.handle, { color: colors.textTertiary }]}>
                           {new Date(ev.starts_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                           {ev.venue_city ? ` · ${ev.venue_city}` : ''}
@@ -697,8 +697,8 @@ export const FeedScreen: React.FC = () => {
             id: item.id,
             data: item,
           }));
-        const reelItems: FeedItem[] = (reelsResult.items ?? [])
-          .filter((r: any) => r.id)
+        const reelItems: FeedItem[] = (Array.isArray(reelsResult?.items) ? reelsResult.items : Array.isArray(reelsResult) ? reelsResult : [])
+          .filter((r: any) => r?.id)
           .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
         const postItems: FeedItem[] = (Array.isArray(postsResult) ? postsResult : [])
           .filter((p: Post) => p.id)
@@ -1691,7 +1691,7 @@ export const FeedScreen: React.FC = () => {
                             <Image source={{ uri: u.avatar_url }} style={{ width: 52, height: 52, borderRadius: 26 }} />
                           ) : (
                             <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#7B3FF2' + '20', alignItems: 'center', justifyContent: 'center' }}>
-                              <Text style={{ fontSize: 20, fontWeight: '800', color: '#7B3FF2' }}>{((u.display_name ?? u.username) as string)[0].toUpperCase()}</Text>
+                              <Text style={{ fontSize: 20, fontWeight: '800', color: '#7B3FF2' }}>{((u.display_name ?? u.username ?? '?')[0] ?? '?').toUpperCase()}</Text>
                             </View>
                           )}
                           <View style={{ flex: 1 }}>
@@ -1952,7 +1952,7 @@ export const FeedScreen: React.FC = () => {
                 ) : (
                   <View style={[mnu.profileAvatar, { backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }]}>
                     <Text style={{ fontSize: 22, fontWeight: '800', color: colors.primary }}>
-                      {(currentUser.display_name ?? currentUser.username ?? '?')[0].toUpperCase()}
+                      {((currentUser.display_name ?? currentUser.username ?? '?')[0] ?? '?').toUpperCase()}
                     </Text>
                   </View>
                 )}
@@ -3000,18 +3000,21 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const event    = isEvent  ? (item.data as any) : null;
   const concert  = isConcert ? (item.data as any) : null;
 
-  const title     = isEvent ? event.title : concert.title;
-  const date      = isEvent ? event.starts_at : concert.scheduled_at;
-  const city      = isEvent ? event.venue_city : concert.venue_city;
-  const desc      = isEvent ? event.description : concert.description;
-  const thumbUrl  = isEvent
-    ? (event.thumbnail_url ?? event.banner_url)
-    : (concert.thumbnail_url ?? concert.banner_url);
-  const videoUrl  = isEvent ? (event.hls_url ?? event.video_url) : (concert.hls_url ?? concert.video_url);
+  // Guard — si data null/undefined on ne peut pas render
+  if (!event && !concert) return null;
 
-  const isFree = isEvent ? event.access_type === 'free' : concert.access_type === 'free';
-  const isLive = isConcert && concert.status === 'live';
-  const price  = isEvent ? event.ticket_price : concert.ticket_price;
+  const title     = isEvent ? (event?.title ?? '') : (concert?.title ?? '');
+  const date      = isEvent ? event?.starts_at : concert?.scheduled_at;
+  const city      = isEvent ? event?.venue_city : concert?.venue_city;
+  const desc      = isEvent ? event?.description : concert?.description;
+  const thumbUrl  = isEvent
+    ? (event?.thumbnail_url ?? event?.banner_url)
+    : (concert?.thumbnail_url ?? concert?.banner_url);
+  const videoUrl  = isEvent ? (event?.hls_url ?? event?.video_url) : (concert?.hls_url ?? concert?.video_url);
+
+  const isFree = isEvent ? event?.access_type === 'free' : concert?.access_type === 'free';
+  const isLive = isConcert && concert?.status === 'live';
+  const price  = isEvent ? event?.ticket_price : concert?.ticket_price;
 
   const accent   = isEvent ? (EVENT_COLORS[event.event_type] ?? colors.primary) : colors.primary;
   const cardIcon = isEvent ? (EVENT_ICONS[event.event_type]  ?? 'calendar') : 'music';
@@ -3225,12 +3228,15 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const authorId     = author?.id ?? null;
   const authorName   = author?.display_name ?? author?.username ?? 'FoliX';
   const authorAvatar = author?.avatar_url ?? null;
-  const authorInit   = authorName[0]?.toUpperCase() ?? 'F';
+  const authorInit   = (authorName || 'F')[0].toUpperCase();
   const isOwnContent = !!(currentUserId && authorId && currentUserId === authorId);
   const showFollowBtn = !isOwnContent && !!authorId;
   const publishedAt  = isEvent ? (event?.published_at ?? event?.created_at) : (concert?.published_at ?? concert?.created_at);
   const timeAgo = (() => {
-    const diff = (Date.now() - new Date(publishedAt).getTime()) / 1000;
+    if (!publishedAt) return '';
+    const parsed = new Date(publishedAt);
+    if (isNaN(parsed.getTime())) return '';
+    const diff = (Date.now() - parsed.getTime()) / 1000;
     if (diff < 60)   return 'À l\'instant';
     if (diff < 3600) return `${Math.floor(diff / 60)} min`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
