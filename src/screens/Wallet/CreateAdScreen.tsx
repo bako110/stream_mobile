@@ -85,7 +85,7 @@ export const CreateAdScreen: React.FC = () => {
         await adService.create(payload);
         Alert.alert(
           'Campagne créée !',
-          'Ta campagne est en attente de validation. Elle sera activée sous 24h.',
+          'Ta pub est maintenant active et sera diffusée dans le feed.',
         );
       }
       nav.goBack();
@@ -284,10 +284,10 @@ export const CreateAdScreen: React.FC = () => {
 
         {/* Info validation */}
         {!isEdit && (
-          <View style={[s.infoBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-            <Icon name="info" size={14} color={colors.textTertiary} />
-            <Text style={[s.infoTxt, { color: colors.textTertiary }]}>
-              Ta campagne sera soumise à validation avant d'être diffusée (délai max 24h).
+          <View style={[s.infoBox, { backgroundColor: '#10B98122', borderColor: '#10B98144' }]}>
+            <Icon name="zap" size={14} color="#10B981" />
+            <Text style={[s.infoTxt, { color: '#10B981' }]}>
+              Ta pub sera diffusée immédiatement dans le feed après création.
             </Text>
           </View>
         )}
