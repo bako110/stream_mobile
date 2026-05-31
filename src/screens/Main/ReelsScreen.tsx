@@ -244,7 +244,7 @@ export const ReelsScreen: React.FC = () => {
     setSearching(true);
     try {
       const data = await reelService.search(q.trim(), 1, 20);
-      if (mountedRef.current) setSearchResults(data.items.filter((r: Reel) => !!r.video_url));
+      if (mountedRef.current) setSearchResults(data.items.filter((r: Reel) => !!r.hls_url));
     } catch {
       if (mountedRef.current) setSearchResults([]);
     } finally {
