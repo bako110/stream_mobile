@@ -1,146 +1,90 @@
 import React, { useEffect } from 'react';
 import {
   View, Text, StyleSheet, Dimensions,
-  StatusBar, TouchableOpacity,
+  StatusBar, TouchableOpacity, Image,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle,
-  withTiming, withDelay, withRepeat, withSequence,
-  Easing, interpolate, Extrapolation,
+  withTiming, withDelay, withSpring,
+  Easing,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { AppLogo } from '../../components/common';
 import { useTheme } from '../../hooks/useTheme';
+import { getLogo } from '../../assets';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-// Echelle responsive
-const hs = (size: number) => Math.round(size * (H / 812));
-const ws = (size: number) => Math.round(size * (W / 375));
-
 interface Props {
-  onFinish: () => void;
-  onLogin?: () => void;
-  onGoCGU?: () => void;
+  onFinish:    () => void;
+  onLogin?:    () => void;
+  onGoCGU?:    () => void;
   onGoPrivacy?: () => void;
 }
 
-// ── Orbe lumineux animé ───────────────────────────────────────────────────────
-const Orb: React.FC<{
-  x: number; y: number; r: number;
-  color: string; opacity: number; delay: number; duration: number;
-}> = ({ x, y, r, color, opacity, delay, duration }) => {
-  const scale   = useSharedValue(1);
-  const anim_op = useSharedValue(0);
-
-  useEffect(() => {
-    anim_op.value = withDelay(delay, withTiming(1, { duration: 800 }));
-    scale.value   = withDelay(delay, withRepeat(
-      withSequence(
-        withTiming(1.18, { duration, easing: Easing.inOut(Easing.sin) }),
-        withTiming(1,    { duration, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1, false,
-    ));
-  }, []);
-
-  const anim = useAnimatedStyle(() => ({
-    opacity:   interpolate(anim_op.value, [0, 1], [0, opacity], Extrapolation.CLAMP),
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[anim, {
-        position: 'absolute',
-        left: x - r, top: y - r,
-        width: r * 2, height: r * 2,
-        borderRadius: r,
-        backgroundColor: color,
-      }]}
-    />
-  );
-};
-
 // ── Feature pill ──────────────────────────────────────────────────────────────
-const FeaturePill: React.FC<{
+const Pill: React.FC<{
   icon: string; label: string; delay: number;
-  isDark: boolean; pillBg: string; pillBorder: string; textColor: string;
-}> = ({ icon, label, delay, pillBg, pillBorder, textColor }) => {
+  bg: string; border: string; txt: string;
+}> = ({ icon, label, delay, bg, border, txt }) => {
   const opacity = useSharedValue(0);
-  const tx      = useSharedValue(-16);
+  const ty      = useSharedValue(14);
 
   useEffect(() => {
-    opacity.value = withDelay(delay, withTiming(1, { duration: 500 }));
-    tx.value      = withDelay(delay, withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }));
-  }, []);
+    opacity.value = withDelay(delay, withTiming(1, { duration: 400 }));
+    ty.value      = withDelay(delay, withSpring(0, { damping: 16, stiffness: 160 }));
+  }, []); // eslint-disable-line
 
   const anim = useAnimatedStyle(() => ({
-    opacity:   opacity.value,
-    transform: [{ translateX: tx.value }],
+    opacity: opacity.value,
+    transform: [{ translateY: ty.value }],
   }));
 
   return (
-    <Animated.View style={[{
-      flexDirection: 'row', alignItems: 'center',
-      gap: ws(6), paddingHorizontal: ws(14), paddingVertical: hs(7),
-      borderRadius: 20, backgroundColor: pillBg,
-      borderWidth: 1, borderColor: pillBorder,
-    }, anim]}>
-      <Icon name={icon} size={ws(13)} color={textColor} />
-      <Text style={{ fontSize: ws(12), fontWeight: '600', color: textColor, letterSpacing: 0.2 }}>
-        {label}
-      </Text>
+    <Animated.View style={[s.pill, { backgroundColor: bg, borderColor: border }, anim]}>
+      <Icon name={icon} size={13} color={txt} />
+      <Text style={[s.pillTxt, { color: txt }]}>{label}</Text>
     </Animated.View>
   );
 };
 
-// ── Screen ────────────────────────────────────────────────────────────────────
+// ── OnboardingScreen ──────────────────────────────────────────────────────────
 export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, onGoPrivacy }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
-  const logoScale    = useSharedValue(0.72);
-  const logoOpacity  = useSharedValue(0);
-  const titleOpacity = useSharedValue(0);
-  const titleY       = useSharedValue(28);
-  const ctaOpacity   = useSharedValue(0);
-  const ctaY         = useSharedValue(24);
+  // ── Couleurs selon le mode ────────────────────────────────────────────────
+  const bg         = isDark ? '#09071C' : '#F5F3FF';
+  const headline   = isDark ? '#FFFFFF' : '#0D0B2A';
+  const sub        = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(13,11,42,0.55)';
+  const accent     = '#C872FF';
+  const pillBg     = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(123,63,242,0.08)';
+  const pillBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(123,63,242,0.2)';
+  const pillTxt    = isDark ? 'rgba(255,255,255,0.75)' : '#7B3FF2';
+  const loginColor = isDark ? 'rgba(255,255,255,0.4)'  : 'rgba(13,11,42,0.45)';
+  const legalColor = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(13,11,42,0.35)';
+  const glowOp     = isDark ? 0.18 : 0.10;
+
+  // ── Animations ────────────────────────────────────────────────────────────
+  const logoOp = useSharedValue(0);
+  const logoY  = useSharedValue(-20);
+  const textOp = useSharedValue(0);
+  const textY  = useSharedValue(30);
+  const ctaOp  = useSharedValue(0);
+  const ctaY   = useSharedValue(30);
 
   useEffect(() => {
-    logoOpacity.value  = withDelay(200, withTiming(1, { duration: 700 }));
-    logoScale.value    = withDelay(200, withTiming(1, { duration: 700, easing: Easing.out(Easing.back(1.6)) }));
-    titleOpacity.value = withDelay(650, withTiming(1, { duration: 600 }));
-    titleY.value       = withDelay(650, withTiming(0, { duration: 600, easing: Easing.out(Easing.cubic) }));
-    ctaOpacity.value   = withDelay(1100, withTiming(1, { duration: 500 }));
-    ctaY.value         = withDelay(1100, withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }));
-  }, []);
+    logoOp.value = withDelay(200, withTiming(1,  { duration: 600 }));
+    logoY.value  = withDelay(200, withSpring(0,  { damping: 14, stiffness: 120 }));
+    textOp.value = withDelay(600, withTiming(1,  { duration: 600 }));
+    textY.value  = withDelay(600, withTiming(0,  { duration: 600, easing: Easing.out(Easing.cubic) }));
+    ctaOp.value  = withDelay(1000, withTiming(1, { duration: 500 }));
+    ctaY.value   = withDelay(1000, withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }));
+  }, []); // eslint-disable-line
 
-  const logoAnim  = useAnimatedStyle(() => ({
-    opacity:   logoOpacity.value,
-    transform: [{ scale: logoScale.value }],
-  }));
-  const titleAnim = useAnimatedStyle(() => ({
-    opacity:   titleOpacity.value,
-    transform: [{ translateY: titleY.value }],
-  }));
-  const ctaAnim   = useAnimatedStyle(() => ({
-    opacity:   ctaOpacity.value,
-    transform: [{ translateY: ctaY.value }],
-  }));
-
-  // Couleurs adaptées au thème
-  const bg          = isDark ? '#050816' : colors.background;
-  const headline    = colors.textPrimary;
-  const sub         = colors.textSecondary;
-  const pillBg      = isDark ? 'rgba(255,255,255,0.06)' : colors.backgroundSecondary;
-  const pillBorder  = isDark ? 'rgba(255,255,255,0.10)' : colors.border;
-  const pillText    = colors.textSecondary;
-  const loginText   = colors.textTertiary;
-  // Orbes : opacité réduite en mode clair pour rester discret
-  const orbOpacity  = isDark ? 0.50 : 0.22;
+  const logoAnim = useAnimatedStyle(() => ({ opacity: logoOp.value, transform: [{ translateY: logoY.value }] }));
+  const textAnim = useAnimatedStyle(() => ({ opacity: textOp.value, transform: [{ translateY: textY.value }] }));
+  const ctaAnim  = useAnimatedStyle(() => ({ opacity: ctaOp.value,  transform: [{ translateY: ctaY.value }] }));
 
   return (
     <View style={[s.root, { backgroundColor: bg }]}>
@@ -150,109 +94,95 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
         translucent
       />
 
-      {/* Gradient de fond */}
+      {/* Fond dégradé */}
       <LinearGradient
         colors={isDark
-          ? [bg, '#0A0820', bg]
-          : [colors.background, colors.backgroundSecondary, colors.background]}
-        locations={[0, 0.5, 1]}
+          ? ['#09071C', '#130B2E', '#1A0A20']
+          : ['#F5F3FF', '#EDE8FF', '#F9F5FF']}
+        locations={[0, 0.55, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Orbes — couleurs brand du thème */}
-      <Orb x={W * 0.18} y={H * 0.28} r={W * 0.58} color={colors.primary}      opacity={orbOpacity}        delay={0}   duration={4200} />
-      <Orb x={W * 0.82} y={H * 0.38} r={W * 0.48} color={colors.gradientEnd}   opacity={orbOpacity}        delay={600} duration={3800} />
-      <Orb x={W * 0.50} y={H * 0.72} r={W * 0.53} color={colors.accentOrange}  opacity={orbOpacity * 0.7}  delay={300} duration={5000} />
+      {/* Lueurs de fond */}
+      <View style={[s.glow, {
+        top: -H * 0.1, left: -W * 0.2,
+        width: W * 0.9, height: W * 0.9,
+        backgroundColor: '#7B3FF2', opacity: glowOp,
+      }]} />
+      <View style={[s.glow, {
+        bottom: H * 0.08, right: -W * 0.3,
+        width: W * 0.8, height: W * 0.8,
+        backgroundColor: '#E0389A', opacity: glowOp,
+      }]} />
 
-      {/* Ligne de séparation lumineuse */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute', top: H * 0.48, left: 0, right: 0, height: 1,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : colors.divider,
-        }}
-      />
+      {/* Corps */}
+      <View style={s.body}>
 
-      {/* ── Contenu principal ── */}
-      <View style={[s.content, { paddingHorizontal: ws(28), paddingTop: hs(48) }]}>
-
-        <Animated.View style={[{ marginBottom: hs(28) }, logoAnim]}>
-          <AppLogo size="xl" />
+        {/* Logo */}
+        <Animated.View style={[s.logoWrap, logoAnim]}>
+          <View style={s.logoCircle}>
+            <Image
+              source={getLogo(isDark)}
+              style={{ width: 88, height: 88 }}
+              resizeMode="cover"
+            />
+          </View>
         </Animated.View>
 
-        <Animated.View style={[{ alignItems: 'center', marginBottom: hs(28) }, titleAnim]}>
-          <Text style={{
-            fontSize: ws(42), fontWeight: '900', color: headline,
-            textAlign: 'center', lineHeight: ws(42) * 1.18,
-            letterSpacing: -1, marginBottom: hs(16),
-          }}>
-            Tout ce que{'\n'}vous aimez,{'\n'}
-            <Text style={{ color: colors.primary }}>ici.</Text>
+        {/* Titre + sous-titre */}
+        <Animated.View style={[{ alignItems: 'center' }, textAnim]}>
+          <Text style={[s.headline, { color: headline }]}>
+            Tout ce que{'\n'}vous aimez,{' '}
+            <Text style={{ color: accent }}>ici.</Text>
           </Text>
-          <Text style={{
-            fontSize: ws(14), color: sub,
-            textAlign: 'center', lineHeight: ws(14) * 1.7, fontWeight: '400',
-          }}>
-            Live, films, events, communautes —{'\n'}une seule app, zero compromis.
+          <Text style={[s.sub, { color: sub }]}>
+            Lives · Films · Événements · Reels{'\n'}Une seule app. Zéro compromis.
           </Text>
         </Animated.View>
 
-        {/* Pills features */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: ws(8) }}>
-          <FeaturePill icon="radio"       label="Concerts live"  delay={900}  isDark={isDark} pillBg={pillBg} pillBorder={pillBorder} textColor={pillText} />
-          <FeaturePill icon="film"        label="Films & series" delay={1010} isDark={isDark} pillBg={pillBg} pillBorder={pillBorder} textColor={pillText} />
-          <FeaturePill icon="calendar"    label="Evenements"     delay={1120} isDark={isDark} pillBg={pillBg} pillBorder={pillBorder} textColor={pillText} />
-          <FeaturePill icon="play-circle" label="Reels & feed"   delay={1230} isDark={isDark} pillBg={pillBg} pillBorder={pillBorder} textColor={pillText} />
+        {/* Pills */}
+        <View style={s.pills}>
+          <Pill icon="radio"       label="Concerts live"  delay={900}  bg={pillBg} border={pillBorder} txt={pillTxt} />
+          <Pill icon="film"        label="Films & séries" delay={1000} bg={pillBg} border={pillBorder} txt={pillTxt} />
+          <Pill icon="calendar"    label="Événements"     delay={1100} bg={pillBg} border={pillBorder} txt={pillTxt} />
+          <Pill icon="play-circle" label="Reels"          delay={1200} bg={pillBg} border={pillBorder} txt={pillTxt} />
+          <Pill icon="users"       label="Communautés"    delay={1300} bg={pillBg} border={pillBorder} txt={pillTxt} />
         </View>
 
       </View>
 
-      {/* ── CTA fixe en bas ── */}
-      <Animated.View style={[{ paddingHorizontal: ws(24), paddingBottom: hs(48), gap: hs(4) }, ctaAnim]}>
+      {/* CTA bas */}
+      <Animated.View style={[s.cta, ctaAnim]}>
 
-        <TouchableOpacity onPress={onFinish} activeOpacity={0.86}>
+        {/* Bouton principal */}
+        <TouchableOpacity onPress={onFinish} activeOpacity={0.88} style={{ width: '100%' }}>
           <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-              gap: ws(10), paddingVertical: hs(17), borderRadius: ws(18),
-            }}
+            colors={['#7B3FF2', '#C044E8', '#E0389A']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={s.ctaBtn}
           >
-            <Text style={{ fontSize: ws(16), fontWeight: '800', color: '#fff', letterSpacing: 0.1 }}>
-              Rejoindre FoliX
-            </Text>
-            <Icon name="arrow-right" size={ws(18)} color="#fff" />
+            <Text style={s.ctaBtnTxt}>Rejoindre FoliX</Text>
+            <Icon name="arrow-right" size={18} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={onLogin ?? onFinish}
-          activeOpacity={0.7}
-          style={{ alignSelf: 'center', paddingVertical: hs(14) }}
-        >
-          <Text style={{ fontSize: ws(14), color: loginText, textAlign: 'center' }}>
-            Deja membre ?{'  '}
-            <Text style={{ color: colors.primary, fontWeight: '700' }}>Connexion</Text>
+        {/* Connexion */}
+        <TouchableOpacity onPress={onLogin ?? onFinish} activeOpacity={0.7} style={s.loginBtn}>
+          <Text style={[s.loginTxt, { color: loginColor }]}>
+            Déjà membre ?{'  '}
+            <Text style={{ color: accent, fontWeight: '700' }}>Connexion</Text>
           </Text>
         </TouchableOpacity>
 
-        {/* Texte legal CGU + Confidentialite */}
-        <Text style={{ fontSize: ws(11), color: loginText, textAlign: 'center', lineHeight: ws(11) * 1.7, paddingHorizontal: ws(8) }}>
+        {/* Légal */}
+        <Text style={[s.legal, { color: legalColor }]}>
           En continuant, vous acceptez nos{' '}
-          <Text
-            style={{ color: colors.primary, fontWeight: '600' }}
-            onPress={onGoCGU}
-          >
+          <Text style={[s.legalLink, { color: isDark ? '#C872FF' : '#7B3FF2' }]} onPress={onGoCGU}>
             Conditions d'utilisation
           </Text>
           {' '}et notre{' '}
-          <Text
-            style={{ color: colors.primary, fontWeight: '600' }}
-            onPress={onGoPrivacy}
-          >
-            Politique de confidentialite
+          <Text style={[s.legalLink, { color: isDark ? '#C872FF' : '#7B3FF2' }]} onPress={onGoPrivacy}>
+            Politique de confidentialité
           </Text>
           .
         </Text>
@@ -263,6 +193,67 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
 };
 
 const s = StyleSheet.create({
-  root:    { flex: 1 },
-  content: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1 },
+  glow: { position: 'absolute', borderRadius: 999 },
+
+  body: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    gap: 28,
+    paddingTop: 60,
+  },
+
+  logoWrap:   { alignItems: 'center' },
+  logoCircle: {
+    width: 88, height: 88,
+    borderRadius: 44,         // parfaitement rond
+    overflow: 'hidden',       // coupe les coins du fond foncé de l'image
+    shadowColor: '#7B3FF2',
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+
+  headline: {
+    fontSize: 38, fontWeight: '900',
+    textAlign: 'center', lineHeight: 46,
+    letterSpacing: -1, marginBottom: 12,
+  },
+  sub: {
+    fontSize: 15, textAlign: 'center',
+    lineHeight: 24, fontWeight: '400',
+  },
+
+  pills: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    justifyContent: 'center', gap: 8,
+  },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 20, borderWidth: 1,
+  },
+  pillTxt: { fontSize: 12, fontWeight: '600', letterSpacing: 0.1 },
+
+  cta: {
+    paddingHorizontal: 24, paddingBottom: 44,
+    gap: 4, alignItems: 'center',
+  },
+  ctaBtn: {
+    width: '100%',
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 10,
+    paddingVertical: 17, borderRadius: 18,
+    shadowColor: '#7B3FF2', shadowOpacity: 0.5,
+    shadowRadius: 16, shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+  ctaBtnTxt: { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: 0.1 },
+  loginBtn:  { alignSelf: 'center', paddingVertical: 14 },
+  loginTxt:  { fontSize: 14, textAlign: 'center' },
+  legal:     { fontSize: 11, textAlign: 'center', lineHeight: 18, paddingHorizontal: 8 },
+  legalLink: { fontWeight: '600' },
 });
