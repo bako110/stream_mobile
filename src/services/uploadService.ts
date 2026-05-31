@@ -209,19 +209,23 @@ export async function uploadVideoFromUri(
       throw new Error(detail);
     }
 
+    // Upload multipart terminé → 70%
+    onProgress?.(70);
+
     const data = res!.json() as any;
     const jobId: string | undefined = data.job_id;
 
     // Poll le statut HLS jusqu'à done (max 5min, poll toutes les 4s)
-    // Retry réseau : 3 tentatives consécutives avant d'abandonner
     if (jobId) {
-      const MAX_POLLS = 75;          // 75 × 4s = 5 minutes
+      const MAX_POLLS = 75;
       const POLL_INTERVAL_MS = 4_000;
       const MAX_NETWORK_ERRORS = 3;
       let networkErrors = 0;
 
       for (let i = 0; i < MAX_POLLS; i++) {
         await new Promise<void>(r => setTimeout(() => r(), POLL_INTERVAL_MS));
+        // Progression pendant le poll : 70% → 95% sur 75 polls
+        onProgress?.(Math.min(95, 70 + Math.round(i * 25 / MAX_POLLS)));
         try {
           const statusRes = await ReactNativeBlobUtil.fetch(
             'GET',
@@ -229,8 +233,9 @@ export async function uploadVideoFromUri(
             { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           );
           const status = statusRes.json() as any;
-          networkErrors = 0; // reset sur succès réseau
+          networkErrors = 0;
           if (status.status === 'done') {
+            onProgress?.(100);
             return {
               url:           status.url  ?? data.url,
               public_id:     data.public_id ?? data.url,
@@ -243,7 +248,7 @@ export async function uploadVideoFromUri(
           if (status.status === 'error') break;
         } catch {
           networkErrors++;
-          if (networkErrors >= MAX_NETWORK_ERRORS) break; // abandon après 3 erreurs consécutives
+          if (networkErrors >= MAX_NETWORK_ERRORS) break;
         }
       }
     }
