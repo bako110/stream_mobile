@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { BackButton } from '../../components/common';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -917,13 +918,7 @@ export const CommunitiesScreen: React.FC = () => {
       }]}>
         {/* Titre + bouton + */}
         <View style={S.headerRow}>
-          <TouchableOpacity
-            onPress={() => nav.goBack()}
-            style={S.backBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => nav.goBack()} />
           <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Communautés</Text>
           <TouchableOpacity
             onPress={() => { resetForm(); setCreateOpen(true); }}

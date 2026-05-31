@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { BackButton } from '../../components/common';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
@@ -246,13 +247,7 @@ export const NearbyEventsScreen: React.FC = () => {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: Platform.OS === 'ios' ? 56 : 44 }]}>
         <View style={st.headerContent}>
-          <TouchableOpacity
-            onPress={() => nav.goBack()}
-            style={[st.backBtn, { backgroundColor: colors.backgroundSecondary }]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => nav.goBack()} />
 
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Près de toi</Text>

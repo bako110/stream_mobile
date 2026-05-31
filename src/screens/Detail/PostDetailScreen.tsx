@@ -15,7 +15,7 @@ import Animated, {
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
-import { CommentsBottomSheet, ShareBottomSheet, ExpandableText, SkeletonPostDetail, LikersBottomSheet } from '../../components/common';
+import { CommentsBottomSheet, ShareBottomSheet, ExpandableText, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import type { Post } from '../../types/post';
 
@@ -721,13 +721,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
       {/* Top bar */}
       <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
-          onPress={onBack}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={[s.topBtn, { backgroundColor: colors.backgroundSecondary }]}
-        >
-          <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={onBack} />
         <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
         <TouchableOpacity
           onPress={handleShare}

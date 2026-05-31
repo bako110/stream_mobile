@@ -13,7 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { ExpandableText } from '../../components/common';
+import { BackButton } from '../../components/common';
 import { contentService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -339,13 +339,9 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Bouton retour fixe */}
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={[fh.backBtn, { top: insets.top + 8 }]}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Icon name="arrow-left" size={20} color="#fff" />
-      </TouchableOpacity>
+      <View style={[fh.backBtn, { top: insets.top + 8 }]}>
+        <BackButton onPress={() => navigation.goBack()} transparent color="#fff" />
+      </View>
 
       {/* Header titre au scroll */}
       <Animated.View style={[fh.titleBar, { top: insets.top, backgroundColor: colors.background }, headerStyle]}>

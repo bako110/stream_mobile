@@ -18,7 +18,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail, CommentsBottomSheet, ExpandableText } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, authService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
@@ -524,10 +524,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Bouton retour flottant */}
-      <TouchableOpacity onPress={onBack}
-        style={ds.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Icon name="arrow-left" size={20} color="#fff" />
-      </TouchableOpacity>
+      <BackButton onPress={onBack} transparent color="#fff" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 

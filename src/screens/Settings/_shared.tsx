@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
@@ -52,11 +53,9 @@ export const PageHeader: React.FC<{ title: string; onBack: () => void }> = ({ ti
   const { colors } = theme;
   return (
     <View style={[sh.header, { borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
-      <TouchableOpacity onPress={onBack} style={sh.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-        <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-      </TouchableOpacity>
+      <BackButton onPress={onBack} />
       <Text style={[sh.title, { color: colors.textPrimary }]}>{title}</Text>
-      <View style={{ width: 44 }} />
+      <View style={{ width: 40 }} />
     </View>
   );
 };

@@ -7,6 +7,7 @@ import {
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { BackButton } from '../../components/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
@@ -215,12 +216,9 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           />
 
           {/* Retour */}
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={[s.backBtn, { top: insets.top + 8 }]}
-          >
-            <Icon name="arrow-left" size={20} color="#fff" />
-          </TouchableOpacity>
+          <View style={[s.backBtn, { top: insets.top + 8 }]}>
+            <BackButton onPress={() => navigation.goBack()} transparent color="#fff" />
+          </View>
 
           {/* Premium / Accès */}
           {item.is_premium && (

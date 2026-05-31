@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { BackButton } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -1208,9 +1209,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         backgroundColor: colors.surface,
         borderBottomColor: colors.divider,
       }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={s.headerIcon}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           {community.name}
         </Text>
