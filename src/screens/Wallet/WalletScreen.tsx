@@ -433,6 +433,7 @@ const WalletScreen: React.FC = () => {
             { icon: 'bar-chart-2',   label: 'Créateur',   color: '#E85DAD', screen: 'CreatorDashboard',   show: isMonetized },
             { icon: 'arrow-up-right',label: 'Retirer',    color: '#3FEDB6', screen: 'Withdraw',           show: isMonetized },
             { icon: 'gift',          label: 'Parrainage', color: '#F59E0B', screen: 'Referral',           show: true },
+            { icon: 'megaphone',     label: 'Pub',        color: '#EC4899', screen: 'Ads',                show: true },
           ].filter(a => a.show).map(a => (
             <TouchableOpacity
               key={a.screen}

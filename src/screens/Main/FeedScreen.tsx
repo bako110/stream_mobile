@@ -116,9 +116,9 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
     useEffect(() => { onImpression(ad.id); }, [ad.id, onImpression]);
     return (
       <View style={{ backgroundColor: colors.surface, marginVertical: 4, marginHorizontal: 0 }}>
-        {ad.creative_url || ad.thumbnail_url ? (
+        {(ad.creative_url || ad.thumbnail_url) ? (
           <Image
-            source={{ uri: ad.creative_url ?? ad.thumbnail_url! }}
+            source={{ uri: (ad.creative_url || ad.thumbnail_url) as string }}
             style={{ width: '100%', height: 180 }}
             resizeMode="cover"
           />
@@ -130,7 +130,7 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
             </View>
           </View>
           <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 4 }} numberOfLines={2}>
-            {ad.title}
+            {ad.title ?? ''}
           </Text>
           {ad.description ? (
             <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 8 }} numberOfLines={2}>
@@ -325,7 +325,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                     {/* Viewers */}
                     <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
                       <Icon name="eye" size={9} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{live.current_viewers}</Text>
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{live.current_viewers ?? 0}</Text>
                     </View>
 
                     {/* Avatar centré */}
@@ -680,7 +680,7 @@ export const FeedScreen: React.FC = () => {
         setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
         const commData: CommunityData[] = Array.isArray(commResult)
           ? commResult.slice(0, 5)
-          : Array.isArray((commResult as any)?.items)
+          : Array.isArray((commResult as any)?.items) && (commResult as any).items !== null
             ? (commResult as any).items.slice(0, 5)
             : [];
         setTrendingComm(commData);
@@ -735,7 +735,7 @@ export const FeedScreen: React.FC = () => {
           reelRows.push({
             kind: 'reel_row',
             id: `__reel_row__${r}`,
-            data: chunk.map(ri => ri.data),
+            data: chunk.map(ri => ri.data).filter(Boolean),
           });
         }
 
@@ -1029,6 +1029,7 @@ export const FeedScreen: React.FC = () => {
   // ── renderItem stable ──────────────────────────────────────────────────────
 
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
+    if (!item) return null;
     if (item.kind === 'suggestions') {
       // Extraire le numero de bloc depuis l'id "__suggestions__N"
       const blockNum = parseInt(item.id.split('__suggestions__')[1] ?? '1', 10) || 1;
@@ -1148,6 +1149,7 @@ export const FeedScreen: React.FC = () => {
       );
     }
     if (item.kind === 'post') {
+      if (!item.data) return null;
       const postAuthorId = (item.data as Post).author?.id;
       return (
         <PostCard
@@ -1170,9 +1172,10 @@ export const FeedScreen: React.FC = () => {
         />
       );
     }
+    if (!item.data) return null;
     const aid = item.kind === 'event'
-      ? (item.data as Event).organizer?.id
-      : (item.data as Concert).artist?.id;
+      ? (item.data as Event)?.organizer?.id
+      : (item.data as Concert)?.artist?.id;
     return (
       <FeedCard
         item={item}

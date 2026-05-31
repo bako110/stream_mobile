@@ -95,6 +95,8 @@ import SubscriptionPlansScreen     from '../screens/Wallet/SubscriptionPlansScre
 import SubscriptionPaymentScreen   from '../screens/Wallet/SubscriptionPaymentScreen';
 import MySubscriptionScreen        from '../screens/Wallet/MySubscriptionScreen';
 import MonetisationRequestScreen   from '../screens/Wallet/MonetisationRequestScreen';
+import { AdsScreen }              from '../screens/Wallet/AdsScreen';
+import { CreateAdScreen }         from '../screens/Wallet/CreateAdScreen';
 import { WebQRScannerScreen } from '../screens/Auth/WebQRScannerScreen';
 import { SettingsWalletScreen }        from '../screens/Settings/SettingsWalletScreen';
 import { SettingsMonetisationScreen }  from '../screens/Settings/SettingsMonetisationScreen';
@@ -199,6 +201,8 @@ export type MainStackParamList = {
   SubscriptionPayment:      { plan: string; walletCheck: any };
   MySubscription:           undefined;
   MonetisationRequest:      undefined;
+  Ads:                      undefined;
+  CreateAd:                 { ad: any | null };
   AdminVerification:         undefined;
   WebQRScanner:              undefined;
   SettingsWallet:            undefined;
@@ -419,6 +423,8 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Attendees"      component={AttendeesWrapper}      options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="TicketScanner"  component={TicketScannerWrapper}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Wallet"         component={WalletScreen}          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Ads"            component={AdsScreen}             options={{ animation: 'slide_from_right', headerShown: false }} />
+        <Stack.Screen name="CreateAd"       component={CreateAdScreen}        options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="BuyCoins"       component={BuyCoinsScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreatorDashboard" component={CreatorDashboardScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreatorStats"     component={CreatorStatsScreen}     options={{ animation: 'slide_from_right' }} />
