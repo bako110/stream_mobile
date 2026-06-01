@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
-  Platform, PermissionsAndroid, Alert, ActivityIndicator,
+  Platform, PermissionsAndroid, Alert, ActivityIndicator, Animated,
 } from 'react-native';
 import {
   LiveKitRoom,
@@ -55,8 +55,19 @@ const StreamControls: React.FC<{
   const [cameraFront, setCameraFront] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
   const [elapsed,     setElapsed]     = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const bannerY     = useRef(new Animated.Value(-80)).current;
+  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Banner de lancement — slide down, disparaît après 4s
+  useEffect(() => {
+    Animated.spring(bannerY, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 6 }).start();
+    bannerTimer.current = setTimeout(() => {
+      Animated.timing(bannerY, { toValue: -80, duration: 350, useNativeDriver: true }).start();
+    }, 4000);
+    return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); };
+  }, []);
 
   useEffect(() => {
     localParticipant.setCameraEnabled(true).catch(() => {});
@@ -130,6 +141,12 @@ const StreamControls: React.FC<{
           <Icon name="video-off" size={48} color="#666" />
         </View>
       )}
+
+      {/* Banner lancement — slide down, auto-dismiss 4s */}
+      <Animated.View style={[styles.launchBanner, { transform: [{ translateY: bannerY }] }]}>
+        <View style={styles.launchDot} />
+        <Text style={styles.launchTxt}>🎙 Live lancé · tu es en direct !</Text>
+      </Animated.View>
 
       {/* Top overlay */}
       <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={styles.topOverlay}>
@@ -319,4 +336,15 @@ const styles = StyleSheet.create({
   controlBtn:   { alignItems: 'center', gap: 4 },
   controlLabel: { color: '#fff', fontSize: 11 },
   endBtn:       { backgroundColor: '#E53E3E', borderRadius: 24, padding: 12 },
+  launchBanner: {
+    position: 'absolute', top: Platform.OS === 'ios' ? 54 : 36,
+    left: 20, right: 20, zIndex: 99,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(229,62,62,0.92)',
+    borderRadius: 14, paddingVertical: 11, paddingHorizontal: 16,
+    shadowColor: '#E53E3E', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  launchDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
+  launchTxt: { color: '#fff', fontSize: 14, fontWeight: '700', flex: 1 },
 });
