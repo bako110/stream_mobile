@@ -238,13 +238,20 @@ export const CommunityFundScreen: React.FC = () => {
               await apiClient.post(`${BASE}/${c.id}/pay`);
               load();
             } catch (e: any) {
-              const detail = e?.response?.data?.detail ?? 'Impossible de payer.';
-              Alert.alert('Erreur', detail, [
-                { text: 'Fermer', style: 'cancel' },
-                ...(detail.toLowerCase().includes('insuffisant')
-                  ? [{ text: 'Recharger', onPress: () => nav.navigate('BuyCoins') }]
-                  : []),
-              ]);
+              const status = e?.response?.status;
+              const detail = e?.response?.data?.detail ?? '';
+              if (status === 402) {
+                Alert.alert(
+                  'Solde insuffisant',
+                  `Il vous faut ${c.amount_per_member} coins pour participer à cette cotisation.\n\nRechargez votre wallet pour continuer.`,
+                  [
+                    { text: 'Plus tard', style: 'cancel' },
+                    { text: 'Recharger mes coins', onPress: () => nav.navigate('BuyCoins') },
+                  ],
+                );
+              } else {
+                Alert.alert('Erreur', detail || 'Impossible de payer. Réessayez.');
+              }
             } finally { setPaying(null); }
           },
         },
