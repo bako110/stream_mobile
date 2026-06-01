@@ -130,8 +130,9 @@ export const CommunityChatScreen: React.FC = () => {
   const [menuMsg,        setMenuMsg]        = useState<CommunityMessage | null>(null);
   const [pinnedMsgs,     setPinnedMsgs]     = useState<CommunityMessage[]>([]);
   const [showPinned,     setShowPinned]     = useState(false);
-  const [communityTitle,    setCommunityTitle]    = useState(communityName);
-  const [communityVerified, setCommunityVerified] = useState(false);
+  const [communityTitle,      setCommunityTitle]      = useState(communityName);
+  const [communityVerified,   setCommunityVerified]   = useState(false);
+  const [membersOnlyChat,     setMembersOnlyChat]     = useState(false);
   const [typingUsers,    setTypingUsers]    = useState<TypingUser[]>([]);
   const [recordingUsers, setRecordingUsers] = useState<TypingUser[]>([]);
   const recordingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -330,7 +331,10 @@ export const CommunityChatScreen: React.FC = () => {
     }).catch(() => {
       nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
     });
-    communityService.getById(communityId).then(c => setCommunityVerified(c.is_verified)).catch(() => {});
+    communityService.getById(communityId).then(c => {
+      setCommunityVerified(c.is_verified);
+      setMembersOnlyChat(!!(c as any).members_only_chat);
+    }).catch(() => {});
     loadMessages(1, false, 'discussion');
     loadPinned();
   }, [communityId]);
@@ -1520,8 +1524,17 @@ export const CommunityChatScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Barre de saisie — masquée pour non-admin dans Annonces et Sondages */}
-            {(activeTab === 'announcements' || activeTab === 'polls') && !canAnnounce
+            {/* Barre de saisie — masquée selon le mode et le rôle */}
+            {membersOnlyChat && !canAnnounce
+              ? (
+                <View style={[S.readonlyBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+                  <Icon name="lock" size={15} color={colors.textTertiary} />
+                  <Text style={[S.readonlyText, { color: colors.textTertiary }]}>
+                    Seuls les admins et modérateurs peuvent écrire dans ce chat
+                  </Text>
+                </View>
+              )
+            : (activeTab === 'announcements' || activeTab === 'polls') && !canAnnounce
               ? (
                 <View style={[S.readonlyBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
                   <Icon name={activeTab === 'announcements' ? 'bell' : 'bar-chart-2'} size={15} color={colors.textTertiary} />
