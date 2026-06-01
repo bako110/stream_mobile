@@ -133,6 +133,11 @@ export const CommunityChatScreen: React.FC = () => {
   const [communityTitle,      setCommunityTitle]      = useState(communityName);
   const [communityVerified,   setCommunityVerified]   = useState(false);
   const [membersOnlyChat,     setMembersOnlyChat]     = useState(false);
+  const [activeCotisation,    setActiveCotisation]    = useState<{
+    id: string; title: string; amount_per_member: number;
+    progress_pct: number; collected_coins: number; target_amount_coins: number;
+    my_status?: string;
+  } | null>(null);
   const [typingUsers,    setTypingUsers]    = useState<TypingUser[]>([]);
   const [recordingUsers, setRecordingUsers] = useState<TypingUser[]>([]);
   const recordingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -282,6 +287,13 @@ export const CommunityChatScreen: React.FC = () => {
         setCommunityVerified(payload.is_verified);
       } else if (payload.type === 'community_deleted') {
         Alert.alert('Communauté supprimée', 'Cette communauté a été supprimée.', [{ text: 'OK', onPress: () => nav.goBack() }]);
+      } else if (payload.type === 'community_cotisation_created') {
+        const c = payload.cotisation;
+        setActiveCotisation(c);
+      } else if (payload.type === 'community_cotisation_updated') {
+        const c = payload.cotisation;
+        if (c.status === 'active') setActiveCotisation(c);
+        else setActiveCotisation(prev => prev?.id === c.id ? null : prev);
       }
     }, [nav]),
   );
@@ -336,6 +348,12 @@ export const CommunityChatScreen: React.FC = () => {
       setCommunityVerified(c.is_verified);
       setMembersOnlyChat(!!(c as any).members_only_chat);
     }).catch(() => {});
+    // Charger la cotisation active
+    apiClient.get(`/api/v1/communities/${communityId}/cotisations?status=active`)
+      .then((r: any) => {
+        const list = r.data ?? [];
+        if (list.length > 0) setActiveCotisation(list[0]);
+      }).catch(() => {});
     loadMessages(1, false, 'discussion');
     loadPinned();
   }, [communityId]);
@@ -1467,6 +1485,39 @@ export const CommunityChatScreen: React.FC = () => {
           );
         })}
       </View>
+
+      {/* ── Bannière cotisation active ── */}
+      {activeCotisation && activeTab === 'discussion' && (
+        <TouchableOpacity
+          onPress={() => nav.navigate('CommunityFund', { communityId, communityName: communityTitle, myRole })}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={['#10B981', '#059669']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 }}
+          >
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)',
+              alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="dollar-sign" size={16} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
+                Cotisation : {activeCotisation.title}
+              </Text>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>
+                {activeCotisation.amount_per_member} coins par membre · {activeCotisation.progress_pct}% collecté
+              </Text>
+            </View>
+            {/* Barre mini progression */}
+            <View style={{ width: 50, height: 4, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, overflow: 'hidden' }}>
+              <View style={{ width: `${Math.min(activeCotisation.progress_pct, 100)}%` as any,
+                height: 4, backgroundColor: '#fff', borderRadius: 2 }} />
+            </View>
+            <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.7)" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
 
       {/* ── Contenu principal ── */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
