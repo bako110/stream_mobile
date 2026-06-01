@@ -315,11 +315,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
       if (!asset?.uri) return;
       setSending(true);
       const uploaded = await uploadMessageVideo(asset.uri, asset.fileName, asset.type);
+      const videoUrl = uploaded.hls_url ?? uploaded.url;
       const reply_to_id = replyingTo?.id;
       setReplyingTo(null);
       const msg = await communityService.sendChannelMessage(
-        communityId, channelId, null as any, 'video', [uploaded.url], reply_to_id,
-        { duration: uploaded.duration, thumbnail_url: uploaded.thumbnail_url },
+        communityId, channelId, null as any, 'video', [videoUrl], reply_to_id,
+        { duration: uploaded.duration, thumbnail_url: uploaded.thumbnail_url, hls_url: uploaded.hls_url },
       );
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
@@ -568,10 +569,11 @@ export const CommunityChannelChatScreen: React.FC = () => {
       if (msg.message_type === 'video') {
         const thumb = msg.metadata?.thumbnail_url;
         const dur = msg.metadata?.duration;
+        const videoPlayUrl = msg.metadata?.hls_url ?? msg.media_urls[0];
         return (
           <TouchableOpacity
             style={[C.bubble, { backgroundColor: bubbleBg, padding: 0, overflow: 'hidden' }, isMe ? myRadius : otherRadius]}
-            onPress={() => msg.media_urls[0] && Linking.openURL(msg.media_urls[0])}
+            onPress={() => videoPlayUrl && Linking.openURL(videoPlayUrl)}
             activeOpacity={0.8}
           >
             {thumb

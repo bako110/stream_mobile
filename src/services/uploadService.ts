@@ -178,9 +178,9 @@ export async function uploadVideoFromUri(
   const filename    = fileName ?? `video_${Date.now()}.mp4`;
   const token       = getToken();
 
-  // Pour les reels : upload multipart async — le backend retourne immédiatement
-  // url + job_id, le HLS est généré en background. On poll jusqu'à done.
-  if (folder === 'reels') {
+  // Upload multipart async — le backend retourne immédiatement url + job_id,
+  // le HLS est généré en background. On poll jusqu'à done pour tous les dossiers vidéo.
+  if (['reels', 'stories', 'messages', 'events', 'concerts', 'content', 'posts'].includes(folder)) {
     const filePath = compressed.uri.startsWith('file://')
       ? compressed.uri.slice(7)
       : compressed.uri;

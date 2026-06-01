@@ -386,7 +386,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     }
 
     setUploadPct(100);
-    return { url: result.url, duration: compressed.durationSec, thumbnailUrl };
+    return { url: result.hls_url ?? result.url, duration: compressed.durationSec, thumbnailUrl };
   };
 
   const doUploadAudio = async (uri: string) => {

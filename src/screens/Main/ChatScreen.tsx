@@ -534,9 +534,10 @@ export const ChatScreen: React.FC = () => {
       if (!asset?.uri) return;
       setUploading(true);
       const uploaded = await uploadMessageVideo(asset.uri, asset.fileName, asset.type);
+      const videoUrl = uploaded.hls_url ?? uploaded.url;
       const msg = await messageService.sendMessage(
-        partnerId, '', 'video', uploaded.url,
-        { duration: uploaded.duration, thumbnail_url: uploaded.thumbnail_url, width: uploaded.width, height: uploaded.height },
+        partnerId, '', 'video', videoUrl,
+        { duration: uploaded.duration, thumbnail_url: uploaded.thumbnail_url, width: uploaded.width, height: uploaded.height, hls_url: uploaded.hls_url },
       );
       setMessages(prev => [msg, ...prev]);
     } catch {
@@ -923,9 +924,10 @@ export const ChatScreen: React.FC = () => {
           </View>
         );
 
-      case 'video':
+      case 'video': {
+        const videoPlayUrl = item.attachment_meta?.hls_url ?? item.attachment_url;
         return (
-          <TouchableOpacity onPress={() => item.attachment_url && Linking.openURL(item.attachment_url)}>
+          <TouchableOpacity onPress={() => videoPlayUrl && Linking.openURL(videoPlayUrl)}>
             {item.attachment_meta?.thumbnail_url ? (
               <View>
                 <Image
@@ -949,6 +951,7 @@ export const ChatScreen: React.FC = () => {
             )}
           </TouchableOpacity>
         );
+      }
 
       case 'file':
         return (
