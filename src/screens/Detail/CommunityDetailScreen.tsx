@@ -1200,6 +1200,24 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           activeOpacity={0.7}
           onPress={() => {
             setSettingsOpen(false);
+            setTimeout(() => (nav as any).navigate('CommunityTreasury', { communityId, communityName: community?.name ?? '' }), 250);
+          }}
+        >
+          <View style={[s.secIcon, { backgroundColor: '#7B3FF220' }]}>
+            <Icon name="briefcase" size={18} color="#7B3FF2" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Trésorerie</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>Solde et historique du compte communautaire</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSettingsOpen(false);
             setTimeout(() => (nav as any).navigate('CommunityFund', { communityId, communityName: community?.name ?? '', myRole }), 250);
           }}
         >
