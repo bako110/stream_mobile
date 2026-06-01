@@ -76,7 +76,7 @@ export const CreateAdScreen: React.FC = () => {
     }
 
     // Vérifier solde avant création
-    const coinsRequired = Math.ceil(budget * 200);
+    const coinsRequired = Math.ceil(budget * 100); // 1 € = 100 coins
     if (!isEdit && walletCoins !== null && walletCoins < coinsRequired) {
       Alert.alert(
         'Solde insuffisant',
@@ -104,7 +104,7 @@ export const CreateAdScreen: React.FC = () => {
         Alert.alert('Modifié', 'Ta campagne a été mise à jour.');
       } else {
         const result = await adService.create(payload);
-        const coinsDebited = (result as any).coins_debited ?? Math.ceil(budget * 200);
+        const coinsDebited = (result as any).coins_debited ?? Math.ceil(budget * 100);
         setWalletCoins(prev => prev !== null ? prev - coinsDebited : null);
         Alert.alert(
           'Campagne créée ! 🎯',
@@ -159,15 +159,15 @@ export const CreateAdScreen: React.FC = () => {
               ~{estimatedImpressions.toLocaleString('fr-FR')} impressions estimées
             </Text>
             <Text style={{ color: '#7B3FF2', fontSize: 12, opacity: 0.8 }}>
-              Coût : {(budget * 200).toLocaleString('fr-FR')} coins ({budget.toFixed(2)}€)
+              Coût : {(budget * 100).toLocaleString('fr-FR')} coins ({budget.toFixed(2)}€)
             </Text>
             {walletCoins !== null && (
               <Text style={{
-                color: walletCoins < budget * 200 ? '#EF4444' : '#10B981',
+                color: walletCoins < budget * 100 ? '#EF4444' : '#10B981',
                 fontSize: 12, fontWeight: '700', marginTop: 2,
               }}>
                 Solde : {walletCoins.toLocaleString('fr-FR')} coins
-                {walletCoins < budget * 200 ? ' — insuffisant' : ' ✓'}
+                {walletCoins < budget * 100 ? ' — insuffisant' : ' ✓'}
               </Text>
             )}
           </View>

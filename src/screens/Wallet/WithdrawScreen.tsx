@@ -34,7 +34,7 @@ import { Endpoints } from '../../api/endpoints';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SLIDER_W = SCREEN_W - 40 - 32; // padding + card padding
-const MIN_COINS = 1000;
+const MIN_COINS = 500; // minimum retrait : 500 coins = 1.75 €
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type PayoutMethod = 'stripe' | 'mobile_money';

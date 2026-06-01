@@ -385,20 +385,20 @@ const CreatorDashboardScreen: React.FC = () => {
           </View>
           <TouchableOpacity
             onPress={() => navigation.navigate('Withdraw')}
-            disabled={(stats?.available_balance ?? 0) < 1000}
+            disabled={(stats?.available_balance ?? 0) < 500}
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={(stats?.available_balance ?? 0) >= 1000 ? ['#9B65F5', '#E85DAD'] : [colors.border, colors.border]}
+              colors={(stats?.available_balance ?? 0) >= 500 ? ['#9B65F5', '#E85DAD'] : [colors.border, colors.border]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.withdrawBtn}
             >
               <Icon name="arrow-up-right" size={18} color={
-                (stats?.available_balance ?? 0) >= 1000 ? '#FFF' : colors.textTertiary
+                (stats?.available_balance ?? 0) >= 500 ? '#FFF' : colors.textTertiary
               } />
               <Text style={[s.withdrawBtnText, {
-                color: (stats?.available_balance ?? 0) >= 1000 ? '#FFF' : colors.textTertiary,
+                color: (stats?.available_balance ?? 0) >= 500 ? '#FFF' : colors.textTertiary,
               }]}>
                 Retirer
               </Text>

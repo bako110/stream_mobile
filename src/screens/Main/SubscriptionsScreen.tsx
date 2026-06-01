@@ -42,11 +42,11 @@ const PLAN_FEATURES: Record<string, string[]> = {
 
 const PAID_PLANS: PlanType[] = ['basic', 'premium', 'family'];
 
-// 1 EUR = 200 coins (aligné sur le backend)
+// 1 EUR = 100 coins (aligné sur le backend)
 const PLAN_COINS: Record<string, number> = {
-  basic:   Math.round(5.99  * 200),  // 1198
-  premium: Math.round(9.99  * 200),  // 1998
-  family:  Math.round(14.99 * 200),  // 2998
+  basic:   Math.round(5.99  * 100),  // 599
+  premium: Math.round(9.99  * 100),  // 999
+  family:  Math.round(14.99 * 100),  // 1499
 };
 
 // ── Utilitaire date ────────────────────────────────────────────────────────────

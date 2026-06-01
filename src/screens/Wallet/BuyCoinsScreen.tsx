@@ -234,9 +234,9 @@ const BuyCoinsScreen: React.FC = () => {
   const cpPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef  = useRef(AppState.currentState);
 
-  const EUR_TO_COINS = 200;
+  const EUR_TO_COINS = 100; // 1 € = 100 coins
   const customCoins  = Math.floor(parseFloat(customEur || '0') * EUR_TO_COINS);
-  const customValid  = customCoins >= 100 && parseFloat(customEur || '0') >= 0.5;
+  const customValid  = customCoins >= 50 && parseFloat(customEur || '0') >= 0.50;
 
   const loadData = useCallback(() => {
     Promise.allSettled([
@@ -463,7 +463,7 @@ const BuyCoinsScreen: React.FC = () => {
               </LinearGradient>
             </TouchableOpacity>
             <Text style={[s.customHint, { color: colors.textTertiary }]}>
-              Minimum 0.50 € · 1 EUR = {EUR_TO_COINS} coins
+              Minimum 0.50 € · 1 EUR = 100 coins
             </Text>
           </View>
         )}
@@ -487,7 +487,7 @@ const BuyCoinsScreen: React.FC = () => {
         <View style={s.infoBox}>
           <Icon name="info" size={14} color={colors.textSecondary} />
           <Text style={s.infoText}>
-            1 EUR = 200 coins • Les coins ne sont pas remboursables • Les bonus sont immédiatement crédités
+            1 EUR = 100 coins • Retrait : 100 coins = 0,35 € • Les coins ne sont pas remboursables • Les bonus sont immédiatement crédités
           </Text>
         </View>
       </ScrollView>

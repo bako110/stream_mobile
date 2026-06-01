@@ -92,7 +92,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const isSerie  = item.type === 'serie';
   const banner   = item.banner_url || item.thumbnail_url;
   const synopsis = item.synopsis || item.short_synopsis;
-  const coinsRequired = item.is_premium && item.price ? Math.round(item.price * 200) : 0;
+  const coinsRequired = item.is_premium && item.price ? Math.round(item.price * 100) : 0; // 1 € = 100 coins
 
   // Vérifier l'accès + solde wallet si contenu premium
   useEffect(() => {

@@ -240,7 +240,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
   const [purchasing, setPurchasing]       = useState(false);
   const [playingEpId, setPlayingEpId]     = useState<string | null>(null);
 
-  const coinsRequired = Math.round((item.price ?? 0) * 200);
+  const coinsRequired = Math.round((item.price ?? 0) * 100); // 1 € = 100 coins
   const canAfford     = walletCoins >= coinsRequired;
   const banner        = item.banner_url || item.thumbnail_url;
   const synopsis      = (item as any).synopsis || (item as any).short_synopsis;
