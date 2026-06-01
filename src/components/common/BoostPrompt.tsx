@@ -16,7 +16,7 @@ import { useTheme } from '../../hooks/useTheme';
 
 interface Props {
   visible: boolean;
-  contentType: 'event' | 'concert' | 'post';
+  contentType: 'event' | 'concert' | 'post' | 'live';
   onBoost: () => void;
   onDismiss: () => void;
 }
@@ -25,13 +25,21 @@ const TYPE_LABELS: Record<string, string> = {
   event:   'ton événement',
   concert: 'ton concert',
   post:    'ton post',
+  live:    'ton live',
 };
 
-const BOOST_PERKS = [
-  { icon: 'trending-up', text: '10× plus de visibilité dans le feed' },
-  { icon: 'users',       text: 'Touche des milliers de nouveaux utilisateurs' },
-  { icon: 'zap',         text: 'Résultats visibles en moins de 5 minutes' },
-];
+const BOOST_PERKS: Record<string, { icon: string; text: string }[]> = {
+  default: [
+    { icon: 'trending-up', text: '10× plus de visibilité dans le feed' },
+    { icon: 'users',       text: 'Touche des milliers de nouveaux utilisateurs' },
+    { icon: 'zap',         text: 'Résultats visibles en moins de 5 minutes' },
+  ],
+  live: [
+    { icon: 'radio',       text: 'Ton live affiché en tête du feed en direct' },
+    { icon: 'users',       text: 'Attire plus de viewers pendant que tu streames' },
+    { icon: 'zap',         text: 'Boost actif immédiatement, arrêtable à tout moment' },
+  ],
+};
 
 export const BoostPrompt: React.FC<Props> = ({ visible, contentType, onBoost, onDismiss }) => {
   const { theme: { colors } } = useTheme();
@@ -53,6 +61,7 @@ export const BoostPrompt: React.FC<Props> = ({ visible, contentType, onBoost, on
   const overlayStyle = useAnimatedStyle(() => ({ opacity: overlayOp.value }));
 
   const label = TYPE_LABELS[contentType] ?? 'ton contenu';
+  const perks = BOOST_PERKS[contentType] ?? BOOST_PERKS.default;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onDismiss}>
@@ -74,10 +83,12 @@ export const BoostPrompt: React.FC<Props> = ({ visible, contentType, onBoost, on
           </LinearGradient>
           <View style={{ flex: 1 }}>
             <Text style={[s.successTitle, { color: colors.textPrimary }]}>
-              Publié avec succès !
+              {contentType === 'live' ? 'Tu es en direct !' : 'Publié avec succès !'}
             </Text>
             <Text style={[s.successSub, { color: colors.textSecondary }]}>
-              {label.charAt(0).toUpperCase() + label.slice(1)} est maintenant en ligne.
+              {contentType === 'live'
+                ? 'Ton live est lancé — booste-le pour attirer plus de viewers maintenant.'
+                : `${label.charAt(0).toUpperCase() + label.slice(1)} est maintenant en ligne.`}
             </Text>
           </View>
         </View>
@@ -95,7 +106,7 @@ export const BoostPrompt: React.FC<Props> = ({ visible, contentType, onBoost, on
 
         {/* Avantages */}
         <View style={s.perks}>
-          {BOOST_PERKS.map(p => (
+          {perks.map(p => (
             <View key={p.icon} style={s.perkRow}>
               <View style={[s.perkIcon, { backgroundColor: '#7B3FF215' }]}>
                 <Icon name={p.icon} size={13} color="#7B3FF2" />

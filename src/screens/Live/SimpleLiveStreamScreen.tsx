@@ -48,6 +48,7 @@ import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
 import { useWs } from '../../context/WebSocketContext';
+import { BoostPrompt } from '../../components/common';
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveStream'>;
@@ -318,6 +319,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const wsRef       = useRef<WebSocket | null>(null);
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showLaunchBanner, setShowLaunchBanner] = useState(true);
+  const [showBoost,        setShowBoost]        = useState(false);
   const giftRef  = useRef<LiveGiftOverlayRef>(null);
 
   const addSysMsg = useCallback((text: string) => {
@@ -334,7 +336,9 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
     const bannerTimer = setTimeout(() => setShowLaunchBanner(false), 4000);
-    return () => clearTimeout(bannerTimer);
+    // Propose le boost 5s après le lancement (après que le banner ait disparu)
+    const boostTimer  = setTimeout(() => setShowBoost(true), 5500);
+    return () => { clearTimeout(bannerTimer); clearTimeout(boostTimer); };
 
     // Couper la caméra en background pour éviter le crash Android
     const handleAppState = (next: AppStateStatus) => {
@@ -1077,6 +1081,13 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         liveId={liveId}
         incomingNotifs={giftNotifs}
         onNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
+      />
+
+      <BoostPrompt
+        visible={showBoost}
+        contentType="live"
+        onBoost={() => { setShowBoost(false); nav.navigate('CreateAd', { ad: null }); }}
+        onDismiss={() => setShowBoost(false)}
       />
     </View>
   );
