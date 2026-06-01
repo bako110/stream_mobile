@@ -16,7 +16,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
-import { settings } from '../../utils/constants';
 
 interface Contribution {
   id: string;
@@ -57,7 +56,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { communityId, cotisationId, cotisationTitle, myRole } = route.params;
+  const { communityId, cotisationId, myRole } = route.params;
   const isAdmin = myRole === 'admin' || myRole === 'moderator';
 
   const [cotisation,    setCotisation]    = useState<Cotisation | null>(null);
@@ -77,11 +76,26 @@ export const CommunityFundDetailScreen: React.FC = () => {
         apiClient.get<Cotisation>(BASE),
         apiClient.get<Contribution[]>(`${BASE}/contributions`),
       ]);
-      setCotisation(cotRes.data);
+      const cot = cotRes.data;
+      setCotisation(cot);
       setContributions(contribRes.data ?? []);
+
+      // Vérifier si le retrait a déjà été effectué en consultant l'historique du wallet
+      if (cot.status === 'closed' && cot.collected_coins > 0) {
+        apiClient.get<{ tx_type: string; reference_id: string }[]>(
+          `/api/v1/communities/${communityId}/wallet/transactions?limit=100`
+        ).then(r => {
+          const already = (r.data ?? []).some(
+            tx => tx.tx_type === 'withdrawal' && tx.reference_id === cotisationId
+          );
+          setWithdrawn(already);
+        }).catch(() => {});
+      } else {
+        setWithdrawn(false);
+      }
     } catch { }
     finally { setLoading(false); setRefreshing(false); }
-  }, [BASE]);
+  }, [BASE, communityId, cotisationId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -158,7 +172,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
   const handleExport = async () => {
     try {
       // Partage via URL — le navigateur ou une app de fichiers télécharge le CSV
-      const exportUrl = `${(settings as any).API_BASE_URL ?? ''}/api/v1/communities/${communityId}/cotisations/${cotisationId}/export`;
+      const exportUrl = `/api/v1/communities/${communityId}/cotisations/${cotisationId}/export`;
       await Share.share({
         title: `Cotisation — ${cotisation?.title ?? ''}`,
         message: `Télécharger le rapport CSV :\n${exportUrl}`,
