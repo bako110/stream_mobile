@@ -290,6 +290,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const allParticipants      = useParticipants();
   const { currentUser }      = useUser();
   const { addListener, removeListener } = useWs();
+  const nav                  = useNavigation<Nav>();
   const remoteParticipants   = allParticipants.filter(p => !p.isLocal);
 
   const [muted,        setMuted]        = useState(false);
