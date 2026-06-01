@@ -114,36 +114,75 @@ interface AdData {
 const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (url: string) => void }> = React.memo(
   ({ ad, colors, onImpression, onPress }) => {
     useEffect(() => { if (ad?.id) onImpression(ad.id); }, [ad?.id, onImpression]);
+    const hasCreative = !!(ad.creative_url || ad.thumbnail_url);
     return (
-      <View style={{ backgroundColor: colors.surface, marginVertical: 4, marginHorizontal: 0 }}>
-        {(ad.creative_url || ad.thumbnail_url) ? (
-          <Image
-            source={{ uri: (ad.creative_url || ad.thumbnail_url) as string }}
-            style={{ width: '100%', height: 180 }}
-            resizeMode="cover"
-          />
-        ) : null}
-        <View style={{ padding: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <View style={{ backgroundColor: colors.primary + '22', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-              <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>SPONSORISÉ</Text>
-            </View>
+      <View style={{
+        marginVertical: 8, marginHorizontal: 12,
+        borderRadius: 18,
+        backgroundColor: colors.surface,
+        borderWidth: 1, borderColor: colors.divider,
+        overflow: 'hidden',
+        shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+      }}>
+        {/* Image / créatif */}
+        {hasCreative && (
+          <View style={{ position: 'relative' }}>
+            <Image
+              source={{ uri: (ad.creative_url || ad.thumbnail_url)! }}
+              style={{ width: '100%', height: 190 }}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.35)']}
+              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }}
+              pointerEvents="none"
+            />
           </View>
-          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 4 }} numberOfLines={2}>
+        )}
+
+        <View style={{ padding: 14 }}>
+          {/* Ligne sponsorisé + icône */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+              backgroundColor: '#7B3FF210', borderWidth: 1, borderColor: '#7B3FF230',
+              paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+              <Icon name="zap" size={10} color="#7B3FF2" />
+              <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>SPONSORISÉ</Text>
+            </View>
+            <Icon name="more-horizontal" size={16} color={colors.textTertiary} />
+          </View>
+
+          {/* Titre */}
+          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>
             {ad.title ?? ''}
           </Text>
+
+          {/* Description */}
           {ad.description ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 8 }} numberOfLines={2}>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: 12 }} numberOfLines={2}>
               {ad.description}
             </Text>
-          ) : null}
+          ) : <View style={{ height: 8 }} />}
+
+          {/* CTA */}
           {ad.cta_url ? (
             <TouchableOpacity
-              style={{ backgroundColor: colors.primary, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 8, alignSelf: 'flex-start' }}
               onPress={() => onPress(ad.cta_url!)}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
+              style={{ overflow: 'hidden', borderRadius: 12, alignSelf: 'stretch' }}
             >
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{ad.cta_text ?? 'En savoir plus'}</Text>
+              <LinearGradient
+                colors={['#7B3FF2', '#E0389A']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: 6, paddingVertical: 11, paddingHorizontal: 20, borderRadius: 12 }}
+              >
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>
+                  {ad.cta_text ?? 'En savoir plus'}
+                </Text>
+                <Icon name="arrow-right" size={14} color="#fff" />
+              </LinearGradient>
             </TouchableOpacity>
           ) : null}
         </View>
