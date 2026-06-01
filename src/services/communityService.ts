@@ -51,6 +51,7 @@ export interface CreateCommunityPayload {
   description?: string;
   is_private?: boolean;
   requires_approval?: boolean;
+  members_only_chat?: boolean;
   entry_price_coins?: number;
   avatar_url?: string;
   banner_url?: string;
