@@ -314,9 +314,10 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const [showOnStage,  setShowOnStage]  = useState(false);
   const [onStage,      setOnStage]      = useState<Set<string>>(new Set());
 
-  const chatRef  = useRef<FlatList>(null);
-  const wsRef    = useRef<WebSocket | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chatRef     = useRef<FlatList>(null);
+  const wsRef       = useRef<WebSocket | null>(null);
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showLaunchBanner, setShowLaunchBanner] = useState(true);
   const giftRef  = useRef<LiveGiftOverlayRef>(null);
 
   const addSysMsg = useCallback((text: string) => {
@@ -332,6 +333,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    const bannerTimer = setTimeout(() => setShowLaunchBanner(false), 4000);
+    return () => clearTimeout(bannerTimer);
 
     // Couper la caméra en background pour éviter le crash Android
     const handleAppState = (next: AppStateStatus) => {
@@ -725,6 +728,19 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
       {/* Gradients */}
       <LinearGradient colors={['rgba(0,0,0,0.72)', 'transparent']} style={st.gradTop} pointerEvents="none" />
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={st.gradBottom} pointerEvents="none" />
+
+      {/* ── BANNER LANCEMENT ─────────────────────────────────────────────── */}
+      {showLaunchBanner && (
+        <Animated.View
+          entering={FadeIn.springify().damping(16).stiffness(180)}
+          exiting={FadeOut.duration(350)}
+          style={st.launchBanner}
+          pointerEvents="none"
+        >
+          <View style={st.launchDot} />
+          <Text style={st.launchTxt}>🎙 Live lancé · tu es en direct !</Text>
+        </Animated.View>
+      )}
 
       {/* ── HEADER ─────────────────────────────────────────────────────── */}
       <View style={st.header}>
@@ -1238,6 +1254,18 @@ const st = StyleSheet.create({
   viewerAvatar:   { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
   viewerAvatarText:{ color: '#fff', fontSize: 10, fontWeight: '800' },
 
+  launchBanner: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 42,
+    left: 20, right: 20, zIndex: 99,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(229,62,62,0.92)',
+    borderRadius: 14, paddingVertical: 11, paddingHorizontal: 16,
+    shadowColor: '#E53E3E', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  launchDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
+  launchTxt: { color: '#fff', fontSize: 14, fontWeight: '700', flex: 1 },
   toastsContainer: { position: 'absolute', top: Platform.OS === 'ios' ? 115 : 95, left: 14, zIndex: 30, gap: 4 },
   joinToast: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
