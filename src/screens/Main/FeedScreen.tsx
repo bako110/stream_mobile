@@ -115,86 +115,122 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
   ({ ad, onImpression, onPress }) => {
     useEffect(() => { if (ad?.id) onImpression(ad.id); }, [ad?.id, onImpression]);
     const hasCreative = !!(ad.creative_url || ad.thumbnail_url);
+    const fullTitle = ad.title ?? '';
+
+    // ── Typewriter : lettres apparaissent une par une ──────────────────────
+    const [displayedTitle, setDisplayedTitle] = useState('');
+    const titleOpacity = useSharedValue(1);
+
+    useEffect(() => {
+      setDisplayedTitle('');
+      titleOpacity.value = 1;
+      let i = 0;
+      const iv = setInterval(() => {
+        i += 1;
+        setDisplayedTitle(fullTitle.slice(0, i));
+        if (i >= fullTitle.length) {
+          clearInterval(iv);
+          // Pulse lent une fois l'écriture terminée
+          titleOpacity.value = withRepeat(
+            withSequence(
+              withTiming(0.5, { duration: 1000 }),
+              withTiming(1,   { duration: 1000 }),
+            ), -1, false,
+          );
+        }
+      }, 40);
+      return () => clearInterval(iv);
+    }, [fullTitle]);
+
+    const titleAnimStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
 
     return (
       <TouchableOpacity
-        activeOpacity={0.97}
+        activeOpacity={0.95}
         onPress={() => ad.cta_url && onPress(ad.cta_url)}
         style={{
-          marginVertical: 6, marginHorizontal: 0,
-          overflow: 'hidden',
-          shadowColor: '#7B3FF2', shadowOpacity: 0.13, shadowRadius: 16, shadowOffset: { width: 0, height: 4 },
-          elevation: 5,
+          marginVertical: 6, marginHorizontal: 0, overflow: 'hidden',
+          shadowColor: '#7B3FF2', shadowOpacity: 0.18, shadowRadius: 20,
+          shadowOffset: { width: 0, height: 6 }, elevation: 6,
         }}
       >
-        {/* Image pleine largeur grande */}
         {hasCreative ? (
-          <View style={{ height: 320 }}>
+          <View style={{ height: 340 }}>
             <Image
               source={{ uri: (ad.creative_url || ad.thumbnail_url)! }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
-            {/* Overlay gradient bas — titre lisible sur image */}
             <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.82)']}
-              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 200 }}
+              colors={['transparent', 'rgba(0,0,0,0.88)']}
+              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 230 }}
               pointerEvents="none"
             />
-            {/* Badge sponsorisé flottant en haut à gauche */}
+            {/* Badge */}
             <View style={{
               position: 'absolute', top: 14, left: 14,
               flexDirection: 'row', alignItems: 'center', gap: 4,
-              backgroundColor: 'rgba(0,0,0,0.55)',
+              backgroundColor: 'rgba(0,0,0,0.6)',
               paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
             }}>
               <Icon name="zap" size={9} color="#F59E0B" />
               <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>SPONSORISÉ</Text>
             </View>
 
-            {/* Contenu positionné sur l'image en bas */}
+            {/* Contenu bas */}
             <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18 }}>
-              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', lineHeight: 26, marginBottom: 6, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }} numberOfLines={2}>
-                {ad.title ?? ''}
-              </Text>
+              {/* Titre typewriter + pulse */}
+              <Animated.Text
+                style={[titleAnimStyle, {
+                  color: '#fff', fontSize: 21, fontWeight: '900', lineHeight: 27, marginBottom: 6,
+                  textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
+                }]}
+                numberOfLines={2}
+              >
+                {displayedTitle}
+              </Animated.Text>
+
               {ad.description ? (
                 <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, lineHeight: 18, marginBottom: 14 }} numberOfLines={2}>
                   {ad.description}
                 </Text>
               ) : <View style={{ height: 10 }} />}
+
               {ad.cta_url ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <LinearGradient
-                    colors={['#7B3FF2', '#E0389A']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                      gap: 8, paddingVertical: 13, borderRadius: 14 }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>
-                      {ad.cta_text ?? 'En savoir plus'}
-                    </Text>
-                    <Icon name="arrow-right" size={15} color="#fff" />
-                  </LinearGradient>
-                </View>
+                <LinearGradient
+                  colors={['#7B3FF2', '#E0389A']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                    gap: 8, paddingVertical: 13, borderRadius: 14 }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>
+                    {ad.cta_text ?? 'En savoir plus'}
+                  </Text>
+                  <Icon name="arrow-right" size={15} color="#fff" />
+                </LinearGradient>
               ) : null}
             </View>
           </View>
+
         ) : (
-          /* Pas d'image — card colorée pleine */
           <LinearGradient
             colors={['#7B3FF2', '#E0389A']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={{ padding: 28, minHeight: 200, justifyContent: 'space-between' }}
+            style={{ padding: 28, minHeight: 220, justifyContent: 'space-between' }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 }}>
               <Icon name="zap" size={9} color="#F59E0B" />
               <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>SPONSORISÉ</Text>
             </View>
             <View>
-              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900', lineHeight: 28, marginBottom: 8 }} numberOfLines={2}>
-                {ad.title ?? ''}
-              </Text>
+              {/* Titre typewriter + pulse */}
+              <Animated.Text
+                style={[titleAnimStyle, { color: '#fff', fontSize: 22, fontWeight: '900', lineHeight: 28, marginBottom: 8 }]}
+                numberOfLines={2}
+              >
+                {displayedTitle}
+              </Animated.Text>
               {ad.description ? (
                 <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 20, marginBottom: 20 }} numberOfLines={3}>
                   {ad.description}
