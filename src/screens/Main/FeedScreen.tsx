@@ -789,7 +789,7 @@ export const FeedScreen: React.FC = () => {
         const SUGGEST_EVERY  = 8;
         const COMM_EVERY     = 12;
         const REEL_ROW_EVERY = 5; // une rangée de reels toutes les 5 cartes
-        const AD_EVERY       = 7; // 1 pub toutes les 7 cartes
+        const AD_EVERY       = 3; // 1 pub toutes les 3 cartes
         const result: FeedItem[] = [];
         let suggestCount = 0;
         let commCount    = 0;
