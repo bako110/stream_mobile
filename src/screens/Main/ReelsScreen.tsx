@@ -100,7 +100,6 @@ export const ReelsScreen: React.FC = () => {
   const [editCaption,   setEditCaption]   = useState('');
   const [editSaving,    setEditSaving]    = useState(false);
   const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId);
-  const [loadingMore,   setLoadingMore]   = useState(false);
   const [hasMore,       setHasMore]       = useState(true);
   const [tab,           setTab]           = useState<'feed' | 'mine'>('feed');
   const [myId,          setMyId]          = useState<string | null>(null);
@@ -215,7 +214,6 @@ export const ReelsScreen: React.FC = () => {
   const loadMore = useCallback(async () => {
     if (isLoadingMoreRef.current || !hasMoreRef.current || !mountedRef.current) return;
     isLoadingMoreRef.current = true;
-    if (mountedRef.current) setLoadingMore(true);
     try {
       const nextPage = pageRef.current + 1;
       const data     = await reelService.getFeed({ page: nextPage });
@@ -228,10 +226,7 @@ export const ReelsScreen: React.FC = () => {
       pageRef.current = nextPage;
       setHasMore(data.has_more);
     } catch { /* silencieux */ }
-    finally {
-      if (mountedRef.current) setLoadingMore(false);
-      isLoadingMoreRef.current = false;
-    }
+    finally { isLoadingMoreRef.current = false; }
   }, []);
 
   const loadMoreRef = useRef(loadMore);
@@ -722,11 +717,7 @@ export const ReelsScreen: React.FC = () => {
         </View>
       )}
 
-      {loadingMore && (
-        <View style={s.loadMoreIndicator}>
-          <ActivityIndicator color="#fff" size="small" />
-        </View>
-      )}
+      {/* loadingMore silencieux — pas d'indicateur visible comme TikTok */}
     </View>
   );
 };
