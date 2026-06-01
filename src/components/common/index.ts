@@ -46,3 +46,4 @@ export { ExpandableText }        from './ExpandableText';
 export { InlineVideoPlayer }     from './InlineVideoPlayer';
 export { UploadProgressBanner }  from './UploadProgressBanner';
 export { LikersBottomSheet }     from './LikersBottomSheet';
+export { BoostPrompt } from './BoostPrompt';

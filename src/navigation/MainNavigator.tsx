@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import { Platform, PermissionsAndroid, BackHandler, ToastAndroid, InteractionManager } from 'react-native';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -13,7 +13,7 @@ import { CommunitiesScreen as CommunitiesTabScreen } from '../screens/Main/Commu
 import { ReelsScreen }              from '../screens/Main/ReelsScreen';
 import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
-import { AppTabBar, NotificationToast } from '../components/common';
+import { AppTabBar, NotificationToast, BoostPrompt } from '../components/common';
 import { UploadProgressBanner } from '../components/common/UploadProgressBanner';
 import { ActiveCallBar }        from '../components/call/ActiveCallBar';
 import { ActiveCallProvider }   from '../context/ActiveCallContext';
@@ -234,9 +234,59 @@ const EventDetailWrapper: React.FC<any>    = ({ navigation, route }) => <EventDe
 const CreateReelWrapper: React.FC<any>     = ({ navigation }) => <CreateReelScreen onBack={() => navigation.goBack()} />;
 const LiveStreamWrapper: React.FC<any>     = ({ navigation, route }) => <LiveStreamScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
 const LiveViewerWrapper: React.FC<any>     = ({ navigation, route }) => <LiveViewerScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
-const CreateEventWrapper: React.FC<any>    = ({ navigation, route }) => <CreateEventScreen eventId={route.params?.eventId} onBack={() => navigation.goBack()} />;
-const CreateConcertWrapper: React.FC<any>  = ({ navigation, route }) => <CreateConcertScreen concertId={route.params?.concertId} onBack={() => navigation.goBack()} />;
-const CreatePostWrapper: React.FC<any>     = ({ navigation }) => <CreatePostScreen onBack={() => navigation.goBack()} onPostCreated={() => navigation.goBack()} />;
+const CreateEventWrapper: React.FC<any> = ({ navigation, route }) => {
+  const [boost, setBoost] = useState(false);
+  return (
+    <>
+      <CreateEventScreen
+        eventId={route.params?.eventId}
+        onBack={() => { setBoost(true); }}
+      />
+      <BoostPrompt
+        visible={boost}
+        contentType="event"
+        onBoost={() => { setBoost(false); navigation.navigate('CreateAd', { ad: null }); }}
+        onDismiss={() => { setBoost(false); navigation.goBack(); }}
+      />
+    </>
+  );
+};
+
+const CreateConcertWrapper: React.FC<any> = ({ navigation, route }) => {
+  const [boost, setBoost] = useState(false);
+  return (
+    <>
+      <CreateConcertScreen
+        concertId={route.params?.concertId}
+        onBack={() => { setBoost(true); }}
+      />
+      <BoostPrompt
+        visible={boost}
+        contentType="concert"
+        onBoost={() => { setBoost(false); navigation.navigate('CreateAd', { ad: null }); }}
+        onDismiss={() => { setBoost(false); navigation.goBack(); }}
+      />
+    </>
+  );
+};
+
+const CreatePostWrapper: React.FC<any> = ({ navigation }) => {
+  const [boost, setBoost] = useState(false);
+  return (
+    <>
+      <CreatePostScreen
+        onBack={() => navigation.goBack()}
+        onPostCreated={() => { setBoost(true); }}
+      />
+      <BoostPrompt
+        visible={boost}
+        contentType="post"
+        onBoost={() => { setBoost(false); navigation.navigate('CreateAd', { ad: null }); }}
+        onDismiss={() => { setBoost(false); navigation.goBack(); }}
+      />
+    </>
+  );
+};
 const PostDetailWrapper: React.FC<any>     = ({ navigation, route }) => <PostDetailScreen postId={route.params.postId} initialPost={route.params.initialPost} onBack={() => navigation.goBack()} onAuthorPress={(userId: string) => navigation.navigate('UserProfile', { userId })} navigation={navigation} />;
 const MyTicketWrapper: React.FC<any>       = ({ navigation, route }) => <MyTicketScreen ticket={route.params.ticket} onBack={() => navigation.goBack()} />;
 const AttendeesWrapper: React.FC<any>      = ({ navigation, route }) => (
