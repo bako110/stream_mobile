@@ -144,6 +144,17 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
 
     const titleAnimStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
 
+    // ── Ken Burns : zoom lent + légère dérive sur l'image ─────────────────
+    const imgScale = useSharedValue(1);
+    const imgX     = useSharedValue(0);
+    useEffect(() => {
+      imgScale.value = withRepeat(withTiming(1.08, { duration: 7000 }), -1, true);
+      imgX.value     = withRepeat(withTiming(-8,   { duration: 7000 }), -1, true);
+    }, []);
+    const imgAnimStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: imgScale.value }, { translateX: imgX.value }],
+    }));
+
     return (
       <TouchableOpacity
         activeOpacity={0.95}
@@ -155,10 +166,10 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
         }}
       >
         {hasCreative ? (
-          <View style={{ height: 340 }}>
-            <Image
+          <View style={{ height: 460, overflow: 'hidden' }}>
+            <Animated.Image
               source={{ uri: (ad.creative_url || ad.thumbnail_url)! }}
-              style={{ width: '100%', height: '100%' }}
+              style={[{ width: '100%', height: '100%' }, imgAnimStyle]}
               resizeMode="cover"
             />
             <LinearGradient
