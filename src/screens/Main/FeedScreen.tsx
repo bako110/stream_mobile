@@ -112,81 +112,107 @@ interface AdData {
 }
 
 const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (url: string) => void }> = React.memo(
-  ({ ad, colors, onImpression, onPress }) => {
+  ({ ad, onImpression, onPress }) => {
     useEffect(() => { if (ad?.id) onImpression(ad.id); }, [ad?.id, onImpression]);
     const hasCreative = !!(ad.creative_url || ad.thumbnail_url);
+
     return (
-      <View style={{
-        marginVertical: 8, marginHorizontal: 12,
-        borderRadius: 18,
-        backgroundColor: colors.surface,
-        borderWidth: 1, borderColor: colors.divider,
-        overflow: 'hidden',
-        shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-        elevation: 2,
-      }}>
-        {/* Image / créatif */}
-        {hasCreative && (
-          <View style={{ position: 'relative' }}>
+      <TouchableOpacity
+        activeOpacity={0.97}
+        onPress={() => ad.cta_url && onPress(ad.cta_url)}
+        style={{
+          marginVertical: 6, marginHorizontal: 0,
+          overflow: 'hidden',
+          shadowColor: '#7B3FF2', shadowOpacity: 0.13, shadowRadius: 16, shadowOffset: { width: 0, height: 4 },
+          elevation: 5,
+        }}
+      >
+        {/* Image pleine largeur grande */}
+        {hasCreative ? (
+          <View style={{ height: 320 }}>
             <Image
               source={{ uri: (ad.creative_url || ad.thumbnail_url)! }}
-              style={{ width: '100%', height: 190 }}
+              style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
+            {/* Overlay gradient bas — titre lisible sur image */}
             <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.35)']}
-              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }}
+              colors={['transparent', 'rgba(0,0,0,0.82)']}
+              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 200 }}
               pointerEvents="none"
             />
-          </View>
-        )}
-
-        <View style={{ padding: 14 }}>
-          {/* Ligne sponsorisé + icône */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
-              backgroundColor: '#7B3FF210', borderWidth: 1, borderColor: '#7B3FF230',
-              paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-              <Icon name="zap" size={10} color="#7B3FF2" />
-              <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>SPONSORISÉ</Text>
+            {/* Badge sponsorisé flottant en haut à gauche */}
+            <View style={{
+              position: 'absolute', top: 14, left: 14,
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              backgroundColor: 'rgba(0,0,0,0.55)',
+              paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+            }}>
+              <Icon name="zap" size={9} color="#F59E0B" />
+              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>SPONSORISÉ</Text>
             </View>
-            <Icon name="more-horizontal" size={16} color={colors.textTertiary} />
-          </View>
 
-          {/* Titre */}
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>
-            {ad.title ?? ''}
-          </Text>
-
-          {/* Description */}
-          {ad.description ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: 12 }} numberOfLines={2}>
-              {ad.description}
-            </Text>
-          ) : <View style={{ height: 8 }} />}
-
-          {/* CTA */}
-          {ad.cta_url ? (
-            <TouchableOpacity
-              onPress={() => onPress(ad.cta_url!)}
-              activeOpacity={0.85}
-              style={{ overflow: 'hidden', borderRadius: 12, alignSelf: 'stretch' }}
-            >
-              <LinearGradient
-                colors={['#7B3FF2', '#E0389A']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                  gap: 6, paddingVertical: 11, paddingHorizontal: 20, borderRadius: 12 }}
-              >
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>
-                  {ad.cta_text ?? 'En savoir plus'}
+            {/* Contenu positionné sur l'image en bas */}
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18 }}>
+              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', lineHeight: 26, marginBottom: 6, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }} numberOfLines={2}>
+                {ad.title ?? ''}
+              </Text>
+              {ad.description ? (
+                <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, lineHeight: 18, marginBottom: 14 }} numberOfLines={2}>
+                  {ad.description}
                 </Text>
-                <Icon name="arrow-right" size={14} color="#fff" />
-              </LinearGradient>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </View>
+              ) : <View style={{ height: 10 }} />}
+              {ad.cta_url ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <LinearGradient
+                    colors={['#7B3FF2', '#E0389A']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                      gap: 8, paddingVertical: 13, borderRadius: 14 }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>
+                      {ad.cta_text ?? 'En savoir plus'}
+                    </Text>
+                    <Icon name="arrow-right" size={15} color="#fff" />
+                  </LinearGradient>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        ) : (
+          /* Pas d'image — card colorée pleine */
+          <LinearGradient
+            colors={['#7B3FF2', '#E0389A']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{ padding: 28, minHeight: 200, justifyContent: 'space-between' }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 }}>
+              <Icon name="zap" size={9} color="#F59E0B" />
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>SPONSORISÉ</Text>
+            </View>
+            <View>
+              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900', lineHeight: 28, marginBottom: 8 }} numberOfLines={2}>
+                {ad.title ?? ''}
+              </Text>
+              {ad.description ? (
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 20, marginBottom: 20 }} numberOfLines={3}>
+                  {ad.description}
+                </Text>
+              ) : <View style={{ height: 16 }} />}
+              {ad.cta_url ? (
+                <View style={{ backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: 20,
+                  borderRadius: 14, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ color: '#7B3FF2', fontSize: 14, fontWeight: '800' }}>
+                    {ad.cta_text ?? 'En savoir plus'}
+                  </Text>
+                  <Icon name="arrow-right" size={14} color="#7B3FF2" />
+                </View>
+              ) : null}
+            </View>
+          </LinearGradient>
+        )}
+      </TouchableOpacity>
     );
   },
 );
@@ -789,7 +815,7 @@ export const FeedScreen: React.FC = () => {
         const SUGGEST_EVERY  = 8;
         const COMM_EVERY     = 12;
         const REEL_ROW_EVERY = 5; // une rangée de reels toutes les 5 cartes
-        const AD_EVERY       = 3; // 1 pub toutes les 3 cartes
+        const AD_EVERY       = 1; // 1 pub toutes les 3 cartes
         const result: FeedItem[] = [];
         let suggestCount = 0;
         let commCount    = 0;
