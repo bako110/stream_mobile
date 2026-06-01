@@ -2,10 +2,10 @@
  * CreateAdScreen — Créer ou modifier une campagne publicitaire.
  * Accessible depuis AdsScreen.
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton } from '../../components/common';
@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { adService, type Ad, type AdPlacement, type AdFormat } from '../../services/adService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 const PLACEMENTS: { key: AdPlacement; label: string; icon: string; desc: string }[] = [
   { key: 'feed',    label: 'Feed principal', icon: 'home',       desc: '1 pub toutes les 7 cartes' },
@@ -55,6 +56,9 @@ export const CreateAdScreen: React.FC = () => {
   const [cpmEur,       setCpmEur]       = useState(existingAd ? existingAd.cpm_eur : 2.0);
   const [saving,       setSaving]       = useState(false);
   const [walletCoins,  setWalletCoins]  = useState<number | null>(null);
+  const [localImage,   setLocalImage]   = useState<string | null>(null);
+  const [uploading,    setUploading]    = useState(false);
+  const pickingRef = useRef(false);
 
   // Charger le solde wallet
   useEffect(() => {
@@ -66,6 +70,34 @@ export const CreateAdScreen: React.FC = () => {
   // Estimation impressions
   const budget = parseFloat(budgetEur) || 0;
   const estimatedImpressions = cpmEur > 0 ? Math.round((budget / cpmEur) * 1000) : 0;
+
+  const pickCreative = () => {
+    if (pickingRef.current) return;
+    pickingRef.current = true;
+    launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 1 }, async (resp) => {
+      pickingRef.current = false;
+      if (resp.didCancel || resp.errorCode || !resp.assets?.length) return;
+      const uri = resp.assets[0].uri!;
+      setLocalImage(uri);
+      setUploading(true);
+      try {
+        const fd = new FormData();
+        fd.append('file', { uri, name: `ad_creative_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
+        const res = await apiClient.upload<{ uploaded: { url: string }[] }>(
+          Endpoints.upload.images('ads'),
+          fd,
+        );
+        const url = res.data?.uploaded?.[0]?.url ?? null;
+        if (url) setCreativeUrl(url);
+        else Alert.alert('Erreur', "Impossible d'uploader l'image.");
+      } catch {
+        Alert.alert('Erreur', "Impossible d'uploader l'image.");
+        setLocalImage(null);
+      } finally {
+        setUploading(false);
+      }
+    });
+  };
 
   const handleSave = useCallback(async () => {
     if (!title.trim())  { Alert.alert('Erreur', 'Le titre est requis.'); return; }
@@ -199,17 +231,48 @@ export const CreateAdScreen: React.FC = () => {
           />
         </Field>
 
-        {/* URL image/vidéo */}
-        <Field label="URL image ou vidéo (créatif)">
-          <TextInput
-            style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
-            value={creativeUrl}
-            onChangeText={setCreativeUrl}
-            placeholder="https://ton-site.com/image.jpg"
-            placeholderTextColor={colors.textTertiary}
-            autoCapitalize="none"
-            keyboardType="url"
-          />
+        {/* Image créatif — picker galerie */}
+        <Field label="Image de la publicité">
+          <TouchableOpacity
+            onPress={pickCreative}
+            disabled={uploading}
+            activeOpacity={0.8}
+            style={[s.imagePicker, {
+              backgroundColor: colors.backgroundSecondary,
+              borderColor: creativeUrl ? '#7B3FF2' : colors.divider,
+            }]}
+          >
+            {uploading ? (
+              <View style={s.imagePickerInner}>
+                <ActivityIndicator color="#7B3FF2" />
+                <Text style={[s.imagePickerTxt, { color: colors.textTertiary }]}>Upload en cours…</Text>
+              </View>
+            ) : (localImage || creativeUrl) ? (
+              <>
+                <Image
+                  source={{ uri: localImage ?? creativeUrl! }}
+                  style={s.imagePreview}
+                  resizeMode="cover"
+                />
+                <View style={s.imageEditBadge}>
+                  <Icon name="camera" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Changer</Text>
+                </View>
+              </>
+            ) : (
+              <View style={s.imagePickerInner}>
+                <View style={[s.imagePickerIcon, { backgroundColor: '#7B3FF215' }]}>
+                  <Icon name="image" size={22} color="#7B3FF2" />
+                </View>
+                <Text style={[s.imagePickerTxt, { color: colors.textSecondary }]}>
+                  Sélectionner une image
+                </Text>
+                <Text style={[s.imagePickerHint, { color: colors.textTertiary }]}>
+                  JPG, PNG · recommandé 1200×628px
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </Field>
 
         {/* CTA */}
@@ -341,7 +404,15 @@ const s = StyleSheet.create({
   row:          { flexDirection: 'row', gap: 10 },
   chips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5 },
-  hint:         { fontSize: 11, marginTop: 4 },
-  infoBox:      { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
-  infoTxt:      { flex: 1, fontSize: 12, lineHeight: 18 },
+  hint:            { fontSize: 11, marginTop: 4 },
+  infoBox:         { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
+  infoTxt:         { flex: 1, fontSize: 12, lineHeight: 18 },
+  imagePicker:     { borderWidth: 1.5, borderRadius: 14, overflow: 'hidden', minHeight: 140 },
+  imagePickerInner:{ alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8 },
+  imagePickerIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  imagePickerTxt:  { fontSize: 14, fontWeight: '600' },
+  imagePickerHint: { fontSize: 11 },
+  imagePreview:    { width: '100%', height: 180 },
+  imageEditBadge:  { position: 'absolute', bottom: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4,
+                     backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
 });

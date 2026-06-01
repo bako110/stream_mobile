@@ -251,7 +251,7 @@ export const Endpoints = {
 
   // ── Upload médias (Cloudinary) ────────────────────────────────────────────
   upload: {
-    images: (folder: 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities') =>
+    images: (folder: 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'ads') =>
       `${V1}/upload/images?folder=${folder}`,
     video: (folder: 'reels' | 'stories' | 'messages') =>
       `${V1}/upload/video?folder=${folder}`,
