@@ -918,36 +918,71 @@ export const CommunityChatScreen: React.FC = () => {
     // ── ANNONCE ──────────────────────────────────────────────────────────────
     if (isAnnouncement) {
       return (
-        <View style={{ marginHorizontal: 12 }}>
+        <View style={{ marginHorizontal: 12, marginVertical: 6 }}>
           {DateSep}
           <TouchableOpacity
-            activeOpacity={0.85}
+            activeOpacity={0.92}
             onLongPress={() => canAnnounce ? setMenuMsg(msg) : null}
             delayLongPress={350}
-            style={[S.announceBubble, { backgroundColor: '#F59E0B0D', borderColor: '#F59E0B40' }]}
           >
-            <View style={S.announceTop}>
-              <View style={[S.announceIconBox, { backgroundColor: '#F59E0B20' }]}>
-                <Icon name="bell" size={14} color="#F59E0B" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[S.announceLabel, { color: '#D97706' }]}>Annonce</Text>
-                <Text style={[S.announceMeta, { color: colors.textTertiary }]}>
-                  {msg.sender_display_name || msg.sender_username} · {fmtTime(msg.created_at)}
-                  {msg.edited_at ? '  · modifié' : ''}
+            {/* Bande accent gauche + fond dégradé */}
+            <LinearGradient
+              colors={['#F59E0B08', '#F59E0B18']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={{
+                borderRadius: 18, borderWidth: 1, borderColor: '#F59E0B35',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Barre accent top */}
+              <LinearGradient
+                colors={['#F59E0B', '#FBBF24']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ height: 3, width: '100%' }}
+              />
+              <View style={{ padding: 14 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <LinearGradient
+                    colors={['#F59E0B', '#D97706']}
+                    style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Icon name="bell" size={16} color="#fff" />
+                  </LinearGradient>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#D97706', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 }}>
+                      ANNONCE OFFICIELLE
+                    </Text>
+                    <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 1 }}>
+                      {msg.sender_display_name || msg.sender_username} · {fmtTime(msg.created_at)}
+                      {msg.edited_at ? ' · modifié' : ''}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {msg.is_pinned && (
+                      <View style={{ backgroundColor: '#F59E0B20', padding: 5, borderRadius: 8 }}>
+                        <Icon name="bookmark" size={12} color="#F59E0B" />
+                      </View>
+                    )}
+                    {canAnnounce && (
+                      <TouchableOpacity onPress={() => setMenuMsg(msg)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Icon name="more-horizontal" size={16} color="#D97706" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {/* Ligne séparateur */}
+                <View style={{ height: 1, backgroundColor: '#F59E0B25', marginBottom: 12 }} />
+
+                {/* Contenu */}
+                <Text style={{ color: colors.textPrimary, fontSize: 15, lineHeight: 22, fontWeight: '500' }}>
+                  {msg.content}
                 </Text>
+
+                <Reactions msg={msg} />
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                {msg.is_pinned && <View style={[S.pinnedBadge, { backgroundColor: '#F59E0B20' }]}><Icon name="bookmark" size={11} color="#F59E0B" /></View>}
-                {canAnnounce && (
-                  <TouchableOpacity onPress={() => setMenuMsg(msg)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Icon name="more-horizontal" size={16} color="#D97706" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-            <Text style={[S.announceText, { color: colors.textPrimary }]}>{msg.content}</Text>
-            <Reactions msg={msg} />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       );
@@ -955,39 +990,143 @@ export const CommunityChatScreen: React.FC = () => {
 
     // ── SONDAGE ──────────────────────────────────────────────────────────────
     if (isPoll) {
-      const pollEnded = msg.poll?.ended ?? false;
+      const poll = msg.poll;
+      const pollEnded = poll?.ended ?? false;
+      const total = poll?.total_votes ?? 0;
       return (
-        <View style={{ marginHorizontal: 12 }}>
+        <View style={{ marginHorizontal: 12, marginVertical: 6 }}>
           {DateSep}
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.92}
             onLongPress={() => canAnnounce ? setMenuMsg(msg) : null}
             delayLongPress={350}
-            style={[S.pollMessageWrap, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+            style={{
+              borderRadius: 18, borderWidth: 1,
+              borderColor: colors.primary + '35',
+              backgroundColor: colors.surface,
+              overflow: 'hidden',
+            }}
           >
-            <View style={S.pollMsgTop}>
-              <View style={[S.pollIconBox, { backgroundColor: colors.primary + '20' }]}>
-                <Icon name="bar-chart-2" size={14} color={colors.primary} />
+            {/* Barre accent top */}
+            <LinearGradient
+              colors={[colors.primary, '#E0389A']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ height: 3 }}
+            />
+
+            <View style={{ padding: 14 }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <LinearGradient
+                  colors={[colors.primary, '#E0389A']}
+                  style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Icon name="bar-chart-2" size={16} color="#fff" />
+                </LinearGradient>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 }}>
+                      SONDAGE
+                    </Text>
+                    {pollEnded && (
+                      <View style={{ backgroundColor: '#EF444420', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
+                        <Text style={{ color: '#EF4444', fontSize: 9, fontWeight: '800' }}>TERMINÉ</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 1 }}>
+                    {msg.sender_display_name || msg.sender_username} · {fmtTime(msg.created_at)}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {msg.is_pinned && (
+                    <View style={{ backgroundColor: colors.primary + '20', padding: 5, borderRadius: 8 }}>
+                      <Icon name="bookmark" size={12} color={colors.primary} />
+                    </View>
+                  )}
+                  {canAnnounce && (
+                    <TouchableOpacity onPress={() => setMenuMsg(msg)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Icon name="more-horizontal" size={16} color={colors.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[S.pollMsgLabel, { color: colors.primary }]}>
-                  Sondage{pollEnded ? ' · Terminé' : ''}
-                </Text>
-                <Text style={[S.announceMeta, { color: colors.textTertiary }]}>
-                  {msg.sender_display_name || msg.sender_username} · {fmtTime(msg.created_at)}
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                {msg.is_pinned && <View style={[S.pinnedBadge, { backgroundColor: colors.primary + '20' }]}><Icon name="bookmark" size={11} color={colors.primary} /></View>}
-                {canAnnounce && (
-                  <TouchableOpacity onPress={() => setMenuMsg(msg)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Icon name="more-horizontal" size={16} color={colors.primary} />
-                  </TouchableOpacity>
-                )}
-              </View>
+
+              {/* Question */}
+              {poll && (
+                <>
+                  <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22, marginBottom: 14 }}>
+                    {poll.question}
+                  </Text>
+
+                  {/* Options */}
+                  <View style={{ gap: 8 }}>
+                    {poll.options.map(opt => {
+                      const voted = poll.my_votes.includes(opt.id);
+                      const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
+                      const isLeading = opt.votes === Math.max(...poll.options.map(o => o.votes)) && total > 0;
+                      return (
+                        <TouchableOpacity
+                          key={opt.id}
+                          onPress={() => !pollEnded && handleVote(msg, opt.id)}
+                          disabled={pollEnded}
+                          activeOpacity={0.75}
+                        >
+                          <View style={{
+                            borderRadius: 12, borderWidth: 1.5, overflow: 'hidden',
+                            borderColor: voted ? colors.primary : (isLeading && pollEnded ? '#10B98160' : colors.divider),
+                          }}>
+                            {/* Barre de progression */}
+                            <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${pct}%` as any,
+                              backgroundColor: voted ? colors.primary + '22' : (isLeading ? '#10B98112' : colors.backgroundSecondary) }} />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 11, gap: 10 }}>
+                              {/* Dot / check */}
+                              <View style={{
+                                width: 20, height: 20, borderRadius: 10, borderWidth: 1.5,
+                                borderColor: voted ? colors.primary : colors.divider,
+                                backgroundColor: voted ? colors.primary : 'transparent',
+                                alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {voted && <Icon name="check" size={10} color="#fff" />}
+                              </View>
+                              <Text style={{ flex: 1, color: colors.textPrimary, fontSize: 14, fontWeight: voted ? '700' : '400' }} numberOfLines={2}>
+                                {opt.text}
+                              </Text>
+                              <Text style={{ color: voted ? colors.primary : (isLeading && pollEnded ? '#10B981' : colors.textTertiary), fontSize: 13, fontWeight: '800', minWidth: 32, textAlign: 'right' }}>
+                                {pct}%
+                              </Text>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Footer */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.divider }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Icon name="users" size={12} color={colors.textTertiary} />
+                      <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
+                        {total} vote{total !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    {poll.allow_multiple && (
+                      <Text style={{ color: colors.textTertiary, fontSize: 11 }}>Choix multiple</Text>
+                    )}
+                    {!pollEnded && poll.ends_at && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Icon name="clock" size={11} color={colors.textTertiary} />
+                        <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                          Fin le {new Date(poll.ends_at).toLocaleDateString('fr-FR')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </>
+              )}
+
+              <Reactions msg={msg} />
             </View>
-            <PollCard msg={msg} />
-            <Reactions msg={msg} />
           </TouchableOpacity>
         </View>
       );
