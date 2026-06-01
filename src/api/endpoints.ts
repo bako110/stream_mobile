@@ -253,8 +253,9 @@ export const Endpoints = {
   upload: {
     images: (folder: 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'ads') =>
       `${V1}/upload/images?folder=${folder}`,
-    video: (folder: 'reels' | 'stories' | 'messages') =>
+    video: (folder: 'reels' | 'stories' | 'messages' | 'ads') =>
       `${V1}/upload/video?folder=${folder}`,
+    videoJobStatus: (jobId: string) => `${V1}/upload/video/status/${jobId}`,
     audio: (folder: 'messages' | 'stories') =>
       `${V1}/upload/audio?folder=${folder}`,
     file: (folder: 'messages') =>

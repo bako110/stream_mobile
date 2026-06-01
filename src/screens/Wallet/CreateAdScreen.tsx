@@ -56,9 +56,12 @@ export const CreateAdScreen: React.FC = () => {
   const [cpmEur,       setCpmEur]       = useState(existingAd ? existingAd.cpm_eur : 2.0);
   const [saving,       setSaving]       = useState(false);
   const [walletCoins,  setWalletCoins]  = useState<number | null>(null);
-  const [localImage,   setLocalImage]   = useState<string | null>(null);
-  const [uploading,    setUploading]    = useState(false);
-  const pickingRef = useRef(false);
+  const [localMedia,     setLocalMedia]     = useState<string | null>(null);
+  const [mediaType,      setMediaType]      = useState<'image' | 'video' | null>(null);
+  const [uploading,      setUploading]      = useState(false);
+  const [uploadStatus,   setUploadStatus]   = useState<string>('');
+  const pickingRef  = useRef(false);
+  const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Charger le solde wallet
   useEffect(() => {
@@ -72,29 +75,108 @@ export const CreateAdScreen: React.FC = () => {
   const estimatedImpressions = cpmEur > 0 ? Math.round((budget / cpmEur) * 1000) : 0;
 
   const pickCreative = () => {
+    if (pickingRef.current || uploading) return;
+    Alert.alert('Type de créatif', 'Choisir le type de média', [
+      {
+        text: 'Image',
+        onPress: () => _pick('photo'),
+      },
+      {
+        text: 'Vidéo',
+        onPress: () => _pick('video'),
+      },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+  };
+
+  const _poll = (jobId: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await apiClient.get<{
+          status: string; hls_url?: string; thumbnail_url?: string;
+        }>(Endpoints.upload.videoJobStatus(jobId));
+        const { status, hls_url, thumbnail_url } = r.data;
+        if (status === 'done') {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          if (hls_url) {
+            setCreativeUrl(hls_url);
+            if (thumbnail_url) setLocalMedia(thumbnail_url);
+          } else {
+            Alert.alert('Erreur', 'Transcoding HLS échoué.');
+            setLocalMedia(null);
+          }
+          setUploading(false);
+          setUploadStatus('');
+        } else if (status === 'error') {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          setUploading(false);
+          setUploadStatus('');
+          Alert.alert('Erreur', 'Impossible de convertir la vidéo.');
+          setLocalMedia(null);
+        } else {
+          setUploadStatus('Conversion HLS en cours…');
+        }
+      } catch { /* retry next tick */ }
+    }, 3000);
+  };
+
+  const _pick = (mediaTypeIn: 'photo' | 'video') => {
     if (pickingRef.current) return;
     pickingRef.current = true;
-    launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 1 }, async (resp) => {
+    launchImageLibrary({ mediaType: mediaTypeIn, selectionLimit: 1, quality: 1 }, async (resp) => {
       pickingRef.current = false;
       if (resp.didCancel || resp.errorCode || !resp.assets?.length) return;
-      const uri = resp.assets[0].uri!;
-      setLocalImage(uri);
+      const asset = resp.assets[0];
+      const uri   = asset.uri!;
+      const isVid = mediaTypeIn === 'video';
+      setLocalMedia(uri);
+      setMediaType(isVid ? 'video' : 'image');
+      setCreativeUrl('');
       setUploading(true);
+      setUploadStatus(isVid ? 'Upload vidéo…' : 'Upload image…');
+
       try {
         const fd = new FormData();
-        fd.append('file', { uri, name: `ad_creative_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
-        const res = await apiClient.upload<{ uploaded: { url: string }[] }>(
-          Endpoints.upload.images('ads'),
-          fd,
-        );
-        const url = res.data?.uploaded?.[0]?.url ?? null;
-        if (url) setCreativeUrl(url);
-        else Alert.alert('Erreur', "Impossible d'uploader l'image.");
+        if (isVid) {
+          const ext  = uri.split('.').pop() ?? 'mp4';
+          fd.append('file', { uri, name: `ad_video_${Date.now()}.${ext}`, type: asset.type ?? 'video/mp4' } as any);
+          const res = await apiClient.upload<{ job_id?: string; hls_url?: string }>(
+            Endpoints.upload.video('ads'),
+            fd,
+          );
+          const { job_id, hls_url } = res.data;
+          if (hls_url) {
+            setCreativeUrl(hls_url);
+            setUploading(false);
+            setUploadStatus('');
+          } else if (job_id) {
+            setUploadStatus('Conversion HLS en cours…');
+            _poll(job_id);
+          } else {
+            throw new Error('no job_id');
+          }
+        } else {
+          fd.append('file', { uri, name: `ad_img_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
+          const res = await apiClient.upload<{ uploaded: { url: string }[] }>(
+            Endpoints.upload.images('ads'),
+            fd,
+          );
+          const url = res.data?.uploaded?.[0]?.url ?? null;
+          if (url) setCreativeUrl(url);
+          else throw new Error('no url');
+          setUploading(false);
+          setUploadStatus('');
+        }
       } catch {
-        Alert.alert('Erreur', "Impossible d'uploader l'image.");
-        setLocalImage(null);
-      } finally {
+        Alert.alert('Erreur', "Impossible d'uploader le fichier.");
+        setLocalMedia(null);
+        setMediaType(null);
         setUploading(false);
+        setUploadStatus('');
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       }
     });
   };
@@ -102,6 +184,8 @@ export const CreateAdScreen: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!title.trim())  { Alert.alert('Erreur', 'Le titre est requis.'); return; }
     if (budget < 1)     { Alert.alert('Erreur', 'Budget minimum : 1 €'); return; }
+    if (uploading) { Alert.alert('Patiente', 'Le fichier est encore en cours d\'upload.'); return; }
+    if (localMedia && !creativeUrl) { Alert.alert('Patiente', 'La conversion HLS est en cours, réessaie dans quelques secondes.'); return; }
     if (ctaUrl && !ctaUrl.startsWith('http')) {
       Alert.alert('Erreur', 'L\'URL doit commencer par http:// ou https://');
       return;
@@ -231,8 +315,8 @@ export const CreateAdScreen: React.FC = () => {
           />
         </Field>
 
-        {/* Image créatif — picker galerie */}
-        <Field label="Image de la publicité">
+        {/* Créatif — image ou vidéo */}
+        <Field label="Image ou vidéo de la publicité">
           <TouchableOpacity
             onPress={pickCreative}
             disabled={uploading}
@@ -245,30 +329,40 @@ export const CreateAdScreen: React.FC = () => {
             {uploading ? (
               <View style={s.imagePickerInner}>
                 <ActivityIndicator color="#7B3FF2" />
-                <Text style={[s.imagePickerTxt, { color: colors.textTertiary }]}>Upload en cours…</Text>
+                <Text style={[s.imagePickerTxt, { color: colors.textTertiary }]}>{uploadStatus || 'Upload en cours…'}</Text>
+                {uploadStatus.includes('HLS') && (
+                  <Text style={[s.imagePickerHint, { color: colors.textTertiary }]}>
+                    La vidéo est convertie en streaming HLS
+                  </Text>
+                )}
               </View>
-            ) : (localImage || creativeUrl) ? (
+            ) : localMedia ? (
               <>
-                <Image
-                  source={{ uri: localImage ?? creativeUrl! }}
-                  style={s.imagePreview}
-                  resizeMode="cover"
-                />
+                {mediaType === 'video' ? (
+                  <View style={[s.imagePreview, { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Icon name="play-circle" size={48} color="rgba(255,255,255,0.8)" />
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 6 }}>
+                      Vidéo HLS {creativeUrl ? '— prête' : '— en cours…'}
+                    </Text>
+                  </View>
+                ) : (
+                  <Image source={{ uri: localMedia }} style={s.imagePreview} resizeMode="cover" />
+                )}
                 <View style={s.imageEditBadge}>
-                  <Icon name="camera" size={12} color="#fff" />
+                  <Icon name={mediaType === 'video' ? 'video' : 'camera'} size={12} color="#fff" />
                   <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Changer</Text>
                 </View>
               </>
             ) : (
               <View style={s.imagePickerInner}>
                 <View style={[s.imagePickerIcon, { backgroundColor: '#7B3FF215' }]}>
-                  <Icon name="image" size={22} color="#7B3FF2" />
+                  <Icon name="film" size={22} color="#7B3FF2" />
                 </View>
                 <Text style={[s.imagePickerTxt, { color: colors.textSecondary }]}>
-                  Sélectionner une image
+                  Sélectionner image ou vidéo
                 </Text>
                 <Text style={[s.imagePickerHint, { color: colors.textTertiary }]}>
-                  JPG, PNG · recommandé 1200×628px
+                  Image : JPG/PNG · Vidéo : MP4 → HLS automatique
                 </Text>
               </View>
             )}
