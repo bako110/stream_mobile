@@ -196,7 +196,7 @@ const TxList: React.FC<{
   return (
     <>
       <View style={{ gap: 2 }}>
-        {filtered.map(renderTx)}
+        {filtered.map(tx => <React.Fragment key={tx.id}>{renderTx(tx)}</React.Fragment>)}
       </View>
       {txHasMore && txFilter === 'all' && (
         <TouchableOpacity
@@ -344,7 +344,7 @@ const WalletScreen: React.FC = () => {
     const amtColor = isCredit ? colors.success : colors.error;
 
     return (
-      <TouchableOpacity key={tx.id} style={s.txRow} activeOpacity={0.7} onPress={() => openReceipt(tx)}>
+      <TouchableOpacity style={s.txRow} activeOpacity={0.7} onPress={() => openReceipt(tx)}>
         <View style={[s.txIconBox, { backgroundColor: `${icon.color}22` }]}>
           {icon.lib === 'mci' ? (
             <MaterialCommunityIcons name={icon.name} size={20} color={icon.color} />
