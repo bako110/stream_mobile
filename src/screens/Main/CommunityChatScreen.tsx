@@ -1493,27 +1493,42 @@ export const CommunityChatScreen: React.FC = () => {
           activeOpacity={0.88}
         >
           <LinearGradient
-            colors={['#10B981', '#059669']}
+            colors={activeCotisation.my_status === 'paid' ? ['#059669', '#047857'] : ['#10B981', '#059669']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 }}
           >
+            {/* Icône statut perso */}
             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)',
               alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="dollar-sign" size={16} color="#fff" />
+              <Icon
+                name={activeCotisation.my_status === 'paid' ? 'check-circle' : activeCotisation.my_status === 'exempt' ? 'shield' : 'dollar-sign'}
+                size={16} color="#fff"
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
-                Cotisation : {activeCotisation.title}
+                {activeCotisation.title}
               </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>
-                {activeCotisation.amount_per_member} coins par membre · {activeCotisation.progress_pct}% collecté
+              <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>
+                {activeCotisation.my_status === 'paid'
+                  ? `Vous avez payé · ${activeCotisation.progress_pct}% collecté`
+                  : activeCotisation.my_status === 'exempt'
+                  ? 'Vous êtes exempté de cette cotisation'
+                  : `${activeCotisation.amount_per_member} coins requis · ${activeCotisation.progress_pct}% collecté`}
               </Text>
             </View>
-            {/* Barre mini progression */}
-            <View style={{ width: 50, height: 4, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, overflow: 'hidden' }}>
-              <View style={{ width: `${Math.min(activeCotisation.progress_pct, 100)}%` as any,
-                height: 4, backgroundColor: '#fff', borderRadius: 2 }} />
-            </View>
+            {/* Badge statut */}
+            {activeCotisation.my_status === 'paid' ? (
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 10,
+                paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>PAYÉ</Text>
+              </View>
+            ) : activeCotisation.my_status !== 'exempt' ? (
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 10,
+                paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>PAYER</Text>
+              </View>
+            ) : null}
             <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.7)" />
           </LinearGradient>
         </TouchableOpacity>
