@@ -537,8 +537,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   function handleUpgradeTier(tier: 'pro' | 'elite') {
     const prices: Record<string, { eur: number; coins: number }> = {
-      pro:   { eur: 9.99,  coins: Math.ceil(9.99  * 200) },
-      elite: { eur: 24.99, coins: Math.ceil(24.99 * 200) },
+      pro:   { eur: 9.99,  coins: Math.ceil(9.99  * 100) }, // 1 € = 100 coins
+      elite: { eur: 24.99, coins: Math.ceil(24.99 * 100) },
     };
     const p = prices[tier];
     const tierLabel = tier === 'pro' ? 'Pro' : 'Elite';

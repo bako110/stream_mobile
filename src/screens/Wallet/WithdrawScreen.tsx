@@ -56,7 +56,8 @@ interface Withdrawal {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const coinsToEur = (coins: number) => ((coins / 100) * 0.5).toFixed(2);
+// Taux retrait aligné backend : 100 coins = 0.35 €
+const coinsToEur = (coins: number) => ((coins / 100) * 0.35).toFixed(2);
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -282,7 +283,7 @@ const WithdrawScreen: React.FC = () => {
           <View style={s.infoBanner}>
             <Icon name="info" size={14} color={colors.info} />
             <Text style={s.infoBannerText}>
-              Minimum <Text style={{ fontWeight: '700', color: colors.textPrimary }}>1 000 coins</Text> = <Text style={{ fontWeight: '700', color: colors.textPrimary }}>5,00 €</Text>. Traitement sous 2-5 jours ouvrés.
+              Minimum <Text style={{ fontWeight: '700', color: colors.textPrimary }}>500 coins</Text> = <Text style={{ fontWeight: '700', color: colors.textPrimary }}>1,75 €</Text>. Taux : 100 coins = 0,35 €. Traitement sous 2-5 jours ouvrés.
             </Text>
           </View>
 

@@ -96,7 +96,7 @@ export default function TransferScreen() {
   };
 
   const coins = parseInt(amount, 10) || 0;
-  const eur   = ((coins / 100) * 0.5).toFixed(2);
+  const eur   = ((coins / 100) * 0.35).toFixed(2); // 100 coins = 0.35 €
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>

@@ -52,7 +52,8 @@ interface Transaction {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const coinsToEur = (coins: number) => ((coins / 100) * 0.5).toFixed(2);
+// Taux retrait : 100 coins = 0.35 € (aligné avec COINS_TO_EUR_RATE backend)
+const coinsToEur = (coins: number) => ((coins / 100) * 0.35).toFixed(2);
 
 const formatDate = (iso: string) => {
   const d = new Date(iso);

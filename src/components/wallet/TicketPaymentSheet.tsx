@@ -45,9 +45,9 @@ interface Props {
 // ── Constantes ──────────────────────────────────────────────────────────────
 
 const FEES_RATE    = 0.10;
-const EUR_TO_COINS = 200;
+const EUR_TO_COINS = 100; // 1 € = 100 coins à l'achat
 
-const coinsToEur = (c: number) => (c / 100) * 0.5;
+const coinsToEur = (c: number) => (c / 100) * 0.35; // taux retrait : 100 coins = 0.35 €
 const eurToCoins = (e: number) => Math.ceil(e * EUR_TO_COINS);
 const fmtCoins   = (c: number) => c.toLocaleString('fr-FR');
 const fmtEur     = (e: number) => e.toFixed(2).replace('.', ',') + ' €';

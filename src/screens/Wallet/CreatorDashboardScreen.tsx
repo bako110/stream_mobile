@@ -69,7 +69,8 @@ interface GiftReceived {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const coinsToEur = (coins: number | string) => ((parseFloat(String(coins ?? 0)) / 100) * 0.5).toFixed(2);
+// Taux retrait : 100 coins = 0.35 €
+const coinsToEur = (coins: number | string) => ((parseFloat(String(coins ?? 0)) / 100) * 0.35).toFixed(2);
 const fmtNum = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : `${n}`;
 
@@ -405,7 +406,7 @@ const CreatorDashboardScreen: React.FC = () => {
           </TouchableOpacity>
           {(stats?.available_balance ?? 0) < 1000 && (
             <Text style={s.withdrawMin}>
-              Minimum 1 000 coins ({coinsToEur(1000)} €) requis
+              Minimum 500 coins ({coinsToEur(500)} €) requis
             </Text>
           )}
         </View>
