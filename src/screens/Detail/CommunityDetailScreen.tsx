@@ -1200,6 +1200,24 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           activeOpacity={0.7}
           onPress={() => {
             setSettingsOpen(false);
+            setTimeout(() => (nav as any).navigate('CommunityFund', { communityId, communityName: community?.name ?? '', myRole }), 250);
+          }}
+        >
+          <View style={[s.secIcon, { backgroundColor: '#10B98120' }]}>
+            <Icon name="dollar-sign" size={18} color="#10B981" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Cotisations</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>Lancer et gérer les cotisations des membres</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSettingsOpen(false);
             setTimeout(() => (nav as any).navigate('CommunityEvents', { communityId, communityName: community?.name ?? '', myRole }), 250);
           }}
         >
@@ -1757,6 +1775,17 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                         <Icon name="chevron-right" size={13} color={colors.textTertiary} />
                       </TouchableOpacity>
                     )}
+                    <TouchableOpacity
+                      style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                      onPress={() => (nav as any).navigate('CommunityFund', { communityId, communityName: community.name, myRole })}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[s.navIcon, { backgroundColor: '#10B98120' }]}>
+                        <Icon name="dollar-sign" size={20} color="#10B981" />
+                      </View>
+                      <Text style={[s.navLabel, { color: colors.textPrimary }]}>Cotisations</Text>
+                      <Icon name="chevron-right" size={13} color={colors.textTertiary} />
+                    </TouchableOpacity>
                     {(isAdmin || isMod || isGlobalAdmin) && (
                       <TouchableOpacity
                         style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
