@@ -670,6 +670,13 @@ export const FeedScreen: React.FC = () => {
 
   useEffect(() => { loadSuggestions(); }, []);
 
+  // ── Chargement de la pub feed ─────────────────────────────────────────────
+  useEffect(() => {
+    apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=feed')
+      .then((res: { data: AdData | null }) => { if (res.data) setCurrentAdData(res.data); })
+      .catch(() => {});
+  }, []);
+
   // ── Suivi (follow) state ──────────────────────────────────────────────────
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
 
@@ -777,11 +784,6 @@ export const FeedScreen: React.FC = () => {
             data: chunk.map(ri => ri.data).filter(Boolean),
           });
         }
-
-        // Charger une pub active en arrière-plan (sans bloquer le feed)
-        apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=feed')
-          .then((res: { data: AdData | null }) => { if (res.data) setCurrentAdData(res.data); })
-          .catch(() => {});
 
         // Injecter suggestions, communities, pub et rangées de reels à intervalles réguliers
         const SUGGEST_EVERY  = 8;
@@ -1852,6 +1854,7 @@ export const FeedScreen: React.FC = () => {
           ref={feedListRef}
           data={items}
           keyExtractor={item => `${item.kind}-${item.id}`}
+          extraData={currentAdData}
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           scrollEnabled={feedScrollEnabled}
