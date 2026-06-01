@@ -1588,25 +1588,23 @@ export const CommunityChatScreen: React.FC = () => {
                       multiline maxLength={2000}
                     />
                   </View>
-                  {text.trim() ? (
-                    <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
-                      <TouchableOpacity
-                        style={S.sendBtn}
-                        onPress={handleSend}
-                        disabled={sending}
+                  {(text.trim() || activeTab === 'announcements') ? (
+                    <TouchableOpacity
+                      style={[S.sendBtn, !text.trim() && { opacity: 0.35 }]}
+                      onPress={handleSend}
+                      disabled={sending || !text.trim()}
+                    >
+                      <LinearGradient
+                        colors={activeTab === 'announcements' ? ['#F59E0B', '#D97706'] : ['#7B3FF2', '#E0389A']}
+                        style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       >
-                        <LinearGradient
-                          colors={['#7B3FF2', '#E0389A']}
-                          style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
-                          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                        >
-                          {sending
-                            ? <ActivityIndicator size="small" color="#fff" />
-                            : <Icon name={editingMsg ? 'check' : 'send'} size={17} color="#fff" />
-                          }
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    </Animated.View>
+                        {sending
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <Icon name={editingMsg ? 'check' : activeTab === 'announcements' ? 'bell' : 'send'} size={17} color="#fff" />
+                        }
+                      </LinearGradient>
+                    </TouchableOpacity>
                   ) : (
                     <TouchableOpacity style={S.sendBtn} onPress={startRecording} disabled={sending}>
                       <LinearGradient
