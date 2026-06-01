@@ -27,7 +27,7 @@ import { ExpandableText } from '../../components/common';
 import { favoriteService } from '../../services/favoriteService';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
-interface Props { route: { params: { communityId: string } }; }
+interface Props { route: { params: { communityId: string; autoEnter?: boolean } }; }
 
 type SettingsTab = 'info' | 'members' | 'security';
 
@@ -66,7 +66,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const { colors } = theme;
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { communityId } = route.params;
+  const { communityId, autoEnter } = route.params;
 
   const [community,      setCommunity]      = useState<CommunityData | null>(null);
   const [members,        setMembers]        = useState<CommunityMemberData[]>([]);
@@ -157,6 +157,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       setIsGlobalAdmin(globalAdmin);
       const js = (c as any).join_status ?? (role ? 'member' : 'none');
       setJoinStatus(js);
+      if (autoEnter && (js === 'member' || role === 'admin' || role === 'moderator')) {
+        nav.replace('CommunityChat', { communityId, communityName: c.name });
+        return;
+      }
       const canSeeMembers = !c.is_private || js === 'member' || role === 'admin' || role === 'moderator' || globalAdmin;
       if (canSeeMembers) {
         communityService.getMembers(communityId)

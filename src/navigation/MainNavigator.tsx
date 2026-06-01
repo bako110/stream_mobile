@@ -159,7 +159,7 @@ export type MainStackParamList = {
   Following:       { userId?: string; tab?: 'followers' | 'following' } | undefined;
   CommunityChat:           { communityId: string; communityName: string };
   Communities:             undefined;
-  CommunityDetail:         { communityId: string };
+  CommunityDetail:         { communityId: string; autoEnter?: boolean };
   CommunityMembers:        { communityId: string; communityName: string };
   CommunityStats:          { communityId: string; communityName: string };
   CommunityEvents:         { communityId: string; communityName: string; myRole?: string | null };

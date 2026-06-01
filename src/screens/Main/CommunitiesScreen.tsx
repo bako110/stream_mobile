@@ -543,7 +543,7 @@ export const CommunitiesScreen: React.FC = () => {
       setCreateOpen(false);
       resetForm();
       load();
-      nav.navigate('CommunityDetail', { communityId: created.id });
+      nav.navigate('CommunityDetail', { communityId: created.id, autoEnter: true });
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? 'Impossible de créer la communauté.');
     } finally { setCreating(false); }
