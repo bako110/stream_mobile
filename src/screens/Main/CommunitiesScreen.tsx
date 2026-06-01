@@ -539,11 +539,11 @@ export const CommunitiesScreen: React.FC = () => {
         avatar_url:        avatarUrl ?? undefined,
         banner_url:        bannerUrl ?? undefined,
       };
-      await communityService.create(payload);
+      const created = await communityService.create(payload);
       setCreateOpen(false);
       resetForm();
-      setTab('mine');
       load();
+      nav.navigate('CommunityDetail', { communityId: created.id });
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? 'Impossible de créer la communauté.');
     } finally { setCreating(false); }
