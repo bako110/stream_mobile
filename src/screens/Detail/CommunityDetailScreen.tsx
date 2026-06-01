@@ -1101,14 +1101,26 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
         {/* ── CHAT ── */}
         <Text style={[s.secSection, { color: colors.textTertiary, marginTop: 20 }]}>CHAT</Text>
-        <View style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-          <View style={[s.secIcon, { backgroundColor: '#7B3FF220' }]}>
-            <Icon name="message-circle" size={18} color="#7B3FF2" />
+        <View style={[s.secRow, {
+          backgroundColor: editMembersOnly ? '#7B3FF210' : colors.backgroundSecondary,
+          borderColor: editMembersOnly ? '#7B3FF240' : colors.divider,
+        }]}>
+          <View style={[s.secIcon, { backgroundColor: editMembersOnly ? '#7B3FF230' : '#7B3FF215' }]}>
+            <Icon name={editMembersOnly ? 'lock' : 'message-circle'} size={18} color="#7B3FF2" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Chat membres uniquement</Text>
-            <Text style={[s.secDesc, { color: colors.textTertiary }]}>
-              Seuls les membres peuvent envoyer des messages dans le groupe
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={[s.secLabel, { color: colors.textPrimary }]}>Chat admins seulement</Text>
+              {editMembersOnly && (
+                <View style={{ backgroundColor: '#7B3FF2', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>ACTIF</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[s.secDesc, { color: editMembersOnly ? '#7B3FF2AA' : colors.textTertiary }]}>
+              {editMembersOnly
+                ? 'Les membres ne peuvent que lire — seuls admins et mods peuvent écrire'
+                : 'Activer pour réserver l\'écriture aux admins et modérateurs'}
             </Text>
           </View>
           <Switch
