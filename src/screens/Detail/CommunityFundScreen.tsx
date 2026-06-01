@@ -5,10 +5,11 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, RefreshControl, Modal,
-  TextInput, KeyboardAvoidingView, Platform, ScrollView, Switch,
+  TextInput, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { BackButton } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -184,11 +185,12 @@ export const CommunityFundScreen: React.FC = () => {
   const [paying,      setPaying]      = useState<string | null>(null);
 
   // Form
-  const [formTitle,  setFormTitle]  = useState('');
-  const [formDesc,   setFormDesc]   = useState('');
-  const [formAmount, setFormAmount] = useState('');
-  const [formDeadline, setFormDeadline] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [formTitle,       setFormTitle]       = useState('');
+  const [formDesc,        setFormDesc]        = useState('');
+  const [formAmount,      setFormAmount]      = useState('');
+  const [formDeadline,    setFormDeadline]    = useState<Date | null>(null);
+  const [showDatePicker,  setShowDatePicker]  = useState(false);
+  const [saving,          setSaving]          = useState(false);
 
   const BASE = `/api/v1/communities/${communityId}/cotisations`;
 
@@ -212,10 +214,10 @@ export const CommunityFundScreen: React.FC = () => {
         title:             formTitle.trim(),
         description:       formDesc.trim() || undefined,
         amount_per_member: amount,
-        deadline:          formDeadline.trim() ? new Date(formDeadline).toISOString() : undefined,
+        deadline:          formDeadline ? formDeadline.toISOString() : undefined,
       });
       setCreateOpen(false);
-      setFormTitle(''); setFormDesc(''); setFormAmount(''); setFormDeadline('');
+      setFormTitle(''); setFormDesc(''); setFormAmount(''); setFormDeadline(null);
       load();
     } catch (e: any) {
       Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de créer la cotisation.');
@@ -421,14 +423,41 @@ export const CommunityFundScreen: React.FC = () => {
 
               <View>
                 <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>DATE LIMITE (optionnel)</Text>
-                <TextInput
-                  style={[st.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
-                  value={formDeadline}
-                  onChangeText={setFormDeadline}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textTertiary}
-                  keyboardType="numbers-and-punctuation"
-                />
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(true)}
+                  style={[st.input, { backgroundColor: colors.backgroundSecondary, borderColor: formDeadline ? '#7B3FF2' : colors.divider,
+                    flexDirection: 'row', alignItems: 'center', gap: 10 }]}
+                  activeOpacity={0.75}
+                >
+                  <Icon name="calendar" size={16} color={formDeadline ? '#7B3FF2' : colors.textTertiary} />
+                  <Text style={{ flex: 1, color: formDeadline ? colors.textPrimary : colors.textTertiary, fontSize: 14 }}>
+                    {formDeadline
+                      ? formDeadline.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+                      : 'Sélectionner une date limite'}
+                  </Text>
+                  {formDeadline && (
+                    <TouchableOpacity onPress={() => setFormDeadline(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Icon name="x" size={14} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={formDeadline ?? new Date()}
+                    mode="date"
+                    display="calendar"
+                    minimumDate={new Date()}
+                    onChange={(_, date) => {
+                      setShowDatePicker(false);
+                      if (date) setFormDeadline(date);
+                    }}
+                  />
+                )}
+                {formDeadline && (
+                  <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>
+                    Les paiements seront automatiquement bloqués après cette date.
+                  </Text>
+                )}
               </View>
 
               {/* Résumé */}
