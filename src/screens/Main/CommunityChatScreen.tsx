@@ -21,6 +21,7 @@ import type { CommunityMessageData } from '../../services/communityService';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Geolocation from '@react-native-community/geolocation';
 import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
+import { BoostPrompt } from '../../components/common';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -124,6 +125,7 @@ export const CommunityChatScreen: React.FC = () => {
   const [page,           setPage]           = useState(1);
   const [hasMore,        setHasMore]        = useState(true);
   const [editingMsg,     setEditingMsg]     = useState<CommunityMessage | null>(null);
+  const [boostType,      setBoostType]      = useState<'post' | 'event' | 'concert' | 'live' | null>(null);
   const [replyingTo,     setReplyingTo]     = useState<CommunityMessage | null>(null);
   const [menuMsg,        setMenuMsg]        = useState<CommunityMessage | null>(null);
   const [pinnedMsgs,     setPinnedMsgs]     = useState<CommunityMessage[]>([]);
@@ -389,14 +391,17 @@ export const CommunityChatScreen: React.FC = () => {
     const reply_to_id = replyingTo?.id ?? null;
     setReplyingTo(null);
     const msgType = activeTab === 'announcements' ? 'announcement' : 'text';
+    const isAnnouncement = msgType === 'announcement';
 
     if (isConnected) {
       sendWsMessage({ type: 'message', content, message_type: msgType, reply_to_id });
+      if (isAnnouncement) setBoostType('post');
     } else {
       try {
         const msg = await communityService.sendMessage(communityId, content, msgType, [], reply_to_id ?? undefined);
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+        if (isAnnouncement) setBoostType('post');
       } catch { setText(content); }
     }
     setSending(false);
@@ -690,6 +695,7 @@ export const CommunityChatScreen: React.FC = () => {
       setMessages(prev => [...prev, res as CommunityMessage]);
       setPollQ(''); setPollOpts(['', '']); setPollMulti(false);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+      setBoostType('post');
     } catch { Alert.alert('Erreur', 'Impossible de créer le sondage'); }
     finally { setSending(false); }
   };
@@ -1947,6 +1953,13 @@ export const CommunityChatScreen: React.FC = () => {
           </ScrollView>
         </View>
       </Modal>
+
+      <BoostPrompt
+        visible={!!boostType}
+        contentType={boostType ?? 'post'}
+        onBoost={() => { setBoostType(null); nav.navigate('CreateAd', { ad: null }); }}
+        onDismiss={() => setBoostType(null)}
+      />
     </View>
   );
 };
