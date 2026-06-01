@@ -276,7 +276,8 @@ export const CommunityChatScreen: React.FC = () => {
         setTypingUsers(p => p.filter(u => u.user_id !== payload.user_id));
         setRecordingUsers(p => p.filter(u => u.user_id !== payload.user_id));
       } else if (payload.type === 'community_updated') {
-        setCommunityTitle(payload.name);
+        if (payload.name) setCommunityTitle(payload.name);
+        if (typeof payload.members_only_chat === 'boolean') setMembersOnlyChat(payload.members_only_chat);
       } else if (payload.type === 'community_verified') {
         setCommunityVerified(payload.is_verified);
       } else if (payload.type === 'community_deleted') {
