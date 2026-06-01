@@ -66,6 +66,8 @@ export const CommunityFundDetailScreen: React.FC = () => {
   const [refreshing,    setRefreshing]    = useState(false);
   const [filter,        setFilter]        = useState<'all' | 'paid' | 'pending' | 'exempt'>('all');
   const [exempting,     setExempting]     = useState<string | null>(null);
+  const [withdrawing,   setWithdrawing]   = useState(false);
+  const [withdrawn,     setWithdrawn]     = useState(false);
 
   const BASE = `/api/v1/communities/${communityId}/cotisations/${cotisationId}`;
 
@@ -124,6 +126,33 @@ export const CommunityFundDetailScreen: React.FC = () => {
         finally { setExempting(null); }
       }},
     ]);
+  };
+
+  const handleWithdraw = () => {
+    if (!cotisation) return;
+    Alert.alert(
+      'Retirer les fonds',
+      `Transférer ${cotisation.collected_coins.toLocaleString('fr-FR')} coins vers votre wallet ?\n\nCette action est irréversible.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: `Retirer ${cotisation.collected_coins} coins`,
+          onPress: async () => {
+            setWithdrawing(true);
+            try {
+              const res = await apiClient.post<{ coins_received: number; new_balance: number }>(`${BASE}/withdraw`);
+              setWithdrawn(true);
+              Alert.alert(
+                'Fonds retirés',
+                `${res.data?.coins_received?.toLocaleString('fr-FR') ?? cotisation.collected_coins} coins ont été ajoutés à votre wallet.\n\nNouveau solde : ${res.data?.new_balance?.toLocaleString('fr-FR') ?? '—'} coins`,
+              );
+            } catch (e: any) {
+              Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de retirer.');
+            } finally { setWithdrawing(false); }
+          },
+        },
+      ],
+    );
   };
 
   const handleExport = async () => {
@@ -274,6 +303,48 @@ export const CommunityFundDetailScreen: React.FC = () => {
                   <Icon name="x-circle" size={14} color="#EF4444" />
                   <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13 }}>Annuler + rembourser</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Bouton retrait — cotisation clôturée, fonds non encore retirés */}
+            {isAdmin && cotisation.status === 'closed' && cotisation.collected_coins > 0 && !withdrawn && (
+              <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                <TouchableOpacity
+                  onPress={handleWithdraw}
+                  disabled={withdrawing}
+                  activeOpacity={0.85}
+                  style={{ borderRadius: 14, overflow: 'hidden' }}
+                >
+                  <LinearGradient
+                    colors={['#10B981', '#059669']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                      gap: 10, paddingVertical: 14, borderRadius: 14 }}
+                  >
+                    {withdrawing
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <>
+                          <Icon name="download" size={18} color="#fff" />
+                          <View>
+                            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '900' }}>
+                              Retirer {cotisation.collected_coins.toLocaleString('fr-FR')} coins
+                            </Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>
+                              Transférer vers mon wallet · {(cotisation.collected_coins / 100).toFixed(2)} €
+                            </Text>
+                          </View>
+                        </>
+                    }
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )}
+            {isAdmin && cotisation.status === 'closed' && withdrawn && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 8, backgroundColor: '#10B98115', borderRadius: 14, paddingVertical: 12,
+                marginHorizontal: 16, marginBottom: 12 }}>
+                <Icon name="check-circle" size={16} color="#10B981" />
+                <Text style={{ color: '#10B981', fontWeight: '700' }}>Fonds retirés vers votre wallet</Text>
               </View>
             )}
 
