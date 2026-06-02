@@ -13,7 +13,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, FolixLoader } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { concertService, socialService, authService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
@@ -43,11 +43,21 @@ const formatTime = (iso: string) =>
 // ── VideoModal ────────────────────────────────────────────────────────────────
 
 const VideoModal: React.FC<{ uri: string; onClose: () => void }> = ({ uri, onClose }) => {
+  const [isReady, setIsReady] = useState(false);
   const player = useVideoPlayer({ uri }, p => { p.muted = false; p.play(); });
+
+  useEffect(() => {
+    const sub = player.addListener('statusChange', ({ status }: any) => {
+      if (status === 'readyToPlay') setIsReady(true);
+    });
+    return () => sub?.remove?.();
+  }, [player]);
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
         <VideoView player={player} style={{ width: SW, height: SW * 0.62 }} resizeMode="contain" controls />
+        {!isReady && <FolixLoader variant="reel" color="#ffffff" />}
         <TouchableOpacity onPress={onClose}
           style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, right: 16,
             width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.6)',
