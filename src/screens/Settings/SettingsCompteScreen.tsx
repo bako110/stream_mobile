@@ -21,6 +21,7 @@ export const SettingsCompteScreen: React.FC = () => {
           <Row icon="slash"    label="Utilisateurs bloqués"    color="#EF4444" onPress={() => nav.navigate('BlockedUsers')} />
           <Row icon="users"    label="Abonnements / Abonnés"   color="#10B981" onPress={() => nav.navigate('Following')} />
           <Row icon="zap"      label="Booster mon compte"      color="#E0389A" value="Gagne des abonnés et des vues" onPress={() => nav.navigate('Boost')} />
+          <Row icon="check-circle" label="Badge vérifié FoliX"  color="#1D9BF0" value="Obtenir le badge bleu" onPress={() => nav.navigate('SettingsVerification')} />
           <Row icon="download" label="Télécharger mes données" color="#6366F1"
             onPress={() => Alert.alert('Bientôt disponible', 'Export de données disponible prochainement.')} last />
         </Card>
