@@ -2209,40 +2209,55 @@ export const FeedScreen: React.FC = () => {
 
 // ── MiniReelPlayer — mini carte reel avec autoplay muet ──────────────────────
 
+// Durée max de preview dans le feed : 2 segments HLS (~4s) puis pause
+const PREVIEW_DURATION_MS = 4000;
+
 const MiniReelPlayer: React.FC<{
   reel: any; w: number; h: number;
   isActive: boolean; feedFocused: boolean; onPress: () => void;
 }> = React.memo(({ reel, w, h, isActive, feedFocused, onPress }) => {
-  const [muted, setMuted] = useState(true);
+  const [muted,    setMuted]    = useState(true);
+  const [previewed,setPreviewed]= useState(false); // a déjà joué son preview
 
-  const videoUri = reel.hls_url ?? null;
+  const videoUri  = reel.hls_url ?? null;
+  const previewRef= useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const player = useVideoPlayer(
     videoUri ? {
       uri: videoUri,
       bufferConfig: {
-        minBufferMs: 2_000, maxBufferMs: 15_000,
-        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 1_000,
-        preferredForwardBufferDurationMs: 5_000,
+        minBufferMs: 1_000, maxBufferMs: 8_000,
+        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 800,
       },
     } : 'about:blank',
-    (p: any) => { p.muted = true; p.volume = 0; p.loop = true; },
+    (p: any) => { p.muted = true; p.volume = 0; p.loop = false; },
   );
 
-  // Cleanup player au démontage — évite les players fantômes
+  // Cleanup
   useEffect(() => {
     return () => {
+      if (previewRef.current) clearTimeout(previewRef.current);
       try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
     };
   }, []); // eslint-disable-line
 
   useEffect(() => {
     if (!videoUri) return;
-    try {
-      if (isActive && feedFocused) { player.play(); }
-      else                         { player.pause(); }
-    } catch {}
-  }, [isActive, feedFocused, videoUri]);
+    if (isActive && feedFocused && !previewed) {
+      // Joue le preview et arrête après PREVIEW_DURATION_MS
+      try { player.play(); } catch {}
+      previewRef.current = setTimeout(() => {
+        try { player.pause(); } catch {}
+        setPreviewed(true);
+      }, PREVIEW_DURATION_MS);
+    } else if (!isActive || !feedFocused) {
+      // Hors écran ou feed sans focus → pause immédiate
+      if (previewRef.current) { clearTimeout(previewRef.current); previewRef.current = null; }
+      try { player.pause(); } catch {}
+      // Reset preview si la rangée quitte l'écran (pour rejouer si l'user revient)
+      if (!isActive) setPreviewed(false);
+    }
+  }, [isActive, feedFocused, videoUri, previewed]);
 
   useEffect(() => {
     try { player.muted = muted; player.volume = muted ? 0 : 1; } catch {}
@@ -2325,28 +2340,33 @@ const MiniReelRow: React.FC<{
   feedFocused: boolean; isVisible: boolean;
   onPressReel: (id: string, data: any) => void;
 }> = React.memo(({ reels, itemW, itemH, feedFocused, isVisible, onPressReel }) => {
-  const [activeId, setActiveId] = useState<string | null>(reels[0]?.id ?? null);
+  // UN SEUL reel actif à la fois — null quand la rangée n'est pas visible
+  const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Stopper la lecture quand la rangée disparaît ou que le feed perd le focus
+  // Active le premier reel quand la rangée devient visible, stoppe tout quand elle disparaît
   useEffect(() => {
-    return () => { setActiveId(null); };
-  }, []);
+    if (isVisible && feedFocused) {
+      setActiveId(prev => prev ?? reels[0]?.id ?? null);
+    } else {
+      setActiveId(null);
+    }
+  }, [isVisible, feedFocused, reels]);
 
-  // Seuil bas (30%) + waitForInteraction:false → le 1er et le dernier sont bien détectés
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 30,
+    itemVisiblePercentThreshold: 60,  // 60% visible pour être considéré "actif"
     waitForInteraction: false,
-    minimumViewTime: 100,
+    minimumViewTime: 150,
   });
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<{ item: any }> }) => {
-      if (viewableItems.length === 0) return;
-      // Prendre l'item le plus centré (le milieu de la liste visible)
+      if (!isVisible || !feedFocused) return;
+      if (viewableItems.length === 0) { setActiveId(null); return; }
+      // UN seul actif : le plus centré dans la vue
       const mid = Math.floor(viewableItems.length / 2);
       setActiveId(viewableItems[mid].item.id);
     },
-    [],
+    [isVisible, feedFocused],
   );
 
   return (
