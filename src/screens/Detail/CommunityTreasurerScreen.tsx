@@ -4,7 +4,7 @@
  * - Lister et gérer les demandes de retrait (admin + trésorier)
  * - Créer une demande de retrait (admin)
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, RefreshControl, Modal,
@@ -82,6 +82,8 @@ export const CommunityTreasurerScreen: React.FC = () => {
   const [formDesc,     setFormDesc]     = useState('');
   const [formSaving,   setFormSaving]   = useState(false);
   const [actionLoading,setActionLoading]= useState<string | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   const load = useCallback(async () => {
     try {
@@ -90,6 +92,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
         apiClient.get<WithdrawalRequest[]>(`${BASE}/withdrawal-requests`).catch(() => ({ data: [] })),
         apiClient.get<{ election: Election | null }>(`${BASE}/treasurer-elections/active`).catch(() => ({ data: { election: null } })),
       ]);
+      if (!mountedRef.current) return;
       setTreasurer(tRes.data?.treasurer ?? null);
       setIsTreasurer(!!tRes.data?.treasurer && tRes.data.treasurer.user_id === myId);
       setRequests(rRes.data ?? []);
