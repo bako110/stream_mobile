@@ -53,12 +53,12 @@ interface Props {
 
 // ── Lecteur vidéo story ───────────────────────────────────────────────────────
 
-// Buffer agressif — priorité lecture immédiate
+// Buffer continu — charge tous les segments HLS au fur et à mesure
 const BUFFER_CFG = {
-  minBufferMs:                      1000,   // commence à lire très vite
-  maxBufferMs:                      30000,  // garde 30s en avance
-  bufferForPlaybackMs:              300,    // 300ms suffisent pour démarrer
-  bufferForPlaybackAfterRebufferMs: 800,
+  minBufferMs:                      8000,   // garde au moins 8s chargées en permanence
+  maxBufferMs:                      60000,  // charge jusqu'à 60s en avance (toute la story)
+  bufferForPlaybackMs:              500,    // attend 500ms avant de démarrer (évite les micro-stops)
+  bufferForPlaybackAfterRebufferMs: 1500,   // 1.5s après rebuffer
 };
 
 const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void }> = ({ uri, paused, onReady }) => {
@@ -71,6 +71,8 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
       p.loop   = false;
       p.muted  = false;
       p.volume = 1.0;
+      // Démarre le prefetch des segments HLS immédiatement — sans attendre play()
+      p.preload().catch(() => {});
       if (!paused) p.play();
     },
   );
