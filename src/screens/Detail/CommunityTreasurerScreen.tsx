@@ -567,21 +567,34 @@ export const CommunityTreasurerScreen: React.FC = () => {
                   <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{req.description}</Text>
                 )}
 
+                {/* Qui a lancé */}
+                {req.requested_by === myId && req.status !== 'approved' && req.status !== 'rejected' && req.status !== 'cancelled' && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                    backgroundColor: '#3B82F610', borderRadius: 10, padding: 8 }}>
+                    <Icon name="send" size={12} color="#3B82F6" />
+                    <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: '700' }}>
+                      Vous avez lancé cette demande · en attente de {isAdmin ? 'l\'approbation du trésorier' : 'l\'approbation de l\'admin'}
+                    </Text>
+                  </View>
+                )}
+
                 {/* Approbations */}
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {[
-                    { label: 'Admin', approved: req.admin_approved, at: req.admin_approved_at },
-                    { label: 'Trésorier', approved: req.treasurer_approved, at: req.treasurer_approved_at },
+                    { label: 'Admin', approved: req.admin_approved, at: req.admin_approved_at, isMe: isAdmin && req.requested_by !== myId },
+                    { label: 'Trésorier', approved: req.treasurer_approved, at: req.treasurer_approved_at, isMe: isTreasurer && req.requested_by !== myId },
                   ].map(a => (
                     <View key={a.label} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-                      backgroundColor: a.approved ? '#10B98115' : colors.backgroundSecondary,
-                      borderRadius: 10, padding: 8 }}>
-                      <Icon name={a.approved ? 'check-circle' : 'clock'} size={14}
-                        color={a.approved ? '#10B981' : colors.textTertiary} />
+                      backgroundColor: a.approved ? '#10B98115' : a.isMe ? '#F59E0B10' : colors.backgroundSecondary,
+                      borderRadius: 10, padding: 8,
+                      borderWidth: a.isMe && !a.approved ? 1 : 0,
+                      borderColor: '#F59E0B40' }}>
+                      <Icon name={a.approved ? 'check-circle' : a.isMe ? 'alert-circle' : 'clock'} size={14}
+                        color={a.approved ? '#10B981' : a.isMe ? '#F59E0B' : colors.textTertiary} />
                       <View>
                         <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: '700' }}>{a.label}</Text>
-                        <Text style={{ color: a.approved ? '#10B981' : colors.textTertiary, fontSize: 10 }}>
-                          {a.approved ? (a.at ? fmtDate(a.at) : 'Approuvé') : 'En attente'}
+                        <Text style={{ color: a.approved ? '#10B981' : a.isMe ? '#F59E0B' : colors.textTertiary, fontSize: 10 }}>
+                          {a.approved ? (a.at ? fmtDate(a.at) : 'Approuvé') : a.isMe ? 'Votre approbation requise' : 'En attente'}
                         </Text>
                       </View>
                     </View>
