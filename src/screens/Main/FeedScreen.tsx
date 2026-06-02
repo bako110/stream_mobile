@@ -1261,7 +1261,7 @@ export const FeedScreen: React.FC = () => {
           colors={colors}
           feedFocused={feedFocused}
           isVisible={activeReelRowId === item.id && feedFocused}
-          onPressReel={(reelId, reelData) => (nav as any).navigate('Reels', { initialReelId: reelId, initialReel: reelData })}
+          onPressReel={(reelId, reelData) => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: reelId, initialReel: reelData } })}
         />
       );
     }
@@ -1643,7 +1643,7 @@ export const FeedScreen: React.FC = () => {
                     {[
                       { icon: 'calendar', label: 'Événements', accent: '#0EA5E9', nav: 'Events' },
                       { icon: 'music',    label: 'Concerts',   accent: '#E0389A', nav: 'Concerts' },
-                      { icon: 'video',    label: 'Reels',      accent: '#10B981', nav: 'Reels' },
+                      { icon: 'video',    label: 'Reels',      accent: '#10B981', nav: 'Tabs/Reels' },
                       { icon: 'film',     label: 'Films',      accent: '#3B82F6', nav: 'Movies' },
                       { icon: 'tv',       label: 'Séries',     accent: '#7B3FF2', nav: 'Series' },
                       { icon: 'trending-up', label: 'Tendances', accent: '#6366F1', nav: 'Trending' },
@@ -1652,7 +1652,14 @@ export const FeedScreen: React.FC = () => {
                       <TouchableOpacity
                         key={label}
                         activeOpacity={0.75}
-                        onPress={() => { closeSearch(); (nav as any).navigate(navTarget); }}
+                        onPress={() => {
+                          closeSearch();
+                          if (navTarget === 'Tabs/Reels') {
+                            (nav as any).navigate('Tabs', { screen: 'Reels' });
+                          } else {
+                            (nav as any).navigate(navTarget);
+                          }
+                        }}
                         style={{
                           flexDirection: 'row', alignItems: 'center', gap: 8,
                           paddingHorizontal: 14, paddingVertical: 10,
@@ -2343,34 +2350,41 @@ const MiniReelRow: React.FC<{
   feedFocused: boolean; isVisible: boolean;
   onPressReel: (id: string, data: any) => void;
 }> = React.memo(({ reels, itemW, itemH, feedFocused, isVisible, onPressReel }) => {
-  // UN SEUL reel actif à la fois — null quand la rangée n'est pas visible
-  const [activeId, setActiveId] = useState<string | null>(null);
+  // Initialise directement sur le premier reel — pas besoin d'attendre
+  const [activeId, setActiveId] = useState<string | null>(() => reels[0]?.id ?? null);
 
-  // Active le premier reel quand la rangée devient visible, stoppe tout quand elle disparaît
+  // Stoppe quand la rangée quitte l'écran, reprend sur le premier quand elle revient
+  const isVisibleRef  = useRef(isVisible);
+  const feedFocusedRef= useRef(feedFocused);
+  useEffect(() => { isVisibleRef.current   = isVisible;   }, [isVisible]);
+  useEffect(() => { feedFocusedRef.current = feedFocused; }, [feedFocused]);
+
   useEffect(() => {
-    if (isVisible && feedFocused) {
-      setActiveId(prev => prev ?? reels[0]?.id ?? null);
-    } else {
+    if (!isVisible || !feedFocused) {
       setActiveId(null);
+    } else {
+      // Réactiver le premier si rien n'est actif
+      setActiveId(prev => prev ?? reels[0]?.id ?? null);
     }
-  }, [isVisible, feedFocused, reels]);
+  }, [isVisible, feedFocused]);
 
+  // viewabilityConfig stable (useRef) — RN exige que cette valeur ne change pas
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60,  // 60% visible pour être considéré "actif"
+    itemVisiblePercentThreshold: 50,
     waitForInteraction: false,
-    minimumViewTime: 150,
-  });
+    minimumViewTime: 100,
+  }).current;
 
-  const onViewableItemsChanged = useCallback(
+  // onViewableItemsChanged stable (useRef) — obligatoire pour RN FlatList
+  // Si on passe une nouvelle référence, RN ignore les changements silencieusement
+  const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ item: any }> }) => {
-      if (!isVisible || !feedFocused) return;
-      if (viewableItems.length === 0) { setActiveId(null); return; }
-      // UN seul actif : le plus centré dans la vue
-      const mid = Math.floor(viewableItems.length / 2);
-      setActiveId(viewableItems[mid].item.id);
-    },
-    [isVisible, feedFocused],
-  );
+      if (!isVisibleRef.current || !feedFocusedRef.current) return;
+      if (viewableItems.length === 0) return;
+      // Le premier item visible est le plus centré (scroll horizontal)
+      setActiveId(viewableItems[0].item.id);
+    }
+  ).current;
 
   return (
     <FlatList
@@ -2380,14 +2394,14 @@ const MiniReelRow: React.FC<{
       keyExtractor={r => r.id}
       contentContainerStyle={rrS.miniList}
       ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-      viewabilityConfig={viewabilityConfig.current}
+      viewabilityConfig={viewabilityConfig}
       onViewableItemsChanged={onViewableItemsChanged}
       renderItem={({ item }) => (
         <MiniReelPlayer
           reel={item}
           w={itemW}
           h={itemH}
-          isActive={activeId === item.id && isVisible}
+          isActive={activeId === item.id && isVisible && feedFocused}
           feedFocused={feedFocused}
           onPress={() => onPressReel(item.id, item)}
         />
