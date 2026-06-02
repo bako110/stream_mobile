@@ -201,6 +201,7 @@ export const RootNavigator: React.FC = () => {
         PostDetail:    'post/:postId',
         EventDetail:   'event/:eventId',
         ConcertDetail: 'concert/:concertId',
+        JoinCommunity: 'join/:inviteCode',
       },
     },
   };

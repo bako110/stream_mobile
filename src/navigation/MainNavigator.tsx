@@ -61,6 +61,7 @@ import { CommunityStatsScreen }           from '../screens/Detail/CommunityStats
 import { CommunityEventsScreen }          from '../screens/Detail/CommunityEventsScreen';
 import { CommunityFundScreen }            from '../screens/Detail/CommunityFundScreen';
 import { CommunityInviteScreen }          from '../screens/Detail/CommunityInviteScreen';
+import { JoinCommunityScreen }            from '../screens/Detail/JoinCommunityScreen';
 import { CommunityFundDetailScreen }      from '../screens/Detail/CommunityFundDetailScreen';
 import { CommunityTreasuryScreen }        from '../screens/Detail/CommunityTreasuryScreen';
 import { CommunityTreasurerScreen }       from '../screens/Detail/CommunityTreasurerScreen';
@@ -170,6 +171,7 @@ export type MainStackParamList = {
   CommunityEvents:         { communityId: string; communityName: string; myRole?: string | null };
   CommunityFund:           { communityId: string; communityName: string; myRole?: string | null };
   CommunityInvite:         { communityId: string; communityName: string; myRole: string; inviteCode?: string };
+  JoinCommunity:           { inviteCode: string };
   CommunityFundDetail:     { communityId: string; cotisationId: string; cotisationTitle: string; myRole?: string | null; myId?: string };
   CommunityTreasury:       { communityId: string; communityName: string };
   CommunityTreasurer:      { communityId: string; communityName: string; myRole: string; myId: string };
@@ -503,6 +505,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CommunityEvents"         component={CommunityEventsScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityFund"            component={CommunityFundScreen}            options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CommunityInvite"          component={CommunityInviteScreen}          options={{ animation: 'slide_from_right', headerShown: false }} />
+        <Stack.Screen name="JoinCommunity"            component={JoinCommunityScreen}            options={{ animation: 'slide_from_bottom', headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="CommunityFundDetail"      component={CommunityFundDetailScreen}      options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CommunityTreasury"        component={CommunityTreasuryScreen}        options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CommunityTreasurer"       component={CommunityTreasurerScreen}       options={{ animation: 'slide_from_right', headerShown: false }} />
