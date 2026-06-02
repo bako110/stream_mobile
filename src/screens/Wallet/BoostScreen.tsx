@@ -357,26 +357,34 @@ const ActiveBoostCard: React.FC<{
   const cat = BOOST_CATEGORIES.find(c => c.id === boost.target) ?? BOOST_CATEGORIES[0];
   const [g1, g2] = cat.gradient;
 
-  const isGlobal  = !boost.target_content_id;
-  const totalSec  = Math.max(1, (new Date(boost.expires_at).getTime() - new Date(boost.activated_at).getTime()) / 1000);
-  const elapsedSec= Math.max(0, (Date.now() - new Date(boost.activated_at).getTime()) / 1000);
-  const timePct   = Math.min(1, elapsedSec / totalSec);
-  const serverPct = Math.min(1, Math.max(0, Number(boost.progress ?? 0)));
-  const pct       = isGlobal ? Math.max(serverPct, timePct) : serverPct;
-  const pctRounded= Math.round(pct * 100);
+  const isGlobal = !boost.target_content_id;
 
-  const dl          = daysLeft(boost.expires_at);
-  const total       = boost.target_quantity ?? 0;
-  const delivered   = isGlobal && total > 0
+  // Guard NaN : si les dates sont invalides on tombe sur des valeurs sûres
+  const activatedMs = boost.activated_at ? new Date(boost.activated_at).getTime() : Date.now();
+  const expiresMs   = boost.expires_at   ? new Date(boost.expires_at).getTime()   : Date.now();
+  const isValidDates = !isNaN(activatedMs) && !isNaN(expiresMs);
+
+  const totalSec   = isValidDates ? Math.max(1, (expiresMs - activatedMs) / 1000) : 1;
+  const elapsedSec = isValidDates ? Math.max(0, (Date.now() - activatedMs) / 1000) : 0;
+  const timePct    = Math.min(1, elapsedSec / totalSec);
+  const serverPct  = Math.min(1, Math.max(0, isNaN(Number(boost.progress)) ? 0 : Number(boost.progress)));
+  const pct        = isNaN(isGlobal ? Math.max(serverPct, timePct) : serverPct)
+    ? 0
+    : (isGlobal ? Math.max(serverPct, timePct) : serverPct);
+  const pctRounded = Math.round(pct * 100);
+
+  const dl        = daysLeft(boost.expires_at);
+  const total     = boost.target_quantity ?? 0;
+  const delivered = isGlobal && total > 0
     ? Math.round(pct * total)
     : ((boost.impression_count ?? 0) > 0 ? boost.impression_count : boost.delivered_quantity);
-  const mult        = Number(boost.feed_multiplier ?? 1);
-  const canCancel   = elapsedSec / 60 < 30;
-  const hoursLeft   = Math.max(0, Math.ceil((new Date(boost.expires_at).getTime() - Date.now()) / 3600000));
+  const mult      = isNaN(Number(boost.feed_multiplier)) ? 1 : Number(boost.feed_multiplier ?? 1);
+  const canCancel = isValidDates && elapsedSec / 60 < 30;
+  const hoursLeft = isValidDates ? Math.max(0, Math.ceil((expiresMs - Date.now()) / 3600000)) : 0;
 
   useEffect(() => {
     Animated.timing(progressAnim, { toValue: pct, duration: 800, useNativeDriver: false }).start();
-  }, [pct]);
+  }, [pct, progressAnim]);
 
   const progressWidth = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
