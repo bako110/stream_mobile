@@ -13,8 +13,8 @@ import { storage } from '../utils/storage';
 
 const CACHE_DIR    = `${RNBlobUtil.fs.dirs.CacheDir}/folix_story_videos`;
 const INDEX_KEY    = 'video_cache_index';  // { url → { path, size, ts } }
-const MAX_AGE_MS   = 7 * 24 * 3600 * 1000; // 7 jours
-const MAX_SIZE_B   = 200 * 1024 * 1024;     // 200 Mo total
+const MAX_AGE_MS   = 26 * 3600 * 1000;    // 26h — légèrement > 24h pour couvrir les décalages
+const MAX_SIZE_B   = 150 * 1024 * 1024;   // 150 Mo (stories durent 24h, pas besoin de plus)
 
 interface CacheEntry { path: string; size: number; ts: number; }
 type CacheIndex = Record<string, CacheEntry>;
