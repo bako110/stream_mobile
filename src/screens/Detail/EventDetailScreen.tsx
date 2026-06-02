@@ -524,7 +524,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Bouton retour flottant */}
-      <BackButton onPress={onBack} transparent color="#fff" />
+      <BackButton onPress={onBack ?? (() => {})} transparent color="#fff" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 
@@ -597,13 +597,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               </Text>
             </View>
           </View>
-          <TouchableOpacity onPress={handleRemind} disabled={remindLoading}
-            style={[ds.remindBtn, { backgroundColor: reminded ? accent + '15' : colors.backgroundSecondary, borderColor: reminded ? accent : colors.border }]}>
-            {remindLoading ? <ActivityIndicator size="small" color={accent} /> : <Icon name="bell" size={14} color={reminded ? accent : colors.textTertiary} />}
-            <Text style={{ fontSize: 12, fontWeight: '700', color: reminded ? accent : colors.textTertiary }}>
-              {reminded ? 'Rappel actif' : 'Me rappeler'}
-            </Text>
-          </TouchableOpacity>
+          {!isOwner && (
+            <TouchableOpacity onPress={handleRemind} disabled={remindLoading}
+              style={[ds.remindBtn, { backgroundColor: reminded ? accent + '15' : colors.backgroundSecondary, borderColor: reminded ? accent : colors.border }]}>
+              {remindLoading ? <ActivityIndicator size="small" color={accent} /> : <Icon name="bell" size={14} color={reminded ? accent : colors.textTertiary} />}
+              <Text style={{ fontSize: 12, fontWeight: '700', color: reminded ? accent : colors.textTertiary }}>
+                {reminded ? 'Rappel actif' : 'Me rappeler'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── Barre sociale ────────────────────────────────────────── */}
