@@ -62,7 +62,22 @@ const BUFFER_CFG = {
   bufferForPlaybackAfterRebufferMs: 1500,   // 1.5s après rebuffer
 };
 
-const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void; onBuffering?: (b: boolean) => void }> = ({ uri, paused, onReady, onBuffering }) => {
+// ── Image avec fondu au chargement ───────────────────────────────────────────
+const StoryImageView = React.memo(({ uri, bgColor }: { uri: string; bgColor?: string }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  return (
+    <View style={[s.media, { backgroundColor: bgColor ?? '#111' }]}>
+      <Animated.Image
+        source={{ uri }}
+        style={[s.media, { opacity }]}
+        resizeMode="cover"
+        onLoad={() => Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start()}
+      />
+    </View>
+  );
+});
+
+const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void; onBuffering?: (b: boolean) => void }> = React.memo(({ uri, paused, onReady, onBuffering }) => {
   const [buffering,   setBuffering]   = useState(false);
   const [ready,       setReady]       = useState(false);
   const [usedFallback,setUsedFallback]= useState(false);
@@ -118,7 +133,7 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
       )}
     </View>
   );
-};
+}, (prev, next) => prev.uri === next.uri && prev.paused === next.paused);
 
 // ── Préchargeur silencieux — instancie un player et appelle preload() ─────────
 // Rendu invisible, libéré au unmount automatiquement par react-native-video
@@ -479,17 +494,24 @@ export const StoryViewer: React.FC<Props> = ({
   // ── Reset videoReady on story change ──────────────────────────────────────
 
   useEffect(() => {
+    setVideoBuffering(false);
     if (story?.media_type === 'video') setVideoReady(false);
     else setVideoReady(true);
-  }, [story?.id]);
+  }, [story?.id, storyIdx, groupIdx]);  // reset aussi sur changement de groupe
 
   // ── Progress ───────────────────────────────────────────────────────────────
 
+  const goNextRef = useRef(goNext);
+  useEffect(() => { goNextRef.current = goNext; }, [goNext]);
+
   const startProgress = useCallback(() => {
+    progressAnim.stopAnimation();   // stopper toute animation en cours avant de redémarrer
     progressAnim.setValue(0);
-    Animated.timing(progressAnim, { toValue: 1, duration, useNativeDriver: false })
-      .start(({ finished }) => { if (finished) goNext(); });
-  }, [storyIdx, groupIdx, duration]);
+    Animated.timing(progressAnim, {
+      toValue: 1, duration,
+      useNativeDriver: false,       // width% ne supporte pas native driver
+    }).start(({ finished }) => { if (finished) goNextRef.current(); });
+  }, [duration]);                   // plus de storyIdx/groupIdx → callback stable
 
   useEffect(() => {
     if (!paused && !menuOpen && !editMode && videoReady && !videoBuffering) startProgress();
@@ -691,7 +713,7 @@ export const StoryViewer: React.FC<Props> = ({
           <View style={[s.media, { backgroundColor: story.background_color ?? '#7B3FF2' }]} />
         )}
         {story.media_type === 'image' && story.media_url && (
-          <Image source={{ uri: story.media_url }} style={s.media} resizeMode="cover" />
+          <StoryImageView uri={story.media_url} bgColor={story.background_color ?? undefined} />
         )}
         {story.media_type === 'video' && story.media_url && (
           <StoryVideoView key={story.id} uri={story.media_url} paused={paused}

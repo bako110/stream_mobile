@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Image, StyleSheet, ActivityIndicator,
@@ -92,11 +92,11 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
     return () => removeListener(onWs);
   }, [addListener, removeListener, load]);
 
-  const myGroup     = groups.find(g => g.user.id === currentUser?.id);
-  const otherGroups = groups.filter(g => g.user.id !== currentUser?.id);
-  const allGroups   = myGroup ? [myGroup, ...otherGroups] : groups;
+  const myGroup     = useMemo(() => groups.find(g => g.user.id === currentUser?.id), [groups, currentUser?.id]);
+  const otherGroups = useMemo(() => groups.filter(g => g.user.id !== currentUser?.id), [groups, currentUser?.id]);
+  const allGroups   = useMemo(() => myGroup ? [myGroup, ...otherGroups] : groups, [myGroup, otherGroups, groups]);
 
-  const openViewer = (index: number) => { setViewerGroup(index); setViewerOpen(true); };
+  const openViewer = useCallback((index: number) => { setViewerGroup(index); setViewerOpen(true); }, []);
 
   const displayName = currentUser?.display_name ?? currentUser?.username ?? 'Vous';
   const initials    = displayName[0]?.toUpperCase() ?? '?';
