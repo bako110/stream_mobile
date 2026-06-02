@@ -138,6 +138,12 @@ export const CommunityChatScreen: React.FC = () => {
     progress_pct: number; collected_coins: number; target_amount_coins: number;
     my_status?: string;
   } | null>(null);
+  const [activeElection, setActiveElection] = useState<{
+    id: string; total_votes: number; total_members: number; participation: number;
+    my_vote?: string | null;
+    results: { user_id: string; display_name?: string; username?: string; avatar_url?: string; votes: number; pct: number }[];
+  } | null>(null);
+  const [electionVoting, setElectionVoting] = useState<string | null>(null);
   const [typingUsers,    setTypingUsers]    = useState<TypingUser[]>([]);
   const [recordingUsers, setRecordingUsers] = useState<TypingUser[]>([]);
   const recordingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -294,6 +300,18 @@ export const CommunityChatScreen: React.FC = () => {
         const c = payload.cotisation;
         if (c.status === 'active') setActiveCotisation(c);
         else setActiveCotisation(prev => prev?.id === c.id ? null : prev);
+      } else if (payload.type === 'treasurer_election_launched') {
+        // Recharger l'élection active
+        apiClient.get(`/api/v1/communities/${communityId}/treasurer-elections/active`)
+          .then((r: any) => setActiveElection(r.data?.election ?? null))
+          .catch(() => {});
+      } else if (payload.type === 'treasurer_vote_cast') {
+        // Mettre à jour les résultats en temps réel
+        apiClient.get(`/api/v1/communities/${communityId}/treasurer-elections/active`)
+          .then((r: any) => setActiveElection(r.data?.election ?? null))
+          .catch(() => {});
+      } else if (payload.type === 'treasurer_elected') {
+        setActiveElection(null);
       }
     }, [nav]),
   );
@@ -354,6 +372,10 @@ export const CommunityChatScreen: React.FC = () => {
         const list = r.data ?? [];
         if (list.length > 0) setActiveCotisation(list[0]);
       }).catch(() => {});
+    // Charger le vote trésorier actif
+    apiClient.get(`/api/v1/communities/${communityId}/treasurer-elections/active`)
+      .then((r: any) => setActiveElection(r.data?.election ?? null))
+      .catch(() => {});
     loadMessages(1, false, 'discussion');
     loadPinned();
   }, [communityId]);
@@ -1532,6 +1554,113 @@ export const CommunityChatScreen: React.FC = () => {
             <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.7)" />
           </LinearGradient>
         </TouchableOpacity>
+      )}
+
+      {/* ── Carte vote trésorier ── */}
+      {activeElection && activeTab === 'discussion' && (
+        <View style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
+          {/* Barre accent */}
+          <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={{ height: 3 }} />
+          <View style={{ padding: 12, gap: 8 }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <LinearGradient colors={['#7B3FF2', '#E0389A']}
+                style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="award" size={14} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 13 }}>
+                  Vote trésorier en cours
+                </Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                  {activeElection.total_votes} vote{activeElection.total_votes !== 1 ? 's' : ''} · {activeElection.participation}% de participation
+                </Text>
+              </View>
+              {activeElection.my_vote && (
+                <View style={{ backgroundColor: '#10B98120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '800' }}>VOTÉ</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Candidats top 3 */}
+            {activeElection.results.slice(0, 3).map((c, i) => {
+              const isMyVote = activeElection.my_vote === c.user_id;
+              return (
+                <TouchableOpacity key={c.user_id}
+                  onPress={async () => {
+                    if (electionVoting) return;
+                    const name = c.display_name || c.username || 'ce membre';
+                    Alert.alert(
+                      isMyVote ? 'Changer mon vote' : 'Voter',
+                      `${isMyVote ? 'Changer pour' : 'Voter pour'} ${name} ?`,
+                      [
+                        { text: 'Annuler', style: 'cancel' },
+                        { text: isMyVote ? 'Changer' : 'Voter', onPress: async () => {
+                          setElectionVoting(c.user_id);
+                          try {
+                            await apiClient.post(
+                              `/api/v1/communities/${communityId}/treasurer-elections/${activeElection.id}/vote`,
+                              { candidate_id: c.user_id }
+                            );
+                          } catch (e: any) {
+                            Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de voter.');
+                          } finally { setElectionVoting(null); }
+                        }},
+                      ],
+                    );
+                  }}
+                  activeOpacity={0.8}
+                  style={{ borderRadius: 10, borderWidth: 1, overflow: 'hidden',
+                    borderColor: isMyVote ? '#7B3FF2' : colors.divider }}
+                >
+                  {/* Barre progression */}
+                  <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
+                    width: `${c.pct}%` as any,
+                    backgroundColor: isMyVote ? '#7B3FF215' : colors.backgroundSecondary }} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, gap: 8 }}>
+                    {i === 0 && <Icon name="award" size={14} color="#F59E0B" />}
+                    <Text style={{ flex: 1, color: colors.textPrimary, fontWeight: '600', fontSize: 13 }} numberOfLines={1}>
+                      {c.display_name || c.username}
+                    </Text>
+                    <Text style={{ color: isMyVote ? '#7B3FF2' : colors.textTertiary, fontWeight: '800', fontSize: 12 }}>
+                      {c.votes} · {c.pct}%
+                    </Text>
+                    {electionVoting === c.user_id
+                      ? <ActivityIndicator size="small" color="#7B3FF2" style={{ width: 16 }} />
+                      : isMyVote
+                      ? <Icon name="check-circle" size={14} color="#7B3FF2" />
+                      : <Icon name="chevron-right" size={12} color={colors.textTertiary} />
+                    }
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Si aucun candidat encore */}
+            {activeElection.results.length === 0 && (
+              <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
+                  Aucun vote pour l'instant — soyez le premier !
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              onPress={() => nav.navigate('CommunityTreasurer', {
+                communityId, communityName, myRole, myId,
+              })}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 4, paddingVertical: 6 }}
+            >
+              <Text style={{ color: '#7B3FF2', fontSize: 12, fontWeight: '700' }}>
+                Voir tous les candidats
+              </Text>
+              <Icon name="arrow-right" size={12} color="#7B3FF2" />
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
 
       {/* ── Contenu principal ── */}
