@@ -339,9 +339,14 @@ export const CommunityChatScreen: React.FC = () => {
         setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
       }
       setHasMore(msgs.length === 30);
-    } catch {}
+    } catch (e: any) {
+      // 403 = pas encore membre confirmé → rediriger
+      if (e?.response?.status === 403) {
+        nav.goBack();
+      }
+    }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [communityId]);
+  }, [communityId, nav]);
 
   const loadPinned = useCallback(async () => {
     try { setPinnedMsgs((await communityService.getPinnedMessages(communityId)) as CommunityMessage[]); } catch {}
