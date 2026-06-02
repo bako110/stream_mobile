@@ -1126,10 +1126,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       />
 
       {!videoPlaying && !videoError && !ended && isActive && (
-        <View style={s.bufferOverlay} pointerEvents="none">
-          <ActivityIndicator size="large" color="rgba(255,255,255,0.85)" />
-          {!videoLoaded && <Text style={s.bufferText}>Chargement…</Text>}
-        </View>
+        <FolixLoader color="#ffffff" height={3} fullScreen />
       )}
 
       {videoError && (
