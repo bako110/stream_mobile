@@ -62,13 +62,14 @@ const BUFFER_CFG = {
   bufferForPlaybackAfterRebufferMs: 1500,   // 1.5s après rebuffer
 };
 
-const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void }> = ({ uri, paused, onReady }) => {
-  const [buffering, setBuffering] = useState(false);
-  const [ready,     setReady]     = useState(false);
+const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void; onBuffering?: (b: boolean) => void }> = ({ uri, paused, onReady, onBuffering }) => {
+  const [buffering,   setBuffering]   = useState(false);
+  const [ready,       setReady]       = useState(false);
+  const [usedFallback,setUsedFallback]= useState(false);
 
   // Utilise le cache disque si disponible, sinon l'URL réseau
-  const localUri = getLocalUri(uri);
-  const playUri  = localUri ?? uri;
+  const localUri  = getLocalUri(uri);
+  const playUri   = (!usedFallback && localUri) ? localUri : uri;
 
   const player = useVideoPlayer(
     { uri: playUri, bufferConfig: BUFFER_CFG },
@@ -83,10 +84,10 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
 
   // Télécharge en background pendant la lecture pour la prochaine fois
   useEffect(() => {
-    if (!localUri && uri && !uri.includes('.m3u8')) {
+    if (uri && !uri.includes('.m3u8')) {
       cacheInBackground(uri).catch(() => {});
     }
-  }, [uri, localUri]);
+  }, [uri]);
 
   useEffect(() => {
     if (paused) player.pause();
@@ -94,15 +95,19 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
   }, [paused]);
 
   useEffect(() => {
-    const bufSub = player.addEventListener('onBuffer', (isBuffering: boolean) => setBuffering(isBuffering));
+    const bufSub = player.addEventListener('onBuffer', (isBuffering: boolean) => { setBuffering(isBuffering); onBuffering?.(isBuffering); });
     const stsSub = player.addEventListener('onStatusChange', (status: VideoPlayerStatus) => {
-      if (status === 'readyToPlay' && !ready) {
-        setReady(true);
-        onReady();
+      if (status === 'readyToPlay' && !ready) { setReady(true); onReady(); }
+    });
+    // Fallback réseau si le fichier local est corrompu/supprimé
+    const errSub = player.addEventListener('onError', () => {
+      if (localUri && !usedFallback) {
+        setUsedFallback(true);  // déclenche re-render avec l'URL réseau
+        setReady(false);
       }
     });
-    return () => { bufSub.remove(); stsSub.remove(); };
-  }, []);
+    return () => { bufSub.remove(); stsSub.remove(); errSub.remove(); };
+  }, [localUri, usedFallback]);
 
   return (
     <View style={s.media}>
@@ -296,7 +301,8 @@ export const StoryViewer: React.FC<Props> = ({
   const [viewersLoading, setViewersLoading] = useState(false);
   const [replies,        setReplies]        = useState<any[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
-  const [videoReady,  setVideoReady]  = useState(false);
+  const [videoReady,     setVideoReady]     = useState(false);
+  const [videoBuffering, setVideoBuffering] = useState(false);
   const [saved,       setSaved]       = useState(false);
   const [liked,       setLiked]       = useState(false);
   const [likeCount,   setLikeCount]   = useState(0);
@@ -485,9 +491,9 @@ export const StoryViewer: React.FC<Props> = ({
   }, [storyIdx, groupIdx, duration]);
 
   useEffect(() => {
-    if (!paused && !menuOpen && !editMode && videoReady) startProgress();
+    if (!paused && !menuOpen && !editMode && videoReady && !videoBuffering) startProgress();
     else progressAnim.stopAnimation();
-  }, [storyIdx, groupIdx, paused, menuOpen, editMode, videoReady]);
+  }, [storyIdx, groupIdx, paused, menuOpen, editMode, videoReady, videoBuffering]);
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
@@ -687,7 +693,9 @@ export const StoryViewer: React.FC<Props> = ({
           <Image source={{ uri: story.media_url }} style={s.media} resizeMode="cover" />
         )}
         {story.media_type === 'video' && story.media_url && (
-          <StoryVideoView key={story.id} uri={story.media_url} paused={paused} onReady={() => setVideoReady(true)} />
+          <StoryVideoView key={story.id} uri={story.media_url} paused={paused}
+            onReady={() => setVideoReady(true)}
+            onBuffering={setVideoBuffering} />
         )}
         {story.media_type === 'audio' && (
           <LinearGradient colors={[story.background_color ?? '#FF9800', '#000']} style={s.media}>
