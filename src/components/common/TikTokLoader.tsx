@@ -13,6 +13,15 @@ import LinearGradient from 'react-native-linear-gradient';
 
 const W = Dimensions.get('window').width;
 
+// Convertit un hex #RRGGBB en rgba(r,g,b,a) — évite les bugs Android avec 'transparent' et hex 8 chiffres
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 interface Props {
   color?: string;
   height?: number;
@@ -27,7 +36,6 @@ export const TikTokLoader: React.FC<Props> = ({
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Boucle infinie : la barre part de -W, traverse tout l'écran, et repart
     Animated.loop(
       Animated.timing(anim, {
         toValue: 1,
@@ -44,24 +52,24 @@ export const TikTokLoader: React.FC<Props> = ({
     outputRange: [-W * 1.2, W * 1.2],
   });
 
-  // Largeur de la tête lumineuse : ~40% de l'écran
   const barWidth = W * 0.55;
 
+  // Toutes les couleurs en rgba — Android ne supporte pas 'transparent' ni hex 8 chiffres
+  const gradientColors = [
+    hexToRgba(color, 0),
+    hexToRgba(color, 0.6),
+    hexToRgba(color, 1),
+    hexToRgba(color, 0.6),
+    hexToRgba(color, 0),
+  ];
+
   const bar = (
-    <View
-      style={[
-        styles.track,
-        { height, backgroundColor: color + '22' },
-      ]}
-    >
+    <View style={[styles.track, { height, backgroundColor: hexToRgba(color, 0.15) }]}>
       <Animated.View
-        style={[
-          styles.barWrap,
-          { width: barWidth, height, transform: [{ translateX }] },
-        ]}
+        style={[styles.barWrap, { width: barWidth, height, transform: [{ translateX }] }]}
       >
         <LinearGradient
-          colors={['transparent', color, color + 'CC', color, 'transparent']}
+          colors={gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={{ flex: 1, borderRadius: height / 2 }}
