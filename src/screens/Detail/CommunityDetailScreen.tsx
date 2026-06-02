@@ -1218,7 +1218,27 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           activeOpacity={0.7}
           onPress={() => {
             setSettingsOpen(false);
-            setTimeout(() => (nav as any).navigate('CommunityFund', { communityId, communityName: community?.name ?? '', myRole }), 250);
+            setTimeout(() => (nav as any).navigate('CommunityTreasurer', {
+              communityId, communityName: community?.name ?? '', myRole, myId,
+            }), 250);
+          }}
+        >
+          <View style={[s.secIcon, { backgroundColor: '#10B98120' }]}>
+            <Icon name="user-check" size={18} color="#10B981" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Trésorier & Retraits</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>Nommer le trésorier, gérer les demandes de retrait</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSettingsOpen(false);
+            setTimeout(() => (nav as any).navigate('CommunityFund', { communityId, communityName: community?.name ?? '', myRole, myId }), 250);
           }}
         >
           <View style={[s.secIcon, { backgroundColor: '#10B98120' }]}>
@@ -1795,7 +1815,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     )}
                     <TouchableOpacity
                       style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-                      onPress={() => (nav as any).navigate('CommunityFund', { communityId, communityName: community.name, myRole })}
+                      onPress={() => (nav as any).navigate('CommunityFund', { communityId, communityName: community.name, myRole, myId })}
                       activeOpacity={0.75}
                     >
                       <View style={[s.navIcon, { backgroundColor: '#10B98120' }]}>

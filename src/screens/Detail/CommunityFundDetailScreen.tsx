@@ -56,7 +56,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { communityId, cotisationId, myRole } = route.params;
+  const { communityId, cotisationId, myRole, myId } = route.params;
   const isAdmin = myRole === 'admin' || myRole === 'moderator';
 
   const [cotisation,    setCotisation]    = useState<Cotisation | null>(null);
@@ -65,8 +65,6 @@ export const CommunityFundDetailScreen: React.FC = () => {
   const [refreshing,    setRefreshing]    = useState(false);
   const [filter,        setFilter]        = useState<'all' | 'paid' | 'pending' | 'exempt'>('all');
   const [exempting,     setExempting]     = useState<string | null>(null);
-  const [withdrawing,   setWithdrawing]   = useState(false);
-  const [withdrawn,     setWithdrawn]     = useState(false);
 
   const BASE = `/api/v1/communities/${communityId}/cotisations/${cotisationId}`;
 
@@ -76,26 +74,11 @@ export const CommunityFundDetailScreen: React.FC = () => {
         apiClient.get<Cotisation>(BASE),
         apiClient.get<Contribution[]>(`${BASE}/contributions`),
       ]);
-      const cot = cotRes.data;
-      setCotisation(cot);
+      setCotisation(cotRes.data);
       setContributions(contribRes.data ?? []);
-
-      // Vérifier si le retrait a déjà été effectué en consultant l'historique du wallet
-      if (cot.status === 'closed' && cot.collected_coins > 0) {
-        apiClient.get<{ tx_type: string; reference_id: string }[]>(
-          `/api/v1/communities/${communityId}/wallet/transactions?limit=100`
-        ).then(r => {
-          const already = (r.data ?? []).some(
-            tx => tx.tx_type === 'withdrawal' && tx.reference_id === cotisationId
-          );
-          setWithdrawn(already);
-        }).catch(() => {});
-      } else {
-        setWithdrawn(false);
-      }
     } catch { }
     finally { setLoading(false); setRefreshing(false); }
-  }, [BASE, communityId, cotisationId]);
+  }, [BASE]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -140,33 +123,6 @@ export const CommunityFundDetailScreen: React.FC = () => {
         finally { setExempting(null); }
       }},
     ]);
-  };
-
-  const handleWithdraw = () => {
-    if (!cotisation) return;
-    Alert.alert(
-      'Retirer les fonds',
-      `Transférer ${cotisation.collected_coins.toLocaleString('fr-FR')} coins vers votre wallet ?\n\nCette action est irréversible.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: `Retirer ${cotisation.collected_coins} coins`,
-          onPress: async () => {
-            setWithdrawing(true);
-            try {
-              const res = await apiClient.post<{ coins_received: number; new_balance: number }>(`${BASE}/withdraw`);
-              setWithdrawn(true);
-              Alert.alert(
-                'Fonds retirés',
-                `${res.data?.coins_received?.toLocaleString('fr-FR') ?? cotisation.collected_coins} coins ont été ajoutés à votre wallet.\n\nNouveau solde : ${res.data?.new_balance?.toLocaleString('fr-FR') ?? '—'} coins`,
-              );
-            } catch (e: any) {
-              Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de retirer.');
-            } finally { setWithdrawing(false); }
-          },
-        },
-      ],
-    );
   };
 
   const handleExport = async () => {
@@ -320,12 +276,16 @@ export const CommunityFundDetailScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Bouton retrait — cotisation clôturée, fonds non encore retirés */}
-            {isAdmin && cotisation.status === 'closed' && cotisation.collected_coins > 0 && !withdrawn && (
+            {/* Bouton retrait — demande formelle via trésorier */}
+            {isAdmin && cotisation.status === 'closed' && cotisation.collected_coins > 0 && (
               <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
                 <TouchableOpacity
-                  onPress={handleWithdraw}
-                  disabled={withdrawing}
+                  onPress={() => nav.navigate('CommunityTreasurer', {
+                    communityId,
+                    communityName: cotisation?.title ?? communityId,
+                    myRole,
+                    myId: myId ?? '',
+                  })}
                   activeOpacity={0.85}
                   style={{ borderRadius: 14, overflow: 'hidden' }}
                 >
@@ -335,30 +295,17 @@ export const CommunityFundDetailScreen: React.FC = () => {
                     style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                       gap: 10, paddingVertical: 14, borderRadius: 14 }}
                   >
-                    {withdrawing
-                      ? <ActivityIndicator size="small" color="#fff" />
-                      : <>
-                          <Icon name="download" size={18} color="#fff" />
-                          <View>
-                            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '900' }}>
-                              Retirer {cotisation.collected_coins.toLocaleString('fr-FR')} coins
-                            </Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>
-                              Transférer vers mon wallet · {(cotisation.collected_coins / 100).toFixed(2)} €
-                            </Text>
-                          </View>
-                        </>
-                    }
+                    <Icon name="shield" size={18} color="#fff" />
+                    <View>
+                      <Text style={{ color: '#fff', fontSize: 15, fontWeight: '900' }}>
+                        Demander le retrait
+                      </Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>
+                        Requiert approbation admin + trésorier
+                      </Text>
+                    </View>
                   </LinearGradient>
                 </TouchableOpacity>
-              </View>
-            )}
-            {isAdmin && cotisation.status === 'closed' && withdrawn && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 8, backgroundColor: '#10B98115', borderRadius: 14, paddingVertical: 12,
-                marginHorizontal: 16, marginBottom: 12 }}>
-                <Icon name="check-circle" size={16} color="#10B981" />
-                <Text style={{ color: '#10B981', fontWeight: '700' }}>Fonds retirés vers votre wallet</Text>
               </View>
             )}
 

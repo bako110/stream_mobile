@@ -62,6 +62,7 @@ import { CommunityEventsScreen }          from '../screens/Detail/CommunityEvent
 import { CommunityFundScreen }            from '../screens/Detail/CommunityFundScreen';
 import { CommunityFundDetailScreen }      from '../screens/Detail/CommunityFundDetailScreen';
 import { CommunityTreasuryScreen }        from '../screens/Detail/CommunityTreasuryScreen';
+import { CommunityTreasurerScreen }       from '../screens/Detail/CommunityTreasurerScreen';
 import { CommunityMemberProfileScreen }   from '../screens/Detail/CommunityMemberProfileScreen';
 import { CommunityLeaderboardScreen }     from '../screens/Detail/CommunityLeaderboardScreen';
 import { CommunityMemberCreatorStatsScreen } from '../screens/Detail/CommunityMemberCreatorStatsScreen';
@@ -169,6 +170,7 @@ export type MainStackParamList = {
   CommunityFund:           { communityId: string; communityName: string; myRole?: string | null };
   CommunityFundDetail:     { communityId: string; cotisationId: string; cotisationTitle: string; myRole?: string | null };
   CommunityTreasury:       { communityId: string; communityName: string };
+  CommunityTreasurer:      { communityId: string; communityName: string; myRole: string; myId: string };
   CommunityMemberProfile:  { communityId: string; communityName: string; memberId: string; memberName: string };
   CommunityLeaderboard:        { communityId: string; communityName: string };
   CommunityMemberCreatorStats: { communityId: string; communityName: string; memberId: string; memberName: string };
@@ -500,6 +502,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="CommunityFund"            component={CommunityFundScreen}            options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CommunityFundDetail"      component={CommunityFundDetailScreen}      options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CommunityTreasury"        component={CommunityTreasuryScreen}        options={{ animation: 'slide_from_right', headerShown: false }} />
+        <Stack.Screen name="CommunityTreasurer"       component={CommunityTreasurerScreen}       options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CommunityMemberProfile"  component={CommunityMemberProfileScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityLeaderboard"         component={CommunityLeaderboardScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityMemberCreatorStats"  component={CommunityMemberCreatorStatsScreen}  options={{ animation: 'slide_from_right' }} />

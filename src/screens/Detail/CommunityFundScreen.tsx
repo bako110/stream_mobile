@@ -174,7 +174,7 @@ export const CommunityFundScreen: React.FC = () => {
   const nav   = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { communityId, communityName, myRole } = route.params;
+  const { communityId, communityName, myRole, myId } = route.params;
 
   const isAdmin = myRole === 'admin' || myRole === 'moderator';
 
@@ -329,7 +329,7 @@ export const CommunityFundScreen: React.FC = () => {
                 item={item}
                 colors={colors}
                 myRole={myRole}
-                onPress={() => nav.navigate('CommunityFundDetail', { communityId, cotisationId: item.id, cotisationTitle: item.title, myRole })}
+                onPress={() => nav.navigate('CommunityFundDetail', { communityId, cotisationId: item.id, cotisationTitle: item.title, myRole, myId })}
                 onPay={() => handlePay(item)}
               />
             </View>
