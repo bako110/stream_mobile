@@ -350,7 +350,6 @@ const ActiveBoostCard: React.FC<{
   colors: any;
   onCancelled: (id: string, refund: number, newBalance: number) => void;
 }> = ({ boost, colors, onCancelled }) => {
-  const [expanded, setExpanded] = useState(false);
   const [showStop, setShowStop] = useState(false);
   const [stopping, setStopping] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -358,38 +357,28 @@ const ActiveBoostCard: React.FC<{
   const cat = BOOST_CATEGORIES.find(c => c.id === boost.target) ?? BOOST_CATEGORIES[0];
   const [g1, g2] = cat.gradient;
 
-  // Pour les boosts globaux (sans contenu ciblé) : progress time-based calculé côté client
-  // pour avoir un affichage fluide même entre deux refreshs
-  const isGlobal = !boost.target_content_id;
-  const totalSec   = Math.max(1, (new Date(boost.expires_at).getTime() - new Date(boost.activated_at).getTime()) / 1000);
-  const elapsedSec = Math.max(0, (Date.now() - new Date(boost.activated_at).getTime()) / 1000);
-  const timePct    = Math.min(1, elapsedSec / totalSec);
-  // Utilise le max entre ce que le serveur a déjà enregistré et le calcul temps réel côté client
-  const serverPct  = Math.min(1, Math.max(0, Number(boost.progress ?? 0)));
-  const pct        = isGlobal ? Math.max(serverPct, timePct) : serverPct;
+  const isGlobal  = !boost.target_content_id;
+  const totalSec  = Math.max(1, (new Date(boost.expires_at).getTime() - new Date(boost.activated_at).getTime()) / 1000);
+  const elapsedSec= Math.max(0, (Date.now() - new Date(boost.activated_at).getTime()) / 1000);
+  const timePct   = Math.min(1, elapsedSec / totalSec);
+  const serverPct = Math.min(1, Math.max(0, Number(boost.progress ?? 0)));
+  const pct       = isGlobal ? Math.max(serverPct, timePct) : serverPct;
+  const pctRounded= Math.round(pct * 100);
 
-  const dl  = daysLeft(boost.expires_at);
-  const total = boost.target_quantity ?? 0;
-  // Delivered : pour les boosts globaux utiliser le pct temps réel × target pour afficher quelque chose de cohérent
-  const deliveredDisplay = isGlobal && total > 0
+  const dl          = daysLeft(boost.expires_at);
+  const total       = boost.target_quantity ?? 0;
+  const delivered   = isGlobal && total > 0
     ? Math.round(pct * total)
     : ((boost.impression_count ?? 0) > 0 ? boost.impression_count : boost.delivered_quantity);
-  const deliveredLabel = isGlobal ? 'livres' : ((boost.impression_count ?? 0) > 0 ? 'impressions reelles' : 'livres');
-  const mult  = Number(boost.feed_multiplier ?? 1);
-  const canCancel = elapsedSec / 60 < 30;
+  const mult        = Number(boost.feed_multiplier ?? 1);
+  const canCancel   = elapsedSec / 60 < 30;
+  const hoursLeft   = Math.max(0, Math.ceil((new Date(boost.expires_at).getTime() - Date.now()) / 3600000));
 
   useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: pct,
-      duration: 600,
-      useNativeDriver: false,
-    }).start();
+    Animated.timing(progressAnim, { toValue: pct, duration: 800, useNativeDriver: false }).start();
   }, [pct]);
 
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
+  const progressWidth = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   async function handleStop() {
     setStopping(true);
@@ -401,129 +390,128 @@ const ActiveBoostCard: React.FC<{
       onCancelled(boost.id, res.data.refund_coins, res.data.new_balance);
     } catch (e: any) {
       Alert.alert('Erreur', e?.response?.data?.detail ?? "Echec de l'annulation.");
-    } finally {
-      setStopping(false);
-    }
+    } finally { setStopping(false); }
   }
 
   return (
     <>
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => setExpanded(e => !e)}
-        style={[abc.card, { backgroundColor: colors.surface, borderColor: g1 + '30' }]}
-      >
+      <View style={[abc.card, { backgroundColor: colors.surface, borderColor: g1 + '35' }]}>
+        {/* Barre accent top */}
         <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={abc.topBar} />
 
-        <View style={abc.mainRow}>
-          <LinearGradient colors={[g1, g2]} style={abc.iconBox}>
-            <Icon name={cat.icon as any} size={18} color="#fff" />
-          </LinearGradient>
-
-          <View style={{ flex: 1 }}>
-            <View style={abc.titleRow}>
-              <Text style={[abc.tierLabel, { color: colors.textPrimary }]} numberOfLines={1}>
+        <View style={{ padding: 14, gap: 12 }}>
+          {/* Header : icône + titre + badge statut */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <LinearGradient colors={[g1, g2]} style={abc.iconBox}>
+              <Icon name={cat.icon as any} size={20} color="#fff" />
+            </LinearGradient>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>
                 {boost.tier_label}
               </Text>
-              <StatusBadge status={boost.status} colors={colors} />
-            </View>
-
-            {boost.target_content_title ? (
-              <Text style={[abc.contentTitle, { color: g1 }]} numberOfLines={1}>
-                {boost.target_content_title}
-              </Text>
-            ) : null}
-
-            {total > 0 && (
-              <View style={[abc.statsBadge, { backgroundColor: g1 + '12', borderColor: g1 + '25' }]}>
-                <Icon name="trending-up" size={10} color={g1} />
-                <Text style={[abc.statsText, { color: g1 }]}>
-                  {fmtNum(deliveredDisplay)} / {fmtNum(total)} {deliveredLabel}
+              {boost.target_content_title ? (
+                <Text style={{ color: g1, fontSize: 12, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
+                  {boost.target_content_title}
                 </Text>
-              </View>
-            )}
+              ) : (
+                <Text style={{ color: colors.textTertiary, fontSize: 12 }}>{cat.label}</Text>
+              )}
+            </View>
+            <StatusBadge status={boost.status} colors={colors} />
+          </View>
 
-            <View style={[abc.progressBg, { backgroundColor: colors.border }]}>
-              <Animated.View style={[abc.progressFill, { width: progressWidth }]}>
-                <LinearGradient
-                  colors={[g1, g2]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={StyleSheet.absoluteFill}
-                />
+          {/* Progression — grande barre + % central */}
+          <View style={{ gap: 6 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '600' }}>
+                PROGRESSION
+              </Text>
+              <Text style={{ color: g1, fontSize: 16, fontWeight: '900' }}>{pctRounded}%</Text>
+            </View>
+            {/* Barre haute + gradient */}
+            <View style={{ height: 10, backgroundColor: colors.backgroundSecondary, borderRadius: 5, overflow: 'hidden' }}>
+              <Animated.View style={[{ height: 10, borderRadius: 5 }, { width: progressWidth }]}>
+                <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={{ flex: 1 }} />
               </Animated.View>
             </View>
-          </View>
-
-          <View style={{ alignItems: 'center', gap: 4, marginLeft: 8 }}>
-            <View style={[abc.ring, { borderColor: g1 + '30' }]}>
-              <View style={[abc.ringFill, { borderColor: g1 }]} />
-              <Text style={[abc.ringText, { color: g1 }]}>{Math.round(pct * 100)}%</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                {total > 0 ? `${fmtNum(delivered)} / ${fmtNum(total)} livrés` : 'En cours…'}
+              </Text>
+              {boost.status === 'active' && (
+                <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                  {hoursLeft > 24 ? `${dl}j restants` : `${hoursLeft}h restantes`}
+                </Text>
+              )}
             </View>
-            {boost.status === 'active' && (
-              <Text style={[abc.daysLeft, { color: colors.textTertiary }]}>{dl}j</Text>
-            )}
           </View>
-        </View>
 
-        {expanded && (
-          <View style={[abc.details, { borderTopColor: colors.divider }]}>
+          {/* Stats 4 cases */}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             {[
-              { label: 'Multiplicateur feed', value: mult > 1 ? `x${mult.toFixed(1)}` : 'x1.0' },
-              { label: 'Duree',               value: `${boost.duration_days} jours` },
-              { label: 'Coins depenses',      value: `${boost.coins_spent.toLocaleString('fr-FR')} coins` },
-              { label: 'Debut',               value: new Date(boost.activated_at).toLocaleDateString('fr-FR') },
-              { label: 'Expire',              value: new Date(boost.expires_at).toLocaleDateString('fr-FR') },
-            ].map(row => (
-              <View key={row.label} style={abc.detailRow}>
-                <Text style={[abc.detailLabel, { color: colors.textSecondary }]}>{row.label}</Text>
-                <Text style={[abc.detailValue, { color: colors.textPrimary }]}>{row.value}</Text>
+              { icon: 'trending-up', label: 'Multiplicateur', val: mult > 1 ? `×${mult.toFixed(1)}` : '×1.0', color: g1 },
+              { icon: 'eye',         label: 'Impressions',    val: fmtNum(boost.impression_count ?? 0), color: '#3B82F6' },
+              { icon: 'zap',         label: 'Coins',          val: fmtNum(boost.coins_spent), color: '#F59E0B' },
+              { icon: 'clock',       label: boost.status === 'active' ? 'Expire' : 'Durée',
+                val: boost.status === 'active'
+                  ? new Date(boost.expires_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+                  : `${boost.duration_days}j`,
+                color: '#10B981' },
+            ].map(st => (
+              <View key={st.label} style={{ flex: 1, backgroundColor: st.color + '10',
+                borderRadius: 10, padding: 8, alignItems: 'center', gap: 3 }}>
+                <Icon name={st.icon} size={13} color={st.color} />
+                <Text style={{ color: st.color, fontSize: 13, fontWeight: '900' }}>{st.val}</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 9 }}>{st.label}</Text>
               </View>
             ))}
-
-            {boost.status === 'active' && (
-              canCancel ? (
-                <TouchableOpacity
-                  onPress={() => setShowStop(true)}
-                  style={[abc.stopBtn, { borderColor: '#EF444440' }]}
-                  activeOpacity={0.8}
-                >
-                  <Icon name="square" size={13} color="#EF4444" />
-                  <Text style={abc.stopText}>Arreter le boost</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={[abc.stopBtn, { borderColor: colors.border, opacity: 0.45 }]}>
-                  <Icon name="lock" size={13} color={colors.textTertiary} />
-                  <Text style={[abc.stopText, { color: colors.textTertiary }]}>Annulation impossible apres 30 min</Text>
-                </View>
-              )
-            )}
           </View>
-        )}
-      </TouchableOpacity>
+
+          {/* Bouton arrêter */}
+          {boost.status === 'active' && (
+            canCancel ? (
+              <TouchableOpacity onPress={() => setShowStop(true)} activeOpacity={0.8}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: 6, paddingVertical: 10, borderRadius: 12,
+                  backgroundColor: '#EF444412', borderWidth: 1, borderColor: '#EF444430' }}>
+                <Icon name="square" size={13} color="#EF4444" />
+                <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13 }}>Arrêter le boost</Text>
+                <Text style={{ color: '#EF444480', fontSize: 11 }}>
+                  (+{Math.round(boost.coins_spent * 0.9).toLocaleString('fr-FR')} coins remboursés)
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 6, paddingVertical: 10, borderRadius: 12,
+                backgroundColor: colors.backgroundSecondary, opacity: 0.5 }}>
+                <Icon name="lock" size={13} color={colors.textTertiary} />
+                <Text style={{ color: colors.textTertiary, fontSize: 12 }}>Annulation impossible après 30 min</Text>
+              </View>
+            )
+          )}
+        </View>
+      </View>
 
       <Modal visible={showStop} transparent animationType="slide" onRequestClose={() => setShowStop(false)}>
         <View style={ms.overlay}>
           <View style={[ms.sheet, { backgroundColor: colors.surface }]}>
             <View style={[ms.handle, { backgroundColor: colors.border }]} />
-            <Text style={[ms.title, { color: colors.textPrimary }]}>Arreter le boost ?</Text>
+            <Text style={[ms.title, { color: colors.textPrimary }]}>Arrêter le boost ?</Text>
             <Text style={[ms.sub, { color: colors.textSecondary }]}>
-              Vous annulez dans les 30 premieres minutes. 90% des coins vous sont rembourses (10% de frais retenus).
+              Annulation dans les 30 premières minutes. 90% des coins vous sont remboursés.
             </Text>
             <View style={[ms.refundBox, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
               <Icon name="gift" size={18} color="#22C55E" />
               <Text style={[ms.refundText, { color: '#22C55E' }]}>
-                +{Math.round(boost.coins_spent * 0.9).toLocaleString('fr-FR')} coins rembourses
+                +{Math.round(boost.coins_spent * 0.9).toLocaleString('fr-FR')} coins remboursés
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={handleStop}
-              disabled={stopping}
-              activeOpacity={0.85}
-              style={[ms.stopConfirm, { opacity: stopping ? 0.6 : 1 }]}
-            >
+            <TouchableOpacity onPress={handleStop} disabled={stopping} activeOpacity={0.85}
+              style={[ms.stopConfirm, { opacity: stopping ? 0.6 : 1 }]}>
               {stopping
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={ms.stopConfirmText}>Confirmer l'arret</Text>}
+                : <Text style={ms.stopConfirmText}>Confirmer l'arrêt</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowStop(false)} style={ms.cancelBtn}>
               <Text style={[ms.cancelText, { color: colors.textSecondary }]}>Garder le boost</Text>
@@ -837,14 +825,14 @@ export default function BoostScreen() {
     finally { if (!silent) setRefreshingActive(false); }
   }, []);
 
-  // Refresh immédiat + auto-refresh toutes les 30s quand l'onglet actifs est ouvert
+  // Refresh immédiat + auto-refresh toutes les 10s quand l'onglet actifs est ouvert
   useEffect(() => {
     if (tab !== 'active') {
       if (activeRefreshTimer.current) clearInterval(activeRefreshTimer.current);
       return;
     }
     refreshActiveBoosts(true);
-    activeRefreshTimer.current = setInterval(() => refreshActiveBoosts(true), 30000);
+    activeRefreshTimer.current = setInterval(() => refreshActiveBoosts(true), 10000);
     return () => {
       if (activeRefreshTimer.current) clearInterval(activeRefreshTimer.current);
     };
