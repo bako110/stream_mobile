@@ -850,7 +850,7 @@ export const FeedScreen: React.FC = () => {
         const nonReels   = filtered.filter(i => i.kind !== 'reel');
 
         // Découper les reels en blocs de 5 max pour les rangées horizontales
-        const REELS_PER_ROW = 5;
+        const REELS_PER_ROW = 10;
         const reelRows: FeedItem[] = [];
         for (let r = 0; r < allReels.length; r += REELS_PER_ROW) {
           const chunk = allReels.slice(r, r + REELS_PER_ROW);
@@ -865,7 +865,7 @@ export const FeedScreen: React.FC = () => {
         const SUGGEST_EVERY  = 8;
         const COMM_EVERY     = 12;
         const REEL_ROW_EVERY = 5; // une rangée de reels toutes les 5 cartes
-        const AD_EVERY       = 1; // 1 pub toutes les 3 cartes
+        const AD_EVERY       = 8; // 1 pub toutes les 8 cartes
         const result: FeedItem[] = [];
         let suggestCount = 0;
         let commCount    = 0;
