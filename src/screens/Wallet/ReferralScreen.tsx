@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Share, ActivityIndicator, RefreshControl, StatusBar,
+  Share, RefreshControl, StatusBar,
   Clipboard,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton } from '../../components/common';
+import { BackButton, SkeletonFeed } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
@@ -80,6 +80,14 @@ export const ReferralScreen: React.FC = () => {
     ? Math.min(100, Math.round((stats.monthly_coins_earned / stats.monthly_cap) * 100))
     : 0;
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors?.background ?? '#0a0a0f' }}>
+        <SkeletonFeed />
+      </View>
+    );
+  }
+
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
@@ -91,16 +99,11 @@ export const ReferralScreen: React.FC = () => {
         <View style={{ width: 40 }} />
       </View>
 
-      {loading ? (
-        <View style={s.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={s.scroll}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.primary} />}
-        >
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.primary} />}
+      >
 
           {/* Hero */}
           <LinearGradient
@@ -239,8 +242,7 @@ export const ReferralScreen: React.FC = () => {
             </View>
           )}
 
-        </ScrollView>
-      )}
+      </ScrollView>
     </View>
   );
 };

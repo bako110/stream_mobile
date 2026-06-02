@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton } from '../../components/common';
+import { BackButton, SkeletonFeed } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -284,8 +284,8 @@ export const CommunityTreasurerScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#7B3FF2" size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SkeletonFeed />
       </View>
     );
   }

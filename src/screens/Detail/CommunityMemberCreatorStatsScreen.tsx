@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { SkeletonFeed } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { MemberCreatorStats } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -128,21 +129,8 @@ export function CommunityMemberCreatorStatsScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-        <View style={[styles.header, { paddingTop: insets.top + 6, borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => nav.goBack()}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Statistiques</Text>
-            <Text style={[styles.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>{memberName}</Text>
-          </View>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SkeletonFeed />
       </View>
     );
   }

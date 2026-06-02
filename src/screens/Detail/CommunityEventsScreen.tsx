@@ -22,7 +22,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { ExpandableText, BoostPrompt } from '../../components/common';
+import { ExpandableText, BoostPrompt, SkeletonFeed } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityEvent } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -658,8 +658,8 @@ export function CommunityEventsScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SkeletonFeed />
       </View>
     );
   }

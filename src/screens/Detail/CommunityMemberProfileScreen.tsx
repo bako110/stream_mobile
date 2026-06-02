@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { SkeletonUserProfile } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityMemberProfile } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -122,8 +123,8 @@ export function CommunityMemberProfileScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SkeletonUserProfile />
       </View>
     );
   }

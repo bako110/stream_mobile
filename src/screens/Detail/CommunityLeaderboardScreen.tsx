@@ -16,6 +16,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SkeletonFeed } from '../../components/common';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import type { LeaderboardEntry, LeaderboardMyStats } from '../../services/communityService';
@@ -443,8 +444,8 @@ export function CommunityLeaderboardScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SkeletonFeed />
       </View>
     );
   }

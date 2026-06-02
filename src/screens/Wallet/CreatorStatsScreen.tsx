@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BackButton } from '../../components/common';
+import { BackButton, SkeletonFeed } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, StatusBar, Image, Dimensions,
@@ -476,9 +476,8 @@ export function CreatorStatsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle="light-content" />
-        <ActivityIndicator size="large" color="#7B3FF2" />
+      <View style={{ flex: 1, backgroundColor: colors?.background ?? '#0a0a0f' }}>
+        <SkeletonFeed />
       </View>
     );
   }
