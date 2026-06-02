@@ -168,7 +168,7 @@ export type MainStackParamList = {
   CommunityStats:          { communityId: string; communityName: string };
   CommunityEvents:         { communityId: string; communityName: string; myRole?: string | null };
   CommunityFund:           { communityId: string; communityName: string; myRole?: string | null };
-  CommunityFundDetail:     { communityId: string; cotisationId: string; cotisationTitle: string; myRole?: string | null };
+  CommunityFundDetail:     { communityId: string; cotisationId: string; cotisationTitle: string; myRole?: string | null; myId?: string };
   CommunityTreasury:       { communityId: string; communityName: string };
   CommunityTreasurer:      { communityId: string; communityName: string; myRole: string; myId: string };
   CommunityMemberProfile:  { communityId: string; communityName: string; memberId: string; memberName: string };
