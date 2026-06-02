@@ -15,7 +15,7 @@ import { storyService } from '../../services/storyService';
 import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
 import { FolixLoader } from '../common';
-import { getLocalUri, cacheInBackground } from '../../services/videoCacheService';
+import { getLocalUri, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -102,7 +102,8 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
     // Fallback réseau si le fichier local est corrompu/supprimé
     const errSub = player.addEventListener('onError', () => {
       if (localUri && !usedFallback) {
-        setUsedFallback(true);  // déclenche re-render avec l'URL réseau
+        invalidateCacheEntry(uri);  // supprime l'entrée zombie de l'index
+        setUsedFallback(true);       // déclenche re-render avec l'URL réseau
         setReady(false);
       }
     });

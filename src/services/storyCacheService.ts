@@ -112,8 +112,17 @@ export function saveViewedStory(story: Story): void {
 export function getViewedStories(): Story[] {
   const now    = Date.now();
   const stored = loadViewedStories();
-  const valid  = stored.filter(s => !s.expires_at || new Date(s.expires_at).getTime() > now);
-  // Si des stories ont été purgées, on persiste la version nettoyée
+  const valid  = stored.filter(s => {
+    // Exclure les stories expirées
+    if (s.expires_at && new Date(s.expires_at).getTime() <= now) return false;
+    // Exclure les stories dont le média local (file://) n'est plus dans l'index
+    // (le fichier a pu être purgé par cleanup) — on retombe sur le réseau
+    if (s.media_url?.startsWith('file://')) {
+      const { getLocalUri } = require('./videoCacheService');
+      if (!getLocalUri(s.media_url)) return false;
+    }
+    return true;
+  });
   if (valid.length !== stored.length) saveViewedStoriesRaw(valid);
   return valid;
 }

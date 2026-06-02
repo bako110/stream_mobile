@@ -1,37 +1,51 @@
 /**
  * videoCacheService — Cache local des vidéos stories sur disque.
- * Style WhatsApp : télécharge silencieusement pendant/après visionnage,
- * restitue depuis le disque la prochaine fois sans réseau.
+ * Style WhatsApp : télécharge silencieusement, restitue depuis le disque.
  *
- * Cycle de vie :
- *  1. getLocalUri(url)  → chemin local si disponible, null sinon
- *  2. cacheInBackground(url) → télécharge en bg, résolu quand prêt
- *  3. cleanup() → supprime les fichiers > 7 jours et > 200 Mo
+ * Corrections v2 :
+ * - getLocalUri vérifie l'existence réelle du fichier (plus d'entrées zombies)
+ * - saveIndex avec backup pour résister aux crashes
+ * - cleanup() nettoie aussi les zombies (fichier absent du disque)
+ * - cacheInBackground évite de retélécharger si fichier physique présent
+ * - cleanup() appelé avant chaque saveIndex pour tenir sous MAX_SIZE_B
  */
 import RNBlobUtil from 'react-native-blob-util';
 import { storage } from '../utils/storage';
 
-const CACHE_DIR    = `${RNBlobUtil.fs.dirs.CacheDir}/folix_story_videos`;
-const INDEX_KEY    = 'video_cache_index';  // { url → { path, size, ts } }
-const MAX_AGE_MS   = 26 * 3600 * 1000;    // 26h — légèrement > 24h pour couvrir les décalages
-const MAX_SIZE_B   = 150 * 1024 * 1024;   // 150 Mo (stories durent 24h, pas besoin de plus)
+const CACHE_DIR      = `${RNBlobUtil.fs.dirs.CacheDir}/folix_story_videos`;
+const INDEX_KEY      = 'video_cache_index';
+const INDEX_KEY_BAK  = 'video_cache_index_bak';  // backup anti-crash
+const MAX_AGE_MS     = 26 * 3600 * 1000;          // 26h (stories = 24h)
+const MAX_SIZE_B     = 150 * 1024 * 1024;          // 150 Mo
 
 interface CacheEntry { path: string; size: number; ts: number; }
 type CacheIndex = Record<string, CacheEntry>;
 
-// ── Index en mémoire ──────────────────────────────────────────────────────────
-
 let _index: CacheIndex | null = null;
 const _downloading = new Map<string, Promise<string | null>>();
 
+// ── Index MMKV avec backup anti-crash ─────────────────────────────────────────
+
 function loadIndex(): CacheIndex {
-  try { return JSON.parse(storage.getItem(INDEX_KEY) ?? '{}'); }
-  catch { return {}; }
+  try {
+    const raw = storage.getItem(INDEX_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  // Tentative de restauration depuis backup
+  try {
+    const bak = storage.getItem(INDEX_KEY_BAK);
+    if (bak) return JSON.parse(bak);
+  } catch {}
+  return {};
 }
 
 function saveIndex(idx: CacheIndex): void {
-  try { storage.setItem(INDEX_KEY, JSON.stringify(idx)); }
-  catch {}
+  try {
+    const json = JSON.stringify(idx);
+    // Écrire d'abord le backup, puis l'index principal
+    storage.setItem(INDEX_KEY_BAK, json);
+    storage.setItem(INDEX_KEY, json);
+  } catch {}
 }
 
 function getIndex(): CacheIndex {
@@ -39,23 +53,58 @@ function getIndex(): CacheIndex {
   return _index;
 }
 
-// Normalise l'URL — supprime les query params (tokens) pour éviter les doublons
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function normalizeUrl(url: string): string {
   return url.split('?')[0];
 }
 
 function urlToFilename(url: string): string {
-  const normalized = normalizeUrl(url);
+  const norm = normalizeUrl(url);
   let h = 5381;
-  for (let i = 0; i < normalized.length; i++) h = (h * 33) ^ normalized.charCodeAt(i);
-  const ext = normalized.endsWith('.m3u8') ? 'm3u8' : normalized.split('.').pop() ?? 'mp4';
+  for (let i = 0; i < norm.length; i++) h = (h * 33) ^ norm.charCodeAt(i);
+  const ext = norm.split('.').pop()?.toLowerCase() ?? 'mp4';
   return `${(h >>> 0).toString(36)}.${ext}`;
+}
+
+/** Vérifie si un fichier existe réellement sur le disque. */
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    const stat = await RNBlobUtil.fs.stat(path);
+    return !!stat && parseInt(String(stat.size), 10) > 0;
+  } catch {
+    return false;
+  }
 }
 
 // ── API publique ──────────────────────────────────────────────────────────────
 
 /**
- * Retourne le chemin local si la vidéo est déjà en cache, null sinon.
+ * Retourne file:// si le fichier est en cache ET existe sur disque.
+ * Supprime l'entrée zombie si le fichier a disparu.
+ */
+export async function getLocalUriAsync(url: string): Promise<string | null> {
+  if (!url || url.includes('.m3u8')) return null;
+  const key   = normalizeUrl(url);
+  const entry = getIndex()[key];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > MAX_AGE_MS) return null;
+
+  // Vérification disque — supprime les zombies
+  const exists = await fileExists(entry.path);
+  if (!exists) {
+    const idx = getIndex();
+    delete idx[key];
+    _index = idx;
+    saveIndex(idx);
+    return null;
+  }
+  return `file://${entry.path}`;
+}
+
+/**
+ * Version synchrone — retourne depuis l'index sans vérifier le disque.
+ * Utiliser pour les décisions de lecture rapide (le fallback onError gère les zombies).
  */
 export function getLocalUri(url: string): string | null {
   if (!url || url.includes('.m3u8')) return null;
@@ -67,9 +116,23 @@ export function getLocalUri(url: string): string | null {
 }
 
 /**
- * Télécharge la vidéo en arrière-plan et retourne le chemin local.
- * Si déjà en cache → retourne immédiatement.
- * Si déjà en cours → attend la même promesse (pas de doublon).
+ * Supprime une entrée zombie de l'index (appelé par le fallback onError).
+ */
+export function invalidateCacheEntry(url: string): void {
+  const key = normalizeUrl(url);
+  const idx = getIndex();
+  if (idx[key]) {
+    delete idx[key];
+    _index = idx;
+    saveIndex(idx);
+  }
+}
+
+/**
+ * Télécharge en arrière-plan.
+ * - Si fichier physique présent → met à jour le timestamp sans retélécharger
+ * - Si déjà en cours → attend la même promesse
+ * - Nettoie les fichiers partiels en cas d'erreur
  */
 export async function cacheInBackground(url: string): Promise<string | null> {
   if (!url || url.includes('.m3u8')) return null;
@@ -77,18 +140,33 @@ export async function cacheInBackground(url: string): Promise<string | null> {
   const cached = getLocalUri(url);
   if (cached) return cached;
 
-  const key = normalizeUrl(url);
+  const key      = normalizeUrl(url);
+  const filename = urlToFilename(url);
+  const destPath = `${CACHE_DIR}/${filename}`;
+
   if (_downloading.has(key)) return _downloading.get(key)!;
 
   const promise = (async () => {
-    const filename = urlToFilename(url);
-    const destPath = `${CACHE_DIR}/${filename}`;
     try {
       await RNBlobUtil.fs.mkdir(CACHE_DIR).catch(() => {});
 
+      // Si le fichier existe déjà physiquement, rafraîchir juste le timestamp
+      const alreadyExists = await fileExists(destPath);
+      if (alreadyExists) {
+        const stat = await RNBlobUtil.fs.stat(destPath).catch(() => null);
+        const size = stat?.size ? parseInt(String(stat.size), 10) : 0;
+        const idx  = getIndex();
+        idx[key]   = { path: destPath, size, ts: Date.now() };
+        _index     = idx;
+        await _pruneIfNeeded(idx);
+        saveIndex(idx);
+        return `file://${destPath}`;
+      }
+
+      // Téléchargement
       await RNBlobUtil.config({
         path:           destPath,
-        overwrite:      true,     // overwrite pour remplacer les fichiers partiels
+        overwrite:      true,
         timeout:        30000,
         followRedirect: true,
         wifiOnly:       false,
@@ -99,13 +177,13 @@ export async function cacheInBackground(url: string): Promise<string | null> {
       if (size === 0) throw new Error('empty file');
 
       const idx = getIndex();
-      idx[key] = { path: destPath, size, ts: Date.now() };
-      _index = idx;
+      idx[key]  = { path: destPath, size, ts: Date.now() };
+      _index    = idx;
+      await _pruneIfNeeded(idx);  // nettoyage AVANT saveIndex
       saveIndex(idx);
 
       return `file://${destPath}`;
     } catch {
-      // Nettoyer le fichier partiel en cas d'erreur
       await RNBlobUtil.fs.unlink(destPath).catch(() => {});
       return null;
     } finally {
@@ -118,36 +196,51 @@ export async function cacheInBackground(url: string): Promise<string | null> {
 }
 
 /**
- * Purge les fichiers expirés (> 7j) et réduit à 200 Mo max.
- * À appeler au démarrage ou quand le stockage est faible.
+ * Vérifie si la taille totale dépasse MAX_SIZE_B et supprime les plus anciens.
+ * Appelé avant chaque saveIndex pour toujours rester sous la limite.
+ */
+async function _pruneIfNeeded(idx: CacheIndex): Promise<void> {
+  const entries = Object.entries(idx).sort(([, a], [, b]) => b.ts - a.ts);
+  let total = entries.reduce((s, [, e]) => s + e.size, 0);
+  if (total <= MAX_SIZE_B) return;
+
+  for (let i = entries.length - 1; i >= 0 && total > MAX_SIZE_B; i--) {
+    const [url, entry] = entries[i];
+    await RNBlobUtil.fs.unlink(entry.path).catch(() => {});
+    delete idx[url];
+    total -= entry.size;
+  }
+}
+
+/**
+ * Purge complète : expirés + zombies (fichier absent du disque) + dépassement taille.
+ * À appeler au démarrage de l'app.
  */
 export async function cleanup(): Promise<void> {
   try {
-    const idx   = getIndex();
-    const now   = Date.now();
-    let   total = 0;
-
-    // Supprimer les expirés
-    const entries = Object.entries(idx)
-      .filter(([, e]) => now - e.ts <= MAX_AGE_MS)
-      .sort(([, a], [, b]) => b.ts - a.ts); // les plus récents en premier
-
-    // Calculer la taille totale et couper si > 200 Mo
+    const idx = getIndex();
+    const now = Date.now();
     const kept: CacheIndex = {};
-    for (const [url, entry] of entries) {
-      total += entry.size;
-      if (total <= MAX_SIZE_B) {
-        kept[url] = entry;
-      } else {
-        await RNBlobUtil.fs.unlink(entry.path).catch(() => {});
-      }
-    }
+    let total = 0;
 
-    // Supprimer les entrées expirées du disque
-    const expiredUrls = Object.keys(idx).filter(u => !kept[u]);
-    for (const url of expiredUrls) {
-      const e = idx[url];
-      if (e) await RNBlobUtil.fs.unlink(e.path).catch(() => {});
+    const entries = Object.entries(idx).sort(([, a], [, b]) => b.ts - a.ts);
+
+    for (const [url, entry] of entries) {
+      // 1. Expirés
+      if (now - entry.ts > MAX_AGE_MS) {
+        await RNBlobUtil.fs.unlink(entry.path).catch(() => {});
+        continue;
+      }
+      // 2. Zombies (fichier absent du disque)
+      const exists = await fileExists(entry.path);
+      if (!exists) continue;
+      // 3. Limite de taille (les plus récents gardés en priorité)
+      total += entry.size;
+      if (total > MAX_SIZE_B) {
+        await RNBlobUtil.fs.unlink(entry.path).catch(() => {});
+        continue;
+      }
+      kept[url] = entry;
     }
 
     _index = kept;
