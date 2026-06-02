@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton } from '../../components/common';
+import { BackButton, TikTokLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -650,8 +650,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   // ── Loading / not found ──────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+        <TikTokLoader />
       </View>
     );
   }

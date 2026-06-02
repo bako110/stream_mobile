@@ -8,7 +8,6 @@ import {
   StatusBar,
   Animated,
   Dimensions,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -17,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { TikTokLoader } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityStats } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -430,12 +430,8 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
-        {renderHeader()}
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.textTertiary, fontSize: 13 }}>Chargement des statistiques…</Text>
-        </View>
+      <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+        <TikTokLoader />
       </View>
     );
   }

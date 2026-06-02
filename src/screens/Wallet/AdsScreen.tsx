@@ -9,7 +9,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { BackButton } from '../../components/common';
+import { BackButton, TikTokLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -278,8 +278,8 @@ export const AdsScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#7B3FF2" size="large" />
+        <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+          <TikTokLoader />
         </View>
       ) : (
         <FlatList

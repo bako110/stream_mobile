@@ -20,6 +20,7 @@ import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
+import { TikTokLoader } from '../../components/common';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -817,8 +818,8 @@ export const CommunityChannelChatScreen: React.FC = () => {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color={colors.primary} />
+          <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+            <TikTokLoader />
           </View>
         ) : (
           <>

@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Share, ActivityIndicator, RefreshControl, StatusBar,
+  Share, RefreshControl, StatusBar,
   Clipboard,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton } from '../../components/common';
+import { BackButton, TikTokLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
@@ -92,8 +92,8 @@ export const ReferralScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <View style={s.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+          <TikTokLoader />
         </View>
       ) : (
         <ScrollView

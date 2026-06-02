@@ -21,6 +21,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
+import { TikTokLoader } from '../../components/common';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 
@@ -280,7 +281,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
       {/* Gift grid — 2 rows, horizontal scroll */}
       {loading ? (
         <View style={{ height: 210, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <TikTokLoader />
         </View>
       ) : (
         <ScrollView

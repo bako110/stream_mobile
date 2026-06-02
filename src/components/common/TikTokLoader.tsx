@@ -1,0 +1,95 @@
+/**
+ * TikTokLoader — barre serpent animée style TikTok/YouTube.
+ * Une barre fine en haut de l'écran avec un dégradé qui avance en boucle.
+ *
+ * Usage :
+ *   {loading && <TikTokLoader />}
+ *   <TikTokLoader color="#7B3FF2" />
+ *   <TikTokLoader fullScreen />   ← centre aussi un fond semi-transparent
+ */
+import React, { useEffect, useRef } from 'react';
+import { View, Animated, StyleSheet, Dimensions, Easing } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+
+const W = Dimensions.get('window').width;
+
+interface Props {
+  color?: string;
+  height?: number;
+  fullScreen?: boolean;
+}
+
+export const TikTokLoader: React.FC<Props> = ({
+  color = '#7B3FF2',
+  height = 3,
+  fullScreen = false,
+}) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Boucle infinie : la barre part de -W, traverse tout l'écran, et repart
+    Animated.loop(
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 1400,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      })
+    ).start();
+    return () => anim.stopAnimation();
+  }, []);
+
+  const translateX = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-W * 1.2, W * 1.2],
+  });
+
+  // Largeur de la tête lumineuse : ~40% de l'écran
+  const barWidth = W * 0.55;
+
+  const bar = (
+    <View
+      style={[
+        styles.track,
+        { height, backgroundColor: color + '22' },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.barWrap,
+          { width: barWidth, height, transform: [{ translateX }] },
+        ]}
+      >
+        <LinearGradient
+          colors={['transparent', color, color + 'CC', color, 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ flex: 1, borderRadius: height / 2 }}
+        />
+      </Animated.View>
+    </View>
+  );
+
+  if (!fullScreen) return bar;
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {bar}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  track: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: 9999,
+  },
+  barWrap: {
+    position: 'absolute',
+    top: 0,
+  },
+});

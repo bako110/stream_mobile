@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { TikTokLoader } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityMemberData } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -217,8 +218,8 @@ export default function CommunityMembersScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+        <TikTokLoader />
       </View>
     );
   }
