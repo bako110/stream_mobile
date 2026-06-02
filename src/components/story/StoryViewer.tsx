@@ -53,11 +53,12 @@ interface Props {
 
 // ── Lecteur vidéo story ───────────────────────────────────────────────────────
 
+// Buffer agressif — priorité lecture immédiate
 const BUFFER_CFG = {
-  minBufferMs:                      2000,
-  maxBufferMs:                      15000,
-  bufferForPlaybackMs:              800,
-  bufferForPlaybackAfterRebufferMs: 1500,
+  minBufferMs:                      1000,   // commence à lire très vite
+  maxBufferMs:                      30000,  // garde 30s en avance
+  bufferForPlaybackMs:              300,    // 300ms suffisent pour démarrer
+  bufferForPlaybackAfterRebufferMs: 800,
 };
 
 const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void }> = ({ uri, paused, onReady }) => {
@@ -307,24 +308,34 @@ export const StoryViewer: React.FC<Props> = ({
   // ── Video ──────────────────────────────────────────────────────────────────
 
 
-  // ── Prefetch des médias suivants (WhatsApp-style) ─────────────────────────
+  // ── Prefetch agressif — stories + 2 groupes en avance + groupe précédent ────
 
   useEffect(() => {
-    // Collecte les 3 prochains médias (stories suivantes + groupe suivant)
-    const nextUrls: string[] = [];
+    const urls: string[] = [];
     const curStories = groups[groupIdx]?.stories ?? [];
 
-    // Stories suivantes dans le groupe courant
-    for (let i = storyIdx + 1; i < Math.min(storyIdx + 3, curStories.length); i++) {
+    // Toutes les stories restantes du groupe courant
+    for (let i = storyIdx + 1; i < curStories.length; i++) {
       const url = curStories[i]?.media_url;
-      if (url) nextUrls.push(url);
+      if (url) urls.push(url);
     }
-    // Première story du groupe suivant
-    const nextGroup = groups[groupIdx + 1];
-    if (nextGroup?.stories[0]?.media_url) nextUrls.push(nextGroup.stories[0].media_url);
+    // 2 groupes suivants complets
+    for (let g = groupIdx + 1; g <= Math.min(groupIdx + 2, groups.length - 1); g++) {
+      for (const st of groups[g]?.stories ?? []) {
+        if (st.media_url) urls.push(st.media_url);
+      }
+    }
+    // 1 groupe précédent (navigation retour)
+    if (groupIdx > 0) {
+      for (const st of groups[groupIdx - 1]?.stories ?? []) {
+        if (st.media_url) urls.push(st.media_url);
+      }
+    }
 
-    // Prefetch en arrière-plan — silencieux
-    nextUrls.forEach(url => Image.prefetch(url).catch(() => {}));
+    // Prefetch images en arrière-plan
+    urls.forEach(url => {
+      if (!url.includes('.m3u8')) Image.prefetch(url).catch(() => {});
+    });
   }, [storyIdx, groupIdx]);
 
   // ── Mark viewed ────────────────────────────────────────────────────────────
@@ -630,13 +641,23 @@ export const StoryViewer: React.FC<Props> = ({
       <Animated.View style={[s.root, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
         <StatusBar hidden translucent backgroundColor="transparent" />
 
-        {/* ── Préchargeurs vidéo invisibles — story suivante + 1ère du groupe suivant */}
+        {/* ── Préchargeurs vidéo invisibles ─────────────────────────────────────
+            Story suivante + 2 premiers groupes suivants + groupe précédent     */}
         {group.stories[storyIdx + 1]?.media_type === 'video' && group.stories[storyIdx + 1]?.media_url && (
-          <VideoPreloader key={group.stories[storyIdx + 1].id} uri={group.stories[storyIdx + 1].media_url!} />
+          <VideoPreloader key={`cur-next-${group.stories[storyIdx + 1].id}`} uri={group.stories[storyIdx + 1].media_url!} />
         )}
-        {groups[groupIdx + 1]?.stories[0]?.media_type === 'video' && groups[groupIdx + 1]?.stories[0]?.media_url && (
-          <VideoPreloader key={groups[groupIdx + 1].stories[0].id} uri={groups[groupIdx + 1].stories[0].media_url!} />
-        )}
+        {[groupIdx + 1, groupIdx + 2].map(gi => {
+          const g = groups[gi];
+          const st = g?.stories[0];
+          if (!st || st.media_type !== 'video' || !st.media_url) return null;
+          return <VideoPreloader key={`grp-${gi}-${st.id}`} uri={st.media_url!} />;
+        })}
+        {groupIdx > 0 && (() => {
+          const prev = groups[groupIdx - 1];
+          const lastSt = prev?.stories[prev.stories.length - 1];
+          if (!lastSt || lastSt.media_type !== 'video' || !lastSt.media_url) return null;
+          return <VideoPreloader key={`prev-${lastSt.id}`} uri={lastSt.media_url!} />;
+        })()}
 
         {/* ── Media ─────────────────────────────────────────────────────── */}
         {story.media_type === 'text' && (

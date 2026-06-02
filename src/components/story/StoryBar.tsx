@@ -55,10 +55,19 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
     try {
       const data = await storyService.getFeed({ forceRefresh });
       setGroups(data);
+      // Précharger thumbnails + 1ère story image des 10 premiers groupes
       data.slice(0, 10).forEach(g => {
         g.stories.slice(0, 2).forEach(st => {
           if (st.thumbnail_url) Image.prefetch(st.thumbnail_url).catch(() => {});
           else if (st.media_url && st.media_type === 'image') Image.prefetch(st.media_url).catch(() => {});
+        });
+      });
+      // Précharger les URLs vidéo HLS des 3 premiers groupes (fetch léger — juste le manifest)
+      data.slice(0, 3).forEach(g => {
+        g.stories.forEach(st => {
+          if (st.media_type === 'video' && st.media_url) {
+            fetch(st.media_url, { method: 'HEAD' }).catch(() => {});
+          }
         });
       });
     } catch (e) {
