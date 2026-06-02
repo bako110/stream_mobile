@@ -34,6 +34,17 @@ interface WithdrawalRequest {
   cotisation_id?: string;
 }
 
+interface ElectionResult {
+  user_id: string; display_name?: string; username?: string; avatar_url?: string;
+  votes: number; pct: number;
+}
+interface Election {
+  id: string; status: string; created_at: string;
+  total_votes: number; total_members: number; participation: number;
+  my_vote?: string | null;
+  results: ElectionResult[];
+}
+
 const STATUS_CFG: Record<string, { color: string; label: string; icon: string }> = {
   pending:              { color: '#F59E0B', label: 'En attente',         icon: 'clock' },
   approved_admin:       { color: '#3B82F6', label: 'Attente trésorier',  icon: 'user-check' },
@@ -58,6 +69,9 @@ export const CommunityTreasurerScreen: React.FC = () => {
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [isTreasurer, setIsTreasurer] = useState(false);
+  const [election,    setElection]    = useState<Election | null>(null);
+  const [voteLoading, setVoteLoading] = useState<string | null>(null);
+  const [launching,   setLaunching]   = useState(false);
 
   // Modals
   const [pickOpen,     setPickOpen]     = useState(false);
@@ -71,13 +85,22 @@ export const CommunityTreasurerScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const [tRes, rRes] = await Promise.all([
+      const [tRes, rRes, eRes] = await Promise.all([
         apiClient.get<{ treasurer: Treasurer | null }>(`${BASE}/treasurer`),
         apiClient.get<WithdrawalRequest[]>(`${BASE}/withdrawal-requests`).catch(() => ({ data: [] })),
+        apiClient.get<{ election: Election | null }>(`${BASE}/treasurer-elections/active`).catch(() => ({ data: { election: null } })),
       ]);
       setTreasurer(tRes.data?.treasurer ?? null);
       setIsTreasurer(!!tRes.data?.treasurer && tRes.data.treasurer.user_id === myId);
       setRequests(rRes.data ?? []);
+      const elec = eRes.data?.election ?? null;
+      setElection(elec);
+      // Charger les membres si vote en cours et pas encore de résultats
+      if (elec && elec.results.length === 0) {
+        apiClient.get<any[]>(`${BASE}/members`)
+          .then(r => setMembers((r.data ?? []).filter((m: any) => m.user_id !== myId)))
+          .catch(() => {});
+      }
     } catch { setTreasurer(null); }
     finally { setLoading(false); setRefreshing(false); }
   }, [BASE, myId]);
@@ -117,6 +140,64 @@ export const CommunityTreasurerScreen: React.FC = () => {
         } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
       }},
     ]);
+  };
+
+  const handleLaunchElection = async () => {
+    Alert.alert(
+      'Lancer un vote',
+      'Lancer un vote pour que les membres élisent le trésorier ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Lancer le vote', onPress: async () => {
+          setLaunching(true);
+          try {
+            await apiClient.post(`${BASE}/treasurer-elections`);
+            load();
+          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+          finally { setLaunching(false); }
+        }},
+      ],
+    );
+  };
+
+  const handleVote = (candidate: ElectionResult) => {
+    if (!election) return;
+    const name = candidate.display_name || candidate.username || 'ce membre';
+    const isChanging = !!election.my_vote;
+    Alert.alert(
+      isChanging ? 'Changer mon vote' : 'Voter',
+      `${isChanging ? 'Changer votre vote pour' : 'Voter pour'} ${name} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: isChanging ? 'Changer' : 'Voter', onPress: async () => {
+          setVoteLoading(candidate.user_id);
+          try {
+            await apiClient.post(`${BASE}/treasurer-elections/${election.id}/vote`, { candidate_id: candidate.user_id });
+            load();
+          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de voter.'); }
+          finally { setVoteLoading(null); }
+        }},
+      ],
+    );
+  };
+
+  const handleCloseElection = () => {
+    if (!election) return;
+    if (election.total_votes === 0) { Alert.alert('Impossible', 'Aucun vote enregistré.'); return; }
+    const leader = election.results[0];
+    Alert.alert(
+      'Clôturer le vote',
+      `Élire ${leader.display_name || leader.username} comme trésorier ?\n${leader.votes} vote${leader.votes > 1 ? 's' : ''} (${leader.pct}%)`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Élire', onPress: async () => {
+          try {
+            await apiClient.post(`${BASE}/treasurer-elections/${election.id}/close`);
+            load();
+          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+        }},
+      ],
+    );
   };
 
   const handleCreateRequest = async () => {
@@ -290,6 +371,148 @@ export const CommunityTreasurerScreen: React.FC = () => {
                 </View>
               )}
             </View>
+
+            {/* ── Section Vote ── */}
+            {(election || isAdmin) && (
+              <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700' }}>
+                    {election ? 'VOTE EN COURS' : 'ÉLECTION TRÉSORIER'}
+                  </Text>
+                  {isAdmin && !election && (
+                    <TouchableOpacity onPress={handleLaunchElection} disabled={launching}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                        backgroundColor: '#7B3FF2', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
+                      {launching ? <ActivityIndicator size="small" color="#fff" /> : (
+                        <><Icon name="vote" size={12} color="#fff" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Lancer un vote</Text></>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  {isAdmin && election && (
+                    <TouchableOpacity onPress={handleCloseElection}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                        backgroundColor: '#10B981', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
+                      <Icon name="check" size={12} color="#fff" />
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Clôturer et élire</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {election && (
+                  <View style={[{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.divider, overflow: 'hidden' }]}>
+                    {/* Barre top */}
+                    <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={{ height: 3 }} />
+                    <View style={{ padding: 14, gap: 10 }}>
+                      {/* Stats */}
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {[
+                          { val: election.total_votes, lbl: 'Votes', color: '#7B3FF2' },
+                          { val: `${election.participation}%`, lbl: 'Participation', color: '#3B82F6' },
+                          { val: election.total_members, lbl: 'Membres', color: '#10B981' },
+                        ].map(s => (
+                          <View key={s.lbl} style={{ flex: 1, backgroundColor: s.color + '12',
+                            borderRadius: 10, padding: 8, alignItems: 'center' }}>
+                            <Text style={{ color: s.color, fontWeight: '900', fontSize: 16 }}>{String(s.val)}</Text>
+                            <Text style={{ color: colors.textTertiary, fontSize: 9 }}>{s.lbl}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {/* Candidats avec barres */}
+                      {election.results.length > 0 ? (
+                        <View style={{ gap: 8 }}>
+                          {election.results.map((c, i) => {
+                            const isMyVote = election.my_vote === c.user_id;
+                            const isLeader = i === 0;
+                            return (
+                              <TouchableOpacity key={c.user_id}
+                                onPress={() => handleVote(c)}
+                                disabled={voteLoading === c.user_id}
+                                activeOpacity={0.8}
+                                style={{ borderRadius: 12, borderWidth: 1.5, overflow: 'hidden',
+                                  borderColor: isMyVote ? '#7B3FF2' : isLeader ? '#F59E0B40' : colors.divider }}
+                              >
+                                {/* Barre progression */}
+                                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
+                                  width: `${c.pct}%` as any,
+                                  backgroundColor: isMyVote ? '#7B3FF215' : '#F59E0B08' }} />
+                                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10 }}>
+                                  {c.avatar_url ? (
+                                    <Image source={{ uri: c.avatar_url }} style={st.avatarSm} />
+                                  ) : (
+                                    <View style={[st.avatarSm, { backgroundColor: '#7B3FF220',
+                                      alignItems: 'center', justifyContent: 'center' }]}>
+                                      <Text style={{ color: '#7B3FF2', fontWeight: '800' }}>
+                                        {(c.display_name || c.username || '?')[0].toUpperCase()}
+                                      </Text>
+                                    </View>
+                                  )}
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>
+                                      {c.display_name || c.username}
+                                    </Text>
+                                    <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                                      {c.votes} vote{c.votes !== 1 ? 's' : ''} · {c.pct}%
+                                    </Text>
+                                  </View>
+                                  {isLeader && <Icon name="award" size={16} color="#F59E0B" />}
+                                  {isMyVote && (
+                                    <View style={{ backgroundColor: '#7B3FF220', borderRadius: 8,
+                                      paddingHorizontal: 8, paddingVertical: 3 }}>
+                                      <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>MON VOTE</Text>
+                                    </View>
+                                  )}
+                                  {voteLoading === c.user_id && <ActivityIndicator size="small" color="#7B3FF2" />}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <View style={{ alignItems: 'center', paddingVertical: 16, gap: 6 }}>
+                          <Icon name="users" size={28} color={colors.textTertiary} />
+                          <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>
+                            Aucun vote pour l'instant
+                          </Text>
+                          <Text style={{ color: colors.textTertiary, fontSize: 12, textAlign: 'center' }}>
+                            Tapez sur un membre dans la liste pour voter
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Tous les membres votables si pas encore de résultats */}
+                      {election.results.length === 0 && members.length > 0 && (
+                        <View style={{ gap: 6 }}>
+                          <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700' }}>CANDIDATS</Text>
+                          {members.slice(0, 5).map(m => (
+                            <TouchableOpacity key={m.user_id} onPress={() => handleVote({
+                              user_id: m.user_id, display_name: m.display_name,
+                              username: m.username, avatar_url: m.avatar_url, votes: 0, pct: 0,
+                            })} style={{ flexDirection: 'row', alignItems: 'center', gap: 10,
+                              padding: 10, backgroundColor: colors.backgroundSecondary, borderRadius: 12 }}>
+                              {m.avatar_url
+                                ? <Image source={{ uri: m.avatar_url }} style={st.avatarSm} />
+                                : <View style={[st.avatarSm, { backgroundColor: '#7B3FF220',
+                                    alignItems: 'center', justifyContent: 'center' }]}>
+                                    <Text style={{ color: '#7B3FF2', fontWeight: '700' }}>
+                                      {(m.display_name || m.username || '?')[0].toUpperCase()}
+                                    </Text>
+                                  </View>
+                              }
+                              <Text style={{ color: colors.textPrimary, fontWeight: '600', flex: 1 }}>
+                                {m.display_name || m.username}
+                              </Text>
+                              <Text style={{ color: '#7B3FF2', fontSize: 12, fontWeight: '700' }}>Voter →</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Explication double approbation */}
             <View style={[st.infoBox, { backgroundColor: '#7B3FF210', borderColor: '#7B3FF230', marginHorizontal: 16, marginBottom: 16 }]}>
