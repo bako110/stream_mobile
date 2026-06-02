@@ -969,24 +969,13 @@ export const CommunitiesScreen: React.FC = () => {
         <View style={S.headerRow}>
           <BackButton onPress={() => nav.goBack()} />
           <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Communautés</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {/* Rejoindre par code */}
-            <TouchableOpacity
-              onPress={() => setJoinOpen(true)}
-              style={[S.createBtn, { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.divider }]}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <Icon name="hash" size={18} color={colors.textPrimary} />
-            </TouchableOpacity>
-            {/* Créer */}
-            <TouchableOpacity
-              onPress={() => setTemplateOpen(true)}
-              style={[S.createBtn, { backgroundColor: colors.primary }]}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <Icon name="plus" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => setTemplateOpen(true)}
+            style={[S.createBtn, { backgroundColor: colors.primary }]}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Icon name="plus" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         {/* Barre de recherche */}
@@ -1012,6 +1001,30 @@ export const CommunitiesScreen: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Bandeau rejoindre par code — visible et intuitif */}
+        <TouchableOpacity
+          onPress={() => setJoinOpen(true)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10,
+            marginHorizontal: 16, marginTop: 10, paddingHorizontal: 14, paddingVertical: 11,
+            borderRadius: 14, borderWidth: 1.5, borderColor: '#7B3FF240',
+            backgroundColor: '#7B3FF210' }}
+          activeOpacity={0.8}
+        >
+          <View style={{ width: 32, height: 32, borderRadius: 16,
+            backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="key" size={15} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>
+              J'ai un code d'invitation
+            </Text>
+            <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 1 }}>
+              Entre le code pour rejoindre une communauté privée
+            </Text>
+          </View>
+          <Icon name="chevron-right" size={16} color="#7B3FF2" />
+        </TouchableOpacity>
 
         {/* Onglets pills */}
         <View style={S.tabRow}>
