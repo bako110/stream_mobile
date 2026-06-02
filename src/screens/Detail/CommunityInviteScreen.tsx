@@ -70,7 +70,11 @@ export const CommunityInviteScreen: React.FC = () => {
     try {
       await Share.share({
         title: `Rejoins ${communityName} sur Folix !`,
-        message: `Rejoins notre communauté "${communityName}" sur Folix !\n\nCode d'invitation : ${code}\n\nOu ouvre ce lien : https://folix.app/join/${code}`,
+        message:
+          `🔥 Rejoins notre communauté "${communityName}" sur Folix !\n\n` +
+          `👉 Code d'invitation : *${code}*\n\n` +
+          `Télécharge Folix et entre ce code pour rejoindre le groupe.\n` +
+          `https://folix.app/join/${code}`,
       });
     } catch { }
   };

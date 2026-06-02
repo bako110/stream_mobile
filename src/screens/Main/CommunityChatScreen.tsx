@@ -1486,6 +1486,18 @@ export const CommunityChatScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           )}
+          {(myRole === 'admin' || myRole === 'moderator') && (
+            <TouchableOpacity
+              onPress={() => (nav as any).navigate('CommunityInvite', {
+                communityId, communityName, myRole, inviteCode: undefined,
+              })}
+              style={S.headerBtn}
+            >
+              <View style={[S.headerBtnInner, { backgroundColor: '#7B3FF215' }]}>
+                <Icon name="user-plus" size={16} color="#7B3FF2" />
+              </View>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => nav.navigate('CommunityDetail', { communityId })} style={S.headerBtn}>
             <View style={[S.headerBtnInner, { backgroundColor: colors.backgroundSecondary }]}>
               <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
