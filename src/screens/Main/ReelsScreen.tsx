@@ -25,7 +25,7 @@ import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
 import {
-  CommentsBottomSheet, VerifiedBadge, ReportModal, TikTokLoader,
+  CommentsBottomSheet, VerifiedBadge, ReportModal, FolixLoader,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -445,7 +445,7 @@ export const ReelsScreen: React.FC = () => {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <TikTokLoader color="#fff" />
+        <FolixLoader color="#fff" />
       </View>
     );
   }

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, TikTokLoader } from '../../components/common';
+import { BackButton, FolixLoader } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -145,7 +145,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <TikTokLoader />
+        <FolixLoader />
       </View>
     );
   }

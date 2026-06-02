@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
-import { BackButton, TikTokLoader } from '../../components/common';
+import { BackButton, FolixLoader } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, Alert,
@@ -125,7 +125,7 @@ export default function SubscriptionPlansScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <TikTokLoader />
+        <FolixLoader />
       </View>
     );
   }

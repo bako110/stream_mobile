@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
-import { BoostPrompt, TikTokLoader } from '../../components/common';
+import { BoostPrompt, FolixLoader } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, ChannelType } from '../../services/communityService';
 
@@ -317,7 +317,7 @@ export const CommunityChannelsScreen: React.FC = () => {
       {/* Liste */}
       {loading ? (
         <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-          <TikTokLoader />
+          <FolixLoader />
         </View>
       ) : (
         <FlatList

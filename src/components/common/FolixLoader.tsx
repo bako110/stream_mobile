@@ -1,11 +1,11 @@
 /**
- * TikTokLoader — barre serpent animée style TikTok/YouTube.
+ * FolixLoader — barre serpent animée style TikTok/YouTube.
  * Une barre fine en haut de l'écran avec un dégradé qui avance en boucle.
  *
  * Usage :
- *   {loading && <TikTokLoader />}
- *   <TikTokLoader color="#7B3FF2" />
- *   <TikTokLoader fullScreen />   ← centre aussi un fond semi-transparent
+ *   {loading && <FolixLoader />}
+ *   <FolixLoader color="#7B3FF2" />
+ *   <FolixLoader fullScreen />   ← centre aussi un fond semi-transparent
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, Dimensions, Easing } from 'react-native';
@@ -28,7 +28,7 @@ interface Props {
   fullScreen?: boolean;
 }
 
-export const TikTokLoader: React.FC<Props> = ({
+export const FolixLoader: React.FC<Props> = ({
   color = '#7B3FF2',
   height = 3,
   fullScreen = false,

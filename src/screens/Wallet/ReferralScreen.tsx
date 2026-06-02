@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, TikTokLoader } from '../../components/common';
+import { BackButton, FolixLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
@@ -93,7 +93,7 @@ export const ReferralScreen: React.FC = () => {
 
       {loading ? (
         <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-          <TikTokLoader />
+          <FolixLoader />
         </View>
       ) : (
         <ScrollView

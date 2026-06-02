@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { TikTokLoader } from '../../components/common';
+import { FolixLoader } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { LeaderboardEntry, LeaderboardMyStats } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -444,7 +444,7 @@ export function CommunityLeaderboardScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <TikTokLoader />
+        <FolixLoader />
       </View>
     );
   }

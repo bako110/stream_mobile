@@ -25,7 +25,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { BackButton, TikTokLoader } from '../../components/common';
+import { BackButton, FolixLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
@@ -218,7 +218,7 @@ const CreatorDashboardScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <TikTokLoader />
+        <FolixLoader />
       </View>
     );
   }
