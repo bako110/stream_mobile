@@ -37,6 +37,8 @@ export const storyService = {
       setCachedFeed(groups);
       // Purge des stories expirées à chaque refresh réseau réussi
       purgeExpiredViewedStories();
+      // Nettoyage silencieux du cache vidéo (7j max, 200Mo max)
+      import('././videoCacheService').then(m => m.cleanup().catch(() => {})).catch(() => {});
       return applyLocalViewsToFeed(groups);
     } catch (e) {
       // Reseau KO — retourner le cache expire plutot que vide

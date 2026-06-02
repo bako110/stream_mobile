@@ -15,6 +15,7 @@ import { storyService } from '../../services/storyService';
 import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
 import { FolixLoader } from '../common';
+import { getLocalUri, cacheInBackground } from '../../services/videoCacheService';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -65,17 +66,27 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
   const [buffering, setBuffering] = useState(false);
   const [ready,     setReady]     = useState(false);
 
+  // Utilise le cache disque si disponible, sinon l'URL réseau
+  const localUri = getLocalUri(uri);
+  const playUri  = localUri ?? uri;
+
   const player = useVideoPlayer(
-    { uri, bufferConfig: BUFFER_CFG },
+    { uri: playUri, bufferConfig: BUFFER_CFG },
     p => {
       p.loop   = false;
       p.muted  = false;
       p.volume = 1.0;
-      // Démarre le prefetch des segments HLS immédiatement — sans attendre play()
       p.preload().catch(() => {});
       if (!paused) p.play();
     },
   );
+
+  // Télécharge en background pendant la lecture pour la prochaine fois
+  useEffect(() => {
+    if (!localUri && uri && !uri.includes('.m3u8')) {
+      cacheInBackground(uri).catch(() => {});
+    }
+  }, [uri, localUri]);
 
   useEffect(() => {
     if (paused) player.pause();
@@ -107,12 +118,19 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
 // Rendu invisible, libéré au unmount automatiquement par react-native-video
 
 const VideoPreloader: React.FC<{ uri: string }> = ({ uri }) => {
+  const localUri = getLocalUri(uri);
+  const playUri  = localUri ?? uri;
+
   const player = useVideoPlayer(
-    { uri, bufferConfig: BUFFER_CFG },
+    { uri: playUri, bufferConfig: BUFFER_CFG },
     p => { p.muted = true; p.volume = 0; },
   );
   useEffect(() => {
     player.preload().catch(() => {});
+    // Sauvegarde en background si pas encore en cache
+    if (!localUri && uri && !uri.includes('.m3u8')) {
+      cacheInBackground(uri).catch(() => {});
+    }
     return () => { try { player.pause(); } catch {} };
   }, [uri]);
   return null;
