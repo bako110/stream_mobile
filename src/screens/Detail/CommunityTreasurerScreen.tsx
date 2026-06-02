@@ -287,7 +287,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
           <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800' }}>Trésorier</Text>
           <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{communityName}</Text>
         </View>
-        {isAdmin && (
+        {(isAdmin || isTreasurer) && (
           <TouchableOpacity
             onPress={() => setCreateOpen(true)}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -380,14 +380,22 @@ export const CommunityTreasurerScreen: React.FC = () => {
               <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700' }}>
-                    {election ? 'VOTE EN COURS' : 'ÉLECTION TRÉSORIER'}
+                    {election
+                      ? 'VOTE EN COURS'
+                      : treasurer
+                      ? 'VOTE DE DESTITUTION'
+                      : 'ÉLECTION TRÉSORIER'}
                   </Text>
                   {isAdmin && !election && (
                     <TouchableOpacity onPress={handleLaunchElection} disabled={launching}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
-                        backgroundColor: '#7B3FF2', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
+                        backgroundColor: treasurer ? '#EF4444' : '#7B3FF2',
+                        borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
                       {launching ? <ActivityIndicator size="small" color="#fff" /> : (
-                        <><Icon name="users" size={12} color="#fff" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Lancer un vote</Text></>
+                        <><Icon name="users" size={12} color="#fff" />
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>
+                          {treasurer ? 'Voter pour destituer' : 'Lancer un vote'}
+                        </Text></>
                       )}
                     </TouchableOpacity>
                   )}
