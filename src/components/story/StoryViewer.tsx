@@ -504,15 +504,40 @@ export const StoryViewer: React.FC<Props> = ({
     lastTapRef.current = now;
   }, [story, liked, isOwn, showHeartAnim, goNext]);
 
-  // ── Swipe down to close ────────────────────────────────────────────────────
+  // ── Swipe vertical (fermer) + horizontal (changer de groupe) ─────────────────
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10 && gs.dy > 0,
-      onPanResponderGrant:  () => setPaused(true),
-      onPanResponderMove:   (_, gs) => { if (gs.dy > 0) translateY.setValue(gs.dy); },
-      onPanResponderRelease:(_, gs) => {
-        if (gs.dy > 120) {
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dy) > 10 || Math.abs(gs.dx) > 15,
+      onPanResponderGrant: () => setPaused(true),
+      onPanResponderMove: (_, gs) => {
+        // Swipe vertical → translateY (fermer)
+        if (Math.abs(gs.dy) > Math.abs(gs.dx) && gs.dy > 0) {
+          translateY.setValue(gs.dy);
+        }
+      },
+      onPanResponderRelease: (_, gs) => {
+        const isHorizontal = Math.abs(gs.dx) > Math.abs(gs.dy);
+        if (isHorizontal) {
+          // Swipe gauche → groupe suivant
+          if (gs.dx < -60 && groupIdx < groups.length - 1) {
+            progressAnim.stopAnimation();
+            stopAudio();
+            setGroupIdx(g => g + 1);
+            setStoryIdx(0);
+            return;
+          }
+          // Swipe droite → groupe précédent
+          if (gs.dx > 60 && groupIdx > 0) {
+            progressAnim.stopAnimation();
+            stopAudio();
+            setGroupIdx(g => g - 1);
+            setStoryIdx(0);
+            return;
+          }
+          setPaused(false);
+        } else if (gs.dy > 120) {
           stopAudio();
           Animated.timing(translateY, { toValue: H, duration: 200, useNativeDriver: true }).start(onClose);
         } else {
@@ -748,6 +773,64 @@ export const StoryViewer: React.FC<Props> = ({
         </Animated.View>
 
         {/* ── Bouton like (story des autres) + bouton vues (propre story) ── */}
+        {/* ── Avatars navigation groupes (sauter d'une personne à l'autre) ── */}
+        {groups.length > 1 && !viewersOpen && !menuOpen && !editMode && !replyFocused && (
+          <View style={s.groupNav} pointerEvents="box-none">
+            {/* Groupe précédent */}
+            {groupIdx > 0 && (() => {
+              const prev = groups[groupIdx - 1];
+              return (
+                <TouchableOpacity
+                  style={s.groupNavBtn}
+                  onPress={() => { progressAnim.stopAnimation(); stopAudio(); setGroupIdx(g => g - 1); setStoryIdx(0); }}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="chevron-left" size={14} color="rgba(255,255,255,0.7)" />
+                  {prev.user?.avatar_url
+                    ? <Animated.Image source={{ uri: prev.user.avatar_url }} style={s.groupNavAvatar} />
+                    : <View style={[s.groupNavAvatar, s.groupNavAvatarFallback]}>
+                        <Text style={s.groupNavInitial}>
+                          {(prev.user?.display_name || prev.user?.username || '?')[0].toUpperCase()}
+                        </Text>
+                      </View>
+                  }
+                  <Text style={s.groupNavName} numberOfLines={1}>
+                    {prev.user?.display_name || prev.user?.username}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })()}
+
+            {/* Spacer */}
+            <View style={{ flex: 1 }} />
+
+            {/* Groupe suivant */}
+            {groupIdx < groups.length - 1 && (() => {
+              const next = groups[groupIdx + 1];
+              return (
+                <TouchableOpacity
+                  style={[s.groupNavBtn, { flexDirection: 'row-reverse' }]}
+                  onPress={() => { progressAnim.stopAnimation(); stopAudio(); setGroupIdx(g => g + 1); setStoryIdx(0); }}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.7)" />
+                  {next.user?.avatar_url
+                    ? <Animated.Image source={{ uri: next.user.avatar_url }} style={s.groupNavAvatar} />
+                    : <View style={[s.groupNavAvatar, s.groupNavAvatarFallback]}>
+                        <Text style={s.groupNavInitial}>
+                          {(next.user?.display_name || next.user?.username || '?')[0].toUpperCase()}
+                        </Text>
+                      </View>
+                  }
+                  <Text style={s.groupNavName} numberOfLines={1}>
+                    {next.user?.display_name || next.user?.username}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })()}
+          </View>
+        )}
+
         <View style={s.bottomBar}>
           {isOwn ? (
             <TouchableOpacity style={s.viewsBtn} onPress={() => openViewers('views')} activeOpacity={0.8}>
@@ -1132,6 +1215,23 @@ const s = StyleSheet.create({
   tapZones: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', zIndex: 5 },
   tapLeft:  { flex: 1 },
   tapRight: { flex: 2 },
+
+  // ── Navigation groupes ─────────────────────────────────────────────────────────
+  groupNav: {
+    position: 'absolute', bottom: Platform.OS === 'ios' ? 138 : 124,
+    left: 0, right: 0, flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, zIndex: 8,
+  },
+  groupNavBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 20,
+    paddingVertical: 6, paddingHorizontal: 10,
+    maxWidth: 140,
+  },
+  groupNavAvatar:       { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' },
+  groupNavAvatarFallback:{ backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  groupNavInitial:      { color: '#fff', fontSize: 11, fontWeight: '800' },
+  groupNavName:         { color: '#fff', fontSize: 11, fontWeight: '600', maxWidth: 70 },
 
   // ── Bottom bar (like / views) ─────────────────────────────────────────────────
   bottomBar: {
