@@ -25,7 +25,6 @@ import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../se
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
 const audioRecorderChannel = new AudioRecorderPlayerClass();
-import { SkeletonMessages } from '../../components/common';
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
 import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
@@ -818,8 +817,8 @@ export const CommunityChannelChatScreen: React.FC = () => {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
-          <View style={{ flex: 1, backgroundColor: colors.background }}>
-            <SkeletonMessages />
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <>

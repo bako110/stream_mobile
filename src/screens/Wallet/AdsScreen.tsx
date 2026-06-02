@@ -4,12 +4,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Alert, RefreshControl,
+  ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { BackButton, SkeletonFeed } from '../../components/common';
+import { BackButton } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -233,14 +233,6 @@ export const AdsScreen: React.FC = () => {
     } catch { Alert.alert('Erreur', 'Impossible de modifier le statut.'); }
   };
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors?.background ?? '#0a0a0f' }}>
-        <SkeletonFeed />
-      </View>
-    );
-  }
-
   const GlobalStats = ads.length > 0 ? (
     <View style={[s.globalStats, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
       <Text style={[s.globalTitle, { color: colors.textPrimary }]}>
@@ -285,7 +277,12 @@ export const AdsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <FlatList
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#7B3FF2" size="large" />
+        </View>
+      ) : (
+        <FlatList
           data={ads}
           keyExtractor={a => a.id}
           renderItem={({ item }) => (
@@ -331,6 +328,7 @@ export const AdsScreen: React.FC = () => {
             </View>
           }
         />
+      )}
     </View>
   );
 };

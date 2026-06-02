@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
-import { BoostPrompt, SkeletonFeed } from '../../components/common';
+import { BoostPrompt } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, ChannelType } from '../../services/communityService';
 
@@ -316,8 +316,8 @@ export const CommunityChannelsScreen: React.FC = () => {
 
       {/* Liste */}
       {loading ? (
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <SkeletonFeed />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList

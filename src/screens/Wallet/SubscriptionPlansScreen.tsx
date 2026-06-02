@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
-import { BackButton, SkeletonSubscriptions } from '../../components/common';
+import { BackButton } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, Alert,
@@ -124,8 +124,9 @@ export default function SubscriptionPlansScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors?.background ?? '#0a0a0f' }}>
-        <SkeletonSubscriptions />
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }

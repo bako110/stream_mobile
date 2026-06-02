@@ -25,7 +25,7 @@ import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
 import {
-  CommentsBottomSheet, VerifiedBadge, ReportModal, SkeletonReels,
+  CommentsBottomSheet, VerifiedBadge, ReportModal,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -442,7 +442,12 @@ export const ReelsScreen: React.FC = () => {
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
-    return <SkeletonReels />;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
   }
 
   // ── Render: empty ─────────────────────────────────────────────────────────
