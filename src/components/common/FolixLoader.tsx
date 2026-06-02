@@ -1,11 +1,13 @@
 /**
- * FolixLoader — barre serpent animée style TikTok/YouTube.
- * Une barre fine en haut de l'écran avec un dégradé qui avance en boucle.
+ * FolixLoader — deux modes :
  *
- * Usage :
+ * Mode "bar" (défaut) — barre serpent en haut de l'écran, pour les pages
  *   {loading && <FolixLoader />}
  *   <FolixLoader color="#7B3FF2" />
- *   <FolixLoader fullScreen />   ← centre aussi un fond semi-transparent
+ *
+ * Mode "reel" — spinner centré plein écran sombre, pour les reels/vidéos
+ *   <FolixLoader variant="reel" />
+ *   <FolixLoader variant="reel" color="#ffffff" />
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, Dimensions, Easing } from 'react-native';
@@ -31,15 +33,67 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 interface Props {
-  color?: string;
-  height?: number;
+  color?:   string;
+  height?:  number;
   fullScreen?: boolean;
+  variant?: 'bar' | 'reel';
 }
 
+// ── Spinner centré style TikTok — pour les reels ──────────────────────────────
+const ReelSpinner: React.FC<{ color: string }> = ({ color }) => {
+  const rot = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.8)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rot, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1, duration: 450, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 0.8, duration: 450, useNativeDriver: true }),
+      ])
+    ).start();
+    return () => { rot.stopAnimation(); scale.stopAnimation(); };
+  }, []);
+
+  const rotate = rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const SIZE = 44;
+  const STROKE = 3.5;
+  const r = hexToRgba(color, 1);
+  const rFade = hexToRgba(color, 0.25);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={styles.reelCenter}>
+        <Animated.View style={[
+          styles.spinner,
+          {
+            width: SIZE, height: SIZE, borderRadius: SIZE / 2,
+            borderWidth: STROKE,
+            borderTopColor: r,
+            borderRightColor: r,
+            borderBottomColor: rFade,
+            borderLeftColor: rFade,
+            transform: [{ rotate }, { scale }],
+          }
+        ]} />
+      </View>
+    </View>
+  );
+};
+
+// ── Barre serpent — pour les pages ────────────────────────────────────────────
 export const FolixLoader: React.FC<Props> = ({
-  color = '#7B3FF2',
-  height = 3,
+  color    = '#7B3FF2',
+  height   = 3,
   fullScreen = false,
+  variant  = 'bar',
 }) => {
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -55,6 +109,9 @@ export const FolixLoader: React.FC<Props> = ({
     return () => anim.stopAnimation();
   }, []);
 
+  // Mode reel → spinner centré
+  if (variant === 'reel') return <ReelSpinner color={color} />;
+
   const translateX = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [-W * 1.2, W * 1.2],
@@ -62,7 +119,6 @@ export const FolixLoader: React.FC<Props> = ({
 
   const barWidth = W * 0.55;
 
-  // Toutes les couleurs en rgba — Android ne supporte pas 'transparent' ni hex 8 chiffres
   const gradientColors = [
     hexToRgba(color, 0),
     hexToRgba(color, 0.6),
@@ -98,14 +154,20 @@ export const FolixLoader: React.FC<Props> = ({
 const styles = StyleSheet.create({
   track: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: 0, left: 0, right: 0,
     overflow: 'hidden',
     zIndex: 9999,
   },
   barWrap: {
     position: 'absolute',
     top: 0,
+  },
+  reelCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spinner: {
+    backgroundColor: 'transparent',
   },
 });

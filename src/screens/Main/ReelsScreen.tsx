@@ -445,7 +445,7 @@ export const ReelsScreen: React.FC = () => {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <FolixLoader color="#ffffff" />
+        <FolixLoader variant="reel" color="#ffffff" />
       </View>
     );
   }
@@ -1126,7 +1126,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       />
 
       {!videoPlaying && !videoError && !ended && isActive && (
-        <FolixLoader color="#ffffff" height={3} fullScreen />
+        <FolixLoader variant="reel" color="#ffffff" />
       )}
 
       {videoError && (
