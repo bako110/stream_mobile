@@ -211,6 +211,13 @@ export const CommunityTreasurerScreen: React.FC = () => {
   const handleCreateRequest = async () => {
     const amount = parseInt(formAmount, 10);
     if (!amount || amount < 1) { Alert.alert('Erreur', 'Montant invalide.'); return; }
+    if (communityBalance !== null && amount > communityBalance) {
+      Alert.alert(
+        'Solde insuffisant',
+        `Le solde communautaire est de ${communityBalance.toLocaleString('fr-FR')} coins.\nVous ne pouvez pas retirer plus.`,
+      );
+      return;
+    }
     setFormSaving(true);
     try {
       const res = await apiClient.post<any>(`${BASE}/withdrawal-requests`, {
