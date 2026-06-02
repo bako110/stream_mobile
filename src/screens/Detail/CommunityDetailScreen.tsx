@@ -676,7 +676,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   });
 
   const previewMembers = members.slice(0, 5);
-  const isLocked = community.is_private && joinStatus !== 'member' && !isAdmin && !isMod && !isGlobalAdmin;
+  // Verrouillé si : communauté privée OU demande en attente (requires_approval) et pas encore membre
+  const isLocked = (
+    (community.is_private || community.requires_approval)
+    && joinStatus !== 'member'
+    && !isAdmin && !isMod && !isGlobalAdmin
+  );
 
   // ── Onglet Info (settings) ───────────────────────────────────────────────────
   const renderTabInfo = () => (
