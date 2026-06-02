@@ -1384,6 +1384,19 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             />
           </TouchableOpacity>
           {(isAdmin || isMod) && (
+            <TouchableOpacity
+              onPress={() => (nav as any).navigate('CommunityInvite', {
+                communityId,
+                communityName: community.name,
+                myRole,
+                inviteCode: (community as any).invite_code,
+              })}
+              style={s.headerIcon}
+            >
+              <Icon name="user-plus" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+          )}
+          {(isAdmin || isMod) && (
             <TouchableOpacity onPress={openSettings} style={s.headerIcon}>
               <Icon name="settings" size={20} color={colors.textPrimary} />
             </TouchableOpacity>

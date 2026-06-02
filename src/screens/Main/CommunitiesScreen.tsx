@@ -382,6 +382,12 @@ export const CommunitiesScreen: React.FC = () => {
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
   const [createOpen,     setCreateOpen]     = useState(false);
+  const [templateOpen,   setTemplateOpen]   = useState(false);
+  const [joinOpen,       setJoinOpen]       = useState(false);
+  const [joinCode,       setJoinCode]       = useState('');
+  const [joining,        setJoining]        = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null);
+  const [templates,      setTemplates]      = useState<any[]>([]);
 
   // Formulaire création
   const [step,             setStep]             = useState<'info' | 'settings'>('info');
@@ -404,6 +410,48 @@ export const CommunitiesScreen: React.FC = () => {
     setCreatePriceCoins('');
     setCreateAvatarUri(null);
     setCreateBannerUri(null);
+    setSelectedTemplate(null);
+  };
+
+  // Charger les templates
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await apiClient.get<any[]>('/api/v1/communities/templates');
+      setTemplates(res.data ?? []);
+    } catch { }
+  }, []);
+
+  useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+  // Appliquer un template au formulaire
+  const applyTemplate = (t: any) => {
+    setSelectedTemplate(t);
+    setCreatePrivate(t.default_settings?.is_private ?? false);
+    setCreateInviteOnly(t.default_settings?.requires_approval ?? false);
+    if (t.suggested_description && !createDesc.trim()) setCreateDesc(t.suggested_description);
+    setTemplateOpen(false);
+    setCreateOpen(true);
+  };
+
+  // Rejoindre par code
+  const handleJoinByCode = async () => {
+    const code = joinCode.trim().toUpperCase();
+    if (!code) { Alert.alert('Erreur', 'Entre un code d\'invitation.'); return; }
+    setJoining(true);
+    try {
+      const res = await apiClient.post<any>(`/api/v1/communities/join/${code}`);
+      setJoinOpen(false);
+      setJoinCode('');
+      load();
+      if (res.data?.joined) {
+        nav.navigate('CommunityDetail', { communityId: res.data.community_id, autoEnter: true });
+      } else if (res.data?.pending) {
+        Alert.alert('Demande envoyée', 'Ta demande est en cours d\'examen par l\'admin.');
+      }
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail ?? 'Code invalide ou expiré.';
+      Alert.alert('Erreur', detail);
+    } finally { setJoining(false); }
   };
 
   const load = useCallback(async (silent = false) => {
@@ -530,7 +578,7 @@ export const CommunitiesScreen: React.FC = () => {
         createAvatarUri ? uploadImage(createAvatarUri) : null,
         createBannerUri ? uploadImage(createBannerUri) : null,
       ]);
-      const payload: CreateCommunityPayload = {
+      const payload: CreateCommunityPayload & { template?: string } = {
         name:              createName.trim(),
         description:       createDesc.trim() || undefined,
         is_private:        createPrivate,
@@ -538,6 +586,7 @@ export const CommunitiesScreen: React.FC = () => {
         entry_price_coins: parseInt(createPriceCoins, 10) || 0,
         avatar_url:        avatarUrl ?? undefined,
         banner_url:        bannerUrl ?? undefined,
+        template:          selectedTemplate?.id,
       };
       const created = await communityService.create(payload);
       setCreateOpen(false);
@@ -916,17 +965,28 @@ export const CommunitiesScreen: React.FC = () => {
         paddingTop: insets.top + 10,
         borderBottomColor: colors.divider,
       }]}>
-        {/* Titre + bouton + */}
+        {/* Titre + boutons */}
         <View style={S.headerRow}>
           <BackButton onPress={() => nav.goBack()} />
           <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Communautés</Text>
-          <TouchableOpacity
-            onPress={() => { resetForm(); setCreateOpen(true); }}
-            style={[S.createBtn, { backgroundColor: colors.primary }]}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <Icon name="plus" size={20} color="#fff" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {/* Rejoindre par code */}
+            <TouchableOpacity
+              onPress={() => setJoinOpen(true)}
+              style={[S.createBtn, { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.divider }]}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Icon name="hash" size={18} color={colors.textPrimary} />
+            </TouchableOpacity>
+            {/* Créer */}
+            <TouchableOpacity
+              onPress={() => setTemplateOpen(true)}
+              style={[S.createBtn, { backgroundColor: colors.primary }]}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Icon name="plus" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Barre de recherche */}
@@ -1053,6 +1113,86 @@ export const CommunitiesScreen: React.FC = () => {
             </View>
           </KeyboardAvoidingView>
         </View>
+      </Modal>
+
+      {/* ── Modal : choisir un template ── */}
+      <Modal visible={templateOpen} transparent animationType="slide" onRequestClose={() => setTemplateOpen(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} activeOpacity={1} onPress={() => setTemplateOpen(false)} />
+        <View style={[{ position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.background, maxHeight: '80%' }]}>
+          <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.divider }} />
+          </View>
+          <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800', textAlign: 'center', paddingVertical: 14 }}>
+            Quel type de communauté ?
+          </Text>
+          <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}>
+            {templates.map(t => (
+              <TouchableOpacity key={t.id} onPress={() => applyTemplate(t)} activeOpacity={0.8}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14,
+                  backgroundColor: colors.surface, borderRadius: 16, padding: 14,
+                  borderWidth: 1.5, borderColor: colors.divider }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24,
+                  backgroundColor: t.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 22 }}>{t.icon}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 15 }}>{t.name}</Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                    {t.description}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ── Modal : rejoindre par code ── */}
+      <Modal visible={joinOpen} transparent animationType="slide" onRequestClose={() => setJoinOpen(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} activeOpacity={1} onPress={() => setJoinOpen(false)} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.background, padding: 24, gap: 16 }}>
+            <View style={{ alignItems: 'center', marginBottom: 4 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.divider }} />
+            </View>
+            <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800', textAlign: 'center' }}>
+              Rejoindre par code
+            </Text>
+            <Text style={{ color: colors.textTertiary, fontSize: 13, textAlign: 'center' }}>
+              Entre le code d'invitation que tu as reçu (ex: FOLIX-A3K9F)
+            </Text>
+            <TextInput
+              style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 14, borderWidth: 1,
+                borderColor: joinCode ? colors.primary : colors.divider,
+                paddingHorizontal: 16, paddingVertical: 14,
+                fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: 3,
+                color: colors.textPrimary }}
+              value={joinCode}
+              onChangeText={v => setJoinCode(v.toUpperCase())}
+              placeholder="FOLIX-XXXXX"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="characters"
+              autoFocus
+              maxLength={11}
+            />
+            <TouchableOpacity onPress={handleJoinByCode} disabled={joining}
+              activeOpacity={0.85} style={{ borderRadius: 14, overflow: 'hidden' }}>
+              <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, paddingVertical: 14 }}>
+                {joining ? <ActivityIndicator color="#fff" size="small" /> : (
+                  <><Icon name="log-in" size={18} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Rejoindre</Text></>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setJoinOpen(false); setJoinCode(''); }} style={{ alignItems: 'center', paddingVertical: 8 }}>
+              <Text style={{ color: colors.textTertiary, fontSize: 14 }}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
