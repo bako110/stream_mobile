@@ -1222,6 +1222,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
           activeOpacity={0.7}
           onPress={() => {
+            if (!myId) return;
             setSettingsOpen(false);
             setTimeout(() => (nav as any).navigate('CommunityTreasurer', {
               communityId, communityName: community?.name ?? '', myRole, myId,

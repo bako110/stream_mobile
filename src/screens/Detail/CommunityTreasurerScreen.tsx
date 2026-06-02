@@ -81,7 +81,8 @@ export const CommunityTreasurerScreen: React.FC = () => {
   const [formAmount,   setFormAmount]   = useState('');
   const [formDesc,     setFormDesc]     = useState('');
   const [formSaving,   setFormSaving]   = useState(false);
-  const [actionLoading,setActionLoading]= useState<string | null>(null);
+  const [actionLoading,   setActionLoading]   = useState<string | null>(null);
+  const [communityBalance,setCommunityBalance] = useState<number | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
@@ -98,6 +99,10 @@ export const CommunityTreasurerScreen: React.FC = () => {
       setRequests(rRes.data ?? []);
       const elec = eRes.data?.election ?? null;
       setElection(elec);
+      // Solde communautaire
+      apiClient.get<{ coins_balance: number }>(`${BASE}/wallet`)
+        .then(r => { if (mountedRef.current) setCommunityBalance(r.data?.coins_balance ?? null); })
+        .catch(() => {});
       // Charger les membres si vote en cours et pas encore de résultats
       if (elec && elec.results.length === 0) {
         apiClient.get<any[]>(`${BASE}/members`)
@@ -717,6 +722,21 @@ export const CommunityTreasurerScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+
+              {/* Solde communautaire disponible */}
+              {communityBalance !== null && (
+                <View style={[st.infoBox, { backgroundColor: '#10B98110', borderColor: '#10B98130' }]}>
+                  <Icon name="briefcase" size={14} color="#10B981" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '800' }}>
+                      Solde communautaire : {communityBalance.toLocaleString('fr-FR')} coins
+                    </Text>
+                    <Text style={{ color: '#10B981', fontSize: 11, opacity: 0.8 }}>
+                      ≈ {(communityBalance / 100).toFixed(2)} € disponibles
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               {/* Info double approbation */}
               {treasurer && (
