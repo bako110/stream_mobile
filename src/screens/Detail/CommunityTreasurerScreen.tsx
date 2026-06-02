@@ -384,7 +384,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                         backgroundColor: '#7B3FF2', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
                       {launching ? <ActivityIndicator size="small" color="#fff" /> : (
-                        <><Icon name="vote" size={12} color="#fff" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Lancer un vote</Text></>
+                        <><Icon name="users" size={12} color="#fff" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Lancer un vote</Text></>
                       )}
                     </TouchableOpacity>
                   )}
