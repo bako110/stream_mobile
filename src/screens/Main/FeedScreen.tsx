@@ -631,7 +631,10 @@ export const FeedScreen: React.FC = () => {
   const [feedFocused,       setFeedFocused]        = useState(true);
   const [feedScrollEnabled, setFeedScrollEnabled]  = useState(true);
 
-  const feedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 65 }).current;
+  const feedViewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,   // 50% de l'item visible suffit
+    minimumViewTime: 200,              // évite les faux positifs au scroll rapide
+  }).current;
   const [activeReelRowId, setActiveReelRowId] = useState<string | null>(null);
 
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
