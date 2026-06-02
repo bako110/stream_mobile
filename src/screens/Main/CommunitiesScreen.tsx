@@ -665,7 +665,7 @@ export const CommunitiesScreen: React.FC = () => {
             </Text>
             {tab === 'mine' && (
               <TouchableOpacity
-                onPress={() => { resetForm(); setCreateOpen(true); }}
+                onPress={() => { resetForm(); setTemplateOpen(true); }}
                 style={{ borderRadius: 14, overflow: 'hidden', marginTop: 4 }}
               >
                 <LinearGradient
