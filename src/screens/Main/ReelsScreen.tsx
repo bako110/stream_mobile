@@ -445,7 +445,7 @@ export const ReelsScreen: React.FC = () => {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <FolixLoader color="#fff" />
+        <FolixLoader color="#ffffff" />
       </View>
     );
   }

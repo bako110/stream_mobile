@@ -13,13 +13,21 @@ import LinearGradient from 'react-native-linear-gradient';
 
 const W = Dimensions.get('window').width;
 
-// Convertit un hex #RRGGBB en rgba(r,g,b,a) — évite les bugs Android avec 'transparent' et hex 8 chiffres
+// Convertit un hex en rgba — robuste : gère #RGB, #RRGGBB, valeurs invalides
 function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.substring(0, 2), 16);
-  const g = parseInt(h.substring(2, 4), 16);
-  const b = parseInt(h.substring(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
+  try {
+    let h = (hex ?? '#7B3FF2').replace('#', '');
+    if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    if (h.length > 6)   h = h.substring(0, 6);
+    if (h.length !== 6) return `rgba(123,63,242,${alpha})`;
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return `rgba(123,63,242,${alpha})`;
+    return `rgba(${r},${g},${b},${alpha})`;
+  } catch {
+    return `rgba(123,63,242,${alpha})`;
+  }
 }
 
 interface Props {
