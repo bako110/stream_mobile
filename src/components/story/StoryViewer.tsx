@@ -14,6 +14,7 @@ import type { StoryGroup, StoryViewerUser } from '../../types/story';
 import { storyService } from '../../services/storyService';
 import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
+import { FolixLoader } from '../common';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -93,9 +94,7 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
     <View style={s.media}>
       <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />
       {(!ready || buffering) && (
-        <View style={s.bufferOverlay}>
-          <ActivityIndicator size="large" color="#fff" />
-        </View>
+        <FolixLoader variant="reel" color="#ffffff" />
       )}
     </View>
   );
@@ -873,7 +872,7 @@ export const StoryViewer: React.FC<Props> = ({
                   {/* Contenu onglet Vues */}
                   {viewersTab === 'views' && (
                     viewersLoading ? (
-                      <ActivityIndicator color={accent} style={{ marginTop: 32 }} />
+                      <FolixLoader color={accent} height={2} />
                     ) : viewers.length === 0 ? (
                       <View style={s.emptyBox}>
                         <Icon name="eye-off" size={38} color="rgba(255,255,255,0.2)" />
@@ -935,7 +934,7 @@ export const StoryViewer: React.FC<Props> = ({
                   {/* Contenu onglet Réponses */}
                   {viewersTab === 'replies' && (
                     repliesLoading ? (
-                      <ActivityIndicator color={accent} style={{ marginTop: 32 }} />
+                      <FolixLoader color={accent} height={2} />
                     ) : replies.length === 0 ? (
                       <View style={s.emptyBox}>
                         <Icon name="message-circle" size={38} color="rgba(255,255,255,0.2)" />
