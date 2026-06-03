@@ -11,12 +11,17 @@ function getDeviceName(): string {
   if (Platform.OS === 'ios') {
     const ver = typeof Platform.Version === 'string' ? Platform.Version : String(Platform.Version);
     _cachedDeviceName = `iPhone (iOS ${ver})`;
+    console.log('[DeviceName] iOS ->', _cachedDeviceName);
     return _cachedDeviceName;
   }
 
   if (Platform.OS === 'android') {
-    // Lire lazily apres init du bridge — plusieurs sources par ordre de fiabilite
     const pc = (NativeModules.PlatformConstants ?? {}) as Record<string, any>;
+    console.log('[DeviceName] NativeModules.PlatformConstants keys:', Object.keys(pc));
+    console.log('[DeviceName] Model:', pc.Model, '| model:', pc.model);
+    console.log('[DeviceName] Brand:', pc.Brand, '| brand:', pc.brand);
+    console.log('[DeviceName] Platform.Version:', Platform.Version);
+
     const model: string = pc.Model ?? pc.model ?? '';
     const brand: string = pc.Brand ?? pc.brand ?? '';
     if (model) {
@@ -26,10 +31,11 @@ function getDeviceName(): string {
       _cachedDeviceName = (brandLow && !modelLow.startsWith(brandLow))
         ? `${brandCap} ${model}`
         : model;
+      console.log('[DeviceName] result ->', _cachedDeviceName);
       return _cachedDeviceName;
     }
-    // Fallback si PlatformConstants pas encore dispo
     _cachedDeviceName = `Android ${Platform.Version}`;
+    console.log('[DeviceName] fallback (no Model) ->', _cachedDeviceName);
     return _cachedDeviceName;
   }
 
