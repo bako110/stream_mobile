@@ -1,29 +1,16 @@
-import { Platform, NativeModules } from 'react-native';
+import { Platform } from 'react-native';
 import { API_BASE_URL } from '../utils/constants';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import DeviceInfo from 'react-native-device-info';
 
-// Cache — calculé une seule fois apres le premier appel API (bridge deja pret)
+// Cache — lu une fois depuis react-native-device-info (sync API)
 let _cachedDeviceName: string | null = null;
 
 function getDeviceName(): string {
   if (_cachedDeviceName) return _cachedDeviceName;
-
-  if (Platform.OS === 'ios') {
-    const ver = typeof Platform.Version === 'string' ? Platform.Version : String(Platform.Version);
-    _cachedDeviceName = `iPhone (iOS ${ver})`;
-    console.log('[DeviceName] iOS ->', _cachedDeviceName);
-    return _cachedDeviceName;
-  }
-
-  if (Platform.OS === 'android') {
-    const pc = (NativeModules.PlatformConstants ?? {}) as Record<string, any>;
-    console.log('[DeviceName] NativeModules.PlatformConstants keys:', Object.keys(pc));
-    console.log('[DeviceName] Model:', pc.Model, '| model:', pc.model);
-    console.log('[DeviceName] Brand:', pc.Brand, '| brand:', pc.brand);
-    console.log('[DeviceName] Platform.Version:', Platform.Version);
-
-    const model: string = pc.Model ?? pc.model ?? '';
-    const brand: string = pc.Brand ?? pc.brand ?? '';
+  try {
+    const model = DeviceInfo.getModel();       // ex: "Samsung Galaxy S22"
+    const brand = DeviceInfo.getBrand();       // ex: "samsung"
     if (model) {
       const brandCap = brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : '';
       const modelLow = model.toLowerCase();
@@ -31,15 +18,12 @@ function getDeviceName(): string {
       _cachedDeviceName = (brandLow && !modelLow.startsWith(brandLow))
         ? `${brandCap} ${model}`
         : model;
-      console.log('[DeviceName] result ->', _cachedDeviceName);
-      return _cachedDeviceName;
+    } else {
+      _cachedDeviceName = Platform.OS === 'ios' ? 'iPhone' : `Android ${Platform.Version}`;
     }
-    _cachedDeviceName = `Android ${Platform.Version}`;
-    console.log('[DeviceName] fallback (no Model) ->', _cachedDeviceName);
-    return _cachedDeviceName;
+  } catch {
+    _cachedDeviceName = Platform.OS === 'ios' ? 'iPhone' : `Android ${Platform.Version}`;
   }
-
-  _cachedDeviceName = 'Web';
   return _cachedDeviceName;
 }
 
