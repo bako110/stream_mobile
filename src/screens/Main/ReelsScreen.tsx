@@ -607,9 +607,9 @@ export const ReelsScreen: React.FC = () => {
           setTimeout(() => listRef.current?.scrollToIndex({ index, animated: false }), 300);
         }}
         renderItem={renderVideoSlide}
-        removeClippedSubviews
-        maxToRenderPerBatch={3}
-        windowSize={5}
+        removeClippedSubviews={false}
+        maxToRenderPerBatch={2}
+        windowSize={3}
         initialNumToRender={2}
       />
 
