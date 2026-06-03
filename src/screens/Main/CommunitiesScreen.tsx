@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { BackButton } from '../../components/common';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +20,17 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
+// Icones Feather/MCIcon par template id
+const TEMPLATE_ICONS: Record<string, { lib: 'feather' | 'mc'; name: string }> = {
+  tontine:     { lib: 'mc',      name: 'piggy-bank-outline' },
+  association: { lib: 'feather', name: 'users' },
+  religion:    { lib: 'mc',      name: 'hands-pray' },
+  sport:       { lib: 'mc',      name: 'soccer' },
+  school:      { lib: 'feather', name: 'book-open' },
+  family:      { lib: 'mc',      name: 'home-heart' },
+  business:    { lib: 'feather', name: 'briefcase' },
+  free:        { lib: 'feather', name: 'star' },
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -833,7 +845,7 @@ export const CommunitiesScreen: React.FC = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
           >
-            {/* Option "Aucun type" */}
+            {/* Option "Libre" */}
             <TouchableOpacity
               onPress={() => setSelectedTemplate(null)}
               activeOpacity={0.8}
@@ -842,7 +854,7 @@ export const CommunitiesScreen: React.FC = () => {
                 borderColor: !selectedTemplate ? colors.primary : colors.border,
               }]}
             >
-              <Text style={{ fontSize: 18 }}>✨</Text>
+              <Icon name="star" size={15} color={!selectedTemplate ? colors.primary : colors.textTertiary} />
               <Text style={[S.typeChipLabel, { color: !selectedTemplate ? colors.primary : colors.textSecondary }]}>
                 Libre
               </Text>
@@ -850,6 +862,8 @@ export const CommunitiesScreen: React.FC = () => {
 
             {templates.map(t => {
               const active = selectedTemplate?.id === t.id;
+              const chipColor = t.color ?? colors.primary;
+              const iconInfo = TEMPLATE_ICONS[t.id as keyof typeof TEMPLATE_ICONS] ?? { lib: 'feather', name: 'users' };
               return (
                 <TouchableOpacity
                   key={t.id}
@@ -863,14 +877,15 @@ export const CommunitiesScreen: React.FC = () => {
                   }}
                   activeOpacity={0.8}
                   style={[S.typeChip, {
-                    backgroundColor: active ? (t.color ?? colors.primary) + '18' : colors.surface,
-                    borderColor: active ? (t.color ?? colors.primary) : colors.border,
+                    backgroundColor: active ? chipColor + '18' : colors.surface,
+                    borderColor: active ? chipColor : colors.border,
                   }]}
                 >
-                  <Text style={{ fontSize: 18 }}>{t.icon ?? '🏠'}</Text>
-                  <Text style={[S.typeChipLabel, {
-                    color: active ? (t.color ?? colors.primary) : colors.textSecondary,
-                  }]}>
+                  {iconInfo.lib === 'mc'
+                    ? <MCIcon name={iconInfo.name} size={16} color={active ? chipColor : colors.textTertiary} />
+                    : <Icon name={iconInfo.name} size={15} color={active ? chipColor : colors.textTertiary} />
+                  }
+                  <Text style={[S.typeChipLabel, { color: active ? chipColor : colors.textSecondary }]}>
                     {t.name}
                   </Text>
                 </TouchableOpacity>
