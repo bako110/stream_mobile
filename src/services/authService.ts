@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { apiClient, Endpoints } from '../api';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
@@ -8,6 +9,22 @@ import type {
 } from '../types';
 import { removeFCMToken } from './fcmService';
 
+function getDeviceHeaders() {
+  const os = Platform.OS; // 'ios' | 'android' | 'web'
+  const version = typeof Platform.Version === 'string'
+    ? Platform.Version
+    : String(Platform.Version);
+  const name = os === 'ios'
+    ? `iPhone (iOS ${version})`
+    : os === 'android'
+      ? `Android ${version}`
+      : 'Web';
+  return {
+    'X-Device-Name': name,
+    'X-Platform': os,
+  };
+}
+
 // ── Cache utilisateur (évite les appels répétés à /auth/me) ────────────────
 let _cachedUser: User | null = null;
 let _cachedAt: number = 0;
@@ -17,7 +34,9 @@ export const invalidateUserCache = () => { _cachedUser = null; _cachedAt = 0; };
 
 export const authService = {
   async login(payload: LoginRequest): Promise<{ user: User } & AuthToken> {
-    const res = await apiClient.post<{ access_token: string; refresh_token: string; token_type: string; user: User }>(Endpoints.auth.login, payload);
+    const res = await apiClient.post<{ access_token: string; refresh_token: string; token_type: string; user: User }>(
+      Endpoints.auth.login, payload, { headers: getDeviceHeaders() },
+    );
     const { access_token, refresh_token, token_type, user } = res.data;
     authService._saveTokens({ access_token, refresh_token, token_type });
     _cachedUser = user;
@@ -28,10 +47,11 @@ export const authService = {
   async register(payload: RegisterRequest): Promise<{ user: User } & AuthToken> {
     await apiClient.post<User>(Endpoints.auth.register, payload);
     // Auto-login après inscription — identifier = email ou phone
-    const loginRes = await apiClient.post<{ access_token: string; refresh_token: string; token_type: string; user: User }>(Endpoints.auth.login, {
-      identifier: payload.email ?? payload.phone,
-      password: payload.password,
-    });
+    const loginRes = await apiClient.post<{ access_token: string; refresh_token: string; token_type: string; user: User }>(
+      Endpoints.auth.login,
+      { identifier: payload.email ?? payload.phone, password: payload.password },
+      { headers: getDeviceHeaders() },
+    );
     const { access_token, refresh_token, token_type } = loginRes.data;
     authService._saveTokens({ access_token, refresh_token, token_type });
     // Force un /auth/me pour avoir toutes les données (folix_id, referral_code, etc.)
@@ -103,14 +123,22 @@ export const authService = {
   },
 
   async oauthGoogle(accessToken: string): Promise<AuthToken> {
-    const res = await apiClient.post<AuthToken>(Endpoints.auth.oauthGoogle, { provider: 'google', access_token: accessToken });
+    const res = await apiClient.post<AuthToken>(
+      Endpoints.auth.oauthGoogle,
+      { provider: 'google', access_token: accessToken },
+      { headers: getDeviceHeaders() },
+    );
     authService._saveTokens(res.data);
     invalidateUserCache();
     return res.data;
   },
 
   async oauthFacebook(accessToken: string): Promise<AuthToken> {
-    const res = await apiClient.post<AuthToken>(Endpoints.auth.oauthFacebook, { provider: 'facebook', access_token: accessToken });
+    const res = await apiClient.post<AuthToken>(
+      Endpoints.auth.oauthFacebook,
+      { provider: 'facebook', access_token: accessToken },
+      { headers: getDeviceHeaders() },
+    );
     authService._saveTokens(res.data);
     invalidateUserCache();
     return res.data;
