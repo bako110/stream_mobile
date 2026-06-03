@@ -817,9 +817,18 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   useEffect(() => {
     mountedRef.current = true;
     const appSub = AppState.addEventListener('change', state => {
-      if ((state === 'background' || state === 'inactive') && isActive) {
+      if (state === 'background' || state === 'inactive') {
         clearAllTimers();
         try { player.pause(); } catch {}
+      } else if (state === 'active') {
+        // Retour au premier plan — reprendre si ce reel est actif et pas en pause manuelle
+        if (isActiveRef.current && !pausedRef.current && mountedRef.current) {
+          setTimeout(() => {
+            if (isActiveRef.current && !pausedRef.current && mountedRef.current) {
+              try { player.play(); } catch {}
+            }
+          }, 200);
+        }
       }
     });
     return () => {
@@ -923,26 +932,29 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       playTimerRef.current = setTimeout(() => {
         if (!mountedRef.current || pausedRef.current) return;
         if (wasEndedOnActivate.current) {
+          // Reel termine → repart depuis le debut
           endedRef.current = false;
           wasEndedOnActivate.current = false;
           if (mountedRef.current) setEnded(false);
           try { player.seekTo(0); } catch {}
           setTimeout(() => { if (!mountedRef.current || pausedRef.current) return; try { player.play(); } catch {}; }, 80);
         } else {
+          // Reel deja charge (scroll retour) → reprend directement sans rechargement
           try { player.play(); } catch {}
         }
-      }, 50);
+      }, 80); // delai un peu plus long pour laisser le player se stabiliser
     } else {
       try { player.pause(); } catch {}
     }
     return () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); };
   }, [isActive, player]); // eslint-disable-line
 
-  // Reset états quand inactif
+  // Reset états quand inactif — on garde videoLoaded=true pour eviter le rechargement
+  // au retour (scroll arriere). La video reste en memoire, juste pausee.
   useEffect(() => {
     if (!isActive) {
       pausedRef.current = false; endedRef.current = false; retryCountRef.current = 0;
-      if (mountedRef.current) { setPaused(false); setVideoError(false); setEnded(false); setVideoLoaded(false); setVideoPlaying(false); }
+      if (mountedRef.current) { setPaused(false); setVideoError(false); setEnded(false); setVideoPlaying(false); }
       clearAllTimers(); clearStall();
     }
   }, [isActive, clearAllTimers, clearStall]);
