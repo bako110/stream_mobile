@@ -4,7 +4,8 @@ import {
   TouchableOpacity, KeyboardAvoidingView, Platform, Image,
   Animated, Pressable, Dimensions, Alert,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { storage } from '../../utils/storage';
@@ -132,7 +133,7 @@ const LikeButton: React.FC<{
   return (
     <TouchableOpacity onPress={handlePress} activeOpacity={0.7} style={st.likeBtn}>
       <Animated.View style={{ transform: [{ scale }] }}>
-        <Icon
+        <MCIcon
           name={liked ? 'heart' : 'heart-outline'}
           size={24}
           color={liked ? '#E0389A' : color}
@@ -239,7 +240,7 @@ const CommentRow: React.FC<RowProps> = ({
 
             {isOwn && (
               <TouchableOpacity onPress={showMenu} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Icon name="ellipsis-horizontal" size={20} color={colors.textTertiary} />
+                <Icon name="more-horizontal" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
             )}
           </View>
@@ -275,7 +276,7 @@ const CommentRow: React.FC<RowProps> = ({
                 onPress={() => onReply(item)}
                 activeOpacity={0.7}
               >
-                <Icon name="chatbubble-outline" size={20} color={colors.textTertiary} />
+                <MCIcon name="comment-outline" size={22} color={colors.textTertiary} />
                 <Text style={[st.replyBtnText, { color: colors.textTertiary }]}>
                   Repondre
                 </Text>
@@ -297,7 +298,7 @@ const CommentRow: React.FC<RowProps> = ({
                 <>
                   <Icon
                     name={item.showReplies ? 'chevron-up' : 'chevron-down'}
-                    size={18}
+                    size={20}
                     color={colors.primary}
                   />
                   <Text style={[st.toggleText, { color: colors.primary }]}>
@@ -640,7 +641,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                 : 'Commentaires'}
             </Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Icon name="close" size={26} color={colors.textSecondary} />
+              <Icon name="x" size={26} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -651,7 +652,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
             </View>
           ) : comments.length === 0 ? (
             <View style={st.center}>
-              <Icon name="chatbubbles-outline" size={56} color={colors.textTertiary} />
+              <MCIcon name="comment-text-outline" size={56} color={colors.textTertiary} />
               <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Pas encore de commentaires</Text>
               <Text style={[st.emptySubtitle, { color: colors.textTertiary }]}>
                 Soyez le premier a reagir
@@ -707,9 +708,9 @@ export const CommentsBottomSheet: React.FC<Props> = ({
               borderTopColor: colors.primary + '25',
             }]}>
               <View style={[st.contextAccent, { backgroundColor: colors.primary }]} />
-              <Icon
-                name={isEditMode ? 'pencil-outline' : 'return-down-forward-outline'}
-                size={18}
+              <MCIcon
+                name={isEditMode ? 'pencil-outline' : 'reply-outline'}
+                size={20}
                 color={colors.primary}
               />
               <Text style={[st.contextText, { color: colors.primary }]} numberOfLines={1}>
@@ -718,7 +719,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                   : `Reponse a ${getDisplayName(replyTo!.author)}`}
               </Text>
               <TouchableOpacity onPress={cancelAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Icon name="close-circle" size={20} color={colors.primary} />
+                <Icon name="x-circle" size={20} color={colors.primary} />
               </TouchableOpacity>
             </View>
           )}
@@ -753,8 +754,8 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                   {(sending || editSaving)
                     ? <FolixLoader variant="bar" color="#fff" />
                     : isEditMode
-                      ? <Icon name="checkmark" size={20} color="#fff" />
-                      : <Icon name="send" size={20} color="#fff" />
+                      ? <Icon name="check" size={20} color="#fff" />
+                      : <MCIcon name="send" size={20} color="#fff" />
                   }
                 </TouchableOpacity>
               )}
