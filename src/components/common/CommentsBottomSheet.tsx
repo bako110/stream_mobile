@@ -275,10 +275,28 @@ const CommentRow: React.FC<RowProps> = ({
                 </Text>
               </TouchableOpacity>
             )}
+
+            {/* Compteur de reponses visible dans la barre d'actions */}
+            {!isReply && replyCount > 0 && (
+              <TouchableOpacity
+                style={st.replyCountBtn}
+                onPress={() => onToggleReplies(item.id)}
+                activeOpacity={0.7}
+              >
+                <MCIcon
+                  name="comment-multiple-outline"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text style={[st.replyCountText, { color: colors.primary }]}>
+                  {replyCount} reponse{replyCount > 1 ? 's' : ''}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Toggle replies */}
-          {!isReply && replyCount > 0 && (
+          {/* Toggle replies — masquer/afficher */}
+          {!isReply && replyCount > 0 && item.showReplies && (
             <TouchableOpacity
               style={st.toggleReplies}
               onPress={() => onToggleReplies(item.id)}
@@ -289,15 +307,9 @@ const CommentRow: React.FC<RowProps> = ({
                 <FolixLoader variant="bar" color={colors.primary} />
               ) : (
                 <>
-                  <Icon
-                    name={item.showReplies ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={colors.primary}
-                  />
-                  <Text style={[st.toggleText, { color: colors.primary }]}>
-                    {item.showReplies
-                      ? 'Masquer'
-                      : `${replyCount} reponse${replyCount > 1 ? 's' : ''}`}
+                  <Icon name="chevron-up" size={20} color={colors.textTertiary} />
+                  <Text style={[st.toggleText, { color: colors.textTertiary }]}>
+                    Masquer les reponses
                   </Text>
                 </>
               )}
@@ -863,8 +875,10 @@ const st = StyleSheet.create({
   likeCount:  { fontSize: 14, fontWeight: '700' },
   replyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
   replyBtnText: { fontSize: 13, fontWeight: '600' },
+  replyCountBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  replyCountText: { fontSize: 13, fontWeight: '700' },
 
-  toggleReplies: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10 },
+  toggleReplies: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 6 },
   toggleLine:    { width: 28, height: 1.5 },
   toggleText:    { fontSize: 13, fontWeight: '700' },
 
