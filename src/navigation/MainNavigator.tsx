@@ -117,6 +117,7 @@ import { SettingsDangerScreen }        from '../screens/Settings/SettingsDangerS
 import { CGUScreen }                          from '../screens/Main/CGUScreen';
 import { PolitiqueConfidentialiteScreen }     from '../screens/Main/PolitiqueConfidentialiteScreen';
 import { SettingsVerificationScreen }         from '../screens/Settings/SettingsVerificationScreen';
+import { SettingsSecurityScreen }            from '../screens/Settings/SettingsSecurityScreen';
 import { SupportScreen }                      from '../screens/Main/SupportScreen';
 import { SupportChatScreen }                  from '../screens/Main/SupportChatScreen';
 
@@ -232,6 +233,7 @@ export type MainStackParamList = {
   Support:                   undefined;
   SupportChat:               undefined;
   SettingsVerification:      { user?: any } | undefined;
+  SettingsSecurity:          undefined;
 };
 
 type MainNav = NativeStackNavigationProp<MainStackParamList>;
@@ -530,6 +532,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
           {() => <SettingsDangerScreen onLogout={onLogout} />}
         </Stack.Screen>
         <Stack.Screen name="SettingsVerification"  component={SettingsVerificationScreen}  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsSecurity"       component={SettingsSecurityScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CGU" options={{ animation: 'slide_from_right' }}>
           {({ navigation }) => <CGUScreen onBack={() => navigation.goBack()} />}
         </Stack.Screen>
