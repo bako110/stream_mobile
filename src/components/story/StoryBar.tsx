@@ -96,7 +96,12 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
   const otherGroups = useMemo(() => groups.filter(g => g.user.id !== currentUser?.id), [groups, currentUser?.id]);
   const allGroups   = useMemo(() => myGroup ? [myGroup, ...otherGroups] : groups, [myGroup, otherGroups, groups]);
 
-  const openViewer = useCallback((index: number) => { setViewerGroup(index); setViewerOpen(true); }, []);
+  const openViewer = useCallback((index: number) => {
+    const group = (myGroup ? [myGroup, ...otherGroups] : groups)[index];
+    if (!group || group.stories.length === 0) return; // groupe vide — rien a afficher
+    setViewerGroup(index);
+    setViewerOpen(true);
+  }, [myGroup, otherGroups, groups]);
 
   const displayName = currentUser?.display_name ?? currentUser?.username ?? 'Vous';
   const initials    = displayName[0]?.toUpperCase() ?? '?';

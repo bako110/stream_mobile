@@ -807,7 +807,23 @@ export const StoryViewer: React.FC<Props> = ({
 
   const closeViewers = () => { setViewersOpen(false); setViewersTab('views'); setPaused(false); };
 
-  if (!group || !story || !group.user) return null;
+  // Si storyIdx hors limites (stories supprimees/expirees), aller a la premiere disponible
+  if (!group || !group.user) return null;
+  if (!story) {
+    if (group.stories.length > 0) {
+      // Corriger l'index silencieusement
+      setStoryIdx(0);
+      return null;
+    }
+    // Groupe vide → passer au suivant ou fermer
+    if (groupIdx < groups.length - 1) {
+      setGroupIdx(g => g + 1);
+      setStoryIdx(0);
+    } else {
+      onClose();
+    }
+    return null;
+  }
 
   const author = group.user;
   const timeAgo = (() => {
