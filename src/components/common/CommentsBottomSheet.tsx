@@ -245,13 +245,6 @@ const CommentRow: React.FC<RowProps> = ({
             )}
           </View>
 
-          {/* Mention reply */}
-          {isReply && item.parent_id && (
-            <Text style={[st.replyMention, { color: colors.primary }]} numberOfLines={1}>
-              @{item.author?.username ?? name}
-            </Text>
-          )}
-
           {/* Corps */}
           <Text style={[st.commentText, { color: colors.textPrimary }]}>
             {item.body}
@@ -401,14 +394,33 @@ export const CommentsBottomSheet: React.FC<Props> = ({
   // WebSocket
   const handleWsEvent = useCallback((event: CommentWsEvent) => {
     switch (event.type) {
-      case 'comment_added':
-        setComments(prev => {
-          if (prev.some(c => c.id === event.comment.id)) return prev;
-          onCommentCountChange?.(+1);
-          setTotalCount(t => t + 1);
-          return [{ ...event.comment, userReaction: null, replies: [], repliesLoaded: false, showReplies: false }, ...prev];
-        });
+      case 'comment_added': {
+        const isReply = !!(event.comment as any).parent_id;
+        if (isReply) {
+          // C'est une reply → l'injecter dans les replies du parent seulement si pas deja presente
+          const parentId = (event.comment as any).parent_id as string;
+          setComments(prev => prev.map(c => {
+            if (c.id !== parentId) return c;
+            if ((c.replies ?? []).some(r => r.id === event.comment.id)) return c;
+            return {
+              ...c,
+              reply_count: (c.reply_count ?? 0) + 1,
+              replies: [...(c.replies ?? []), { ...event.comment, userReaction: null }],
+              repliesLoaded: true,
+              showReplies: true,
+            };
+          }));
+        } else {
+          // Commentaire racine
+          setComments(prev => {
+            if (prev.some(c => c.id === event.comment.id)) return prev;
+            onCommentCountChange?.(+1);
+            setTotalCount(t => t + 1);
+            return [{ ...event.comment, userReaction: null, replies: [], repliesLoaded: false, showReplies: false }, ...prev];
+          });
+        }
         break;
+      }
       case 'comment_updated':
         setComments(prev => prev.map(c => {
           if (c.id === event.comment_id) return { ...c, body: event.body, is_edited: event.is_edited };
@@ -811,7 +823,6 @@ const st = StyleSheet.create({
   timeText:       { fontSize: 11, flexShrink: 0 },
   commentText:    { fontSize: 14, lineHeight: 20 },
   editedTag:      { fontSize: 11, fontStyle: 'italic', marginTop: 2 },
-  replyMention:   { fontSize: 12, fontWeight: '600', marginBottom: 3 },
   ownerBadge:     { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5 },
   ownerBadgeText: { fontSize: 10, fontWeight: '700' },
 
