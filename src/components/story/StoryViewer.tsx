@@ -403,7 +403,7 @@ export const StoryViewer: React.FC<Props> = ({
   const [storyAd,     setStoryAd]     = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string } | null>(null);
   const [showStoryAd, setShowStoryAd] = useState(false);
   const storyAdTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const storyAdShownRef               = useRef(false); // une pub max par session
+  const nextGroupIdxRef               = useRef<number>(0); // groupe cible apres la pub
   const [menuOpen,    setMenuOpen]    = useState(false);
   const [editMode,    setEditMode]    = useState(false);
   const [editCaption, setEditCaption] = useState('');
@@ -476,16 +476,19 @@ export const StoryViewer: React.FC<Props> = ({
     });
   }, [storyIdx, groupIdx]);
 
-  // ── Charger pub stories au montage ────────────────────────────────────────
+  // ── Charger pub stories — au montage ET apres chaque affichage (storyAd=null) ──
   useEffect(() => {
-    if (groups.length > 1) { // pub utile seulement si plusieurs groupes
-      try {
-        (require('../../api/client').apiClient as any)
-          .get('/api/v1/ads/feed/next?placement=stories')
-          .then((r: any) => { if (r?.data?.id) setStoryAd(r.data); })
-          .catch(() => {});
-      } catch {}
-    }
+    if (storyAd !== null) return; // deja chargee ou en cours
+    if (groups.length <= 1) return; // inutile avec un seul groupe
+    try {
+      (require('../../api/client').apiClient as any)
+        .get('/api/v1/ads/feed/next?placement=stories')
+        .then((r: any) => { if (r?.data?.id) setStoryAd(r.data); })
+        .catch(() => {});
+    } catch {}
+  }, [storyAd, groups.length]); // se relance quand storyAd repasse a null
+
+  useEffect(() => {
     return () => { if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current); };
   }, []);
 
@@ -632,22 +635,23 @@ export const StoryViewer: React.FC<Props> = ({
     if (storyIdx < total - 1) {
       setStoryIdx(i => i + 1);
     } else if (groupIdx < groups.length - 1) {
-      // Entre groupes — afficher pub une fois par session
-      if (!storyAdShownRef.current && storyAd) {
-        storyAdShownRef.current = true;
+      const nextGroup = groupIdx + 1;
+      // Afficher la pub si disponible, sinon passer directement
+      if (storyAd) {
+        nextGroupIdxRef.current = nextGroup;
         setPaused(true);
         setShowStoryAd(true);
-        // Tracker impression
         try { (require('../../api/client').apiClient as any).post(`/api/v1/ads/${storyAd.id}/impression`, {}); } catch {}
-        // Auto-passer apres 5s
         if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
         storyAdTimerRef.current = setTimeout(() => {
           setShowStoryAd(false);
           setPaused(false);
-          setGroupIdx(g => g + 1); setStoryIdx(0);
+          setStoryAd(null); // reset pour recharger a la prochaine transition
+          setGroupIdx(nextGroupIdxRef.current); setStoryIdx(0);
         }, 5000);
       } else {
-        setGroupIdx(g => g + 1); setStoryIdx(0);
+        // Pas de pub dispo — passer directement
+        setGroupIdx(nextGroup); setStoryIdx(0);
       }
     } else {
       onClose();
@@ -812,8 +816,11 @@ export const StoryViewer: React.FC<Props> = ({
   if (showStoryAd && storyAd) {
     return <StoryAdSlide ad={storyAd} onSkip={() => {
       if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
-      setShowStoryAd(false); setPaused(false);
-      setGroupIdx(g => g + 1); setStoryIdx(0);
+      setShowStoryAd(false);
+      setPaused(false);
+      setStoryAd(null); // reset → la prochaine transition rechargera une pub fraîche
+      setGroupIdx(nextGroupIdxRef.current);
+      setStoryIdx(0);
     }} />;
   }
 
