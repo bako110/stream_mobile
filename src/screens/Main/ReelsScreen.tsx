@@ -314,8 +314,19 @@ export const ReelsScreen: React.FC = () => {
         setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
       } else if (newInitialId !== lastInitialReelRef.current) {
         lastInitialReelRef.current = newInitialId;
-        // Charger le feed complet — le reel cible sera injecté en tête ou scrollé
-        load(false, newInitialId, newReel);
+        // Injecter le reel immédiatement → évite l'écran loader (reels.length > 0)
+        // Le FlatList existe dès le départ → scroll possible tout de suite
+        if (newReel?.hls_url) {
+          setReels(prev => {
+            const already = prev.findIndex(r => r.id === newInitialId);
+            if (already >= 0) return prev;
+            return [newReel, ...prev];
+          });
+          currentIdxRef.current = 0;
+          setCurrentIndex(0);
+        }
+        // Feed complet en silent — remplace la liste sans bloquer l'affichage
+        load(true, newInitialId, newReel);
       }
 
     } else if (!didFocusOnceRef.current) {
