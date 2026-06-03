@@ -1,28 +1,27 @@
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import { API_BASE_URL } from '../utils/constants';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
-// Platform.constants contient le vrai nom du device sans lib externe :
-// Android : { Model: "Samsung Galaxy S22", Brand: "samsung", ... }
-// iOS     : { interfaceIdiom: "phone", osVersion: "17.2", ... } — model via "Model"
-const _constants = (Platform.constants ?? {}) as Record<string, any>;
-const _model: string  = _constants.Model  ?? _constants.model  ?? '';
-const _brand: string  = (_constants.Brand ?? _constants.brand  ?? '').replace(/^\w/, (c: string) => c.toUpperCase());
-
 function _buildDeviceName(): string {
   if (Platform.OS === 'ios') {
-    // iOS: model = "iPhone", version dans Version
-    const ver = typeof Platform.Version === 'string' ? Platform.Version : '';
-    return _model || `iPhone (iOS ${ver})`;
+    const ver = typeof Platform.Version === 'string' ? Platform.Version : String(Platform.Version);
+    return `iPhone (iOS ${ver})`;
   }
   if (Platform.OS === 'android') {
-    // Combine brand + model si brand n'est pas deja dans model
-    if (_brand && _model) {
-      const modelLow = _model.toLowerCase();
-      const brandLow = _brand.toLowerCase();
-      return modelLow.startsWith(brandLow) ? _model : `${_brand} ${_model}`;
+    // NativeModules.PlatformConstants expose Model et Brand nativement sur Android
+    const pc = NativeModules.PlatformConstants as Record<string, any> | undefined;
+    const model: string = pc?.Model ?? pc?.model ?? '';
+    const brand: string = pc?.Brand ?? pc?.brand ?? '';
+    const brandCap = brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : '';
+    if (model) {
+      const modelLow = model.toLowerCase();
+      const brandLow = brandCap.toLowerCase();
+      // Si le model commence deja par la marque (ex: "Samsung Galaxy") ne pas doubler
+      return (brandLow && !modelLow.startsWith(brandLow))
+        ? `${brandCap} ${model}`
+        : model;
     }
-    return _model || `Android ${Platform.Version}`;
+    return `Android ${Platform.Version}`;
   }
   return 'Web';
 }
