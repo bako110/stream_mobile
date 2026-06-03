@@ -16,6 +16,7 @@ import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
 import { FolixLoader } from '../common';
 import { getLocalUri, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
+import { apiClient } from '../../api/client';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -320,9 +321,8 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
     Animated.timing(prog, { toValue: 1, duration: 5000, useNativeDriver: false }).start();
   }, [prog]);
 
-  const apiClientRef = require('../../api/client').apiClient;
   useEffect(() => {
-    try { apiClientRef.post(`/api/v1/ads/${ad.id}/impression`, {}); } catch {}
+    apiClient.post(`/api/v1/ads/${ad.id}/impression`).catch(() => {});
   }, [ad.id]);
 
   return (
@@ -382,7 +382,7 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => {
-                try { apiClientRef.post(`/api/v1/ads/${ad.id}/click`, {}); } catch {}
+                apiClient.post(`/api/v1/ads/${ad.id}/click`).catch(() => {});
                 onSkip();
               }}
               style={{ alignSelf: 'flex-start', backgroundColor: '#fff', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 8 }}
@@ -487,9 +487,8 @@ export const StoryViewer: React.FC<Props> = ({
   // ── Charger pub stories une seule fois au montage ─────────────────────────
   useEffect(() => {
     try {
-      (require('../../api/client').apiClient as any)
-        .get('/api/v1/ads/feed/next?placement=stories')
-        .then((r: any) => { if (r?.data?.id) setStoryAd(r.data); })
+      apiClient.get<{ id: string; title: string } | null>('/api/v1/ads/feed/next?placement=stories')
+        .then(r => { if (r?.data?.id) setStoryAd(r.data as any); })
         .catch(() => {});
     } catch {}
     return () => { if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current); };
@@ -644,7 +643,7 @@ export const StoryViewer: React.FC<Props> = ({
         nextGroupIdxRef.current = nextGroup;
         setPaused(true);
         setShowStoryAd(true);
-        try { (require('../../api/client').apiClient as any).post(`/api/v1/ads/${storyAd.id}/impression`, {}); } catch {}
+        apiClient.post(`/api/v1/ads/${storyAd.id}/impression`).catch(() => {});
         if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
         storyAdTimerRef.current = setTimeout(() => {
           setShowStoryAd(false);
