@@ -7,7 +7,7 @@ import type {
   User, LoginRequest, RegisterRequest,
   AuthToken, PasswordChangeRequest,
 } from '../types';
-import { removeFCMToken } from './fcmService';
+import { removeFCMToken, resetFCMSessionFlag } from './fcmService';
 
 function getDeviceHeaders() {
   const os = Platform.OS; // 'ios' | 'android' | 'web'
@@ -39,6 +39,7 @@ export const authService = {
     );
     const { access_token, refresh_token, token_type, user } = res.data;
     authService._saveTokens({ access_token, refresh_token, token_type });
+    resetFCMSessionFlag();
     _cachedUser = user;
     _cachedAt = Date.now();
     return { access_token, refresh_token, token_type, user };
@@ -129,6 +130,7 @@ export const authService = {
       { headers: getDeviceHeaders() },
     );
     authService._saveTokens(res.data);
+    resetFCMSessionFlag();
     invalidateUserCache();
     return res.data;
   },
@@ -140,6 +142,7 @@ export const authService = {
       { headers: getDeviceHeaders() },
     );
     authService._saveTokens(res.data);
+    resetFCMSessionFlag();
     invalidateUserCache();
     return res.data;
   },

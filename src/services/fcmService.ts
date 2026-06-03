@@ -366,15 +366,27 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
 }
 
 // ── Backend token registration ────────────────────────────────────────────────
+let _isFirstRegister = true;
+
 async function _registerToken(token: string): Promise<void> {
   try {
+    const headers: Record<string, string> = {};
+    // Premier enregistrement apres login = nouvelle session → declenche notif push
+    if (_isFirstRegister) {
+      headers['X-New-Session'] = 'true';
+      _isFirstRegister = false;
+    }
     await apiClient.post(Endpoints.notifications.deviceToken, {
       token, platform: Platform.OS,
-    });
+    }, { headers });
     console.log('[FCM] device token registered');
   } catch (e: any) {
     console.warn('[FCM] register token failed:', e?.status, e?.message);
   }
+}
+
+export function resetFCMSessionFlag(): void {
+  _isFirstRegister = true;
 }
 
 async function _unregisterToken(token: string): Promise<void> {
