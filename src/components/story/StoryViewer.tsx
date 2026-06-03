@@ -607,6 +607,7 @@ export const StoryViewer: React.FC<Props> = ({
 
   useEffect(() => {
     setVideoBuffering(false);
+    setPaused(false); // force resume a chaque changement de story
     if (story?.media_type === 'video') setVideoReady(false);
     else setVideoReady(true);
   }, [story?.id, storyIdx, groupIdx]);  // reset aussi sur changement de groupe
@@ -634,6 +635,8 @@ export const StoryViewer: React.FC<Props> = ({
 
   const goNext = useCallback(() => {
     progressAnim.stopAnimation();
+    progressAnim.setValue(0);
+    setPaused(false); // force resume
     if (storyIdx < total - 1) {
       setStoryIdx(i => i + 1);
     } else if (groupIdx < groups.length - 1) {
@@ -661,6 +664,8 @@ export const StoryViewer: React.FC<Props> = ({
 
   const goPrev = useCallback(() => {
     progressAnim.stopAnimation();
+    progressAnim.setValue(0);
+    setPaused(false); // force resume — evite que la story reste figee
     if (storyIdx > 0) { setStoryIdx(i => i - 1); }
     else if (groupIdx > 0) {
       setGroupIdx(g => g - 1);
@@ -954,7 +959,7 @@ export const StoryViewer: React.FC<Props> = ({
 
         {/* ── Tap zones (double-tap = like) ─────────────────────────────── */}
         <View style={s.tapZones} pointerEvents="box-none">
-          <TouchableWithoutFeedback onPress={goPrev} onLongPress={() => setPaused(true)} onPressOut={() => setPaused(false)}>
+          <TouchableWithoutFeedback onPress={goPrev}>
             <View style={s.tapLeft} />
           </TouchableWithoutFeedback>
           <TouchableWithoutFeedback
