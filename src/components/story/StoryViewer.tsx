@@ -476,19 +476,14 @@ export const StoryViewer: React.FC<Props> = ({
     });
   }, [storyIdx, groupIdx]);
 
-  // ── Charger pub stories — au montage ET apres chaque affichage (storyAd=null) ──
+  // ── Charger pub stories une seule fois au montage ─────────────────────────
   useEffect(() => {
-    if (storyAd !== null) return; // deja chargee ou en cours
-    if (groups.length <= 1) return; // inutile avec un seul groupe
     try {
       (require('../../api/client').apiClient as any)
         .get('/api/v1/ads/feed/next?placement=stories')
         .then((r: any) => { if (r?.data?.id) setStoryAd(r.data); })
         .catch(() => {});
     } catch {}
-  }, [storyAd, groups.length]); // se relance quand storyAd repasse a null
-
-  useEffect(() => {
     return () => { if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current); };
   }, []);
 
@@ -636,8 +631,8 @@ export const StoryViewer: React.FC<Props> = ({
       setStoryIdx(i => i + 1);
     } else if (groupIdx < groups.length - 1) {
       const nextGroup = groupIdx + 1;
-      // Afficher la pub si disponible, sinon passer directement
       if (storyAd) {
+        // Afficher la pub puis passer au groupe suivant
         nextGroupIdxRef.current = nextGroup;
         setPaused(true);
         setShowStoryAd(true);
@@ -646,11 +641,10 @@ export const StoryViewer: React.FC<Props> = ({
         storyAdTimerRef.current = setTimeout(() => {
           setShowStoryAd(false);
           setPaused(false);
-          setStoryAd(null); // reset pour recharger a la prochaine transition
-          setGroupIdx(nextGroupIdxRef.current); setStoryIdx(0);
+          setGroupIdx(nextGroupIdxRef.current);
+          setStoryIdx(0);
         }, 5000);
       } else {
-        // Pas de pub dispo — passer directement
         setGroupIdx(nextGroup); setStoryIdx(0);
       }
     } else {
@@ -818,7 +812,6 @@ export const StoryViewer: React.FC<Props> = ({
       if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
       setShowStoryAd(false);
       setPaused(false);
-      setStoryAd(null); // reset → la prochaine transition rechargera une pub fraîche
       setGroupIdx(nextGroupIdxRef.current);
       setStoryIdx(0);
     }} />;
