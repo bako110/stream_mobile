@@ -598,6 +598,64 @@ export const CommunitiesScreen: React.FC = () => {
     } finally { setCreating(false); }
   };
 
+  // ── Hero banner — tab Découvrir ──────────────────────────────────────────────
+  const renderHero = () => {
+    if (tab !== 'discover' || query.trim()) return null;
+    return (
+      <LinearGradient
+        colors={['#7B3FF2', '#E0389A']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={S.hero}
+      >
+        {/* Cercles décoratifs */}
+        <View style={S.heroCircle1} />
+        <View style={S.heroCircle2} />
+
+        <View style={S.heroContent}>
+          <Text style={S.heroTitle}>Rejoins ta communauté</Text>
+          <Text style={S.heroSub}>
+            Découvre des espaces qui te ressemblent — musique, sport, culture et plus encore.
+          </Text>
+          <View style={S.heroActions}>
+            <TouchableOpacity
+              onPress={() => { resetForm(); setTemplateOpen(true); }}
+              style={S.heroBtnPrimary}
+              activeOpacity={0.85}
+            >
+              <Icon name="plus" size={14} color="#7B3FF2" />
+              <Text style={S.heroBtnPrimaryText}>Créer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setJoinOpen(true)}
+              style={S.heroBtnSecondary}
+              activeOpacity={0.85}
+            >
+              <Icon name="key" size={14} color="#fff" />
+              <Text style={S.heroBtnSecondaryText}>Code d'invitation</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </LinearGradient>
+    );
+  };
+
+  // ── En-tête section liste ─────────────────────────────────────────────────
+  const renderSectionHeader = () => {
+    const count = communities.length;
+    const label = tab === 'discover' ? 'Toutes les communautés' : 'Mes communautés';
+    return (
+      <View style={S.sectionHeader}>
+        <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>{label}</Text>
+        {count > 0 && (
+          <View style={[S.sectionCount, { backgroundColor: colors.primary + '20' }]}>
+            <Text style={[S.sectionCountText, { color: colors.primary }]}>{count}</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   // ── Rendu liste ──────────────────────────────────────────────────────────────
   const renderList = () => {
     if (loading && all.length === 0) {
@@ -621,7 +679,13 @@ export const CommunitiesScreen: React.FC = () => {
         contentContainerStyle={
           communities.length === 0
             ? S.emptyContainer
-            : { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }
+            : { paddingHorizontal: 16, paddingBottom: 32 }
+        }
+        ListHeaderComponent={
+          <>
+            {renderHero()}
+            {communities.length > 0 && renderSectionHeader()}
+          </>
         }
         refreshControl={
           <RefreshControl
@@ -1002,47 +1066,26 @@ export const CommunitiesScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Bandeau rejoindre par code — visible et intuitif */}
-        <TouchableOpacity
-          onPress={() => setJoinOpen(true)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 10,
-            marginHorizontal: 16, marginTop: 10, paddingHorizontal: 14, paddingVertical: 11,
-            borderRadius: 14, borderWidth: 1.5, borderColor: '#7B3FF240',
-            backgroundColor: '#7B3FF210' }}
-          activeOpacity={0.8}
-        >
-          <View style={{ width: 32, height: 32, borderRadius: 16,
-            backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="key" size={15} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>
-              J'ai un code d'invitation
-            </Text>
-            <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 1 }}>
-              Entre le code pour rejoindre une communauté privée
-            </Text>
-          </View>
-          <Icon name="chevron-right" size={16} color="#7B3FF2" />
-        </TouchableOpacity>
-
-        {/* Onglets pills */}
-        <View style={S.tabRow}>
+        {/* Segmented control tabs */}
+        <View style={[S.segmented, { backgroundColor: colors.backgroundSecondary }]}>
           {(['discover', 'mine'] as const).map(t => {
             const active = tab === t;
             return (
               <TouchableOpacity
                 key={t}
                 onPress={() => { setTab(t); setLoading(true); }}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
                 style={[
-                  S.pill,
-                  active
-                    ? { backgroundColor: colors.primary }
-                    : { backgroundColor: 'transparent', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider },
+                  S.segment,
+                  active && [S.segmentActive, { backgroundColor: colors.background }],
                 ]}
               >
-                <Text style={[S.pillText, { color: active ? '#fff' : colors.textTertiary }]}>
+                <Icon
+                  name={t === 'discover' ? 'compass' : 'home'}
+                  size={13}
+                  color={active ? colors.primary : colors.textTertiary}
+                />
+                <Text style={[S.segmentText, { color: active ? colors.primary : colors.textTertiary }]}>
                   {t === 'discover' ? 'Découvrir' : 'Mes communautés'}
                 </Text>
               </TouchableOpacity>
@@ -1263,19 +1306,79 @@ const S = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
 
-  // Tabs pills
-  tabRow: {
+  // Segmented control
+  segmented: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 14,
+    padding: 4,
   },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  segmentActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: { fontSize: 13, fontWeight: '700' },
+
+  // Hero banner
+  hero: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 4,
     borderRadius: 20,
+    overflow: 'hidden',
+    minHeight: 148,
   },
-  pillText: { fontSize: 13, fontWeight: '700' },
+  heroCircle1: {
+    position: 'absolute', top: -30, right: -30,
+    width: 130, height: 130, borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  heroCircle2: {
+    position: 'absolute', bottom: -20, left: -20,
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  heroContent: { padding: 20, zIndex: 1 },
+  heroTitle: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4, marginBottom: 6 },
+  heroSub: { color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 18, marginBottom: 16 },
+  heroActions: { flexDirection: 'row', gap: 10 },
+  heroBtnPrimary: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16, paddingVertical: 9,
+    borderRadius: 11,
+  },
+  heroBtnPrimaryText: { color: '#7B3FF2', fontWeight: '700', fontSize: 13 },
+  heroBtnSecondary: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 16, paddingVertical: 9,
+    borderRadius: 11,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  heroBtnSecondaryText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  // Section header
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 2, paddingTop: 20, paddingBottom: 12,
+  },
+  sectionTitle: { fontSize: 15, fontWeight: '800', flex: 1 },
+  sectionCount: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10 },
+  sectionCountText: { fontSize: 12, fontWeight: '700' },
 
   // Empty
   emptyIcon: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center' },
