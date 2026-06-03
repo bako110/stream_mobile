@@ -176,15 +176,13 @@ export const ReelsScreen: React.FC = () => {
       lastLoadedAtRef.current = Date.now();
 
       if (!silent) {
-        // Chargement initial ou pull-to-refresh → reset complet
         viewedReelsRef.current = new Set();
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
-        if (targetIdx > 0) {
-          setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
-        }
-      } else if (targetId) {
-        // Silent avec cible → scroll si pas déjà dessus
+        setTimeout(() => {
+          try { listRef.current?.scrollToIndex({ index: targetIdx, animated: false }); } catch {}
+        }, 150);
+      } else if (targetIdx > 0 && targetId) {
         const alreadyVisible = reelsRef.current[currentIdxRef.current]?.id === targetId;
         if (!alreadyVisible) {
           currentIdxRef.current = targetIdx;
@@ -316,8 +314,7 @@ export const ReelsScreen: React.FC = () => {
         setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
       } else if (newInitialId !== lastInitialReelRef.current) {
         lastInitialReelRef.current = newInitialId;
-        // Charger le feed complet immédiatement avec le reel cible en tête
-        // load(false) = non-silent → scroll automatique vers le reel une fois chargé
+        // Charger le feed complet — le reel cible sera injecté en tête ou scrollé
         load(false, newInitialId, newReel);
       }
 
