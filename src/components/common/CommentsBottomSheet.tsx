@@ -360,9 +360,11 @@ export const CommentsBottomSheet: React.FC<Props> = ({
   const [editText,    setEditText]    = useState('');
   const [editSaving,  setEditSaving]  = useState(false);
 
-  const inputRef  = useRef<TextInput>(null);
-  const listRef   = useRef<FlatList>(null);
-  const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+  const inputRef       = useRef<TextInput>(null);
+  const listRef        = useRef<FlatList>(null);
+  const slideAnim      = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+  // IDs de commentaires dont la reaction est en cours d'envoi — bloque les doubles clics
+  const pendingLikes   = useRef<Set<string>>(new Set());
 
   const PAGE_LIMIT = 20;
 
@@ -442,6 +444,8 @@ export const CommentsBottomSheet: React.FC<Props> = ({
         });
         break;
       case 'reaction_updated':
+        // Ignorer si une requete optimistic est encore en vol pour ce commentaire
+        if (pendingLikes.current.has(event.comment_id)) break;
         setComments(prev => prev.map(c => {
           if (c.id === event.comment_id) return { ...c, like_count: event.like_count, dislike_count: event.dislike_count };
           return { ...c, replies: (c.replies ?? []).map(r =>
@@ -553,23 +557,48 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     finally { setSending(false); }
   };
 
-  // Reaction
+  // Reaction — optimistic + anti double-clic via pendingLikes ref
   const handleReaction = useCallback((comment: CommentEx) => {
+    if (pendingLikes.current.has(comment.id)) return; // requete deja en vol
+    pendingLikes.current.add(comment.id);
+
     const type = 'like';
+    const isSame = comment.userReaction === type;
+
     const update = (c: CommentEx): CommentEx => {
       if (c.id !== comment.id) return c;
-      const isSame = c.userReaction === type;
       return {
         ...c,
         userReaction: isSame ? null : type,
-        like_count: c.like_count + (isSame ? -1 : 1),
+        like_count: Math.max(0, c.like_count + (isSame ? -1 : 1)),
       };
     };
+
+    // Optimistic update immediat → coeur plein tout de suite
     setComments(prev => prev.map(p => ({
       ...update(p),
       replies: (p.replies ?? []).map(update),
     })));
-    socialService.toggleReaction({ reaction_type: type, comment_id: comment.id }).catch(() => {});
+
+    socialService.toggleReaction({ reaction_type: type, comment_id: comment.id })
+      .catch(() => {
+        // Rollback si erreur
+        const rollback = (c: CommentEx): CommentEx => {
+          if (c.id !== comment.id) return c;
+          return {
+            ...c,
+            userReaction: comment.userReaction ?? null,
+            like_count: Math.max(0, c.like_count + (isSame ? 1 : -1)),
+          };
+        };
+        setComments(prev => prev.map(p => ({
+          ...rollback(p),
+          replies: (p.replies ?? []).map(rollback),
+        })));
+      })
+      .finally(() => {
+        pendingLikes.current.delete(comment.id);
+      });
   }, []);
 
   // Modifier
