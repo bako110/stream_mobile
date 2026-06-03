@@ -233,6 +233,28 @@ export const AdsScreen: React.FC = () => {
     } catch { Alert.alert('Erreur', 'Impossible de modifier le statut.'); }
   };
 
+  // ── Construction de la liste avec separateurs de sections ────────────────
+  type SectionHeader = { __header: true; label: string; icon: string; color: string; count: number };
+  type FlatRow = SectionHeader | Ad;
+
+  const flatData: FlatRow[] = (() => {
+    const sections: { status: string; label: string; icon: string; color: string }[] = [
+      { status: 'active',  label: 'En ligne',    icon: 'zap',     color: '#10B981' },
+      { status: 'paused',  label: 'En pause',    icon: 'pause',   color: '#F59E0B' },
+      { status: 'draft',   label: 'Brouillons',  icon: 'edit-2',  color: '#6B7280' },
+      { status: 'ended',   label: 'Terminees',   icon: 'check',   color: '#6B7280' },
+      { status: 'rejected',label: 'Refusees',    icon: 'x-circle',color: '#EF4444' },
+    ];
+    const rows: FlatRow[] = [];
+    for (const sec of sections) {
+      const group = ads.filter(a => a.status === sec.status);
+      if (group.length === 0) continue;
+      rows.push({ __header: true, label: sec.label, icon: sec.icon, color: sec.color, count: group.length });
+      group.forEach(a => rows.push(a));
+    }
+    return rows;
+  })();
+
   const GlobalStats = ads.length > 0 ? (
     <View style={[s.globalStats, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
       <Text style={[s.globalTitle, { color: colors.textPrimary }]}>
@@ -283,17 +305,32 @@ export const AdsScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
-          data={ads}
-          keyExtractor={a => a.id}
-          renderItem={({ item }) => (
-            <AdCard
-              item={item}
-              colors={colors}
-              onEdit={() => nav.navigate('CreateAd', { ad: item })}
-              onToggle={() => handleToggle(item)}
-              onDelete={() => handleDelete(item)}
-            />
-          )}
+          data={flatData}
+          keyExtractor={(row: any) => row.__header ? `hdr-${row.label}` : (row as Ad).id}
+          renderItem={({ item }: { item: any }) => {
+            if (item.__header) {
+              return (
+                <View style={[s.sectionHdr, { borderLeftColor: item.color }]}>
+                  <View style={[s.sectionDot, { backgroundColor: item.color }]} />
+                  <Icon name={item.icon} size={13} color={item.color} />
+                  <Text style={[s.sectionLabel, { color: item.color }]}>{item.label}</Text>
+                  <View style={[s.sectionBadge, { backgroundColor: item.color + '22' }]}>
+                    <Text style={[s.sectionCount, { color: item.color }]}>{item.count}</Text>
+                  </View>
+                </View>
+              );
+            }
+            const ad = item as Ad;
+            return (
+              <AdCard
+                item={ad}
+                colors={colors}
+                onEdit={() => nav.navigate('CreateAd', { ad })}
+                onToggle={() => handleToggle(ad)}
+                onDelete={() => handleDelete(ad)}
+              />
+            );
+          }}
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }}
@@ -334,9 +371,15 @@ export const AdsScreen: React.FC = () => {
 };
 
 const s = StyleSheet.create({
-  title:       { fontSize: 17, fontWeight: '800' },
-  createBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
-  createTxt:   { color: '#fff', fontWeight: '700', fontSize: 13 },
+  title:        { fontSize: 17, fontWeight: '800' },
+  createBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
+  createTxt:    { color: '#fff', fontWeight: '700', fontSize: 13 },
+  sectionHdr:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6,
+                  paddingLeft: 10, borderLeftWidth: 3, borderRadius: 2, marginBottom: -2 },
+  sectionDot:   { width: 6, height: 6, borderRadius: 3 },
+  sectionLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5, flex: 1 },
+  sectionBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  sectionCount: { fontSize: 11, fontWeight: '800' },
   card:        { borderRadius: 18, padding: 16, borderWidth: 1, gap: 12 },
   adTitle:     { fontSize: 15, fontWeight: '800' },
   iconBtn:     { padding: 7, borderRadius: 8 },

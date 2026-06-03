@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image,
-  RefreshControl, StyleSheet, Dimensions,
+  RefreshControl, StyleSheet, Dimensions, Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -9,11 +9,122 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonTrending } from '../../components/common';
 import { searchService } from '../../services';
+import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = (W - 48) / 2;
 
+// ── Types pub ─────────────────────────────────────────────────────────────────
+
+interface SearchAdData {
+  id: string;
+  title: string;
+  description?: string | null;
+  cta_text?: string | null;
+  cta_url?: string | null;
+  creative_url?: string | null;
+  thumbnail_url?: string | null;
+}
+
+// ── SearchAdCard — pub native inline dans les resultats ───────────────────────
+
+const SearchAdCard: React.FC<{
+  ad: SearchAdData;
+  colors: any;
+  onImpression: (id: string) => void;
+}> = ({ ad, colors, onImpression }) => {
+  useEffect(() => {
+    if (ad?.id) onImpression(ad.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ad?.id]);
+
+  const handlePress = () => {
+    if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handlePress}
+      activeOpacity={0.88}
+      style={[sAd.card, { backgroundColor: colors.surface, borderColor: '#7B3FF244' }]}
+    >
+      {/* Badge sponsorise */}
+      <View style={sAd.badge}>
+        <Icon name="zap" size={9} color="#F59E0B" />
+        <Text style={sAd.badgeTxt}>SPONSORISE</Text>
+      </View>
+
+      <View style={sAd.row}>
+        {/* Visuel creatif optionnel */}
+        {(ad.creative_url || ad.thumbnail_url) ? (
+          <Image
+            source={{ uri: (ad.creative_url || ad.thumbnail_url)! }}
+            style={sAd.thumb}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={['#7B3FF2', '#E0389A']}
+            style={sAd.thumbGrad}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          >
+            <Icon name="zap" size={18} color="rgba(255,255,255,0.85)" />
+          </LinearGradient>
+        )}
+
+        {/* Texte */}
+        <View style={{ flex: 1 }}>
+          <Text style={[sAd.title, { color: colors.textPrimary }]} numberOfLines={2}>
+            {ad.title}
+          </Text>
+          {!!ad.description && (
+            <Text style={[sAd.desc, { color: colors.textSecondary }]} numberOfLines={2}>
+              {ad.description}
+            </Text>
+          )}
+          {/* Bouton CTA */}
+          <View style={sAd.cta}>
+            <Text style={sAd.ctaTxt}>{ad.cta_text ?? 'En savoir plus'}</Text>
+            <Icon name="arrow-right" size={11} color="#fff" />
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const sAd = StyleSheet.create({
+  card:     { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 4 },
+  badge:    { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 8 },
+  badgeTxt: { color: '#F59E0B', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  row:      { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  thumb:    { width: 72, height: 72, borderRadius: 10 },
+  thumbGrad:{ width: 72, height: 72, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  title:    { fontSize: 14, fontWeight: '700', lineHeight: 19, marginBottom: 3 },
+  desc:     { fontSize: 12, lineHeight: 17, marginBottom: 6 },
+  cta:      { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
+              backgroundColor: '#7B3FF2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  ctaTxt:   { color: '#fff', fontSize: 11, fontWeight: '700' },
+});
+
 type Tab = 'content' | 'reels';
+
+// ── Helper : injecte une pub tous les AD_EVERY items ─────────────────────────
+
+const AD_EVERY = 5;
+
+function injectAds<T>(items: T[], ad: SearchAdData | null): (T | { __ad: true; ad: SearchAdData })[] {
+  if (!ad) return items;
+  const result: (T | { __ad: true; ad: SearchAdData })[] = [];
+  items.forEach((item, idx) => {
+    result.push(item);
+    if ((idx + 1) % AD_EVERY === 0) {
+      result.push({ __ad: true, ad });
+    }
+  });
+  return result;
+}
 
 export const TrendingScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -25,6 +136,7 @@ export const TrendingScreen: React.FC = () => {
   const [loading,    setLoading]    = useState(true);
   const [tab,        setTab]        = useState<Tab>('content');
   const [refreshing, setRefreshing] = useState(false);
+  const [searchAd,   setSearchAd]   = useState<SearchAdData | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -36,6 +148,17 @@ export const TrendingScreen: React.FC = () => {
       if (r.status === 'fulfilled') setReels(Array.isArray(r.value) ? r.value : []);
     } catch { /* silencieux */ }
     finally { setLoading(false); setRefreshing(false); }
+  }, []);
+
+  // Chargement de la pub search
+  useEffect(() => {
+    apiClient.get<SearchAdData | null>(Endpoints.ads.feedNext('search'))
+      .then((res: { data: SearchAdData | null }) => { if (res.data?.id) setSearchAd(res.data); })
+      .catch(() => {});
+  }, []);
+
+  const handleAdImpression = useCallback((id: string) => {
+    apiClient.post(Endpoints.ads.impression(id)).catch(() => {});
   }, []);
 
   useEffect(() => { load(); }, []);
@@ -56,7 +179,8 @@ export const TrendingScreen: React.FC = () => {
     });
   };
 
-  const data = tab === 'content' ? trending : reels;
+  const rawData = tab === 'content' ? trending : reels;
+  const data = injectAds(rawData, searchAd);
 
   const TABS: { key: Tab; icon: string; label: string }[] = [
     { key: 'content', icon: 'trending-up', label: 'Contenus' },
@@ -90,32 +214,99 @@ export const TrendingScreen: React.FC = () => {
       ) : tab === 'content' ? (
         <FlatList
           key="trending-content"
-          data={trending}
-          keyExtractor={i => i.id}
-          numColumns={2}
+          data={data}
+          keyExtractor={(i: any) => (i.__ad ? `ad-${i.ad.id}` : i.id)}
+          numColumns={1}
           contentContainerStyle={{ padding: 16, gap: 12 }}
-          columnWrapperStyle={{ gap: 12 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />}
           ListHeaderComponent={<HeroBanner count={trending.length} label="contenus" />}
           ListEmptyComponent={<EmptyState colors={colors} />}
-          renderItem={({ item, index }) => (
-            <ContentCard item={item} index={index} colors={colors} onPress={() => handleContentPress(item)} />
-          )}
+          renderItem={({ item, index }: any) => {
+            if (item.__ad) {
+              return (
+                <SearchAdCard
+                  ad={item.ad}
+                  colors={colors}
+                  onImpression={handleAdImpression}
+                />
+              );
+            }
+            // Rang reel = position dans le tableau source (sans les slots pub)
+            const realIdx = trending.indexOf(item);
+            const rank = realIdx >= 0 ? realIdx : index;
+            // Dans ce mode 1 colonne on affiche les cartes en ligne complete
+            const GRADS: [string, string][] = [
+              ['#7B3FF2', '#E0389A'], ['#0EA5E9', '#6366F1'],
+              ['#10B981', '#0EA5E9'], ['#F59E0B', '#EF4444'],
+              ['#EC4899', '#8B5CF6'], ['#14B8A6', '#3B82F6'],
+            ];
+            const grad = GRADS[rank % GRADS.length];
+            const fmtV = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
+            return (
+              <TouchableOpacity
+                style={[s.contentCard, { backgroundColor: colors.surface, borderColor: colors.border, width: '100%' }]}
+                onPress={() => handleContentPress(item)}
+                activeOpacity={0.85}
+              >
+                <View style={[s.rankBadge, { backgroundColor: rank < 3 ? '#F59E0B' : colors.primary }]}>
+                  <Text style={s.rankText}>#{rank + 1}</Text>
+                </View>
+                <View style={s.contentThumb}>
+                  {item.thumbnail_url ? (
+                    <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : (
+                    <LinearGradient
+                      colors={grad}
+                      style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    >
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="film" size={30} color="rgba(255,255,255,0.7)" />
+                      </View>
+                    </LinearGradient>
+                  )}
+                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={s.contentThumbGrad} />
+                </View>
+                <View style={s.contentBody}>
+                  <Text style={[s.contentTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+                    {item.title ?? 'Sans titre'}
+                  </Text>
+                  {!!item.view_count && (
+                    <View style={s.statRow}>
+                      <Icon name="eye" size={11} color={colors.textTertiary} />
+                      <Text style={[s.statText, { color: colors.textTertiary }]}>{fmtV(item.view_count)}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          }}
         />
       ) : (
         <FlatList
           key="trending-reels"
-          data={reels}
-          keyExtractor={i => i.id}
+          data={data}
+          keyExtractor={(i: any) => (i.__ad ? `ad-${i.ad.id}` : i.id)}
           contentContainerStyle={{ padding: 16, gap: 12 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />}
           ListHeaderComponent={<HeroBanner count={reels.length} label="reels" />}
           ListEmptyComponent={<EmptyState colors={colors} />}
-          renderItem={({ item, index }) => (
-            <ReelRow item={item} index={index} colors={colors} onPress={() => handleReelPress(item)} />
-          )}
+          renderItem={({ item, index }: any) => {
+            if (item.__ad) {
+              return (
+                <SearchAdCard
+                  ad={item.ad}
+                  colors={colors}
+                  onImpression={handleAdImpression}
+                />
+              );
+            }
+            const realIdx = reels.indexOf(item);
+            return (
+              <ReelRow item={item} index={realIdx >= 0 ? realIdx : index} colors={colors} onPress={() => handleReelPress(item)} />
+            );
+          }}
         />
       )}
     </View>
