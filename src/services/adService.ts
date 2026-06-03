@@ -29,6 +29,7 @@ export interface Ad {
   starts_at:        string | null;
   ends_at:          string | null;
   created_at:       string;
+  coins_debited?:   number;
 }
 
 export interface AdCreate {

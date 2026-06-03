@@ -146,14 +146,21 @@ const AdCard: React.FC<{
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 4 }}>
-          <View style={{ backgroundColor: '#7B3FF222', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-            <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '700' }}>
-              CPM {cpmCoins} coins
+          <View style={{ backgroundColor: '#7B3FF222', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, alignItems: 'center' }}>
+            <Text style={{ color: '#7B3FF2', fontSize: 9, fontWeight: '700', letterSpacing: 0.3 }}>CPM</Text>
+            <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>
+              1 000 imp = {cpmCoins} coins
             </Text>
             <Text style={{ color: colors.textTertiary, fontSize: 9 }}>= {(item.cpm_eur ?? 2).toFixed(2)}€</Text>
           </View>
         </View>
       </View>
+      {/* coins_debited — affiché si disponible */}
+      {item.coins_debited != null && (
+        <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: -4 }}>
+          Débité à la création : {item.coins_debited.toLocaleString('fr-FR')} coins
+        </Text>
+      )}
 
       {/* Barre progression */}
       <View>
@@ -212,6 +219,19 @@ export const AdsScreen: React.FC = () => {
   const globalCtr        = totalImpressions > 0 ? (totalClicks / totalImpressions * 100).toFixed(2) : '0.00';
   const activeCount      = ads.filter(a => a.status === 'active').length;
 
+  // Budget total en coins : somme des coins_debited si disponibles, sinon eur2coins(budget_eur)
+  const totalBudgetCoins = ads.reduce((s, a) =>
+    s + (a.coins_debited != null ? a.coins_debited : eur2coins(a.budget_eur)), 0);
+
+  // Impressions restantes estimées sur les campagnes actives/en pause
+  const estimatedRemainingImpressions = ads
+    .filter(a => a.status === 'active' || a.status === 'paused')
+    .reduce((s, a) => {
+      const remaining = a.budget_eur - a.spent_eur;
+      const cpm = a.cpm_eur > 0 ? a.cpm_eur : 2;
+      return s + Math.round((remaining / cpm) * 1000);
+    }, 0);
+
   const handleDelete = (ad: Ad) => {
     if (ad.status === 'active' || ad.status === 'paused') {
       Alert.alert('Impossible', 'Arrêtez la campagne avant de la supprimer.');
@@ -265,12 +285,13 @@ export const AdsScreen: React.FC = () => {
       <Text style={[s.globalTitle, { color: colors.textPrimary }]}>
         Vue d'ensemble · <Text style={{ color: '#10B981' }}>{activeCount} active{activeCount !== 1 ? 's' : ''}</Text>
       </Text>
+      {/* Ligne 1 : Budget total + Dépensé + Impressions + CTR */}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {[
-          { lbl: 'Budget total',   val: `${eur2coins(totalBudget).toLocaleString('fr-FR')} c`, sub: `${totalBudget.toFixed(0)}€`, color: '#7B3FF2' },
-          { lbl: 'Dépensé',        val: `${eur2coins(totalSpent).toLocaleString('fr-FR')} c`,  sub: `${totalSpent.toFixed(0)}€`,  color: '#E0389A' },
-          { lbl: 'Impressions',    val: totalImpressions.toLocaleString('fr-FR'),               sub: 'vues',                       color: '#3B82F6' },
-          { lbl: 'CTR moyen',      val: `${globalCtr}%`,                                        sub: 'taux clic',                  color: '#F59E0B' },
+          { lbl: 'Budget total',  val: `${totalBudgetCoins.toLocaleString('fr-FR')} c`,      sub: `${totalBudget.toFixed(0)}€`,  color: '#7B3FF2' },
+          { lbl: 'Dépensé',       val: `${eur2coins(totalSpent).toLocaleString('fr-FR')} c`, sub: `${totalSpent.toFixed(0)}€`,   color: '#E0389A' },
+          { lbl: 'Impressions',   val: totalImpressions.toLocaleString('fr-FR'),              sub: 'vues réelles',                color: '#3B82F6' },
+          { lbl: 'CTR moyen',     val: `${globalCtr}%`,                                       sub: 'taux clic',                   color: '#F59E0B' },
         ].map(g => (
           <View key={g.lbl} style={[s.gStat, { backgroundColor: g.color + '12', borderRadius: 12, padding: 10 }]}>
             <Text style={[s.gVal, { color: g.color }]}>{g.val}</Text>
@@ -279,6 +300,20 @@ export const AdsScreen: React.FC = () => {
           </View>
         ))}
       </View>
+      {/* Ligne 2 : Impressions restantes estimées (campagnes actives/pause) */}
+      {estimatedRemainingImpressions > 0 && (
+        <View style={[s.gStat, { backgroundColor: '#10B98112', borderRadius: 12, padding: 10, width: '100%', alignItems: 'flex-start' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name="eye" size={13} color="#10B981" />
+            <Text style={[s.gVal, { color: '#10B981', fontSize: 13 }]}>
+              ~{estimatedRemainingImpressions.toLocaleString('fr-FR')} imp. restantes estimées
+            </Text>
+          </View>
+          <Text style={[s.gLbl, { color: colors.textTertiary, marginTop: 2 }]}>
+            Sur budget restant des campagnes actives / en pause
+          </Text>
+        </View>
+      )}
     </View>
   ) : null;
 

@@ -280,6 +280,9 @@ export const CreateAdScreen: React.FC = () => {
             <Text style={{ color: '#7B3FF2', fontSize: 12, opacity: 0.8 }}>
               Coût : {(budget * 100).toLocaleString('fr-FR')} coins ({budget.toFixed(2)}€)
             </Text>
+            <Text style={{ color: '#7B3FF2', fontSize: 11, opacity: 0.7, marginTop: 1 }}>
+              Coût : {(cpmEur / 1000 * 100).toFixed(3)} coins/impression
+            </Text>
             {walletCoins !== null && (
               <Text style={{
                 color: walletCoins < budget * 100 ? '#EF4444' : '#10B981',
