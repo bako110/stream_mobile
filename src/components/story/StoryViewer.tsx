@@ -308,6 +308,10 @@ export const StoryViewer: React.FC<Props> = ({
   const [groupIdx,    setGroupIdx]    = useState(initialGroupIndex);
   const [storyIdx,    setStoryIdx]    = useState(initialStoryIndex ?? 0);
   const [paused,      setPaused]      = useState(false);
+  const [storyAd,     setStoryAd]     = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string } | null>(null);
+  const [showStoryAd, setShowStoryAd] = useState(false);
+  const storyAdTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const storyAdShownRef               = useRef(false); // une pub max par session
   const [menuOpen,    setMenuOpen]    = useState(false);
   const [editMode,    setEditMode]    = useState(false);
   const [editCaption, setEditCaption] = useState('');
@@ -380,11 +384,22 @@ export const StoryViewer: React.FC<Props> = ({
     });
   }, [storyIdx, groupIdx]);
 
+  // ── Charger pub stories au montage ────────────────────────────────────────
+  useEffect(() => {
+    if (groups.length > 1) { // pub utile seulement si plusieurs groupes
+      try {
+        (require('../../api/client').apiClient as any)
+          .get('/api/v1/ads/feed/next?placement=stories')
+          .then((r: any) => { if (r?.data?.id) setStoryAd(r.data); })
+          .catch(() => {});
+      } catch {}
+    }
+    return () => { if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current); };
+  }, []);
+
   // ── Mark viewed ────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    // Sauvegarde toujours la story complète localement (relecture hors-ligne)
-    // markViewed n'appelle l'API que si pas encore vue
     if (story && !isOwn) storyService.markViewed(story.id, story);
   }, [story?.id]);
 
@@ -525,11 +540,27 @@ export const StoryViewer: React.FC<Props> = ({
     if (storyIdx < total - 1) {
       setStoryIdx(i => i + 1);
     } else if (groupIdx < groups.length - 1) {
-      setGroupIdx(g => g + 1); setStoryIdx(0);
+      // Entre groupes — afficher pub une fois par session
+      if (!storyAdShownRef.current && storyAd) {
+        storyAdShownRef.current = true;
+        setPaused(true);
+        setShowStoryAd(true);
+        // Tracker impression
+        try { (require('../../api/client').apiClient as any).post(`/api/v1/ads/${storyAd.id}/impression`, {}); } catch {}
+        // Auto-passer apres 5s
+        if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
+        storyAdTimerRef.current = setTimeout(() => {
+          setShowStoryAd(false);
+          setPaused(false);
+          setGroupIdx(g => g + 1); setStoryIdx(0);
+        }, 5000);
+      } else {
+        setGroupIdx(g => g + 1); setStoryIdx(0);
+      }
     } else {
       onClose();
     }
-  }, [storyIdx, total, groupIdx, groups.length]);
+  }, [storyIdx, total, groupIdx, groups.length, storyAd]);
 
   const goPrev = useCallback(() => {
     progressAnim.stopAnimation();
@@ -684,6 +715,63 @@ export const StoryViewer: React.FC<Props> = ({
   })();
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  // Slide pub entre groupes
+  if (showStoryAd && storyAd) {
+    const { width: W, height: H } = Dimensions.get('window');
+    return (
+      <Modal visible transparent animationType="fade" statusBarTranslucent>
+        <View style={{ flex: 1, backgroundColor: '#000', width: W, height: H }}>
+          <StatusBar hidden translucent />
+          {(storyAd.creative_url || storyAd.thumbnail_url) ? (
+            <Image source={{ uri: storyAd.creative_url || storyAd.thumbnail_url }} style={{ width: W, height: H, position: 'absolute' }} resizeMode="cover" />
+          ) : <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ width: W, height: H, position: 'absolute' }} />}
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.45 }} />
+          {/* Badge sponsorisé */}
+          <View style={{ position: 'absolute', top: 52, left: 16, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Sponsorisé</Text>
+          </View>
+          {/* Barre de progression */}
+          <View style={{ position: 'absolute', top: 44, left: 8, right: 8, height: 2, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 1 }}>
+            <Animated.View style={{ height: 2, backgroundColor: '#fff', borderRadius: 1, width: '100%' }} />
+          </View>
+          {/* Contenu */}
+          <View style={{ position: 'absolute', bottom: 80, left: 20, right: 20 }}>
+            <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
+              {storyAd.title}
+            </Text>
+            {storyAd.description ? <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20, marginBottom: 16 }} numberOfLines={2}>{storyAd.description}</Text> : null}
+            {storyAd.cta_url ? (
+              <TouchableOpacity
+                onPress={() => {
+                  try { (require('../../api/client').apiClient as any).post(`/api/v1/ads/${storyAd.id}/click`, {}); } catch {}
+                  if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
+                  setShowStoryAd(false); setPaused(false);
+                  setGroupIdx(g => g + 1); setStoryIdx(0);
+                }}
+                style={{ backgroundColor: '#fff', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <Icon name="external-link" size={15} color="#7B3FF2" />
+                <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 14 }}>{storyAd.cta_text || 'En savoir plus'}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          {/* Passer */}
+          <TouchableOpacity
+            onPress={() => {
+              if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
+              setShowStoryAd(false); setPaused(false);
+              setGroupIdx(g => g + 1); setStoryIdx(0);
+            }}
+            style={{ position: 'absolute', top: 52, right: 16 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Icon name="x" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => { stopAudio(); onClose(); }}>
