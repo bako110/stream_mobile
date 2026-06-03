@@ -601,6 +601,47 @@ export const CommunitiesScreen: React.FC = () => {
   // ── Hero banner — tab Découvrir ──────────────────────────────────────────────
   const renderHero = () => {
     if (tab !== 'discover' || query.trim()) return null;
+
+    const hasData = communities.length > 0;
+
+    // Version compacte si données présentes — juste les boutons actions
+    if (hasData) {
+      return (
+        <LinearGradient
+          colors={['#7B3FF2', '#E0389A']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={S.heroCompact}
+        >
+          <View style={S.heroCompactLeft}>
+            <Icon name="users" size={16} color="rgba(255,255,255,0.9)" />
+            <Text style={S.heroCompactLabel}>
+              {communities.length} communauté{communities.length > 1 ? 's' : ''}
+            </Text>
+          </View>
+          <View style={S.heroCompactActions}>
+            <TouchableOpacity
+              onPress={() => { resetForm(); setTemplateOpen(true); }}
+              style={S.heroBtnPrimary}
+              activeOpacity={0.85}
+            >
+              <Icon name="plus" size={13} color="#7B3FF2" />
+              <Text style={S.heroBtnPrimaryText}>Créer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setJoinOpen(true)}
+              style={S.heroBtnSecondary}
+              activeOpacity={0.85}
+            >
+              <Icon name="key" size={13} color="#fff" />
+              <Text style={S.heroBtnSecondaryText}>Code</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      );
+    }
+
+    // Version pleine si pas encore de données
     return (
       <LinearGradient
         colors={['#7B3FF2', '#E0389A']}
@@ -608,10 +649,8 @@ export const CommunitiesScreen: React.FC = () => {
         end={{ x: 1, y: 1 }}
         style={S.hero}
       >
-        {/* Cercles décoratifs */}
         <View style={S.heroCircle1} />
         <View style={S.heroCircle2} />
-
         <View style={S.heroContent}>
           <Text style={S.heroTitle}>Rejoins ta communauté</Text>
           <Text style={S.heroSub}>
@@ -1340,6 +1379,33 @@ const S = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     minHeight: 148,
+  },
+  heroCompact: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 4,
+    borderRadius: 16,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  heroCompactLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  heroCompactLabel: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  heroCompactActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
   heroCircle1: {
     position: 'absolute', top: -30, right: -30,
