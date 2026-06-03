@@ -293,39 +293,39 @@ export const ReelsScreen: React.FC = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Focus — UN SEUL point d'entrée pour le chargement ────────────────────
+  // ── Réaction aux nouveaux params (reel cliqué depuis le feed) ───────────────
+  useEffect(() => {
+    const newInitialId = params.initialReelId;
+    const newReel      = params.initialReel as Reel | undefined;
+    if (!newInitialId) return;
+
+    const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
+    if (idx >= 0) {
+      // Déjà dans la liste → scroll immédiat
+      currentIdxRef.current = idx;
+      setCurrentIndex(idx);
+      setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 80);
+    } else if (newInitialId !== lastInitialReelRef.current) {
+      lastInitialReelRef.current = newInitialId;
+      load(false, newInitialId, newReel);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.initialReelId]);
+
+  // ── Focus ─────────────────────────────────────────────────────────────────
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
 
-    const freshParams  = (route.params ?? {}) as typeof params;
-    const newInitialId = freshParams.initialReelId;
-    const newReel      = freshParams.initialReel as Reel | undefined;
+    const freshParams = (route.params ?? {}) as typeof params;
 
     if (freshParams.reelPublished) {
-      // Nouveau reel publié → recharger le feed complet
       nav.setParams({ reelPublished: undefined } as any);
       load(false);
-
-    } else if (newInitialId) {
-      // Reel cliqué depuis le feed — traiter à chaque focus même si même ID
-      const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
-      if (idx >= 0) {
-        // Déjà dans la liste → scroll immédiat, 0 rechargement
-        currentIdxRef.current = idx;
-        setCurrentIndex(idx);
-        setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
-      } else if (newInitialId !== lastInitialReelRef.current) {
-        lastInitialReelRef.current = newInitialId;
-        // Charger le feed complet avec le reel cible — liste complète dès le départ
-        load(false, newInitialId, newReel);
-      }
-
-    } else if (!didFocusOnceRef.current) {
+    } else if (!freshParams.initialReelId && !didFocusOnceRef.current) {
       // Premier affichage sans reel cible → chargement normal
       load(false);
-
-    } else {
-      // Retour simple (pas de nouveau reel) → silent si données fraîches
+    } else if (!freshParams.initialReelId) {
+      // Retour simple → silent si données fraîches
       const age = Date.now() - lastLoadedAtRef.current;
       if (age > 90_000) load(true);
     }
@@ -334,11 +334,10 @@ export const ReelsScreen: React.FC = () => {
     return () => {
       setScreenFocused(false);
       try { activePlayerRef.current?.pause(); } catch {}
-      // Différé pour ne pas bloquer le goBack
       requestAnimationFrame(() => sendViewForCurrent());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.reelPublished, params.initialReelId]));
+  }, [params.reelPublished]));
 
   // ── Edit / Delete ─────────────────────────────────────────────────────────
   const handleDeleteReel = useCallback((reel: Reel) => {
