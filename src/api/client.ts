@@ -2,31 +2,41 @@ import { Platform, NativeModules } from 'react-native';
 import { API_BASE_URL } from '../utils/constants';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
-function _buildDeviceName(): string {
+// Cache — calculé une seule fois apres le premier appel API (bridge deja pret)
+let _cachedDeviceName: string | null = null;
+
+function getDeviceName(): string {
+  if (_cachedDeviceName) return _cachedDeviceName;
+
   if (Platform.OS === 'ios') {
     const ver = typeof Platform.Version === 'string' ? Platform.Version : String(Platform.Version);
-    return `iPhone (iOS ${ver})`;
+    _cachedDeviceName = `iPhone (iOS ${ver})`;
+    return _cachedDeviceName;
   }
+
   if (Platform.OS === 'android') {
-    // NativeModules.PlatformConstants expose Model et Brand nativement sur Android
-    const pc = NativeModules.PlatformConstants as Record<string, any> | undefined;
-    const model: string = pc?.Model ?? pc?.model ?? '';
-    const brand: string = pc?.Brand ?? pc?.brand ?? '';
-    const brandCap = brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : '';
+    // Lire lazily apres init du bridge — plusieurs sources par ordre de fiabilite
+    const pc = (NativeModules.PlatformConstants ?? {}) as Record<string, any>;
+    const model: string = pc.Model ?? pc.model ?? '';
+    const brand: string = pc.Brand ?? pc.brand ?? '';
     if (model) {
+      const brandCap = brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : '';
       const modelLow = model.toLowerCase();
       const brandLow = brandCap.toLowerCase();
-      // Si le model commence deja par la marque (ex: "Samsung Galaxy") ne pas doubler
-      return (brandLow && !modelLow.startsWith(brandLow))
+      _cachedDeviceName = (brandLow && !modelLow.startsWith(brandLow))
         ? `${brandCap} ${model}`
         : model;
+      return _cachedDeviceName;
     }
-    return `Android ${Platform.Version}`;
+    // Fallback si PlatformConstants pas encore dispo
+    _cachedDeviceName = `Android ${Platform.Version}`;
+    return _cachedDeviceName;
   }
-  return 'Web';
+
+  _cachedDeviceName = 'Web';
+  return _cachedDeviceName;
 }
 
-const _DEVICE_NAME = _buildDeviceName();
 const _PLATFORM = Platform.OS;
 
 interface RequestOptions {
@@ -85,7 +95,7 @@ const buildHeaders = (extra?: Record<string, string>): Record<string, string> =>
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    'X-Device-Name': _DEVICE_NAME,
+    'X-Device-Name': getDeviceName(),
     'X-Platform': _PLATFORM,
     ...extra,
   };
