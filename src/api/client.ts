@@ -1,16 +1,25 @@
 import { Platform } from 'react-native';
 import { API_BASE_URL } from '../utils/constants';
 import ReactNativeBlobUtil from 'react-native-blob-util';
-import DeviceInfo from 'react-native-device-info';
 
-// Cache — lu une fois depuis react-native-device-info (sync API)
-let _cachedDeviceName: string | null = null;
+// Cache initialise de facon asynchrone au demarrage
+let _cachedDeviceName: string = Platform.OS === 'ios'
+  ? 'iPhone'
+  : `Android ${Platform.Version}`;
 
-function getDeviceName(): string {
-  if (_cachedDeviceName) return _cachedDeviceName;
+// Lit /system/build.prop pour extraire ro.product.model et ro.product.brand
+// Fonctionne sur tous les Android sans permission, sans lib native supplementaire
+async function _initDeviceName(): Promise<void> {
+  if (Platform.OS !== 'android') return;
   try {
-    const model = DeviceInfo.getModel();       // ex: "Samsung Galaxy S22"
-    const brand = DeviceInfo.getBrand();       // ex: "samsung"
+    const content: string = await ReactNativeBlobUtil.fs.readFile('/system/build.prop', 'utf8');
+    const lines = content.split('\n');
+    const get = (key: string): string => {
+      const line = lines.find(l => l.startsWith(key + '='));
+      return line ? line.split('=').slice(1).join('=').trim() : '';
+    };
+    const model = get('ro.product.model') || get('ro.product.name');
+    const brand = get('ro.product.brand') || get('ro.product.manufacturer');
     if (model) {
       const brandCap = brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : '';
       const modelLow = model.toLowerCase();
@@ -18,12 +27,16 @@ function getDeviceName(): string {
       _cachedDeviceName = (brandLow && !modelLow.startsWith(brandLow))
         ? `${brandCap} ${model}`
         : model;
-    } else {
-      _cachedDeviceName = Platform.OS === 'ios' ? 'iPhone' : `Android ${Platform.Version}`;
     }
   } catch {
-    _cachedDeviceName = Platform.OS === 'ios' ? 'iPhone' : `Android ${Platform.Version}`;
+    // Fallback deja defini
   }
+}
+
+// Lance la lecture en arriere-plan des le chargement du module
+_initDeviceName();
+
+function getDeviceName(): string {
   return _cachedDeviceName;
 }
 
