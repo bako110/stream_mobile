@@ -1,5 +1,13 @@
+import { Platform } from 'react-native';
 import { API_BASE_URL } from '../utils/constants';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+
+const _DEVICE_NAME = Platform.OS === 'ios'
+  ? `iPhone (iOS ${Platform.Version})`
+  : Platform.OS === 'android'
+    ? `Android ${Platform.Version}`
+    : 'Web';
+const _PLATFORM = Platform.OS;
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -53,6 +61,8 @@ const buildHeaders = (extra?: Record<string, string>): Record<string, string> =>
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    'X-Device-Name': _DEVICE_NAME,
+    'X-Platform': _PLATFORM,
     ...extra,
   };
   if (authToken) {

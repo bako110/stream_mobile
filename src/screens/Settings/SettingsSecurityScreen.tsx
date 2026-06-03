@@ -85,7 +85,7 @@ function platformColor(platform: string | null): string {
 
 interface CardProps {
   session: Session;
-  onRevoke: (id: string) => void;
+  onRevoke: (id: string, isCurrent: boolean) => void;
 }
 
 const SessionCard: React.FC<CardProps> = ({ session, onRevoke }) => {
@@ -97,17 +97,17 @@ const SessionCard: React.FC<CardProps> = ({ session, onRevoke }) => {
     <View style={[sc.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
       <View style={sc.row}>
         <View style={[sc.iconWrap, { backgroundColor: pc + '22' }]}>
-          <MCIcon name={platformIcon(session.platform)} size={22} color={pc} />
+          <MCIcon name={platformIcon(session.platform)} size={24} color={pc} />
         </View>
 
         <View style={{ flex: 1 }}>
           <View style={sc.titleRow}>
             <Text style={[sc.deviceName, { color: colors.textPrimary }]} numberOfLines={1}>
-              {session.device_name ?? 'Appareil inconnu'}
+              {session.device_name ?? 'Cet appareil'}
             </Text>
             {session.is_current && (
               <View style={sc.currentBadge}>
-                <Text style={sc.currentBadgeText}>Session actuelle</Text>
+                <Text style={sc.currentBadgeText}>Cet appareil</Text>
               </View>
             )}
           </View>
@@ -129,15 +129,14 @@ const SessionCard: React.FC<CardProps> = ({ session, onRevoke }) => {
           ) : null}
         </View>
 
-        {!session.is_current && (
-          <TouchableOpacity
-            style={sc.trashBtn}
-            onPress={() => onRevoke(session.id)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Icon name="trash-2" size={17} color="#EF4444" />
-          </TouchableOpacity>
-        )}
+        {/* Bouton supprimer — visible sur TOUS les appareils */}
+        <TouchableOpacity
+          style={sc.trashBtn}
+          onPress={() => onRevoke(session.id, session.is_current)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon name="trash-2" size={18} color="#EF4444" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -192,37 +191,52 @@ export const SettingsSecurityScreen: React.FC = () => {
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
-  const handleRevoke = useCallback((sessionId: string) => {
-    Alert.alert(
-      'Deconnecter cet appareil ?',
-      "Cette session sera terminee et l'appareil devra se reconnecter.",
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Deconnecter',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setRevoking(sessionId);
+  const handleRevoke = useCallback((sessionId: string, isCurrent: boolean) => {
+    const title   = isCurrent ? 'Se deconnecter ?' : 'Deconnecter cet appareil ?';
+    const message = isCurrent
+      ? 'Vous allez etre deconnecte de ce compte sur cet appareil.'
+      : "Cette session sera terminee et l'appareil devra se reconnecter.";
+    const btnText = isCurrent ? 'Se deconnecter' : 'Deconnecter';
+
+    Alert.alert(title, message, [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: btnText,
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setRevoking(sessionId);
+            // Pour la session courante on utilise /auth/logout (pas de restriction)
+            if (isCurrent) {
+              await apiClient.post('/api/v1/auth/logout', {});
+            } else {
               await apiClient.delete('/api/v1/auth/sessions/' + sessionId);
-              const anim = fadeAnims.current[sessionId];
-              if (anim) {
-                Animated.timing(anim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
-                  setSessions(prev => prev.filter(s => s.id !== sessionId));
-                });
-              } else {
-                setSessions(prev => prev.filter(s => s.id !== sessionId));
-              }
-            } catch {
-              Alert.alert('Erreur', 'Impossible de revoquer cette session.');
-            } finally {
-              setRevoking(null);
             }
-          },
+            const anim = fadeAnims.current[sessionId];
+            if (anim) {
+              Animated.timing(anim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
+                setSessions(prev => prev.filter(s => s.id !== sessionId));
+              });
+            } else {
+              setSessions(prev => prev.filter(s => s.id !== sessionId));
+            }
+            // Si c'est la session courante → déclencher la déconnexion app
+            if (isCurrent) {
+              const { storage } = require('../../utils/storage');
+              const { STORAGE_KEYS } = require('../../utils/constants');
+              storage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+              storage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+              nav.reset({ index: 0, routes: [{ name: 'Auth' as any }] });
+            }
+          } catch {
+            Alert.alert('Erreur', 'Impossible de terminer cette session.');
+          } finally {
+            setRevoking(null);
+          }
         },
-      ],
-    );
-  }, []);
+      },
+    ]);
+  }, [nav]);
 
   const handleRevokeAll = useCallback(() => {
     Alert.alert(
@@ -280,7 +294,7 @@ export const SettingsSecurityScreen: React.FC = () => {
               const anim = fadeAnims.current[session.id] ?? new Animated.Value(1);
               return (
                 <Animated.View key={session.id} style={{ opacity: anim, position: 'relative' }}>
-                  <SessionCard session={session} onRevoke={handleRevoke} />
+                  <SessionCard session={session} onRevoke={(id) => handleRevoke(id, session.is_current)} />
                   {revoking === session.id && (
                     <View style={s.revokingOverlay}>
                       <FolixLoader variant="bar" color="#EF4444" />
