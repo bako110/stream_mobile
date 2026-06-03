@@ -621,7 +621,7 @@ export const CommunitiesScreen: React.FC = () => {
           </View>
           <View style={S.heroCompactActions}>
             <TouchableOpacity
-              onPress={() => { resetForm(); setTemplateOpen(true); }}
+              onPress={() => { resetForm(); setCreateOpen(true); }}
               style={S.heroBtnPrimary}
               activeOpacity={0.85}
             >
@@ -658,7 +658,7 @@ export const CommunitiesScreen: React.FC = () => {
           </Text>
           <View style={S.heroActions}>
             <TouchableOpacity
-              onPress={() => { resetForm(); setTemplateOpen(true); }}
+              onPress={() => { resetForm(); setCreateOpen(true); }}
               style={S.heroBtnPrimary}
               activeOpacity={0.85}
             >
@@ -768,7 +768,7 @@ export const CommunitiesScreen: React.FC = () => {
             </Text>
             {tab === 'mine' && (
               <TouchableOpacity
-                onPress={() => { resetForm(); setTemplateOpen(true); }}
+                onPress={() => { resetForm(); setCreateOpen(true); }}
                 style={{ borderRadius: 14, overflow: 'hidden', marginTop: 4 }}
               >
                 <LinearGradient
@@ -823,6 +823,62 @@ export const CommunitiesScreen: React.FC = () => {
           <Icon name="camera" size={11} color="#fff" />
         </View>
       </TouchableOpacity>
+
+      {/* Sélecteur de type — scroll horizontal */}
+      {templates.length > 0 && (
+        <View style={{ marginTop: 16 }}>
+          <Text style={[S.fieldLabel, { color: colors.textTertiary }]}>TYPE DE COMMUNAUTÉ</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+          >
+            {/* Option "Aucun type" */}
+            <TouchableOpacity
+              onPress={() => setSelectedTemplate(null)}
+              activeOpacity={0.8}
+              style={[S.typeChip, {
+                backgroundColor: !selectedTemplate ? colors.primary + '18' : colors.surface,
+                borderColor: !selectedTemplate ? colors.primary : colors.border,
+              }]}
+            >
+              <Text style={{ fontSize: 18 }}>✨</Text>
+              <Text style={[S.typeChipLabel, { color: !selectedTemplate ? colors.primary : colors.textSecondary }]}>
+                Libre
+              </Text>
+            </TouchableOpacity>
+
+            {templates.map(t => {
+              const active = selectedTemplate?.id === t.id;
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  onPress={() => {
+                    setSelectedTemplate(active ? null : t);
+                    if (!active) {
+                      if (t.default_settings?.is_private !== undefined) setCreatePrivate(t.default_settings.is_private);
+                      if (t.default_settings?.requires_approval !== undefined) setCreateInviteOnly(t.default_settings.requires_approval);
+                      if (t.suggested_description && !createDesc.trim()) setCreateDesc(t.suggested_description);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                  style={[S.typeChip, {
+                    backgroundColor: active ? (t.color ?? colors.primary) + '18' : colors.surface,
+                    borderColor: active ? (t.color ?? colors.primary) : colors.border,
+                  }]}
+                >
+                  <Text style={{ fontSize: 18 }}>{t.icon ?? '🏠'}</Text>
+                  <Text style={[S.typeChipLabel, {
+                    color: active ? (t.color ?? colors.primary) : colors.textSecondary,
+                  }]}>
+                    {t.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Champs */}
       <View style={{ marginTop: 14, gap: 14 }}>
@@ -1073,7 +1129,7 @@ export const CommunitiesScreen: React.FC = () => {
           <BackButton onPress={() => nav.goBack()} />
           <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Communautés</Text>
           <TouchableOpacity
-            onPress={() => setTemplateOpen(true)}
+            onPress={() => { resetForm(); setCreateOpen(true); }}
             style={[S.createBtn, { backgroundColor: colors.primary }]}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
@@ -1526,6 +1582,14 @@ const S = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
+
+  // Type chips
+  typeChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 12, borderWidth: 1.5,
+  },
+  typeChipLabel: { fontSize: 13, fontWeight: '700' },
 
   // Form
   fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 7 },
