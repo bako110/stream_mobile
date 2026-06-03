@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { PageHeader } from './_shared';
 import { FolixLoader } from '../../components/common/FolixLoader';
 import { apiClient } from '../../api/client';
+import { authService } from '../../services';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -220,13 +221,9 @@ export const SettingsSecurityScreen: React.FC = () => {
             } else {
               setSessions(prev => prev.filter(s => s.id !== sessionId));
             }
-            // Si c'est la session courante → déclencher la déconnexion app
+            // Si c'est la session courante → déconnexion via RootNavigator
             if (isCurrent) {
-              const { storage } = require('../../utils/storage');
-              const { STORAGE_KEYS } = require('../../utils/constants');
-              storage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-              storage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-              nav.reset({ index: 0, routes: [{ name: 'Auth' as any }] });
+              authService.forceLogout();
             }
           } catch {
             Alert.alert('Erreur', 'Impossible de terminer cette session.');

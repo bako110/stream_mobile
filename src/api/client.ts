@@ -53,6 +53,10 @@ export const setOnUnauthorized = (fn: () => void) => {
   _onUnauthorized = fn;
 };
 
+export const triggerUnauthorized = () => {
+  if (_onUnauthorized) _onUnauthorized();
+};
+
 export const setOnAccountBlocked = (fn: (reason?: string, contact?: string) => void) => {
   _onAccountBlocked = fn;
 };

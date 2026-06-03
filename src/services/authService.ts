@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { apiClient, Endpoints } from '../api';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
-import { setAuthToken, setRefreshTokenFn, setOnUnauthorized, setOnAccountBlocked } from '../api/client';
+import { setAuthToken, setRefreshTokenFn, setOnUnauthorized, setOnAccountBlocked, triggerUnauthorized } from '../api/client';
 import type {
   User, LoginRequest, RegisterRequest,
   AuthToken, PasswordChangeRequest,
@@ -201,5 +201,11 @@ export const authService = {
     storage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     setAuthToken(null);
     invalidateUserCache();
+  },
+
+  /** Deconnexion immediate : efface les tokens ET declenche le callback RootNavigator */
+  forceLogout(): void {
+    authService._clearTokens();
+    triggerUnauthorized();
   },
 };
