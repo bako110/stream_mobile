@@ -894,19 +894,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   useEffect(() => {
     const subEnd   = player.addEventListener('onEnd', () => {
       clearStall();
-      if (isActiveRef.current && mountedRef.current) {
-        // Retour a l etat initial auto : seekTo(0) + pause + thumbnail
-        // Pas d avance auto — l utilisateur tape pour relire ou scrolle
-        try { player.seekTo(0); player.pause(); } catch {}
-        endedRef.current = false;
-        pausedRef.current = true;
-        if (mountedRef.current) {
-          setEnded(false);
-          setPaused(true);
-          setVideoLoaded(false); // re-affiche la thumbnail
-          setVideoPlaying(false);
-        }
-      }
+      if (isActiveRef.current && mountedRef.current) { endedRef.current = true; setEnded(true); onEndRef.current(); }
     });
     const subBuf   = player.addEventListener('onBuffer', (val: boolean) => {
       if (!mountedRef.current) return;
@@ -943,8 +931,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       }
       playTimerRef.current = setTimeout(() => {
         if (!mountedRef.current || pausedRef.current) return;
-        // Reprend/demarre la lecture
-        try { player.play(); } catch {}
+        if (endedRef.current) {
+          // Reel termine → afficher overlay "Revoir", ne pas relancer auto
+          if (mountedRef.current) setEnded(true);
+        } else {
+          // Reel en cours ou pas encore joue → reprend/demarre
+          try { player.play(); } catch {}
+        }
       }, 80);
     } else {
       try { player.pause(); } catch {}
