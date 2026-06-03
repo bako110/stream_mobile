@@ -182,13 +182,19 @@ export const ReelsScreen: React.FC = () => {
         setTimeout(() => {
           try { listRef.current?.scrollToIndex({ index: targetIdx, animated: false }); } catch {}
         }, 150);
-      } else if (targetIdx > 0 && targetId) {
-        const alreadyVisible = reelsRef.current[currentIdxRef.current]?.id === targetId;
-        if (!alreadyVisible) {
-          currentIdxRef.current = targetIdx;
-          setCurrentIndex(targetIdx);
-          setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
-        }
+      } else if (targetId) {
+        // Silent avec cible — repositionner après remount du FlatList (key change)
+        currentIdxRef.current = targetIdx;
+        setCurrentIndex(targetIdx);
+        // Délai 300ms pour laisser le FlatList se remonter avec la liste complète
+        setTimeout(() => {
+          try {
+            listRef.current?.scrollToOffset({
+              offset: (SCREEN_H - HEADER_H) * targetIdx,
+              animated: false,
+            });
+          } catch {}
+        }, 300);
       }
       // Si silent sans cible → on garde simplement la liste à jour sans bouger l'index
 
@@ -584,6 +590,7 @@ export const ReelsScreen: React.FC = () => {
         ref={listRef}
         data={reels}
         keyExtractor={r => r.id}
+        key={reels.length === 1 ? 'single' : 'multi'}
         style={{ flex: 1, marginTop: HEADER_H }}
         pagingEnabled={false}
         snapToInterval={SCREEN_H - HEADER_H}
