@@ -179,22 +179,18 @@ export const ReelsScreen: React.FC = () => {
         viewedReelsRef.current = new Set();
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
-        setTimeout(() => {
-          try { listRef.current?.scrollToIndex({ index: targetIdx, animated: false }); } catch {}
-        }, 150);
-      } else if (targetId) {
-        // Silent avec cible — repositionner après remount du FlatList (key change)
-        currentIdxRef.current = targetIdx;
-        setCurrentIndex(targetIdx);
-        // Délai 300ms pour laisser le FlatList se remonter avec la liste complète
-        setTimeout(() => {
-          try {
-            listRef.current?.scrollToOffset({
-              offset: (SCREEN_H - HEADER_H) * targetIdx,
-              animated: false,
-            });
-          } catch {}
-        }, 300);
+        if (targetIdx > 0) {
+          setTimeout(() => {
+            try { listRef.current?.scrollToIndex({ index: targetIdx, animated: false }); } catch {}
+          }, 150);
+        }
+      } else if (targetIdx > 0 && targetId) {
+        const alreadyVisible = reelsRef.current[currentIdxRef.current]?.id === targetId;
+        if (!alreadyVisible) {
+          currentIdxRef.current = targetIdx;
+          setCurrentIndex(targetIdx);
+          setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
+        }
       }
       // Si silent sans cible → on garde simplement la liste à jour sans bouger l'index
 
@@ -320,19 +316,8 @@ export const ReelsScreen: React.FC = () => {
         setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
       } else if (newInitialId !== lastInitialReelRef.current) {
         lastInitialReelRef.current = newInitialId;
-        // Injecter le reel immédiatement → évite l'écran loader (reels.length > 0)
-        // Le FlatList existe dès le départ → scroll possible tout de suite
-        if (newReel?.hls_url) {
-          setReels(prev => {
-            const already = prev.findIndex(r => r.id === newInitialId);
-            if (already >= 0) return prev;
-            return [newReel, ...prev];
-          });
-          currentIdxRef.current = 0;
-          setCurrentIndex(0);
-        }
-        // Feed complet en silent — remplace la liste sans bloquer l'affichage
-        load(true, newInitialId, newReel);
+        // Charger le feed complet avec le reel cible — liste complète dès le départ
+        load(false, newInitialId, newReel);
       }
 
     } else if (!didFocusOnceRef.current) {
@@ -590,7 +575,6 @@ export const ReelsScreen: React.FC = () => {
         ref={listRef}
         data={reels}
         keyExtractor={r => r.id}
-        key={reels.length === 1 ? 'single' : 'multi'}
         style={{ flex: 1, marginTop: HEADER_H }}
         pagingEnabled={false}
         snapToInterval={SCREEN_H - HEADER_H}
