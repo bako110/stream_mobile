@@ -152,4 +152,20 @@ export const concertsStyles = StyleSheet.create({
     fontSize: 14,
     padding:  0,
   },
+
+  // ── NearbyCard ────────────────────────────────────────────────────────────
+  nearbyCard:      { width: 148, borderRadius: BorderRadius.lg, overflow: 'hidden' },
+  nearbyThumbWrap: { position: 'relative' },
+  nearbyThumb:     { width: '100%', height: 100, alignItems: 'center', justifyContent: 'center' },
+  nearbyDistBadge: {
+    position: 'absolute', bottom: 7, right: 7,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: BorderRadius.sm, overflow: 'hidden',
+  },
+  nearbyDistText:  { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.2 },
+  nearbyInfo:      { padding: 9, gap: 3 },
+  nearbyTitle:     { fontSize: 13, fontWeight: '700' },
+  nearbyVenueRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  nearbyVenue:     { fontSize: 11, flex: 1 },
 });

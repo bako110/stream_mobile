@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, ScrollView, StyleSheet,
+  View, Text, FlatList, TouchableOpacity, ScrollView,
   Image, RefreshControl, Alert, TextInput, Keyboard,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -294,18 +294,18 @@ const NearbyCard: React.FC<NearbyCardProps> = ({ concert, colors, onPress }) => 
 
   return (
     <TouchableOpacity
-      style={[nearbyCardSt.card, { backgroundColor: colors.surfaceElevated }]}
+      style={[s.nearbyCard, { backgroundColor: colors.surfaceElevated }]}
       activeOpacity={0.85}
       onPress={onPress}
     >
       {/* Thumbnail */}
-      <View style={nearbyCardSt.thumbWrap}>
+      <View style={s.nearbyThumbWrap}>
         {concert.thumbnail_url ? (
-          <Image source={{ uri: concert.thumbnail_url }} style={nearbyCardSt.thumb} resizeMode="cover" />
+          <Image source={{ uri: concert.thumbnail_url }} style={s.nearbyThumb} resizeMode="cover" />
         ) : (
           <LinearGradient
             colors={[colors.gradientStart + '60', colors.gradientEnd + '30']}
-            style={nearbyCardSt.thumb}
+            style={s.nearbyThumb}
           >
             <Icon name="music" size={28} color={colors.textOnBrand + 'AA'} />
           </LinearGradient>
@@ -325,23 +325,23 @@ const NearbyCard: React.FC<NearbyCardProps> = ({ concert, colors, onPress }) => 
             colors={['#7B3FF2', '#E0389A']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={nearbyCardSt.distBadge}
+            style={s.nearbyDistBadge}
           >
             <Icon name="map-pin" size={9} color="#fff" />
-            <Text style={nearbyCardSt.distText}>{distLabel}</Text>
+            <Text style={s.nearbyDistText}>{distLabel}</Text>
           </LinearGradient>
         ) : null}
       </View>
 
       {/* Info */}
-      <View style={nearbyCardSt.info}>
-        <Text style={[nearbyCardSt.title, { color: colors.textPrimary }]} numberOfLines={1}>
+      <View style={s.nearbyInfo}>
+        <Text style={[s.nearbyTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           {concert.title}
         </Text>
         {concert.venue_city ? (
-          <View style={nearbyCardSt.venueRow}>
+          <View style={s.nearbyVenueRow}>
             <Icon name="map-pin" size={10} color={colors.textTertiary} />
-            <Text style={[nearbyCardSt.venue, { color: colors.textTertiary }]} numberOfLines={1}>
+            <Text style={[s.nearbyVenue, { color: colors.textTertiary }]} numberOfLines={1}>
               {concert.venue_city}
             </Text>
           </View>
@@ -351,19 +351,3 @@ const NearbyCard: React.FC<NearbyCardProps> = ({ concert, colors, onPress }) => 
   );
 };
 
-const nearbyCardSt = StyleSheet.create({
-  card:      { width: 148, borderRadius: 14, overflow: 'hidden' },
-  thumbWrap: { position: 'relative' },
-  thumb:     { width: '100%', height: 100, alignItems: 'center', justifyContent: 'center' },
-  distBadge: {
-    position: 'absolute', bottom: 7, right: 7,
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 7, paddingVertical: 3,
-    borderRadius: 10, overflow: 'hidden',
-  },
-  distText:  { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.2 },
-  info:      { padding: 9, gap: 3 },
-  title:     { fontSize: 13, fontWeight: '700' },
-  venueRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  venue:     { fontSize: 11, flex: 1 },
-});
