@@ -297,6 +297,98 @@ const MusicWidget: React.FC<{ audioUrl: string; accent: string; playing: boolean
   );
 };
 
+// ─── StoryAdSlide — pub plein ecran entre groupes de stories ─────────────────
+
+interface AdInfo { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; }
+
+const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip }) => {
+  const { width: W, height: H } = Dimensions.get('window');
+  const isVideo = !!(ad.creative_url && (ad.creative_url.includes('.m3u8') || ad.creative_url.includes('/hls/')));
+  const adPlayer = useVideoPlayer(
+    isVideo && ad.creative_url ? { uri: ad.creative_url } : 'about:blank',
+    p => { p.loop = true; p.muted = false; p.volume = 1; },
+  );
+  useEffect(() => {
+    if (!isVideo) return;
+    try { adPlayer.play(); } catch {}
+    return () => { try { adPlayer.pause(); } catch {} };
+  }, [isVideo, adPlayer]);
+
+  // Barre de progression animee (5s)
+  const prog = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(prog, { toValue: 1, duration: 5000, useNativeDriver: false }).start();
+  }, [prog]);
+
+  const apiClientRef = require('../../api/client').apiClient;
+  useEffect(() => {
+    try { apiClientRef.post(`/api/v1/ads/${ad.id}/impression`, {}); } catch {}
+  }, [ad.id]);
+
+  return (
+    <Modal visible transparent animationType="fade" statusBarTranslucent>
+      <View style={{ width: W, height: H, backgroundColor: '#000' }}>
+        <StatusBar hidden translucent />
+
+        {/* Media */}
+        {isVideo && ad.creative_url ? (
+          <VideoView player={adPlayer} style={{ position: 'absolute', width: W, height: H }} resizeMode="cover" controls={false} />
+        ) : (ad.creative_url || ad.thumbnail_url) ? (
+          <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={{ position: 'absolute', width: W, height: H }} resizeMode="cover" />
+        ) : (
+          <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ position: 'absolute', width: W, height: H }} />
+        )}
+
+        {/* Gradient bas */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.92)']}
+          locations={[0.35, 0.65, 1]}
+          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.55 }}
+        />
+
+        {/* Barre progression */}
+        <View style={{ position: 'absolute', top: 44, left: 8, right: 8, height: 2.5, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }}>
+          <Animated.View style={{ height: '100%', backgroundColor: '#fff', borderRadius: 2, width: prog.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
+        </View>
+
+        {/* Badge + fermer */}
+        <View style={{ position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+            <Icon name="zap" size={11} color="#F59E0B" />
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Sponsorisé</Text>
+          </View>
+          <TouchableOpacity onPress={onSkip} style={{ marginLeft: 'auto' as any }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Icon name="x" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Contenu bas */}
+        <View style={{ position: 'absolute', bottom: 72, left: 20, right: 20 }}>
+          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 8, lineHeight: 28, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={2}>
+            {ad.title}
+          </Text>
+          {ad.description ? (
+            <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 14, lineHeight: 20, marginBottom: 18 }} numberOfLines={2}>{ad.description}</Text>
+          ) : null}
+          {ad.cta_url ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                try { apiClientRef.post(`/api/v1/ads/${ad.id}/click`, {}); } catch {}
+                onSkip();
+              }}
+              style={{ alignSelf: 'flex-start', backgroundColor: '#fff', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            >
+              <Icon name="external-link" size={14} color="#7B3FF2" />
+              <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 14 }}>{ad.cta_text || 'En savoir plus'}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const StoryViewer: React.FC<Props> = ({
@@ -716,61 +808,13 @@ export const StoryViewer: React.FC<Props> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  // Slide pub entre groupes
+  // Slide pub entre groupes — avec lecture video si HLS
   if (showStoryAd && storyAd) {
-    const { width: W, height: H } = Dimensions.get('window');
-    return (
-      <Modal visible transparent animationType="fade" statusBarTranslucent>
-        <View style={{ flex: 1, backgroundColor: '#000', width: W, height: H }}>
-          <StatusBar hidden translucent />
-          {(storyAd.creative_url || storyAd.thumbnail_url) ? (
-            <Image source={{ uri: storyAd.creative_url || storyAd.thumbnail_url }} style={{ width: W, height: H, position: 'absolute' }} resizeMode="cover" />
-          ) : <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ width: W, height: H, position: 'absolute' }} />}
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.45 }} />
-          {/* Badge sponsorisé */}
-          <View style={{ position: 'absolute', top: 52, left: 16, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Sponsorisé</Text>
-          </View>
-          {/* Barre de progression */}
-          <View style={{ position: 'absolute', top: 44, left: 8, right: 8, height: 2, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 1 }}>
-            <Animated.View style={{ height: 2, backgroundColor: '#fff', borderRadius: 1, width: '100%' }} />
-          </View>
-          {/* Contenu */}
-          <View style={{ position: 'absolute', bottom: 80, left: 20, right: 20 }}>
-            <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
-              {storyAd.title}
-            </Text>
-            {storyAd.description ? <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20, marginBottom: 16 }} numberOfLines={2}>{storyAd.description}</Text> : null}
-            {storyAd.cta_url ? (
-              <TouchableOpacity
-                onPress={() => {
-                  try { (require('../../api/client').apiClient as any).post(`/api/v1/ads/${storyAd.id}/click`, {}); } catch {}
-                  if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
-                  setShowStoryAd(false); setPaused(false);
-                  setGroupIdx(g => g + 1); setStoryIdx(0);
-                }}
-                style={{ backgroundColor: '#fff', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8 }}
-              >
-                <Icon name="external-link" size={15} color="#7B3FF2" />
-                <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 14 }}>{storyAd.cta_text || 'En savoir plus'}</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          {/* Passer */}
-          <TouchableOpacity
-            onPress={() => {
-              if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
-              setShowStoryAd(false); setPaused(false);
-              setGroupIdx(g => g + 1); setStoryIdx(0);
-            }}
-            style={{ position: 'absolute', top: 52, right: 16 }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Icon name="x" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
-    );
+    return <StoryAdSlide ad={storyAd} onSkip={() => {
+      if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
+      setShowStoryAd(false); setPaused(false);
+      setGroupIdx(g => g + 1); setStoryIdx(0);
+    }} />;
   }
 
   return (

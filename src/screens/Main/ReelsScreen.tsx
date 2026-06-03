@@ -434,36 +434,15 @@ export const ReelsScreen: React.FC = () => {
   }, [reels, reelAd]);
 
   const renderVideoSlide = useCallback(({ item, index }: { item: any; index: number }) => {
-    // Slide pub
     if (item._isAd) {
-      const ad = item.ad;
       return (
-        <View style={{ width: SCREEN_W, height: SCREEN_H - HEADER_H, backgroundColor: '#0a0a1a', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <View style={{ position: 'absolute', top: 14, left: 14, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Sponsorisé</Text>
-          </View>
-          {ad.creative_url || ad.thumbnail_url ? (
-            <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={{ width: SCREEN_W, height: SCREEN_H - HEADER_H, position: 'absolute' }} resizeMode="cover" />
-          ) : null}
-          <View style={{ position: 'absolute', bottom: 60, left: 24, right: 80 }}>
-            <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 6, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
-              {ad.title}
-            </Text>
-            {ad.description ? <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20 }} numberOfLines={3}>{ad.description}</Text> : null}
-            {ad.cta_url ? (
-              <TouchableOpacity
-                style={{ marginTop: 14, backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 22, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7 }}
-                onPress={() => {
-                  apiClient.post(`/api/v1/ads/${ad.id}/impression`, {}).catch(() => {});
-                  apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
-                }}
-              >
-                <Icon name="external-link" size={14} color="#fff" />
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{ad.cta_text || 'En savoir plus'}</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
+        <AdSlide
+          ad={item.ad}
+          isActive={index === currentIndex && screenFocused}
+          muted={muted}
+          screenW={SCREEN_W}
+          screenH={SCREEN_H - HEADER_H}
+        />
       );
     }
     return (
@@ -782,6 +761,110 @@ export const ReelsScreen: React.FC = () => {
     </View>
   );
 };
+
+// ─── AdSlide — slide pub plein ecran dans le feed reels ──────────────────────
+
+interface AdData {
+  id: string;
+  title: string;
+  description?: string;
+  cta_text?: string;
+  cta_url?: string;
+  creative_url?: string;
+  thumbnail_url?: string;
+}
+
+const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW: number; screenH: number }> = memo(({
+  ad, isActive, muted, screenW, screenH,
+}) => {
+  const isVideo = !!(ad.creative_url && (ad.creative_url.includes('.m3u8') || ad.creative_url.includes('/hls/') || ad.creative_url.includes('video')));
+  const player = useVideoPlayer(
+    isVideo && ad.creative_url ? { uri: ad.creative_url } : 'about:blank',
+    p => { p.loop = true; p.muted = muted; p.volume = muted ? 0 : 1; },
+  );
+
+  useEffect(() => {
+    if (!isVideo) return;
+    try { if (isActive) player.play(); else player.pause(); } catch {}
+  }, [isActive, isVideo, player]);
+
+  useEffect(() => {
+    try { player.muted = muted; player.volume = muted ? 0 : 1; } catch {}
+  }, [muted, player]);
+
+  // Track impression une seule fois
+  const impressionSent = useRef(false);
+  useEffect(() => {
+    if (isActive && !impressionSent.current) {
+      impressionSent.current = true;
+      apiClient.post(`/api/v1/ads/${ad.id}/impression`, {}).catch(() => {});
+    }
+  }, [isActive, ad.id]);
+
+  return (
+    <View style={{ width: screenW, height: screenH, backgroundColor: '#0a0a1a' }}>
+      {/* Media background */}
+      {isVideo && ad.creative_url ? (
+        <VideoView
+          player={player}
+          style={{ position: 'absolute', width: screenW, height: screenH }}
+          resizeMode="cover"
+          controls={false}
+        />
+      ) : (ad.creative_url || ad.thumbnail_url) ? (
+        <Image
+          source={{ uri: ad.creative_url || ad.thumbnail_url }}
+          style={{ position: 'absolute', width: screenW, height: screenH }}
+          resizeMode="cover"
+        />
+      ) : (
+        <LinearGradient
+          colors={['#7B3FF2', '#E0389A']}
+          style={{ position: 'absolute', width: screenW, height: screenH }}
+        />
+      )}
+
+      {/* Gradient bas */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.92)']}
+        locations={[0.3, 0.65, 1]}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.55 }}
+      />
+
+      {/* Badge sponsorisé */}
+      <View style={{ position: 'absolute', top: 14, left: 14, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+        <Icon name="zap" size={11} color="#F59E0B" />
+        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>Sponsorisé</Text>
+      </View>
+
+      {/* Contenu bas */}
+      <View style={{ position: 'absolute', bottom: 50, left: 16, right: 72 }}>
+        <Text style={{ color: '#fff', fontSize: 19, fontWeight: '800', marginBottom: 6, lineHeight: 24, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={2}>
+          {ad.title}
+        </Text>
+        {ad.description ? (
+          <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, lineHeight: 19, marginBottom: 14 }} numberOfLines={2}>
+            {ad.description}
+          </Text>
+        ) : null}
+        {ad.cta_url ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+              apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
+            }}
+            style={{ alignSelf: 'flex-start', backgroundColor: '#fff', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: 7 }}
+          >
+            <Icon name="external-link" size={13} color="#7B3FF2" />
+            <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 13 }}>
+              {ad.cta_text || 'En savoir plus'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </View>
+  );
+});
 
 // ─── VideoSlide ───────────────────────────────────────────────────────────────
 
