@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
+  View, Text, FlatList, TouchableOpacity, ScrollView, StyleSheet,
   Image, RefreshControl, Alert, TextInput, Keyboard,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -8,6 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
+import { useUserLocation } from '../../hooks/useUserLocation';
 import { AppHeader, SkeletonFeed } from '../../components/common';
 import { concertService } from '../../services';
 import type { Concert } from '../../types';
@@ -19,8 +20,10 @@ export const ConcertsScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation();
+  const location = useUserLocation();
 
   const [myConcerts,     setMyConcerts]     = useState<Concert[]>([]);
+  const [nearbyConcerts, setNearbyConcerts] = useState<Concert[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
   const [searchVisible,  setSearchVisible]  = useState(false);
@@ -36,7 +39,18 @@ export const ConcertsScreen: React.FC = () => {
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
 
+  const loadNearby = useCallback(async () => {
+    if (!location) return;
+    try {
+      const nearby = await concertService.list({ lat: location.lat, lon: location.lon, limit: 10 });
+      setNearbyConcerts(Array.isArray(nearby) ? nearby : []);
+    } catch {
+      setNearbyConcerts([]);
+    }
+  }, [location]);
+
   useEffect(() => { setLoading(true); load(); }, []);
+  useEffect(() => { loadNearby(); }, [loadNearby]);
 
   const filteredConcerts = searchQuery.trim()
     ? myConcerts.filter(c =>
@@ -98,6 +112,32 @@ export const ConcertsScreen: React.FC = () => {
             </TouchableOpacity>
           )}
         </Animated.View>
+      )}
+
+      {/* ── Concerts à proximité ─────────────────────────────────────── */}
+      {nearbyConcerts.length > 0 && (
+        <View>
+          <View style={[s.mySection, { borderBottomColor: colors.divider }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="map-pin" size={13} color={colors.primary} />
+              <Text style={[s.mySectionTitle, { color: colors.textTertiary }]}>PRÈS DE TOI</Text>
+            </View>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}
+          >
+            {nearbyConcerts.map(concert => (
+              <NearbyCard
+                key={concert.id}
+                concert={concert}
+                colors={colors}
+                onPress={() => (nav as any).navigate('ConcertDetail', { concertId: concert.id })}
+              />
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       <View style={[s.mySection, { borderBottomColor: colors.divider }]}>
@@ -238,3 +278,92 @@ const ConcertCard: React.FC<ConcertCardProps> = ({ concert, colors, onPress, onD
     </TouchableOpacity>
   );
 };
+
+// ── NearbyCard ────────────────────────────────────────────────────────────────
+
+function formatDist(km: number | null | undefined): string {
+  if (km == null) return '';
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
+
+interface NearbyCardProps { concert: Concert; colors: AppColors; onPress: () => void; }
+
+const NearbyCard: React.FC<NearbyCardProps> = ({ concert, colors, onPress }) => {
+  const isLive = concert.status === 'live';
+  const distLabel = formatDist(concert.distance_km);
+
+  return (
+    <TouchableOpacity
+      style={[nearbyCardSt.card, { backgroundColor: colors.surfaceElevated }]}
+      activeOpacity={0.85}
+      onPress={onPress}
+    >
+      {/* Thumbnail */}
+      <View style={nearbyCardSt.thumbWrap}>
+        {concert.thumbnail_url ? (
+          <Image source={{ uri: concert.thumbnail_url }} style={nearbyCardSt.thumb} resizeMode="cover" />
+        ) : (
+          <LinearGradient
+            colors={[colors.gradientStart + '60', colors.gradientEnd + '30']}
+            style={nearbyCardSt.thumb}
+          >
+            <Icon name="music" size={28} color={colors.textOnBrand + 'AA'} />
+          </LinearGradient>
+        )}
+
+        {/* Badge LIVE */}
+        {isLive && (
+          <View style={[s.liveBadge, { backgroundColor: colors.accentOrange }]}>
+            <View style={[s.liveDot, { backgroundColor: colors.textOnBrand }]} />
+            <Text style={[s.liveBadgeText, { color: colors.textOnBrand }]}>LIVE</Text>
+          </View>
+        )}
+
+        {/* Badge distance */}
+        {distLabel ? (
+          <LinearGradient
+            colors={['#7B3FF2', '#E0389A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={nearbyCardSt.distBadge}
+          >
+            <Icon name="map-pin" size={9} color="#fff" />
+            <Text style={nearbyCardSt.distText}>{distLabel}</Text>
+          </LinearGradient>
+        ) : null}
+      </View>
+
+      {/* Info */}
+      <View style={nearbyCardSt.info}>
+        <Text style={[nearbyCardSt.title, { color: colors.textPrimary }]} numberOfLines={1}>
+          {concert.title}
+        </Text>
+        {concert.venue_city ? (
+          <View style={nearbyCardSt.venueRow}>
+            <Icon name="map-pin" size={10} color={colors.textTertiary} />
+            <Text style={[nearbyCardSt.venue, { color: colors.textTertiary }]} numberOfLines={1}>
+              {concert.venue_city}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const nearbyCardSt = StyleSheet.create({
+  card:      { width: 148, borderRadius: 14, overflow: 'hidden' },
+  thumbWrap: { position: 'relative' },
+  thumb:     { width: '100%', height: 100, alignItems: 'center', justifyContent: 'center' },
+  distBadge: {
+    position: 'absolute', bottom: 7, right: 7,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: 10, overflow: 'hidden',
+  },
+  distText:  { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.2 },
+  info:      { padding: 9, gap: 3 },
+  title:     { fontSize: 13, fontWeight: '700' },
+  venueRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  venue:     { fontSize: 11, flex: 1 },
+});

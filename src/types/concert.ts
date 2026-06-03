@@ -35,6 +35,8 @@ export interface Concert {
   updated_at: string;
   // live programme associé
   live_id: string | null;
+  // distance géolocalisée (injectée par le backend lors des requêtes avec lat/lon)
+  distance_km?: number | null;
   // relation
   artist?: import('./user').User;
 }

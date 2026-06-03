@@ -120,10 +120,15 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
 
             {/* Badge distance haut droite */}
             {distLabel ? (
-              <View style={[st.distPill, { position: 'absolute', top: 12, right: 12 }]}>
-                <Icon name="navigation" size={10} color="#fff" />
+              <LinearGradient
+                colors={['#7B3FF2', '#E0389A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[st.distPill, { position: 'absolute', top: 12, right: 12 }]}
+              >
+                <Icon name="map-pin" size={10} color="#fff" />
                 <Text style={st.distTxt}>{distLabel}</Text>
-              </View>
+              </LinearGradient>
             ) : null}
 
             {/* Titre + date en bas cover */}
@@ -371,8 +376,8 @@ const st = StyleSheet.create({
   coverDate:  { fontSize: 11, color: 'rgba(255,255,255,0.72)' },
   typePill:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   typePillText: { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
-  distPill:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  distTxt:    { fontSize: 10, fontWeight: '700', color: '#fff' },
+  distPill:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, overflow: 'hidden' },
+  distTxt:    { fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
 
   // Body
   body:         { padding: 14, gap: 10 },
