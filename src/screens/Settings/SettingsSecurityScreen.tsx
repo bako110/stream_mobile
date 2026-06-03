@@ -7,7 +7,6 @@ import {
   Alert,
   StyleSheet,
   Animated,
-  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -254,53 +253,65 @@ export const SettingsSecurityScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {loading && <FolixLoader color={colors.primary ?? '#7B3FF2'} />}
       <PageHeader title="Appareils connectes" onBack={() => nav.goBack()} />
+
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>
-          {sessions.length + ' appareil' + (sessions.length > 1 ? 's' : '') + ' connecte' + (sessions.length > 1 ? 's' : '')}
-        </Text>
 
-        {!loading && sessions.length === 0 && (
-          <View style={s.empty}>
-            <MCIcon name="shield-check" size={48} color={colors.textTertiary} />
-            <Text style={[s.emptyText, { color: colors.textTertiary }]}>Aucune session active</Text>
+        {/* Chargement */}
+        {loading ? (
+          <View style={s.loadingWrap}>
+            <FolixLoader variant="bar" color={colors.primary ?? '#7B3FF2'} />
           </View>
-        )}
+        ) : sessions.length === 0 ? (
+          <View style={s.empty}>
+            <MCIcon name="shield-check-outline" size={52} color={colors.textTertiary} />
+            <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Aucune session active</Text>
+            <Text style={[s.emptyText, { color: colors.textTertiary }]}>
+              Vos appareils connectes apparaitront ici
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>
+              {sessions.length + ' appareil' + (sessions.length > 1 ? 's' : '') + ' connecte' + (sessions.length > 1 ? 's' : '')}
+            </Text>
 
-        {sessions.map(session => {
-          const anim = fadeAnims.current[session.id] ?? new Animated.Value(1);
-          return (
-            <Animated.View key={session.id} style={{ opacity: anim }}>
-              <SessionCard session={session} onRevoke={handleRevoke} />
-              {revoking === session.id && (
-                <View style={s.revokingOverlay}>
-                  <ActivityIndicator size="small" color="#EF4444" />
-                </View>
-              )}
-            </Animated.View>
-          );
-        })}
+            {sessions.map(session => {
+              const anim = fadeAnims.current[session.id] ?? new Animated.Value(1);
+              return (
+                <Animated.View key={session.id} style={{ opacity: anim, position: 'relative' }}>
+                  <SessionCard session={session} onRevoke={handleRevoke} />
+                  {revoking === session.id && (
+                    <View style={s.revokingOverlay}>
+                      <FolixLoader variant="bar" color="#EF4444" />
+                    </View>
+                  )}
+                </Animated.View>
+              );
+            })}
 
-        {othersCount > 0 && (
-          <TouchableOpacity
-            style={[s.revokeAllBtn, { borderColor: '#EF444440' }]}
-            onPress={handleRevokeAll}
-            activeOpacity={0.75}
-            disabled={revokingAll}
-          >
-            {revokingAll ? (
-              <ActivityIndicator size="small" color="#EF4444" />
-            ) : (
-              <>
-                <Icon name="log-out" size={16} color="#EF4444" />
-                <Text style={s.revokeAllText}>
-                  {'Deconnecter tous les autres appareils (' + othersCount + ')'}
-                </Text>
-              </>
+            {othersCount > 0 && (
+              <TouchableOpacity
+                style={[s.revokeAllBtn, { borderColor: '#EF444440' }]}
+                onPress={handleRevokeAll}
+                activeOpacity={0.75}
+                disabled={revokingAll}
+              >
+                {revokingAll ? (
+                  <FolixLoader variant="bar" color="#EF4444" />
+                ) : (
+                  <>
+                    <Icon name="log-out" size={16} color="#EF4444" />
+                    <Text style={s.revokeAllText}>
+                      {'Deconnecter tous les autres appareils (' + othersCount + ')'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </>
         )}
+
         <View style={{ height: 32 }} />
       </ScrollView>
     </View>
@@ -310,9 +321,11 @@ export const SettingsSecurityScreen: React.FC = () => {
 const s = StyleSheet.create({
   scroll:          { padding: 16, paddingTop: 12 },
   sectionLabel:    { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginLeft: 2 },
-  empty:           { alignItems: 'center', paddingVertical: 48, gap: 12 },
-  emptyText:       { fontSize: 14 },
-  revokingOverlay: { position: 'absolute', right: 14, top: 14 },
+  loadingWrap:     { paddingVertical: 48, alignItems: 'center' },
+  empty:           { alignItems: 'center', paddingVertical: 60, gap: 10 },
+  emptyTitle:      { fontSize: 15, fontWeight: '700', marginTop: 4 },
+  emptyText:       { fontSize: 13, textAlign: 'center' },
+  revokingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 14 },
   revokeAllBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingVertical: 14, marginTop: 8 },
   revokeAllText:   { fontSize: 14, fontWeight: '600', color: '#EF4444' },
 });
