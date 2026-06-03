@@ -444,17 +444,33 @@ export const ReelsScreen: React.FC = () => {
   // ── Render: empty ─────────────────────────────────────────────────────────
   if (reels.length === 0 && tab === 'feed') {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-        <Icon name="film" size={48} color={colors.textDisabled} />
-        <Text style={{ color: colors.textTertiary, fontSize: 14 }}>Aucun reel disponible</Text>
+        {/* Bouton retour */}
         <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8, borderRadius: 10 }}
-          onPress={() => nav.navigate('CreateReel')}
+          onPress={() => nav.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={{
+            position: 'absolute', top: 52, left: 16, zIndex: 10,
+            width: 40, height: 40, borderRadius: 20,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+            alignItems: 'center', justifyContent: 'center',
+          }}
         >
-          <Icon name="plus" size={18} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ajouter un reel</Text>
+          <Icon name="arrow-left" size={20} color="#fff" />
         </TouchableOpacity>
+        {/* Contenu vide centré */}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <Icon name="film" size={48} color={colors.textDisabled} />
+          <Text style={{ color: colors.textTertiary, fontSize: 14 }}>Aucun reel disponible</Text>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8, borderRadius: 10 }}
+            onPress={() => nav.navigate('CreateReel')}
+          >
+            <Icon name="plus" size={18} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ajouter un reel</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
