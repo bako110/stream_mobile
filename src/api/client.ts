@@ -2,11 +2,32 @@ import { Platform } from 'react-native';
 import { API_BASE_URL } from '../utils/constants';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
-const _DEVICE_NAME = Platform.OS === 'ios'
-  ? `iPhone (iOS ${Platform.Version})`
-  : Platform.OS === 'android'
-    ? `Android ${Platform.Version}`
-    : 'Web';
+// Platform.constants contient le vrai nom du device sans lib externe :
+// Android : { Model: "Samsung Galaxy S22", Brand: "samsung", ... }
+// iOS     : { interfaceIdiom: "phone", osVersion: "17.2", ... } — model via "Model"
+const _constants = (Platform.constants ?? {}) as Record<string, any>;
+const _model: string  = _constants.Model  ?? _constants.model  ?? '';
+const _brand: string  = (_constants.Brand ?? _constants.brand  ?? '').replace(/^\w/, (c: string) => c.toUpperCase());
+
+function _buildDeviceName(): string {
+  if (Platform.OS === 'ios') {
+    // iOS: model = "iPhone", version dans Version
+    const ver = typeof Platform.Version === 'string' ? Platform.Version : '';
+    return _model || `iPhone (iOS ${ver})`;
+  }
+  if (Platform.OS === 'android') {
+    // Combine brand + model si brand n'est pas deja dans model
+    if (_brand && _model) {
+      const modelLow = _model.toLowerCase();
+      const brandLow = _brand.toLowerCase();
+      return modelLow.startsWith(brandLow) ? _model : `${_brand} ${_model}`;
+    }
+    return _model || `Android ${Platform.Version}`;
+  }
+  return 'Web';
+}
+
+const _DEVICE_NAME = _buildDeviceName();
 const _PLATFORM = Platform.OS;
 
 interface RequestOptions {
