@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image,
+  ScrollView, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton } from '../../components/common';
@@ -243,10 +243,7 @@ export const CreateAdScreen: React.FC = () => {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
         <BackButton onPress={() => nav.goBack()} />
@@ -266,8 +263,9 @@ export const CreateAdScreen: React.FC = () => {
       </View>
 
       <ScrollView
-        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 24 }]}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 80 }]}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
         showsVerticalScrollIndicator={false}
       >
 
@@ -484,7 +482,7 @@ export const CreateAdScreen: React.FC = () => {
         )}
 
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
