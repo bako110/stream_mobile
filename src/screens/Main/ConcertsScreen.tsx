@@ -14,7 +14,6 @@ import { concertService } from '../../services';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
 import { concertsStyles as s } from '../../styles/ConcertsScreen.styles';
-import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 export const ConcertsScreen: React.FC = () => {
   const { theme } = useTheme();
