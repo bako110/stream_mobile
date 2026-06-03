@@ -183,8 +183,8 @@ export const ReelsScreen: React.FC = () => {
         if (targetIdx > 0) {
           setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
         }
-      } else if (targetIdx > 0 && targetId) {
-        // Silent avec cible non-visible → scroll sans perturber la lecture en cours
+      } else if (targetId) {
+        // Silent avec cible → scroll si pas déjà dessus
         const alreadyVisible = reelsRef.current[currentIdxRef.current]?.id === targetId;
         if (!alreadyVisible) {
           currentIdxRef.current = targetIdx;
@@ -315,14 +315,16 @@ export const ReelsScreen: React.FC = () => {
         setCurrentIndex(idx);
         setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
       } else if (newInitialId !== lastInitialReelRef.current) {
-        // Nouveau reel pas encore chargé → afficher immédiatement
         lastInitialReelRef.current = newInitialId;
-        if (newReel?.hls_url) {
+        const hasReels = reelsRef.current.length > 0;
+
+        if (newReel?.hls_url && !hasReels) {
+          // Première fois ET liste vide → afficher le reel seul le temps que le feed charge
           setReels([newReel]);
           currentIdxRef.current = 0;
           setCurrentIndex(0);
         }
-        // Enrichir le feed en arrière-plan sans toucher au reel affiché
+        // Charger le feed complet en arrière-plan — positionne sur le reel cible dès qu'il arrive
         load(true, newInitialId, newReel);
       }
 
