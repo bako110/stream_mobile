@@ -37,6 +37,14 @@ const CPM_OPTIONS = [
   { value: 10.0, label: '10.00€', desc: 'Top' },
 ];
 
+// Defini en dehors du composant pour eviter le remontage a chaque render
+const Field: React.FC<{ label: string; textColor: string; children: React.ReactNode }> = ({ label, textColor, children }) => (
+  <View style={s.field}>
+    <Text style={[s.fieldLabel, { color: textColor }]}>{label}</Text>
+    {children}
+  </View>
+);
+
 export const CreateAdScreen: React.FC = () => {
   const { theme: { colors } } = useTheme();
   const nav = useNavigation<any>();
@@ -235,13 +243,6 @@ export const CreateAdScreen: React.FC = () => {
     }
   }, [title, description, ctaText, ctaUrl, creativeUrl, placement, format, budget, cpmEur, isEdit, existingAd, nav]);
 
-  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <View style={s.field}>
-      <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
-      {children}
-    </View>
-  );
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
@@ -292,7 +293,7 @@ export const CreateAdScreen: React.FC = () => {
         </View>
 
         {/* Titre */}
-        <Field label="Titre *">
+        <Field label="Titre *" textColor={colors.textSecondary}>
           <TextInput
             style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
             value={title}
@@ -304,7 +305,7 @@ export const CreateAdScreen: React.FC = () => {
         </Field>
 
         {/* Description */}
-        <Field label="Description">
+        <Field label="Description" textColor={colors.textSecondary}>
           <TextInput
             style={[s.input, s.textarea, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
             value={description}
@@ -318,7 +319,7 @@ export const CreateAdScreen: React.FC = () => {
         </Field>
 
         {/* Créatif — image ou vidéo */}
-        <Field label="Image ou vidéo de la publicité">
+        <Field label="Image ou vidéo de la publicité" textColor={colors.textSecondary}>
           <TouchableOpacity
             onPress={pickCreative}
             disabled={uploading}
@@ -374,7 +375,7 @@ export const CreateAdScreen: React.FC = () => {
         {/* CTA */}
         <View style={s.row}>
           <View style={{ flex: 1 }}>
-            <Field label="Texte bouton CTA">
+            <Field label="Texte bouton CTA" textColor={colors.textSecondary}>
               <TextInput
                 style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
                 value={ctaText}
@@ -387,7 +388,7 @@ export const CreateAdScreen: React.FC = () => {
           </View>
         </View>
 
-        <Field label="URL de destination (CTA)">
+        <Field label="URL de destination (CTA)" textColor={colors.textSecondary}>
           <TextInput
             style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
             value={ctaUrl}
@@ -400,7 +401,7 @@ export const CreateAdScreen: React.FC = () => {
         </Field>
 
         {/* Placement */}
-        <Field label="Emplacement">
+        <Field label="Emplacement" textColor={colors.textSecondary}>
           <View style={s.chips}>
             {PLACEMENTS.map(p => (
               <TouchableOpacity
@@ -419,7 +420,7 @@ export const CreateAdScreen: React.FC = () => {
         </Field>
 
         {/* Format */}
-        <Field label="Format">
+        <Field label="Format" textColor={colors.textSecondary}>
           <View style={s.chips}>
             {FORMATS.map(f => (
               <TouchableOpacity
@@ -438,7 +439,7 @@ export const CreateAdScreen: React.FC = () => {
         </Field>
 
         {/* CPM */}
-        <Field label="CPM — Coût pour 1000 impressions">
+        <Field label="CPM — Coût pour 1000 impressions" textColor={colors.textSecondary}>
           <View style={s.chips}>
             {CPM_OPTIONS.map(c => (
               <TouchableOpacity
@@ -457,7 +458,7 @@ export const CreateAdScreen: React.FC = () => {
         </Field>
 
         {/* Budget */}
-        <Field label="Budget total (€) *">
+        <Field label="Budget total (€) *" textColor={colors.textSecondary}>
           <TextInput
             style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
             value={budgetEur}
