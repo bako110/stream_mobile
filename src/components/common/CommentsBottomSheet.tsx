@@ -4,8 +4,7 @@ import {
   TouchableOpacity, KeyboardAvoidingView, Platform, Image,
   Animated, Pressable, Dimensions, Alert,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Feather';
-import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { storage } from '../../utils/storage';
@@ -133,9 +132,9 @@ const LikeButton: React.FC<{
   return (
     <TouchableOpacity onPress={handlePress} activeOpacity={0.7} style={st.likeBtn}>
       <Animated.View style={{ transform: [{ scale }] }}>
-        <MCIcon
+        <Icon
           name={liked ? 'heart' : 'heart-outline'}
-          size={18}
+          size={24}
           color={liked ? '#E0389A' : color}
         />
       </Animated.View>
@@ -240,7 +239,7 @@ const CommentRow: React.FC<RowProps> = ({
 
             {isOwn && (
               <TouchableOpacity onPress={showMenu} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Icon name="more-horizontal" size={15} color={colors.textTertiary} />
+                <Icon name="ellipsis-horizontal" size={20} color={colors.textTertiary} />
               </TouchableOpacity>
             )}
           </View>
@@ -276,7 +275,7 @@ const CommentRow: React.FC<RowProps> = ({
                 onPress={() => onReply(item)}
                 activeOpacity={0.7}
               >
-                <MCIcon name="reply-outline" size={16} color={colors.textTertiary} />
+                <Icon name="chatbubble-outline" size={20} color={colors.textTertiary} />
                 <Text style={[st.replyBtnText, { color: colors.textTertiary }]}>
                   Repondre
                 </Text>
@@ -298,7 +297,7 @@ const CommentRow: React.FC<RowProps> = ({
                 <>
                   <Icon
                     name={item.showReplies ? 'chevron-up' : 'chevron-down'}
-                    size={13}
+                    size={18}
                     color={colors.primary}
                   />
                   <Text style={[st.toggleText, { color: colors.primary }]}>
@@ -641,7 +640,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                 : 'Commentaires'}
             </Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Icon name="x" size={22} color={colors.textSecondary} />
+              <Icon name="close" size={26} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -652,7 +651,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
             </View>
           ) : comments.length === 0 ? (
             <View style={st.center}>
-              <MCIcon name="comment-text-outline" size={48} color={colors.textTertiary} />
+              <Icon name="chatbubbles-outline" size={56} color={colors.textTertiary} />
               <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Pas encore de commentaires</Text>
               <Text style={[st.emptySubtitle, { color: colors.textTertiary }]}>
                 Soyez le premier a reagir
@@ -708,9 +707,9 @@ export const CommentsBottomSheet: React.FC<Props> = ({
               borderTopColor: colors.primary + '25',
             }]}>
               <View style={[st.contextAccent, { backgroundColor: colors.primary }]} />
-              <MCIcon
-                name={isEditMode ? 'pencil-outline' : 'reply-outline'}
-                size={15}
+              <Icon
+                name={isEditMode ? 'pencil-outline' : 'return-down-forward-outline'}
+                size={18}
                 color={colors.primary}
               />
               <Text style={[st.contextText, { color: colors.primary }]} numberOfLines={1}>
@@ -719,7 +718,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                   : `Reponse a ${getDisplayName(replyTo!.author)}`}
               </Text>
               <TouchableOpacity onPress={cancelAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Icon name="x" size={14} color={colors.primary} />
+                <Icon name="close-circle" size={20} color={colors.primary} />
               </TouchableOpacity>
             </View>
           )}
@@ -754,8 +753,8 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                   {(sending || editSaving)
                     ? <FolixLoader variant="bar" color="#fff" />
                     : isEditMode
-                      ? <Icon name="check" size={16} color="#fff" />
-                      : <MCIcon name="send" size={16} color="#fff" />
+                      ? <Icon name="checkmark" size={20} color="#fff" />
+                      : <Icon name="send" size={20} color="#fff" />
                   }
                 </TouchableOpacity>
               )}
@@ -818,15 +817,15 @@ const st = StyleSheet.create({
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 48 },
 
   // Actions
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 },
-  likeBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  likeCount:  { fontSize: 12, fontWeight: '700' },
-  replyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  replyBtnText: { fontSize: 12, fontWeight: '600' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 10 },
+  likeBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  likeCount:  { fontSize: 14, fontWeight: '700' },
+  replyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  replyBtnText: { fontSize: 13, fontWeight: '600' },
 
-  toggleReplies: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-  toggleLine:    { width: 24, height: 1.5 },
-  toggleText:    { fontSize: 12, fontWeight: '700' },
+  toggleReplies: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10 },
+  toggleLine:    { width: 28, height: 1.5 },
+  toggleText:    { fontSize: 13, fontWeight: '700' },
 
   // Banniere contexte
   contextBanner: {
@@ -853,9 +852,9 @@ const st = StyleSheet.create({
     maxHeight: 90, paddingVertical: 2,
   },
   sendBtn: {
-    width: 34, height: 34, borderRadius: 17,
+    width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
-    marginLeft: 4,
+    marginLeft: 6,
   },
   loadMoreBtn: {
     alignItems: 'center', justifyContent: 'center',
