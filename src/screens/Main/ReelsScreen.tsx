@@ -931,30 +931,27 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       }
       playTimerRef.current = setTimeout(() => {
         if (!mountedRef.current || pausedRef.current) return;
-        if (wasEndedOnActivate.current) {
-          // Reel termine → repart depuis le debut
-          endedRef.current = false;
-          wasEndedOnActivate.current = false;
-          if (mountedRef.current) setEnded(false);
-          try { player.seekTo(0); } catch {}
-          setTimeout(() => { if (!mountedRef.current || pausedRef.current) return; try { player.play(); } catch {}; }, 80);
+        if (endedRef.current) {
+          // Reel termine → afficher overlay "Revoir", ne pas relancer auto
+          if (mountedRef.current) setEnded(true);
         } else {
-          // Reel deja charge (scroll retour) → reprend directement sans rechargement
+          // Reel en cours ou pas encore joue → reprend/demarre
           try { player.play(); } catch {}
         }
-      }, 80); // delai un peu plus long pour laisser le player se stabiliser
+      }, 80);
     } else {
       try { player.pause(); } catch {}
     }
     return () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); };
   }, [isActive, player]); // eslint-disable-line
 
-  // Reset états quand inactif — on garde videoLoaded=true pour eviter le rechargement
-  // au retour (scroll arriere). La video reste en memoire, juste pausee.
+  // Reset états quand inactif — garde videoLoaded + ended pour retour sans rechargement
   useEffect(() => {
     if (!isActive) {
-      pausedRef.current = false; endedRef.current = false; retryCountRef.current = 0;
-      if (mountedRef.current) { setPaused(false); setVideoError(false); setEnded(false); setVideoPlaying(false); }
+      pausedRef.current = false; retryCountRef.current = 0;
+      // endedRef + ended intentionnellement PAS remis a false :
+      // si la video etait terminee, au retour scroll on affiche "Revoir" directement
+      if (mountedRef.current) { setPaused(false); setVideoError(false); setVideoPlaying(false); }
       clearAllTimers(); clearStall();
     }
   }, [isActive, clearAllTimers, clearStall]);
