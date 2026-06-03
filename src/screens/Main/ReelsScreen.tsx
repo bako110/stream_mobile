@@ -95,6 +95,7 @@ export const ReelsScreen: React.FC = () => {
 
   const [reels,         setReels]         = useState<Reel[]>(seedReel);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
+  const [reelAd,        setReelAd]        = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string } | null>(null);
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
   const [editCaption,   setEditCaption]   = useState('');
@@ -193,6 +194,11 @@ export const ReelsScreen: React.FC = () => {
         }
       }
       // Si silent sans cible → on garde simplement la liste à jour sans bouger l'index
+
+      // Charger la pub reels en arriere-plan
+      apiClient.get<{ id: string; title: string } | null>('/api/v1/ads/feed/next?placement=reels')
+        .then(r => { if (r.data && mountedRef.current) setReelAd(r.data as any); })
+        .catch(() => {});
 
       // Charger myId + mes reels en parallèle sans bloquer l'affichage
       authService.getMe().then(me => {
@@ -413,23 +419,71 @@ export const ReelsScreen: React.FC = () => {
   const onAddReel     = useCallback(() => nav.navigate('CreateReel'), [nav]);
   const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
 
-  const renderVideoSlide = useCallback(({ item, index }: { item: Reel; index: number }) => (
-    <VideoSlide
-      reel={item}
-      isActive={index === currentIndex && screenFocused}
-      muted={muted}
-      screenW={SCREEN_W}
-      screenH={SCREEN_H - HEADER_H}
-      insetBottom={insets.bottom}
-      colors={colors}
-      currentUserId={myId ?? undefined}
-      onToggleMute={toggleMute}
-      onAdd={onAddReel}
-      onAuthorPress={onAuthorPress}
-      onEnd={goNextReel}
-      activePlayerRef={activePlayerRef}
-    />
-  ), [currentIndex, screenFocused, muted, HEADER_H, insets.bottom, colors, myId, toggleMute, onAddReel, onAuthorPress, goNextReel]);
+  // Feed reels avec pub injectee toutes les 5 reels
+  const AD_INTERVAL = 5;
+  const feedWithAds = useMemo(() => {
+    if (!reelAd) return reels;
+    const result: (Reel | { _isAd: true; id: string; ad: typeof reelAd })[] = [];
+    reels.forEach((r, i) => {
+      result.push(r);
+      if ((i + 1) % AD_INTERVAL === 0) {
+        result.push({ _isAd: true, id: `ad-${reelAd.id}-${i}`, ad: reelAd });
+      }
+    });
+    return result;
+  }, [reels, reelAd]);
+
+  const renderVideoSlide = useCallback(({ item, index }: { item: any; index: number }) => {
+    // Slide pub
+    if (item._isAd) {
+      const ad = item.ad;
+      return (
+        <View style={{ width: SCREEN_W, height: SCREEN_H - HEADER_H, backgroundColor: '#0a0a1a', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <View style={{ position: 'absolute', top: 14, left: 14, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Sponsorisé</Text>
+          </View>
+          {ad.creative_url || ad.thumbnail_url ? (
+            <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={{ width: SCREEN_W, height: SCREEN_H - HEADER_H, position: 'absolute' }} resizeMode="cover" />
+          ) : null}
+          <View style={{ position: 'absolute', bottom: 60, left: 24, right: 80 }}>
+            <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 6, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
+              {ad.title}
+            </Text>
+            {ad.description ? <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20 }} numberOfLines={3}>{ad.description}</Text> : null}
+            {ad.cta_url ? (
+              <TouchableOpacity
+                style={{ marginTop: 14, backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 22, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7 }}
+                onPress={() => {
+                  apiClient.post(`/api/v1/ads/${ad.id}/impression`, {}).catch(() => {});
+                  apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
+                }}
+              >
+                <Icon name="external-link" size={14} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{ad.cta_text || 'En savoir plus'}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      );
+    }
+    return (
+      <VideoSlide
+        reel={item}
+        isActive={index === currentIndex && screenFocused}
+        muted={muted}
+        screenW={SCREEN_W}
+        screenH={SCREEN_H - HEADER_H}
+        insetBottom={insets.bottom}
+        colors={colors}
+        currentUserId={myId ?? undefined}
+        onToggleMute={toggleMute}
+        onAdd={onAddReel}
+        onAuthorPress={onAuthorPress}
+        onEnd={goNextReel}
+        activePlayerRef={activePlayerRef}
+      />
+    );
+  }, [currentIndex, screenFocused, muted, HEADER_H, insets.bottom, colors, myId, toggleMute, onAddReel, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -586,8 +640,8 @@ export const ReelsScreen: React.FC = () => {
 
       <FlatList
         ref={listRef}
-        data={reels}
-        keyExtractor={r => r.id}
+        data={feedWithAds}
+        keyExtractor={r => (r as any).id}
         style={{ flex: 1, marginTop: HEADER_H }}
         pagingEnabled={false}
         snapToInterval={SCREEN_H - HEADER_H}
