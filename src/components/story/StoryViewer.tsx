@@ -3,7 +3,7 @@ import {
   View, Text, Image, TouchableOpacity, Dimensions,
   StatusBar, StyleSheet, Animated, PanResponder,
   TouchableWithoutFeedback, Alert, TextInput, Modal, Platform,
-  FlatList, ActivityIndicator, Easing,
+  FlatList, ActivityIndicator, Easing, Linking,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import type { VideoPlayerStatus } from 'react-native-video';
@@ -383,6 +383,7 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
               activeOpacity={0.85}
               onPress={() => {
                 apiClient.post(`/api/v1/ads/${ad.id}/click`).catch(() => {});
+                if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
                 onSkip();
               }}
               style={{ alignSelf: 'flex-start', backgroundColor: '#fff', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 8 }}

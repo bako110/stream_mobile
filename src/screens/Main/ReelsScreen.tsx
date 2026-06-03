@@ -6,7 +6,7 @@ import {
   View, Text, StyleSheet, FlatList, Dimensions,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
   Share, Platform, Alert, Modal, TextInput,
-  KeyboardAvoidingView, Keyboard, AppState,
+  KeyboardAvoidingView, Keyboard, AppState, Linking,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle,
@@ -852,6 +852,7 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
             activeOpacity={0.85}
             onPress={() => {
               apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
+              if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
             }}
             style={{ alignSelf: 'flex-start', backgroundColor: '#fff', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: 7 }}
           >
