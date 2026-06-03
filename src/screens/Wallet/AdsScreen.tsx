@@ -213,11 +213,16 @@ export const AdsScreen: React.FC = () => {
   const activeCount      = ads.filter(a => a.status === 'active').length;
 
   const handleDelete = (ad: Ad) => {
-    if (ad.status !== 'draft') {
-      Alert.alert('Impossible', 'Seules les campagnes en brouillon peuvent être supprimées.');
+    if (ad.status === 'active' || ad.status === 'paused') {
+      Alert.alert('Impossible', 'Arrêtez la campagne avant de la supprimer.');
       return;
     }
-    Alert.alert('Supprimer', `Supprimer "${ad.title}" ?`, [
+    const isDraft    = ad.status === 'draft';
+    const isArchived = ad.status === 'ended' || ad.status === 'rejected';
+    const msg = isDraft
+      ? `Supprimer le brouillon "${ad.title}" ?`
+      : `Supprimer la campagne terminée "${ad.title}" ? L'historique (impressions, clics) sera perdu.`;
+    Alert.alert('Supprimer', msg, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try { await adService.delete(ad.id); setAds(prev => prev.filter(a => a.id !== ad.id)); }
