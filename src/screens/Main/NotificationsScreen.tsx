@@ -35,6 +35,8 @@ const CFG: Record<string, { icon: string; grad: [string, string] }> = {
   welcome:          { icon: 'gift',           grad: ['#7B3FF2', '#E0389A'] },
   ticket:           { icon: 'tag',            grad: ['#FF7A2F', '#FCD34D'] },
   concert_live:     { icon: 'radio',          grad: ['#EF4444', '#FF7A2F'] },
+  system:           { icon: 'shield',         grad: ['#6366F1', '#8B5CF6'] },
+  security:         { icon: 'lock',           grad: ['#EF4444', '#F97316'] },
 };
 const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
 
