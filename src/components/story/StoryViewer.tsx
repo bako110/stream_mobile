@@ -336,7 +336,11 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
         ) : (ad.creative_url || ad.thumbnail_url) ? (
           <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={{ position: 'absolute', width: W, height: H }} resizeMode="cover" />
         ) : (
-          <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ position: 'absolute', width: W, height: H }} />
+          // Pas de creative — fond gradient avec cercles decoratifs
+          <LinearGradient colors={['#3B0764', '#7B3FF2', '#E0389A']} locations={[0, 0.5, 1]} style={{ position: 'absolute', width: W, height: H }}>
+            <View style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+            <View style={{ position: 'absolute', bottom: -60, left: -30, width: 250, height: 250, borderRadius: 125, backgroundColor: 'rgba(255,255,255,0.05)' }} />
+          </LinearGradient>
         )}
 
         {/* Gradient bas */}
@@ -352,13 +356,17 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
         </View>
 
         {/* Badge + fermer */}
-        <View style={{ position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 }}>
+        <View style={{ position: 'absolute', top: 52, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
             <Icon name="zap" size={11} color="#F59E0B" />
             <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Sponsorisé</Text>
           </View>
-          <TouchableOpacity onPress={onSkip} style={{ marginLeft: 'auto' as any }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Icon name="x" size={22} color="#fff" />
+          <TouchableOpacity
+            onPress={onSkip}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, padding: 6 }}
+          >
+            <Icon name="x" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
 
