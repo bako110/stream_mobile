@@ -5,7 +5,7 @@
 -keep class com.facebook.soloader.** { *; }
 
 # App package
--keep class com.folix.mobile.** { *; }
+-keep class com.gofolyx.mobile.** { *; }
 
 # Firebase / FCM
 -keep class com.google.firebase.** { *; }

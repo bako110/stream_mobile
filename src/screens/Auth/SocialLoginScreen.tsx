@@ -11,7 +11,7 @@ import { AppLogo, SocialAuthButton } from '../../components/common';
 import { authService } from '../../services/authService';
 
 GoogleSignin.configure({
-  webClientId: '679923149254-fj18oqdipsfinbqaksiikta9eql9d6kn.apps.googleusercontent.com',
+  webClientId: '862524928219-ojtrr3me5atb36mnd99fu71h37e94pte.apps.googleusercontent.com',
   offlineAccess: false,
 });
 

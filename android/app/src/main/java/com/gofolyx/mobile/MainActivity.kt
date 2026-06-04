@@ -1,4 +1,4 @@
-package com.folix.mobile
+package com.gofolyx.mobile
 
 import android.os.Bundle
 import com.facebook.react.ReactActivity

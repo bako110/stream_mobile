@@ -61,20 +61,20 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
 
-        <!-- Deep links folix:// -->
+        <!-- Deep links gofolyx:// -->
         <intent-filter>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
-            <data android:scheme="folix" />
+            <data android:scheme="gofolyx" />
         </intent-filter>
 
-        <!-- App Links https://folix.app -->
+        <!-- App Links https://gofolyx.com -->
         <intent-filter android:autoVerify="true">
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
-            <data android:scheme="https" android:host="folix.app" />
+            <data android:scheme="https" android:host="gofolyx.com" />
         </intent-filter>
       </activity>
 

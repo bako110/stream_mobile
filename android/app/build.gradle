@@ -88,9 +88,9 @@ android {
         abortOnError false
     }
 
-    namespace "com.folix.mobile"
+    namespace "com.gofolyx.mobile"
     defaultConfig {
-        applicationId "com.folix.mobile"
+        applicationId "com.gofolyx.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
