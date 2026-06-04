@@ -6,8 +6,8 @@
 import { storage } from '../utils/storage';
 import { apiClient } from '../api';
 
-const HIDDEN_KEY   = 'folix_feed_hidden';
-const REMINDER_KEY = 'folix_feed_reminders';
+const HIDDEN_KEY   = 'gofolix_feed_hidden';
+const REMINDER_KEY = 'gofolix_feed_reminders';
 
 type RefType = 'event' | 'concert' | 'post' | 'reel';
 

@@ -1,6 +1,6 @@
 /**
  * JoinCommunityScreen — Atterrissage depuis un lien d'invitation.
- * folix://join/FOLIX-A3K9F  ou  https://folix.app/join/FOLIX-A3K9F
+ * gofolix://join/GOFOLIX-A3K9F  ou  https://gofolix.app/join/GOFOLIX-A3K9F
  *
  * Charge les infos de la communauté via le code, puis :
  * - Si déjà membre → redirige vers le chat

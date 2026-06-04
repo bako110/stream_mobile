@@ -24,13 +24,13 @@ const SECTIONS: Section[] = [
   {
     key: 'identite', icon: 'info', title: '1. Identité du responsable de traitement',
     body: `Responsable de traitement :
-FoliX SAS
+GoFolix SAS
 Siège social : Paris, France
-Email DPO : privacy@folix.app
+Email DPO : privacy@gofolix.app
 
-FoliX SAS est responsable du traitement de vos données personnelles collectées via l'application mobile FoliX et le site web folix.app.
+GoFolix SAS est responsable du traitement de vos données personnelles collectées via l'application mobile GoFolix et le site web gofolix.app.
 
-Pour toute question relative à la protection de vos données, vous pouvez contacter notre Délégué à la Protection des Données (DPO) à l'adresse privacy@folix.app. Nous nous engageons à répondre à toute demande dans un délai maximum de 30 jours.`,
+Pour toute question relative à la protection de vos données, vous pouvez contacter notre Délégué à la Protection des Données (DPO) à l'adresse privacy@gofolix.app. Nous nous engageons à répondre à toute demande dans un délai maximum de 30 jours.`,
   },
   {
     key: 'collecte', icon: 'database', title: '2. Données collectées',
@@ -86,7 +86,7 @@ Obligations légales :
     key: 'base-legale', icon: 'shield', title: '4. Base légale des traitements',
     body: `Conformément au RGPD, chaque traitement repose sur l'une des bases légales suivantes :
 
-• Exécution du contrat (art. 6.1.b RGPD) : traitements nécessaires à la fourniture du service FoliX (compte, contenus, paiements)
+• Exécution du contrat (art. 6.1.b RGPD) : traitements nécessaires à la fourniture du service GoFolix (compte, contenus, paiements)
 
 • Consentement (art. 6.1.a RGPD) : communications marketing, géolocalisation précise, cookies optionnels — vous pouvez retirer votre consentement à tout moment
 
@@ -94,11 +94,11 @@ Obligations légales :
 
 • Obligation légale (art. 6.1.c RGPD) : conservation des données de facturation, réponse aux autorités judiciaires
 
-Pour les données sensibles (origine ethnique, opinions politiques, santé), FoliX ne collecte pas ce type de données et met en place des mesures pour éviter que les utilisateurs n'en publient volontairement dans des contextes exposés.`,
+Pour les données sensibles (origine ethnique, opinions politiques, santé), GoFolix ne collecte pas ce type de données et met en place des mesures pour éviter que les utilisateurs n'en publient volontairement dans des contextes exposés.`,
   },
   {
     key: 'partage', icon: 'users', title: '5. Partage et destinataires des données',
-    body: `FoliX ne vend jamais vos données personnelles à des tiers. Elles peuvent être partagées uniquement dans les cas suivants :
+    body: `GoFolix ne vend jamais vos données personnelles à des tiers. Elles peuvent être partagées uniquement dans les cas suivants :
 
 Sous-traitants techniques (traitement pour notre compte) :
 • Hébergement cloud (serveurs EU) — AWS / OVH
@@ -109,7 +109,7 @@ Sous-traitants techniques (traitement pour notre compte) :
 
 Tous nos sous-traitants sont liés par des DPA (Data Processing Agreements) conformes au RGPD et ne peuvent utiliser vos données qu'aux fins pour lesquelles nous les mandatons.
 
-Autres utilisateurs FoliX :
+Autres utilisateurs GoFolix :
 • Vos contenus publics (posts, reels, profil public) sont visibles conformément à vos paramètres de confidentialité
 • Vos messages privés ne sont partagés qu'avec leurs destinataires
 
@@ -126,7 +126,7 @@ En cas de transfert hors UE (notamment pour certains services tiers comme Google
 • Décision d'adéquation de la Commission pour les pays reconnus équivalents
 • Certification Privacy Shield ou mécanisme équivalent en vigueur
 
-Vous pouvez obtenir une copie des garanties mises en place en contactant privacy@folix.app.`,
+Vous pouvez obtenir une copie des garanties mises en place en contactant privacy@gofolix.app.`,
   },
   {
     key: 'conservation', icon: 'clock', title: '7. Durée de conservation',
@@ -154,7 +154,7 @@ Consentements marketing :
     key: 'droits', icon: 'check-circle', title: '8. Vos droits RGPD',
     body: `Conformément au RGPD (articles 15 à 22), vous disposez des droits suivants sur vos données personnelles :
 
-• Droit d'accès (art. 15) : obtenir une copie complète de vos données personnelles traitées par FoliX
+• Droit d'accès (art. 15) : obtenir une copie complète de vos données personnelles traitées par GoFolix
 
 • Droit de rectification (art. 16) : corriger toute donnée inexacte ou incomplète
 
@@ -170,13 +170,13 @@ Consentements marketing :
 
 Comment exercer vos droits :
 → Depuis l'application : Paramètres > Confidentialité > Mes données
-→ Par email : privacy@folix.app (réponse sous 30 jours maximum)
+→ Par email : privacy@gofolix.app (réponse sous 30 jours maximum)
 
 Recours : si vous estimez que vos droits ne sont pas respectés, vous pouvez saisir la CNIL (Commission Nationale de l'Informatique et des Libertés) sur www.cnil.fr`,
   },
   {
     key: 'securite', icon: 'lock', title: '9. Sécurité des données',
-    body: `FoliX met en œuvre un ensemble de mesures techniques et organisationnelles pour protéger vos données contre tout accès non autorisé, divulgation, altération ou destruction :
+    body: `GoFolix met en œuvre un ensemble de mesures techniques et organisationnelles pour protéger vos données contre tout accès non autorisé, divulgation, altération ou destruction :
 
 Mesures techniques :
 • Chiffrement des données en transit : TLS 1.3 minimum sur toutes les connexions
@@ -192,12 +192,12 @@ Mesures organisationnelles :
 • Politique de gestion des incidents de sécurité documentée
 
 En cas de violation de données :
-• FoliX s'engage à notifier la CNIL dans les 72 heures
+• GoFolix s'engage à notifier la CNIL dans les 72 heures
 • Les utilisateurs concernés seront notifiés dans les meilleurs délais si la violation présente un risque élevé pour leurs droits et libertés`,
   },
   {
     key: 'cookies', icon: 'smartphone', title: '10. Cookies et technologies de suivi',
-    body: `L'application FoliX utilise des technologies similaires aux cookies (stockage local, identifiants d'appareil, SDK analytics) que nous classons en trois catégories :
+    body: `L'application GoFolix utilise des technologies similaires aux cookies (stockage local, identifiants d'appareil, SDK analytics) que nous classons en trois catégories :
 
 Strictement nécessaires (toujours actifs) :
 • Maintien de votre session authentifiée
@@ -221,7 +221,7 @@ Comment gérer vos préférences :
   },
   {
     key: 'mineurs', icon: 'user-x', title: '11. Protection des mineurs',
-    body: `FoliX est destiné aux personnes âgées de 13 ans et plus. Nous prenons la protection des mineurs très au sérieux.
+    body: `GoFolix est destiné aux personnes âgées de 13 ans et plus. Nous prenons la protection des mineurs très au sérieux.
 
 Mesures en place :
 • Vérification de l'âge lors de l'inscription (déclaration de date de naissance)
@@ -229,11 +229,11 @@ Mesures en place :
 • Contenu sensible masqué par défaut pour les comptes mineurs
 • Signalement facilité des profils suspects
 
-Nous ne collectons pas sciemment de données personnelles d'enfants de moins de 13 ans. Si vous êtes un parent ou tuteur légal et pensez qu'un enfant de moins de 13 ans a créé un compte sur FoliX, contactez-nous immédiatement à privacy@folix.app. Nous procéderons à la vérification et, le cas échéant, à la suppression immédiate du compte et des données associées.`,
+Nous ne collectons pas sciemment de données personnelles d'enfants de moins de 13 ans. Si vous êtes un parent ou tuteur légal et pensez qu'un enfant de moins de 13 ans a créé un compte sur GoFolix, contactez-nous immédiatement à privacy@gofolix.app. Nous procéderons à la vérification et, le cas échéant, à la suppression immédiate du compte et des données associées.`,
   },
   {
     key: 'ia', icon: 'cpu', title: '12. Intelligence artificielle et algorithmes',
-    body: `FoliX utilise des systèmes algorithmiques et d'intelligence artificielle pour :
+    body: `GoFolix utilise des systèmes algorithmiques et d'intelligence artificielle pour :
 
 Personnalisation :
 • Recommandation de contenus dans votre fil d'actualité
@@ -250,11 +250,11 @@ Conformément à l'article 22 du RGPD, si une décision vous concernant (suspens
 • Exprimer votre point de vue
 • Contester la décision
 
-Contactez support@folix.app pour toute demande en ce sens.`,
+Contactez support@gofolix.app pour toute demande en ce sens.`,
   },
   {
     key: 'modifications', icon: 'refresh-cw', title: '13. Modifications de la politique',
-    body: `FoliX se réserve le droit de modifier la présente Politique de Confidentialité à tout moment, notamment pour :
+    body: `GoFolix se réserve le droit de modifier la présente Politique de Confidentialité à tout moment, notamment pour :
 • Se conformer aux évolutions légales et réglementaires
 • Refléter de nouvelles pratiques de traitement
 • Intégrer de nouveaux services ou fonctionnalités
@@ -265,7 +265,7 @@ Notification des changements :
 
 La date de dernière mise à jour est toujours indiquée en haut de ce document. Nous vous encourageons à consulter régulièrement cette politique.
 
-La poursuite de l'utilisation de FoliX après notification des modifications vaut acceptation de la nouvelle version.`,
+La poursuite de l'utilisation de GoFolix après notification des modifications vaut acceptation de la nouvelle version.`,
   },
 ];
 
@@ -349,7 +349,7 @@ export const PolitiqueConfidentialiteScreen: React.FC<Props> = ({ onBack }) => {
             <Icon name="shield" size={22} color={accentColor} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.introTitle, { color: colors.textPrimary }]}>Confidentialité FoliX</Text>
+            <Text style={[s.introTitle, { color: colors.textPrimary }]}>Confidentialité GoFolix</Text>
             <Text style={[s.introSub, { color: colors.textTertiary }]}>Dernière mise à jour : 1er mai 2026</Text>
             <Text style={[s.introDesc, { color: colors.textSecondary }]}>
               Nous prenons la protection de vos données très au sérieux. Cette politique explique comment nous collectons, utilisons et protégeons vos informations.
@@ -414,7 +414,7 @@ export const PolitiqueConfidentialiteScreen: React.FC<Props> = ({ onBack }) => {
           <Icon name="mail" size={16} color={accentColor} />
           <Text style={[s.contactTxt, { color: colors.textTertiary }]}>
             Questions sur vos données ? Contactez notre DPO à{' '}
-            <Text style={{ color: accentColor, fontWeight: '600' }}>privacy@folix.app</Text>
+            <Text style={{ color: accentColor, fontWeight: '600' }}>privacy@gofolix.app</Text>
             {'\n'}Réponse garantie sous 30 jours.
           </Text>
         </View>
@@ -430,7 +430,7 @@ export const PolitiqueConfidentialiteScreen: React.FC<Props> = ({ onBack }) => {
 
         {/* Version */}
         <Text style={[s.versionTxt, { color: colors.textTertiary }]}>
-          Version 2.0 · FoliX SAS · Paris, France
+          Version 2.0 · GoFolix SAS · Paris, France
         </Text>
 
       </ScrollView>

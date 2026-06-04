@@ -91,7 +91,7 @@ const Step1: React.FC<{
         Comment vous appelez-vous ? 👋
       </Animated.Text>
       <Animated.Text entering={FadeInDown.delay(140).duration(400)} style={[s.stepSubtitle, { color: colors.textSecondary }]}>
-        Votre identité sur FoliX
+        Votre identité sur GoFolix
       </Animated.Text>
 
       <Animated.View entering={FadeInDown.delay(200).springify()}>

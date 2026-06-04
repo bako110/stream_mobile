@@ -1,5 +1,5 @@
 ﻿/**
- * MessagesScreen â€” Messagerie directe FoliX
+ * MessagesScreen â€” Messagerie directe GoFolix
  * ConnectÃ© Ã  l'API /api/v1/messages/conversations
  */
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';

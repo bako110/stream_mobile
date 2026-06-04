@@ -47,4 +47,4 @@ export { InlineVideoPlayer }     from './InlineVideoPlayer';
 export { UploadProgressBanner }  from './UploadProgressBanner';
 export { LikersBottomSheet }     from './LikersBottomSheet';
 export { BoostPrompt } from './BoostPrompt';
-export { FolixLoader } from './FolixLoader';
+export { GoFolixLoader } from './GoFolixLoader';

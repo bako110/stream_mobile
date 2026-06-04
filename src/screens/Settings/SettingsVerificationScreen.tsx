@@ -111,7 +111,7 @@ export const SettingsVerificationScreen: React.FC = () => {
     const CFG: Record<VerifStatus, { icon: string; color: string; title: string; sub: string }> = {
       none:     { icon: 'shield',       color: colors.textTertiary, title: 'Non vérifié',        sub: '' },
       pending:  { icon: 'clock',        color: '#F59E0B',           title: 'En cours d\'examen', sub: 'Notre équipe examine votre dossier. Cela peut prendre quelques jours.' },
-      approved: { icon: 'check-circle', color: BLUE,                title: 'Compte vérifié ✓',   sub: 'Votre compte est certifié FoliX.' },
+      approved: { icon: 'check-circle', color: BLUE,                title: 'Compte vérifié ✓',   sub: 'Votre compte est certifié GoFolix.' },
       rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',    sub: (user?.verification_note ? user.verification_note + '\n\n' : '') + `Tes ${VERIFICATION_FEE} coins ont été remboursés dans ton wallet. Tu peux soumettre une nouvelle demande.` },
     };
     const cfg = CFG[status];
@@ -137,7 +137,7 @@ export const SettingsVerificationScreen: React.FC = () => {
         <View style={[vs.heroBadgeIcon, { backgroundColor: BLUE + '20' }]}>
           <Icon name="shield" size={32} color={BLUE} />
         </View>
-        <Text style={[vs.heroTitle, { color: colors.textPrimary }]}>Badge vérifié FoliX</Text>
+        <Text style={[vs.heroTitle, { color: colors.textPrimary }]}>Badge vérifié GoFolix</Text>
         <Text style={[vs.heroSub, { color: colors.textSecondary }]}>
           Le badge bleu confirme que ce compte est le vrai compte d'une personnalité, créateur ou marque notable.
         </Text>
@@ -317,7 +317,7 @@ export const SettingsVerificationScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <PageHeader title="Vérification FoliX" onBack={() => nav.goBack()} />
+      <PageHeader title="Vérification GoFolix" onBack={() => nav.goBack()} />
 
       {fetching
         ? <ActivityIndicator color={BLUE} style={{ marginTop: 40 }} />

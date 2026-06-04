@@ -75,7 +75,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
         if (e?.status === 403 && detail?.code === 'account_blocked') {
           setBlockedInfo({
             reason: detail?.reason ?? undefined,
-            contact: detail?.contact ?? 'support@folix.app',
+            contact: detail?.contact ?? 'support@gofolix.app',
             blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
           });
         } else {
@@ -103,7 +103,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
       if (e?.status === 403 && detail?.code === 'account_blocked') {
         setBlockedInfo({
           reason: detail?.reason ?? undefined,
-          contact: detail?.contact ?? 'support@folix.app',
+          contact: detail?.contact ?? 'support@gofolix.app',
           blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
         });
       } else if (e?.status === 403 && detail?.code === 'account_deactivated') {
@@ -183,7 +183,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
 
           <Animated.Text entering={FadeInDown.delay(220).duration(500)}
             style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Connectez-vous à votre compte FoliX
+            Connectez-vous à votre compte GoFolix
           </Animated.Text>
 
           {/* QR Code — connexion rapide */}
@@ -288,7 +288,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                 </Text>
               ) : null}
               <TouchableOpacity
-                onPress={() => Linking.openURL(`mailto:${blockedInfo.contact ?? 'support@folix.app'}`)}
+                onPress={() => Linking.openURL(`mailto:${blockedInfo.contact ?? 'support@gofolix.app'}`)}
                 style={[styles.blockedContactBtn, { backgroundColor: '#EF444420', borderColor: '#EF444460' }]}
               >
                 <Icon name="mail" size={13} color="#EF4444" />

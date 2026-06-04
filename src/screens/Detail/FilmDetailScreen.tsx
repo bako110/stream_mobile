@@ -466,7 +466,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
             <View style={pw.infoRow}>
               <Icon name="check-circle" size={14} color="#10B981" />
-              <Text style={[pw.infoTxt, { color: colors.textSecondary }]}>Lié à votre compte FoliX</Text>
+              <Text style={[pw.infoTxt, { color: colors.textSecondary }]}>Lié à votre compte GoFolix</Text>
             </View>
 
             {/* Boutons */}

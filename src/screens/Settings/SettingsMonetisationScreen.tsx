@@ -67,7 +67,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!acceptsTerms) {
-      Alert.alert('Conditions requises', "Vous devez accepter les conditions d'utilisation FoliX Creator Program.");
+      Alert.alert('Conditions requises', "Vous devez accepter les conditions d'utilisation GoFolix Creator Program.");
       return;
     }
     setLoading(true);
@@ -94,7 +94,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
     const CFG: Record<MonetStatus, { icon: string; color: string; title: string; sub: string }> = {
       none:     { icon: 'bar-chart-2',  color: colors.textTertiary, title: 'Non monétisé',         sub: '' },
       pending:  { icon: 'clock',        color: '#F59E0B',           title: "En cours d'examen",    sub: 'Notre équipe examine votre dossier. Cela peut prendre quelques jours.' },
-      approved: { icon: 'check-circle', color: GREEN,               title: 'Monétisation activée', sub: 'Votre compte est monétisé FoliX. Accédez à votre espace créateur.' },
+      approved: { icon: 'check-circle', color: GREEN,               title: 'Monétisation activée', sub: 'Votre compte est monétisé GoFolix. Accédez à votre espace créateur.' },
       rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',      sub: (adminNote ? adminNote + '\n\n' : '') + 'Vous pouvez soumettre une nouvelle demande.' },
     };
     const cfg = CFG[status];
@@ -132,7 +132,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
         <View style={[ms.heroBadgeIcon, { backgroundColor: GREEN + '20' }]}>
           <Icon name="bar-chart-2" size={32} color={GREEN} />
         </View>
-        <Text style={[ms.heroTitle, { color: colors.textPrimary }]}>Programme Créateur FoliX</Text>
+        <Text style={[ms.heroTitle, { color: colors.textPrimary }]}>Programme Créateur GoFolix</Text>
         <Text style={[ms.heroSub, { color: colors.textSecondary }]}>
           Monétisez votre contenu et gagnez des revenus grâce à votre communauté.
         </Text>
@@ -141,10 +141,10 @@ export const SettingsMonetisationScreen: React.FC = () => {
       <Card>
         <Text style={[ms.sectionLabel, { color: colors.textTertiary }]}>CONDITIONS REQUISES</Text>
         {[
-          'Minimum 500 abonnés sur FoliX',
+          'Minimum 500 abonnés sur GoFolix',
           "Contenu original publié régulièrement (min. 3 posts/mois)",
           'Compte actif depuis au moins 30 jours',
-          "Respecter les conditions d'utilisation FoliX",
+          "Respecter les conditions d'utilisation GoFolix",
           'Contenu conforme aux règles de la communauté',
         ].map((item, i, arr) => (
           <Row key={i} icon="check" label={item} color={GREEN} last={i === arr.length - 1} />
@@ -339,7 +339,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
           </View>
           <Text style={{ fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 19 }}>
             {"J'accepte les "}
-            <Text style={{ color: GREEN, fontWeight: '700' }}>Conditions d'utilisation FoliX Creator Program</Text>
+            <Text style={{ color: GREEN, fontWeight: '700' }}>Conditions d'utilisation GoFolix Creator Program</Text>
           </Text>
         </TouchableOpacity>
 
@@ -368,7 +368,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <PageHeader title="Monetisation FoliX" onBack={() => nav.goBack()} />
+      <PageHeader title="Monetisation GoFolix" onBack={() => nav.goBack()} />
 
       {fetching
         ? <ActivityIndicator color={GREEN} style={{ marginTop: 40 }} />

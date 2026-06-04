@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BackButton, FolixLoader } from '../../components/common';
+import { BackButton, GoFolixLoader } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, StatusBar, Image, Dimensions,
@@ -477,7 +477,7 @@ export function CreatorStatsScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <FolixLoader />
+        <GoFolixLoader />
       </View>
     );
   }

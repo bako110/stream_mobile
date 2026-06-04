@@ -161,7 +161,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.ctaBtn}
           >
-            <Text style={s.ctaBtnTxt}>Rejoindre FoliX</Text>
+            <Text style={s.ctaBtnTxt}>Rejoindre GoFolix</Text>
             <Icon name="arrow-right" size={18} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>

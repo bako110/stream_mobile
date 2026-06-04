@@ -36,10 +36,10 @@ function timeAgo(iso: string) {
 }
 
 function getDeepLink(type: ContentType, id: string): string {
-  if (type === 'post')    return `folix://post/${id}`;
-  if (type === 'event')   return `folix://event/${id}`;
-  if (type === 'concert') return `folix://concert/${id}`;
-  return 'folix://';
+  if (type === 'post')    return `gofolix://post/${id}`;
+  if (type === 'event')   return `gofolix://event/${id}`;
+  if (type === 'concert') return `gofolix://concert/${id}`;
+  return 'gofolix://';
 }
 
 export const ShareBottomSheet: React.FC<Props> = (props) => {
@@ -69,7 +69,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = author?.display_name ?? author?.username ?? 'Utilisateur';
     authorAvatar = author?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = p.body ? (p.body.length > 80 ? p.body.slice(0, 80) + '…' : p.body) : 'Post FoliX';
+    title        = p.body ? (p.body.length > 80 ? p.body.slice(0, 80) + '…' : p.body) : 'Post GoFolix';
     thumb        = p.image_urls?.[0] ?? p.image_url ?? null;
     createdAt    = p.created_at;
     likeCount    = p.like_count ?? 0;
@@ -82,7 +82,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = organizer?.display_name ?? organizer?.username ?? 'Organisateur';
     authorAvatar = organizer?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = e.title ?? 'Événement FoliX';
+    title        = e.title ?? 'Événement GoFolix';
     subtitle     = e.venue_city ? `${e.venue_city}${e.starts_at ? ' · ' + new Date(e.starts_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}` : null;
     thumb        = e.thumbnail_url ?? e.banner_url ?? null;
     createdAt    = e.created_at;
@@ -96,7 +96,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = artist?.display_name ?? artist?.username ?? 'Artiste';
     authorAvatar = artist?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = c.title ?? 'Concert FoliX';
+    title        = c.title ?? 'Concert GoFolix';
     subtitle     = c.venue_city ? `${c.venue_city}${c.scheduled_at ? ' · ' + new Date(c.scheduled_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}` : null;
     thumb        = c.thumbnail_url ?? c.banner_url ?? null;
     createdAt    = c.created_at;
@@ -124,7 +124,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
       await Share.share({
         message: shareMessage,
         url: deepLink,
-        title: `${title} sur FoliX`,
+        title: `${title} sur GoFolix`,
       });
       onShareCountChange?.();
     } catch {}

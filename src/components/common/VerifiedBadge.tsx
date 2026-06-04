@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 
-// Badge bleu FoliX — icône seule
+// Badge bleu GoFolix — icône seule
 export const VerifiedBadge: React.FC<{ size?: number }> = ({ size = 16 }) => (
   <View style={{
     width: size, height: size, borderRadius: size / 2,

@@ -1,4 +1,4 @@
-// Palette extraite du logo FoliX :
+// Palette extraite du logo GoFolix :
 // - Violet/Rose dégradé  → brand primary
 // - Orange chaud         → accent secondaire
 // - Vert émeraude        → accent tertiaire
@@ -12,7 +12,7 @@ export const LightColors = {
   surface:             '#FFFFFF',
   surfaceElevated:     '#F2F2FA',
 
-  // ── Brand FoliX ───────────────────────────────────────────────────────────
+  // ── Brand GoFolix ───────────────────────────────────────────────────────────
   primary:             '#7B3FF2',   // violet logo
   primaryLight:        '#A67CF7',
   primaryDark:         '#5A1ED9',
@@ -52,7 +52,7 @@ export const LightColors = {
   shadowNeutral:       'rgba(0,0,0,0.06)',
   ripple:              'rgba(123,63,242,0.12)',
 
-  // ── FoliX spécifique ──────────────────────────────────────────────────────
+  // ── GoFolix spécifique ──────────────────────────────────────────────────────
   liveTag:             '#F0365A',
   livePulse:           'rgba(240,54,90,0.3)',
   premiumTag:          '#FF7A2F',
@@ -87,7 +87,7 @@ export const DarkColors = {
   surface:             '#161625',
   surfaceElevated:     '#1E1E30',
 
-  // ── Brand FoliX ───────────────────────────────────────────────────────────
+  // ── Brand GoFolix ───────────────────────────────────────────────────────────
   primary:             '#9B65F5',   // violet légèrement plus clair sur fond sombre
   primaryLight:        '#BFA0F8',
   primaryDark:         '#7B3FF2',
@@ -127,7 +127,7 @@ export const DarkColors = {
   shadowNeutral:       'rgba(0,0,0,0.40)',
   ripple:              'rgba(155,101,245,0.15)',
 
-  // ── FoliX spécifique ──────────────────────────────────────────────────────
+  // ── GoFolix spécifique ──────────────────────────────────────────────────────
   liveTag:             '#F25270',
   livePulse:           'rgba(242,82,112,0.35)',
   premiumTag:          '#FF8C4A',

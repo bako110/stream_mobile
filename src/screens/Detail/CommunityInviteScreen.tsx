@@ -69,12 +69,12 @@ export const CommunityInviteScreen: React.FC = () => {
   const handleShare = async () => {
     try {
       await Share.share({
-        title: `Rejoins ${communityName} sur Folix !`,
+        title: `Rejoins ${communityName} sur GoFolix !`,
         message:
-          `🔥 Rejoins notre communauté "${communityName}" sur Folix !\n\n` +
+          `🔥 Rejoins notre communauté "${communityName}" sur GoFolix !\n\n` +
           `👉 Code d'invitation : *${code}*\n\n` +
-          `Télécharge Folix et entre ce code pour rejoindre le groupe.\n` +
-          `https://folix.app/join/${code}`,
+          `Télécharge GoFolix et entre ce code pour rejoindre le groupe.\n` +
+          `https://gofolix.app/join/${code}`,
       });
     } catch { }
   };
@@ -96,7 +96,7 @@ export const CommunityInviteScreen: React.FC = () => {
         <View style={[st.infoBox, { backgroundColor: '#7B3FF210', borderColor: '#7B3FF230' }]}>
           <Icon name="users" size={16} color="#7B3FF2" />
           <Text style={{ color: '#7B3FF2', fontSize: 13, flex: 1, lineHeight: 19 }}>
-            Partage ce code avec qui tu veux inviter. Il suffira de le saisir dans Folix pour rejoindre ta communauté.
+            Partage ce code avec qui tu veux inviter. Il suffira de le saisir dans GoFolix pour rejoindre ta communauté.
           </Text>
         </View>
 
@@ -117,7 +117,7 @@ export const CommunityInviteScreen: React.FC = () => {
             </Text>
           )}
           <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
-            folix.app/join/{code || '...'}
+            gofolix.app/join/{code || '...'}
           </Text>
         </LinearGradient>
 

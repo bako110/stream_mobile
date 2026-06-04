@@ -40,7 +40,7 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess, on
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
         const detail = e?.data?.detail ?? e?.response?.data?.detail;
         if (e?.status === 403 && detail?.code === 'account_blocked') {
-          onAccountBlocked?.(detail?.reason, detail?.contact ?? 'support@folix.app');
+          onAccountBlocked?.(detail?.reason, detail?.contact ?? 'support@gofolix.app');
         } else {
           Alert.alert('Erreur Google', e?.message ?? 'Connexion impossible');
         }

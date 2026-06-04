@@ -142,7 +142,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        { title: 'Localisation', message: 'FoliX a besoin de votre position.', buttonPositive: 'OK' },
+        { title: 'Localisation', message: 'GoFolix a besoin de votre position.', buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         Alert.alert('Permission refusée', 'Activez la localisation dans les paramètres.');
@@ -156,7 +156,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
           const { latitude, longitude } = pos.coords;
           const res  = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { 'Accept-Language': 'fr', 'User-Agent': 'FoliX-App/1.0' } },
+            { headers: { 'Accept-Language': 'fr', 'User-Agent': 'GoFolix-App/1.0' } },
           );
           const data = await res.json();
           const addr = data.address ?? {};
@@ -189,7 +189,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
     try {
       const res  = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
-        { headers: { 'Accept-Language': 'fr', 'User-Agent': 'FoliX-App/1.0' } },
+        { headers: { 'Accept-Language': 'fr', 'User-Agent': 'GoFolix-App/1.0' } },
       );
       const data = await res.json();
       if (data.length > 0) {

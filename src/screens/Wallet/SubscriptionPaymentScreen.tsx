@@ -205,7 +205,7 @@ export default function SubscriptionPaymentScreen() {
         </TouchableOpacity>
 
         <Text style={[s.disclaimer, { color: colors.textTertiary }]}>
-          En confirmant, vous acceptez les CGU FoliX. Annulation possible à tout moment depuis votre compte.
+          En confirmant, vous acceptez les CGU GoFolix. Annulation possible à tout moment depuis votre compte.
         </Text>
 
         <View style={{ height: 40 }} />

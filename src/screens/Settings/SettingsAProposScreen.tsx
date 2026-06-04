@@ -17,7 +17,7 @@ export const SettingsAProposScreen: React.FC = () => {
           <Row icon="info"        label="Version"                   value="1.0.0 (build 1)" />
           <Row icon="file-text"   label="Conditions d'utilisation"  onPress={() => nav.navigate('CGU')} />
           <Row icon="shield"      label="Politique de confidentialité" onPress={() => nav.navigate('PolitiqueConfidentialite')} />
-          <Row icon="help-circle" label="Aide & Support"            onPress={() => Linking.openURL('mailto:support@folix.app')} last />
+          <Row icon="help-circle" label="Aide & Support"            onPress={() => Linking.openURL('mailto:support@gofolix.app')} last />
         </Card>
       </ScrollView>
     </View>

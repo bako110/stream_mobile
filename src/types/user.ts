@@ -28,7 +28,7 @@ export interface User {
   verification_note?: string | null;
   verification_requested_at?: string | null;
   referral_code?: string | null;
-  folix_id?: string | null;
+  gofolix_id?: string | null;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;

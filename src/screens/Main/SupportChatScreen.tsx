@@ -175,7 +175,7 @@ const BOT: Record<string, BotNode> = {
     ],
   },
   fin: {
-    text: 'Merci d\'avoir contacté le support FoliX ! Bonne utilisation de l\'application.',
+    text: 'Merci d\'avoir contacté le support GoFolix ! Bonne utilisation de l\'application.',
     options: [],
   },
 };
@@ -204,7 +204,7 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
   const [messages, setMessages] = useState<LocalMsg[]>([{
     id:   'w0',
     side: 'agent',
-    text: 'Bonjour ! Bienvenue sur le support FoliX.\n\nJe suis votre assistant virtuel. Sélectionnez un sujet ou décrivez votre problème.',
+    text: 'Bonjour ! Bienvenue sur le support GoFolix.\n\nJe suis votre assistant virtuel. Sélectionnez un sujet ou décrivez votre problème.',
     time: nowStr(),
     options: MENU_OPTIONS,
   }]);
@@ -300,7 +300,7 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
         setMessages(prev => [...prev, {
           id:   Date.now().toString() + '_a',
           side: 'agent',
-          text: 'Je vous mets en relation avec un agent FoliX.\n\nDécrivez votre problème ci-dessous et un membre de notre équipe vous répondra dans les plus brefs délais (Lun–Ven 8h–20h · Sam 9h–17h).',
+          text: 'Je vous mets en relation avec un agent GoFolix.\n\nDécrivez votre problème ci-dessous et un membre de notre équipe vous répondra dans les plus brefs délais (Lun–Ven 8h–20h · Sam 9h–17h).',
           time: nowStr(),
           options: [],
         }]);
@@ -502,7 +502,7 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
             <Icon name={phase === 'agent' ? 'headphones' : 'life-buoy'} size={17} color="#fff" />
           </View>
           <View>
-            <Text style={s.headerName}>Support FoliX</Text>
+            <Text style={s.headerName}>Support GoFolix</Text>
             <View style={s.onlineRow}>
               <View style={[s.onlineDot, { backgroundColor: phase === 'agent' && loadingAgent ? '#FBBF24' : '#4ADE80' }]} />
               <Text style={s.onlineTxt}>{headerSubtitle}</Text>

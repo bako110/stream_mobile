@@ -1327,7 +1327,7 @@ export const CommunitiesScreen: React.FC = () => {
               Rejoindre par code
             </Text>
             <Text style={{ color: colors.textTertiary, fontSize: 13, textAlign: 'center' }}>
-              Entre le code d'invitation que tu as reçu (ex: FOLIX-A3K9F)
+              Entre le code d'invitation que tu as reçu (ex: GOFOLIX-A3K9F)
             </Text>
             <TextInput
               style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 14, borderWidth: 1,
@@ -1337,7 +1337,7 @@ export const CommunitiesScreen: React.FC = () => {
                 color: colors.textPrimary }}
               value={joinCode}
               onChangeText={v => setJoinCode(v.toUpperCase())}
-              placeholder="FOLIX-XXXXX"
+              placeholder="GOFOLIX-XXXXX"
               placeholderTextColor={colors.textTertiary}
               autoCapitalize="characters"
               autoFocus

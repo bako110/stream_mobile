@@ -108,7 +108,7 @@ const Wizard: React.FC<WizardProps> = ({ type, onClose, onSuccess }) => {
               {isDelete ? 'Pourquoi voulez-vous supprimer votre compte ?' : 'Pourquoi voulez-vous désactiver votre compte ?'}
             </Text>
             <Text style={[wz.stepSub, { color: colors.textTertiary }]}>
-              Votre réponse nous aide à améliorer FoliX.
+              Votre réponse nous aide à améliorer GoFolix.
             </Text>
 
             <View style={{ gap: 10, marginTop: 8 }}>

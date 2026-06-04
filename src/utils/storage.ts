@@ -1,7 +1,7 @@
 import { createMMKV } from 'react-native-mmkv';
 
 // MMKV est ~30x plus rapide qu'AsyncStorage — utilisé pour tokens/préférences
-const mmkv = createMMKV({ id: 'folix-storage' });
+const mmkv = createMMKV({ id: 'gofolix-storage' });
 
 export const storage = {
   getItem: (key: string): string | null => {

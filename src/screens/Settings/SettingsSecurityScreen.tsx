@@ -13,7 +13,7 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { PageHeader } from './_shared';
-import { FolixLoader } from '../../components/common/FolixLoader';
+import { GoFolixLoader } from '../../components/common/GoFolixLoader';
 import { apiClient } from '../../api/client';
 import { authService } from '../../services';
 
@@ -271,7 +271,7 @@ export const SettingsSecurityScreen: React.FC = () => {
         {/* Chargement */}
         {loading ? (
           <View style={s.loadingWrap}>
-            <FolixLoader variant="bar" color={colors.primary ?? '#7B3FF2'} />
+            <GoFolixLoader variant="bar" color={colors.primary ?? '#7B3FF2'} />
           </View>
         ) : sessions.length === 0 ? (
           <View style={s.empty}>
@@ -294,7 +294,7 @@ export const SettingsSecurityScreen: React.FC = () => {
                   <SessionCard session={session} onRevoke={(id) => handleRevoke(id, session.is_current)} />
                   {revoking === session.id && (
                     <View style={s.revokingOverlay}>
-                      <FolixLoader variant="bar" color="#EF4444" />
+                      <GoFolixLoader variant="bar" color="#EF4444" />
                     </View>
                   )}
                 </Animated.View>
@@ -309,7 +309,7 @@ export const SettingsSecurityScreen: React.FC = () => {
                 disabled={revokingAll}
               >
                 {revokingAll ? (
-                  <FolixLoader variant="bar" color="#EF4444" />
+                  <GoFolixLoader variant="bar" color="#EF4444" />
                 ) : (
                   <>
                     <Icon name="log-out" size={16} color="#EF4444" />
