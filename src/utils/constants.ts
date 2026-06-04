@@ -15,7 +15,7 @@ export const WS_BASE_URL = USE_LOCAL_API
 export const API_TIMEOUT = 30_000; // 30s (Fly.dev cold start)
 
 // ── App ────────────────────────────────────────────────────────────────────
-export const APP_NAME    = 'GoFolix';
+export const APP_NAME    = 'GoFolyX';
 export const APP_VERSION = '1.0.0';
 
 // ── Pagination ─────────────────────────────────────────────────────────────
@@ -33,11 +33,11 @@ export const PLAN_LABELS = {
 
 // ── Storage keys ───────────────────────────────────────────────────────────
 export const STORAGE_KEYS = {
-  ACCESS_TOKEN:   'gofolix_access_token',
-  REFRESH_TOKEN:  'gofolix_refresh_token',
-  THEME_MODE:     'gofolix_theme_mode',
-  ONBOARDING_DONE:'gofolix_onboarding_done',
-  LAST_USER_ID:   'gofolix_last_user_id',
+  ACCESS_TOKEN:   'gofolyx_access_token',
+  REFRESH_TOKEN:  'gofolyx_refresh_token',
+  THEME_MODE:     'gofolyx_theme_mode',
+  ONBOARDING_DONE:'gofolyx_onboarding_done',
+  LAST_USER_ID:   'gofolyx_last_user_id',
 } as const;
 
 // ── Durées (ms) ────────────────────────────────────────────────────────────
@@ -50,10 +50,10 @@ export const DURATIONS = {
 
 // ── Saved items (MMKV keys) ────────────────────────────────────────────────
 export const SAVED_KEYS = {
-  EVENTS:      'gofolix_saved_events',
-  CONCERTS:    'gofolix_saved_concerts',
-  REELS:       'gofolix_saved_reels',
-  STORIES:     'gofolix_saved_stories',
-  POSTS:       'gofolix_saved_posts',
-  COMMUNITIES: 'gofolix_saved_communities',
+  EVENTS:      'gofolyx_saved_events',
+  CONCERTS:    'gofolyx_saved_concerts',
+  REELS:       'gofolyx_saved_reels',
+  STORIES:     'gofolyx_saved_stories',
+  POSTS:       'gofolyx_saved_posts',
+  COMMUNITIES: 'gofolyx_saved_communities',
 } as const;

@@ -183,7 +183,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
           <Icon name="monitor" size={18} color="#7B3FF2" />
           <View style={{ flex: 1 }}>
             <Text style={{ color: '#7B3FF2', fontWeight: '700', fontSize: 15 }}>Connecter le site web</Text>
-            <Text style={{ color: '#7B3FF2', fontSize: 11, opacity: 0.7, marginTop: 1 }}>Scanner le QR code sur gofolix.com</Text>
+            <Text style={{ color: '#7B3FF2', fontSize: 11, opacity: 0.7, marginTop: 1 }}>Scanner le QR code sur gofolyx.com</Text>
           </View>
           <Icon name="camera" size={16} color="#7B3FF2" />
         </TouchableOpacity>

@@ -110,7 +110,7 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
     try {
       await Share.share({
         title: event?.title ?? 'Mon billet',
-        message: `Mon billet ${th.label} pour "${event?.title ?? 'cet événement'}" — Réf: ${(ticket.access_code ?? ticket.id ?? '').slice(0, 8).toUpperCase()}\nVia GoFolix`,
+        message: `Mon billet ${th.label} pour "${event?.title ?? 'cet événement'}" — Réf: ${(ticket.access_code ?? ticket.id ?? '').slice(0, 8).toUpperCase()}\nVia GoFolyX`,
       });
     } catch { /**/ }
   };

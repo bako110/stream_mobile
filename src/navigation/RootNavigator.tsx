@@ -33,7 +33,7 @@ async function requestLocationPermission() {
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
           title: 'Localisation',
-          message: 'GoFolix utilise votre position pour vous afficher les événements près de chez vous.',
+          message: 'GoFolyX utilise votre position pour vous afficher les événements près de chez vous.',
           buttonPositive: 'Autoriser',
           buttonNegative: 'Plus tard',
         },
@@ -195,7 +195,7 @@ export const RootNavigator: React.FC = () => {
   }
 
   const linking = {
-    prefixes: ['gofolix://', 'https://gofolix.app'],
+    prefixes: ['gofolyx://', 'https://gofolyx.app'],
     config: {
       screens: {
         PostDetail:    'post/:postId',

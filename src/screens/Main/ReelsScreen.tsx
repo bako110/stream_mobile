@@ -25,7 +25,7 @@ import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
 import {
-  CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolixLoader,
+  CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -469,7 +469,7 @@ export const ReelsScreen: React.FC = () => {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <GoFolixLoader variant="reel" color="#ffffff" />
+        <GoFolyXLoader variant="reel" color="#ffffff" />
       </View>
     );
   }
@@ -1280,7 +1280,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       />
 
       {!videoPlaying && !videoError && !ended && isActive && (
-        <GoFolixLoader variant="reel" color="#ffffff" />
+        <GoFolyXLoader variant="reel" color="#ffffff" />
       )}
 
       {videoError && (

@@ -317,16 +317,16 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
       await Promise.all(urls.map(async (url, i) => {
         const ext  = url.match(/\.(mp4|mov|webm)/i) ? 'mp4' : 'jpg';
         const dest = Platform.OS === 'android'
-          ? `${dirs.DownloadDir}/GoFolix_${Date.now()}_${i}.${ext}`
-          : `${dirs.DocumentDir}/GoFolix_${Date.now()}_${i}.${ext}`;
+          ? `${dirs.DownloadDir}/GoFolyX_${Date.now()}_${i}.${ext}`
+          : `${dirs.DocumentDir}/GoFolyX_${Date.now()}_${i}.${ext}`;
         await RNBlobUtil.config({
           fileCache: true,
           path: dest,
           addAndroidDownloads: {
             useDownloadManager: true,
             notification: true,
-            title: `GoFolix — fichier ${i + 1}/${urls.length}`,
-            description: 'Téléchargement GoFolix',
+            title: `GoFolyX — fichier ${i + 1}/${urls.length}`,
+            description: 'Téléchargement GoFolyX',
             mime: ext === 'mp4' ? 'video/mp4' : 'image/jpeg',
             mediaScannable: true,
           },

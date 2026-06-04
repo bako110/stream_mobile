@@ -47,7 +47,7 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw);
-      if (parsed?.type === 'gofolix_qr_login' && parsed?.token) {
+      if (parsed?.type === 'gofolyx_qr_login' && parsed?.token) {
         handleCode(parsed.token);
       }
     } catch {}

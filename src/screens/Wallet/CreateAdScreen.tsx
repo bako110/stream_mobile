@@ -8,7 +8,7 @@ import {
   ScrollView, Alert, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolixLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -246,7 +246,7 @@ export const CreateAdScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Barre de progression sauvegarde */}
-      {saving && <GoFolixLoader variant="bar" color={colors.primary} />}
+      {saving && <GoFolyXLoader variant="bar" color={colors.primary} />}
 
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
@@ -335,7 +335,7 @@ export const CreateAdScreen: React.FC = () => {
             {uploading ? (
               <View style={s.imagePickerInner}>
                 <View style={{ width: '100%', marginBottom: 8 }}>
-                  <GoFolixLoader variant="bar" color={colors.primary} />
+                  <GoFolyXLoader variant="bar" color={colors.primary} />
                 </View>
                 <Text style={[s.imagePickerTxt, { color: colors.textTertiary }]}>{uploadStatus || 'Upload en cours…'}</Text>
                 {uploadStatus.includes('HLS') && (

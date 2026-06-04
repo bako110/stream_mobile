@@ -55,7 +55,7 @@ export const authService = {
     );
     const { access_token, refresh_token, token_type } = loginRes.data;
     authService._saveTokens({ access_token, refresh_token, token_type });
-    // Force un /auth/me pour avoir toutes les données (gofolix_id, referral_code, etc.)
+    // Force un /auth/me pour avoir toutes les données (gofolyx_id, referral_code, etc.)
     const freshUser = await authService.getMe(true);
     return { access_token, refresh_token, token_type, user: freshUser };
   },
@@ -79,7 +79,7 @@ export const authService = {
       return _cachedUser;
     }
     const res = await apiClient.get<User>(Endpoints.auth.me);
-    console.log('[getMe] gofolix_id=', res.data?.gofolix_id, 'raw keys=', Object.keys(res.data || {}));
+    console.log('[getMe] gofolyx_id=', res.data?.gofolyx_id, 'raw keys=', Object.keys(res.data || {}));
     _cachedUser = res.data;
     _cachedAt = now;
     return _cachedUser!;

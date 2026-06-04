@@ -1357,7 +1357,7 @@ export const FeedScreen: React.FC = () => {
             )
           )}
 
-          {/* Centre : GoFolix logo — position absolue, toujours centré */}
+          {/* Centre : GoFolyX logo — position absolue, toujours centré */}
           {!searchOpen && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
@@ -2205,7 +2205,7 @@ export const FeedScreen: React.FC = () => {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>Assistance</Text>
-                <Text style={[mnu.listSub, { color: colors.textTertiary }]}>Centre d'aide GoFolix</Text>
+                <Text style={[mnu.listSub, { color: colors.textTertiary }]}>Centre d'aide GoFolyX</Text>
               </View>
               <Icon name="chevron-right" size={16} color={colors.textTertiary} />
             </TouchableOpacity>
@@ -3378,7 +3378,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
   const author       = isEvent ? event?.organizer : concert?.artist ?? null;
   const authorId     = author?.id ?? null;
-  const authorName   = author?.display_name ?? author?.username ?? 'GoFolix';
+  const authorName   = author?.display_name ?? author?.username ?? 'GoFolyX';
   const authorAvatar = author?.avatar_url ?? null;
   const authorInit   = (authorName || 'F')[0].toUpperCase();
   const isOwnContent = !!(currentUserId && authorId && currentUserId === authorId);

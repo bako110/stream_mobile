@@ -14,7 +14,7 @@ import type { StoryGroup, StoryViewerUser } from '../../types/story';
 import { storyService } from '../../services/storyService';
 import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
-import { GoFolixLoader } from '../common';
+import { GoFolyXLoader } from '../common';
 import { getLocalUri, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
 import { apiClient } from '../../api/client';
 
@@ -130,7 +130,7 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
     <View style={s.media}>
       <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />
       {(!ready || buffering) && (
-        <GoFolixLoader variant="reel" color="#ffffff" />
+        <GoFolyXLoader variant="reel" color="#ffffff" />
       )}
     </View>
   );
@@ -1188,7 +1188,7 @@ export const StoryViewer: React.FC<Props> = ({
                   {/* Contenu onglet Vues */}
                   {viewersTab === 'views' && (
                     viewersLoading ? (
-                      <GoFolixLoader color={accent} height={2} />
+                      <GoFolyXLoader color={accent} height={2} />
                     ) : viewers.length === 0 ? (
                       <View style={s.emptyBox}>
                         <Icon name="eye-off" size={38} color="rgba(255,255,255,0.2)" />
@@ -1250,7 +1250,7 @@ export const StoryViewer: React.FC<Props> = ({
                   {/* Contenu onglet Réponses */}
                   {viewersTab === 'replies' && (
                     repliesLoading ? (
-                      <GoFolixLoader color={accent} height={2} />
+                      <GoFolyXLoader color={accent} height={2} />
                     ) : replies.length === 0 ? (
                       <View style={s.emptyBox}>
                         <Icon name="message-circle" size={38} color="rgba(255,255,255,0.2)" />

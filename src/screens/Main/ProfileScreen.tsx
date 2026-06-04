@@ -51,9 +51,9 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
     try {
       let me = await refreshUser();
       if (!me) return;
-      if (!me.gofolix_id) {
+      if (!me.gofolyx_id) {
         try {
-          const r = await apiClient.post<User>(Endpoints.users.generateGoFolixId);
+          const r = await apiClient.post<User>(Endpoints.users.generateGoFolyXId);
           me = r.data;
           setCurrentUser(r.data);
         } catch {}
@@ -210,22 +210,22 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               <Text style={[s.roleText, { color: colors.primary }]}>{roleLabel}</Text>
             </View>
 
-            {/* Bouton test GoFolix ID */}
-            {!user?.gofolix_id && (
+            {/* Bouton test GoFolyX ID */}
+            {!user?.gofolyx_id && (
               <TouchableOpacity
                 style={{ marginTop: 10, backgroundColor: '#FF6B00', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20, alignSelf: 'center' }}
                 onPress={async () => {
                   try {
-                    console.log('[TEST] Appel generate-gofolix-id...', Endpoints.users.generateGoFolixId);
-                    const r = await apiClient.post<User>(Endpoints.users.generateGoFolixId);
-                    console.log('[TEST] Réponse:', JSON.stringify(r.data?.gofolix_id));
+                    console.log('[TEST] Appel generate-gofolyx-id...', Endpoints.users.generateGoFolyXId);
+                    const r = await apiClient.post<User>(Endpoints.users.generateGoFolyXId);
+                    console.log('[TEST] Réponse:', JSON.stringify(r.data?.gofolyx_id));
                     setCurrentUser(r.data);
                   } catch (e: any) {
                     console.log('[TEST] Erreur:', e?.message, e?.response?.status, JSON.stringify(e?.response?.data));
                   }
                 }}
               >
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Générer GoFolix ID</Text>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Générer GoFolyX ID</Text>
               </TouchableOpacity>
             )}
 
@@ -377,25 +377,25 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.aboutRow, { backgroundColor: colors.primary + '12', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }]}
-                activeOpacity={user?.gofolix_id ? 0.75 : 1}
+                activeOpacity={user?.gofolyx_id ? 0.75 : 1}
                 onPress={() => {
-                  if (!user?.gofolix_id) return;
-                  Clipboard.setString(user.gofolix_id!);
+                  if (!user?.gofolyx_id) return;
+                  Clipboard.setString(user.gofolyx_id!);
                   if (Platform.OS === 'android') {
-                    ToastAndroid.show('GoFolix ID copié !', ToastAndroid.SHORT);
+                    ToastAndroid.show('GoFolyX ID copié !', ToastAndroid.SHORT);
                   } else {
-                    Alert.alert('Copié', 'GoFolix ID copié dans le presse-papier.');
+                    Alert.alert('Copié', 'GoFolyX ID copié dans le presse-papier.');
                   }
                 }}
               >
                 <Icon name="at-sign" size={16} color={colors.primary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>GoFolix ID</Text>
-                  <Text style={{ fontSize: 15, fontWeight: '900', color: user?.gofolix_id ? colors.primary : colors.textTertiary, letterSpacing: 2 }}>
-                    {user?.gofolix_id ?? 'En cours de génération...'}
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>GoFolyX ID</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '900', color: user?.gofolyx_id ? colors.primary : colors.textTertiary, letterSpacing: 2 }}>
+                    {user?.gofolyx_id ?? 'En cours de génération...'}
                   </Text>
                 </View>
-                {user?.gofolix_id ? (
+                {user?.gofolyx_id ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                     <Icon name="copy" size={13} color={colors.primary} />
                     <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Copier</Text>

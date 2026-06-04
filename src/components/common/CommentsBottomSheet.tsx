@@ -14,7 +14,7 @@ import { useCommentsWebSocket } from '../../hooks/useCommentsWebSocket';
 import type { CommentWsEvent } from '../../hooks/useCommentsWebSocket';
 import { socialService } from '../../services';
 import { VerifiedBadge } from './VerifiedBadge';
-import { GoFolixLoader } from './GoFolixLoader';
+import { GoFolyXLoader } from './GoFolyXLoader';
 import type { Comment } from '../../types';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -304,7 +304,7 @@ const CommentRow: React.FC<RowProps> = ({
             >
               <View style={[st.toggleLine, { backgroundColor: colors.border }]} />
               {item.repliesLoading ? (
-                <GoFolixLoader variant="bar" color={colors.primary} />
+                <GoFolyXLoader variant="bar" color={colors.primary} />
               ) : (
                 <>
                   <Icon name="chevron-up" size={20} color={colors.textTertiary} />
@@ -701,7 +701,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
           {/* Liste */}
           {loading ? (
             <View style={st.center}>
-              <GoFolixLoader variant="bar" color={colors.primary} />
+              <GoFolyXLoader variant="bar" color={colors.primary} />
             </View>
           ) : comments.length === 0 ? (
             <View style={st.center}>
@@ -746,7 +746,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                   disabled={loadingMore}
                 >
                   {loadingMore
-                    ? <GoFolixLoader variant="bar" color={colors.primary} />
+                    ? <GoFolyXLoader variant="bar" color={colors.primary} />
                     : <Text style={[st.loadMoreText, { color: colors.primary }]}>Voir plus de commentaires</Text>
                   }
                 </TouchableOpacity>
@@ -805,7 +805,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                   activeOpacity={0.8}
                 >
                   {(sending || editSaving)
-                    ? <GoFolixLoader variant="bar" color="#fff" />
+                    ? <GoFolyXLoader variant="bar" color="#fff" />
                     : isEditMode
                       ? <Icon name="check" size={20} color="#fff" />
                       : <MCIcon name="send" size={20} color="#fff" />

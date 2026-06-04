@@ -2,7 +2,7 @@
  * WebQRScannerScreen — flux "WhatsApp Web"
  *
  * L'utilisateur est déjà connecté sur le mobile.
- * Il scanne le QR affiché sur le site web GoFolix.
+ * Il scanne le QR affiché sur le site web GoFolyX.
  * Le mobile appelle POST /auth/web-qr/scan → le site reçoit ses tokens et se connecte.
  */
 import React, { useCallback, useRef, useState } from 'react';
@@ -124,10 +124,10 @@ export const WebQRScannerScreen: React.FC = () => {
             style={st.badge}
           >
             <Icon name="monitor" size={13} color="#fff" />
-            <Text style={st.badgeText}>Connexion au site web GoFolix</Text>
+            <Text style={st.badgeText}>Connexion au site web GoFolyX</Text>
           </LinearGradient>
           <Text style={st.hint}>
-            Ouvrez gofolix.com sur votre ordinateur, allez sur l'ecran de connexion et scannez le QR code affiché.
+            Ouvrez gofolyx.com sur votre ordinateur, allez sur l'ecran de connexion et scannez le QR code affiché.
           </Text>
           <TouchableOpacity onPress={() => setPhase('manual')} style={st.manualLink}>
             <Icon name="edit-2" size={13} color="rgba(255,255,255,0.55)" />
@@ -212,7 +212,7 @@ export const WebQRScannerScreen: React.FC = () => {
           </View>
           <Text style={[st.resultText, { color: '#22C55E' }]}>Site web connecté !</Text>
           <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 }}>
-            Le site web GoFolix est maintenant connecté avec votre compte.
+            Le site web GoFolyX est maintenant connecté avec votre compte.
           </Text>
         </Animated.View>
       )}

@@ -107,7 +107,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 Bienvenue sur
               </Text>
               <Text style={[styles.greetName, { color: colors.primary, fontSize: fontSize.xl, fontWeight: fontWeight.extraBold }]}>
-                GoFolix
+                GoFolyX
               </Text>
             </View>
           ) : title ? (

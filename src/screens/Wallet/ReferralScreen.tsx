@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolixLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
@@ -25,7 +25,7 @@ interface ReferredUser {
   username:        string;
   display_name:    string | null;
   avatar_url:      string | null;
-  gofolix_id:        string | null;
+  gofolyx_id:        string | null;
   joined_at:       string;
   coins_generated: number;
 }
@@ -71,8 +71,8 @@ export const ReferralScreen: React.FC = () => {
     if (!stats?.referral_code) return;
     await Share.share({
       message:
-        `Rejoins-moi sur GoFolix ! Utilise mon code de parrainage \`${stats.referral_code}\` lors de ton inscription et gagne 20 coins bonus. Tu peux t'inscrire sur GoFolix maintenant.`,
-      title: 'Invite un ami sur GoFolix',
+        `Rejoins-moi sur GoFolyX ! Utilise mon code de parrainage \`${stats.referral_code}\` lors de ton inscription et gagne 20 coins bonus. Tu peux t'inscrire sur GoFolyX maintenant.`,
+      title: 'Invite un ami sur GoFolyX',
     });
   }, [stats]);
 
@@ -93,7 +93,7 @@ export const ReferralScreen: React.FC = () => {
 
       {loading ? (
         <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-          <GoFolixLoader />
+          <GoFolyXLoader />
         </View>
       ) : (
         <ScrollView
@@ -109,7 +109,7 @@ export const ReferralScreen: React.FC = () => {
           >
             <Text style={[s.heroTitle, { color: colors.textPrimary }]}>Invitez vos amis</Text>
             <Text style={[s.heroSub, { color: colors.textSecondary }]}>
-              Gagnez des coins pour chaque ami qui rejoint GoFolix et chaque achat qu'il effectue.
+              Gagnez des coins pour chaque ami qui rejoint GoFolyX et chaque achat qu'il effectue.
             </Text>
 
             {/* Récompenses */}
@@ -220,9 +220,9 @@ export const ReferralScreen: React.FC = () => {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.userName, { color: colors.textPrimary }]}>{name}</Text>
-                      {u.gofolix_id ? (
+                      {u.gofolyx_id ? (
                         <Text style={[s.userDate, { color: colors.primary, fontWeight: '700', letterSpacing: 1 }]}>
-                          {u.gofolix_id}
+                          {u.gofolyx_id}
                         </Text>
                       ) : null}
                       <Text style={[s.userDate, { color: colors.textTertiary }]}>Inscrit le {date}</Text>

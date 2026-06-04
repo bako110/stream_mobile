@@ -1,7 +1,7 @@
 // Centralisation des assets — utiliser uniquement via cet index
 
 export const Images = {
-  // Logos GoFolix — light/dark selon le thème
+  // Logos GoFolyX — light/dark selon le thème
   logoLight: require('./images/stream_logo_light.png'),
   logoDark:  require('./images/stream_logo_dark.png'),
 

@@ -24,7 +24,7 @@ const REQUIREMENTS = [
   { icon: 'users',      label: 'Au moins 100 abonnés' },
   { icon: 'film',       label: 'Au moins 5 contenus publiés' },
   { icon: 'calendar',   label: 'Compte créé depuis 30 jours' },
-  { icon: 'check-circle', label: 'Respect des CGU GoFolix' },
+  { icon: 'check-circle', label: 'Respect des CGU GoFolyX' },
 ];
 
 export default function MonetisationRequestScreen() {
@@ -180,7 +180,7 @@ export default function MonetisationRequestScreen() {
         <View style={[s.legalNote, { backgroundColor: colors.backgroundSecondary }]}>
           <Icon name="shield" size={14} color={colors.textTertiary} />
           <Text style={[s.legalText, { color: colors.textTertiary }]}>
-            En soumettant cette demande, vous confirmez que votre contenu respecte les CGU GoFolix et la législation en vigueur.
+            En soumettant cette demande, vous confirmez que votre contenu respecte les CGU GoFolyX et la législation en vigueur.
           </Text>
         </View>
 

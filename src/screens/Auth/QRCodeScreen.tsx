@@ -71,7 +71,7 @@ export const QRCodeScreen: React.FC<Props> = ({ visible, onClose }) => {
     return clearTimers;
   }, [visible, generate]);
 
-  const qrValue  = token ? JSON.stringify({ type: 'gofolix_qr_login', token }) : 'gofolix';
+  const qrValue  = token ? JSON.stringify({ type: 'gofolyx_qr_login', token }) : 'gofolyx';
   const ttlColor = ttl > 60 ? '#22C55E' : ttl > 20 ? '#F5A623' : '#EF4444';
   const ttlMin   = Math.floor(ttl / 60);
   const ttlSec   = ttl % 60;
@@ -169,7 +169,7 @@ export const QRCodeScreen: React.FC<Props> = ({ visible, onClose }) => {
               <Animated.View entering={FadeInDown.delay(300)} style={s.stepsWrap}>
                 <Text style={[s.stepsTitle, { color: colors.textTertiary }]}>COMMENT ÇA MARCHE</Text>
                 {[
-                  { n: '1', icon: 'smartphone',  text: 'Ouvrez GoFolix sur un autre téléphone' },
+                  { n: '1', icon: 'smartphone',  text: 'Ouvrez GoFolyX sur un autre téléphone' },
                   { n: '2', icon: 'log-in',       text: "Sur l'écran de connexion, appuyez sur « Scanner un QR code »" },
                   { n: '3', icon: 'camera',        text: 'Pointez la caméra vers ce code' },
                   { n: '4', icon: 'zap',           text: 'Connexion automatique en 1 seconde' },

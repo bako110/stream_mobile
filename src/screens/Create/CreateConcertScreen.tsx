@@ -165,7 +165,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        { title: 'Localisation', message: 'GoFolix a besoin de votre position pour remplir le lieu.', buttonPositive: 'OK' },
+        { title: 'Localisation', message: 'GoFolyX a besoin de votre position pour remplir le lieu.', buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         Alert.alert('Permission refusée', 'Activez la localisation dans les paramètres.');
@@ -289,7 +289,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
 
     Alert.alert(
       isEditing ? 'Enregistrer et publier ?' : 'Publier le concert ?',
-      'Votre concert sera visible par tous les utilisateurs GoFolix.',
+      'Votre concert sera visible par tous les utilisateurs GoFolyX.',
       [
         { text: 'Annuler', style: 'cancel' },
         {

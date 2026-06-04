@@ -27,7 +27,7 @@ export const Endpoints = {
   users: {
     me:             `${V1}/users/me`,
     updateMe:       `${V1}/users/me`,
-    generateGoFolixId: `${V1}/users/me/generate-gofolix-id`,
+    generateGoFolyXId: `${V1}/users/me/generate-gofolyx-id`,
     watchHistory:   `${V1}/users/me/history`,
     publicProfile:  (id: string) => `${V1}/users/${id}/profile`,
     userReels:      (id: string) => `${V1}/users/${id}/reels`,
@@ -328,8 +328,8 @@ export const Endpoints = {
     referralMe:    `${V1}/wallet/referral/me`,
     referralStats: `${V1}/wallet/referral/stats`,
     referralUsers: `${V1}/wallet/referral/users`,
-    // GoFolix ID
-    resolveFlixId: (gofolixId: string) => `${V1}/wallet/resolve/${gofolixId}`,
+    // GoFolyX ID
+    resolveFlixId: (gofolyxId: string) => `${V1}/wallet/resolve/${gofolyxId}`,
   },
 
   // ── Lives simples (spontanés) ─────────────────────────────────────────────

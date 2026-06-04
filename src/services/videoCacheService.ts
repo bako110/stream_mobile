@@ -12,7 +12,7 @@
 import RNBlobUtil from 'react-native-blob-util';
 import { storage } from '../utils/storage';
 
-const CACHE_DIR      = `${RNBlobUtil.fs.dirs.CacheDir}/gofolix_story_videos`;
+const CACHE_DIR      = `${RNBlobUtil.fs.dirs.CacheDir}/gofolyx_story_videos`;
 const INDEX_KEY      = 'video_cache_index';
 const INDEX_KEY_BAK  = 'video_cache_index_bak';  // backup anti-crash
 const MAX_AGE_MS     = 26 * 3600 * 1000;          // 26h (stories = 24h)
