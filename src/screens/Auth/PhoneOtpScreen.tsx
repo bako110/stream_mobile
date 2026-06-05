@@ -222,6 +222,11 @@ export const PhoneOtpScreen: React.FC<Props> = ({
                 {!!error && <ErrorBox msg={error} color={colors.danger} />}
 
                 <Button label="Recevoir le code SMS" onPress={handleSendOtp} loading={loading} style={{ marginTop: 8 }} />
+
+                <TouchableOpacity onPress={onGoBack} style={st.goBackBtn}>
+                  <Icon name="arrow-left" size={15} color={colors.textSecondary} />
+                  <Text style={[st.goBackTxt, { color: colors.textSecondary }]}>Retour a la connexion</Text>
+                </TouchableOpacity>
               </>
             )}
 
@@ -361,6 +366,8 @@ const st = StyleSheet.create({
   errorTxt:   { fontSize: 13, flex: 1 },
   resendBtn:  { alignItems: 'center', paddingVertical: 4 },
   resendTxt:  { fontSize: 14, fontWeight: '500' },
+  goBackBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, marginTop: 4 },
+  goBackTxt:  { fontSize: 14 },
   iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
   doneTitle:  { fontSize: 24, fontWeight: '700', textAlign: 'center', marginTop: 24 },
   doneSub:    { fontSize: 15, textAlign: 'center', marginTop: 8, lineHeight: 22 },
