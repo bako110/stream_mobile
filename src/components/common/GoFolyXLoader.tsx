@@ -1,0 +1,1 @@
+export { GoFolyXLoader } from './FolixLoader';
