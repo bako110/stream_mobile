@@ -10,6 +10,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
+import { PhoneOtpScreen } from './PhoneOtpScreen';
 
 type Method = 'email' | 'phone' | 'username';
 type Step   = 'input' | 'code' | 'newpass' | 'done';
@@ -35,6 +36,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
   const [confirmPass, setConfirmPass] = useState('');
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState('');
+  const [showPhoneOtp, setShowPhoneOtp] = useState(false);
 
   const newPassRef    = useRef<TextInput>(null);
   const confirmRef    = useRef<TextInput>(null);
@@ -45,11 +47,12 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
   const handleRequestReset = useCallback(async () => {
     if (!value.trim()) { setError('Ce champ est obligatoire.'); return; }
     if (method === 'email' && !value.includes('@')) { setError('Adresse email invalide.'); return; }
+    // Pour le telephone on bascule sur le flow Firebase OTP
+    if (method === 'phone') { setShowPhoneOtp(true); return; }
     setError(''); setLoading(true);
     try {
       const payload =
         method === 'email'    ? { email: value.trim().toLowerCase() } :
-        method === 'phone'    ? { phone: `${country.dial}${value.trim()}` } :
                                 { username: value.trim() };
       await authService.forgotPassword(payload);
       setStep('code');
@@ -79,6 +82,16 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
   }, [code, newPass, confirmPass]);
 
   /* ── UI ──────────────────────────────────────────────────────────────────── */
+
+  if (showPhoneOtp) {
+    return (
+      <PhoneOtpScreen
+        mode="forgot"
+        onSuccess={() => { setShowPhoneOtp(false); onGoBack(); }}
+        onGoBack={() => setShowPhoneOtp(false)}
+      />
+    );
+  }
 
   const renderHeader = () => (
     <Animated.View entering={FadeInDown.delay(40).springify()} style={s.header}>

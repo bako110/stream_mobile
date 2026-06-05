@@ -14,6 +14,7 @@ import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../compo
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
 import { QRScannerScreen } from './QRScannerScreen';
+import { PhoneOtpScreen } from './PhoneOtpScreen';
 
 GoogleSignin.configure({
   webClientId: '778294681035-6lg8qhahhd89rvvmd07nggchv2slp521.apps.googleusercontent.com',
@@ -57,6 +58,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
   };
 
   const [socialLoading, setSocialLoading] = useState<'google' | null>(null);
+  const [showPhoneOtp, setShowPhoneOtp] = useState(false);
 
   const handleGoogleLogin = useCallback(async () => {
     setSocialLoading('google');
@@ -137,6 +139,16 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
       setLoading(false);
     }
   }, [identifier, password, isEmail, country, onLoginSuccess]);
+
+  if (showPhoneOtp) {
+    return (
+      <PhoneOtpScreen
+        mode="login"
+        onSuccess={() => { setShowPhoneOtp(false); onLoginSuccess(); }}
+        onGoBack={() => setShowPhoneOtp(false)}
+      />
+    );
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -379,6 +391,16 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                   <Text style={styles.googleIcon}>G</Text>
                 )}
                 <Text style={[styles.socialBtnText, { color: colors.textPrimary }]}>Google</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+                onPress={() => setShowPhoneOtp(true)}
+                disabled={!!socialLoading}
+                activeOpacity={0.75}
+              >
+                <Icon name="smartphone" size={18} color={colors.primary} />
+                <Text style={[styles.socialBtnText, { color: colors.textPrimary }]}>SMS</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

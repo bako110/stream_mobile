@@ -21,6 +21,8 @@ export const Endpoints = {
     qrVerify:       `${V1}/auth/qr/verify`,
     qrStatus:       (token: string) => `${V1}/auth/qr/status/${token}`,
     webQrScan:      `${V1}/auth/web-qr/scan`,
+    phoneVerify:    `${V1}/auth/phone/verify`,
+    phoneLink:      `${V1}/auth/phone/link`,
   },
 
   // ── Users (prefix: /api/v1/users) ─────────────────────────────────────────
