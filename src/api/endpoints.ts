@@ -421,6 +421,7 @@ export const Endpoints = {
     delete:        (id: string) => `${V1}/notifications/${id}`,
     deleteAll:     `${V1}/notifications`,
     deviceToken:   `${V1}/notifications/device-token`,
+    preferences:   `${V1}/notifications/preferences`,
   },
 
   // ── Publicités (prefix: /api/v1/ads) ─────────────────────────────────────
