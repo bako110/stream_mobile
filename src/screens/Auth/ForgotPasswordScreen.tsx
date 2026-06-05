@@ -10,7 +10,9 @@ import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
-import { PhoneOtpScreen } from './PhoneOtpScreen';
+import { phoneAuthService } from '../../services/phoneAuthService';
+import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
 
 type Method = 'email' | 'phone' | 'username';
 type Step   = 'input' | 'code' | 'newpass' | 'done';
@@ -36,8 +38,6 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
   const [confirmPass, setConfirmPass] = useState('');
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState('');
-  const [showPhoneOtp, setShowPhoneOtp] = useState(false);
-
   const newPassRef    = useRef<TextInput>(null);
   const confirmRef    = useRef<TextInput>(null);
 
@@ -47,26 +47,61 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
   const handleRequestReset = useCallback(async () => {
     if (!value.trim()) { setError('Ce champ est obligatoire.'); return; }
     if (method === 'email' && !value.includes('@')) { setError('Adresse email invalide.'); return; }
-    // Pour le telephone on bascule sur le flow Firebase OTP
-    if (method === 'phone') { setShowPhoneOtp(true); return; }
     setError(''); setLoading(true);
     try {
-      const payload =
-        method === 'email'    ? { email: value.trim().toLowerCase() } :
-                                { username: value.trim() };
-      await authService.forgotPassword(payload);
-      setStep('code');
-    } catch {
-      setStep('code'); // toujours avancer même si erreur (sécurité)
+      if (method === 'phone') {
+        // Firebase envoie le SMS, on stocke la confirmation en mémoire
+        const e164 = `${country.dial}${value.trim().replace(/\D/g, '')}`;
+        await phoneAuthService.sendOtp(e164);
+        setStep('code');
+      } else {
+        const payload =
+          method === 'email' ? { email: value.trim().toLowerCase() } :
+                               { username: value.trim() };
+        await authService.forgotPassword(payload);
+        setStep('code');
+      }
+    } catch (e: any) {
+      if (method === 'phone') {
+        const msg = e?.message ?? '';
+        if (msg.includes('TOO_MANY_REQUESTS') || msg.includes('quota')) {
+          setError('Trop de tentatives. Reessayez dans quelques minutes.');
+        } else {
+          setError('Impossible d\'envoyer le SMS. Verifiez le numero.');
+        }
+      } else {
+        setStep('code'); // anti-enumeration : toujours avancer
+      }
     } finally { setLoading(false); }
   }, [value, method, country]);
 
   /* ── Étape 2 : saisie du code ────────────────────────────────────────────── */
-  const handleVerifyCode = useCallback(() => {
+  const handleVerifyCode = useCallback(async () => {
     if (code.trim().length < 6) { setError('Le code doit faire au moins 6 caractères.'); return; }
     setError('');
-    setStep('newpass');
-  }, [code]);
+    if (method === 'phone') {
+      // Validation Firebase OTP → connexion backend (JWT) → étape mdp
+      setLoading(true);
+      try {
+        await phoneAuthService.confirmOtp(code.trim());
+        await phoneAuthService.verifyWithBackend({});
+        await phoneAuthService.signOutFirebase();
+        setStep('newpass');
+      } catch (e: any) {
+        const msg = e?.message ?? '';
+        if (msg.includes('invalid-verification-code') || msg.includes('INVALID_CODE')) {
+          setError('Code incorrect. Vérifiez le SMS.');
+        } else if (msg.includes('session-expired') || msg.includes('SESSION_EXPIRED')) {
+          setError('Code expiré. Demandez un nouveau code.');
+          setStep('input'); setCode('');
+        } else {
+          setError('Vérification échouée. Réessayez.');
+        }
+      } finally { setLoading(false); }
+    } else {
+      setStep('newpass');
+    }
+  }, [code, method]);
 
   /* ── Étape 3 : nouveau mot de passe ─────────────────────────────────────── */
   const handleResetPassword = useCallback(async () => {
@@ -74,24 +109,19 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
     if (newPass !== confirmPass) { setError('Les mots de passe ne correspondent pas.'); return; }
     setError(''); setLoading(true);
     try {
-      await authService.resetPassword(code.trim(), newPass);
+      if (method === 'phone') {
+        // JWT déjà obtenu après OTP Firebase — reset direct sans ancien mdp
+        await apiClient.post(Endpoints.auth.resetPasswordMe, { new_password: newPass });
+      } else {
+        await authService.resetPassword(code.trim(), newPass);
+      }
       setStep('done');
     } catch (e: any) {
       setError(e?.message ?? 'Code invalide ou expiré.');
     } finally { setLoading(false); }
-  }, [code, newPass, confirmPass]);
+  }, [code, method, newPass, confirmPass]);
 
   /* ── UI ──────────────────────────────────────────────────────────────────── */
-
-  if (showPhoneOtp) {
-    return (
-      <PhoneOtpScreen
-        mode="forgot"
-        onSuccess={() => { setShowPhoneOtp(false); onGoBack(); }}
-        onGoBack={() => setShowPhoneOtp(false)}
-      />
-    );
-  }
 
   const renderHeader = () => (
     <Animated.View entering={FadeInDown.delay(40).springify()} style={s.header}>
