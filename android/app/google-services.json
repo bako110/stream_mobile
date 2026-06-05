@@ -12,7 +12,20 @@
           "package_name": "com.gofolyx.mobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "778294681035-mfdjpsq2tbv25nnfpub1icj6ju6plb9e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gofolyx.mobile",
+            "certificate_hash": "d4a10414b7c7e1d950dfed3ebda7fa88ad319bb2"
+          }
+        },
+        {
+          "client_id": "778294681035-6lg8qhahhd89rvvmd07nggchv2slp521.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBGfr00omSs8eG9FgBgzgXvp0IwUMVK9mE"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "778294681035-6lg8qhahhd89rvvmd07nggchv2slp521.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

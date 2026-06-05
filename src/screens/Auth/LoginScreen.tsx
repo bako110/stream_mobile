@@ -16,7 +16,7 @@ import { authService } from '../../services';
 import { QRScannerScreen } from './QRScannerScreen';
 
 GoogleSignin.configure({
-  webClientId: '862524928219-ojtrr3me5atb36mnd99fu71h37e94pte.apps.googleusercontent.com',
+  webClientId: '778294681035-6lg8qhahhd89rvvmd07nggchv2slp521.apps.googleusercontent.com',
   offlineAccess: false,
 });
 
