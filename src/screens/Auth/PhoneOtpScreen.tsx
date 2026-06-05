@@ -85,7 +85,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
   /* ── Etape 1 : envoyer le SMS ──────────────────────────────────────────────── */
   const handleSendOtp = useCallback(async () => {
     const digits = phone.replace(/\D/g, '');
-    if (digits.length < 6) { setError('Numero de telephone invalide.'); return; }
+    if (digits.length < 6) { setError('Numéro de téléphone invalide.'); return; }
     setError(''); setLoading(true);
     try {
       await phoneAuthService.sendOtp(`${country.dial}${digits}`);
@@ -93,14 +93,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
       startResendTimer();
       setTimeout(() => otpRef.current?.focus(), 300);
     } catch (e: any) {
-      const msg = e?.message ?? '';
-      if (msg.includes('TOO_SHORT') || msg.includes('INVALID_PHONE')) {
-        setError('Numero de telephone invalide.');
-      } else if (msg.includes('TOO_MANY_REQUESTS') || msg.includes('quota')) {
-        setError('Trop de tentatives. Reessayez dans quelques minutes.');
-      } else {
-        setError('Impossible d\'envoyer le code SMS. Verifiez votre numero.');
-      }
+      setError(e?.response?.data?.detail ?? e?.message ?? 'Impossible d\'envoyer le SMS.');
     } finally { setLoading(false); }
   }, [phone, country]);
 
@@ -109,37 +102,16 @@ export const PhoneOtpScreen: React.FC<Props> = ({
     if (otp.length !== OTP_LENGTH) { setError(`Le code fait ${OTP_LENGTH} chiffres.`); return; }
     setError(''); setLoading(true);
     try {
-      await phoneAuthService.confirmOtp(otp);
-
-      if (mode === 'verify') {
-        await phoneAuthService.linkPhoneToAccount();
-        await phoneAuthService.signOutFirebase();
-        onSuccess({});
-        return;
-      }
-
-      // login ou forgot : on connecte via le backend
-      await phoneAuthService.verifyWithBackend({ firstName, lastName, referralCode });
-      await phoneAuthService.signOutFirebase();
+      const result = await phoneAuthService.verifyOtp(otp, { firstName, lastName, referralCode });
 
       if (mode === 'forgot') {
-        // L'utilisateur est maintenant authentifie → etape nouveau mdp
         setStep('newpass');
         return;
       }
 
-      onSuccess({ isNewUser: false });
+      onSuccess({ isNewUser: result.is_new_user });
     } catch (e: any) {
-      const msg = e?.message ?? '';
-      if (msg.includes('invalid-verification-code') || msg.includes('INVALID_CODE')) {
-        setError('Code incorrect. Verifiez le SMS et reessayez.');
-      } else if (msg.includes('session-expired') || msg.includes('SESSION_EXPIRED')) {
-        setError('Code expire. Demandez un nouveau code.');
-        setStep('phone');
-        setOtp('');
-      } else {
-        setError(e?.response?.data?.detail ?? msg ?? 'Une erreur est survenue.');
-      }
+      setError(e?.response?.data?.detail ?? e?.message ?? 'Code incorrect ou expiré.');
     } finally { setLoading(false); }
   }, [otp, mode, firstName, lastName, referralCode, onSuccess]);
 

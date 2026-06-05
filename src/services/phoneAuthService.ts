@@ -1,4 +1,11 @@
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+/**
+ * phoneAuthService — OTP SMS via backend GoFolyX (Firebase REST côté serveur).
+ * Aucun SDK natif Firebase requis, pas de rebuild Android/iOS nécessaire.
+ *
+ * Flux :
+ *   1. sendOtp(phoneE164)      → POST /auth/phone/send-otp   → sessionInfo
+ *   2. verifyOtp(sessionInfo, code, opts?) → POST /auth/phone/verify-otp → JWT
+ */
 import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 import { authService } from './authService';
@@ -12,37 +19,30 @@ export interface PhoneVerifyResult {
 }
 
 class PhoneAuthService {
-  private _confirmation: FirebaseAuthTypes.ConfirmationResult | null = null;
+  private _sessionInfo: string | null = null;
 
-  /** Etape 1 : demande d'envoi du SMS OTP via Firebase. */
+  /** Etape 1 : demande d'envoi du SMS via le backend (Firebase REST). */
   async sendOtp(phoneE164: string): Promise<void> {
-    this._confirmation = await auth().signInWithPhoneNumber(phoneE164, true);
+    const res = await apiClient.post<{ session_info: string }>(
+      Endpoints.auth.phoneSendOtp,
+      { phone: phoneE164 },
+    );
+    this._sessionInfo = res.data.session_info;
   }
 
-  /** Etape 2 : confirmation du code saisi par l'utilisateur. */
-  async confirmOtp(code: string): Promise<FirebaseAuthTypes.UserCredential> {
-    if (!this._confirmation) throw new Error('Aucune verification en cours.');
-    return this._confirmation.confirm(code);
-  }
-
-  /**
-   * Etape 3 : envoie l'idToken Firebase au backend GoFolyX
-   * pour connexion / inscription / liaison.
-   */
-  async verifyWithBackend(opts?: {
+  /** Etape 2 : vérifie le code + connecte/crée le compte. */
+  async verifyOtp(code: string, opts?: {
     firstName?: string;
     lastName?: string;
     referralCode?: string;
   }): Promise<PhoneVerifyResult> {
-    const currentUser = auth().currentUser;
-    if (!currentUser) throw new Error('Utilisateur Firebase non connecte.');
-
-    const idToken = await currentUser.getIdToken(true);
+    if (!this._sessionInfo) throw new Error('Aucune session OTP en cours. Demandez d\'abord un code.');
 
     const res = await apiClient.post<PhoneVerifyResult>(
-      Endpoints.auth.phoneVerify,
+      Endpoints.auth.phoneVerifyOtp,
       {
-        id_token:      idToken,
+        session_info:  this._sessionInfo,
+        code:          code.trim(),
         first_name:    opts?.firstName,
         last_name:     opts?.lastName,
         referral_code: opts?.referralCode,
@@ -55,26 +55,12 @@ class PhoneAuthService {
       token_type:    res.data.token_type,
     });
 
+    this._sessionInfo = null;
     return res.data;
   }
 
-  /**
-   * Lie le numero verifie au compte deja connecte (verification de compte).
-   */
-  async linkPhoneToAccount(): Promise<void> {
-    const currentUser = auth().currentUser;
-    if (!currentUser) throw new Error('Utilisateur Firebase non connecte.');
-    const idToken = await currentUser.getIdToken(true);
-    await apiClient.post(Endpoints.auth.phoneLink, { id_token: idToken });
-  }
-
-  /** Deconnecte la session Firebase locale (sans toucher aux JWT GoFolyX). */
-  async signOutFirebase(): Promise<void> {
-    try { await auth().signOut(); } catch { /* ignore */ }
-  }
-
   reset() {
-    this._confirmation = null;
+    this._sessionInfo = null;
   }
 }
 

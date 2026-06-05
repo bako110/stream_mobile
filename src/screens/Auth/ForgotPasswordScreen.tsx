@@ -50,7 +50,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
     setError(''); setLoading(true);
     try {
       if (method === 'phone') {
-        // Firebase envoie le SMS, on stocke la confirmation en mémoire
+        // Backend appelle Firebase REST → envoie le SMS
         const e164 = `${country.dial}${value.trim().replace(/\D/g, '')}`;
         await phoneAuthService.sendOtp(e164);
         setStep('code');
@@ -63,11 +63,18 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
       }
     } catch (e: any) {
       if (method === 'phone') {
-        const msg = e?.message ?? '';
-        if (msg.includes('TOO_MANY_REQUESTS') || msg.includes('quota')) {
-          setError('Trop de tentatives. Reessayez dans quelques minutes.');
+        const msg: string = e?.message ?? e?.code ?? '';
+        console.error('[PhoneOTP] sendOtp error:', e?.code, e?.message);
+        if (msg.includes('TOO_MANY_REQUESTS') || msg.includes('quota') || msg.includes('too-many-requests')) {
+          setError('Trop de tentatives. Réessayez dans quelques minutes.');
+        } else if (msg.includes('invalid-phone-number') || msg.includes('INVALID_PHONE_NUMBER')) {
+          setError('Numéro de téléphone invalide. Vérifiez le format.');
+        } else if (msg.includes('operation-not-allowed')) {
+          setError('Connexion par SMS non activée. Contactez le support.');
+        } else if (msg.includes('missing-client-identifier') || msg.includes('MISSING_CLIENT_IDENTIFIER')) {
+          setError('Configuration Firebase incomplète (SHA-1). Contactez le support.');
         } else {
-          setError('Impossible d\'envoyer le SMS. Verifiez le numero.');
+          setError(`Erreur : ${msg || 'Impossible d\'envoyer le SMS.'}`);
         }
       } else {
         setStep('code'); // anti-enumeration : toujours avancer
@@ -80,23 +87,13 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
     if (code.trim().length < 6) { setError('Le code doit faire au moins 6 caractères.'); return; }
     setError('');
     if (method === 'phone') {
-      // Validation Firebase OTP → connexion backend (JWT) → étape mdp
+      // Backend vérifie le code OTP Firebase → JWT → étape mdp
       setLoading(true);
       try {
-        await phoneAuthService.confirmOtp(code.trim());
-        await phoneAuthService.verifyWithBackend({});
-        await phoneAuthService.signOutFirebase();
+        await phoneAuthService.verifyOtp(code.trim());
         setStep('newpass');
       } catch (e: any) {
-        const msg = e?.message ?? '';
-        if (msg.includes('invalid-verification-code') || msg.includes('INVALID_CODE')) {
-          setError('Code incorrect. Vérifiez le SMS.');
-        } else if (msg.includes('session-expired') || msg.includes('SESSION_EXPIRED')) {
-          setError('Code expiré. Demandez un nouveau code.');
-          setStep('input'); setCode('');
-        } else {
-          setError('Vérification échouée. Réessayez.');
-        }
+        setError(e?.response?.data?.detail ?? e?.message ?? 'Code incorrect ou expiré.');
       } finally { setLoading(false); }
     } else {
       setStep('newpass');
