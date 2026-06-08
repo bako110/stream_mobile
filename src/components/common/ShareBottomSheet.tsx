@@ -13,13 +13,14 @@ import { socialService } from '../../services/socialService';
 import type { Post } from '../../types/post';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
+import type { Reel } from '../../types/reel';
 
 const { height: H } = Dimensions.get('window');
 const SHEET_H = H * 0.52;
 
 const APP_DOMAIN = 'https://gofolyx.com';
 
-type ContentType = 'post' | 'event' | 'concert';
+type ContentType = 'post' | 'event' | 'concert' | 'reel';
 
 interface BaseProps {
   visible:  boolean;
@@ -27,11 +28,12 @@ interface BaseProps {
   onShareCountChange?: () => void;
 }
 
-interface PostProps    extends BaseProps { type: 'post';    post:    Post;    event?: never; concert?: never; }
-interface EventProps   extends BaseProps { type: 'event';   event:   Event;   post?: never;  concert?: never; }
-interface ConcertProps extends BaseProps { type: 'concert'; concert: Concert; post?: never;  event?: never; }
+interface PostProps    extends BaseProps { type: 'post';    post:    Post;    event?: never; concert?: never; reel?: never; }
+interface EventProps   extends BaseProps { type: 'event';   event:   Event;   post?: never;  concert?: never; reel?: never; }
+interface ConcertProps extends BaseProps { type: 'concert'; concert: Concert; post?: never;  event?: never;   reel?: never; }
+interface ReelProps    extends BaseProps { type: 'reel';    reel:    Reel;    post?: never;  event?: never;   concert?: never; }
 
-type Props = PostProps | EventProps | ConcertProps;
+type Props = PostProps | EventProps | ConcertProps | ReelProps;
 
 function timeAgo(iso: string) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -46,6 +48,7 @@ function getShareUrl(type: ContentType, id: string): string {
   if (type === 'post')    return `${APP_DOMAIN}/posts/${slug}`;
   if (type === 'event')   return `${APP_DOMAIN}/events/${slug}`;
   if (type === 'concert') return `${APP_DOMAIN}/concerts/${slug}`;
+  if (type === 'reel')    return `${APP_DOMAIN}/reels?id=${slug}`;
   return APP_DOMAIN;
 }
 
@@ -54,6 +57,7 @@ function getDisplayUrl(type: ContentType, id: string): string {
   if (type === 'post')    return `gofolyx.com/posts/${slug}`;
   if (type === 'event')   return `gofolyx.com/events/${slug}`;
   if (type === 'concert') return `gofolyx.com/concerts/${slug}`;
+  if (type === 'reel')    return `gofolyx.com/reels?id=${slug}`;
   return 'gofolyx.com';
 }
 
@@ -108,7 +112,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     likeCount    = e.like_count ?? 0;
     commentCount = e.comment_count ?? 0;
     shareCount   = e.share_count ?? 0;
-  } else {
+  } else if (type === 'concert') {
     const c = props.concert as any;
     id           = c.id;
     const artist = c.artist;
@@ -125,6 +129,21 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     likeCount    = c.like_count ?? 0;
     commentCount = c.comment_count ?? 0;
     shareCount   = c.share_count ?? 0;
+  } else {
+    const r = props.reel as Reel;
+    id           = r.id;
+    const author = r.author;
+    authorName   = author?.display_name ?? author?.username ?? 'Utilisateur';
+    authorAvatar = author?.avatar_url ?? null;
+    initials     = authorName[0]?.toUpperCase() ?? '?';
+    title        = r.caption ? (r.caption.length > 80 ? r.caption.slice(0, 80) + '…' : r.caption) : 'Reel GoFolyX';
+    subtitle     = null;
+    thumb        = r.thumbnail_url ?? null;
+    videoUrl     = r.hls_url ?? null;
+    createdAt    = r.created_at;
+    likeCount    = r.like_count ?? 0;
+    commentCount = r.comment_count ?? 0;
+    shareCount   = r.share_count ?? 0;
   }
 
   const shareUrl   = getShareUrl(type, id);
@@ -145,6 +164,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     if (type === 'post')    payload.post_id    = id;
     if (type === 'event')   payload.event_id   = id;
     if (type === 'concert') payload.concert_id = id;
+    if (type === 'reel')    payload.reel_id    = id;
     socialService.share(payload as any).catch(() => {});
   };
 

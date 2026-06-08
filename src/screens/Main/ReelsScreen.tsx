@@ -5,7 +5,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, FlatList, Dimensions,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
-  Share, Platform, Alert, Modal, TextInput,
+  Platform, Alert, Modal, TextInput,
   KeyboardAvoidingView, Keyboard, AppState, Linking,
 } from 'react-native';
 import Animated, {
@@ -25,7 +25,7 @@ import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
 import {
-  CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader,
+  CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader, ShareBottomSheet,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -897,6 +897,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [likes,        setLikes]        = useState(reel.like_count ?? 0);
   const [commentCount, setCommentCount] = useState(reel.comment_count ?? 0);
   const [shareCount,   setShareCount]   = useState(reel.share_count ?? 0);
+  const [showShare,    setShowShare]    = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentText,  setCommentText]  = useState('');
   const [sending,      setSending]      = useState(false);
@@ -1192,13 +1193,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     finally { likeInFlight.current = false; }
   }, [reel.id, reel.like_count]);
 
-  const handleShare = useCallback(async () => {
-    try {
-      await Share.share({ message: reel.caption ? `${reel.caption}\n${reel.hls_url ?? ''}` : (reel.hls_url ?? '') });
-      await socialService.share({ platform: 'external', reel_id: reel.id });
-      if (mountedRef.current) setShareCount(v => v + 1);
-    } catch {}
-  }, [reel]);
+  const handleShare = useCallback(() => {
+    setShowShare(true);
+  }, []);
 
   const doReplay = useCallback(() => {
     try { player.seekTo(0); pausedRef.current = false; player.play(); if (mountedRef.current) { setEnded(false); setPaused(false); } } catch {}
@@ -1396,6 +1393,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
 
         <ReportModal visible={reportVisible} contentType="reel" contentId={reel.id} onClose={() => setReportVisible(false)} />
+        <ShareBottomSheet
+          type="reel"
+          reel={reel}
+          visible={showShare}
+          onClose={() => setShowShare(false)}
+          onShareCountChange={() => { if (mountedRef.current) setShareCount(v => v + 1); }}
+        />
         {showGiftPicker && reel.author?.id && (
           <GiftPickerModal reelId={reel.id} receiverId={String(reel.author.id)} receiverName={reel.author.display_name ?? reel.author.username ?? 'Créateur'} onClose={() => setShowGiftPicker(false)} />
         )}
