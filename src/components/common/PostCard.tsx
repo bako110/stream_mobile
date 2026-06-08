@@ -19,7 +19,6 @@ import type { AppColors } from '../../theme/colors';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
-import { socialService } from '../../services/socialService';
 import { favoriteService } from '../../services/favoriteService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 import { ExpandableText } from './ExpandableText';
@@ -218,9 +217,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
   const handleShareDone = useCallback(() => {
     setShareCount(c => c + 1);
-    socialService.share({ platform: 'native', post_id: post.id } as any)
-      .catch(() => setShareCount(c => Math.max(0, c - 1)));
-  }, [post.id]);
+  }, []);
 
   const handleDelete = useCallback(() => {
     Alert.alert('Supprimer', 'Supprimer ce post ?', [

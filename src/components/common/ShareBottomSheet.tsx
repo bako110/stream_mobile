@@ -176,6 +176,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
           recordShare('external');
           onShareCountChange?.();
           return;
+
         } catch (e: any) {
           if (e?.error === 'User did not share' || e?.dismissedAction) return;
           // téléchargement raté → fallback lien seul
@@ -187,7 +188,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
         message: caption,
         failOnCancel: false,
       });
-      recordShare('link');
+      recordShare('external');
       onShareCountChange?.();
     } catch {
     } finally {
@@ -197,7 +198,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
 
   const handleCopyLink = () => {
     Clipboard.setString(shareUrl);
-    recordShare('link');
+    recordShare('external');
     onShareCountChange?.();
     onClose();
     Alert.alert('Lien copié', `gofolyx.com — le lien a été copié dans le presse-papier.`);

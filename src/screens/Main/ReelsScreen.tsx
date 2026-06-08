@@ -1195,7 +1195,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const handleShare = useCallback(async () => {
     try {
       await Share.share({ message: reel.caption ? `${reel.caption}\n${reel.hls_url ?? ''}` : (reel.hls_url ?? '') });
-      await socialService.share({ platform: Platform.OS, reel_id: reel.id });
+      await socialService.share({ platform: 'external', reel_id: reel.id });
       if (mountedRef.current) setShareCount(v => v + 1);
     } catch {}
   }, [reel]);
