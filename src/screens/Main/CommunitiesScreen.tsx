@@ -41,17 +41,8 @@ function fmtCount(n: number): string {
   return String(n);
 }
 
-const GRADIENTS: [string, string][] = [
-  ['#7B3FF2', '#E0389A'],
-  ['#0EA5E9', '#6366F1'],
-  ['#10B981', '#0EA5E9'],
-  ['#F59E0B', '#EF4444'],
-  ['#EC4899', '#8B5CF6'],
-];
-
-function gradientFor(name: string): [string, string] {
-  const i = (name?.charCodeAt(0) ?? 0) % GRADIENTS.length;
-  return GRADIENTS[i];
+function gradientFor(_name: string): [string, string] {
+  return ['#7B3FF2', '#9B65F5'];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -184,7 +175,7 @@ const CommunityCard = React.memo(function CommunityCard({
     return (
       <TouchableOpacity onPress={onJoin} activeOpacity={0.85} style={CS.joinWrap}>
         <LinearGradient
-          colors={isPrivateOrApproval ? ['#7B3FF2', '#6D28D9'] : ['#7B3FF2', '#E0389A']}
+          colors={isPrivateOrApproval ? [colors.primary, colors.primaryDark] : [colors.gradientStart, colors.gradientEnd]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={CS.joinGrad}
@@ -206,16 +197,16 @@ const CommunityCard = React.memo(function CommunityCard({
 
   // Type badge label
   let typeBadgeLabel = '';
-  let typeBadgeColor = '#3B82F6';
+  let typeBadgeColor = colors.info;
   if (item.is_private) {
     typeBadgeLabel = 'Privée';
-    typeBadgeColor = '#E0389A';
+    typeBadgeColor = colors.gradientEnd;
   } else if (item.requires_approval) {
     typeBadgeLabel = 'Approbation';
-    typeBadgeColor = '#F59E0B';
+    typeBadgeColor = colors.warning;
   } else {
     typeBadgeLabel = 'Publique';
-    typeBadgeColor = '#10B981';
+    typeBadgeColor = colors.success;
   }
 
   return (
@@ -295,7 +286,7 @@ const CommunityCard = React.memo(function CommunityCard({
             )}
             {(item as any).tier === 'elite' && (
               <View style={{ backgroundColor: '#F59E0B22', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginLeft: 4 }}>
-                <Text style={{ color: '#F59E0B', fontSize: 9, fontWeight: '800' }}>ELITE</Text>
+                <Text style={{ color: colors.warning, fontSize: 9, fontWeight: '800' }}>ELITE</Text>
               </View>
             )}
           </View>
@@ -333,7 +324,7 @@ const CommunityCard = React.memo(function CommunityCard({
               <>
                 <View style={[CS.dot, { backgroundColor: colors.textTertiary }]} />
                 <Icon name="zap" size={11} color="#F59E0B" />
-                <Text style={[CS.statTxt, { color: '#F59E0B' }]}>
+                <Text style={[CS.statTxt, { color: colors.warning }]}>
                   {item.entry_price_coins} coins
                 </Text>
               </>
@@ -620,7 +611,7 @@ export const CommunitiesScreen: React.FC = () => {
     if (hasData) {
       return (
         <LinearGradient
-          colors={['#7B3FF2', '#E0389A']}
+          colors={[colors.gradientStart, colors.gradientEnd]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={S.heroCompact}
@@ -656,7 +647,7 @@ export const CommunitiesScreen: React.FC = () => {
     // Version pleine si pas encore de données
     return (
       <LinearGradient
-        colors={['#7B3FF2', '#E0389A']}
+        colors={[colors.gradientStart, colors.gradientEnd]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={S.hero}
@@ -784,7 +775,7 @@ export const CommunitiesScreen: React.FC = () => {
                 style={{ borderRadius: 14, overflow: 'hidden', marginTop: 4 }}
               >
                 <LinearGradient
-                  colors={['#7B3FF2', '#E0389A']}
+                  colors={[colors.gradientStart, colors.gradientEnd]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={S.emptyBtn}
@@ -825,7 +816,7 @@ export const CommunitiesScreen: React.FC = () => {
         {createAvatarUri ? (
           <Image source={{ uri: createAvatarUri }} style={S.avatarPickerImg} />
         ) : (
-          <LinearGradient colors={['#7B3FF2', '#E0389A']} style={S.avatarPickerImg}>
+          <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={S.avatarPickerImg}>
             <Text style={S.avatarPickerLetter}>
               {createName ? createName[0].toUpperCase() : '?'}
             </Text>
@@ -956,7 +947,7 @@ export const CommunitiesScreen: React.FC = () => {
           activeOpacity={0.85}
         >
           <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
+            colors={[colors.gradientStart, colors.gradientEnd]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={S.footerBtnPrimary}
@@ -1000,14 +991,14 @@ export const CommunitiesScreen: React.FC = () => {
         {
           val: false,
           icon: 'globe',
-          color: '#3B82F6',
+          color: colors.info,
           label: 'Publique',
           sub: 'Tout le monde peut voir et rejoindre',
         },
         {
           val: true,
           icon: 'lock',
-          color: '#E0389A',
+          color: colors.gradientEnd,
           label: 'Privée',
           sub: 'Visible uniquement par les membres',
         },
@@ -1080,7 +1071,7 @@ export const CommunitiesScreen: React.FC = () => {
         <TextInput
           style={[S.coinsInput, {
             color: colors.textPrimary,
-            borderColor: (parseInt(createPriceCoins, 10) || 0) > 0 ? '#F59E0B' : colors.border,
+            borderColor: (parseInt(createPriceCoins, 10) || 0) > 0 ? colors.warning : colors.border,
             backgroundColor: colors.backgroundSecondary,
           }]}
           value={createPriceCoins}
@@ -1109,7 +1100,7 @@ export const CommunitiesScreen: React.FC = () => {
           activeOpacity={0.85}
         >
           <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
+            colors={[colors.gradientStart, colors.gradientEnd]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={S.footerBtnPrimary}
@@ -1345,7 +1336,7 @@ export const CommunitiesScreen: React.FC = () => {
             />
             <TouchableOpacity onPress={handleJoinByCode} disabled={joining}
               activeOpacity={0.85} style={{ borderRadius: 14, overflow: 'hidden' }}>
-              <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                   gap: 8, paddingVertical: 14 }}>
                 {joining ? <ActivityIndicator color="#fff" size="small" /> : (
@@ -1735,7 +1726,7 @@ const CS = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F59E0B50',
   },
-  coinsNum: { color: '#F59E0B', fontSize: 11, fontWeight: '800' },
+  coinsNum: { color: '#FF7A2F', fontSize: 11, fontWeight: '800' },
 
   // Avatar superposé
   avatarWrap: {
@@ -1768,7 +1759,7 @@ const CS = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#1D9BF0',
+    backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -1832,12 +1823,12 @@ const CS = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
   },
-  priceChipNum: { color: '#F59E0B', fontWeight: '800', fontSize: 11 },
+  priceChipNum: { color: '#FF7A2F', fontWeight: '800', fontSize: 11 },
 
   pendingWrap: {
     borderRadius: 13,
     borderWidth: 1.5,
-    borderColor: '#F59E0B',
+    borderColor: '#FF7A2F',
     overflow: 'hidden',
   },
   pendingInner: {
@@ -1846,9 +1837,9 @@ const CS = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 11,
-    backgroundColor: '#F59E0B12',
+    backgroundColor: '#FF7A2F12',
   },
-  pendingText: { color: '#F59E0B', fontWeight: '700', fontSize: 13 },
-  pendingSep: { width: 1, height: 14, backgroundColor: '#F59E0B40' },
-  pendingCancel: { color: '#F59E0B', fontWeight: '600', fontSize: 12 },
+  pendingText: { color: '#FF7A2F', fontWeight: '700', fontSize: 13 },
+  pendingSep: { width: 1, height: 14, backgroundColor: '#FF7A2F40' },
+  pendingCancel: { color: '#FF7A2F', fontWeight: '600', fontSize: 12 },
 });

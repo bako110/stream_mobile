@@ -36,11 +36,6 @@ const ROLE_LABELS: Record<string, string> = {
   moderator: 'Modérateur',
   member: 'Membre',
 };
-const ROLE_COLORS: Record<string, string> = {
-  admin: '#36D9A0',
-  moderator: '#3B82F6',
-  member: '#9390AB',
-};
 
 function fmtCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -48,16 +43,8 @@ function fmtCount(n: number): string {
   return String(n);
 }
 
-const GRADIENTS: [string, string][] = [
-  ['#7B3FF2', '#E0389A'],
-  ['#0EA5E9', '#6366F1'],
-  ['#10B981', '#0EA5E9'],
-  ['#F59E0B', '#EF4444'],
-  ['#EC4899', '#8B5CF6'],
-];
-function gradientFor(name: string): [string, string] {
-  const i = (name?.charCodeAt(0) ?? 0) % GRADIENTS.length;
-  return GRADIENTS[i];
+function gradientFor(_name: string): [string, string] {
+  return ['#7B3FF2', '#9B65F5'];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -715,7 +702,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             <Image source={{ uri: community.avatar_url }} style={[s.editAvatar, { borderColor: colors.surface }]} />
           ) : (
             <LinearGradient
-              colors={['#7B3FF2', '#E0389A']}
+              colors={[colors.gradientStart, colors.gradientEnd]}
               style={[s.editAvatar, { borderColor: colors.surface, alignItems: 'center', justifyContent: 'center' }]}
             >
               <Icon name="users" size={22} color="#fff" />
@@ -787,7 +774,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               <View style={[s.infoSummarySep, { backgroundColor: colors.divider }]} />
               <View style={s.infoSummaryRow}>
                 <Icon name="zap" size={14} color="#F59E0B" />
-                <Text style={[s.infoSummaryTxt, { color: '#F59E0B' }]}>
+                <Text style={[s.infoSummaryTxt, { color: colors.warning }]}>
                   {community.entry_price_coins} coins requis
                 </Text>
               </View>
@@ -800,9 +787,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 <Icon
                   name="award"
                   size={14}
-                  color={(community as any).tier === 'elite' ? '#F59E0B' : '#7B3FF2'}
+                  color={(community as any).tier === 'elite' ? colors.warning : '#7B3FF2'}
                 />
-                <Text style={[s.infoSummaryTxt, { color: (community as any).tier === 'elite' ? '#F59E0B' : '#7B3FF2', fontWeight: '700' }]}>
+                <Text style={[s.infoSummaryTxt, { color: (community as any).tier === 'elite' ? colors.warning : '#7B3FF2', fontWeight: '700' }]}>
                   {(community as any).tier === 'elite' ? 'Elite' : 'Pro'}
                 </Text>
               </View>
@@ -813,7 +800,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               <View style={[s.infoSummarySep, { backgroundColor: colors.divider }]} />
               <View style={s.infoSummaryRow}>
                 <Icon name="check-circle" size={14} color="#1D9BF0" />
-                <Text style={[s.infoSummaryTxt, { color: '#1D9BF0' }]}>Communauté vérifiée</Text>
+                <Text style={[s.infoSummaryTxt, { color: colors.info }]}>Communauté vérifiée</Text>
               </View>
             </>
           )}
@@ -834,11 +821,11 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             <TouchableOpacity
               onPress={() => handleUpgradeTier('elite')}
               disabled={tierLoading}
-              style={{ flex: 1, backgroundColor: '#F59E0B22', borderWidth: 1.5, borderColor: '#F59E0B', borderRadius: 12, paddingVertical: 10, alignItems: 'center', gap: 4 }}
+              style={{ flex: 1, backgroundColor: '#F59E0B22', borderWidth: 1.5, borderColor: colors.warning, borderRadius: 12, paddingVertical: 10, alignItems: 'center', gap: 4 }}
             >
               <Icon name="star" size={15} color="#F59E0B" />
-              <Text style={{ color: '#F59E0B', fontWeight: '800', fontSize: 12 }}>ELITE</Text>
-              <Text style={{ color: '#F59E0B', fontSize: 10, opacity: 0.8 }}>24.99€/mois</Text>
+              <Text style={{ color: '#FF7A2F', fontWeight: '800', fontSize: 12 }}>ELITE</Text>
+              <Text style={{ color: colors.warning, fontSize: 10, opacity: 0.8 }}>24.99€/mois</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -897,7 +884,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   {member.display_name || member.username}{isSelf ? ' (toi)' : ''}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
-                  <View style={[s.roleDot, { backgroundColor: ROLE_COLORS[member.role as string] ?? '#9390AB' }]} />
+                  <View style={[s.roleDot, { backgroundColor: ROLE_COLORS[member.role as string] ?? colors.textTertiary }]} />
                   <Text style={[s.memberSub, { color: colors.textTertiary }]}>
                     {ROLE_LABELS[member.role as string] ?? member.role}
                   </Text>
@@ -913,7 +900,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       onPress={() => handleChangeRole(member, 'admin')}
                     >
                       <Icon name="shield" size={12} color="#36D9A0" />
-                      <Text style={[s.roleBtnTxt, { color: '#36D9A0' }]}>Admin</Text>
+                      <Text style={[s.roleBtnTxt, { color: colors.success }]}>Admin</Text>
                     </TouchableOpacity>
                   )}
                   {member.role !== 'moderator' && (
@@ -922,7 +909,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       onPress={() => handleChangeRole(member, 'moderator')}
                     >
                       <Icon name="star" size={12} color="#3B82F6" />
-                      <Text style={[s.roleBtnTxt, { color: '#3B82F6' }]}>Mod</Text>
+                      <Text style={[s.roleBtnTxt, { color: colors.info }]}>Mod</Text>
                     </TouchableOpacity>
                   )}
                   {member.role !== 'member' && (
@@ -939,7 +926,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     onPress={() => handleKick(member)}
                   >
                     <Icon name="user-x" size={12} color="#EF4444" />
-                    <Text style={[s.roleBtnTxt, { color: '#EF4444' }]}>Exclure</Text>
+                    <Text style={[s.roleBtnTxt, { color: colors.error }]}>Exclure</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[s.roleBtn, { backgroundColor: '#EF444415', borderColor: '#EF444440', opacity: blockLoading === member.user_id ? 0.5 : 1 }]}
@@ -950,7 +937,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       ? <ActivityIndicator size="small" color="#EF4444" style={{ width: 12, height: 12 }} />
                       : <Icon name="slash" size={12} color="#EF4444" />
                     }
-                    <Text style={[s.roleBtnTxt, { color: '#EF4444' }]}>Bloquer</Text>
+                    <Text style={[s.roleBtnTxt, { color: colors.error }]}>Bloquer</Text>
                   </TouchableOpacity>
                 </View>
               ) : isMod && !isSelf && member.role === 'member' ? (
@@ -960,7 +947,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     onPress={() => handleKick(member)}
                   >
                     <Icon name="user-x" size={12} color="#EF4444" />
-                    <Text style={[s.roleBtnTxt, { color: '#EF4444' }]}>Exclure</Text>
+                    <Text style={[s.roleBtnTxt, { color: colors.error }]}>Exclure</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -974,12 +961,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             <View style={[s.blockedSectionHeader, { borderTopColor: colors.divider, marginTop: 24 }]}>
               <View style={s.blockedSectionLeft}>
                 <View style={s.blockedSectionDot} />
-                <Text style={[s.memberCountLbl, { color: '#EF4444', marginTop: 0 }]}>
+                <Text style={[s.memberCountLbl, { color: colors.error, marginTop: 0 }]}>
                   Membres bloqués
                 </Text>
               </View>
               <View style={[s.blockedCountBadge, { backgroundColor: blockedMembers.length > 0 ? '#EF444420' : colors.backgroundSecondary }]}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: blockedMembers.length > 0 ? '#EF4444' : colors.textTertiary }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: blockedMembers.length > 0 ? colors.error : colors.textTertiary }}>
                   {blockedMembers.length}
                 </Text>
               </View>
@@ -1002,7 +989,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }]}>
-                    <Text style={{ color: '#EF4444', fontWeight: '700' }}>
+                    <Text style={{ color: '#F0365A', fontWeight: '700' }}>
                       {(b.display_name || b.username || '?')[0].toUpperCase()}
                     </Text>
                   </View>
@@ -1011,7 +998,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   <Text style={[s.memberName, { color: colors.textPrimary }]}>
                     {b.display_name || b.username}
                   </Text>
-                  <Text style={[s.memberSub, { color: '#EF4444' }]}>Bloqué</Text>
+                  <Text style={[s.memberSub, { color: colors.error }]}>Bloqué</Text>
                 </View>
                 <TouchableOpacity
                   style={[s.roleBtn, { backgroundColor: '#10B98115', borderColor: '#10B98140', opacity: unblockLoading === b.user_id ? 0.5 : 1 }]}
@@ -1022,7 +1009,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     ? <ActivityIndicator size="small" color="#10B981" style={{ width: 12, height: 12 }} />
                     : <Icon name="user-check" size={12} color="#10B981" />
                   }
-                  <Text style={[s.roleBtnTxt, { color: '#10B981' }]}>Débloquer</Text>
+                  <Text style={[s.roleBtnTxt, { color: colors.success }]}>Débloquer</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -1042,7 +1029,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         <Text style={[s.secSection, { color: colors.textTertiary }]}>VISIBILITÉ</Text>
         <View style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
           <View style={[s.secIcon, { backgroundColor: editPrivate ? '#E0389A20' : '#3B82F620' }]}>
-            <Icon name={editPrivate ? 'lock' : 'globe'} size={18} color={editPrivate ? '#E0389A' : '#3B82F6'} />
+            <Icon name={editPrivate ? 'lock' : 'globe'} size={18} color={editPrivate ? colors.gradientEnd : colors.info} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[s.secLabel, { color: colors.textPrimary }]}>
@@ -1056,7 +1043,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             value={editPrivate}
             onValueChange={setEditPrivate}
             trackColor={{ false: colors.divider, true: '#E0389A55' }}
-            thumbColor={editPrivate ? '#E0389A' : colors.textTertiary}
+            thumbColor={editPrivate ? colors.gradientEnd : colors.textTertiary}
           />
         </View>
 
@@ -1076,7 +1063,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             value={editApproval}
             onValueChange={setEditApproval}
             trackColor={{ false: colors.divider, true: '#F59E0B55' }}
-            thumbColor={editApproval ? '#F59E0B' : colors.textTertiary}
+            thumbColor={editApproval ? colors.warning : colors.textTertiary}
           />
         </View>
 
@@ -1299,7 +1286,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         </TouchableOpacity>
 
         {/* ── ZONE DE DANGER ── */}
-        <Text style={[s.secSection, { color: '#EF4444', marginTop: 28 }]}>ZONE DE DANGER</Text>
+        <Text style={[s.secSection, { color: colors.error, marginTop: 28 }]}>ZONE DE DANGER</Text>
 
         {isAdmin && (
           <TouchableOpacity
@@ -1318,7 +1305,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               <Icon name="repeat" size={18} color="#F59E0B" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.secLabel, { color: '#F59E0B' }]}>Transférer l'admin</Text>
+              <Text style={[s.secLabel, { color: colors.warning }]}>Transférer l'admin</Text>
               <Text style={[s.secDesc, { color: '#F59E0B99' }]}>Passer les droits admin à un autre membre</Text>
             </View>
             <Icon name="chevron-right" size={16} color="#F59E0B60" />
@@ -1334,7 +1321,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             <Icon name="trash-2" size={18} color="#EF4444" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.secLabel, { color: '#EF4444' }]}>Supprimer la communauté</Text>
+            <Text style={[s.secLabel, { color: colors.error }]}>Supprimer la communauté</Text>
             <Text style={[s.secDesc, { color: '#EF444499' }]}>Action irréversible — toutes les données seront perdues</Text>
           </View>
           <Icon name="chevron-right" size={16} color="#EF444460" />
@@ -1422,7 +1409,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   <Image source={{ uri: community.banner_url }} style={s.banner} resizeMode="cover" />
                 ) : (
                   <LinearGradient
-                    colors={['#7B3FF2', '#9B65F5', '#E0389A']}
+                    colors={[colors.gradientStart, colors.primary, colors.gradientEnd]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={s.banner}
@@ -1466,7 +1453,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               <View style={[s.blockedBanner, { backgroundColor: '#EF44441A', borderColor: '#EF444440' }]}>
                 <Icon name="slash" size={16} color="#EF4444" />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.blockedBannerTitle, { color: '#EF4444' }]}>Communauté bloquée</Text>
+                  <Text style={[s.blockedBannerTitle, { color: colors.error }]}>Communauté bloquée</Text>
                   <Text style={[s.blockedBannerSub, { color: colors.textSecondary }]}>
                     Cette communauté a été bloquée par un administrateur. Elle n'est plus visible par les membres.
                     Contactez le support pour plus d'informations.
@@ -1513,20 +1500,20 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 <View style={[s.statSep, { backgroundColor: colors.divider }]} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <View style={s.activeDot} />
-                  <Text style={[s.statItem, { color: '#36D9A0' }]}>Actif</Text>
+                  <Text style={[s.statItem, { color: colors.success }]}>Actif</Text>
                 </View>
               </View>
 
               {/* Badge de rôle */}
               {myRole && (
                 <View style={s.roleRow}>
-                  <View style={[s.roleChip, { backgroundColor: (ROLE_COLORS[myRole] ?? '#9390AB') + '20' }]}>
+                  <View style={[s.roleChip, { backgroundColor: (ROLE_COLORS[myRole] ?? colors.textTertiary) + '20' }]}>
                     <Icon
                       name={isAdmin ? 'shield' : isMod ? 'star' : 'user'}
                       size={12}
-                      color={ROLE_COLORS[myRole] ?? '#9390AB'}
+                      color={ROLE_COLORS[myRole] ?? colors.textTertiary}
                     />
-                    <Text style={[s.roleChipText, { color: ROLE_COLORS[myRole] ?? '#9390AB' }]}>
+                    <Text style={[s.roleChipText, { color: ROLE_COLORS[myRole] ?? colors.textTertiary }]}>
                       {ROLE_LABELS[myRole] ?? myRole}
                     </Text>
                   </View>
@@ -1577,7 +1564,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     style={[s.actionBtn, {
                       flex: 1,
                       backgroundColor: '#F59E0B15',
-                      borderColor: '#F59E0B',
+                      borderColor: colors.warning,
                       borderWidth: 1.5,
                     }]}
                     onPress={() => {
@@ -1601,7 +1588,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     activeOpacity={0.85}
                   >
                     <Icon name="clock" size={15} color="#F59E0B" />
-                    <Text style={[s.actionTxt, { color: '#F59E0B' }]}>En attente d'approbation</Text>
+                    <Text style={[s.actionTxt, { color: colors.warning }]}>En attente d'approbation</Text>
                     <Icon name="x" size={13} color="#F59E0B80" />
                   </TouchableOpacity>
                 ) : (
@@ -1612,7 +1599,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     activeOpacity={0.85}
                   >
                     <LinearGradient
-                      colors={['#7B3FF2', '#E0389A']}
+                      colors={[colors.gradientStart, colors.gradientEnd]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 14 }}
@@ -1653,13 +1640,13 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     backgroundColor: isLow ? '#EF444408' : '#F59E0B08',
                   }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, flex: 1 }}>
-                      <Icon name="zap" size={14} color={isLow ? '#EF4444' : '#F59E0B'} />
+                      <Icon name="zap" size={14} color={isLow ? colors.error : colors.warning} />
                       <View style={{ flex: 1 }}>
-                        <Text style={[s.walletTitle, { color: isLow ? '#EF4444' : '#F59E0B' }]}>
+                        <Text style={[s.walletTitle, { color: isLow ? colors.error : colors.warning }]}>
                           {price} coin{price > 1 ? 's' : ''} requis pour accéder
                         </Text>
                         {myCoins !== null && (
-                          <Text style={[s.walletSub, { color: isLow ? '#EF4444' : colors.textTertiary }]}>
+                          <Text style={[s.walletSub, { color: isLow ? colors.error : colors.textTertiary }]}>
                             {isLow
                               ? `Solde insuffisant — vous avez ${myCoins} coin${myCoins !== 1 ? 's' : ''} (manque ${price - myCoins})`
                               : `Votre solde : ${myCoins} coin${myCoins !== 1 ? 's' : ''}`}
@@ -1715,16 +1702,16 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     activeOpacity={0.7}
                   >
                     {verifyLoading ? (
-                      <ActivityIndicator size="small" color={community.is_verified ? '#EF4444' : '#1D9BF0'} />
+                      <ActivityIndicator size="small" color={community.is_verified ? colors.error : colors.info} />
                     ) : (
                       <>
                         <View style={[s.verifiedBadgeMini, {
-                          backgroundColor: community.is_verified ? '#EF4444' : '#1D9BF0',
+                          backgroundColor: community.is_verified ? colors.error : colors.info,
                         }]}>
                           <Icon name="check" size={9} color="#fff" />
                         </View>
                         <Text style={[s.vrBtnTxt, {
-                          color: community.is_verified ? '#EF4444' : '#1D9BF0',
+                          color: community.is_verified ? colors.error : colors.info,
                         }]}>
                           {community.is_verified ? 'Retirer la vérification' : 'Vérifier la communauté'}
                         </Text>
@@ -1754,11 +1741,11 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       <Icon
                         name={vrStatus === 'pending' ? 'clock' : vrStatus === 'rejected' ? 'x-circle' : 'shield'}
                         size={14}
-                        color={vrStatus === 'pending' ? '#F59E0B' : vrStatus === 'rejected' ? '#EF4444' : '#1D9BF0'}
+                        color={vrStatus === 'pending' ? colors.warning : vrStatus === 'rejected' ? colors.error : colors.info}
                       />
                       <Text style={[s.vrBtnTxt, {
-                        color: vrStatus === 'pending'  ? '#F59E0B'
-                             : vrStatus === 'rejected' ? '#EF4444' : '#1D9BF0',
+                        color: vrStatus === 'pending'  ? colors.warning
+                             : vrStatus === 'rejected' ? colors.error : colors.info,
                       }]}>
                         {vrStatus === 'pending'  ? 'Demande en cours d\'examen…'
                         : vrStatus === 'rejected' ? 'Refusée (coins remboursés) — Renvoyer'
@@ -1921,12 +1908,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             </View>
             {item.role === 'admin' && (
               <View style={[s.rolePill, { backgroundColor: '#36D9A022' }]}>
-                <Text style={{ color: '#36D9A0', fontSize: 10, fontWeight: '700' }}>ADMIN</Text>
+                <Text style={{ color: colors.success, fontSize: 10, fontWeight: '700' }}>ADMIN</Text>
               </View>
             )}
             {item.role === 'moderator' && (
               <View style={[s.rolePill, { backgroundColor: '#3B82F622' }]}>
-                <Text style={{ color: '#3B82F6', fontSize: 10, fontWeight: '700' }}>MOD</Text>
+                <Text style={{ color: colors.info, fontSize: 10, fontWeight: '700' }}>MOD</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -2038,12 +2025,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 return (
                   <View style={[s.vrFeeBox, { borderColor: canAfford ? '#1D9BF040' : '#EF444440', backgroundColor: canAfford ? '#1D9BF008' : '#EF444408' }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: canAfford ? '#1D9BF0' : '#EF4444' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: canAfford ? colors.info : colors.error }}>
                         Frais de vérification
                       </Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <Icon name="zap" size={13} color="#F59E0B" />
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#F59E0B' }}>500 coins</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.warning }}>500 coins</Text>
                       </View>
                     </View>
                     {hasCoins && (
@@ -2054,13 +2041,13 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                           <Text style={{ fontSize: 11, color: colors.textTertiary }}>Solde après</Text>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: canAfford ? '#36D9A0' : '#EF4444' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: canAfford ? colors.success : colors.error }}>
                             {afterBalance} coins
                           </Text>
                         </View>
                       </View>
                     )}
-                    <Text style={{ fontSize: 10, color: '#36D9A0', marginTop: 6 }}>
+                    <Text style={{ fontSize: 10, color: colors.success, marginTop: 6 }}>
                       Remboursement automatique si la demande est refusée
                     </Text>
                   </View>
@@ -2069,7 +2056,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
               {myCoins !== null && myCoins < 500 ? (
                 <TouchableOpacity
-                  style={[s.actionBtn, { backgroundColor: '#EF4444', marginTop: 10 }]}
+                  style={[s.actionBtn, { backgroundColor: colors.error, marginTop: 10 }]}
                   onPress={() => { setVrModalOpen(false); nav.navigate('Wallet'); }}
                   activeOpacity={0.8}
                 >
@@ -2078,7 +2065,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
-                  style={[s.actionBtn, { backgroundColor: '#1D9BF0', marginTop: 10 }]}
+                  style={[s.actionBtn, { backgroundColor: colors.info, marginTop: 10 }]}
                   onPress={handleSubmitVerificationRequest}
                   disabled={vrLoading}
                   activeOpacity={0.8}
@@ -2246,7 +2233,7 @@ const s = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#1D9BF0',
+    backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -2310,7 +2297,7 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 7,
   },
-  coinPillTxt: { color: '#F59E0B', fontWeight: '800', fontSize: 11 },
+  coinPillTxt: { color: '#FF7A2F', fontWeight: '800', fontSize: 11 },
 
   // Wallet bar
   walletBar: {
@@ -2326,7 +2313,7 @@ const s = StyleSheet.create({
   walletTitle: { fontSize: 13, fontWeight: '700' },
   walletSub: { fontSize: 11, marginTop: 2 },
   rechargeBtn: { backgroundColor: '#EF444420', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  rechargeTxt: { color: '#EF4444', fontWeight: '700', fontSize: 12 },
+  rechargeTxt: { color: '#F0365A', fontWeight: '700', fontSize: 12 },
 
   // Info bar
   infoBar: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 6, marginBottom: 4 },
@@ -2605,7 +2592,7 @@ const s = StyleSheet.create({
 
   blockedSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 10, borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: 0 },
   blockedSectionLeft:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  blockedSectionDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
+  blockedSectionDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#F0365A' },
   blockedCountBadge:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   blockedEmpty:         { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
   blockedEmptyText:     { fontSize: 13, fontWeight: '500' },

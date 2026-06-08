@@ -26,16 +26,6 @@ const COVER_H = CARD_W * 0.48;
 const RADII = [5, 10, 20, 50, 100] as const;
 type Radius = typeof RADII[number];
 
-const EVENT_COLORS: Record<string, [string, string]> = {
-  concert:    ['#7B3FF2', '#E0389A'],
-  birthday:   ['#E0389A', '#FF7A2F'],
-  festival:   ['#FF7A2F', '#F59E0B'],
-  conference: ['#0EA5E9', '#36D9A0'],
-  sport:      ['#3B82F6', '#06B6D4'],
-  theater:    ['#9B65F5', '#7B3FF2'],
-  exhibition: ['#F59E0B', '#EF4444'],
-  other:      ['#6366F1', '#9390AB'],
-};
 const EVENT_ICONS: Record<string, string> = {
   concert: 'music', birthday: 'gift', festival: 'star',
   conference: 'mic', sport: 'activity', theater: 'film',
@@ -65,7 +55,7 @@ function formatDist(km: number | null | undefined): string {
 const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: () => void }> = ({
   item, index, colors, onPress,
 }) => {
-  const grad   = EVENT_COLORS[item.event_type ?? 'other'] ?? EVENT_COLORS.other;
+  const grad   = [colors.primary, colors.primaryLight] as [string, string];
   const icon   = EVENT_ICONS[item.event_type ?? 'other'] ?? 'calendar';
   const label  = EVENT_LABELS[item.event_type ?? 'other'] ?? 'Événement';
   const dist   = (item as any).distance_km as number | null | undefined;
@@ -121,7 +111,7 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
             {/* Badge distance haut droite */}
             {distLabel ? (
               <LinearGradient
-                colors={['#7B3FF2', '#E0389A']}
+                colors={[colors.primary, colors.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[st.distPill, { position: 'absolute', top: 12, right: 12 }]}
@@ -190,14 +180,14 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
             <View style={[st.footer, { borderTopColor: colors.divider }]}>
               <View>
                 {isFree ? (
-                  <View style={[st.freeBadge, { borderColor: '#10B981' }]}>
-                    <Icon name="gift" size={11} color="#10B981" />
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#10B981' }}>Entrée gratuite</Text>
+                  <View style={[st.freeBadge, { borderColor: colors.success }]}>
+                    <Icon name="gift" size={11} color={colors.success} />
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.success }}>Entrée gratuite</Text>
                   </View>
                 ) : minPrice != null ? (
                   <View>
                     <Text style={[st.priceLabel, { color: colors.textTertiary }]}>À partir de</Text>
-                    <Text style={[st.priceValue, { color: grad[0] }]}>{minPrice.toLocaleString('fr')} €</Text>
+                    <Text style={[st.priceValue, { color: colors.primary }]}>{minPrice.toLocaleString('fr')} €</Text>
                   </View>
                 ) : null}
               </View>

@@ -61,11 +61,6 @@ interface FeedItem {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const EVENT_COLORS: Record<string, string> = {
-  concert: '#7B3FF2', birthday: '#E0389A', festival: '#FF7A2F',
-  conference: '#36D9A0', sport: '#3B82F6', theater: '#9B65F5',
-  exhibition: '#36D9A0', other: '#9390AB',
-};
 const EVENT_ICONS: Record<string, string> = {
   concert: 'music', birthday: 'gift', festival: 'star',
   conference: 'mic', sport: 'activity', theater: 'film',
@@ -428,7 +423,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
 
                     {/* Badge privé */}
                     {live.is_private && (
-                      <View style={{ position: 'absolute', top: 22, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(123,63,242,0.85)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                      <View style={{ position: 'absolute', top: 22, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#7B3FF2D9', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
                         <MCIcon name="lock" size={8} color="#fff" />
                         <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>Abonnés</Text>
                       </View>
@@ -474,7 +469,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
             {nearbyEvents.map(ev => {
               const dist = (ev as any).distance_km as number | null | undefined;
               const distLabel = dist != null ? (dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`) : null;
-              const typeColor = EVENT_COLORS[ev.event_type ?? 'other'] ?? colors.primary;
+              const typeColor = colors.primary;
               const typeIcon  = EVENT_ICONS[ev.event_type ?? 'other'] ?? 'calendar';
               const NCARD_W   = Dimensions.get('window').width * 0.45;
               const NCOVER_H  = NCARD_W * 0.5;
@@ -514,7 +509,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                       onPress={() => onNavEvent(ev.id)}
                     >
                       <Icon name="arrow-right" size={14} color="#fff" />
-                      <Text style={nbS.goBtnText}>Y aller</Text>
+                      <Text style={nbS.goBtnText}>Découvrir</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1162,13 +1157,8 @@ export const FeedScreen: React.FC = () => {
     if (item.kind === 'communities') {
       const comms: CommunityData[] = Array.isArray(item.data) ? item.data : [];
       if (!comms.length) return null;
-      const COMM_GRADS: [string, string][] = [
-        ['#7B3FF2','#E0389A'],['#0EA5E9','#6366F1'],
-        ['#10B981','#0EA5E9'],['#F59E0B','#EF4444'],
-        ['#EC4899','#8B5CF6'],['#14B8A6','#3B82F6'],
-      ];
-      const gradFor = (name: string): [string, string] =>
-        COMM_GRADS[name.charCodeAt(0) % COMM_GRADS.length];
+      const gradFor = (_name: string): [string, string] =>
+        [colors.primary, colors.primaryLight];
       const fmtM = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
       // Mêmes dimensions que PeopleSuggestions
       const SW       = Dimensions.get('window').width;
@@ -1361,11 +1351,11 @@ export const FeedScreen: React.FC = () => {
           {!searchOpen && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
-                {/* "Foli" — blanc en dark, dark navy en light */}
+                {/* "GoFoly" — blanc en dark, dark navy en light */}
                 <Text style={{ fontSize: 26, fontWeight: '900', letterSpacing: -0.5, color: colors.textPrimary }}>
-                  Foli
+                  GoFoly
                 </Text>
-                {/* "X" gradient — deux barres diagonales colorées */}
+                {/* "x" gradient — deux barres diagonales colorées */}
                 <View style={{ width: 22, height: 30, marginLeft: 1, overflow: 'hidden' }}>
                   {/* Barre \ : jaune → orange */}
                   <LinearGradient
@@ -2717,7 +2707,7 @@ const rrS = StyleSheet.create({
   thumb:            { borderRadius: 14, overflow: 'hidden', backgroundColor: '#111' },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
 
-  reelBadge:        { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(123,63,242,0.85)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  reelBadge:        { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#7B3FF2D9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
   reelBadgeTxt:     { color: '#fff', fontWeight: '800', letterSpacing: 0.5 },
 
   muteBtn:          { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
@@ -3168,117 +3158,9 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const isLive = isConcert && concert?.status === 'live';
   const price  = isEvent ? event?.ticket_price : concert?.ticket_price;
 
-  const accent   = isEvent ? (EVENT_COLORS[event.event_type] ?? colors.primary) : colors.primary;
+  const accent   = colors.primary;
   const cardIcon = isEvent ? (EVENT_ICONS[event.event_type]  ?? 'calendar') : 'music';
   const typeLabel = isEvent ? event.event_type?.toUpperCase() : 'CONCERT';
-
-  // ── Phrase d'accroche psychologique ──────────────────────────────────────
-  const hookPhrase = (() => {
-    const likes     = item.data?.like_count ?? 0;
-    const comments  = item.data?.comment_count ?? 0;
-    const daysUntil = date ? Math.ceil((new Date(date).getTime() - Date.now()) / 86400000) : null;
-    const eventType = isEvent ? event.event_type : 'concert';
-    const seed      = (item.id?.charCodeAt(0) ?? 0) + (item.id?.charCodeAt(2) ?? 0);
-    const pick      = (arr: { icon: string; text: string; color: string }[]) => arr[seed % arr.length];
-
-    // Urgence temporelle — priorité absolue
-    if (daysUntil !== null && daysUntil === 0)
-      return pick([
-        { icon: '⏳', text: 'C\'est aujourd\'hui — il est encore temps de rejoindre !',      color: '#FF3B30' },
-        { icon: '🚨', text: 'Dernier appel — ça commence aujourd\'hui, fonce !',              color: '#FF3B30' },
-      ]);
-    if (daysUntil !== null && daysUntil <= 2)
-      return pick([
-        { icon: '🔥', text: `Demain c\'est trop tard — il reste ${daysUntil} jour${daysUntil > 1 ? 's' : ''}`, color: '#FF7A2F' },
-        { icon: '⌛', text: 'Les places fondent — ne te retrouve pas à regarder les stories des autres', color: '#FF7A2F' },
-      ]);
-    if (daysUntil !== null && daysUntil <= 7)
-      return pick([
-        { icon: '📅', text: 'Cette semaine seulement — une occasion rare à ne pas laisser filer', color: '#F59E0B' },
-        { icon: '👀', text: 'Dans quelques jours c\'est déjà fini — tu y seras ?',             color: '#F59E0B' },
-      ]);
-
-    // Validation sociale forte
-    if (likes >= 500)
-      return { icon: '🤩', text: `${likes.toLocaleString('fr')} personnes adorent déjà — tu attends quoi ?`, color: '#E0389A' };
-    if (likes >= 100)
-      return { icon: '❤️', text: 'Des centaines de personnes ont validé cet event — c\'est bon signe', color: '#E0389A' };
-    if (comments >= 50)
-      return { icon: '💬', text: 'Tout le monde en parle — rejoins la conversation avant que ça soit fini', color: '#7B3FF2' };
-
-    // Gratuité
-    if (isFree)
-      return pick([
-        { icon: '🎁', text: 'C\'est entièrement gratuit — aucune raison de ne pas y aller',  color: '#10B981' },
-        { icon: '🆓', text: 'Zéro euro, 100% de bonne ambiance — c\'est cadeau',              color: '#10B981' },
-      ]);
-
-    // ── Par catégorie ────────────────────────────────────────────────────────
-
-    if (isConcert || eventType === 'concert')
-      return pick([
-        { icon: '🎶', text: 'La musique live crée des frissons qu\'aucun stream ne peut reproduire',    color: '#7B3FF2' },
-        { icon: '🎸', text: 'L\'ambiance d\'un concert en vrai, ça ne s\'explique pas — ça se ressent', color: '#FF7A2F' },
-        { icon: '🎤', text: 'Les artistes donnent tout sur scène — sois là pour le vivre',             color: '#E0389A' },
-        { icon: '🎵', text: 'Une nuit musicale dont tu vas parler pendant longtemps',                  color: '#7B3FF2' },
-        { icon: '🔊', text: 'Sentir les basses dans ta poitrine — ça vaut tous les Spotify du monde',  color: '#6366F1' },
-      ]);
-
-    if (eventType === 'festival')
-      return pick([
-        { icon: '🎪', text: 'Un festival, c\'est une autre vie pendant quelques heures — vis-la',      color: '#FF7A2F' },
-        { icon: '🌟', text: 'Les meilleurs souvenirs se créent dans des moments exactement comme ça',  color: '#F59E0B' },
-        { icon: '🎠', text: 'Tu raconteras encore cette soirée dans dix ans — sois-y',                 color: '#E0389A' },
-        { icon: '🌈', text: 'Un festival, c\'est la vie dans tout son éclat — ne rate pas ça',         color: '#FF7A2F' },
-      ]);
-
-    if (eventType === 'birthday')
-      return pick([
-        { icon: '🎂', text: 'Un anniversaire ça ne se fête qu\'une fois par an — rends ça inoubliable', color: '#E0389A' },
-        { icon: '🥂', text: 'Les meilleures soirées commencent exactement comme ça',                    color: '#7B3FF2' },
-        { icon: '🎉', text: 'La bonne humeur est contagieuse — et cette soirée en est pleine',          color: '#FF7A2F' },
-        { icon: '✨', text: 'Parce que certaines nuits méritent vraiment d\'être célébrées ensemble',   color: '#E0389A' },
-        { icon: '🎈', text: 'Il n\'y a pas d\'âge pour passer la meilleure soirée de l\'année',        color: '#F59E0B' },
-      ]);
-
-    if (eventType === 'sport')
-      return pick([
-        { icon: '⚡', text: 'L\'énergie d\'un stade en feu — ça te traverse de la tête aux pieds',      color: '#3B82F6' },
-        { icon: '🏆', text: 'Sois là quand ça se passe — pas en train de regarder les highlights',      color: '#F59E0B' },
-        { icon: '🔥', text: 'Le sport en vrai, c\'est 10× plus intense que sur un écran',               color: '#FF7A2F' },
-        { icon: '🏟️', text: 'Les cris, l\'adrénaline, l\'ambiance — aucune retransmission ne peut ça', color: '#3B82F6' },
-      ]);
-
-    if (eventType === 'conference')
-      return pick([
-        { icon: '💡', text: 'Une idée entendue ce soir peut changer toute ta trajectoire',              color: '#36D9A0' },
-        { icon: '🧠', text: 'Les personnes qui avancent dans la vie vont exactement à ce genre d\'event', color: '#6366F1' },
-        { icon: '🤝', text: 'Une rencontre ce soir peut valoir mieux que des mois d\'efforts solo',     color: '#36D9A0' },
-      ]);
-
-    if (eventType === 'theater')
-      return pick([
-        { icon: '🎭', text: 'Le théâtre en live, c\'est une émotion que personne ne peut te voler',     color: '#9B65F5' },
-        { icon: '🌙', text: 'Une histoire racontée en vrai touche là où les films ne vont pas',         color: '#6366F1' },
-        { icon: '✨', text: 'Certains spectacles restent gravés en toi pour toujours — celui-ci peut l\'être', color: '#9B65F5' },
-      ]);
-
-    if (eventType === 'exhibition')
-      return pick([
-        { icon: '🖼️', text: 'L\'art vu en vrai change ta façon de voir le monde — pour de bon',        color: '#36D9A0' },
-        { icon: '👁️', text: 'Certaines œuvres te parlent directement — tu en feras partie ?',          color: '#10B981' },
-      ]);
-
-    // Fallback
-    return pick([
-      { icon: '👀', text: 'Les gens qui y vont ne le regrettent jamais — et toi ?',                     color: '#7B3FF2' },
-      { icon: '✨', text: 'Certains moments ne se répètent pas — celui-ci en fait partie',              color: colors.primary },
-      { icon: '🚀', text: 'Tu mérites une vraie expérience, pas juste des photos sur ton écran',        color: '#FF7A2F' },
-      { icon: '💫', text: 'Rejoins les gens qui savent que la vraie vie se passe hors du canapé',       color: '#7B3FF2' },
-      { icon: '🎯', text: 'C\'est exactement le genre de soirée dont tu as besoin ce soir',             color: colors.primary },
-      { icon: '🌙', text: 'Les meilleures histoires commencent toujours par "allez, on y va !"',        color: '#6366F1' },
-    ]);
-  })();
 
   // ── State social branché sur l'API ────────────────────────────────────────
   const [imgFs, setImgFs] = useState(false);
@@ -3512,13 +3394,6 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </View>
       ) : null}
 
-      {/* ── Accroche psychologique ───────────────────────────────────────── */}
-      <TouchableOpacity onPress={onPress} activeOpacity={0.85}
-        style={[fc.hook, { backgroundColor: hookPhrase.color + '12', borderLeftColor: hookPhrase.color }]}>
-        <Text style={fc.hookIcon}>{hookPhrase.icon}</Text>
-        <Text style={[fc.hookText, { color: hookPhrase.color }]}>{hookPhrase.text}</Text>
-      </TouchableOpacity>
-
       {/* ── Compteurs ───────────────────────────────────────────────────── */}
       {(likeCount > 0 || commentCount > 0 || shareCount > 0) && (
         <View style={[fc.countsRow, { borderBottomColor: colors.divider }]}>
@@ -3636,10 +3511,6 @@ const fc = StyleSheet.create({
   // Description
   descWrap:       { paddingHorizontal: 14, paddingBottom: 10 },
   desc:           { fontSize: 14, lineHeight: 21 },
-  // Accroche
-  hook:           { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 14, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderLeftWidth: 3 },
-  hookIcon:       { fontSize: 16 },
-  hookText:       { flex: 1, fontSize: 13, fontWeight: '600', lineHeight: 18 },
   // Compteurs
   countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   countChip:    { flexDirection: 'row', alignItems: 'center', gap: 5 },

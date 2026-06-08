@@ -58,11 +58,6 @@ type FeedFilter = 'all' | 'concerts' | 'events' | 'contacts';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const EVENT_COLORS: Record<string, string> = {
-  concert: '#7B3FF2', birthday: '#E0389A', festival: '#FF7A2F',
-  conference: '#36D9A0', sport: '#3B82F6', theater: '#9B65F5',
-  exhibition: '#F59E0B', other: '#9390AB',
-};
 const EVENT_ICONS: Record<string, string> = {
   concert: 'music', birthday: 'gift', festival: 'star',
   conference: 'mic', sport: 'activity', theater: 'film',
@@ -583,7 +578,7 @@ export const HomeScreen: React.FC = () => {
                       <Image source={{ uri: ev.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                     ) : (
                       <LinearGradient
-                        colors={[EVENT_COLORS[ev.event_type ?? 'other'] + 'CC', EVENT_COLORS[ev.event_type ?? 'other'] + '44']}
+                        colors={[colors.primary + 'CC', colors.primary + '44']}
                         style={StyleSheet.absoluteFill}
                       />
                     )}
@@ -1079,7 +1074,7 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
     : event ? formatDate(event.starts_at) : '';
 
   const eventType   = event?.event_type ?? 'concert';
-  const accentColor = isConcert ? colors.primary : (EVENT_COLORS[eventType] ?? colors.primary);
+  const accentColor = colors.primary;
   const typeIcon    = isConcert ? 'music' : (EVENT_ICONS[eventType] ?? 'calendar');
   const typeLabel   = isConcert ? 'Concert' : (eventType.charAt(0).toUpperCase() + eventType.slice(1));
 

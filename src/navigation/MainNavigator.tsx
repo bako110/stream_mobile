@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
+import { decodeId } from '../utils/slugId';
 import { Platform, PermissionsAndroid, BackHandler, ToastAndroid, InteractionManager } from 'react-native';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -243,8 +244,8 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
 
 // ── Wrappers pour les écrans qui attendent des props custom ───────────────────
 
-const ConcertDetailWrapper: React.FC<any>  = ({ navigation, route }) => <ConcertDetailScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
-const EventDetailWrapper: React.FC<any>    = ({ navigation, route }) => <EventDetailScreen eventId={route.params.eventId} onBack={() => navigation.goBack()} />;
+const ConcertDetailWrapper: React.FC<any>  = ({ navigation, route }) => <ConcertDetailScreen concertId={decodeId(route.params.concertId)} onBack={() => navigation.goBack()} />;
+const EventDetailWrapper: React.FC<any>    = ({ navigation, route }) => <EventDetailScreen eventId={decodeId(route.params.eventId)} onBack={() => navigation.goBack()} />;
 const CreateReelWrapper: React.FC<any>     = ({ navigation }) => <CreateReelScreen onBack={() => navigation.goBack()} />;
 const LiveStreamWrapper: React.FC<any>     = ({ navigation, route }) => <LiveStreamScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
 const LiveViewerWrapper: React.FC<any>     = ({ navigation, route }) => <LiveViewerScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
@@ -301,7 +302,7 @@ const CreatePostWrapper: React.FC<any> = ({ navigation }) => {
     </>
   );
 };
-const PostDetailWrapper: React.FC<any>     = ({ navigation, route }) => <PostDetailScreen postId={route.params.postId} initialPost={route.params.initialPost} onBack={() => navigation.goBack()} onAuthorPress={(userId: string) => navigation.navigate('UserProfile', { userId })} navigation={navigation} />;
+const PostDetailWrapper: React.FC<any>     = ({ navigation, route }) => <PostDetailScreen postId={decodeId(route.params.postId)} initialPost={route.params.initialPost} onBack={() => navigation.goBack()} onAuthorPress={(userId: string) => navigation.navigate('UserProfile', { userId })} navigation={navigation} />;
 const MyTicketWrapper: React.FC<any>       = ({ navigation, route }) => <MyTicketScreen ticket={route.params.ticket} onBack={() => navigation.goBack()} />;
 const AttendeesWrapper: React.FC<any>      = ({ navigation, route }) => (
   <AttendeesScreen

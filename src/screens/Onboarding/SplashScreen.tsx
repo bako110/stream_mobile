@@ -14,8 +14,8 @@ import { useTheme } from '../../hooks/useTheme';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-const LETTERS = ['F', 'o', 'l', 'i', 'X'];
-const DELAY_PER_LETTER = 120; // ms entre chaque lettre
+const LETTERS = ['G', 'o', 'f', 'o', 'l', 'y', 'x'];
+const DELAY_PER_LETTER = 100; // ms entre chaque lettre
 
 interface Props { onFinish: () => void; }
 
@@ -48,7 +48,7 @@ const AnimatedLetter: React.FC<{
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={s.xGrad}
         >
-          <Text style={s.xChar}>X</Text>
+          <Text style={s.xChar}>{char}</Text>
         </LinearGradient>
       </Animated.View>
     );
@@ -112,7 +112,7 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
               key={i}
               char={char}
               index={i}
-              isX={char === 'X'}
+              isX={i === LETTERS.length - 1}
               textColor={textColor}
             />
           ))}
@@ -134,7 +134,7 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
   );
 };
 
-const FONT_SIZE = W * 0.18;
+const FONT_SIZE = W * 0.135;
 
 const s = StyleSheet.create({
   center: {
@@ -170,7 +170,7 @@ const s = StyleSheet.create({
     includeFontPadding: false,
   },
   underlineTrack: {
-    width: W * 0.48,
+    width: W * 0.68,
     height: 3,
     borderRadius: 2,
     overflow: 'hidden',

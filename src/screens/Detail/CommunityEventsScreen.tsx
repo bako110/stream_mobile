@@ -37,10 +37,6 @@ const TABS = [
   { key: 'going',    label: 'Je participe' },
 ];
 
-const EVENT_COLORS = [
-  '#7B3FF2', '#3B82F6', '#10B981', '#F59E0B',
-  '#EF4444', '#EC4899', '#06B6D4', '#8B5CF6',
-];
 
 const MONTH_NAMES = ['jan.', 'fév.', 'mar.', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sep.', 'oct.', 'nov.', 'déc.'];
 const DAY_NAMES   = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
@@ -72,11 +68,11 @@ function getRsvpLabel(s: RsvpStatus | null): string {
   return 'Participer';
 }
 
-function getRsvpColor(s: RsvpStatus | null): string {
-  if (s === 'going')     return '#10B981';
-  if (s === 'maybe')     return '#F59E0B';
-  if (s === 'not_going') return '#EF4444';
-  return '#7B3FF2';
+function getRsvpColor(s: RsvpStatus | null, colors: any): string {
+  if (s === 'going')     return colors.success;
+  if (s === 'maybe')     return colors.warning;
+  if (s === 'not_going') return colors.error;
+  return colors.primary;
 }
 
 // ─── toLocalISOInput ─────────────────────────────────────────────────────────
@@ -118,7 +114,7 @@ function EventCard({ event, rsvpStatus, onRsvpChange, onEdit, onCancel, onDelete
     ]).start();
   }, []);
 
-  const cardColor = event.color ?? '#7B3FF2';
+  const cardColor = event.color ?? colors.primary;
   const isPast    = event.status === 'past' || event.status === 'cancelled';
   const isCancelled = event.status === 'cancelled';
 
@@ -133,17 +129,17 @@ function EventCard({ event, rsvpStatus, onRsvpChange, onEdit, onCancel, onDelete
       >
         <View style={styles.coverBadges}>
           {event.is_online && (
-            <View style={[styles.badge, { backgroundColor: '#3B82F6' }]}>
+            <View style={[styles.badge, { backgroundColor: colors.info }]}>
               <Text style={styles.badgeText}>EN LIGNE</Text>
             </View>
           )}
           {isCancelled && (
-            <View style={[styles.badge, { backgroundColor: '#EF4444' }]}>
+            <View style={[styles.badge, { backgroundColor: colors.error }]}>
               <Text style={styles.badgeText}>ANNULÉ</Text>
             </View>
           )}
           {event.status === 'ongoing' && (
-            <View style={[styles.badge, { backgroundColor: '#10B981' }]}>
+            <View style={[styles.badge, { backgroundColor: colors.success }]}>
               <Text style={styles.badgeText}>EN COURS</Text>
             </View>
           )}
@@ -226,14 +222,14 @@ function EventCard({ event, rsvpStatus, onRsvpChange, onEdit, onCancel, onDelete
         <View style={styles.countsRow}>
           <View style={[styles.countPill, { backgroundColor: '#10B98115' }]}>
             <Icon name="check" size={11} color="#10B981" />
-            <Text style={[styles.countText, { color: '#10B981' }]}>
+            <Text style={[styles.countText, { color: colors.success }]}>
               {event.going_count} participant{event.going_count > 1 ? 's' : ''}
             </Text>
           </View>
           {event.maybe_count > 0 && (
             <View style={[styles.countPill, { backgroundColor: '#F59E0B15' }]}>
               <Icon name="star" size={11} color="#F59E0B" />
-              <Text style={[styles.countText, { color: '#F59E0B' }]}>
+              <Text style={[styles.countText, { color: colors.warning }]}>
                 {event.maybe_count} peut-être
               </Text>
             </View>
@@ -251,7 +247,7 @@ function EventCard({ event, rsvpStatus, onRsvpChange, onEdit, onCancel, onDelete
             isPast
               ? { backgroundColor: colors.backgroundSecondary }
               : rsvpStatus
-              ? { backgroundColor: getRsvpColor(rsvpStatus) + '18', borderColor: getRsvpColor(rsvpStatus) + '50', borderWidth: 1 }
+              ? { backgroundColor: getRsvpColor(rsvpStatus, colors) + '18', borderColor: getRsvpColor(rsvpStatus, colors) + '50', borderWidth: 1 }
               : { backgroundColor: colors.primary },
           ]}
           onPress={() => !isPast && onRsvpChange(event.id, getRsvpNext(rsvpStatus))}
@@ -259,14 +255,14 @@ function EventCard({ event, rsvpStatus, onRsvpChange, onEdit, onCancel, onDelete
           disabled={isPast}
         >
           {!isPast && rsvpStatus && (
-            <Icon name={rsvpStatus === 'going' ? 'check' : rsvpStatus === 'maybe' ? 'star' : 'x'} size={14} color={getRsvpColor(rsvpStatus)} style={{ marginRight: 6 }} />
+            <Icon name={rsvpStatus === 'going' ? 'check' : rsvpStatus === 'maybe' ? 'star' : 'x'} size={14} color={getRsvpColor(rsvpStatus, colors)} style={{ marginRight: 6 }} />
           )}
           <Text style={[
             styles.rsvpBtnText,
             isPast
               ? { color: colors.textTertiary }
               : rsvpStatus
-              ? { color: getRsvpColor(rsvpStatus) }
+              ? { color: getRsvpColor(rsvpStatus, colors) }
               : { color: '#fff' },
           ]}>
             {isPast ? (isCancelled ? 'Annulé' : 'Terminé') : getRsvpLabel(rsvpStatus)}
@@ -306,6 +302,7 @@ function EventFormModal({ visible, initial, onClose, onSave, colors, insets }: E
   const [desc,     setDesc]     = useState('');
   const [location, setLocation] = useState('');
   const [isOnline, setIsOnline] = useState(false);
+  const EVENT_COLORS = [colors.primary, colors.accentGreen, colors.warning, colors.error, colors.info, colors.gradientEnd];
   const [color,    setColor]    = useState(EVENT_COLORS[0]);
   const [startsAt, setStartsAt] = useState(defaultStart);
   const [endsAt,   setEndsAt]   = useState(defaultEnd);
@@ -318,7 +315,7 @@ function EventFormModal({ visible, initial, onClose, onSave, colors, insets }: E
         setDesc(initial.description ?? '');
         setLocation(initial.location ?? '');
         setIsOnline(initial.is_online);
-        setColor(initial.color ?? EVENT_COLORS[0]);
+        setColor(initial.color ?? colors.primary);
         setStartsAt(toLocalISOInput(new Date(initial.starts_at)));
         setEndsAt(initial.ends_at ? toLocalISOInput(new Date(initial.ends_at)) : '');
       } else {
@@ -328,7 +325,7 @@ function EventFormModal({ visible, initial, onClose, onSave, colors, insets }: E
         setDesc('');
         setLocation('');
         setIsOnline(false);
-        setColor(EVENT_COLORS[0]);
+        setColor(colors.primary);
         setStartsAt(toLocalISOInput(n));
         setEndsAt(toLocalISOInput(new Date(n.getTime() + 2 * 60 * 60 * 1000)));
       }
@@ -475,8 +472,8 @@ function EventFormModal({ visible, initial, onClose, onSave, colors, insets }: E
               <Switch
                 value={isOnline}
                 onValueChange={setIsOnline}
-                trackColor={{ false: colors.divider, true: '#3B82F655' }}
-                thumbColor={isOnline ? '#3B82F6' : colors.textTertiary}
+                trackColor={{ false: colors.divider, true: colors.info + '8C' }}
+                thumbColor={isOnline ? colors.info : colors.textTertiary}
               />
             </View>
 
@@ -729,12 +726,12 @@ export function CommunityEventsScreen({ route }: Props) {
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryVal, { color: '#10B981' }]}>{upcomingCount}</Text>
+            <Text style={[styles.summaryVal, { color: colors.success }]}>{upcomingCount}</Text>
             <Text style={[styles.summaryLbl, { color: colors.textTertiary }]}>À venir</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryVal, { color: '#F59E0B' }]}>{goingCount}</Text>
+            <Text style={[styles.summaryVal, { color: colors.warning }]}>{goingCount}</Text>
             <Text style={[styles.summaryLbl, { color: colors.textTertiary }]}>Je participe</Text>
           </View>
         </View>
