@@ -37,6 +37,12 @@ const ROLE_LABELS: Record<string, string> = {
   member: 'Membre',
 };
 
+const ROLE_COLORS: Record<string, string> = {
+  admin:     '#7B3FF2',
+  moderator: '#F59E0B',
+  member:    '#10B981',
+};
+
 function fmtCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
