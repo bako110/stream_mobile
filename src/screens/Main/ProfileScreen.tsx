@@ -10,11 +10,12 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AppHeader, SkeletonProfile } from '../../components/common';
-import { userService, eventService, concertService } from '../../services';
+import { userService, eventService, concertService, reelService, postService } from '../../services';
 import { apiClient, Endpoints } from '../../api';
 import type { User } from '../../types';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
+import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
 import { profileStyles as s } from '../../styles/ProfileScreen.styles';
 import { QRCodeScreen } from '../Auth/QRCodeScreen';
@@ -38,7 +39,10 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
   const [loading,    setLoading]    = useState(true);
   const [myEvents,   setMyEvents]   = useState<Event[]>([]);
   const [myConcerts, setMyConcerts] = useState<Concert[]>([]);
+  const [myReels,    setMyReels]    = useState<any[]>([]);
+  const [myPosts,    setMyPosts]    = useState<Post[]>([]);
   const [draftsTab,  setDraftsTab]  = useState<'events' | 'concerts'>('events');
+  const [contentTab, setContentTab] = useState<'posts' | 'reels'>('posts');
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [showQR, setShowQR] = useState(false);
@@ -59,17 +63,24 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
         } catch {}
       }
 
-      const [profile, evts, res] = await Promise.allSettled([
+      const [profile, evts, res, reelsRes, postsRes] = await Promise.allSettled([
         userService.getPublicProfile(me!.id),
         eventService.getMyEvents(),
         concertService.getMyConcerts(),
+        apiClient.get<any>(`${Endpoints.reels.byUser(me!.id)}?page=1&limit=20`),
+        postService.getByUser(me!.id),
       ]);
       if (profile.status === 'fulfilled') {
         setFollowersCount(profile.value.followers_count ?? 0);
         setFollowingCount(profile.value.following_count ?? 0);
       }
-      if (evts.status === 'fulfilled') setMyEvents(evts.value);
-      if (res.status  === 'fulfilled') setMyConcerts(res.value);
+      if (evts.status  === 'fulfilled') setMyEvents(evts.value);
+      if (res.status   === 'fulfilled') setMyConcerts(res.value);
+      if (reelsRes.status === 'fulfilled') {
+        const d = reelsRes.value.data;
+        setMyReels(Array.isArray(d) ? d : (d?.items ?? []));
+      }
+      if (postsRes.status === 'fulfilled') setMyPosts(postsRes.value);
       lastLoadedAtRef.current = Date.now();
     } catch (err) {
       if (__DEV__) { console.warn('[ProfileScreen]', err); }
@@ -406,62 +417,96 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
           </View>
 
 
-          {/* ── Publications récentes ─────────────────────────────────── */}
-          <View style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16 }]}>
-            <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>PUBLICATIONS</Text>
-            {recentPublished.length > 0 ? (
-              <View style={{ gap: 10, marginTop: 4 }}>
-                {recentPublished.map(pub => {
-                  const isEvt = pub.kind === 'event';
-                  const item = pub.data as any;
-                  const pubDate = new Date(item.created_at).toLocaleDateString('fr-FR', {
-                    day: 'numeric', month: 'short', year: 'numeric',
-                  });
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[s.pubCard, { backgroundColor: colors.surfaceElevated }]}
-                      activeOpacity={0.7}
-                      onPress={() => nav.navigate(
-                        isEvt ? 'EventDetail' : 'ConcertDetail',
-                        isEvt ? { eventId: item.id } : { concertId: item.id },
-                      )}
-                    >
-                      {(item.thumbnail_url || item.banner_url) ? (
-                        <Image
-                          source={{ uri: item.thumbnail_url ?? item.banner_url }}
-                          style={s.pubThumb}
-                        />
-                      ) : (
-                        <View style={[s.pubThumb, { backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }]}>
-                          <Icon name={isEvt ? 'calendar' : 'music'} size={20} color={colors.primary} />
-                        </View>
-                      )}
-                      <View style={s.pubBody}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={[s.pubTypeBadge, { backgroundColor: (isEvt ? '#E0389A' : '#7B3FF2') + '18' }]}>
-                            <Icon name={isEvt ? 'calendar' : 'music'} size={9} color={isEvt ? '#E0389A' : '#7B3FF2'} />
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: isEvt ? '#E0389A' : '#7B3FF2' }}>
-                              {isEvt ? 'ÉVÉNEMENT' : 'CONCERT'}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={[s.pubTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-                          {item.title}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: colors.textTertiary }}>{pubDate}</Text>
+          {/* ── Publications (Posts / Reels) ──────────────────────────── */}
+          <View style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, overflow: 'hidden' }]}>
+            {/* Onglets */}
+            <View style={{ flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
+              {(['posts', 'reels'] as const).map(tab => {
+                const active = contentTab === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => setContentTab(tab)}
+                    activeOpacity={0.7}
+                    style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: active ? colors.primary : 'transparent' }}
+                  >
+                    <Icon name={tab === 'posts' ? 'grid' : 'play-circle'} size={15} color={active ? colors.primary : colors.textTertiary} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: active ? colors.primary : colors.textTertiary, marginTop: 3 }}>
+                      {tab === 'posts' ? `Posts (${myPosts.length})` : `Reels (${myReels.length})`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Contenu posts */}
+            {contentTab === 'posts' && (
+              <View style={{ padding: 12, gap: 8 }}>
+                {myPosts.length === 0 ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
+                    <Icon name="edit-3" size={28} color={colors.textTertiary} />
+                    <Text style={{ fontSize: 13, color: colors.textTertiary }}>Aucun post publié</Text>
+                  </View>
+                ) : myPosts.slice(0, 6).map(post => (
+                  <TouchableOpacity
+                    key={post.id}
+                    activeOpacity={0.75}
+                    onPress={() => nav.navigate('PostDetail', { postId: post.id })}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
+                  >
+                    {(post as any).image_url ? (
+                      <Image source={{ uri: (post as any).image_url }} style={{ width: 46, height: 46, borderRadius: 8 }} />
+                    ) : (
+                      <View style={{ width: 46, height: 46, borderRadius: 8, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="file-text" size={20} color={colors.primary} />
                       </View>
-                      <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                    </TouchableOpacity>
-                  );
-                })}
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }} numberOfLines={2}>
+                        {(post as any).body || (post as any).content || 'Post'}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
+                        {new Date((post as any).created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                ))}
               </View>
-            ) : (
-              <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
-                <Icon name="edit-3" size={28} color={colors.textTertiary} />
-                <Text style={{ fontSize: 13, color: colors.textTertiary }}>
-                  Aucune publication pour le moment
-                </Text>
+            )}
+
+            {/* Contenu reels — grille 3 colonnes */}
+            {contentTab === 'reels' && (
+              <View style={{ padding: 8 }}>
+                {myReels.length === 0 ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
+                    <Icon name="play-circle" size={28} color={colors.textTertiary} />
+                    <Text style={{ fontSize: 13, color: colors.textTertiary }}>Aucun reel publié</Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                    {myReels.slice(0, 9).map(reel => (
+                      <TouchableOpacity
+                        key={reel.id}
+                        activeOpacity={0.8}
+                        onPress={() => nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: reel.id } } as any)}
+                        style={{ width: '31.5%', aspectRatio: 9 / 16, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.surfaceElevated }}
+                      >
+                        {reel.thumbnail_url ? (
+                          <Image source={{ uri: reel.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                        ) : (
+                          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="play" size={24} color={colors.textTertiary} />
+                          </View>
+                        )}
+                        <View style={{ position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Icon name="eye" size={10} color="#fff" />
+                          <Text style={{ fontSize: 10, color: '#fff', fontWeight: '700' }}>{reel.view_count ?? 0}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
           </View>
