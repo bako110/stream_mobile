@@ -17,7 +17,7 @@ import { QRScannerScreen } from './QRScannerScreen';
 import { PhoneOtpScreen } from './PhoneOtpScreen';
 
 GoogleSignin.configure({
-  webClientId: '778294681035-6lg8qhahhd89rvvmd07nggchv2slp521.apps.googleusercontent.com',
+  webClientId: '862524928219-els656vqj6udpnd14u3uhfqc3u3m9np1.apps.googleusercontent.com',
   offlineAccess: false,
 });
 
