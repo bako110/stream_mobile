@@ -1,41 +1,41 @@
 {
   "project_info": {
-    "project_number": "778294681035",
-    "project_id": "gofolyx",
-    "storage_bucket": "gofolyx.firebasestorage.app"
+    "project_number": "633145914883",
+    "project_id": "gofolyx-8d8c8",
+    "storage_bucket": "gofolyx-8d8c8.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:778294681035:android:df799a76c552a0b7aeaa4e",
+        "mobilesdk_app_id": "1:633145914883:android:9e1fda6329101ec7024036",
         "android_client_info": {
           "package_name": "com.gofolyx.mobile"
         }
       },
       "oauth_client": [
         {
-          "client_id": "778294681035-mfdjpsq2tbv25nnfpub1icj6ju6plb9e.apps.googleusercontent.com",
+          "client_id": "633145914883-2g58d20npke1ida56di1fpdt0mgkhibk.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.gofolyx.mobile",
-            "certificate_hash": "d4a10414b7c7e1d950dfed3ebda7fa88ad319bb2"
+            "certificate_hash": "3f4eb621bbb77375f197bca5b63ba0940abe09af"
           }
         },
         {
-          "client_id": "778294681035-6lg8qhahhd89rvvmd07nggchv2slp521.apps.googleusercontent.com",
+          "client_id": "633145914883-2ka459achh16hhlak6h3pk58bpcsm4t2.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBGfr00omSs8eG9FgBgzgXvp0IwUMVK9mE"
+          "current_key": "AIzaSyCq6Vqts3iorv1BhnwmDdMRm7OF-_p6PZk"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "778294681035-6lg8qhahhd89rvvmd07nggchv2slp521.apps.googleusercontent.com",
+              "client_id": "633145914883-2ka459achh16hhlak6h3pk58bpcsm4t2.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
