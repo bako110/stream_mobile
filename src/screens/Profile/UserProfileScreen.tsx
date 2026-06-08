@@ -677,12 +677,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     key={reel.id}
                     style={[styles.reelCard, { backgroundColor: colors.surfaceElevated }]}
                     activeOpacity={0.8}
-                    onPress={() => navigation.navigate('Tabs', { screen: 'Reels', params: { initialReelId: reel.id } } as any)}
+                    onPress={() => navigation.navigate('UserReels', { userId, initialReelId: reel.id, initialReels: userReels })}
                   >
                     {reel.thumbnail_url ? (
-                      <TouchableOpacity onPress={() => setViewerUrl(reel.thumbnail_url)} activeOpacity={0.85}>
-                        <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} />
-                      </TouchableOpacity>
+                      <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} />
                     ) : (
                       <LinearGradient
                         colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
