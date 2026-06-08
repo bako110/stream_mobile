@@ -15,6 +15,7 @@ import Animated, {
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
+import { socialService } from '../../services/socialService';
 import { CommentsBottomSheet, ShareBottomSheet, ExpandableText, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import type { Post } from '../../types/post';
@@ -189,6 +190,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   const [liked,         setLiked]         = useState(initialPost?.user_reaction === 'like');
   const [likeCount,     setLikeCount]     = useState(initialPost?.like_count ?? 0);
   const [commentCount,  setCommentCount]  = useState(initialPost?.comment_count ?? 0);
+  const [shareCount,    setShareCount]    = useState(initialPost?.share_count ?? 0);
   const [commentsOpen,  setCommentsOpen]  = useState(false);
   const [likersOpen,    setLikersOpen]    = useState(false);
   const [shareOpen,     setShareOpen]     = useState(false);
@@ -670,7 +672,12 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               onPress={handleShare}
               style={[s.engageBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
             >
-              <MCIcon name="share-outline" size={18} color={colors.textSecondary} />
+              <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textSecondary} />
+              {shareCount > 0 && (
+                <Text style={[s.engageBtnTxt, { color: colors.textTertiary }]}>
+                  {shareCount > 999 ? `${(shareCount / 1000).toFixed(1)}k` : shareCount}
+                </Text>
+              )}
             </TouchableOpacity>
 
           </View>
@@ -783,7 +790,10 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           visible={shareOpen}
           onClose={() => setShareOpen(false)}
           post={post}
-          onShareCountChange={() => {/* compteur géré côté backend */}}
+          onShareCountChange={() => {
+            setShareCount(c => c + 1);
+            socialService.share({ platform: 'native', post_id: post.id } as any).catch(() => setShareCount(c => Math.max(0, c - 1)));
+          }}
         />
       )}
 

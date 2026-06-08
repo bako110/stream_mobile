@@ -359,6 +359,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [liked,        setLiked]        = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
+  const [shareCount,   setShareCount]   = useState(0);
   const [saved,        setSaved]        = useState(false);
   const [reminded,     setReminded]     = useState(false);
   const [remindLoading,setRemindLoading]= useState(false);
@@ -395,6 +396,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       try {
         const counts = await socialService.getReactionCounts({ event_id: eventId });
         setLikeCount(counts.likes ?? 0);
+        setShareCount(counts.shares ?? 0);
         const myR = await socialService.getMyReaction({ event_id: eventId });
         setLiked(myR.reaction_type === 'like');
       } catch { /**/ }
@@ -450,7 +452,8 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     try {
       await Share.share({ title: event.title,
         message: `${event.title} — ${formatDateShort(event.starts_at)} à ${event.venue_city ?? 'GoFolyX'}\nVia GoFolyX` });
-      socialService.share({ platform: 'native', event_id: eventId }).catch(() => {});
+      setShareCount(c => c + 1);
+      socialService.share({ platform: 'native', event_id: eventId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
     } catch { /**/ }
   };
 
@@ -637,7 +640,12 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={handleNativeShare} activeOpacity={0.7}>
-            <MCIcon name="share-outline" size={21} color={colors.textTertiary} />
+            <MCIcon name="share-outline" size={21} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
+            {shareCount > 0 && (
+              <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
+                {shareCount > 999 ? `${(shareCount / 1000).toFixed(1)}k` : shareCount}
+              </Text>
+            )}
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={[ds.socialBtn, { flex: 0, paddingHorizontal: 18 }]} onPress={handleSave} activeOpacity={0.7}>

@@ -89,7 +89,7 @@ const HeroConcert: React.FC<{
 
     {/* Dégradés */}
     <LinearGradient
-      colors={['rgba(123,63,242,0.35)', 'transparent']}
+      colors={['#7B3FF259', 'transparent']}
       style={{ position: 'absolute', top: 0, left: 0, right: 0, height: HERO_H * 0.45 }}
       pointerEvents="none"
     />
@@ -304,6 +304,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [liked,        setLiked]        = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
+  const [shareCount,   setShareCount]   = useState(0);
   const [saved,        setSaved]        = useState(false);
   const [showVideo,    setShowVideo]    = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -337,6 +338,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
       try {
         const counts = await socialService.getReactionCounts({ concert_id: concertId });
         setLikeCount(counts.likes ?? 0);
+        setShareCount(counts.shares ?? 0);
         const myR = await socialService.getMyReaction({ concert_id: concertId });
         setLiked(myR.reaction_type === 'like');
       } catch { /**/ }
@@ -379,7 +381,8 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     try {
       await Share.share({ title: concert.title,
         message: `${concert.title} — ${formatDateShort(concert.scheduled_at)} à ${concert.venue_city ?? 'GoFolyX'}\nVia GoFolyX` });
-      socialService.share({ platform: 'native', concert_id: concertId }).catch(() => {});
+      setShareCount(c => c + 1);
+      socialService.share({ platform: 'native', concert_id: concertId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
     } catch { /**/ }
   };
 
@@ -557,7 +560,12 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={handleNativeShare} activeOpacity={0.7}>
-            <MCIcon name="share-outline" size={21} color={colors.textTertiary} />
+            <MCIcon name="share-outline" size={21} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
+            {shareCount > 0 && (
+              <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
+                {shareCount > 999 ? `${(shareCount / 1000).toFixed(1)}k` : shareCount}
+              </Text>
+            )}
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={[ds.socialBtn, { flex: 0, paddingHorizontal: 18 }]} onPress={handleSave} activeOpacity={0.7}>
