@@ -14,6 +14,7 @@ import { storage }          from '../utils/storage';
 import { STORAGE_KEYS }     from '../utils/constants';
 import { authService }      from '../services';
 import { useTheme }         from '../hooks/useTheme';
+import { decodeId }         from '../utils/slugId';
 import { setupFCM } from '../services/fcmService';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
@@ -198,11 +199,45 @@ export const RootNavigator: React.FC = () => {
     prefixes: ['gofolyx://', 'https://gofolyx.com', 'https://www.gofolyx.com'],
     config: {
       screens: {
+        Tabs: {
+          screens: {
+            Reels: 'reels',
+          },
+        },
         PostDetail:    'posts/:postId',
         EventDetail:   'events/:eventId',
         ConcertDetail: 'concerts/:concertId',
-        JoinCommunity: 'join/:inviteCode',
+        JoinCommunity: 'communities/:id/invite',
+        UserProfile:   'user/:userId',
       },
+    },
+    // Gère /reels?id=<slug> → ouvre ReelsScreen avec le bon reel
+    getStateFromPath: (path: string, options: any) => {
+      const [pathname, search] = path.split('?');
+      const params = new URLSearchParams(search ?? '');
+      const slugId = params.get('id');
+
+      if (pathname === '/reels' || pathname === 'reels') {
+        if (slugId) {
+          const reelId = decodeId(slugId);
+          return {
+            routes: [{
+              name: 'Tabs',
+              state: {
+                routes: [{ name: 'Reels', params: { initialReelId: reelId } }],
+                index: 2,
+              },
+            }],
+          };
+        }
+        return {
+          routes: [{ name: 'Tabs', state: { routes: [{ name: 'Reels' }], index: 2 } }],
+        };
+      }
+
+      // Déléguer les autres routes au handler par défaut
+      const { getStateFromPath: defaultGet } = require('@react-navigation/native');
+      return defaultGet(path, options);
     },
   };
 
