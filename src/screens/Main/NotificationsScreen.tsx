@@ -194,7 +194,31 @@ export const NotificationsScreen: React.FC = () => {
     );
   }, [selectedIds, exitSelectMode]);
 
-  const unreadCount = items.filter(x => !x.is_read).length;
+  const unreadCount  = items.filter(x => !x.is_read).length;
+  const allSelected  = items.length > 0 && selectedIds.size === items.length;
+
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) setSelectedIds(new Set());
+    else setSelectedIds(new Set(items.map(x => x.id)));
+  }, [allSelected, items]);
+
+  const deleteAll = useCallback(() => {
+    if (items.length === 0) return;
+    Alert.alert(
+      'Supprimer toutes les notifications',
+      `Supprimer ${items.length} notification${items.length > 1 ? 's' : ''} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Tout supprimer', style: 'destructive',
+          onPress: async () => {
+            setItems([]);
+            try { await notificationService.deleteAll(); } catch {}
+          },
+        },
+      ],
+    );
+  }, [items]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -219,25 +243,37 @@ export const NotificationsScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             {items.length > 0 && (
-              <TouchableOpacity onPress={() => setSelectMode(true)} style={[s.readAllBtn, { borderColor: colors.border, marginLeft: 6 }]}>
-                <Icon name="check-square" size={14} color={colors.textSecondary} />
-                <Text style={[s.readAllText, { color: colors.textSecondary }]}>Sélectionner</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity onPress={deleteAll} style={[s.readAllBtn, { borderColor: '#FF3B30', marginLeft: 6 }]}>
+                  <Icon name="trash-2" size={14} color="#FF3B30" />
+                  <Text style={[s.readAllText, { color: '#FF3B30' }]}>Tout supprimer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSelectMode(true)} style={[s.readAllBtn, { borderColor: colors.border, marginLeft: 6 }]}>
+                  <Icon name="check-square" size={14} color={colors.textSecondary} />
+                  <Text style={[s.readAllText, { color: colors.textSecondary }]}>Sélectionner</Text>
+                </TouchableOpacity>
+              </>
             )}
           </>
         ) : (
-          <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity onPress={toggleSelectAll} style={[s.readAllBtn, { borderColor: colors.primary }]}>
+              <Icon name={allSelected ? 'check-square' : 'square'} size={14} color={colors.primary} />
+              <Text style={[s.readAllText, { color: colors.primary }]}>
+                {allSelected ? 'Désélectionner' : 'Tout sélectionner'}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={deleteSelected} disabled={selectedIds.size === 0}
-              style={[s.readAllBtn, { borderColor: selectedIds.size > 0 ? '#FF3B30' : colors.border, marginLeft: 6 }]}>
+              style={[s.readAllBtn, { borderColor: selectedIds.size > 0 ? '#FF3B30' : colors.border }]}>
               <Icon name="trash-2" size={14} color={selectedIds.size > 0 ? '#FF3B30' : colors.textTertiary} />
               <Text style={[s.readAllText, { color: selectedIds.size > 0 ? '#FF3B30' : colors.textTertiary }]}>
                 {selectedIds.size > 0 ? `Supprimer (${selectedIds.size})` : 'Supprimer'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={exitSelectMode} style={[s.readAllBtn, { borderColor: colors.border, marginLeft: 6 }]}>
-              <Text style={[s.readAllText, { color: colors.textSecondary }]}>Annuler</Text>
+            <TouchableOpacity onPress={exitSelectMode} style={[s.readAllBtn, { borderColor: colors.border }]}>
+              <Icon name="x" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
-          </>
+          </View>
         )}
       </LinearGradient>
 
