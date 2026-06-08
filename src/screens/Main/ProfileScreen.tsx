@@ -489,7 +489,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                       <TouchableOpacity
                         key={reel.id}
                         activeOpacity={0.8}
-                        onPress={() => nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: reel.id } } as any)}
+                        onPress={() => nav.navigate('UserReels', { userId: user!.id, initialReelId: reel.id, initialReels: myReels })}
                         style={{ width: '31.5%', aspectRatio: 9 / 16, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.surfaceElevated }}
                       >
                         {reel.thumbnail_url ? (
