@@ -19,6 +19,7 @@ import type { AppColors } from '../../theme/colors';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
+import { socialService } from '../../services/socialService';
 import { favoriteService } from '../../services/favoriteService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 import { ExpandableText } from './ExpandableText';
@@ -187,6 +188,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
   const [liked,        setLiked]        = useState(post.user_reaction === 'like');
   const [likeCount,    setLikeCount]    = useState(post.like_count);
   const [commentCount, setCommentCount] = useState(post.comment_count ?? 0);
+  const [shareCount,   setShareCount]   = useState(post.share_count ?? 0);
   const [saved,        setSaved]        = useState(() => saveService.isPostSaved(post.id));
   const [editOpen,     setEditOpen]     = useState(false);
   const [editBody,     setEditBody]     = useState(post.body ?? '');
@@ -213,6 +215,12 @@ const PostCardInner: React.FC<PostCardProps> = ({
       setLikeCount(c => n ? Math.max(0, c - 1) : c + 1);
     });
   }, [liked, post.id]);
+
+  const handleShareDone = useCallback(() => {
+    setShareCount(c => c + 1);
+    socialService.share({ platform: 'native', post_id: post.id } as any)
+      .catch(() => setShareCount(c => Math.max(0, c - 1)));
+  }, [post.id]);
 
   const handleDelete = useCallback(() => {
     Alert.alert('Supprimer', 'Supprimer ce post ?', [
@@ -446,7 +454,12 @@ const PostCardInner: React.FC<PostCardProps> = ({
         <View style={[pc.actionSep, { backgroundColor: colors.divider }]} />
 
         <TouchableOpacity style={pc.actionBtn} onPress={() => setShareOpen(true)} activeOpacity={0.7}>
-          <MCIcon name="share-outline" size={20} color={colors.textTertiary} />
+          <MCIcon name="share-outline" size={20} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
+          {shareCount > 0 && (
+            <Text style={[pc.countText, { color: colors.textTertiary }]}>
+              {shareCount > 999 ? `${(shareCount / 1000).toFixed(1)}k` : shareCount}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <View style={[pc.actionSep, { backgroundColor: colors.divider }]} />
@@ -539,7 +552,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
       {/* ── Modals secondaires ──────────────────────────────────────────────── */}
       <ReportModal visible={reportOpen} contentType="post" contentId={post.id} onClose={() => setReportOpen(false)} />
-      <ShareBottomSheet type="post" visible={shareOpen} onClose={() => setShareOpen(false)} post={post} />
+      <ShareBottomSheet type="post" visible={shareOpen} onClose={() => setShareOpen(false)} post={post} onShareCountChange={handleShareDone} />
       <CommentsBottomSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} postId={post.id}
         onCommentCountChange={d => setCommentCount(c => Math.max(0, c + d))}
         onCountLoaded={n => setCommentCount(c => Math.max(c, n))} />

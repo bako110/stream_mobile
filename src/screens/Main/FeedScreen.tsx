@@ -3254,8 +3254,10 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
     setShareCount((c: number) => c + 1);
     const payload = isEvent
       ? { platform: 'native', event_id: item.id }
-      : { platform: 'native', concert_id: item.id };
-    socialService.share(payload).catch(() => setShareCount((c: number) => Math.max(0, c - 1)));
+      : isPost
+        ? { platform: 'native', post_id: item.id }
+        : { platform: 'native', concert_id: item.id };
+    socialService.share(payload as any).catch(() => setShareCount((c: number) => Math.max(0, c - 1)));
   };
 
   const author       = isEvent ? event?.organizer : concert?.artist ?? null;
