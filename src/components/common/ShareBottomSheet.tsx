@@ -256,32 +256,67 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
         <View style={[st.handle, { backgroundColor: colors.divider }]} />
 
         {/* Aperçu */}
-        <View style={[st.preview, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-          <View style={st.previewHeader}>
-            {authorAvatar ? (
-              <Image source={{ uri: authorAvatar }} style={st.previewAvatar} />
-            ) : (
-              <View style={[st.previewAvatar, { backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14 }}>{initials}</Text>
+        {type === 'reel' ? (
+          /* ── Reel preview style TikTok ── */
+          <View style={{ alignItems: 'center', marginBottom: 10 }}>
+            <View style={st.reelCard}>
+              {thumb ? (
+                <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Icon name="video" size={32} color="rgba(255,255,255,0.3)" />
+                </View>
+              )}
+              {/* Gradient bas */}
+              <View style={st.reelGradient} />
+              {/* Play centré */}
+              <View style={st.reelPlayBtn}>
+                <Icon name="play" size={22} color="#fff" />
               </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={[st.previewName, { color: colors.textPrimary }]} numberOfLines={1}>{authorName}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                <Text style={[st.previewTime, { color: colors.textTertiary }]}>{timeAgo(createdAt)}</Text>
-                <Icon name="globe" size={10} color={colors.textTertiary} />
+              {/* Auteur en bas */}
+              <View style={st.reelAuthorRow}>
+                {authorAvatar ? (
+                  <Image source={{ uri: authorAvatar }} style={st.reelAvatar} />
+                ) : (
+                  <View style={[st.reelAvatar, { backgroundColor: colors.primary + '55', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 10 }}>{initials}</Text>
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={st.reelAuthorName} numberOfLines={1}>{authorName}</Text>
+                  {title ? <Text style={st.reelCaption} numberOfLines={1}>{title}</Text> : null}
+                </View>
               </View>
             </View>
           </View>
-
-          <Text style={[st.previewBody, { color: colors.textSecondary }]} numberOfLines={2}>{title}</Text>
-          {subtitle ? (
-            <Text style={[st.previewSub, { color: colors.textTertiary }]} numberOfLines={1}>{subtitle}</Text>
-          ) : null}
-          {thumb ? (
-            <Image source={{ uri: thumb }} style={st.previewThumb} resizeMode="cover" />
-          ) : null}
-        </View>
+        ) : (
+          /* ── Aperçu standard (post / event / concert) ── */
+          <View style={[st.preview, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+            <View style={st.previewHeader}>
+              {authorAvatar ? (
+                <Image source={{ uri: authorAvatar }} style={st.previewAvatar} />
+              ) : (
+                <View style={[st.previewAvatar, { backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14 }}>{initials}</Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={[st.previewName, { color: colors.textPrimary }]} numberOfLines={1}>{authorName}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                  <Text style={[st.previewTime, { color: colors.textTertiary }]}>{timeAgo(createdAt)}</Text>
+                  <Icon name="globe" size={10} color={colors.textTertiary} />
+                </View>
+              </View>
+            </View>
+            <Text style={[st.previewBody, { color: colors.textSecondary }]} numberOfLines={2}>{title}</Text>
+            {subtitle ? (
+              <Text style={[st.previewSub, { color: colors.textTertiary }]} numberOfLines={1}>{subtitle}</Text>
+            ) : null}
+            {thumb ? (
+              <Image source={{ uri: thumb }} style={st.previewThumb} resizeMode="cover" />
+            ) : null}
+          </View>
+        )}
 
         {/* Stats */}
         <View style={[st.statsRow, { borderBottomColor: colors.divider }]}>
@@ -341,6 +376,32 @@ const st = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, elevation: 12,
   },
   handle:        { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+
+  /* Reel TikTok-style */
+  reelCard: {
+    width: 130, height: 210, borderRadius: 16, overflow: 'hidden',
+    backgroundColor: '#111',
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+  },
+  reelGradient: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  reelPlayBtn: {
+    position: 'absolute', top: '50%', left: '50%',
+    marginTop: -24, marginLeft: -24,
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)',
+  },
+  reelAuthorRow: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8,
+  },
+  reelAvatar:     { width: 24, height: 24, borderRadius: 12, overflow: 'hidden' },
+  reelAuthorName: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  reelCaption:    { color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 1 },
   preview: {
     marginHorizontal: 16, borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
