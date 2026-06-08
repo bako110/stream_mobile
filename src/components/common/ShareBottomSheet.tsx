@@ -175,11 +175,12 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
         ? `${props.post.body}\n\n${shareUrl}`
         : `${title}${subtitle ? ' — ' + subtitle : ''}\n\n${shareUrl}`;
 
-      // Vidéo prioritaire sur l'image (reels, concerts, etc.)
-      const mediaUrl = videoUrl ?? thumb;
+      // Pour les reels, hls_url n'est pas partageable — on utilise la thumbnail
+      const shareableVideo = type === 'reel' ? null : videoUrl;
+      const mediaUrl = shareableVideo ?? thumb;
       if (mediaUrl) {
         try {
-          const isVideo = !!videoUrl;
+          const isVideo = !!shareableVideo;
           const ext  = isVideo ? 'mp4' : (mediaUrl.split('?')[0].split('.').pop()?.toLowerCase() ?? 'jpg');
           const mime = isVideo ? 'video/mp4' : (ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg');
           const dest = `${RNBlobUtil.fs.dirs.CacheDir}/share_${id.replace(/-/g, '')}.${ext}`;
