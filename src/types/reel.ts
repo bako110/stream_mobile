@@ -82,6 +82,7 @@ export interface ReactionCounts {
 
 export interface ShareCreate {
   platform: string;
+  post_id?: string;
   reel_id?: string;
   content_id?: string;
   concert_id?: string;

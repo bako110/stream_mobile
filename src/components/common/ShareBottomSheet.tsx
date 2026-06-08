@@ -9,6 +9,7 @@ import RNBlobUtil from 'react-native-blob-util';
 import RNShare from 'react-native-share';
 import { useTheme } from '../../hooks/useTheme';
 import { encodeId } from '../../utils/slugId';
+import { socialService } from '../../services/socialService';
 import type { Post } from '../../types/post';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
@@ -139,6 +140,14 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     }
   }, [visible]);
 
+  const recordShare = (platform: string) => {
+    const payload: Record<string, string> = { platform };
+    if (type === 'post')    payload.post_id    = id;
+    if (type === 'event')   payload.event_id   = id;
+    if (type === 'concert') payload.concert_id = id;
+    socialService.share(payload as any).catch(() => {});
+  };
+
   const handleNativeShare = async () => {
     setSharing(true);
     try {
@@ -164,6 +173,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
             message: caption,
             failOnCancel: false,
           });
+          recordShare('external');
           onShareCountChange?.();
           return;
         } catch (e: any) {
@@ -177,6 +187,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
         message: caption,
         failOnCancel: false,
       });
+      recordShare('link');
       onShareCountChange?.();
     } catch {
     } finally {
@@ -186,6 +197,8 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
 
   const handleCopyLink = () => {
     Clipboard.setString(shareUrl);
+    recordShare('link');
+    onShareCountChange?.();
     onClose();
     Alert.alert('Lien copié', `gofolyx.com — le lien a été copié dans le presse-papier.`);
   };
