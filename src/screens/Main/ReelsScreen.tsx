@@ -191,22 +191,15 @@ export const ReelsScreen: React.FC = () => {
           pendingScrollIdx.current = targetIdx;
         }
       } else if (targetId) {
-        // Mode arrière-plan avec reel cible — reconstruire la liste en gardant
-        // le reel cible à l'index courant pour ne pas déplacer l'utilisateur
-        const curId = reelsRef.current[currentIdxRef.current]?.id;
-        // Placer le reel cible en tête, reste du feed derrière
-        const targetInFeed = finalReels.find(r => r.id === targetId);
-        const others = finalReels.filter(r => r.id !== targetId);
-        const mergedList = targetInFeed
-          ? [targetInFeed, ...others]
-          : [reelsRef.current[0], ...others].filter(Boolean) as Reel[];
-        const newIdx = mergedList.findIndex(r => r.id === curId);
-        reelsRef.current = mergedList;
-        setReels(mergedList);
-        if (newIdx >= 0 && newIdx !== currentIdxRef.current) {
-          currentIdxRef.current = newIdx;
-          setCurrentIndex(newIdx);
-          scrollToIdx(newIdx);
+        // Mode arrière-plan avec reel cible — on NE remplace PAS la liste
+        // on ajoute juste les reels du feed qui ne sont pas encore présents
+        // L'utilisateur reste sur le reel injecté sans aucun déplacement
+        const existingIds = new Set(reelsRef.current.map(r => r.id));
+        const toAppend = finalReels.filter(r => r.id !== targetId && !existingIds.has(r.id));
+        if (toAppend.length > 0) {
+          const merged = [...reelsRef.current, ...toAppend];
+          reelsRef.current = merged;
+          setReels(merged);
         }
       } else {
         // Silent sans cible — mise à jour silencieuse sans bouger l'index
