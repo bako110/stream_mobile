@@ -20,7 +20,6 @@ import { SkeletonUserProfile, VerifiedBadge } from '../../components/common';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { postService } from '../../services/postService';
-import { PostCard } from '../../components/common';
 import type { UserPublicProfile, UserPublic } from '../../types/user';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
@@ -577,87 +576,122 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
             ) : (
               <>
-                {/* ── Posts ── */}
-                {userPosts.map((post, idx) => (
-                  <PostCard
-                    key={`post-${post.id}`}
-                    post={post}
-                    colors={colors}
-                    currentUserId={myId ?? undefined}
-                    onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
-                    onAuthorPress={() => {
-                      const aid = post.author?.id;
-                      if (aid && aid !== userId) navigation.navigate('UserProfile', { userId: aid });
-                    }}
-                  />
-                ))}
+                {/* ── Posts — grille 3 colonnes ── */}
+                {userPosts.length > 0 && (
+                  <View style={styles.reelsGrid}>
+                    {userPosts.map((post) => {
+                      const p = post as any;
+                      const thumb = p.thumbnail_url ?? p.media_url ?? p.image_url ?? p.media?.[0]?.url;
+                      const likes  = p.likes_count  ?? p.like_count  ?? 0;
+                      const cmts   = p.comments_count ?? p.comment_count ?? 0;
+                      const label  = p.title ?? p.caption ?? p.content ?? '';
+                      return (
+                        <TouchableOpacity
+                          key={`post-${post.id}`}
+                          style={[styles.reelCard, { backgroundColor: colors.surfaceElevated }]}
+                          activeOpacity={0.8}
+                          onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
+                        >
+                          {thumb ? (
+                            <Image source={{ uri: thumb }} style={styles.reelThumb} resizeMode="cover" />
+                          ) : (
+                            <LinearGradient
+                              colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
+                              style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center' }]}
+                            >
+                              <Icon name="image" size={24} color="rgba(255,255,255,0.6)" />
+                            </LinearGradient>
+                          )}
+                          {/* overlay meta */}
+                          <View style={styles.gridOverlay}>
+                            <View style={styles.gridMetaRow}>
+                              <Icon name="heart" size={11} color="#fff" />
+                              <Text style={styles.gridMetaText}>{likes}</Text>
+                              <Icon name="message-circle" size={11} color="#fff" />
+                              <Text style={styles.gridMetaText}>{cmts}</Text>
+                            </View>
+                          </View>
+                          {label ? (
+                            <Text style={[styles.reelCaption, { color: colors.textSecondary }]} numberOfLines={1}>
+                              {label}
+                            </Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
 
-                {/* ── Événements & Concerts ── */}
+                {/* ── Événements & Concerts — grille 2 colonnes ── */}
                 {publications.length > 0 && (
                   <>
                     {userPosts.length > 0 && (
                       <View style={[styles.sectionDivider, { backgroundColor: colors.divider }]} />
                     )}
-                    {publications.map((pub, idx) => {
-                      const isEvent = pub.kind === 'event';
-                      const item = pub.data as any;
-                      const thumbUrl = item.thumbnail_url ?? item.banner_url;
-                      const date = isEvent ? item.starts_at : item.scheduled_at;
-                      const city = item.venue_city;
-                      const typeIcon = isEvent ? 'calendar' : 'music';
-                      const typeLabel = isEvent ? 'Événement' : 'Concert';
-                      const accent = isEvent ? '#E0389A' : '#7B3FF2';
-                      return (
-                        <TouchableOpacity
-                          key={`${pub.kind}-${item.id}`}
-                          style={[styles.pubCard, { backgroundColor: colors.surfaceElevated }]}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
-                            else navigation.navigate('ConcertDetail', { concertId: item.id });
-                          }}
-                        >
+                    <View style={styles.pubGrid}>
+                      {publications.map((pub) => {
+                        const isEvent = pub.kind === 'event';
+                        const item = pub.data as any;
+                        const thumbUrl = item.thumbnail_url ?? item.banner_url;
+                        const date = isEvent ? item.starts_at : item.scheduled_at;
+                        const typeIcon = isEvent ? 'calendar' : 'music';
+                        const typeLabel = isEvent ? 'Événement' : 'Concert';
+                        const accent = isEvent ? '#E0389A' : '#7B3FF2';
+                        return (
+                          <TouchableOpacity
+                            key={`${pub.kind}-${item.id}`}
+                            style={[styles.pubGridCard, { backgroundColor: colors.surfaceElevated }]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
+                              else navigation.navigate('ConcertDetail', { concertId: item.id });
+                            }}
+                          >
                             {thumbUrl ? (
-                              <Image source={{ uri: thumbUrl }} style={styles.pubThumb} />
+                              <Image source={{ uri: thumbUrl }} style={styles.pubGridThumb} resizeMode="cover" />
                             ) : (
                               <LinearGradient
-                                colors={[accent + 'AA', accent + '55']}
-                                style={[styles.pubThumb, { alignItems: 'center', justifyContent: 'center' }]}
+                                colors={[accent + 'CC', accent + '66']}
+                                style={[styles.pubGridThumb, { alignItems: 'center', justifyContent: 'center' }]}
                               >
-                                <Icon name={typeIcon} size={28} color="rgba(255,255,255,0.6)" />
+                                <Icon name={typeIcon} size={32} color="rgba(255,255,255,0.8)" />
                               </LinearGradient>
                             )}
-                            <View style={styles.pubBody}>
+                            <View style={styles.pubGridBody}>
                               <View style={[styles.pubTypeBadge, { backgroundColor: accent + '18' }]}>
-                                <Icon name={typeIcon} size={10} color={accent} />
+                                <Icon name={typeIcon} size={9} color={accent} />
                                 <Text style={[styles.pubTypeText, { color: accent }]}>{typeLabel}</Text>
                               </View>
-                              <Text style={[styles.pubTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+                              <Text style={[styles.pubGridTitle, { color: colors.textPrimary }]} numberOfLines={2}>
                                 {item.title}
                               </Text>
-                              {item.description ? (
-                                <Text style={[styles.pubDesc, { color: colors.textSecondary }]} numberOfLines={2}>
-                                  {item.description}
-                                </Text>
+                              {date ? (
+                                <View style={styles.pubMetaItem}>
+                                  <Icon name="calendar" size={10} color={colors.textTertiary} />
+                                  <Text style={[styles.pubMetaText, { color: colors.textTertiary }]}>{formatDate(date)}</Text>
+                                </View>
                               ) : null}
-                              <View style={styles.pubMeta}>
-                                {date ? (
-                                  <View style={styles.pubMetaItem}>
-                                    <Icon name="calendar" size={11} color={colors.textTertiary} />
-                                    <Text style={[styles.pubMetaText, { color: colors.textTertiary }]}>{formatDate(date)}</Text>
-                                  </View>
-                                ) : null}
-                                {city ? (
-                                  <View style={styles.pubMetaItem}>
-                                    <Icon name="map-pin" size={11} color={colors.textTertiary} />
-                                    <Text style={[styles.pubMetaText, { color: colors.textTertiary }]}>{city}</Text>
-                                  </View>
-                                ) : null}
-                              </View>
+                              {(item.venue_city ?? item.location) ? (
+                                <View style={styles.pubMetaItem}>
+                                  <Icon name="map-pin" size={10} color={colors.textTertiary} />
+                                  <Text style={[styles.pubMetaText, { color: colors.textTertiary }]} numberOfLines={1}>
+                                    {item.venue_city ?? item.location}
+                                  </Text>
+                                </View>
+                              ) : null}
+                              {item.ticket_price != null ? (
+                                <View style={styles.pubMetaItem}>
+                                  <Icon name="tag" size={10} color={accent} />
+                                  <Text style={[styles.pubMetaText, { color: accent, fontWeight: '700' }]}>
+                                    {item.ticket_price === 0 ? 'Gratuit' : `${item.ticket_price} coins`}
+                                  </Text>
+                                </View>
+                              ) : null}
                             </View>
                           </TouchableOpacity>
-                      );
-                    })}
+                        );
+                      })}
+                    </View>
                   </>
                 )}
               </>
@@ -680,7 +714,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     onPress={() => navigation.navigate('UserReels', { userId, initialReelId: reel.id, initialReels: userReels })}
                   >
                     {reel.thumbnail_url ? (
-                      <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} />
+                      <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} resizeMode="cover" />
                     ) : (
                       <LinearGradient
                         colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
@@ -689,13 +723,20 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                         <Icon name="play" size={24} color="rgba(255,255,255,0.7)" />
                       </LinearGradient>
                     )}
-                    <View style={styles.reelOverlay}>
-                      <Icon name="play" size={14} color="#fff" />
-                      <Text style={styles.reelViews}>{reel.view_count ?? 0}</Text>
+                    {/* overlay meta : vues + likes */}
+                    <View style={styles.gridOverlay}>
+                      <View style={styles.gridMetaRow}>
+                        <Icon name="play" size={11} color="#fff" />
+                        <Text style={styles.gridMetaText}>{reel.view_count ?? 0}</Text>
+                        <Icon name="heart" size={11} color="#fff" />
+                        <Text style={styles.gridMetaText}>{reel.likes_count ?? 0}</Text>
+                      </View>
                     </View>
-                    <Text style={[styles.reelCaption, { color: colors.textSecondary }]} numberOfLines={2}>
-                      {reel.caption ?? 'Reel'}
-                    </Text>
+                    {reel.caption ? (
+                      <Text style={[styles.reelCaption, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {reel.caption}
+                      </Text>
+                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -960,25 +1001,26 @@ const styles = StyleSheet.create({
   emptyContent: { alignItems: 'center', paddingVertical: 48, gap: 10 },
   emptyText: { fontSize: 14 },
 
-  // Publication cards
-  pubCard: {
-    flexDirection: 'row', marginHorizontal: 16, marginBottom: 12,
-    borderRadius: 12, overflow: 'hidden',
+  // Publication grid (2 colonnes adaptatives)
+  pubGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 12, gap: 10, marginBottom: 8,
   },
-  pubThumb: { width: 110, height: 110 },
-  pubBody: { flex: 1, padding: 12, gap: 4, justifyContent: 'center' },
+  pubGridCard: {
+    width: (W - 24 - 10) / 2, borderRadius: 12, overflow: 'hidden',
+  },
+  pubGridThumb: { width: '100%', aspectRatio: 3 / 4 },
+  pubGridBody: { padding: 10, gap: 5 },
+  pubGridTitle: { fontSize: 13, fontWeight: '700', lineHeight: 18 },
   pubTypeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4,
   },
   pubTypeText: { fontSize: 10, fontWeight: '800' },
-  pubTitle: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
-  pubDesc: { fontSize: 12, lineHeight: 16 },
-  pubMeta: { flexDirection: 'row', gap: 12, marginTop: 4 },
   pubMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pubMetaText: { fontSize: 11 },
 
-  // Reels grid
+  // Reels / Posts grid
   reelsGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
     paddingHorizontal: 14, gap: 6,
@@ -986,13 +1028,18 @@ const styles = StyleSheet.create({
   reelCard: {
     width: (W - 28 - 12) / 3, borderRadius: 8, overflow: 'hidden', marginBottom: 4,
   },
-  reelThumb: { width: '100%', height: 140 },
-  reelOverlay: {
-    position: 'absolute', bottom: 28, left: 6,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+  reelThumb: { width: '100%', aspectRatio: 9 / 16 },
+  gridOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 6, paddingVertical: 5,
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  reelViews: { color: '#fff', fontSize: 11, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 2 },
-  reelCaption: { fontSize: 11, padding: 6, lineHeight: 14 },
+  gridMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  gridMetaText: {
+    color: '#fff', fontSize: 10, fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 2, marginRight: 4,
+  },
+  reelCaption: { fontSize: 11, paddingHorizontal: 6, paddingVertical: 4, lineHeight: 14 },
 
   // About
   aboutSection: { gap: 14, marginTop: 8 },
