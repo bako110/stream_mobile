@@ -113,12 +113,19 @@ export const ReelsScreen: React.FC = () => {
   const [searching,     setSearching]     = useState(false);
 
   // Refs stables pour éviter les closures stales
-  const reelsRef   = useRef<Reel[]>([]);
-  const hasMoreRef = useRef(true);
+  const reelsRef        = useRef<Reel[]>([]);
+  const hasMoreRef      = useRef(true);
+  const pendingScrollIdx = useRef<number | null>(null);
   useEffect(() => { reelsRef.current = reels; },    [reels]);
   useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
 
   const toggleMute = useCallback(() => setMuted(v => !v), []);
+
+  // Scroll direct par offset — plus fiable que scrollToIndex car pas de vérification de rendu
+  const scrollToIdx = useCallback((index: number, animated = false) => {
+    const itemH = SCREEN_H - HEADER_H;
+    listRef.current?.scrollToOffset({ offset: itemH * index, animated });
+  }, [SCREEN_H, HEADER_H]);
 
   // ── View tracking ─────────────────────────────────────────────────────────
   const sendViewForCurrent = useCallback(() => {
@@ -181,16 +188,15 @@ export const ReelsScreen: React.FC = () => {
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
         if (targetIdx > 0) {
-          setTimeout(() => {
-            try { listRef.current?.scrollToIndex({ index: targetIdx, animated: false }); } catch {}
-          }, 150);
+          // Stocker l'index — le scroll se fera dans onLayout quand la FlatList est prête
+          pendingScrollIdx.current = targetIdx;
         }
       } else if (targetIdx > 0 && targetId) {
         const alreadyVisible = reelsRef.current[currentIdxRef.current]?.id === targetId;
         if (!alreadyVisible) {
           currentIdxRef.current = targetIdx;
           setCurrentIndex(targetIdx);
-          setTimeout(() => listRef.current?.scrollToIndex({ index: targetIdx, animated: false }), 150);
+          pendingScrollIdx.current = targetIdx;
         }
       }
       // Si silent sans cible → on garde simplement la liste à jour sans bouger l'index
@@ -315,10 +321,10 @@ export const ReelsScreen: React.FC = () => {
       // Reel cliqué depuis le feed
       const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
       if (idx >= 0) {
-        // Déjà chargé → scroll direct
+        // Déjà chargé → scroll direct par offset (instantané, pas de vérification de rendu)
         currentIdxRef.current = idx;
         setCurrentIndex(idx);
-        setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 80);
+        scrollToIdx(idx);
       } else {
         // Pas encore chargé → charger le feed complet
         lastInitialReelRef.current = newInitialId;
@@ -636,8 +642,16 @@ export const ReelsScreen: React.FC = () => {
         extraData={`${currentIndex}-${screenFocused}-${muted}`}
         getItemLayout={(_, index) => ({ length: SCREEN_H - HEADER_H, offset: (SCREEN_H - HEADER_H) * index, index })}
         onScrollToIndexFailed={({ index }) => {
-          listRef.current?.scrollToOffset({ offset: 0, animated: false });
-          setTimeout(() => listRef.current?.scrollToIndex({ index, animated: false }), 300);
+          // Fallback via offset direct — ne nécessite pas que l'item soit rendu
+          scrollToIdx(index);
+        }}
+        onLayout={() => {
+          // FlatList prête — exécuter le scroll en attente s'il y en a un
+          if (pendingScrollIdx.current !== null) {
+            const idx = pendingScrollIdx.current;
+            pendingScrollIdx.current = null;
+            scrollToIdx(idx);
+          }
         }}
         renderItem={renderVideoSlide}
         removeClippedSubviews={false}
