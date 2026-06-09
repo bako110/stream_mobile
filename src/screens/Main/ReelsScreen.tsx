@@ -115,15 +115,20 @@ export const ReelsScreen: React.FC = () => {
   // Refs stables pour éviter les closures stales
   const reelsRef        = useRef<Reel[]>([]);
   const hasMoreRef      = useRef(true);
-  const pendingScrollIdx = useRef<number | null>(null);
+  const pendingScrollIdx  = useRef<number | null>(null);
+  const isScrollingRef    = useRef(false);
+  const scrollLockTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { reelsRef.current = reels; },    [reels]);
   useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
 
   const toggleMute = useCallback(() => setMuted(v => !v), []);
 
-  // Scroll direct par offset — plus fiable que scrollToIndex car pas de vérification de rendu
+  // Scroll direct par offset — verrou isScrollingRef pour bloquer onViewableItemsChanged
   const scrollToIdx = useCallback((index: number, animated = false) => {
     const itemH = SCREEN_H - HEADER_H;
+    isScrollingRef.current = true;
+    if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+    scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 400);
     listRef.current?.scrollToOffset({ offset: itemH * index, animated });
   }, [SCREEN_H, HEADER_H]);
 
@@ -421,6 +426,8 @@ export const ReelsScreen: React.FC = () => {
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<{ index: number | null; item: Reel }> }) => {
       if (!viewableItems.length) return;
+      // Ignorer les callbacks déclenchés pendant un scroll programmé
+      if (isScrollingRef.current) return;
       const idx = viewableItems[0].index ?? 0;
       if (idx === currentIdxRef.current) return;
 
