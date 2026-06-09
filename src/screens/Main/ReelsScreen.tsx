@@ -338,15 +338,19 @@ export const ReelsScreen: React.FC = () => {
         setCurrentIndex(idx);
         scrollToIdx(idx);
       } else if (newReel?.hls_url) {
-        // Pas encore chargé — injecter le reel en tête et l'afficher immédiatement,
-        // puis charger le reste du feed en arrière-plan (silent) sans réinitialiser
+        // Scroll à 0 D'ABORD (avant setReels) pour que la FlatList soit
+        // déjà positionnée quand la nouvelle liste arrive
+        isScrollingRef.current = true;
+        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 500);
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+
         const injected = [newReel, ...reelsRef.current.filter(r => r.id !== newInitialId)];
         reelsRef.current = injected;
-        setReels(injected);
         currentIdxRef.current = 0;
         setCurrentIndex(0);
-        pendingScrollIdx.current = 0;
-        // Charger le feed complet en arrière-plan pour avoir les reels suivants
+        setReels(injected);
+
         lastInitialReelRef.current = newInitialId;
         load(true, newInitialId, newReel);
       } else {
