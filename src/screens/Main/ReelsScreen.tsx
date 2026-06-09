@@ -179,27 +179,39 @@ export const ReelsScreen: React.FC = () => {
         }
       }
 
-      setReels(finalReels);
       setHasMore(data.has_more);
       lastLoadedAtRef.current = Date.now();
 
       if (!silent) {
+        setReels(finalReels);
         viewedReelsRef.current = new Set();
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
         if (targetIdx > 0) {
-          // Stocker l'index — le scroll se fera dans onLayout quand la FlatList est prête
           pendingScrollIdx.current = targetIdx;
         }
-      } else if (targetIdx > 0 && targetId) {
-        const alreadyVisible = reelsRef.current[currentIdxRef.current]?.id === targetId;
-        if (!alreadyVisible) {
-          currentIdxRef.current = targetIdx;
-          setCurrentIndex(targetIdx);
-          pendingScrollIdx.current = targetIdx;
+      } else if (targetId) {
+        // Mode arrière-plan avec reel cible — reconstruire la liste en gardant
+        // le reel cible à l'index courant pour ne pas déplacer l'utilisateur
+        const curId = reelsRef.current[currentIdxRef.current]?.id;
+        // Placer le reel cible en tête, reste du feed derrière
+        const targetInFeed = finalReels.find(r => r.id === targetId);
+        const others = finalReels.filter(r => r.id !== targetId);
+        const mergedList = targetInFeed
+          ? [targetInFeed, ...others]
+          : [reelsRef.current[0], ...others].filter(Boolean) as Reel[];
+        const newIdx = mergedList.findIndex(r => r.id === curId);
+        reelsRef.current = mergedList;
+        setReels(mergedList);
+        if (newIdx >= 0 && newIdx !== currentIdxRef.current) {
+          currentIdxRef.current = newIdx;
+          setCurrentIndex(newIdx);
+          scrollToIdx(newIdx);
         }
+      } else {
+        // Silent sans cible — mise à jour silencieuse sans bouger l'index
+        setReels(finalReels);
       }
-      // Si silent sans cible → on garde simplement la liste à jour sans bouger l'index
 
       // Charger la pub reels en arriere-plan
       apiClient.get<{ id: string; title: string } | null>('/api/v1/ads/feed/next?placement=reels')
@@ -318,20 +330,32 @@ export const ReelsScreen: React.FC = () => {
       load(false);
 
     } else if (newInitialId) {
-      // Reel cliqué depuis le feed
+      // Nettoyer les params immédiatement pour éviter de retraiter au prochain focus
+      nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
+
       const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
       if (idx >= 0) {
-        // Déjà chargé → scroll direct par offset (instantané, pas de vérification de rendu)
+        // Déjà dans la liste → scroll direct
         currentIdxRef.current = idx;
         setCurrentIndex(idx);
         scrollToIdx(idx);
-      } else {
-        // Pas encore chargé → charger le feed complet
+      } else if (newReel?.hls_url) {
+        // Pas encore chargé — injecter le reel en tête et l'afficher immédiatement,
+        // puis charger le reste du feed en arrière-plan (silent) sans réinitialiser
+        const injected = [newReel, ...reelsRef.current.filter(r => r.id !== newInitialId)];
+        reelsRef.current = injected;
+        setReels(injected);
+        currentIdxRef.current = 0;
+        setCurrentIndex(0);
+        pendingScrollIdx.current = 0;
+        // Charger le feed complet en arrière-plan pour avoir les reels suivants
         lastInitialReelRef.current = newInitialId;
-        load(false, newInitialId, newReel);
+        load(true, newInitialId, newReel);
+      } else {
+        // Pas de reel data → charger normalement
+        lastInitialReelRef.current = newInitialId;
+        load(false, newInitialId, undefined);
       }
-      // Nettoyer les params pour éviter de retraiter au prochain focus
-      nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
 
     } else if (!didFocusOnceRef.current) {
       load(false);
