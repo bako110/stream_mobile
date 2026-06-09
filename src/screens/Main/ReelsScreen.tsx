@@ -315,57 +315,15 @@ export const ReelsScreen: React.FC = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Focus — point d'entrée unique ────────────────────────────────────────
+  // ── Focus — gère uniquement screen focus/blur, sans params ─────────────
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
-
-    const freshParams  = (route.params ?? {}) as typeof params;
-    const newInitialId = freshParams.initialReelId;
-    const newReel      = freshParams.initialReel as Reel | undefined;
-
-    if (freshParams.reelPublished) {
-      nav.setParams({ reelPublished: undefined } as any);
-      load(false);
-
-    } else if (newInitialId) {
-      // Nettoyer les params immédiatement pour éviter de retraiter au prochain focus
-      nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
-
-      const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
-      if (idx >= 0) {
-        // Déjà dans la liste → scroll direct
-        currentIdxRef.current = idx;
-        setCurrentIndex(idx);
-        scrollToIdx(idx);
-      } else if (newReel?.hls_url) {
-        // Scroll à 0 D'ABORD (avant setReels) pour que la FlatList soit
-        // déjà positionnée quand la nouvelle liste arrive
-        isScrollingRef.current = true;
-        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 500);
-        listRef.current?.scrollToOffset({ offset: 0, animated: false });
-
-        const injected = [newReel, ...reelsRef.current.filter(r => r.id !== newInitialId)];
-        reelsRef.current = injected;
-        currentIdxRef.current = 0;
-        setCurrentIndex(0);
-        setReels(injected);
-
-        lastInitialReelRef.current = newInitialId;
-        load(true, newInitialId, newReel);
-      } else {
-        // Pas de reel data → charger normalement
-        lastInitialReelRef.current = newInitialId;
-        load(false, newInitialId, undefined);
-      }
-
-    } else if (!didFocusOnceRef.current) {
-      load(false);
+    if (!didFocusOnceRef.current) {
+      if (!params.initialReelId) load(false);
     } else {
       const age = Date.now() - lastLoadedAtRef.current;
       if (age > 90_000) load(true);
     }
-
     didFocusOnceRef.current = true;
     return () => {
       setScreenFocused(false);
@@ -373,7 +331,49 @@ export const ReelsScreen: React.FC = () => {
       requestAnimationFrame(() => sendViewForCurrent());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.reelPublished, params.initialReelId]));
+  }, []));
+
+  // ── Params — réagit à initialReelId/reelPublished séparément ────────────
+  useEffect(() => {
+    const freshParams  = (route.params ?? {}) as typeof params;
+    const newInitialId = freshParams.initialReelId;
+    const newReel      = freshParams.initialReel as Reel | undefined;
+
+    if (freshParams.reelPublished) {
+      nav.setParams({ reelPublished: undefined } as any);
+      load(false);
+      return;
+    }
+    if (!newInitialId) return;
+
+    // Consommer immédiatement pour éviter double traitement au prochain focus
+    nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
+
+    const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
+    if (idx >= 0) {
+      currentIdxRef.current = idx;
+      setCurrentIndex(idx);
+      scrollToIdx(idx);
+    } else if (newReel?.hls_url) {
+      isScrollingRef.current = true;
+      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 500);
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+
+      const injected = [newReel, ...reelsRef.current.filter(r => r.id !== newInitialId)];
+      reelsRef.current = injected;
+      currentIdxRef.current = 0;
+      setCurrentIndex(0);
+      setReels(injected);
+
+      lastInitialReelRef.current = newInitialId;
+      load(true, newInitialId, newReel);
+    } else {
+      lastInitialReelRef.current = newInitialId;
+      load(false, newInitialId, undefined);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.initialReelId, params.reelPublished]);
 
   // ── Edit / Delete ─────────────────────────────────────────────────────────
   const handleDeleteReel = useCallback((reel: Reel) => {
