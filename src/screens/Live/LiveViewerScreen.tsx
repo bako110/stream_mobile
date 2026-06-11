@@ -12,7 +12,7 @@ import {
   VideoTrack,
   useTracks,
 } from '@livekit/react-native';
-import { Track } from 'livekit-client';
+import { Track, VideoPresets } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -33,6 +33,17 @@ interface LiveChat {
   username: string;
   text: string;
 }
+
+// ── LiveKit quality config ─────────────────────────────────────────────────────
+
+const VIEWER_ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: false,
+  publishDefaults: {
+    videoCodec: 'h264' as const,
+    videoSimulcastLayers: [VideoPresets.h720],
+  },
+};
 
 // ── Video view inside the room ────────────────────────────────────────────────
 
@@ -194,7 +205,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   }
 
   return (
-    <LiveKitRoom serverUrl={wsUrl} token={token} connect>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={VIEWER_ROOM_OPTIONS}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

@@ -137,7 +137,8 @@ const ReactionPill: React.FC<{
     rotate.value = withSequence(withTiming(-8, { duration: 60 }), withTiming(8, { duration: 60 }), withTiming(0, { duration: 60 }));
     onPress();
   };
-  const display = count && count > 0 ? (count > 999 ? `${(count / 1000).toFixed(1)}k` : String(count)) : label;
+  const fmtN = (n: number) => n >= 1_000_000 ? `${(n/1_000_000).toFixed(n>=10_000_000?0:1)}M` : n >= 1_000 ? `${(n/1_000).toFixed(n>=10_000?0:1)}K` : String(n);
+  const display = count && count > 0 ? fmtN(count) : label;
 
   if (active && gradient) {
     return (
@@ -611,7 +612,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                     <MCIcon name="heart" size={10} color="#fff" />
                   </View>
                   <Text style={[s.engageCountTxt, { color: colors.textTertiary }]}>
-                    {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
+                    {likeCount >= 1_000_000 ? `${(likeCount/1_000_000).toFixed(1)}M` : likeCount >= 1_000 ? `${(likeCount/1_000).toFixed(1)}K` : likeCount}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -631,53 +632,42 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           {/* Boutons capsules */}
           <View style={[s.engageBtnRow, { borderTopColor: colors.divider }]}>
 
-            {/* Adorer */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleLike}
-              style={[
-                s.engageBtn,
-                liked
-                  ? { backgroundColor: '#E0389A' + '18', borderColor: '#E0389A' + '50' }
-                  : { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-              ]}
+            {/* J'aime */}
+            <TouchableOpacity activeOpacity={0.8} onPress={handleLike}
+              style={[s.engageBtn, liked
+                ? { backgroundColor: '#E0389A18', borderColor: '#E0389A50' }
+                : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
             >
               <Animated.View style={heartStyle}>
                 <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E0389A' : colors.textSecondary} />
               </Animated.View>
-              {likeCount > 0 && (
-                <Text style={[s.engageBtnTxt, { color: liked ? '#E0389A' : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
-                  {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
-                </Text>
-              )}
+              <Text style={[s.engageBtnTxt, { color: liked ? '#E0389A' : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
+                {likeCount > 0 ? (likeCount >= 1_000_000 ? `${(likeCount/1_000_000).toFixed(1)}M` : likeCount >= 1_000 ? `${(likeCount/1_000).toFixed(1)}K` : String(likeCount)) : 'J\'aime'}
+              </Text>
             </TouchableOpacity>
 
             {/* Commenter */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setCommentsOpen(true)}
-              style={[s.engageBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setCommentsOpen(true)}
+              style={[s.engageBtn, commentCount > 0
+                ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '40' }
+                : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
             >
-              <MCIcon name="comment-outline" size={18} color={colors.textSecondary} />
-              {commentCount > 0 && (
-                <Text style={[s.engageBtnTxt, { color: colors.primary, fontWeight: '700' }]}>
-                  {commentCount > 999 ? `${(commentCount / 1000).toFixed(1)}k` : commentCount}
-                </Text>
-              )}
+              <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
+              <Text style={[s.engageBtnTxt, { color: commentCount > 0 ? colors.primary : colors.textSecondary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+                {commentCount > 0 ? (commentCount >= 1_000_000 ? `${(commentCount/1_000_000).toFixed(1)}M` : commentCount >= 1_000 ? `${(commentCount/1_000).toFixed(1)}K` : String(commentCount)) : 'Commenter'}
+              </Text>
             </TouchableOpacity>
 
             {/* Partager */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleShare}
-              style={[s.engageBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+            <TouchableOpacity activeOpacity={0.8} onPress={handleShare}
+              style={[s.engageBtn, shareCount > 0
+                ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '40' }
+                : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
             >
               <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textSecondary} />
-              {shareCount > 0 && (
-                <Text style={[s.engageBtnTxt, { color: colors.textTertiary }]}>
-                  {shareCount > 999 ? `${(shareCount / 1000).toFixed(1)}k` : shareCount}
-                </Text>
-              )}
+              <Text style={[s.engageBtnTxt, { color: shareCount > 0 ? colors.primary : colors.textSecondary, fontWeight: shareCount > 0 ? '700' : '500' }]}>
+                {shareCount > 0 ? (shareCount >= 1_000_000 ? `${(shareCount/1_000_000).toFixed(1)}M` : shareCount >= 1_000 ? `${(shareCount/1_000).toFixed(1)}K` : String(shareCount)) : 'Partager'}
+              </Text>
             </TouchableOpacity>
 
           </View>
@@ -917,7 +907,7 @@ const s = StyleSheet.create({
   engageCountDot:   { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   engageCountTxt:   { fontSize: 13, fontWeight: '500' },
   engageBtnRow:     { flexDirection: 'row', gap: 8, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
-  engageBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  engageBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
   engageBtnTxt:     { fontSize: 13, fontWeight: '700' },
 
   // Footer

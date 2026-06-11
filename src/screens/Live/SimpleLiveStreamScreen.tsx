@@ -28,7 +28,7 @@ import {
   useTracks,
   VideoTrack,
 } from '@livekit/react-native';
-import { Track, RoomEvent, RemoteParticipant, Room } from 'livekit-client';
+import { Track, RoomEvent, RemoteParticipant, Room, VideoPresets } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -49,6 +49,19 @@ import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../..
 import { useUser } from '../../context/UserContext';
 import { useWs } from '../../context/WebSocketContext';
 import { BoostPrompt } from '../../components/common';
+
+// ── LiveKit quality config ─────────────────────────────────────────────────────
+
+const CREATOR_ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: true,
+  publishDefaults: {
+    videoCodec: 'h264' as const,
+    simulcast: true,
+    videoSimulcastLayers: [VideoPresets.h720],
+    videoEncoding: { maxBitrate: 4_000_000, maxFramerate: 30 },
+  },
+};
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveStream'>;
@@ -1139,7 +1152,7 @@ export const SimpleLiveStreamScreen: React.FC = () => {
   }
 
   return (
-    <LiveKitRoom serverUrl={wsUrl} token={token} connect>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={CREATOR_ROOM_OPTIONS}>
       <StreamContent liveId={liveId} onEnd={handleEnd} isPrivate={isPrivate} />
     </LiveKitRoom>
   );
@@ -1252,7 +1265,7 @@ const st = StyleSheet.create({
   timerText:   { color: 'rgba(255,255,255,0.85)', fontSize: 11 },
   privatePill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(123,63,242,0.85)', borderRadius: 10,
+    backgroundColor: '#7B3FF2D9', borderRadius: 10,
     paddingHorizontal: 7, paddingVertical: 4,
   },
   privateText: { color: '#fff', fontWeight: '700', fontSize: 10 },

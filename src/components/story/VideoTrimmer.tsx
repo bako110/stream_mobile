@@ -337,7 +337,7 @@ const s = StyleSheet.create({
   timeText:     { color: '#fff', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
   durationBadge:{
     flexDirection: 'row', alignItems: 'baseline',
-    backgroundColor: 'rgba(123,63,242,0.7)',
+    backgroundColor: '#7B3FF2B3',
     paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12,
   },
   durationBadgeErr: { backgroundColor: 'rgba(239,68,68,0.7)' },

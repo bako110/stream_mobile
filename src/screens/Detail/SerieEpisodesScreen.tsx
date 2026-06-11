@@ -131,7 +131,7 @@ const EpisodeCard: React.FC<{
                 <Icon name="lock" size={13} color="#fff" />
               </View>
             ) : hasVideo ? (
-              <View style={[ec.actionCircle, { backgroundColor: 'rgba(123,63,242,0.85)' }]}>
+              <View style={[ec.actionCircle, { backgroundColor: '#7B3FF2D9' }]}>
                 <Icon name="play" size={13} color="#fff" />
               </View>
             ) : (

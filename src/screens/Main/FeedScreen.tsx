@@ -3416,45 +3416,57 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
       {/* ── Barre d'actions ─────────────────────────────────────────────── */}
       <View style={[fc.actionBar, { borderTopColor: colors.divider }]}>
-        <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.7}>
-          <Animated.View style={heartStyle}>
-            <MCIcon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E0389A' : colors.textTertiary} />
-          </Animated.View>
-          {likeCount > 0 && (
+        <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.8}>
+          <View style={[fc.actionPill,
+            liked
+              ? { backgroundColor: '#E0389A18', borderColor: '#E0389A40' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+          ]}>
+            <Animated.View style={heartStyle}>
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E0389A' : colors.textTertiary} />
+            </Animated.View>
             <Text style={[fc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
-              {likeCount.toLocaleString('fr')}
+              {likeCount > 0 ? fmtN(likeCount) : 'J\'aime'}
             </Text>
-          )}
+          </View>
         </TouchableOpacity>
 
-        <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
-
-        <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.7}>
-          <MCIcon name="comment-outline" size={20} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-          {commentCount > 0 && (
-            <Text style={[fc.actionText, { color: colors.primary, fontWeight: '700' }]}>
-              {commentCount.toLocaleString('fr')}
+        <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.8}>
+          <View style={[fc.actionPill,
+            commentCount > 0
+              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+          ]}>
+            <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
+            <Text style={[fc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+              {commentCount > 0 ? fmtN(commentCount) : 'Commenter'}
             </Text>
-          )}
+          </View>
         </TouchableOpacity>
 
-        <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
-
-        <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.7}>
-          <MCIcon name="share-outline" size={20} color={colors.textTertiary} />
-          {shareCount > 0 && (
-            <Text style={[fc.actionText, { color: colors.textTertiary }]}>
-              {shareCount.toLocaleString('fr')}
+        <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.8}>
+          <View style={[fc.actionPill,
+            shareCount > 0
+              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+          ]}>
+            <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
+            <Text style={[fc.actionText, { color: shareCount > 0 ? colors.primary : colors.textTertiary, fontWeight: shareCount > 0 ? '700' : '500' }]}>
+              {shareCount > 0 ? fmtN(shareCount) : 'Partager'}
             </Text>
-          )}
+          </View>
         </TouchableOpacity>
 
-        <View style={[fc.actionSep, { backgroundColor: colors.divider }]} />
-
-        <TouchableOpacity style={[fc.actionBtn, { flex: 0, paddingHorizontal: 16 }]} onPress={handleSave} activeOpacity={0.7}>
-          <Animated.View style={saveStyle}>
-            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? colors.primary : colors.textTertiary} />
-          </Animated.View>
+        <TouchableOpacity style={[fc.actionBtn, { flex: 0, paddingHorizontal: 10 }]} onPress={handleSave} activeOpacity={0.8}>
+          <View style={[fc.actionPill,
+            saved
+              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+          ]}>
+            <Animated.View style={saveStyle}>
+              <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? colors.primary : colors.textTertiary} />
+            </Animated.View>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -3480,6 +3492,12 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 });
 
 const { width: SW, height: SH } = Dimensions.get('window');
+
+const fmtN = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+  return String(n);
+};
 
 // ── FeedCard styles ───────────────────────────────────────────────────────────
 const fc = StyleSheet.create({
@@ -3515,10 +3533,14 @@ const fc = StyleSheet.create({
   commentIcon:  { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   shareIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#6B7280', alignItems: 'center', justifyContent: 'center' },
   // Actions
-  actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth },
-  actionBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 },
+  actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 6, gap: 4 },
+  actionBtn:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  actionPill:     {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 7,
+    borderRadius: 20, borderWidth: 1,
+  },
   actionText:     { fontSize: 12, fontWeight: '600' },
-  actionSep:      { width: StyleSheet.hairlineWidth, height: 22 },
 });
 
 const nbS = StyleSheet.create({

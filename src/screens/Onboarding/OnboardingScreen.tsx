@@ -56,13 +56,13 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
   // ── Couleurs selon le mode ────────────────────────────────────────────────
   const bg         = isDark ? '#09071C' : '#F5F3FF';
   const headline   = isDark ? '#FFFFFF' : '#0D0B2A';
-  const sub        = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(13,11,42,0.55)';
+  const sub        = isDark ? '#A09DC0' : '#4E4C6A';
   const accent     = '#C872FF';
-  const pillBg     = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(123,63,242,0.08)';
-  const pillBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(123,63,242,0.2)';
-  const pillTxt    = isDark ? 'rgba(255,255,255,0.75)' : '#7B3FF2';
-  const loginColor = isDark ? 'rgba(255,255,255,0.4)'  : 'rgba(13,11,42,0.45)';
-  const legalColor = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(13,11,42,0.35)';
+  const pillBg     = isDark ? '#FFFFFF14' : '#7B3FF214';
+  const pillBorder = isDark ? '#FFFFFF1E' : '#7B3FF233';
+  const pillTxt    = isDark ? '#F0EFF8' : '#7B3FF2';
+  const loginColor = isDark ? '#A09DC0'  : '#4E4C6A';
+  const legalColor = isDark ? '#5C5A78'  : '#9290AE';
   const glowOp     = isDark ? 0.18 : 0.10;
 
   // ── Animations ────────────────────────────────────────────────────────────

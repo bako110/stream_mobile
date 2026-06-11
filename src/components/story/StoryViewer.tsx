@@ -1322,7 +1322,7 @@ export const StoryViewer: React.FC<Props> = ({
               <View style={s.menuSheet}>
                 <View style={s.panelHandle} />
                 <TouchableOpacity style={s.menuItem} onPress={handleEditOpen}>
-                  <View style={[s.menuIconBox, { backgroundColor: 'rgba(123,63,242,0.15)' }]}>
+                  <View style={[s.menuIconBox, { backgroundColor: '#7B3FF226' }]}>
                     <Icon name="edit-2" size={16} color="#7B3FF2" />
                   </View>
                   <Text style={s.menuText}>Modifier la legende</Text>

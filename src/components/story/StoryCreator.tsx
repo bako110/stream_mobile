@@ -1202,8 +1202,8 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
   addTextBtnActive: {
-    backgroundColor: 'rgba(123,63,242,0.2)',
-    borderWidth: 1, borderColor: 'rgba(123,63,242,0.4)',
+    backgroundColor: '#7B3FF233',
+    borderWidth: 1, borderColor: '#7B3FF266',
   },
   addTextLabel: { color: '#fff', fontSize: 13, fontWeight: '600' },
   publishBtn:   { borderRadius: 24, overflow: 'hidden' },
@@ -1241,7 +1241,7 @@ const s = StyleSheet.create({
   },
   successIconRing: {
     width: 76, height: 76, borderRadius: 38,
-    borderWidth: 2.5, borderColor: 'rgba(123,63,242,0.4)',
+    borderWidth: 2.5, borderColor: '#7B3FF266',
     alignItems: 'center', justifyContent: 'center',
   },
   successIconGrad: {
@@ -1297,13 +1297,13 @@ const s = StyleSheet.create({
     borderRadius: 14, padding: 13,
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  audOptRowActive: { backgroundColor: 'rgba(123,63,242,0.18)', borderWidth: 1, borderColor: 'rgba(123,63,242,0.5)' },
+  audOptRowActive: { backgroundColor: '#7B3FF22E', borderWidth: 1, borderColor: '#7B3FF280' },
   audOptIcon: {
     width: 40, height: 40, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  audOptIconActive: { backgroundColor: 'rgba(123,63,242,0.25)' },
+  audOptIconActive: { backgroundColor: '#7B3FF240' },
   audOptLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
   audOptSub:   { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
 

@@ -24,7 +24,7 @@ import {
   useTracks,
   VideoTrack,
 } from '@livekit/react-native';
-import { Track } from 'livekit-client';
+import { Track, VideoPresets } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -45,6 +45,17 @@ import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
+
+// ── LiveKit quality config ─────────────────────────────────────────────────────
+
+const VIEWER_ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: false,
+  publishDefaults: {
+    videoCodec: 'h264' as const,
+    videoSimulcastLayers: [VideoPresets.h720],
+  },
+};
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
 type RouteT = RouteProp<MainStackParamList, 'SimpleLiveViewer'>;
@@ -1020,7 +1031,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   }
 
   return (
-    <LiveKitRoom serverUrl={wsUrl} token={token} connect>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={VIEWER_ROOM_OPTIONS}>
       <RoomContent
         live={live}
         liveId={liveId}
@@ -1131,7 +1142,7 @@ const st = StyleSheet.create({
   hostName:    { color: '#fff', fontSize: 12, fontWeight: '600' },
   privatePill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: 'rgba(123,63,242,0.85)', borderRadius: 10,
+    backgroundColor: '#7B3FF2D9', borderRadius: 10,
     paddingHorizontal: 6, paddingVertical: 3, alignSelf: 'flex-start',
   },
   privateText: { color: '#fff', fontWeight: '700', fontSize: 9 },

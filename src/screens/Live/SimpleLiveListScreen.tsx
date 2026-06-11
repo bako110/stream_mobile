@@ -230,7 +230,7 @@ const st = StyleSheet.create({
   privateBadge: {
     position: 'absolute', top: 32, left: 9,
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: 'rgba(123,63,242,0.85)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6,
+    backgroundColor: '#7B3FF2D9', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6,
   },
   privateBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   viewerBadge: {

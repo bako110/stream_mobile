@@ -30,6 +30,12 @@ import { LikersBottomSheet } from './LikersBottomSheet';
 const { width: SW } = Dimensions.get('window');
 const GAP    = 2;
 const RADIUS = 12;
+
+const fmtN = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+  return String(n);
+};
 const GRID_H = Math.round(SW * 0.68);
 
 // ── ImgTile ───────────────────────────────────────────────────────────────────
@@ -406,9 +412,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
               <View style={pc.likeCountIcon}>
                 <MCIcon name="heart" size={11} color="#fff" />
               </View>
-              <Text style={[pc.countText, { color: colors.textTertiary }]}>
-                {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
-              </Text>
+              <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(likeCount)}</Text>
             </TouchableOpacity>
           )}
           {commentCount > 0 && (
@@ -416,9 +420,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
               <View style={pc.commentCountIcon}>
                 <MCIcon name="comment-outline" size={11} color="#fff" />
               </View>
-              <Text style={[pc.countText, { color: colors.textTertiary }]}>
-                {commentCount > 999 ? `${(commentCount / 1000).toFixed(1)}k` : commentCount}
-              </Text>
+              <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(commentCount)}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -426,43 +428,55 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
       {/* ── Barre d'actions ────────────────────────────────────────────────── */}
       <View style={[pc.actionBar, { borderTopColor: colors.divider }]}>
-        <TouchableOpacity style={pc.actionBtn} onPress={handleLike} activeOpacity={0.7}>
-          <Animated.View style={[{ alignItems: 'center', justifyContent: 'center' }, heartStyle]}>
-            <MCIcon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E0389A' : colors.textTertiary} />
-          </Animated.View>
-          {likeCount > 0 && (
+        <TouchableOpacity style={pc.actionBtn} onPress={handleLike} activeOpacity={0.8}>
+          <View style={[pc.actionPill,
+            liked
+              ? { backgroundColor: '#E0389A18', borderColor: '#E0389A40' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+          ]}>
+            <Animated.View style={heartStyle}>
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E0389A' : colors.textTertiary} />
+            </Animated.View>
             <Text style={[pc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
-              {likeCount > 999 ? `${(likeCount / 1000).toFixed(1)}k` : likeCount}
+              {likeCount > 0 ? fmtN(likeCount) : 'J\'aime'}
             </Text>
-          )}
+          </View>
         </TouchableOpacity>
 
-        <View style={[pc.actionSep, { backgroundColor: colors.divider }]} />
-
-        <TouchableOpacity style={pc.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.7}>
-          <MCIcon name="comment-outline" size={20} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-          {commentCount > 0 && (
-            <Text style={[pc.actionText, { color: colors.primary, fontWeight: '700' }]}>
-              {commentCount > 999 ? `${(commentCount / 1000).toFixed(1)}k` : commentCount}
+        <TouchableOpacity style={pc.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
+          <View style={[pc.actionPill,
+            commentCount > 0
+              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+          ]}>
+            <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
+            <Text style={[pc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+              {commentCount > 0 ? fmtN(commentCount) : 'Commenter'}
             </Text>
-          )}
+          </View>
         </TouchableOpacity>
 
-        <View style={[pc.actionSep, { backgroundColor: colors.divider }]} />
-
-        <TouchableOpacity style={pc.actionBtn} onPress={() => setShareOpen(true)} activeOpacity={0.7}>
-          <MCIcon name="share-outline" size={20} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
-          {shareCount > 0 && (
-            <Text style={[pc.countText, { color: colors.textTertiary }]}>
-              {shareCount > 999 ? `${(shareCount / 1000).toFixed(1)}k` : shareCount}
+        <TouchableOpacity style={pc.actionBtn} onPress={() => setShareOpen(true)} activeOpacity={0.8}>
+          <View style={[pc.actionPill,
+            shareCount > 0
+              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+          ]}>
+            <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
+            <Text style={[pc.actionText, { color: shareCount > 0 ? colors.primary : colors.textTertiary, fontWeight: shareCount > 0 ? '700' : '500' }]}>
+              {shareCount > 0 ? fmtN(shareCount) : 'Partager'}
             </Text>
-          )}
+          </View>
         </TouchableOpacity>
 
-        <View style={[pc.actionSep, { backgroundColor: colors.divider }]} />
-
-        <TouchableOpacity style={[pc.actionBtn, { flex: 0, paddingHorizontal: 16 }]} onPress={handleSave} activeOpacity={0.7}>
-          <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? colors.primary : colors.textTertiary} />
+        <TouchableOpacity style={[pc.actionBtn, { flex: 0, paddingHorizontal: 10 }]} onPress={handleSave} activeOpacity={0.8}>
+          <View style={[pc.actionPill,
+            saved
+              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+          ]}>
+            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? colors.primary : colors.textTertiary} />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -628,10 +642,14 @@ const pc = StyleSheet.create({
   likeCountIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' },
   commentCountIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   // Action bar
-  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth },
-  actionBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 },
+  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 6, gap: 4 },
+  actionBtn:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  actionPill:   {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 7,
+    borderRadius: 20, borderWidth: 1,
+  },
   actionText:   { fontSize: 12, fontWeight: '600' },
-  actionSep:    { width: StyleSheet.hairlineWidth, height: 22 },
   // Menu sheet
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.48)', justifyContent: 'flex-end' },
   sheet:        { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingBottom: Platform.OS === 'ios' ? 38 : 22, paddingTop: 10, paddingHorizontal: 14, gap: 9 },

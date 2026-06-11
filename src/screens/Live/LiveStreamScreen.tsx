@@ -12,7 +12,7 @@ import {
   useTracks,
   VideoTrack,
 } from '@livekit/react-native';
-import { Track } from 'livekit-client';
+import { Track, VideoPresets } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -23,6 +23,19 @@ interface Props {
   concertId: string;
   onBack?: () => void;
 }
+
+// ── LiveKit quality config ─────────────────────────────────────────────────────
+
+const CREATOR_ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: true,
+  publishDefaults: {
+    videoCodec: 'h264' as const,
+    simulcast: true,
+    videoSimulcastLayers: [VideoPresets.h720],
+    videoEncoding: { maxBitrate: 4_000_000, maxFramerate: 30 },
+  },
+};
 
 // ── Aperçu caméra locale ──────────────────────────────────────────────────────
 // Composant séparé pour que useTracks déclenche son propre re-render
@@ -250,7 +263,7 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
   if (isLive && token && wsUrl) {
     return (
-      <LiveKitRoom serverUrl={wsUrl} token={token} connect>
+      <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={CREATOR_ROOM_OPTIONS}>
         <StreamControls concert={concert} concertId={concertId} onEnd={handleEnd} />
       </LiveKitRoom>
     );
