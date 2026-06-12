@@ -2138,6 +2138,7 @@ export const FeedScreen: React.FC = () => {
             {/* Liste — Espace personnel */}
             <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>MON ESPACE</Text>
             {([
+              { icon: 'calendar',     label: 'Planning',      sub: 'Mes événements et invitations',  color: '#7B3FF2', screen: 'Planning'             },
               { icon: 'credit-card',  label: 'Wallet',        sub: 'Solde, achats, transferts',      color: '#F59E0B', screen: 'Wallet'              },
               { icon: 'gift',         label: 'Parrainage',    sub: 'Inviter des amis, gagner des coins', color: '#10B981', screen: 'Referral'         },
               { icon: 'bar-chart-2',  label: 'Monétisation',  sub: 'Dashboard, stats, revenus',      color: '#7B3FF2', screen: 'SettingsMonetisation' },
