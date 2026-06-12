@@ -375,8 +375,15 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
             payload._showToast = true;
           }
         }
-        if (payload.type === 'activity'     && isMounted.current) setUnreadActivity(prev => prev + 1);
-        if (payload.type === 'notification' && isMounted.current) setUnreadNotifications(prev => prev + 1);
+        if (payload.type === 'activity' && isMounted.current) setUnreadActivity(prev => prev + 1);
+        if (
+          (payload.type === 'notification' ||
+           payload.type === 'planning_invite' ||
+           payload.type === 'planning_invite_response' ||
+           payload.type === 'planning_reminder' ||
+           payload.type === 'planning_cancelled') &&
+          isMounted.current
+        ) setUnreadNotifications(prev => prev + 1);
 
         if (payload.type === 'call_offer') {
           const fromSelf    = (myIdConfirmedRef.current && payload.from === myIdRef.current)

@@ -353,10 +353,15 @@ export const PlanningScreen: React.FC = () => {
     }
   }, [load]));
 
-  // Écouter les rappels WS pour rafraîchir
+  // Écouter tous les events planning WS pour rafraîchir
   useEffect(() => {
     const handler = (payload: any) => {
-      if (payload.type === 'planning_reminder') load();
+      if (
+        payload.type === 'planning_reminder' ||
+        payload.type === 'planning_invite' ||
+        payload.type === 'planning_invite_response' ||
+        payload.type === 'planning_cancelled'
+      ) load();
     };
     addListener(handler);
     return () => removeListener(handler);

@@ -79,6 +79,9 @@ export interface WsEventCallbacks {
   // Activité / notifications
   onActivity?: () => void;
   onNotification?: () => void;
+
+  // Planning
+  onPlanningUpdate?: () => void;
 }
 
 // ── Payloads ──────────────────────────────────────────────────────────────────
@@ -225,6 +228,14 @@ export function createWsEventHandler(callbacks: WsEventCallbacks) {
 
       case 'notification':
         callbacks.onNotification?.();
+        break;
+
+      case 'planning_invite':
+      case 'planning_invite_response':
+      case 'planning_reminder':
+      case 'planning_cancelled':
+        callbacks.onNotification?.();
+        callbacks.onPlanningUpdate?.();
         break;
 
       default:
