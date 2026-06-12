@@ -105,12 +105,14 @@ export const NotificationsScreen: React.FC = () => {
 
   useEffect(() => { setLoading(true); load(1); }, [filter]);
 
-  // Injection temps réel
+  // Injection temps réel — ignore si pas d'id réel (évite doublons avec le reload API)
   useEffect(() => {
     const onMessage = (payload: any) => {
       if (payload.type !== 'notification') return;
+      // Sans id persistant on ne peut pas dédupliquer → on recharge depuis l'API
+      if (!payload.id) { load(1, true); return; }
       const newItem: NotifItem = {
-        id:                payload.id ?? `ws-${Date.now()}`,
+        id:                payload.id,
         notification_type: payload.notification_type ?? 'system',
         title:             payload.title ?? 'Notification',
         body:              payload.body  ?? '',
@@ -124,7 +126,7 @@ export const NotificationsScreen: React.FC = () => {
     };
     addListener(onMessage);
     return () => removeListener(onMessage);
-  }, [addListener, removeListener]);
+  }, [addListener, removeListener, load]);
 
   const markAllRead = useCallback(async () => {
     setItems(prev => prev.map(x => ({ ...x, is_read: true })));

@@ -376,14 +376,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           }
         }
         if (payload.type === 'activity' && isMounted.current) setUnreadActivity(prev => prev + 1);
-        if (
-          (payload.type === 'notification' ||
-           payload.type === 'planning_invite' ||
-           payload.type === 'planning_invite_response' ||
-           payload.type === 'planning_reminder' ||
-           payload.type === 'planning_cancelled') &&
-          isMounted.current
-        ) setUnreadNotifications(prev => prev + 1);
+        // NOTE: l'incrément de unreadNotifications pour 'notification' et les types
+        // planning est géré exclusivement par wsEventHandler (onNotification / onPlanningUpdate)
+        // pour éviter les doublons.
 
         if (payload.type === 'call_offer') {
           const fromSelf    = (myIdConfirmedRef.current && payload.from === myIdRef.current)
