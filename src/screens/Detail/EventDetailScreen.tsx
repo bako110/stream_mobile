@@ -760,15 +760,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               <Text style={ds.ctaText}>Voir mon billet</Text>
             </LinearGradient>
           </TouchableOpacity>
-        ) : (
+        ) : isFree ? null : (
           <TouchableOpacity onPress={handleBuyTicket} activeOpacity={0.85}>
             <LinearGradient colors={[accent, accent + 'CC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ds.ctaGradient}>
-              <Icon name={isFree ? 'check-circle' : isInviteOnly ? 'lock' : 'tag'} size={20} color="#fff" />
+              <Icon name={isInviteOnly ? 'lock' : 'tag'} size={20} color="#fff" />
               <Text style={ds.ctaText}>
-                {isFree ? 'S\'inscrire gratuitement' : isInviteOnly ? 'Accès sur invitation'
+                {isInviteOnly ? 'Accès sur invitation'
                   : allTiers.length > 1 ? `Billet ${activeTier?.label ?? ''}` : 'Acheter un billet'}
               </Text>
-              {!isFree && !isInviteOnly && activeTier?.price != null && (
+              {!isInviteOnly && activeTier?.price != null && (
                 <View style={{ marginLeft: 'auto' as any, alignItems: 'flex-end', gap: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}>
                     {(activeTier.price + Math.round(activeTier.price * FEES_RATE)).toLocaleString('fr')} €

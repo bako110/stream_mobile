@@ -660,21 +660,20 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <Icon name="trash-2" size={16} color={colors.error} />
             </TouchableOpacity>
           </View>
-        ) : (
+        ) : isFree ? null : (
           <TouchableOpacity onPress={isRegistered ? undefined : () => setPaySheetOpen(true)}
             disabled={isRegistered} activeOpacity={isRegistered ? 1 : 0.85}>
             <LinearGradient
               colors={isRegistered ? ['#555', '#444'] : [colors.gradientStart, colors.gradientEnd]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={ds.ctaGradient}>
-              <Icon name={isRegistered ? 'check' : isFree ? 'check-circle' : 'tag'} size={20} color="#fff" />
+              <Icon name={isRegistered ? 'check' : 'tag'} size={20} color="#fff" />
               <Text style={ds.ctaText}>
                 {isRegistered ? 'Déjà inscrit'
-                  : isFree ? 'S\'inscrire gratuitement'
                   : allTiers.length > 1 ? `Billet ${activeTier?.label ?? ''}`
                   : 'Acheter un billet'}
               </Text>
-              {!isRegistered && !isFree && activeTier?.price != null && (
+              {!isRegistered && activeTier?.price != null && (
                 <View style={{ marginLeft: 'auto' as any, alignItems: 'flex-end', gap: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}>
                     {(activeTier.price + Math.round(activeTier.price * FEES_RATE)).toLocaleString('fr')} €
