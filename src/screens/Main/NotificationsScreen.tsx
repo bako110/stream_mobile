@@ -19,24 +19,28 @@ import { useWs } from '../../context/WebSocketContext';
 // ── Config visuelle ────────────────────────────────────────────────────────────
 
 const CFG: Record<string, { icon: string; grad: [string, string] }> = {
-  follow:           { icon: 'user-plus',      grad: ['#3B82F6', '#60A5FA'] },
-  reaction:         { icon: 'heart',          grad: ['#EF4444', '#FCA5A5'] },
-  comment:          { icon: 'message-circle', grad: ['#3B82F6', '#93C5FD'] },
-  mention:          { icon: 'at-sign',        grad: ['#06B6D4', '#67E8F9'] },
-  profile_view:     { icon: 'eye',            grad: ['#F59E0B', '#FCD34D'] },
-  story_view:       { icon: 'eye',            grad: ['#F59E0B', '#FCD34D'] },
-  concert_created:  { icon: 'music',          grad: ['#7B3FF2', '#A78BFA'] },
-  event_created:    { icon: 'calendar',       grad: ['#E0389A', '#F472B6'] },
-  concert_going:    { icon: 'headphones',     grad: ['#FF7A2F', '#FCA5A5'] },
-  event_going:      { icon: 'map-pin',        grad: ['#36D9A0', '#6EE7B7'] },
-  community_joined: { icon: 'users',          grad: ['#9B65F5', '#C4B5FD'] },
-  reel_posted:      { icon: 'film',           grad: ['#E0389A', '#FB7185'] },
-  subscription:     { icon: 'star',           grad: ['#36D9A0', '#6EE7B7'] },
-  welcome:          { icon: 'gift',           grad: ['#7B3FF2', '#E0389A'] },
-  ticket:           { icon: 'tag',            grad: ['#FF7A2F', '#FCD34D'] },
-  concert_live:     { icon: 'radio',          grad: ['#EF4444', '#FF7A2F'] },
-  system:           { icon: 'shield',         grad: ['#6366F1', '#8B5CF6'] },
-  security:         { icon: 'lock',           grad: ['#EF4444', '#F97316'] },
+  follow:                    { icon: 'user-plus',      grad: ['#3B82F6', '#60A5FA'] },
+  reaction:                  { icon: 'heart',          grad: ['#EF4444', '#FCA5A5'] },
+  comment:                   { icon: 'message-circle', grad: ['#3B82F6', '#93C5FD'] },
+  mention:                   { icon: 'at-sign',        grad: ['#06B6D4', '#67E8F9'] },
+  profile_view:              { icon: 'eye',            grad: ['#F59E0B', '#FCD34D'] },
+  story_view:                { icon: 'eye',            grad: ['#F59E0B', '#FCD34D'] },
+  concert_created:           { icon: 'music',          grad: ['#7B3FF2', '#A78BFA'] },
+  event_created:             { icon: 'calendar',       grad: ['#E0389A', '#F472B6'] },
+  concert_going:             { icon: 'headphones',     grad: ['#FF7A2F', '#FCA5A5'] },
+  event_going:               { icon: 'map-pin',        grad: ['#36D9A0', '#6EE7B7'] },
+  community_joined:          { icon: 'users',          grad: ['#9B65F5', '#C4B5FD'] },
+  reel_posted:               { icon: 'film',           grad: ['#E0389A', '#FB7185'] },
+  subscription:              { icon: 'star',           grad: ['#36D9A0', '#6EE7B7'] },
+  welcome:                   { icon: 'gift',           grad: ['#7B3FF2', '#E0389A'] },
+  ticket:                    { icon: 'tag',            grad: ['#FF7A2F', '#FCD34D'] },
+  concert_live:              { icon: 'radio',          grad: ['#EF4444', '#FF7A2F'] },
+  system:                    { icon: 'shield',         grad: ['#6366F1', '#8B5CF6'] },
+  security:                  { icon: 'lock',           grad: ['#EF4444', '#F97316'] },
+  planning_invite:           { icon: 'calendar',       grad: ['#7B3FF2', '#9B65F5'] },
+  planning_invite_response:  { icon: 'check-circle',   grad: ['#10B981', '#34D399'] },
+  planning_reminder:         { icon: 'clock',          grad: ['#F59E0B', '#FBBF24'] },
+  planning_cancelled:        { icon: 'x-circle',       grad: ['#EF4444', '#F87171'] },
 };
 const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
 
@@ -147,12 +151,24 @@ export const NotificationsScreen: React.FC = () => {
       return;
     }
 
+    // Types planning → ouvrir le planning
+    if (
+      item.notification_type === 'planning_invite' ||
+      item.notification_type === 'planning_invite_response' ||
+      item.notification_type === 'planning_reminder' ||
+      item.notification_type === 'planning_cancelled'
+    ) {
+      nav.navigate('Planning');
+      return;
+    }
+
     if (!item.ref_id) return;
-    if (item.ref_type === 'concert')        nav.navigate('ConcertDetail',   { concertId:    item.ref_id });
-    else if (item.ref_type === 'event')     nav.navigate('EventDetail',     { eventId:      item.ref_id });
-    else if (item.ref_type === 'reel')      nav.navigate('Reels',           { initialReelId: item.ref_id });
-    else if (item.ref_type === 'user')      nav.navigate('UserProfile',     { userId:        item.ref_id });
-    else if (item.ref_type === 'community') nav.navigate('CommunityDetail', { communityId:  item.ref_id });
+    if (item.ref_type === 'concert')         nav.navigate('ConcertDetail',   { concertId:     item.ref_id });
+    else if (item.ref_type === 'event')      nav.navigate('EventDetail',     { eventId:       item.ref_id });
+    else if (item.ref_type === 'reel')       nav.navigate('Reels',           { initialReelId: item.ref_id });
+    else if (item.ref_type === 'user')       nav.navigate('UserProfile',     { userId:        item.ref_id });
+    else if (item.ref_type === 'community')  nav.navigate('CommunityDetail', { communityId:   item.ref_id });
+    else if (item.ref_type === 'planning_invite' || item.ref_type === 'planning_entry') nav.navigate('Planning');
   }, [nav, markOneRead]);
 
   const loadMore = useCallback(() => {
