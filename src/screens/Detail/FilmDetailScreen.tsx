@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, Dimensions, StatusBar, ActivityIndicator, InteractionManager,
-  Modal, Alert,
+  Modal, Alert, Share,
 } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -10,7 +10,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { BackButton } from '../../components/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { contentService } from '../../services';
+import { contentService, socialService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { VideoMeta } from '../../types';
@@ -88,6 +88,8 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [walletCoins, setWalletCoins]     = useState<number | null>(null);
   const [purchasing, setPurchasing]       = useState(false);
   const [launching, setLaunching]         = useState(false);
+  const [isSaved, setIsSaved]             = useState(false);
+  const [savingFav, setSavingFav]         = useState(false);
 
   const isSerie  = item.type === 'serie';
   const banner   = item.banner_url || item.thumbnail_url;
@@ -161,6 +163,47 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const defaultVideo = videos.find(v => v.is_default) ?? videos[0] ?? null;
   const hasVideo     = !!defaultVideo?.hls_url;
+
+  const targetType = isSerie ? 'serie' : 'film';
+
+  useEffect(() => {
+    apiClient.get<{ saved: boolean }>(Endpoints.favorites.check(targetType, item.id))
+      .then(r => setIsSaved(r.data.saved))
+      .catch(() => {});
+  }, [item.id, targetType]);
+
+  const handleToggleFav = useCallback(async () => {
+    setSavingFav(true);
+    try {
+      if (isSaved) {
+        await apiClient.delete(Endpoints.favorites.unsave(targetType, item.id));
+        setIsSaved(false);
+      } else {
+        await apiClient.post(Endpoints.favorites.save, {
+          target_type:      targetType,
+          target_id:        item.id,
+          target_title:     item.title,
+          target_subtitle:  item.release_year ? String(item.release_year) : undefined,
+          target_thumbnail: item.thumbnail_url ?? undefined,
+        });
+        setIsSaved(true);
+      }
+    } catch {
+      Alert.alert('Erreur', 'Impossible de modifier les favoris.');
+    } finally {
+      setSavingFav(false);
+    }
+  }, [isSaved, item.id, item.title, item.release_year, item.thumbnail_url, targetType]);
+
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        title:   item.title,
+        message: `${item.title}${item.release_year ? ` (${item.release_year})` : ''} — Disponible sur GoFolyX`,
+      });
+      socialService.share({ platform: 'external', content_id: item.id } as any).catch(() => {});
+    } catch { /**/ }
+  }, [item.id, item.title, item.release_year]);
 
   const handleWatch = async () => {
     if (item.is_premium && !hasAccess) {
@@ -360,13 +403,19 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <TouchableOpacity
                 style={[s.ctaIconBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
                 activeOpacity={0.8}
+                onPress={handleToggleFav}
+                disabled={savingFav}
               >
-                <Icon name="bookmark" size={16} color={colors.textSecondary} />
+                {savingFav
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Icon name="bookmark" size={16} color={isSaved ? colors.primary : colors.textSecondary} />
+                }
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[s.ctaIconBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
                 activeOpacity={0.8}
+                onPress={handleShare}
               >
                 <Icon name="share-2" size={16} color={colors.textSecondary} />
               </TouchableOpacity>
