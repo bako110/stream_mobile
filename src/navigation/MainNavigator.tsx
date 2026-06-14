@@ -350,19 +350,38 @@ const Tabs: React.FC<{ onLogout: () => void }> = ({ onLogout }) => (
 const ExitHandler: React.FC = () => {
   const navigation    = useNavigation<MainNav>();
   const backPressedAt = useRef<number>(0);
-  const routeIndex    = useNavigationState(s => s?.index ?? 0);
+
+  // Index du stack principal (0 = on est sur les Tabs, >0 = écran stack ouvert)
+  const routeIndex = useNavigationState(s => s?.index ?? 0);
+
+  // Nom de l'onglet actif dans le Tab Navigator (quand routeIndex === 0)
+  const activeTabName = useNavigationState(s => {
+    if (!s || s.index !== 0) return null;
+    const tabsRoute = s.routes[0];
+    if (!tabsRoute?.state) return 'Home';
+    const tabState = tabsRoute.state;
+    return tabState.routes[tabState.index ?? 0]?.name ?? 'Home';
+  });
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
 
     const handler = () => {
+      // Cas 1 : un écran stack est ouvert → on remonte d'un niveau normalement
       if (routeIndex > 0) {
-        // Remonter d'un niveau dans le stack (comportement natif standard)
         navigation.goBack();
         return true;
       }
 
-      // Sur la racine (Tabs) : double-tap pour quitter
+      // Cas 2 : on est sur les Tabs mais PAS sur Home → revenir sur Home
+      if (activeTabName && activeTabName !== 'Home') {
+        navigation.dispatch(
+          CommonActions.navigate({ name: 'Tabs', params: { screen: 'Home' } }),
+        );
+        return true;
+      }
+
+      // Cas 3 : on est déjà sur Home → double-tap pour quitter l'app
       const now = Date.now();
       if (now - backPressedAt.current < 2000) {
         BackHandler.exitApp();
@@ -376,7 +395,7 @@ const ExitHandler: React.FC = () => {
 
     const sub = BackHandler.addEventListener('hardwareBackPress', handler);
     return () => sub.remove();
-  }, [routeIndex, navigation]);
+  }, [routeIndex, activeTabName, navigation]);
 
   return null;
 };

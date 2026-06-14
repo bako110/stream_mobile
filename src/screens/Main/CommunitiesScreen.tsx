@@ -120,222 +120,99 @@ const CommunityCard = React.memo(function CommunityCard({
   onLeave: () => void;
   onCancelRequest: () => void;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const onPressIn = () =>
-    Animated.spring(scale, { toValue: 0.972, useNativeDriver: true, tension: 220, friction: 14 }).start();
-  const onPressOut = () =>
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 220, friction: 14 }).start();
-
   const joinStatus: JoinStatus = isMine ? 'member' : (item.join_status ?? 'none');
   const isPrivateOrApproval = item.is_private || item.requires_approval;
 
   const renderAction = () => {
     if (joinStatus === 'member') {
-      return (
-        <View style={CS.actRow}>
-          <TouchableOpacity
-            onPress={onPress}
-            style={[CS.actPrimary, { backgroundColor: colors.primary }]}
-            activeOpacity={0.85}
-          >
-            <Icon name="message-circle" size={14} color="#fff" />
-            <Text style={CS.actPrimaryText}>Discussion</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onLeave}
-            style={[CS.actGhost, { borderColor: colors.divider }]}
-            activeOpacity={0.7}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <Icon name="log-out" size={14} color={colors.textTertiary} />
-          </TouchableOpacity>
-        </View>
-      );
+      return null;
     }
 
     if (joinStatus === 'pending') {
       return (
         <TouchableOpacity
           onPress={onCancelRequest}
-          activeOpacity={0.85}
-          style={CS.pendingWrap}
+          activeOpacity={0.8}
+          style={[CS.btnSuivre, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B', borderWidth: 1 }]}
         >
-          <View style={CS.pendingInner}>
-            <Icon name="clock" size={13} color="#F59E0B" />
-            <Text style={CS.pendingText}>En attente</Text>
-            <View style={CS.pendingSep} />
-            <Icon name="x" size={12} color="#F59E0B" />
-            <Text style={CS.pendingCancel}>Annuler</Text>
-          </View>
+          <Text style={[CS.btnSuivreText, { color: '#F59E0B' }]}>En attente</Text>
         </TouchableOpacity>
       );
     }
 
     return (
-      <TouchableOpacity onPress={onJoin} activeOpacity={0.85} style={CS.joinWrap}>
-        <LinearGradient
-          colors={isPrivateOrApproval ? [colors.primary, colors.primaryDark] : [colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={CS.joinGrad}
-        >
-          <Icon name={isPrivateOrApproval ? 'send' : 'user-plus'} size={14} color="#fff" />
-          <Text style={CS.joinText}>
-            {isPrivateOrApproval ? 'Demander' : 'Rejoindre'}
+      <TouchableOpacity
+        onPress={onJoin}
+        activeOpacity={0.8}
+        style={[CS.btnSuivre, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, borderWidth: 1 }]}
+      >
+        <Text style={[CS.btnSuivreText, { color: colors.textPrimary }]}>
+          {isPrivateOrApproval ? 'Demander' : 'Rejoindre'}
+        </Text>
+        {(item.entry_price_coins ?? 0) > 0 && (
+          <Text style={{ color: '#F59E0B', fontSize: 10, fontWeight: '700', marginLeft: 3 }}>
+            · {item.entry_price_coins}
           </Text>
-          {(item.entry_price_coins ?? 0) > 0 && (
-            <View style={CS.priceChip}>
-              <Text style={CS.priceChipNum}>{item.entry_price_coins}</Text>
-              <Icon name="zap" size={10} color="#F59E0B" />
-            </View>
-          )}
-        </LinearGradient>
+        )}
       </TouchableOpacity>
     );
   };
 
-  // Type badge label
-  let typeBadgeLabel = '';
-  let typeBadgeColor = colors.info;
-  if (item.is_private) {
-    typeBadgeLabel = 'Privée';
-    typeBadgeColor = colors.gradientEnd;
-  } else if (item.requires_approval) {
-    typeBadgeLabel = 'Approbation';
-    typeBadgeColor = colors.warning;
-  } else {
-    typeBadgeLabel = 'Publique';
-    typeBadgeColor = colors.success;
-  }
-
   return (
-    <Animated.View style={{ transform: [{ scale }], marginBottom: 14 }}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        style={[CS.card, { backgroundColor: colors.surface }]}
-      >
-        {/* ── Bannière 120px ── */}
-        <View style={CS.bannerWrap}>
-          {item.banner_url ? (
-            <Image source={{ uri: item.banner_url }} style={CS.bannerImg} resizeMode="cover" />
-          ) : (
-            <LinearGradient
-              colors={gradientFor(item.name)}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={CS.bannerImg}
-            />
-          )}
-          {/* Overlay gradient bas */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.6)']}
-            style={CS.bannerOverlay}
-            pointerEvents="none"
-          />
-
-          {/* Badge type — haut droite */}
-          <View style={[CS.badgeTopRight, { backgroundColor: typeBadgeColor + 'CC' }]}>
-            <Icon
-              name={item.is_private ? 'lock' : item.requires_approval ? 'user-check' : 'globe'}
-              size={9}
-              color="#fff"
-            />
-            <Text style={CS.badgeText}>{typeBadgeLabel}</Text>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={CS.row}
+    >
+      {/* Avatar rond */}
+      <View style={CS.avatarWrap}>
+        {item.avatar_url ? (
+          <Image source={{ uri: item.avatar_url }} style={CS.avatar} />
+        ) : (
+          <LinearGradient colors={gradientFor(item.name)} style={CS.avatarGrad}>
+            <Text style={CS.avatarLetter}>{(item.name[0] ?? '?').toUpperCase()}</Text>
+          </LinearGradient>
+        )}
+        {item.is_verified && (
+          <View style={CS.verifiedDot}>
+            <Icon name="check" size={8} color="#fff" />
           </View>
+        )}
+      </View>
 
-          {/* Prix coins — haut gauche si payant */}
-          {(item.entry_price_coins ?? 0) > 0 && joinStatus !== 'member' && (
-            <View style={CS.coinsBadge}>
-              <Icon name="zap" size={10} color="#F59E0B" />
-              <Text style={CS.coinsNum}>{item.entry_price_coins}</Text>
+      {/* Infos */}
+      <View style={CS.info}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Text style={[CS.name, { color: colors.textPrimary }]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          {item.is_verified && (
+            <Icon name="check-circle" size={13} color="#3B82F6" />
+          )}
+          {(item as any).tier === 'pro' && (
+            <View style={{ backgroundColor: '#7B3FF222', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+              <Text style={{ color: '#7B3FF2', fontSize: 9, fontWeight: '800' }}>PRO</Text>
             </View>
           )}
-
-          {/* Avatar 56px superposé bas-gauche */}
-          <View style={CS.avatarWrap}>
-            {item.avatar_url ? (
-              <Image source={{ uri: item.avatar_url }} style={CS.avatar} />
-            ) : (
-              <LinearGradient colors={gradientFor(item.name)} style={CS.avatarGrad}>
-                <Text style={CS.avatarLetter}>{(item.name[0] ?? '?').toUpperCase()}</Text>
-              </LinearGradient>
-            )}
-            {item.is_verified && (
-              <View style={CS.verifiedDot}>
-                <Icon name="check" size={8} color="#fff" />
-              </View>
-            )}
-          </View>
+          {(item as any).tier === 'elite' && (
+            <View style={{ backgroundColor: '#F59E0B22', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+              <Text style={{ color: '#F59E0B', fontSize: 9, fontWeight: '800' }}>ELITE</Text>
+            </View>
+          )}
         </View>
+        <Text style={[CS.followers, { color: colors.textTertiary }]}>
+          {fmtCount(item.members_count ?? 0)} membres
+        </Text>
+        {item.description ? (
+          <Text style={[CS.desc, { color: colors.textTertiary }]} numberOfLines={1}>
+            {item.description}
+          </Text>
+        ) : null}
+      </View>
 
-        {/* ── Corps ── */}
-        <View style={CS.body}>
-          {/* Nom */}
-          <View style={CS.nameRow}>
-            <Text style={[CS.name, { color: colors.textPrimary }]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            {(item as any).tier === 'pro' && (
-              <View style={{ backgroundColor: '#7B3FF222', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginLeft: 4 }}>
-                <Text style={{ color: '#7B3FF2', fontSize: 9, fontWeight: '800' }}>PRO</Text>
-              </View>
-            )}
-            {(item as any).tier === 'elite' && (
-              <View style={{ backgroundColor: '#F59E0B22', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginLeft: 4 }}>
-                <Text style={{ color: colors.warning, fontSize: 9, fontWeight: '800' }}>ELITE</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Créateur */}
-          {item.creator ? (
-            <Text style={[CS.creator, { color: colors.textTertiary }]} numberOfLines={1}>
-              par {item.creator.display_name ?? item.creator.username}
-            </Text>
-          ) : null}
-
-          {/* Description */}
-          {item.description ? (
-            <Text style={[CS.desc, { color: colors.textSecondary }]} numberOfLines={2}>
-              {item.description}
-            </Text>
-          ) : null}
-
-          {/* Stats row */}
-          <View style={CS.statsRow}>
-            <Icon name="users" size={11} color={colors.textTertiary} />
-            <Text style={[CS.statTxt, { color: colors.textTertiary }]}>
-              {fmtCount(item.members_count ?? 0)}
-            </Text>
-            <View style={[CS.dot, { backgroundColor: colors.textTertiary }]} />
-            <Icon
-              name={item.is_private ? 'lock' : 'globe'}
-              size={11}
-              color={colors.textTertiary}
-            />
-            <Text style={[CS.statTxt, { color: colors.textTertiary }]}>
-              {item.is_private ? 'Privée' : 'Publique'}
-            </Text>
-            {(item.entry_price_coins ?? 0) > 0 && (
-              <>
-                <View style={[CS.dot, { backgroundColor: colors.textTertiary }]} />
-                <Icon name="zap" size={11} color="#F59E0B" />
-                <Text style={[CS.statTxt, { color: colors.warning }]}>
-                  {item.entry_price_coins} coins
-                </Text>
-              </>
-            )}
-          </View>
-
-          {/* Bouton action */}
-          {renderAction()}
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+      {/* Bouton */}
+      {renderAction()}
+    </TouchableOpacity>
   );
 });
 
@@ -721,7 +598,7 @@ export const CommunitiesScreen: React.FC = () => {
         contentContainerStyle={
           communities.length === 0
             ? S.emptyContainer
-            : { paddingHorizontal: 16, paddingBottom: 32 }
+            : { paddingBottom: 32 }
         }
         ListHeaderComponent={
           <>
@@ -1683,82 +1560,37 @@ const S = StyleSheet.create({
 // Styles card communauté
 // ─────────────────────────────────────────────────────────────────────────────
 const CS = StyleSheet.create({
-  card: {
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 6,
+  // Ligne liste
+  row: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    paddingHorizontal: 16,
+    paddingVertical:   12,
+    gap: 12,
   },
 
-  // Bannière
-  bannerWrap: { height: 120, position: 'relative' },
-  bannerImg: { width: '100%', height: '100%' },
-  bannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 },
-
-  // Badges bannière
-  badgeTopRight: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-
-  coinsBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#F59E0B50',
-  },
-  coinsNum: { color: '#FF7A2F', fontSize: 11, fontWeight: '800' },
-
-  // Avatar superposé
-  avatarWrap: {
-    position: 'absolute',
-    bottom: -24,
-    left: 14,
-  },
+  // Avatar rond
+  avatarWrap: { position: 'relative' },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 15,
-    borderWidth: 3,
-    borderColor: '#fff',
-    overflow: 'hidden',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   avatarGrad: {
-    width: 56,
-    height: 56,
-    borderRadius: 15,
-    borderWidth: 3,
-    borderColor: '#fff',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 22 },
+  avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 20 },
   verifiedDot: {
     position: 'absolute',
-    bottom: -3,
-    right: -3,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    bottom: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1766,80 +1598,19 @@ const CS = StyleSheet.create({
     borderColor: '#fff',
   },
 
-  // Corps
-  body: { paddingHorizontal: 14, paddingTop: 32, paddingBottom: 14 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
-  name: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3, flex: 1 },
-  creator: { fontSize: 11, marginBottom: 5 },
-  desc: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
+  // Texte
+  info: { flex: 1 },
+  name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
+  followers: { fontSize: 12, marginTop: 2 },
+  desc: { fontSize: 11, marginTop: 1 },
 
-  // Stats
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 12,
-    flexWrap: 'wrap',
+  // Bouton Suivre
+  btnSuivre: {
+    paddingHorizontal: 16,
+    paddingVertical:    8,
+    borderRadius:      20,
+    flexDirection:     'row',
+    alignItems:        'center',
   },
-  statTxt: { fontSize: 11, fontWeight: '500' },
-  dot: { width: 3, height: 3, borderRadius: 2, opacity: 0.5 },
-
-  // Actions
-  actRow: { flexDirection: 'row', gap: 8 },
-  actPrimary: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 11,
-    borderRadius: 13,
-  },
-  actPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  actGhost: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  joinWrap: { borderRadius: 13, overflow: 'hidden' },
-  joinGrad: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    paddingVertical: 12,
-  },
-  joinText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  priceChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  priceChipNum: { color: '#FF7A2F', fontWeight: '800', fontSize: 11 },
-
-  pendingWrap: {
-    borderRadius: 13,
-    borderWidth: 1.5,
-    borderColor: '#FF7A2F',
-    overflow: 'hidden',
-  },
-  pendingInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 11,
-    backgroundColor: '#FF7A2F12',
-  },
-  pendingText: { color: '#FF7A2F', fontWeight: '700', fontSize: 13 },
-  pendingSep: { width: 1, height: 14, backgroundColor: '#FF7A2F40' },
-  pendingCancel: { color: '#FF7A2F', fontWeight: '600', fontSize: 12 },
+  btnSuivreText: { fontSize: 13, fontWeight: '600' },
 });

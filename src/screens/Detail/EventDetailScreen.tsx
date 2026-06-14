@@ -453,7 +453,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       await Share.share({ title: event.title,
         message: `${event.title} — ${formatDateShort(event.starts_at)} à ${event.venue_city ?? 'GoFolyX'}\nVia GoFolyX` });
       setShareCount(c => c + 1);
-      socialService.share({ platform: 'native', event_id: eventId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
+      socialService.share({ platform: 'external', event_id: eventId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
     } catch { /**/ }
   };
 

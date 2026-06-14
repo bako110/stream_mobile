@@ -1444,7 +1444,7 @@ export const FeedScreen: React.FC = () => {
 
         {/* ── Tab bar + actions ─────────────────────────────────────────── */}
         {!searchOpen && (
-          <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }}>
+          <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, marginTop: 8, paddingBottom: 8 }}>
             {/* Tab bar style Instagram — underline animée */}
             <View style={{ flexDirection: 'row' }}>
               {TABS.map((tab, idx) => {
@@ -1482,7 +1482,7 @@ export const FeedScreen: React.FC = () => {
               })}
             </View>
             {/* Underline animée */}
-            <View style={{ height: 2, backgroundColor: 'transparent' }}>
+            <View style={{ height: 2, backgroundColor: 'transparent', marginTop: 4, marginBottom: 8 }}>
               <Animated.View style={[{
                 position: 'absolute',
                 width: TAB_W,

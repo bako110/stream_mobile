@@ -782,7 +782,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           post={post}
           onShareCountChange={() => {
             setShareCount(c => c + 1);
-            socialService.share({ platform: 'native', post_id: post.id } as any).catch(() => setShareCount(c => Math.max(0, c - 1)));
+            socialService.share({ platform: 'external', post_id: post.id } as any).catch(() => setShareCount(c => Math.max(0, c - 1)));
           }}
         />
       )}
