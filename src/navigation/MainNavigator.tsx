@@ -29,6 +29,7 @@ import { SeriesScreen }          from '../screens/Main/SeriesScreen';
 import { TrendingScreen }        from '../screens/Main/TrendingScreen';
 import { FavoritesScreen }       from '../screens/Main/FavoritesScreen';
 import { NotificationsScreen }   from '../screens/Main/NotificationsScreen';
+import { CableInvitesScreen }    from '../screens/Main/CableInvitesScreen';
 import { SubscriptionsScreen }   from '../screens/Main/SubscriptionsScreen';
 import { SettingsScreen }        from '../screens/Main/SettingsScreen';
 import { ChangePasswordScreen }  from '../screens/Main/ChangePasswordScreen';
@@ -156,6 +157,7 @@ export type MainStackParamList = {
   Trending:        undefined;
   Favorites:       undefined;
   Notifications:   undefined;
+  CableInvites:    undefined;
   Subscriptions:   undefined;
   Settings:        undefined;
   ChangePassword:  undefined;
@@ -465,6 +467,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Favorites"      component={FavoritesScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Activity"       component={ActivityScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Notifications"  component={NotificationsScreen}   options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CableInvites"   component={CableInvitesScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Subscriptions"  component={SubscriptionsScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Settings"       component={SettingsWrapper}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen}  options={{ animation: 'slide_from_right' }} />
