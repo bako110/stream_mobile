@@ -38,4 +38,5 @@ export interface PostCreate {
   video_url?: string;
   thumbnail_url?: string;
   feeling?: string;
+  mention_ids?: string[];
 }

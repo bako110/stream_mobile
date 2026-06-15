@@ -21,7 +21,7 @@ import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
 import { favoriteService } from '../../services/favoriteService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
-import { ExpandableText } from './ExpandableText';
+import { RichText } from './RichText';
 import { ShareBottomSheet } from './ShareBottomSheet';
 import { InlineVideoPlayer } from './InlineVideoPlayer';
 import { ReportModal } from './ReportModal';
@@ -379,7 +379,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {/* ── Body texte (si pas d'image en overlay, ou multi-images) ────────── */}
       {post.body && (images.length !== 1) ? (
         <View style={pc.bodyWrap}>
-          <ExpandableText
+          <RichText
             text={post.body}
             maxLines={4}
             textStyle={[pc.body, { color: colors.textPrimary }]}
@@ -392,17 +392,19 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
       {/* ── Post texte seul — zone cliquable vers le détail ─────────────────── */}
       {!hasMedia && post.body && (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.7}
-          style={[pc.textOnlyHero, { borderLeftColor: colors.primary, backgroundColor: colors.primary + '08' }]}>
-          <Text style={[pc.textOnlyBody, { color: colors.textPrimary }]} numberOfLines={6}>
-            {post.body}
-          </Text>
+        <View style={[pc.textOnlyHero, { borderLeftColor: colors.primary, backgroundColor: colors.primary + '08' }]}>
+          <RichText
+            text={post.body}
+            maxLines={6}
+            textStyle={[pc.textOnlyBody, { color: colors.textPrimary }]}
+            primaryColor={colors.primary}
+          />
           {post.feeling && (
             <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 6 }}>
               — se sent <Text style={{ fontWeight: '700', color: colors.primary }}>{post.feeling}</Text>
             </Text>
           )}
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* ── Apercu lien ────────────────────────────────────────────────────── */}

@@ -16,7 +16,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
 import { socialService } from '../../services/socialService';
-import { CommentsBottomSheet, ShareBottomSheet, ExpandableText, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
+import { CommentsBottomSheet, ShareBottomSheet, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
+import { RichText } from '../../components/common/RichText';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { LinkPreviewCard } from '../../components/common/LinkPreviewCard';
 import type { Post } from '../../types/post';
@@ -449,7 +450,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           {/* Caption sous la vignette */}
           {item.body ? (
             <View style={s.pBody}>
-              <ExpandableText
+              <RichText
                 text={item.body}
                 maxLines={2}
                 primaryColor={colors.primary}
@@ -567,7 +568,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
         {/* Texte du post */}
         {post.body ? (
-          <ExpandableText
+          <RichText
             text={post.body}
             maxLines={4}
             primaryColor={colors.primary}

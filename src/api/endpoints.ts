@@ -43,6 +43,7 @@ export const Endpoints = {
     block:          (id: string) => `${V1}/users/${id}/block`,
     blocked:        `${V1}/users/me/blocked`,
     suggestions:    `${V1}/users/suggestions`,
+    search:         `${V1}/users/search`,
     verificationStatus:  `${V1}/users/me/verification`,
     verifyRequest:       `${V1}/users/me/verify-request`,
     adminVerify: (id: string) => `${V1}/users/${id}/verify`,

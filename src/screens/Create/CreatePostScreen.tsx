@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, Image,
+  View, Text, TouchableOpacity, Image,
   StyleSheet, Alert, ScrollView,
   KeyboardAvoidingView, Platform, StatusBar, Dimensions,
 } from 'react-native';
@@ -13,6 +13,7 @@ import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
 import { uploadImageFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
+import { MentionInput } from '../../components/common/MentionInput';
 
 const { width: W } = Dimensions.get('window');
 const MAX_IMAGES   = 6;
@@ -35,13 +36,16 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const insets          = useSafeAreaInsets();
 
   const [body,          setBody]          = useState('');
+  const [mentionIds,    setMentionIds]    = useState<string[]>([]);
   const [feeling,       setFeeling]       = useState<string | undefined>();
   const [localUris,     setLocalUris]     = useState<string[]>([]);
   const [videoUri,      setVideoUri]      = useState<string | null>(null);
   const [showFeelings,  setShowFeelings]  = useState(false);
-  const inputRef = useRef<TextInput>(null);
 
-  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 200); }, []);
+  const handleBodyChange = useCallback((text: string, ids: string[]) => {
+    setBody(text);
+    setMentionIds(ids);
+  }, []);
 
   const videoPlayer = useVideoPlayer(
     videoUri ? { uri: videoUri } : { uri: 'about:blank' },
@@ -131,6 +135,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             image_url,
             image_urls,
             feeling: capturedFeeling,
+            mention_ids: mentionIds.length ? mentionIds : undefined,
           });
         } catch (err: any) {
           console.warn('[CreatePost] échec création post:', err?.message ?? err);
@@ -156,6 +161,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             thumbnail_url: result.thumbnailUrl,
             image_url:     result.imageUrls?.[0],
             image_urls:    result.imageUrls,
+            mention_ids:   mentionIds.length ? mentionIds : undefined,
           });
         },
       });
@@ -171,6 +177,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             feeling:       capturedFeeling,
             video_url:     result.videoUrl,
             thumbnail_url: result.thumbnailUrl,
+            mention_ids:   mentionIds.length ? mentionIds : undefined,
           });
         },
       });
@@ -297,17 +304,15 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           </View>
         </View>
 
-        {/* Zone de texte */}
+        {/* Zone de texte avec autocomplete mentions */}
         <View style={[s.inputWrap, { backgroundColor: colors.surface }]}>
-          <TextInput
-            ref={inputRef}
-            style={[s.input, { color: colors.textPrimary }]}
-            placeholder="Quoi de neuf ?"
-            placeholderTextColor={colors.textTertiary}
-            multiline
-            maxLength={2000}
+          <MentionInput
             value={body}
-            onChangeText={setBody}
+            onChangeText={handleBodyChange}
+            colors={colors}
+            placeholder="Quoi de neuf ?"
+            maxLength={2000}
+            inputStyle={s.input}
           />
         </View>
 
@@ -388,6 +393,14 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             disabled={localUris.length > 0}
           >
             <Icon name="video" size={22} color={localUris.length > 0 ? colors.textDisabled : colors.primary} />
+          </TouchableOpacity>
+
+          {/* Mentionner */}
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => handleBodyChange(body + '@', mentionIds)}
+          >
+            <Icon name="at-sign" size={22} color={colors.primary} />
           </TouchableOpacity>
 
           {/* Feeling */}
