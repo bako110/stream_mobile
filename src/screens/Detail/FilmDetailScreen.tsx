@@ -583,7 +583,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       </Modal>
 
       <ShareBottomSheet
-        type="film"
+        type={isSerie ? 'serie' : 'film'}
         film={item}
         visible={shareOpen}
         onClose={() => setShareOpen(false)}

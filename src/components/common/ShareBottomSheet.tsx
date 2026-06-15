@@ -21,7 +21,7 @@ const SHEET_H = H * 0.52;
 
 const APP_DOMAIN = 'https://gofolyx.com';
 
-type ContentType = 'post' | 'event' | 'concert' | 'reel' | 'film';
+type ContentType = 'post' | 'event' | 'concert' | 'reel' | 'film' | 'serie';
 
 interface BaseProps {
   visible:  boolean;
@@ -33,7 +33,7 @@ interface PostProps    extends BaseProps { type: 'post';    post:    Post;     e
 interface EventProps   extends BaseProps { type: 'event';   event:   Event;    post?: never;  concert?: never; reel?: never; film?: never; }
 interface ConcertProps extends BaseProps { type: 'concert'; concert: Concert;  post?: never;  event?: never;   reel?: never; film?: never; }
 interface ReelProps    extends BaseProps { type: 'reel';    reel:    Reel;     post?: never;  event?: never;   concert?: never; film?: never; }
-interface FilmProps    extends BaseProps { type: 'film';    film:    FilmItem; post?: never;  event?: never;   concert?: never; reel?: never; }
+interface FilmProps    extends BaseProps { type: 'film' | 'serie'; film: FilmItem; post?: never; event?: never; concert?: never; reel?: never; }
 
 type Props = PostProps | EventProps | ConcertProps | ReelProps | FilmProps;
 
@@ -51,6 +51,7 @@ function getShareUrl(type: ContentType, id: string): string {
   if (type === 'event')   return `${APP_DOMAIN}/events/${slug}`;
   if (type === 'concert') return `${APP_DOMAIN}/concerts/${slug}`;
   if (type === 'reel')    return `${APP_DOMAIN}/reels?id=${slug}`;
+  if (type === 'serie')   return `${APP_DOMAIN}/series/${slug}`;
   if (type === 'film')    return `${APP_DOMAIN}/films/${slug}`;
   return APP_DOMAIN;
 }
@@ -61,6 +62,7 @@ function getDisplayUrl(type: ContentType, id: string): string {
   if (type === 'event')   return `gofolyx.com/events/${slug}`;
   if (type === 'concert') return `gofolyx.com/concerts/${slug}`;
   if (type === 'reel')    return `gofolyx.com/reels?id=${slug}`;
+  if (type === 'serie')   return `gofolyx.com/series/${slug}`;
   if (type === 'film')    return `gofolyx.com/films/${slug}`;
   return 'gofolyx.com';
 }
