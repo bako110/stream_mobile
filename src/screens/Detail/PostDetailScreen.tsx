@@ -783,6 +783,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         visible={commentsOpen}
         onClose={() => setCommentsOpen(false)}
         postId={postId}
+        commentsDisabled={post?.comments_disabled ?? false}
         onCommentCountChange={delta => setCommentCount(c => Math.max(0, c + delta))}
       />
 

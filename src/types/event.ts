@@ -40,6 +40,11 @@ export interface Event {
   created_at: string;
   updated_at: string;
   live_id: string | null;
+  comments_disabled: boolean;
+  like_count?: number;
+  comment_count?: number;
+  share_count?: number;
+  user_reaction?: string | null;
   organizer?: import('./user').User;
 }
 

@@ -2046,6 +2046,7 @@ export const FeedScreen: React.FC = () => {
         eventId={commentItem?.kind === 'event'   ? commentItem.id : undefined}
         concertId={commentItem?.kind === 'concert' ? commentItem.id : undefined}
         postId={commentItem?.kind === 'post'     ? commentItem.id : undefined}
+        commentsDisabled={commentItem?.data?.comments_disabled ?? false}
         onCommentCountChange={delta => commentCountChangeRef.current?.(delta)}
         onCountLoaded={count => commentCountLoadedRef.current?.(count)}
       />

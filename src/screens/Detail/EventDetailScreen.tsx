@@ -799,7 +799,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           onBuy={(tierKey) => eventService.buyTicket(eventId, tierKey)}
         />
       )}
-      <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} eventId={eventId} />
+      <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} eventId={eventId} commentsDisabled={event?.comments_disabled ?? false} />
     </View>
   );
 };

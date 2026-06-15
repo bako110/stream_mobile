@@ -153,7 +153,7 @@ export const HomeScreen: React.FC = () => {
   const [currentUser,   setCurrentUser]   = useState<User | null>(null);
   const [liveConcerts,  setLiveConcerts]  = useState<Concert[]>([]);
   const [spontLives,    setSpontLives]    = useState<LiveStream[]>([]);
-  const [commentsSheet, setCommentsSheet] = useState<{ kind: FeedKind; id: string } | null>(null);
+  const [commentsSheet, setCommentsSheet] = useState<{ kind: FeedKind; id: string; commentsDisabled: boolean } | null>(null);
   const [suggestions,    setSuggestions]    = useState<UserPublic[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(true);
   const [contactIds,      setContactIds]      = useState<string[]>([]);
@@ -696,7 +696,7 @@ export const HomeScreen: React.FC = () => {
           if (item.kind === 'concert') onNavConcert(item.id);
           else                         onNavEvent(item.id);
         }}
-        onComment={() => setCommentsSheet({ kind: item.kind, id: item.id })}
+        onComment={() => setCommentsSheet({ kind: item.kind, id: item.id, commentsDisabled: (item.data as any).comments_disabled ?? false })}
         onAuthorPress={onNavUser}
       />
     );
@@ -790,6 +790,7 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setCommentsSheet(null)}
         concertId={commentsSheet?.kind === 'concert' ? commentsSheet.id : undefined}
         eventId={commentsSheet?.kind === 'event'   ? commentsSheet.id : undefined}
+        commentsDisabled={commentsSheet?.commentsDisabled ?? false}
       />
     </View>
   );

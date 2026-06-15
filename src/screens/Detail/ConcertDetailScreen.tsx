@@ -699,7 +699,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         selectedTierKey={selectedTier}
         onBuy={(tierKey) => concertService.buyTicket(concertId, tierKey)}
       />
-      <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} concertId={concertId} />
+      <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} concertId={concertId} commentsDisabled={concert?.comments_disabled ?? false} />
     </View>
   );
 };

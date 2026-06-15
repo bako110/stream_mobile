@@ -585,6 +585,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
       <ReportModal visible={reportOpen} contentType="post" contentId={post.id} onClose={() => setReportOpen(false)} />
       <ShareBottomSheet type="post" visible={shareOpen} onClose={() => setShareOpen(false)} post={post} onShareCountChange={handleShareDone} />
       <CommentsBottomSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} postId={post.id}
+        commentsDisabled={post.comments_disabled ?? false}
         onCommentCountChange={d => setCommentCount(c => Math.max(0, c + d))}
         onCountLoaded={n => setCommentCount(c => Math.max(c, n))} />
       <LikersBottomSheet visible={likersOpen} onClose={() => setLikersOpen(false)} postId={post.id}

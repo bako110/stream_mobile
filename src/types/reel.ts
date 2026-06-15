@@ -18,6 +18,7 @@ export interface Reel {
   dislike_count: number;
   comment_count: number;
   share_count: number;
+  comments_disabled: boolean;
   is_featured: boolean;
   created_at: string;
   updated_at: string;

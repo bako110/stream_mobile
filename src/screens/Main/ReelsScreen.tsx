@@ -1457,7 +1457,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           </View>
         </KeyboardAvoidingView>
 
-        <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} reelId={reel.id} onCommentAdded={() => setCommentCount(v => v + 1)} onCommentCountChange={delta => setCommentCount(v => v + delta)} />
+        <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} reelId={reel.id} commentsDisabled={reel.comments_disabled ?? false} onCommentAdded={() => setCommentCount(v => v + 1)} onCommentCountChange={delta => setCommentCount(v => v + delta)} />
       </View>
     </View>
   );
