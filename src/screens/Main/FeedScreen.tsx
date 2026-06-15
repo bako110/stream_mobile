@@ -108,7 +108,13 @@ interface AdData {
 
 const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (url: string) => void }> = React.memo(
   ({ ad, onImpression, onPress }) => {
-    useEffect(() => { if (ad?.id) onImpression(ad.id); }, [ad?.id, onImpression]);
+    const firedRef = useRef<string | null>(null);
+    useEffect(() => {
+      if (ad?.id && firedRef.current !== ad.id) {
+        firedRef.current = ad.id;
+        onImpression(ad.id);
+      }
+    }, [ad?.id, onImpression]);
     const hasCreative = !!(ad.creative_url || ad.thumbnail_url);
     const fullTitle = ad.title ?? '';
 
