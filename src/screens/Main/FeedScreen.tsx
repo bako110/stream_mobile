@@ -325,6 +325,7 @@ interface FeedListHeaderProps {
   colors:        AppColors;
   isDark:        boolean;
   currentUserId?: string;
+  filter:        FeedFilter;
   onNavLiveList:        () => void;
   onNavSpontList:       () => void;
   onNavNearby:          () => void;
@@ -337,13 +338,14 @@ interface FeedListHeaderProps {
 
 const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
   liveConcerts, spontLives, nearbyEvents, colors, isDark,
-  currentUserId,
+  currentUserId, filter,
   onNavLiveList, onNavSpontList, onNavNearby,
   onNavLiveStream, onNavLiveViewer,
   onNavSpontStream, onNavSpontViewer,
   onNavEvent,
 }) => {
-  if (!liveConcerts.length && !spontLives.length && !nearbyEvents.length) return null;
+  const showNearby = filter !== 'following' && nearbyEvents.length > 0;
+  if (!liveConcerts.length && !spontLives.length && !showNearby) return null;
   return (
     <>
       {/* ── En direct ───────────────────────────────────────── */}
@@ -459,8 +461,8 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
         </View>
       )}
 
-      {/* ── Près de toi ──────────────────────────────────────── */}
-      {nearbyEvents.length > 0 && (
+      {/* ── Près de toi — masqué dans l'onglet Suivis ────────── */}
+      {showNearby && (
         <View style={[nbS.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
           <View style={nbS.header}>
             <View>
@@ -1112,6 +1114,7 @@ export const FeedScreen: React.FC = () => {
         colors={colors}
         isDark={theme.isDark}
         currentUserId={currentUser?.id}
+        filter={filter}
         onNavLiveList={onNavLiveList}
         onNavSpontList={onNavSpontList}
         onNavNearby={onNavNearby}
@@ -1123,7 +1126,7 @@ export const FeedScreen: React.FC = () => {
       />
     </>
   ), [liveConcerts, spontLives, nearbyEvents, colors, theme.isDark,
-      currentUser, currentUser?.id,
+      currentUser, currentUser?.id, filter,
       onNavMyStories, onNavChat, onNavCall,
       onNavLiveList, onNavSpontList, onNavNearby, onNavLiveStream, onNavLiveViewer,
       onNavSpontStream, onNavSpontViewer, onNavEvent]);
