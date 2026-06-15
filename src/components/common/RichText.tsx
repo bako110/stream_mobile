@@ -36,6 +36,16 @@ interface Props {
   onHashtagPress?: (tag: string) => void;
 }
 
+// Safe wrapper — useNavigation crashes when called outside NavigationContainer (e.g. bare Modals).
+function useSafeNavigation() {
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useNavigation<any>();
+  } catch {
+    return null;
+  }
+}
+
 export const RichText: React.FC<Props> = ({
   text,
   maxLines = 0,
@@ -46,7 +56,7 @@ export const RichText: React.FC<Props> = ({
   onMentionPress,
   onHashtagPress,
 }) => {
-  const nav = useNavigation<any>();
+  const nav = useSafeNavigation();
   const [expanded, setExpanded] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -60,14 +70,12 @@ export const RichText: React.FC<Props> = ({
 
   const handleMention = (username: string) => {
     if (onMentionPress) { onMentionPress(username); return; }
-    // Navigate to user profile by username — adapt if your navigator uses a different param
-    try { nav.navigate('UserProfile', { username: username.slice(1) }); } catch {}
+    try { nav?.navigate('UserProfile', { username: username.slice(1) }); } catch {}
   };
 
   const handleHashtag = (tag: string) => {
     if (onHashtagPress) { onHashtagPress(tag); return; }
-    // Navigate to hashtag search results
-    try { nav.navigate('Search', { query: tag }); } catch {}
+    try { nav?.navigate('Search', { query: tag }); } catch {}
   };
 
   const renderSegs = () => segs.map((seg, i) => {

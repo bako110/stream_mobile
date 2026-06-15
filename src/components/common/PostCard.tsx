@@ -392,7 +392,11 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
       {/* ── Post texte seul — zone cliquable vers le détail ─────────────────── */}
       {!hasMedia && post.body && (
-        <View style={[pc.textOnlyHero, { borderLeftColor: colors.primary, backgroundColor: colors.primary + '08' }]}>
+        <TouchableOpacity
+          onPress={onPress}
+          activeOpacity={0.7}
+          style={[pc.textOnlyHero, { borderLeftColor: colors.primary, backgroundColor: colors.primary + '08' }]}
+        >
           <RichText
             text={post.body}
             maxLines={6}
@@ -404,7 +408,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
               — se sent <Text style={{ fontWeight: '700', color: colors.primary }}>{post.feeling}</Text>
             </Text>
           )}
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* ── Apercu lien ────────────────────────────────────────────────────── */}
