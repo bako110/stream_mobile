@@ -21,6 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { RichText } from '../../components/common/RichText';
 import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
@@ -54,38 +55,6 @@ const formatCount = (n: number): string => {
   return String(n ?? 0);
 };
 
-const URL_RE = /https?:\/\/[^\s<>"']+/gi;
-
-const LinkedCaption: React.FC<{ text: string; style: any }> = ({ text, style }) => {
-  const parts: { text: string; isUrl: boolean }[] = [];
-  let last = 0;
-  for (const m of text.matchAll(URL_RE)) {
-    if (m.index! > last) parts.push({ text: text.slice(last, m.index), isUrl: false });
-    parts.push({ text: m[0], isUrl: true });
-    last = m.index! + m[0].length;
-  }
-  if (last < text.length) parts.push({ text: text.slice(last), isUrl: false });
-
-  if (parts.length === 0) return <Text style={style} numberOfLines={3}>{text}</Text>;
-
-  return (
-    <Text style={style} numberOfLines={3}>
-      {parts.map((p, i) =>
-        p.isUrl ? (
-          <Text
-            key={i}
-            style={{ textDecorationLine: 'underline', color: '#93C5FD' }}
-            onPress={() => Linking.openURL(p.text).catch(() => {})}
-          >
-            {p.text}
-          </Text>
-        ) : (
-          <Text key={i}>{p.text}</Text>
-        )
-      )}
-    </Text>
-  );
-};
 
 // ─── ReelsScreen ─────────────────────────────────────────────────────────────
 
@@ -1447,7 +1416,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             )}
           </View>
 
-          {reel.caption ? <LinkedCaption text={reel.caption} style={s.caption} /> : null}
+          {reel.caption ? <RichText text={reel.caption} textStyle={s.caption} primaryColor="#93C5FD" maxLines={3} /> : null}
         </View>
 
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>

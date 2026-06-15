@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Modal, FlatList, TextInput,
+  View, Text, StyleSheet, Modal, FlatList,
   TouchableOpacity, KeyboardAvoidingView, Platform, Image,
   Animated, Pressable, Dimensions, Alert,
 } from 'react-native';
@@ -15,6 +15,8 @@ import type { CommentWsEvent } from '../../hooks/useCommentsWebSocket';
 import { socialService } from '../../services';
 import { VerifiedBadge } from './VerifiedBadge';
 import { GoFolyXLoader } from './GoFolyXLoader';
+import { RichText } from './RichText';
+import { MentionInput } from './MentionInput';
 import type { Comment } from '../../types';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -246,9 +248,11 @@ const CommentRow: React.FC<RowProps> = ({
           </View>
 
           {/* Corps */}
-          <Text style={[st.commentText, { color: colors.textPrimary }]}>
-            {item.body}
-          </Text>
+          <RichText
+            text={item.body}
+            textStyle={[st.commentText, { color: colors.textPrimary }]}
+            primaryColor={colors.primary}
+          />
 
           {item.is_edited && (
             <Text style={[st.editedTag, { color: colors.textTertiary }]}>modifie</Text>
@@ -366,6 +370,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
   const [totalCount,  setTotalCount]  = useState(0);
   const [hasMore,     setHasMore]     = useState(false);
   const [text,        setText]        = useState('');
+  const [mentionIds,  setMentionIds]  = useState<string[]>([]);
   const [sending,     setSending]     = useState(false);
   const [replyTo,     setReplyTo]     = useState<CommentEx | null>(null);
   const [editingId,   setEditingId]   = useState<string | null>(null);
@@ -508,7 +513,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
 
   useEffect(() => {
     if (visible) fetchComments();
-    else { setReplyTo(null); setText(''); setEditingId(null); setEditText(''); }
+    else { setReplyTo(null); setText(''); setMentionIds([]); setEditingId(null); setEditText(''); }
   }, [visible]);
 
   // Toggle replies
@@ -540,8 +545,8 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     setSending(true);
     try {
       const payload = replyTo
-        ? { body, parent_id: replyTo.id, ...targetParams }
-        : { body, ...targetParams };
+        ? { body, mention_ids: mentionIds.length ? mentionIds : undefined, parent_id: replyTo.id, ...targetParams }
+        : { body, mention_ids: mentionIds.length ? mentionIds : undefined, ...targetParams };
       const newComment = await socialService.createComment(payload);
 
       if (replyTo) {
@@ -565,6 +570,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
         setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }), 100);
       }
       setText('');
+      setMentionIds([]);
     } catch { /* silent */ }
     finally { setSending(false); }
   };
@@ -657,7 +663,10 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     ? `Repondre a ${getDisplayName(replyTo.author)}…`
     : 'Ajouter un commentaire…';
   const inputValue    = isEditMode ? editText : text;
-  const onChangeInput = (v: string) => isEditMode ? setEditText(v) : setText(v);
+  const onChangeInput = (v: string, ids?: string[]) => {
+    if (isEditMode) { setEditText(v); }
+    else { setText(v); if (ids !== undefined) setMentionIds(ids); }
+  };
   const canSend       = isEditMode ? !!editText.trim() : !!text.trim();
 
   const handleSubmit = () => { if (isEditMode) saveEdit(); else handleSend(); };
@@ -787,15 +796,13 @@ export const CommentsBottomSheet: React.FC<Props> = ({
               backgroundColor: colors.surfaceElevated ?? colors.surface,
               borderColor: (replyTo || isEditMode) ? colors.primary : colors.border,
             }]}>
-              <TextInput
-                ref={inputRef}
-                style={[st.input, { color: colors.textPrimary }]}
-                placeholder={placeholder}
-                placeholderTextColor={colors.textTertiary}
+              <MentionInput
                 value={inputValue}
                 onChangeText={onChangeInput}
-                multiline
+                colors={colors}
+                placeholder={placeholder}
                 maxLength={500}
+                inputStyle={st.input}
               />
               {canSend && (
                 <TouchableOpacity

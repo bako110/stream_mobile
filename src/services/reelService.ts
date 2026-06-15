@@ -89,6 +89,7 @@ export const reelService = {
     ref_concert_id?: string;
     ref_event_id?:   string;
     ref_content_id?: string;
+    mention_ids?:    string[];
   }): Promise<Reel> {
     const res = await apiClient.post<Reel>(Endpoints.reels.feed, payload);
     return res.data;

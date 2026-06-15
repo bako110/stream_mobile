@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Alert, Platform, StatusBar,
   Dimensions, KeyboardAvoidingView,
 } from 'react-native';
@@ -11,6 +11,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { reelService } from '../../services';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { MentionInput } from '../../components/common/MentionInput';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -23,6 +24,12 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
   const { colors } = theme;
 
   const [caption,       setCaption]       = useState('');
+  const [captionMentionIds, setCaptionMentionIds] = useState<string[]>([]);
+
+  const handleCaptionChange = useCallback((text: string, ids: string[]) => {
+    setCaption(text);
+    setCaptionMentionIds(ids);
+  }, []);
   const [videoLocalUri, setVideoLocalUri] = useState<string | null>(null);
   const [videoPaused,   setVideoPaused]   = useState(false);
 
@@ -80,6 +87,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
           caption:       capturedCaption || undefined,
           thumbnail_url: result.thumbnailUrl,
           duration_sec:  result.durationSec ? Math.round(result.durationSec) : undefined,
+          mention_ids:   captionMentionIds.length ? captionMentionIds : undefined,
         });
       },
     });
@@ -174,19 +182,16 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack }) => {
           {/* Caption */}
           <Animated.View entering={FadeInDown.delay(140).springify()} style={[s.section, { marginBottom: 40 }]}>
             <Text style={[s.label, { color: colors.textPrimary }]}>Description</Text>
-            <TextInput
-              value={caption}
-              onChangeText={setCaption}
-              placeholder="Décris ton reel… #hashtag @mention"
-              placeholderTextColor={colors.textDisabled}
-              multiline
-              maxLength={300}
-              style={[s.captionInput, {
-                backgroundColor: colors.backgroundSecondary,
-                color:           colors.textPrimary,
-                borderColor:     colors.border,
-              }]}
-            />
+            <View style={[s.captionInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+              <MentionInput
+                value={caption}
+                onChangeText={handleCaptionChange}
+                colors={colors}
+                placeholder="Décris ton reel… #hashtag @mention"
+                maxLength={300}
+                inputStyle={{ fontSize: 15, lineHeight: 22, minHeight: 80 }}
+              />
+            </View>
             <Text style={[s.charCount, { color: colors.textTertiary }]}>{caption.length}/300</Text>
           </Animated.View>
 
