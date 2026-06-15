@@ -184,7 +184,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           target_type:      targetType,
           target_id:        item.id,
           target_title:     item.title,
-          target_subtitle:  item.release_year ? String(item.release_year) : undefined,
+          target_subtitle:  item.year ? String(item.year) : undefined,
           target_thumbnail: item.thumbnail_url ?? undefined,
         });
         setIsSaved(true);
@@ -194,7 +194,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } finally {
       setSavingFav(false);
     }
-  }, [isSaved, item.id, item.title, item.release_year, item.thumbnail_url, targetType]);
+  }, [isSaved, item.id, item.title, item.year, item.thumbnail_url, targetType]);
 
   useEffect(() => {
     apiClient.get<{ view_count: number; purchase_count: number; save_count: number }>(

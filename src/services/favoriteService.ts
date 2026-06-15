@@ -2,7 +2,7 @@ import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 import { saveService } from './saveService';
 
-export type FavoriteType = 'event' | 'concert' | 'reel' | 'post' | 'community' | 'content' | 'story';
+export type FavoriteType = 'event' | 'concert' | 'reel' | 'post' | 'community' | 'content' | 'story' | 'film' | 'serie';
 
 export interface FavoriteOut {
   id: string;

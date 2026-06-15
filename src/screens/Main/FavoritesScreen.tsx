@@ -10,7 +10,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { favoriteService } from '../../services/favoriteService';
 import type { FavoriteType } from '../../services/favoriteService';
 
-type Tab = 'events' | 'concerts' | 'reels' | 'posts' | 'communities';
+type Tab = 'events' | 'concerts' | 'reels' | 'posts' | 'communities' | 'films' | 'series';
 
 const TAB_TO_TYPE: Record<Tab, FavoriteType> = {
   events:      'event',
@@ -18,11 +18,15 @@ const TAB_TO_TYPE: Record<Tab, FavoriteType> = {
   reels:       'reel',
   posts:       'post',
   communities: 'community',
+  films:       'film',
+  series:      'serie',
 };
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'events',      label: 'Evenements', icon: 'calendar'      },
   { key: 'concerts',    label: 'Concerts',   icon: 'music'          },
+  { key: 'films',       label: 'Films',      icon: 'film'           },
+  { key: 'series',      label: 'Series',     icon: 'tv'             },
   { key: 'reels',       label: 'Reels',      icon: 'play-circle'    },
   { key: 'posts',       label: 'Posts',      icon: 'file-text'      },
   { key: 'communities', label: 'Communautes',icon: 'users'          },
@@ -104,6 +108,8 @@ export const FavoritesScreen: React.FC = () => {
       case 'reels':       nav.navigate('ReelDetail',     { reelId:      item.id }); break;
       case 'posts':       nav.navigate('PostDetail',     { postId:      item.id }); break;
       case 'communities': nav.navigate('CommunityChat',  { communityId: item.id, communityName: item.name }); break;
+      case 'films':       nav.navigate('FilmDetail',     { item: { id: item.id, type: 'film',  title: item.title, thumbnail_url: item.thumbnail_url } }); break;
+      case 'series':      nav.navigate('FilmDetail',     { item: { id: item.id, type: 'serie', title: item.title, thumbnail_url: item.thumbnail_url } }); break;
     }
   };
 
@@ -121,6 +127,8 @@ export const FavoritesScreen: React.FC = () => {
     if (tab === 'reels')       return item.views_count != null ? `${item.views_count} vues` : '';
     if (tab === 'posts')       return item.author?.display_name ?? item.author?.username ?? '';
     if (tab === 'communities') return item.members_count != null ? `${item.members_count} membres` : (item.description ?? '');
+    if (tab === 'films')       return item.description ? `${item.description}` : '';
+    if (tab === 'series')      return item.description ? `Série · ${item.description}` : 'Série';
     return '';
   };
 
