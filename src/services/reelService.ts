@@ -90,8 +90,19 @@ export const reelService = {
     ref_event_id?:   string;
     ref_content_id?: string;
     mention_ids?:    string[];
+    trim_start?:     number;
+    trim_end?:       number;
+    playback_speed?: number;
+    filter?:         string;
+    source_reel_id?: string;
+    remix_type?:     'repost' | 'remix';
   }): Promise<Reel> {
     const res = await apiClient.post<Reel>(Endpoints.reels.feed, payload);
+    return res.data;
+  },
+
+  async repost(sourceReelId: string, caption?: string): Promise<Reel> {
+    const res = await apiClient.post<Reel>(`${Endpoints.reels.feed}/${sourceReelId}/repost`, { caption });
     return res.data;
   },
 

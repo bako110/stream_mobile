@@ -8,6 +8,7 @@ export * from './search';
 export * from './social';
 export * from './story';
 export * from './post';
+export * from './cable';
 
 // ── Commun ─────────────────────────────────────────────────────────────────
 export interface PaginatedResponse<T> {

@@ -137,7 +137,7 @@ export type MainStackParamList = {
   Feed:            undefined;
   CreateEvent:     { eventId?: string }  | undefined;
   CreateConcert:   { concertId?: string } | undefined;
-  CreateReel:      { reelPublished?: boolean } | undefined;
+  CreateReel:      { reelPublished?: boolean; sourceReelId?: string; sourceReelUrl?: string } | undefined;
   ConcertDetail:   { concertId: string };
   EventDetail:     { eventId:   string };
   MyTicket:        { ticket: any };
@@ -246,7 +246,7 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const ConcertDetailWrapper: React.FC<any>  = ({ navigation, route }) => <ConcertDetailScreen concertId={decodeId(route.params.concertId)} onBack={() => navigation.goBack()} />;
 const EventDetailWrapper: React.FC<any>    = ({ navigation, route }) => <EventDetailScreen eventId={decodeId(route.params.eventId)} onBack={() => navigation.goBack()} />;
-const CreateReelWrapper: React.FC<any>     = ({ navigation }) => <CreateReelScreen onBack={() => navigation.goBack()} />;
+const CreateReelWrapper: React.FC<any>     = ({ navigation, route }) => <CreateReelScreen onBack={() => navigation.goBack()} sourceReelId={route.params?.sourceReelId} sourceReelUrl={route.params?.sourceReelUrl} />;
 const LiveStreamWrapper: React.FC<any>     = ({ navigation, route }) => <LiveStreamScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
 const LiveViewerWrapper: React.FC<any>     = ({ navigation, route }) => <LiveViewerScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
 const CreateEventWrapper: React.FC<any> = ({ navigation, route }) => {

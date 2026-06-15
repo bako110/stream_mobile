@@ -452,4 +452,12 @@ export const Endpoints = {
   utils: {
     linkPreview: (url: string) => `${V1}/utils/link-preview?url=${encodeURIComponent(url)}`,
   },
+
+  // ── Cable (partage de reel en DM ciblé) ──────────────────────────────────
+  cable: {
+    sendInvite:     (reelId: string) => `${V1}/cable/reels/${reelId}`,
+    respondInvite:  (inviteId: string) => `${V1}/cable/invites/${inviteId}`,
+    cancelInvite:   (inviteId: string) => `${V1}/cable/invites/${inviteId}`,
+    listInvites:    `${V1}/cable/invites`,
+  },
 } as const;

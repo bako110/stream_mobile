@@ -24,6 +24,13 @@ export interface Reel {
   updated_at: string;
   author?: import('./user').User;
   user_reaction?: 'like' | 'dislike' | null;
+  remix_type?: 'repost' | 'remix' | null;
+  source_reel_id?: string | null;
+  source_reel?: {
+    id: string;
+    thumbnail_url: string | null;
+    author?: import('./user').User;
+  } | null;
 }
 
 export interface CommentAuthor {

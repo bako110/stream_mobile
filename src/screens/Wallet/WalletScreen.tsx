@@ -17,7 +17,11 @@ import {
   Alert,
   StatusBar,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+
+const SCREEN_W = Dimensions.get('window').width;
+const IS_SMALL = SCREEN_W < 380;
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -451,8 +455,8 @@ const WalletScreen: React.FC = () => {
             >
               <View style={[s.actionIcon, { backgroundColor: `${a.color}22` }]}>
                 {(a as any).mci
-                  ? <MaterialCommunityIcons name={a.icon} size={22} color={a.color} />
-                  : <Icon name={a.icon} size={22} color={a.color} />
+                  ? <MaterialCommunityIcons name={a.icon} size={IS_SMALL ? 18 : 20} color={a.color} />
+                  : <Icon name={a.icon} size={IS_SMALL ? 18 : 20} color={a.color} />
                 }
               </View>
               <Text style={s.actionLabel}>{a.label}</Text>
@@ -529,25 +533,25 @@ const styles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 56,
-    paddingBottom: 12,
+    paddingHorizontal: IS_SMALL ? 14 : 20,
+    paddingTop: IS_SMALL ? 44 : 56,
+    paddingBottom: IS_SMALL ? 8 : 12,
     backgroundColor: colors.background,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: IS_SMALL ? 18 : 22,
     fontWeight: '700',
     color: colors.textPrimary,
     letterSpacing: 0.2,
   },
   scroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: IS_SMALL ? 12 : 20,
     paddingBottom: 40,
-    gap: 16,
+    gap: IS_SMALL ? 12 : 16,
   },
   balanceCard: {
     borderRadius: 24,
-    padding: 28,
+    padding: IS_SMALL ? 20 : 28,
     alignItems: 'center',
     elevation: 8,
     shadowColor: '#7B3FF2',
@@ -556,21 +560,21 @@ const styles = (colors: any) => StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
   },
   balanceLabel: {
-    fontSize: 13,
+    fontSize: IS_SMALL ? 11 : 13,
     color: 'rgba(255,255,255,0.75)',
     fontWeight: '500',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   balanceAmount: {
-    fontSize: 52,
+    fontSize: IS_SMALL ? 40 : 52,
     fontWeight: '800',
     color: '#FFFFFF',
     marginTop: 4,
     letterSpacing: -1,
   },
   balanceSub: {
-    fontSize: 16,
+    fontSize: IS_SMALL ? 14 : 16,
     color: 'rgba(255,255,255,0.65)',
     fontWeight: '500',
     marginTop: -4,
@@ -586,55 +590,60 @@ const styles = (colors: any) => StyleSheet.create({
     borderRadius: 20,
   },
   eurText: {
-    fontSize: 13,
+    fontSize: IS_SMALL ? 12 : 13,
     color: 'rgba(255,255,255,0.9)',
     fontWeight: '600',
   },
   actionsRow: {
     flexDirection: 'row',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: IS_SMALL ? 8 : 10,
   },
   actionBtn: {
-    flex: 1,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: 16,
-    paddingVertical: 18,
-    gap: 8,
+    paddingVertical: IS_SMALL ? 12 : 16,
+    paddingHorizontal: 6,
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.border,
+    width: IS_SMALL
+      ? Math.floor((SCREEN_W - 24 - 8 * 2) / 3)
+      : Math.floor((SCREEN_W - 40 - 10 * 2) / 3),
   },
   actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: IS_SMALL ? 36 : 40,
+    height: IS_SMALL ? 36 : 40,
+    borderRadius: IS_SMALL ? 18 : 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionLabel: {
-    fontSize: 12,
+    fontSize: IS_SMALL ? 10 : 11,
     fontWeight: '600',
     color: colors.textPrimary,
+    textAlign: 'center',
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: IS_SMALL ? 6 : 10,
   },
   statCard: {
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: 14,
-    padding: 14,
+    padding: IS_SMALL ? 10 : 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: IS_SMALL ? 15 : 18,
     fontWeight: '700',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: IS_SMALL ? 10 : 11,
     color: colors.textSecondary,
     marginTop: 2,
     fontWeight: '500',

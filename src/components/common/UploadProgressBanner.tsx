@@ -3,7 +3,7 @@
  * Affichée en bas, au-dessus de la tab bar, pendant qu'un upload tourne.
  * Reste visible 3s après la fin pour confirmer "En ligne !".
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Animated, TouchableOpacity,
 } from 'react-native';
@@ -45,27 +45,33 @@ export const UploadProgressBar: React.FC<{ bottomOffset?: number }> = ({ bottomO
 
   const slideY = useRef(new Animated.Value(BAR_H + 20)).current;
   const prevJobId = useRef<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (job && job.id !== prevJobId.current) {
-      prevJobId.current = job.id;
-      Animated.spring(slideY, {
-        toValue:  0,
-        useNativeDriver: true,
-        friction: 9,
-        tension:  60,
-      }).start();
-    }
-    if (!job) {
+    if (job) {
+      setMounted(true);
+      if (job.id !== prevJobId.current) {
+        prevJobId.current = job.id;
+        Animated.spring(slideY, {
+          toValue:  0,
+          useNativeDriver: true,
+          friction: 9,
+          tension:  60,
+        }).start();
+      }
+    } else {
       Animated.timing(slideY, {
         toValue:  BAR_H + 20,
         useNativeDriver: true,
         duration: 250,
-      }).start(() => { prevJobId.current = null; });
+      }).start(() => {
+        prevJobId.current = null;
+        setMounted(false);
+      });
     }
   }, [job?.id, !!job]);
 
-  if (!job && prevJobId.current === null) return null;
+  if (!mounted && !job) return null;
 
   const isDone   = job?.status === 'done';
   const isError  = job?.status === 'error';

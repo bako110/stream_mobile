@@ -24,6 +24,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { RichText } from '../../components/common/RichText';
 import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
+import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
   CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader, ShareBottomSheet, FriendsWhoLiked,
@@ -952,6 +953,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   reel, isActive, muted, screenW, screenH, insetBottom,
   colors, currentUserId, onToggleMute, onAdd, onAuthorPress, onEnd, activePlayerRef,
 }) => {
+  const nav = useNavigation<Nav>();
+
   const [paused,       setPaused]       = useState(false);
   const [videoLoaded,  setVideoLoaded]  = useState(false);
   const [videoError,   setVideoError]   = useState(false);
@@ -974,9 +977,16 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [refInfo, setRefInfo] = useState<{ label: string; kind: string; thumbnail: string | null; color: string } | null>(null);
   const [skipLeftLabel,  setSkipLeftLabel]  = useState('');
   const [skipRightLabel, setSkipRightLabel] = useState('');
-  const [showOwnerMenu,     setShowOwnerMenu]     = useState(false);
+  const [showOwnerMenu,      setShowOwnerMenu]      = useState(false);
   const [commentsDisabledSt, setCommentsDisabledSt] = useState(reel.comments_disabled ?? false);
-  const [togglingComments,  setTogglingComments]  = useState(false);
+  const [togglingComments,   setTogglingComments]   = useState(false);
+  const [showRemix,          setShowRemix]          = useState(false);
+  const [remixLoading,       setRemixLoading]       = useState(false);
+  const [cableLoading,       setCableLoading]       = useState(false);
+  const [showEditCaption,    setShowEditCaption]     = useState(false);
+  const [editCaptionText,    setEditCaptionText]     = useState(reel.caption ?? '');
+  const [savingCaption,      setSavingCaption]       = useState(false);
+  const [captionSt,          setCaptionSt]           = useState(reel.caption ?? '');
 
   const likeInFlight  = useRef(false);
   const pausedRef     = useRef(false);
@@ -1004,6 +1014,60 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     } catch { /**/ }
     finally { setTogglingComments(false); }
   }, [reel.id, togglingComments]);
+
+  const handleRepost = useCallback(async () => {
+    if (remixLoading) return;
+    setRemixLoading(true);
+    try {
+      await reelService.repost(reel.id);
+      setShowRemix(false);
+      Alert.alert('Republié', 'Le reel a été republié sur votre profil.');
+    } catch {
+      Alert.alert('Erreur', 'Impossible de republier ce reel.');
+    } finally {
+      setRemixLoading(false);
+    }
+  }, [reel.id, remixLoading]);
+
+  const handleRemixer = useCallback(() => {
+    setShowRemix(false);
+    nav.navigate('CreateReel', { sourceReelId: reel.id, sourceReelUrl: reel.hls_url ?? undefined });
+  }, [reel.id, reel.hls_url, nav]);
+
+  const handleDeleteReel = useCallback(() => {
+    setShowOwnerMenu(false);
+    Alert.alert(
+      'Supprimer le reel',
+      'Cette action est irréversible.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer', style: 'destructive',
+          onPress: async () => {
+            try {
+              await reelService.delete(reel.id);
+            } catch {
+              Alert.alert('Erreur', 'Impossible de supprimer ce reel.');
+            }
+          },
+        },
+      ],
+    );
+  }, [reel.id]);
+
+  const handleSaveCaption = useCallback(async () => {
+    if (savingCaption) return;
+    setSavingCaption(true);
+    try {
+      await reelService.update(reel.id, { caption: editCaptionText.trim() });
+      setCaptionSt(editCaptionText.trim());
+      setShowEditCaption(false);
+    } catch {
+      Alert.alert('Erreur', 'Impossible de modifier la description.');
+    } finally {
+      setSavingCaption(false);
+    }
+  }, [reel.id, editCaptionText, savingCaption]);
 
   const videoUri = reel.hls_url;
   // Mémoïsé : même URI → même objet → useVideoPlayer ne recharge pas
@@ -1422,12 +1486,23 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           )}
 
           <View style={s.authorRow}>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
-              {reel.author?.avatar_url
-                ? <Image source={{ uri: reel.author.avatar_url }} style={s.avatar} />
-                : <View style={[s.avatar, { backgroundColor: colors.primary }]}><Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text></View>
-              }
-            </TouchableOpacity>
+            <View style={{ position: 'relative' }}>
+              <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
+                {reel.author?.avatar_url
+                  ? <Image source={{ uri: reel.author.avatar_url }} style={s.avatar} />
+                  : <View style={[s.avatar, { backgroundColor: colors.primary }]}><Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text></View>
+                }
+              </TouchableOpacity>
+              {!isOwnReel && (
+                <TouchableOpacity
+                  style={s.avatarPlusBtn}
+                  activeOpacity={0.85}
+                  onPress={() => nav.navigate('CreateReel', { sourceReelId: reel.id, sourceReelUrl: reel.hls_url ?? undefined })}
+                >
+                  <Icon name="plus" size={10} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
             <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)} style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <Text style={s.authorName} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
@@ -1449,7 +1524,22 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             )}
           </View>
 
-          {reel.caption ? <RichText text={reel.caption} textStyle={s.caption} primaryColor="#93C5FD" maxLines={3} /> : null}
+          {captionSt ? <RichText text={captionSt} textStyle={s.caption} primaryColor="#93C5FD" maxLines={3} /> : null}
+          {reel.source_reel && (
+            <View style={s.sourceBand}>
+              <Icon name={reel.remix_type === 'remix' ? 'git-merge' : 'repeat'} size={11} color="rgba(255,255,255,0.7)" />
+              {reel.source_reel.thumbnail_url
+                ? <Image source={{ uri: reel.source_reel.thumbnail_url }} style={s.sourceThumb} />
+                : null
+              }
+              <Text style={s.sourceText} numberOfLines={1}>
+                {reel.remix_type === 'remix' ? 'Remix de' : 'Repost de'}{' '}
+                <Text style={{ fontWeight: '800' }}>
+                  {reel.source_reel.author?.display_name || reel.source_reel.author?.username || 'un créateur'}
+                </Text>
+              </Text>
+            </View>
+          )}
           {likes > 0 && (
             <FriendsWhoLiked entityType="reel" entityId={reel.id} totalLikes={likes} lightText />
           )}
@@ -1464,10 +1554,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           <ActionBtn icon="share-2" label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
           <ActionBtn icon="eye" label={formatCount(reel.view_count ?? 0)} color="#fff" />
           {!isOwnReel && <ActionBtn icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)} activeBackground="rgba(255,215,0,0.18)" activeBorder="rgba(255,215,0,0.5)" active />}
-          {!isOwnReel && <ActionBtn icon="flag" label="" color="rgba(255,255,255,0.7)" onPress={() => setReportVisible(true)} />}
+          {/* Bouton ... — regroupe Remix, Cable, Signalement pour non-proprio */}
+          {!isOwnReel && (
+            <TouchableOpacity style={s.actionBtn} onPress={() => setShowRemix(true)} activeOpacity={0.8}>
+              <View style={s.actionCircle}>
+                <Icon name="more-horizontal" size={22} color="#fff" />
+              </View>
+              <Text style={s.actionLabel}>Plus</Text>
+            </TouchableOpacity>
+          )}
           {isOwnReel && (
             <TouchableOpacity style={s.actionBtn} onPress={() => setShowOwnerMenu(true)} activeOpacity={0.8}>
-              <Icon name="more-vertical" size={24} color="#fff" />
+              <View style={s.actionCircle}>
+                <Icon name="more-vertical" size={22} color="#fff" />
+              </View>
             </TouchableOpacity>
           )}
           {onAdd && (
@@ -1478,16 +1578,197 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
 
         <ReportModal visible={reportVisible} contentType="reel" contentId={reel.id} onClose={() => setReportVisible(false)} />
-        <Modal visible={showOwnerMenu} transparent animationType="fade" onRequestClose={() => setShowOwnerMenu(false)}>
-          <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowOwnerMenu(false)}>
-            <View style={[s.ownerMenuCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
-              <TouchableOpacity style={s.menuItem} onPress={handleToggleFeedComments} disabled={togglingComments}>
-                <MCIcon name={commentsDisabledSt ? 'comment-check-outline' : 'comment-off-outline'} size={20} color={colors.textPrimary} />
-                <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
-                  {commentsDisabledSt ? 'Activer les commentaires' : 'Desactiver les commentaires'}
-                </Text>
+
+        {/* Owner menu — menu bas de page */}
+        <Modal visible={showOwnerMenu} transparent animationType="slide" onRequestClose={() => setShowOwnerMenu(false)}>
+          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowOwnerMenu(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={[s.menuSheet, { backgroundColor: colors.surface }]}>
+                <View style={[s.menuDivider, { backgroundColor: colors.divider, alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 8 }]} />
+                <TouchableOpacity style={s.menuItem} onPress={() => { setShowOwnerMenu(false); setEditCaptionText(captionSt); setShowEditCaption(true); }}>
+                  <Icon name="edit-2" size={20} color={colors.textPrimary} />
+                  <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Modifier la description</Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+                <TouchableOpacity style={s.menuItem} onPress={handleToggleFeedComments} disabled={togglingComments}>
+                  <MCIcon name={commentsDisabledSt ? 'comment-check-outline' : 'comment-off-outline'} size={20} color={colors.textPrimary} />
+                  <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
+                    {commentsDisabledSt ? 'Activer les commentaires' : 'Desactiver les commentaires'}
+                  </Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+                <TouchableOpacity style={s.menuItem} onPress={() => { setShowOwnerMenu(false); nav.navigate('ReelStats' as any, { reelId: reel.id }); }}>
+                  <Icon name="bar-chart-2" size={20} color={colors.textPrimary} />
+                  <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Stats du reel</Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+                <TouchableOpacity style={s.menuItem} onPress={handleDeleteReel}>
+                  <Icon name="trash-2" size={20} color="#ef4444" />
+                  <Text style={[s.menuItemText, { color: '#ef4444' }]}>Supprimer</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* ── Bottom sheet "..." unifié pour non-proprio ── */}
+        <Modal visible={showRemix} transparent animationType="slide" onRequestClose={() => setShowRemix(false)}>
+          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowRemix(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={[s.menuSheet, { backgroundColor: colors.surface }]}>
+                {/* Handle */}
+                <View style={[s.sheetHandle, { backgroundColor: colors.divider }]} />
+
+                {/* En-tête auteur */}
+                {reel.author && (
+                  <View style={s.sheetAuthorRow}>
+                    {reel.author.avatar_url
+                      ? <View style={s.sheetAvatar}><View style={[StyleSheet.absoluteFill, { borderRadius: 20, overflow: 'hidden' }]}><View style={{ flex: 1, backgroundColor: colors.primary }} /></View></View>
+                      : <View style={[s.sheetAvatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{getAuthorInitial(reel.author)}</Text></View>
+                    }
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.sheetAuthorName, { color: colors.textPrimary }]} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
+                      <Text style={[s.sheetAuthorSub, { color: colors.textSecondary }]} numberOfLines={1}>{reel.caption ? reel.caption.slice(0, 60) : 'Reel'}</Text>
+                    </View>
+                  </View>
+                )}
+
+                <View style={[s.menuDivider, { backgroundColor: colors.divider, marginHorizontal: 0 }]} />
+
+                {/* Republier */}
+                <TouchableOpacity style={s.menuItem} onPress={handleRepost} disabled={remixLoading}>
+                  <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
+                    {remixLoading
+                      ? <ActivityIndicator size="small" color="#A78BFA" />
+                      : <Icon name="repeat" size={20} color="#A78BFA" />
+                    }
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Republier</Text>
+                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Partage ce reel sur ton profil avec attribution</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+
+                {/* Remixer */}
+                <TouchableOpacity style={s.menuItem} onPress={handleRemixer}>
+                  <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
+                    <Icon name="git-merge" size={20} color="#A78BFA" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Remixer</Text>
+                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Cree ta propre version de ce reel</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+
+                {/* Cable */}
+                <TouchableOpacity
+                  style={s.menuItem}
+                  disabled={cableLoading}
+                  onPress={() => {
+                    if (!reel.author?.id) return;
+                    const authorLabel = getAuthorLabel(reel.author);
+                    Alert.alert(
+                      'Invitation Cable',
+                      `Envoyer une invitation de collaboration a ${authorLabel} ?`,
+                      [
+                        { text: 'Annuler', style: 'cancel' },
+                        {
+                          text: 'Envoyer',
+                          onPress: async () => {
+                            setShowRemix(false);
+                            setCableLoading(true);
+                            try {
+                              await cableService.sendInvite(reel.id, String(reel.author!.id));
+                              Alert.alert('Invitation envoyee', `${authorLabel} a recu ton invitation Cable.`);
+                            } catch (err: any) {
+                              const msg = err?.response?.data?.detail ?? 'Erreur lors de l\'envoi';
+                              Alert.alert('Erreur', msg);
+                            } finally {
+                              setCableLoading(false);
+                            }
+                          },
+                        },
+                      ],
+                    );
+                  }}
+                >
+                  <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(96,165,250,0.15)' }]}>
+                    {cableLoading
+                      ? <ActivityIndicator size="small" color="#60A5FA" />
+                      : <Icon name="link-2" size={20} color="#60A5FA" />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Cable</Text>
+                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Invite ce createur a collaborer avec toi</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+
+                {/* Voir le profil */}
+                {reel.author?.id && (
+                  <>
+                    <TouchableOpacity
+                      style={s.menuItem}
+                      onPress={() => { setShowRemix(false); onAuthorPress(String(reel.author!.id)); }}
+                    >
+                      <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                        <Icon name="user" size={20} color={colors.textPrimary} />
+                      </View>
+                      <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Voir le profil</Text>
+                    </TouchableOpacity>
+                    <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+                  </>
+                )}
+
+                {/* Signaler */}
+                <TouchableOpacity
+                  style={s.menuItem}
+                  onPress={() => { setShowRemix(false); setTimeout(() => setReportVisible(true), 300); }}
+                >
+                  <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                    <Icon name="flag" size={20} color="#ef4444" />
+                  </View>
+                  <Text style={[s.menuItemText, { color: '#ef4444' }]}>Signaler</Text>
+                </TouchableOpacity>
+
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Edit caption sheet */}
+        <Modal visible={showEditCaption} transparent animationType="slide" onRequestClose={() => setShowEditCaption(false)}>
+          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowEditCaption(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+              <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+                <View style={[s.editSheet, { backgroundColor: colors.surface }]}>
+                  <Text style={[s.editTitle, { color: colors.textPrimary }]}>Modifier la description</Text>
+                  <TextInput
+                    value={editCaptionText}
+                    onChangeText={setEditCaptionText}
+                    multiline
+                    maxLength={500}
+                    style={[s.editInput, { color: colors.textPrimary, borderColor: colors.divider, backgroundColor: colors.background }]}
+                    placeholder="Décrivez votre reel..."
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={[s.charCount, { color: colors.textSecondary }]}>{editCaptionText.length}/500</Text>
+                  <View style={s.editActions}>
+                    <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.divider }]} onPress={() => setShowEditCaption(false)}>
+                      <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>Annuler</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.primary }]} onPress={handleSaveCaption} disabled={savingCaption}>
+                      {savingCaption ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Enregistrer</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </TouchableOpacity>
-            </View>
+            </KeyboardAvoidingView>
           </TouchableOpacity>
         </Modal>
         <ShareBottomSheet
@@ -1562,8 +1843,13 @@ const s = StyleSheet.create({
 
   reelInfo:   { position: 'absolute', left: 16, right: 82, gap: 8, zIndex: 3 },
   authorRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar:     { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff', overflow: 'hidden' },
-  avatarText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  avatar:       { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff', overflow: 'hidden' },
+  avatarText:   { color: '#fff', fontWeight: '800', fontSize: 14 },
+  avatarPlusBtn: { position: 'absolute', bottom: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
+
+  sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', maxWidth: '100%' },
+  sourceThumb: { width: 20, height: 20, borderRadius: 4, overflow: 'hidden' },
+  sourceText:  { color: 'rgba(255,255,255,0.75)', fontSize: 11 },
   authorName: { color: '#fff', fontWeight: '800', fontSize: 15, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   caption:    { color: '#fff', fontSize: 13, lineHeight: 19, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
 
@@ -1601,10 +1887,18 @@ const s = StyleSheet.create({
   mineStatText:      { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  menuSheet:     { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 32, paddingTop: 8 },
-  menuItem:      { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 16 },
+  menuSheet:     { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 36, paddingTop: 8 },
+  menuItem:      { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 15 },
   menuItemText:  { fontSize: 15, fontWeight: '600' },
   menuDivider:   { height: StyleSheet.hairlineWidth, marginHorizontal: 20 },
+
+  sheetHandle:     { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  sheetAuthorRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
+  sheetAvatar:     { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
+  sheetAuthorName: { fontSize: 15, fontWeight: '700' },
+  sheetAuthorSub:  { fontSize: 12, marginTop: 1 },
+  sheetItemIcon:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  sheetItemSub:    { fontSize: 12, marginTop: 2 },
   editSheet:     { borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, paddingBottom: 36 },
   editTitle:     { fontSize: 16, fontWeight: '800', marginBottom: 14 },
   editInput:     { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 80, textAlignVertical: 'top' },
