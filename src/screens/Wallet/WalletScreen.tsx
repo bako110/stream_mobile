@@ -305,10 +305,11 @@ const WalletScreen: React.FC = () => {
     setRefreshing(false);
   }, [fetchData]);
 
-  // Rafraîchissement automatique quand on reçoit un transfert ou cadeau
+  // Rafraîchissement automatique sur tout événement wallet
   useWsEvents({
     onCoinTransferReceived: () => fetchData(),
     onGiftReceived:         () => fetchData(),
+    onWalletUpdated:        () => fetchData(),
   });
 
   const s = styles(colors);

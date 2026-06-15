@@ -17,6 +17,7 @@ import type {
   NewFollowerPayload,
   CoinTransferPayload,
   GiftReceivedPayload,
+  WalletUpdatedPayload,
   StoryAddedPayload,
   CommentOnContentPayload,
   ReactionOnContentPayload,
@@ -29,6 +30,7 @@ export interface WsEventOptions {
   onNewFollower?:           (d: NewFollowerPayload) => void;
   onCoinTransferReceived?:  (d: CoinTransferPayload) => void;
   onGiftReceived?:          (d: GiftReceivedPayload) => void;
+  onWalletUpdated?:         (d: WalletUpdatedPayload) => void;
   onStoryAdded?:            (d: StoryAddedPayload) => void;
   onCommentOnContent?:      (d: CommentOnContentPayload) => void;
   onReactionOnContent?:     (d: ReactionOnContentPayload) => void;
@@ -44,14 +46,17 @@ export function useWsEvents(options: WsEventOptions) {
     lastPresenceUpdate, lastConcertLive,
   } = useWs();
 
-  // Abonnement général feed_updated via addListener (évite re-render du provider)
+  // Abonnement général via addListener pour les types sans état dans le contexte
   const optsRef = useRef(options);
   optsRef.current = options;
 
   useEffect(() => {
-    const handler = (payload: { type: string; kind?: string }) => {
+    const handler = (payload: { type: string; kind?: string } & Record<string, any>) => {
       if (payload.type === 'feed_updated' && optsRef.current.onFeedUpdated) {
         optsRef.current.onFeedUpdated((payload.kind ?? 'post') as 'post' | 'reel');
+      }
+      if (payload.type === 'wallet_updated' && optsRef.current.onWalletUpdated) {
+        optsRef.current.onWalletUpdated(payload as WalletUpdatedPayload);
       }
     };
     addListener(handler);

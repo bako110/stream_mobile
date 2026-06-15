@@ -69,6 +69,7 @@ export interface WsEventCallbacks {
   // Wallet
   onCoinTransferReceived?: (data: CoinTransferPayload) => void;
   onGiftReceived?: (data: GiftReceivedPayload) => void;
+  onWalletUpdated?: (data: WalletUpdatedPayload) => void;
 
   // Présence
   onPresence?: (data: PresencePayload) => void;
@@ -141,6 +142,13 @@ export interface GiftReceivedPayload {
   from_avatar?: string;
 }
 
+export interface WalletUpdatedPayload {
+  notification_type: string;
+  coins?: number;
+  ref_id?: string;
+  ref_type?: string;
+}
+
 export interface PresencePayload {
   user_id: string;
   is_online: boolean;
@@ -188,11 +196,18 @@ export function createWsEventHandler(callbacks: WsEventCallbacks) {
 
       case 'coin_transfer_received':
         callbacks.onCoinTransferReceived?.(payload as unknown as CoinTransferPayload);
+        callbacks.onWalletUpdated?.(payload as unknown as WalletUpdatedPayload);
         callbacks.onNotification?.();
         break;
 
       case 'gift_received':
         callbacks.onGiftReceived?.(payload as unknown as GiftReceivedPayload);
+        callbacks.onWalletUpdated?.(payload as unknown as WalletUpdatedPayload);
+        callbacks.onNotification?.();
+        break;
+
+      case 'wallet_updated':
+        callbacks.onWalletUpdated?.(payload as unknown as WalletUpdatedPayload);
         callbacks.onNotification?.();
         break;
 
