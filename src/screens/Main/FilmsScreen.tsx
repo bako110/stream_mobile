@@ -523,20 +523,54 @@ export const FilmsScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* ── BOUTON RETOUR flottant ── */}
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={{
-          position: 'absolute', zIndex: 20,
-          top: insets.top + 8, left: 16,
-          width: 36, height: 36, borderRadius: 18,
-          backgroundColor: 'rgba(0,0,0,0.45)',
-          alignItems: 'center', justifyContent: 'center',
-        }}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Icon name="arrow-left" size={20} color="#fff" />
-      </TouchableOpacity>
+      {/* ── HEADER FIXE : retour + tabs + filtre ── */}
+      <View style={{ backgroundColor: colors.background, paddingTop: insets.top + 8, paddingHorizontal: H_PAD, paddingBottom: hasActiveFilter ? 6 : 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Icon name="arrow-left" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <TabSelector tab={tab} onChange={t => { setTab(t); setGenre(''); setCountry(''); }} colors={colors} />
+        </View>
+        <TouchableOpacity
+          onPress={openFilter}
+          activeOpacity={0.75}
+          style={[filt.filterBtn, {
+            backgroundColor: hasActiveFilter ? colors.primary : colors.backgroundSecondary,
+            borderColor: hasActiveFilter ? colors.primary : colors.border,
+          }]}
+        >
+          <Icon name="sliders" size={16} color={hasActiveFilter ? '#fff' : colors.textSecondary} />
+          {hasActiveFilter && <View style={filt.filterDot} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* Chips filtres actifs */}
+      {hasActiveFilter && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: H_PAD, paddingBottom: 10, backgroundColor: colors.background }}>
+          {genre ? (
+            <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
+              <Icon name="tag" size={10} color={colors.primary} />
+              <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{genre}</Text>
+              <TouchableOpacity onPress={() => setGenre('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                <Icon name="x" size={10} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {country ? (
+            <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
+              <Icon name="map-pin" size={10} color={colors.primary} />
+              <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{country}</Text>
+              <TouchableOpacity onPress={() => setCountry('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                <Icon name="x" size={10} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -545,7 +579,6 @@ export const FilmsScreen: React.FC = () => {
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); load(); }}
             tintColor={colors.primary}
-            progressViewOffset={insets.top}
           />
         }
       >
@@ -559,123 +592,6 @@ export const FilmsScreen: React.FC = () => {
             <Icon name={tab === 'film' ? 'film' : 'tv'} size={48} color={colors.textTertiary} />
           </View>
         )}
-
-        {/* ── TABS + BOUTON FILTRE ── */}
-        <View style={{ paddingHorizontal: H_PAD, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <TabSelector tab={tab} onChange={t => { setTab(t); setGenre(''); setCountry(''); }} colors={colors} />
-          </View>
-          <TouchableOpacity
-            onPress={openFilter}
-            activeOpacity={0.75}
-            style={[filt.filterBtn, {
-              backgroundColor: hasActiveFilter ? colors.primary : colors.backgroundSecondary,
-              borderColor: hasActiveFilter ? colors.primary : colors.border,
-            }]}
-          >
-            <Icon name="sliders" size={16} color={hasActiveFilter ? '#fff' : colors.textSecondary} />
-            {hasActiveFilter && <View style={filt.filterDot} />}
-          </TouchableOpacity>
-        </View>
-
-        {/* Chips filtres actifs */}
-        {hasActiveFilter && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: H_PAD, paddingBottom: 10 }}>
-            {genre ? (
-              <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
-                <Icon name="tag" size={10} color={colors.primary} />
-                <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{genre}</Text>
-                <TouchableOpacity onPress={() => setGenre('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                  <Icon name="x" size={10} color={colors.primary} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
-            {country ? (
-              <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
-                <Icon name="map-pin" size={10} color={colors.primary} />
-                <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{country}</Text>
-                <TouchableOpacity onPress={() => setCountry('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                  <Icon name="x" size={10} color={colors.primary} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
-          </View>
-        )}
-
-        {/* ── MODAL FILTRES ── */}
-        <Modal
-          visible={filterOpen}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setFilterOpen(false)}
-        >
-          <TouchableOpacity style={filt.overlay} activeOpacity={1} onPress={() => setFilterOpen(false)} />
-          <View style={[filt.sheet, { backgroundColor: colors.surface }]}>
-            {/* Handle */}
-            <View style={[filt.handle, { backgroundColor: colors.border }]} />
-
-            {/* Header */}
-            <View style={filt.sheetHeader}>
-              <Text style={[filt.sheetTitle, { color: colors.textPrimary }]}>Filtres</Text>
-              <TouchableOpacity onPress={resetFilter} activeOpacity={0.7}>
-                <Text style={[filt.resetTxt, { color: hasDraftFilter ? colors.primary : colors.textTertiary }]}>Réinitialiser</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-              {/* Section Genre */}
-              <Text style={[filt.sectionTitle, { color: colors.textSecondary }]}>TYPE / GENRE</Text>
-              <View style={filt.tagsWrap}>
-                {GENRES.map(g => {
-                  const active = draftGenre === g;
-                  return (
-                    <TouchableOpacity
-                      key={g}
-                      onPress={() => setDraftGenre(active ? '' : g)}
-                      activeOpacity={0.75}
-                      style={[filt.tag, {
-                        backgroundColor: active ? colors.primary : colors.backgroundSecondary,
-                        borderColor: active ? colors.primary : colors.border,
-                      }]}
-                    >
-                      <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{g}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Section Pays / Zone */}
-              <Text style={[filt.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>ZONE / PAYS</Text>
-              <View style={filt.tagsWrap}>
-                {COUNTRIES.map(c => {
-                  const active = draftCountry === c;
-                  return (
-                    <TouchableOpacity
-                      key={c}
-                      onPress={() => setDraftCountry(active ? '' : c)}
-                      activeOpacity={0.75}
-                      style={[filt.tag, {
-                        backgroundColor: active ? colors.primary : colors.backgroundSecondary,
-                        borderColor: active ? colors.primary : colors.border,
-                      }]}
-                    >
-                      <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{c}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            {/* Bouton Appliquer */}
-            <TouchableOpacity
-              onPress={applyFilter}
-              activeOpacity={0.85}
-              style={[filt.applyBtn, { backgroundColor: colors.primary }]}
-            >
-              <Text style={filt.applyTxt}>Appliquer</Text>
-            </TouchableOpacity>
-          </View>
-        </Modal>
 
         {/* ── SECTION HEADER ── */}
         {!loading && <SectionHeader label={label} count={items.length} colors={colors} />}
@@ -706,6 +622,49 @@ export const FilmsScreen: React.FC = () => {
 
         <View style={{ height: insets.bottom + 32 }} />
       </ScrollView>
+
+      {/* ── MODAL FILTRES (hors ScrollView) ── */}
+      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+        <TouchableOpacity style={filt.overlay} activeOpacity={1} onPress={() => setFilterOpen(false)} />
+        <View style={[filt.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[filt.handle, { backgroundColor: colors.border }]} />
+          <View style={filt.sheetHeader}>
+            <Text style={[filt.sheetTitle, { color: colors.textPrimary }]}>Filtres</Text>
+            <TouchableOpacity onPress={resetFilter} activeOpacity={0.7}>
+              <Text style={[filt.resetTxt, { color: hasDraftFilter ? colors.primary : colors.textTertiary }]}>Réinitialiser</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+            <Text style={[filt.sectionTitle, { color: colors.textSecondary }]}>TYPE / GENRE</Text>
+            <View style={filt.tagsWrap}>
+              {GENRES.map(g => {
+                const active = draftGenre === g;
+                return (
+                  <TouchableOpacity key={g} onPress={() => setDraftGenre(active ? '' : g)} activeOpacity={0.75}
+                    style={[filt.tag, { backgroundColor: active ? colors.primary : colors.backgroundSecondary, borderColor: active ? colors.primary : colors.border }]}>
+                    <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{g}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={[filt.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>ZONE / PAYS</Text>
+            <View style={filt.tagsWrap}>
+              {COUNTRIES.map(c => {
+                const active = draftCountry === c;
+                return (
+                  <TouchableOpacity key={c} onPress={() => setDraftCountry(active ? '' : c)} activeOpacity={0.75}
+                    style={[filt.tag, { backgroundColor: active ? colors.primary : colors.backgroundSecondary, borderColor: active ? colors.primary : colors.border }]}>
+                    <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{c}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+          <TouchableOpacity onPress={applyFilter} activeOpacity={0.85} style={[filt.applyBtn, { backgroundColor: colors.primary }]}>
+            <Text style={filt.applyTxt}>Appliquer</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 };
