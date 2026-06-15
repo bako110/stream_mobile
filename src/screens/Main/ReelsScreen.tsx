@@ -54,6 +54,39 @@ const formatCount = (n: number): string => {
   return String(n ?? 0);
 };
 
+const URL_RE = /https?:\/\/[^\s<>"']+/gi;
+
+const LinkedCaption: React.FC<{ text: string; style: any }> = ({ text, style }) => {
+  const parts: { text: string; isUrl: boolean }[] = [];
+  let last = 0;
+  for (const m of text.matchAll(URL_RE)) {
+    if (m.index! > last) parts.push({ text: text.slice(last, m.index), isUrl: false });
+    parts.push({ text: m[0], isUrl: true });
+    last = m.index! + m[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), isUrl: false });
+
+  if (parts.length === 0) return <Text style={style} numberOfLines={3}>{text}</Text>;
+
+  return (
+    <Text style={style} numberOfLines={3}>
+      {parts.map((p, i) =>
+        p.isUrl ? (
+          <Text
+            key={i}
+            style={{ textDecorationLine: 'underline', color: '#93C5FD' }}
+            onPress={() => Linking.openURL(p.text).catch(() => {})}
+          >
+            {p.text}
+          </Text>
+        ) : (
+          <Text key={i}>{p.text}</Text>
+        )
+      )}
+    </Text>
+  );
+};
+
 // ─── ReelsScreen ─────────────────────────────────────────────────────────────
 
 export const ReelsScreen: React.FC = () => {
@@ -1414,7 +1447,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             )}
           </View>
 
-          {reel.caption ? <Text style={s.caption} numberOfLines={3}>{reel.caption}</Text> : null}
+          {reel.caption ? <LinkedCaption text={reel.caption} style={s.caption} /> : null}
         </View>
 
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>

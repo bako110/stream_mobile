@@ -26,6 +26,7 @@ import { ShareBottomSheet } from './ShareBottomSheet';
 import { InlineVideoPlayer } from './InlineVideoPlayer';
 import { ReportModal } from './ReportModal';
 import { LikersBottomSheet } from './LikersBottomSheet';
+import { LinkPreviewCard } from './LinkPreviewCard';
 
 const { width: SW } = Dimensions.get('window');
 const GAP    = 2;
@@ -403,6 +404,19 @@ const PostCardInner: React.FC<PostCardProps> = ({
           )}
         </TouchableOpacity>
       )}
+
+      {/* ── Apercu lien ────────────────────────────────────────────────────── */}
+      {post.link_url ? (
+        <View style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
+          <LinkPreviewCard
+            url={post.link_url}
+            title={post.link_preview_title}
+            description={post.link_preview_description}
+            image={post.link_preview_image}
+            colors={colors}
+          />
+        </View>
+      ) : null}
 
       {/* ── Compteurs ──────────────────────────────────────────────────────── */}
       {(likeCount > 0 || commentCount > 0) && (

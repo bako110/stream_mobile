@@ -18,6 +18,10 @@ export interface Post {
   hls_url?: string | null;
   thumbnail_url?: string | null;
   feeling?: string | null;
+  link_url?: string | null;
+  link_preview_title?: string | null;
+  link_preview_description?: string | null;
+  link_preview_image?: string | null;
   like_count: number;
   comment_count: number;
   share_count: number;

@@ -18,6 +18,7 @@ import { postService } from '../../services/postService';
 import { socialService } from '../../services/socialService';
 import { CommentsBottomSheet, ShareBottomSheet, ExpandableText, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
+import { LinkPreviewCard } from '../../components/common/LinkPreviewCard';
 import type { Post } from '../../types/post';
 
 const { width: W } = Dimensions.get('window');
@@ -571,6 +572,17 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             maxLines={4}
             primaryColor={colors.primary}
             textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
+          />
+        ) : null}
+
+        {/* Apercu lien */}
+        {post.link_url ? (
+          <LinkPreviewCard
+            url={post.link_url}
+            title={post.link_preview_title}
+            description={post.link_preview_description}
+            image={post.link_preview_image}
+            colors={colors}
           />
         ) : null}
 
