@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, TouchableOpacity, Image, RefreshControl,
   StyleSheet, Dimensions, ScrollView, StatusBar, FlatList,
-  TextInput,
+  TextInput, Modal,
 } from 'react-native';
 import Animated, {
   FadeIn, FadeInDown, useSharedValue, useAnimatedStyle,
@@ -37,6 +37,19 @@ const PURPLE_DARK = '#5B2DB0';
 
 type SortKey   = 'recent' | 'rating' | 'seasons' | 'views';
 type FilterKey = 'all' | 'premium' | 'free' | 'ongoing';
+
+const GENRES = [
+  'Action', 'Aventure', 'Animation', 'Comédie', 'Documentaire',
+  'Drame', 'Fantastique', 'Horreur', 'Musical', 'Romance',
+  'Science-Fiction', 'Thriller', 'Western', 'Policier', 'Historique',
+];
+
+const COUNTRIES = [
+  'Sénégal', "Côte d'Ivoire", 'Mali', 'Cameroun', 'Nigeria',
+  'Ghana', 'Maroc', 'Algérie', 'Tunisie', 'Égypte',
+  'Afrique du Sud', 'Kenya', 'France', 'États-Unis', 'Royaume-Uni',
+  'Inde', 'Brésil', 'Mexique', 'Chine', 'Japon', 'Corée du Sud',
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHIMMER
@@ -447,6 +460,13 @@ export const SeriesScreen: React.FC = () => {
 
   const [sort,   setSort]   = useState<SortKey>('recent');
   const [filter, setFilter] = useState<FilterKey>('all');
+  const [genre,   setGenre]   = useState('');
+  const [country, setCountry] = useState('');
+  const [filterOpen,   setFilterOpen]   = useState(false);
+  const [draftSort,    setDraftSort]    = useState<SortKey>('recent');
+  const [draftFilter,  setDraftFilter]  = useState<FilterKey>('all');
+  const [draftGenre,   setDraftGenre]   = useState('');
+  const [draftCountry, setDraftCountry] = useState('');
   const [search, setSearch] = useState('');
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -488,9 +508,10 @@ export const SeriesScreen: React.FC = () => {
       const resp = await contentService.listSeries({
         page: 1,
         limit: PAGE_LIMIT,
-        // "ongoing" = filtre local, pas de param backend
         is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
         sort,
+        genre:   genre   || undefined,
+        country: country || undefined,
       });
       const raw = Array.isArray(resp) ? resp : (resp as any)?.items ?? [];
       const tot = (resp as any)?.total ?? raw.length;
@@ -509,7 +530,7 @@ export const SeriesScreen: React.FC = () => {
       setRefreshing(false);
       loadingRef.current = false;
     }
-  }, [filter, sort]);
+  }, [filter, sort, genre, country]);
 
   // Chargement page suivante
   const loadMore = useCallback(async () => {
@@ -523,6 +544,8 @@ export const SeriesScreen: React.FC = () => {
         limit: PAGE_LIMIT,
         is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
         sort,
+        genre:   genre   || undefined,
+        country: country || undefined,
       });
       const raw = Array.isArray(resp) ? resp : (resp as any)?.items ?? [];
       const tot = (resp as any)?.total ?? total;
@@ -542,7 +565,7 @@ export const SeriesScreen: React.FC = () => {
       setLoadingMore(false);
       loadingRef.current = false;
     }
-  }, [hasMore, page, filter, sort, search, items.length, total]);
+  }, [hasMore, page, filter, sort, genre, country, search, items.length, total]);
 
   useEffect(() => { loadMoreRef.current = loadMore; }, [loadMore]);
 
@@ -565,6 +588,23 @@ export const SeriesScreen: React.FC = () => {
   for (let i = 0; i < displayed.length; i += 2) {
     rows.push([displayed[i], displayed[i + 1] ?? null]);
   }
+
+  const openFilter = () => {
+    setDraftSort(sort); setDraftFilter(filter);
+    setDraftGenre(genre); setDraftCountry(country);
+    setFilterOpen(true);
+  };
+  const applyFilter = () => {
+    setSort(draftSort); setFilter(draftFilter);
+    setGenre(draftGenre); setCountry(draftCountry);
+    setFilterOpen(false);
+  };
+  const resetFilter = () => {
+    setDraftSort('recent'); setDraftFilter('all');
+    setDraftGenre(''); setDraftCountry('');
+  };
+  const hasActiveFilter = !!(genre || country || sort !== 'recent' || filter !== 'all');
+  const hasDraftFilter  = !!(draftGenre || draftCountry || draftSort !== 'recent' || draftFilter !== 'all');
 
   const goDetail = (item: FilmItem) => navigation.navigate('SerieEpisodes', { item });
 
@@ -593,67 +633,142 @@ export const SeriesScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Ligne 2 : recherche */}
-        <View style={[hdr.searchWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-          <Icon name="search" size={14} color={colors.textTertiary} />
-          <TextInput
-            style={[hdr.searchInput, { color: colors.textPrimary }]}
-            placeholder="Rechercher une série..."
-            placeholderTextColor={colors.textTertiary}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            onFocus={() => { setSearchFocused(true); setSearchHistory(searchHistoryService.getAll()); }}
-            onBlur={() => setSearchFocused(false)}
-            onSubmitEditing={() => { if (search.trim()) { searchHistoryService.add(search.trim()); setSearchHistory(searchHistoryService.getAll()); } }}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <View style={hdr.clearBtn}><Icon name="x" size={10} color="#fff" /></View>
-            </TouchableOpacity>
-          )}
+        {/* Ligne 2 : recherche + bouton filtre */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: H_PAD, paddingBottom: 10 }}>
+          <View style={[hdr.searchWrap, { flex: 1, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+            <Icon name="search" size={14} color={colors.textTertiary} />
+            <TextInput
+              style={[hdr.searchInput, { color: colors.textPrimary }]}
+              placeholder="Rechercher une série..."
+              placeholderTextColor={colors.textTertiary}
+              value={search}
+              onChangeText={setSearch}
+              returnKeyType="search"
+              onFocus={() => { setSearchFocused(true); setSearchHistory(searchHistoryService.getAll()); }}
+              onBlur={() => setSearchFocused(false)}
+              onSubmitEditing={() => { if (search.trim()) { searchHistoryService.add(search.trim()); setSearchHistory(searchHistoryService.getAll()); } }}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <View style={hdr.clearBtn}><Icon name="x" size={10} color="#fff" /></View>
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            onPress={openFilter}
+            activeOpacity={0.75}
+            style={[hdr.filterBtn, {
+              backgroundColor: hasActiveFilter ? PURPLE : colors.backgroundSecondary,
+              borderColor: hasActiveFilter ? PURPLE : colors.border,
+            }]}
+          >
+            <Icon name="sliders" size={15} color={hasActiveFilter ? '#fff' : colors.textSecondary} />
+            {hasActiveFilter && <View style={hdr.filterDot} />}
+          </TouchableOpacity>
         </View>
 
-        {/* Ligne 3 : chips sort + filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 8, paddingBottom: 10 }}>
-          {SORTS.map(s => {
-            const active = sort === s.key;
-            return (
-              <TouchableOpacity key={s.key} onPress={() => setSort(s.key)} activeOpacity={0.8}>
-                {active
-                  ? <LinearGradient colors={[PURPLE, PURPLE_DARK]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={hdr.chipActive}>
-                      <Icon name={s.icon} size={11} color="#fff" />
-                      <Text style={hdr.chipActiveTxt}>{s.label}</Text>
-                    </LinearGradient>
-                  : <View style={[hdr.chipInactive, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                      <Icon name={s.icon} size={11} color={colors.textTertiary} />
-                      <Text style={[hdr.chipInactiveTxt, { color: colors.textSecondary }]}>{s.label}</Text>
-                    </View>
-                }
-              </TouchableOpacity>
-            );
-          })}
-          <View style={{ width: 1, backgroundColor: colors.border, marginHorizontal: 4 }} />
-          {FILTERS.map(f => {
-            const active = filter === f.key;
-            const activeColor = f.key === 'ongoing' ? PURPLE : f.key === 'premium' ? '#E8501A' : '#10b981';
-            return (
-              <TouchableOpacity key={f.key} onPress={() => setFilter(f.key)} activeOpacity={0.8}>
-                {active
-                  ? <View style={[hdr.chipActive, { backgroundColor: activeColor }]}>
-                      {f.icon ? <Icon name={f.icon} size={11} color="#fff" /> : null}
-                      <Text style={hdr.chipActiveTxt}>{f.label}</Text>
-                    </View>
-                  : <View style={[hdr.chipInactive, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                      {f.icon ? <Icon name={f.icon} size={11} color={colors.textTertiary} /> : null}
-                      <Text style={[hdr.chipInactiveTxt, { color: colors.textSecondary }]}>{f.label}</Text>
-                    </View>
-                }
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        {/* Chips filtres genre/pays actifs */}
+        {hasActiveFilter && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: H_PAD, paddingBottom: 10 }}>
+            {genre ? (
+              <View style={[hdr.activeChip, { borderColor: PURPLE, backgroundColor: PURPLE + '18' }]}>
+                <Icon name="tag" size={10} color={PURPLE} />
+                <Text style={[hdr.activeChipTxt, { color: PURPLE }]}>{genre}</Text>
+                <TouchableOpacity onPress={() => setGenre('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <Icon name="x" size={10} color={PURPLE} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            {country ? (
+              <View style={[hdr.activeChip, { borderColor: PURPLE, backgroundColor: PURPLE + '18' }]}>
+                <Icon name="map-pin" size={10} color={PURPLE} />
+                <Text style={[hdr.activeChipTxt, { color: PURPLE }]}>{country}</Text>
+                <TouchableOpacity onPress={() => setCountry('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <Icon name="x" size={10} color={PURPLE} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+        )}
       </View>
+
+      {/* ── MODAL FILTRES ── */}
+      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+        <TouchableOpacity style={fl.overlay} activeOpacity={1} onPress={() => setFilterOpen(false)} />
+        <View style={[fl.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[fl.handle, { backgroundColor: colors.border }]} />
+          <View style={fl.sheetHeader}>
+            <Text style={[fl.sheetTitle, { color: colors.textPrimary }]}>Filtres</Text>
+            <TouchableOpacity onPress={resetFilter} activeOpacity={0.7}>
+              <Text style={[fl.resetTxt, { color: hasDraftFilter ? PURPLE : colors.textTertiary }]}>Réinitialiser</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+
+            {/* Tri */}
+            <Text style={[fl.sectionTitle, { color: colors.textSecondary }]}>TRI</Text>
+            <View style={fl.tagsWrap}>
+              {SORTS.map(s => {
+                const active = draftSort === s.key;
+                return (
+                  <TouchableOpacity key={s.key} onPress={() => setDraftSort(s.key)} activeOpacity={0.75}
+                    style={[fl.tag, { backgroundColor: active ? PURPLE : colors.backgroundSecondary, borderColor: active ? PURPLE : colors.border }]}>
+                    <Icon name={s.icon} size={11} color={active ? '#fff' : colors.textSecondary} />
+                    <Text style={[fl.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{s.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Catégorie */}
+            <Text style={[fl.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>CATÉGORIE</Text>
+            <View style={fl.tagsWrap}>
+              {FILTERS.map(f => {
+                const active = draftFilter === f.key;
+                const activeColor = f.key === 'ongoing' ? PURPLE : f.key === 'premium' ? '#E8501A' : f.key === 'free' ? '#10b981' : PURPLE;
+                return (
+                  <TouchableOpacity key={f.key} onPress={() => setDraftFilter(f.key)} activeOpacity={0.75}
+                    style={[fl.tag, { backgroundColor: active ? activeColor : colors.backgroundSecondary, borderColor: active ? activeColor : colors.border }]}>
+                    {f.icon ? <Icon name={f.icon} size={11} color={active ? '#fff' : colors.textSecondary} /> : null}
+                    <Text style={[fl.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{f.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Genre */}
+            <Text style={[fl.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>TYPE / GENRE</Text>
+            <View style={fl.tagsWrap}>
+              {GENRES.map(g => {
+                const active = draftGenre === g;
+                return (
+                  <TouchableOpacity key={g} onPress={() => setDraftGenre(active ? '' : g)} activeOpacity={0.75}
+                    style={[fl.tag, { backgroundColor: active ? PURPLE : colors.backgroundSecondary, borderColor: active ? PURPLE : colors.border }]}>
+                    <Text style={[fl.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{g}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Zone */}
+            <Text style={[fl.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>ZONE / PAYS</Text>
+            <View style={fl.tagsWrap}>
+              {COUNTRIES.map(c => {
+                const active = draftCountry === c;
+                return (
+                  <TouchableOpacity key={c} onPress={() => setDraftCountry(active ? '' : c)} activeOpacity={0.75}
+                    style={[fl.tag, { backgroundColor: active ? PURPLE : colors.backgroundSecondary, borderColor: active ? PURPLE : colors.border }]}>
+                    <Text style={[fl.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{c}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+          <TouchableOpacity onPress={applyFilter} activeOpacity={0.85} style={[fl.applyBtn, { backgroundColor: PURPLE }]}>
+            <Text style={fl.applyTxt}>Appliquer</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       {/* ── Panneau historique / suggestions ── */}
       {searchFocused && (
@@ -850,4 +965,23 @@ const hdr = StyleSheet.create({
   chipActiveTxt:   { color: '#fff', fontSize: 12, fontWeight: '700' },
   chipInactive:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
   chipInactiveTxt: { fontSize: 12, fontWeight: '600' },
+  filterBtn:     { width: 36, height: 36, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  filterDot:     { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  activeChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  activeChipTxt: { fontSize: 12, fontWeight: '600' },
+});
+
+const fl = StyleSheet.create({
+  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '80%' },
+  handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  sheetHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  sheetTitle:   { fontSize: 18, fontWeight: '800' },
+  resetTxt:     { fontSize: 13, fontWeight: '600' },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 12, paddingHorizontal: 2 },
+  tagsWrap:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
+  tagTxt:       { fontSize: 13, fontWeight: '600' },
+  applyBtn:     { marginTop: 20, marginBottom: 8, paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
+  applyTxt:     { color: '#fff', fontSize: 15, fontWeight: '800' },
 });
