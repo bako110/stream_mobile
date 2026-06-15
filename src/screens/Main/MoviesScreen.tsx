@@ -386,6 +386,26 @@ const COUNTRIES = [
   'Afrique du Sud', 'Kenya', 'France', 'États-Unis', 'Royaume-Uni',
   'Inde', 'Brésil', 'Mexique', 'Chine', 'Japon', 'Corée du Sud',
 ];
+const LANGUAGES: { code: string; label: string }[] = [
+  { code: 'fr', label: 'Français'  },
+  { code: 'en', label: 'Anglais'   },
+  { code: 'ar', label: 'Arabe'     },
+  { code: 'wo', label: 'Wolof'     },
+  { code: 'sw', label: 'Swahili'   },
+  { code: 'pt', label: 'Portugais' },
+  { code: 'es', label: 'Espagnol'  },
+  { code: 'hi', label: 'Hindi'     },
+  { code: 'zh', label: 'Chinois'   },
+  { code: 'ko', label: 'Coréen'    },
+  { code: 'ja', label: 'Japonais'  },
+];
+const RATING_OPTIONS: { value: number; label: string }[] = [
+  { value: 0,   label: 'Toutes' },
+  { value: 3,   label: '3+'     },
+  { value: 3.5, label: '3.5+'   },
+  { value: 4,   label: '4+'     },
+  { value: 4.5, label: '4.5+'   },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SKELETON
@@ -432,18 +452,29 @@ export const MoviesScreen: React.FC = () => {
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [hasActiveSub, setHasActiveSub] = useState(false);
 
-  const [sort,    setSort]    = useState<SortKey>('recent');
-  const [filter,  setFilter]  = useState<FilterKey>('all');
-  const [genre,   setGenre]   = useState('');
-  const [country, setCountry] = useState('');
+  const [sort,      setSort]      = useState<SortKey>('recent');
+  const [filter,    setFilter]    = useState<FilterKey>('all');
+  const [genre,     setGenre]     = useState('');
+  const [country,   setCountry]   = useState('');
+  const [language,  setLanguage]  = useState('');
+  const [minRating, setMinRating] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [draftSort,    setDraftSort]    = useState<SortKey>('recent');
-  const [draftFilter,  setDraftFilter]  = useState<FilterKey>('all');
-  const [draftGenre,   setDraftGenre]   = useState('');
-  const [draftCountry, setDraftCountry] = useState('');
+  const [draftSort,      setDraftSort]      = useState<SortKey>('recent');
+  const [draftFilter,    setDraftFilter]    = useState<FilterKey>('all');
+  const [draftGenre,     setDraftGenre]     = useState('');
+  const [draftCountry,   setDraftCountry]   = useState('');
+  const [draftLanguage,  setDraftLanguage]  = useState('');
+  const [draftMinRating, setDraftMinRating] = useState(0);
   const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
+
+  // Debounce 400ms — envoie la recherche au backend sans spam
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(search.trim()), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const historySuggestions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -475,20 +506,23 @@ export const MoviesScreen: React.FC = () => {
     ]);
   }, []);
 
+  const filterParams = useMemo(() => ({
+    is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
+    sort,
+    genre:      genre      || undefined,
+    country:    country    || undefined,
+    language:   language   || undefined,
+    min_rating: minRating  > 0 ? minRating : undefined,
+    search:     searchDebounced || undefined,
+  }), [filter, sort, genre, country, language, minRating, searchDebounced]);
+
   // Chargement page 1 — reset complet
   const load = useCallback(async (silent = false) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     if (!silent) setLoading(true);
     try {
-      const resp = await contentService.listFilms({
-        page: 1,
-        limit: PAGE_LIMIT,
-        is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
-        sort,
-        genre:   genre   || undefined,
-        country: country || undefined,
-      });
+      const resp = await contentService.listFilms({ page: 1, limit: PAGE_LIMIT, ...filterParams });
       const raw  = Array.isArray(resp) ? resp : (resp as any)?.items ?? [];
       const tot  = (resp as any)?.total ?? raw.length;
       setItems(raw);
@@ -503,23 +537,16 @@ export const MoviesScreen: React.FC = () => {
       setRefreshing(false);
       loadingRef.current = false;
     }
-  }, [filter, sort, genre, country]);
+  }, [filterParams]);
 
   // Chargement page suivante — infinite scroll
   const loadMore = useCallback(async () => {
-    if (loadingRef.current || !hasMore || search.trim()) return;
+    if (loadingRef.current || !hasMore) return;
     loadingRef.current = true;
     setLoadingMore(true);
     const nextPage = page + 1;
     try {
-      const resp = await contentService.listFilms({
-        page: nextPage,
-        limit: PAGE_LIMIT,
-        is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
-        sort,
-        genre:   genre   || undefined,
-        country: country || undefined,
-      });
+      const resp = await contentService.listFilms({ page: nextPage, limit: PAGE_LIMIT, ...filterParams });
       const raw = Array.isArray(resp) ? resp : (resp as any)?.items ?? [];
       const tot = (resp as any)?.total ?? total;
       setItems(prev => {
@@ -536,37 +563,35 @@ export const MoviesScreen: React.FC = () => {
       setLoadingMore(false);
       loadingRef.current = false;
     }
-  }, [hasMore, page, filter, sort, genre, country, search, items.length, total]);
+  }, [hasMore, page, filterParams, items.length, total]);
 
   const openFilter = () => {
-    setDraftSort(sort); setDraftFilter(filter);
-    setDraftGenre(genre); setDraftCountry(country);
+    setDraftSort(sort);       setDraftFilter(filter);
+    setDraftGenre(genre);     setDraftCountry(country);
+    setDraftLanguage(language); setDraftMinRating(minRating);
     setFilterOpen(true);
   };
   const applyFilter = () => {
-    setSort(draftSort); setFilter(draftFilter);
-    setGenre(draftGenre); setCountry(draftCountry);
+    setSort(draftSort);       setFilter(draftFilter);
+    setGenre(draftGenre);     setCountry(draftCountry);
+    setLanguage(draftLanguage); setMinRating(draftMinRating);
     setFilterOpen(false);
   };
   const resetFilter = () => {
-    setDraftSort('recent'); setDraftFilter('all');
-    setDraftGenre(''); setDraftCountry('');
+    setDraftSort('recent');   setDraftFilter('all');
+    setDraftGenre('');        setDraftCountry('');
+    setDraftLanguage('');     setDraftMinRating(0);
   };
-  const hasActiveFilter = !!(genre || country || sort !== 'recent' || filter !== 'all');
-  const hasDraftFilter  = !!(draftGenre || draftCountry || draftSort !== 'recent' || draftFilter !== 'all');
+  const hasActiveFilter = !!(genre || country || language || minRating > 0 || sort !== 'recent' || filter !== 'all');
+  const hasDraftFilter  = !!(draftGenre || draftCountry || draftLanguage || draftMinRating > 0 || draftSort !== 'recent' || draftFilter !== 'all');
 
   // Sync loadMoreRef pour le handler Reanimated (worklet ne peut pas capturer des closures React)
   useEffect(() => { loadMoreRef.current = loadMore; }, [loadMore]);
 
-  // Reset à page 1 quand filtre/sort change
+  // Reset à page 1 quand filtre/sort/search change
   useEffect(() => { load(); }, [load]);
 
-  const displayed = search.trim()
-    ? items.filter(i => {
-        const q = search.toLowerCase();
-        return i.title.toLowerCase().includes(q) || (i.director ?? '').toLowerCase().includes(q) || String(i.year ?? '').includes(q);
-      })
-    : items;
+  const displayed = items;
 
   // Rows thématiques uniquement sur les items chargés (pas displayed qui peut être filtré par search)
   const heroItems    = useMemo(() => items.filter(i => i.banner_url || i.thumbnail_url), [items]);
@@ -597,7 +622,7 @@ export const MoviesScreen: React.FC = () => {
             <Text style={[hdr.title, { color: colors.textPrimary }]}>Films</Text>
             {!loading && total > 0 && (
               <Text style={[hdr.sub, { color: colors.textTertiary }]}>
-                {search.trim() ? `${displayed.length} résultat${displayed.length > 1 ? 's' : ''}` : `${total} titre${total > 1 ? 's' : ''}`}
+                {total} titre{total > 1 ? 's' : ''}
               </Text>
             )}
           </View>
@@ -865,6 +890,33 @@ export const MoviesScreen: React.FC = () => {
                   <TouchableOpacity key={c} onPress={() => setDraftCountry(active ? '' : c)} activeOpacity={0.75}
                     style={[mfl.tag, { backgroundColor: active ? colors.primary : colors.backgroundSecondary, borderColor: active ? colors.primary : colors.border }]}>
                     <Text style={[mfl.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{c}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[mfl.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>LANGUE</Text>
+            <View style={mfl.tagsWrap}>
+              {LANGUAGES.map(l => {
+                const active = draftLanguage === l.code;
+                return (
+                  <TouchableOpacity key={l.code} onPress={() => setDraftLanguage(active ? '' : l.code)} activeOpacity={0.75}
+                    style={[mfl.tag, { backgroundColor: active ? colors.primary : colors.backgroundSecondary, borderColor: active ? colors.primary : colors.border }]}>
+                    <Text style={[mfl.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{l.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[mfl.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>NOTE MINIMALE</Text>
+            <View style={mfl.tagsWrap}>
+              {RATING_OPTIONS.map(r => {
+                const active = draftMinRating === r.value;
+                return (
+                  <TouchableOpacity key={String(r.value)} onPress={() => setDraftMinRating(r.value)} activeOpacity={0.75}
+                    style={[mfl.tag, { backgroundColor: active ? '#FFB800' : colors.backgroundSecondary, borderColor: active ? '#FFB800' : colors.border }]}>
+                    {r.value > 0 ? <Icon name="star" size={11} color={active ? '#fff' : colors.textSecondary} /> : null}
+                    <Text style={[mfl.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{r.label}</Text>
                   </TouchableOpacity>
                 );
               })}

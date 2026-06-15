@@ -28,7 +28,21 @@ const CARD_W  = (SW - H_PAD * 2 - GUTTER) / 2;
 const HERO_H  = Math.round(SW * 0.72);
 const HERO_N  = 6;
 
-type Tab = 'film' | 'serie';
+type Tab      = 'film' | 'serie';
+type SortKey  = 'recent' | 'rating' | 'popular';
+type FilterKey = 'all' | 'premium' | 'free';
+
+const SORTS: { key: SortKey; label: string; icon: string }[] = [
+  { key: 'recent',  label: 'Récent',      icon: 'clock'      },
+  { key: 'rating',  label: 'Mieux noté',  icon: 'star'       },
+  { key: 'popular', label: 'Populaire',   icon: 'trending-up' },
+];
+
+const FILTERS: { key: FilterKey; label: string; icon?: string }[] = [
+  { key: 'all',     label: 'Toutes'   },
+  { key: 'premium', label: 'Premium',  icon: 'lock'     },
+  { key: 'free',    label: 'Gratuit',  icon: 'unlock'   },
+];
 
 const GENRES = [
   'Action', 'Aventure', 'Animation', 'Comédie', 'Documentaire',
@@ -41,6 +55,26 @@ const COUNTRIES = [
   'Ghana', 'Maroc', 'Algérie', 'Tunisie', 'Égypte',
   'Afrique du Sud', 'Kenya', 'France', 'États-Unis', 'Royaume-Uni',
   'Inde', 'Brésil', 'Mexique', 'Chine', 'Japon', 'Corée du Sud',
+];
+const LANGUAGES: { code: string; label: string }[] = [
+  { code: 'fr', label: 'Français'  },
+  { code: 'en', label: 'Anglais'   },
+  { code: 'ar', label: 'Arabe'     },
+  { code: 'wo', label: 'Wolof'     },
+  { code: 'sw', label: 'Swahili'   },
+  { code: 'pt', label: 'Portugais' },
+  { code: 'es', label: 'Espagnol'  },
+  { code: 'hi', label: 'Hindi'     },
+  { code: 'zh', label: 'Chinois'   },
+  { code: 'ko', label: 'Coréen'    },
+  { code: 'ja', label: 'Japonais'  },
+];
+const RATING_OPTIONS: { value: number; label: string }[] = [
+  { value: 0,   label: 'Toutes' },
+  { value: 3,   label: '3+'     },
+  { value: 3.5, label: '3.5+'   },
+  { value: 4,   label: '4+'     },
+  { value: 4.5, label: '4.5+'   },
 ];
 
 export interface FilmItem {
@@ -443,12 +477,19 @@ export const FilmsScreen: React.FC = () => {
   const [items, setItems]           = useState<FilmItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [genre,   setGenre]         = useState('');
-  const [country, setCountry]       = useState('');
-  const [filterOpen, setFilterOpen] = useState(false);
-  // Sélection temporaire dans le modal (appliquée seulement à "Appliquer")
-  const [draftGenre,   setDraftGenre]   = useState('');
-  const [draftCountry, setDraftCountry] = useState('');
+  const [sort,      setSort]      = useState<SortKey>('recent');
+  const [filter,    setFilter]    = useState<FilterKey>('all');
+  const [genre,     setGenre]     = useState('');
+  const [country,   setCountry]   = useState('');
+  const [language,  setLanguage]  = useState('');
+  const [minRating, setMinRating] = useState(0);
+  const [filterOpen, setFilterOpen]  = useState(false);
+  const [draftSort,      setDraftSort]      = useState<SortKey>('recent');
+  const [draftFilter,    setDraftFilter]    = useState<FilterKey>('all');
+  const [draftGenre,     setDraftGenre]     = useState('');
+  const [draftCountry,   setDraftCountry]   = useState('');
+  const [draftLanguage,  setDraftLanguage]  = useState('');
+  const [draftMinRating, setDraftMinRating] = useState(0);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [hasActiveSub, setHasActiveSub] = useState(false);
 
@@ -468,8 +509,12 @@ export const FilmsScreen: React.FC = () => {
     try {
       const params = {
         page: 1, limit: 40,
-        genre:   genre   || undefined,
-        country: country || undefined,
+        sort,
+        is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
+        genre:      genre      || undefined,
+        country:    country    || undefined,
+        language:   language   || undefined,
+        min_rating: minRating  > 0 ? minRating : undefined,
       };
       const resp = tab === 'film'
         ? await contentService.listFilms(params)
@@ -481,33 +526,36 @@ export const FilmsScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [tab, genre, country]);
+  }, [tab, sort, filter, genre, country, language, minRating]);
 
   useEffect(() => {
     setLoading(true);
     setItems([]);
     load();
-  }, [tab, genre, country]);
+  }, [tab, sort, filter, genre, country, language, minRating]);
 
   const openFilter = () => {
-    setDraftGenre(genre);
-    setDraftCountry(country);
+    setDraftSort(sort);         setDraftFilter(filter);
+    setDraftGenre(genre);       setDraftCountry(country);
+    setDraftLanguage(language); setDraftMinRating(minRating);
     setFilterOpen(true);
   };
 
   const applyFilter = () => {
-    setGenre(draftGenre);
-    setCountry(draftCountry);
+    setSort(draftSort);         setFilter(draftFilter);
+    setGenre(draftGenre);       setCountry(draftCountry);
+    setLanguage(draftLanguage); setMinRating(draftMinRating);
     setFilterOpen(false);
   };
 
   const resetFilter = () => {
-    setDraftGenre('');
-    setDraftCountry('');
+    setDraftSort('recent');   setDraftFilter('all');
+    setDraftGenre('');        setDraftCountry('');
+    setDraftLanguage('');     setDraftMinRating(0);
   };
 
-  const hasActiveFilter = !!(genre || country);
-  const hasDraftFilter  = !!(draftGenre || draftCountry);
+  const hasActiveFilter = !!(genre || country || language || minRating > 0 || sort !== 'recent' || filter !== 'all');
+  const hasDraftFilter  = !!(draftGenre || draftCountry || draftLanguage || draftMinRating > 0 || draftSort !== 'recent' || draftFilter !== 'all');
 
   const goDetail = (item: FilmItem) => navigation.navigate('FilmDetail', { item });
 
@@ -635,7 +683,40 @@ export const FilmsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-            <Text style={[filt.sectionTitle, { color: colors.textSecondary }]}>TYPE / GENRE</Text>
+
+            {/* Tri */}
+            <Text style={[filt.sectionTitle, { color: colors.textSecondary }]}>TRI</Text>
+            <View style={filt.tagsWrap}>
+              {SORTS.map(s => {
+                const active = draftSort === s.key;
+                return (
+                  <TouchableOpacity key={s.key} onPress={() => setDraftSort(s.key)} activeOpacity={0.75}
+                    style={[filt.tag, { backgroundColor: active ? colors.primary : colors.backgroundSecondary, borderColor: active ? colors.primary : colors.border }]}>
+                    <Icon name={s.icon} size={11} color={active ? '#fff' : colors.textSecondary} />
+                    <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{s.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Catégorie */}
+            <Text style={[filt.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>CATÉGORIE</Text>
+            <View style={filt.tagsWrap}>
+              {FILTERS.map(f => {
+                const active = draftFilter === f.key;
+                const activeColor = f.key === 'premium' ? '#E8501A' : f.key === 'free' ? '#10b981' : colors.primary;
+                return (
+                  <TouchableOpacity key={f.key} onPress={() => setDraftFilter(f.key)} activeOpacity={0.75}
+                    style={[filt.tag, { backgroundColor: active ? activeColor : colors.backgroundSecondary, borderColor: active ? activeColor : colors.border }]}>
+                    {f.icon ? <Icon name={f.icon} size={11} color={active ? '#fff' : colors.textSecondary} /> : null}
+                    <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{f.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Genre */}
+            <Text style={[filt.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>TYPE / GENRE</Text>
             <View style={filt.tagsWrap}>
               {GENRES.map(g => {
                 const active = draftGenre === g;
@@ -647,6 +728,8 @@ export const FilmsScreen: React.FC = () => {
                 );
               })}
             </View>
+
+            {/* Zone */}
             <Text style={[filt.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>ZONE / PAYS</Text>
             <View style={filt.tagsWrap}>
               {COUNTRIES.map(c => {
@@ -655,6 +738,35 @@ export const FilmsScreen: React.FC = () => {
                   <TouchableOpacity key={c} onPress={() => setDraftCountry(active ? '' : c)} activeOpacity={0.75}
                     style={[filt.tag, { backgroundColor: active ? colors.primary : colors.backgroundSecondary, borderColor: active ? colors.primary : colors.border }]}>
                     <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{c}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Langue */}
+            <Text style={[filt.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>LANGUE</Text>
+            <View style={filt.tagsWrap}>
+              {LANGUAGES.map(l => {
+                const active = draftLanguage === l.code;
+                return (
+                  <TouchableOpacity key={l.code} onPress={() => setDraftLanguage(active ? '' : l.code)} activeOpacity={0.75}
+                    style={[filt.tag, { backgroundColor: active ? colors.primary : colors.backgroundSecondary, borderColor: active ? colors.primary : colors.border }]}>
+                    <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{l.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Note minimale */}
+            <Text style={[filt.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>NOTE MINIMALE</Text>
+            <View style={filt.tagsWrap}>
+              {RATING_OPTIONS.map(r => {
+                const active = draftMinRating === r.value;
+                return (
+                  <TouchableOpacity key={String(r.value)} onPress={() => setDraftMinRating(r.value)} activeOpacity={0.75}
+                    style={[filt.tag, { backgroundColor: active ? '#FFB800' : colors.backgroundSecondary, borderColor: active ? '#FFB800' : colors.border }]}>
+                    {r.value > 0 ? <Icon name="star" size={11} color={active ? '#fff' : colors.textSecondary} /> : null}
+                    <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{r.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -690,7 +802,7 @@ const filt = StyleSheet.create({
   resetTxt:     { fontSize: 13, fontWeight: '600' },
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 12, paddingHorizontal: 2 },
   tagsWrap:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
+  tag:          { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
   tagTxt:       { fontSize: 13, fontWeight: '600' },
   applyBtn:     { marginTop: 20, marginBottom: 8, paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
   applyTxt:     { color: '#fff', fontSize: 15, fontWeight: '800' },

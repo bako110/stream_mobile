@@ -2,31 +2,57 @@ import { apiClient, Endpoints } from '../api';
 import { DEFAULT_PAGE_LIMIT } from '../utils/constants';
 import type { Content, ContentListResponse, Season, Episode, VideoMeta } from '../types';
 
+export interface FilmFilterParams {
+  page?: number;
+  limit?: number;
+  year?: number;
+  language?: string;
+  genre?: string;
+  country?: string;
+  is_premium?: boolean;
+  sort?: 'recent' | 'rating' | 'year' | 'views';
+  search?: string;
+  min_rating?: number;
+}
+
+export interface SerieFilterParams {
+  page?: number;
+  limit?: number;
+  year?: number;
+  language?: string;
+  genre?: string;
+  country?: string;
+  is_premium?: boolean;
+  sort?: 'recent' | 'rating' | 'year' | 'views' | 'seasons';
+  search?: string;
+  min_rating?: number;
+  ongoing?: boolean;
+}
+
+function buildParams(params: Record<string, string | number | boolean | undefined | null>): string {
+  const p: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null && v !== '') p[k] = String(v);
+  }
+  return new URLSearchParams(p).toString();
+}
+
 export const contentService = {
   // ── Films ────────────────────────────────────────────────────────────────
-  async listFilms(params?: {
-    page?: number;
-    limit?: number;
-    year?: number;
-    language?: string;
-    genre?: string;
-    country?: string;
-    is_premium?: boolean;
-    sort?: 'recent' | 'rating' | 'year' | 'views';
-  }): Promise<ContentListResponse> {
-    const p: Record<string, string> = {
-      page:  String(params?.page  ?? 1),
-      limit: String(params?.limit ?? DEFAULT_PAGE_LIMIT),
-    };
-    if (params?.year       != null) p.year       = String(params.year);
-    if (params?.language)           p.language   = params.language;
-    if (params?.genre)              p.genre      = params.genre;
-    if (params?.country)            p.country    = params.country;
-    if (params?.is_premium != null) p.is_premium = String(params.is_premium);
-    if (params?.sort)               p.sort       = params.sort;
-    const res = await apiClient.get<ContentListResponse>(
-      `${Endpoints.content.films}?${new URLSearchParams(p).toString()}`,
-    );
+  async listFilms(params?: FilmFilterParams): Promise<ContentListResponse> {
+    const qs = buildParams({
+      page:       params?.page  ?? 1,
+      limit:      params?.limit ?? DEFAULT_PAGE_LIMIT,
+      year:       params?.year,
+      language:   params?.language,
+      genre:      params?.genre,
+      country:    params?.country,
+      is_premium: params?.is_premium,
+      sort:       params?.sort,
+      search:     params?.search,
+      min_rating: params?.min_rating,
+    });
+    const res = await apiClient.get<ContentListResponse>(`${Endpoints.content.films}?${qs}`);
     return res.data;
   },
 
@@ -36,29 +62,21 @@ export const contentService = {
   },
 
   // ── Séries ───────────────────────────────────────────────────────────────
-  async listSeries(params?: {
-    page?: number;
-    limit?: number;
-    year?: number;
-    language?: string;
-    genre?: string;
-    country?: string;
-    is_premium?: boolean;
-    sort?: 'recent' | 'rating' | 'year' | 'views' | 'seasons';
-  }): Promise<ContentListResponse> {
-    const p: Record<string, string> = {
-      page:  String(params?.page  ?? 1),
-      limit: String(params?.limit ?? DEFAULT_PAGE_LIMIT),
-    };
-    if (params?.year       != null) p.year       = String(params.year);
-    if (params?.language)           p.language   = params.language;
-    if (params?.genre)              p.genre      = params.genre;
-    if (params?.country)            p.country    = params.country;
-    if (params?.is_premium != null) p.is_premium = String(params.is_premium);
-    if (params?.sort)               p.sort       = params.sort;
-    const res = await apiClient.get<ContentListResponse>(
-      `${Endpoints.content.series}?${new URLSearchParams(p).toString()}`,
-    );
+  async listSeries(params?: SerieFilterParams): Promise<ContentListResponse> {
+    const qs = buildParams({
+      page:       params?.page  ?? 1,
+      limit:      params?.limit ?? DEFAULT_PAGE_LIMIT,
+      year:       params?.year,
+      language:   params?.language,
+      genre:      params?.genre,
+      country:    params?.country,
+      is_premium: params?.is_premium,
+      sort:       params?.sort,
+      search:     params?.search,
+      min_rating: params?.min_rating,
+      ongoing:    params?.ongoing,
+    });
+    const res = await apiClient.get<ContentListResponse>(`${Endpoints.content.series}?${qs}`);
     return res.data;
   },
 
