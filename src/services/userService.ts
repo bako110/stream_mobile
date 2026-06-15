@@ -119,4 +119,5 @@ export interface PrivacySettings {
   privacy_show_online:     boolean;
   privacy_show_phone:      boolean;
   privacy_show_birthday:   boolean;
+  privacy_allow_comments:  boolean;
 }

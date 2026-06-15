@@ -55,6 +55,7 @@ const DEFAULT_SETTINGS: PrivacySettings = {
   privacy_show_online:     true,
   privacy_show_phone:      false,
   privacy_show_birthday:   true,
+  privacy_allow_comments:  true,
 };
 
 function coerceBooleans(data: any): PrivacySettings {
@@ -120,7 +121,7 @@ export const PrivacyScreen: React.FC<Props> = ({ navigation }) => {
 
       {loading ? (
         <View style={{ flex: 1, paddingTop: 20 }}>
-          {[0, 1, 2, 3, 4, 5, 6].map(i => (
+          {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surfaceElevated }} />
               <View style={{ flex: 1, gap: 5 }}>
@@ -198,6 +199,19 @@ export const PrivacyScreen: React.FC<Props> = ({ navigation }) => {
               value={settings.privacy_show_online}
               saving={saving === 'privacy_show_online'}
               onChange={toggle('privacy_show_online')}
+              last
+            />
+          </View>
+
+          <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>COMMENTAIRES</Text>
+          <View style={[s.section, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            <Row
+              icon="message-square" label="Autoriser les commentaires"
+              description="Personne ne peut commenter vos publications, reels, concerts et événements si désactivé"
+              color="#EF4444"
+              value={settings.privacy_allow_comments}
+              saving={saving === 'privacy_allow_comments'}
+              onChange={toggle('privacy_allow_comments')}
               last
             />
           </View>

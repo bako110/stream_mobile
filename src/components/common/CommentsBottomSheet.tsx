@@ -30,6 +30,7 @@ interface Props {
   concertId?: string;
   eventId?: string;
   postId?: string;
+  commentsDisabled?: boolean;
   onCommentAdded?: () => void;
   onCommentCountChange?: (delta: number) => void;
   onCountLoaded?: (count: number) => void;
@@ -346,6 +347,7 @@ const CommentRow: React.FC<RowProps> = ({
 
 export const CommentsBottomSheet: React.FC<Props> = ({
   visible, onClose, reelId, contentId, concertId, eventId, postId,
+  commentsDisabled = false,
   onCommentAdded, onCommentCountChange, onCountLoaded,
 }) => {
   const { theme }                    = useTheme();
@@ -708,7 +710,15 @@ export const CommentsBottomSheet: React.FC<Props> = ({
           </View>
 
           {/* Liste */}
-          {loading ? (
+          {commentsDisabled ? (
+            <View style={st.center}>
+              <MCIcon name="comment-off-outline" size={56} color={colors.textTertiary} />
+              <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Commentaires desactives</Text>
+              <Text style={[st.emptySubtitle, { color: colors.textTertiary }]}>
+                Les commentaires ont ete desactives sur ce contenu
+              </Text>
+            </View>
+          ) : loading ? (
             <View style={st.center}>
               <GoFolyXLoader variant="bar" color={colors.primary} />
             </View>
@@ -786,7 +796,13 @@ export const CommentsBottomSheet: React.FC<Props> = ({
             </View>
           )}
 
-          {/* Input */}
+          {/* Input — masqué si commentaires désactivés */}
+          {commentsDisabled ? (
+            <View style={[st.disabledBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+              <MCIcon name="comment-off-outline" size={18} color={colors.textTertiary} />
+              <Text style={[st.disabledText, { color: colors.textTertiary }]}>Commentaires desactives</Text>
+            </View>
+          ) : (
           <View style={[st.inputRow, {
             borderTopColor: colors.border,
             backgroundColor: colors.background,
@@ -821,6 +837,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
               )}
             </View>
           </View>
+          )}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -924,4 +941,12 @@ const st = StyleSheet.create({
     borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
   },
   loadMoreText: { fontSize: 13, fontWeight: '700' },
+
+  // Commentaires desactives
+  disabledBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  disabledText: { fontSize: 13, fontWeight: '500' },
 });
