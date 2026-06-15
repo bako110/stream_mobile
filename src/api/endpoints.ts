@@ -73,6 +73,7 @@ export const Endpoints = {
     publishSerie:    (id: string) => `${V1}/content/series/${id}/publish`,
     seriePurchase:   (id: string) => `${V1}/content/series/${id}/purchase`,
     serieAccess:     (id: string) => `${V1}/content/series/${id}/access`,
+    stats:           (id: string) => `${V1}/content/${id}/stats`,
   },
 
   // ── Seasons (prefix: /api/v1/content) ─────────────────────────────────────

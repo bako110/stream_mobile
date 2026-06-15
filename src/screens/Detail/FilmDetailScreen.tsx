@@ -90,6 +90,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [launching, setLaunching]         = useState(false);
   const [isSaved, setIsSaved]             = useState(false);
   const [savingFav, setSavingFav]         = useState(false);
+  const [stats, setStats]                 = useState<{ view_count: number; purchase_count: number; save_count: number } | null>(null);
 
   const isSerie  = item.type === 'serie';
   const banner   = item.banner_url || item.thumbnail_url;
@@ -194,6 +195,12 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setSavingFav(false);
     }
   }, [isSaved, item.id, item.title, item.release_year, item.thumbnail_url, targetType]);
+
+  useEffect(() => {
+    apiClient.get<{ view_count: number; purchase_count: number; save_count: number }>(
+      Endpoints.content.stats(item.id)
+    ).then(r => setStats(r.data)).catch(() => {});
+  }, [item.id]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -422,6 +429,37 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           </Animated.View>
 
+          {/* ── STATS ── */}
+          {stats && (
+            <Animated.View entering={FadeInDown.delay(200).duration(350)} style={[s.statsRow]}>
+              <View style={s.statItem}>
+                <Icon name="eye" size={16} color={colors.primary} />
+                <Text style={[s.statVal, { color: colors.textPrimary }]}>
+                  {stats.view_count >= 1000
+                    ? `${(stats.view_count / 1000).toFixed(1)}k`
+                    : stats.view_count.toLocaleString('fr-FR')}
+                </Text>
+                <Text style={[s.statLabel, { color: colors.textTertiary }]}>vues</Text>
+              </View>
+              <View style={[s.statDivider, { backgroundColor: colors.divider }]} />
+              <View style={s.statItem}>
+                <Icon name="shopping-bag" size={16} color={colors.primary} />
+                <Text style={[s.statVal, { color: colors.textPrimary }]}>
+                  {stats.purchase_count.toLocaleString('fr-FR')}
+                </Text>
+                <Text style={[s.statLabel, { color: colors.textTertiary }]}>achats</Text>
+              </View>
+              <View style={[s.statDivider, { backgroundColor: colors.divider }]} />
+              <View style={s.statItem}>
+                <Icon name="bookmark" size={16} color={isSaved ? colors.primary : colors.primary} />
+                <Text style={[s.statVal, { color: colors.textPrimary }]}>
+                  {stats.save_count.toLocaleString('fr-FR')}
+                </Text>
+                <Text style={[s.statLabel, { color: colors.textTertiary }]}>sauvegardes</Text>
+              </View>
+            </Animated.View>
+          )}
+
           {/* ── SYNOPSIS ── */}
           {synopsis ? (
             <Animated.View entering={FadeInDown.delay(220).duration(350)} style={[s.section, { borderTopColor: colors.border }]}>
@@ -455,8 +493,12 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               {!isSerie && hasVideo && defaultVideo?.duration_sec && (
                 <InfoLine icon="clock" label="Durée" value={formatDuration(defaultVideo.duration_sec)!} colors={colors} />
               )}
-              {item.view_count != null && (
-                <InfoLine icon="eye" label="Vues" value={item.view_count.toLocaleString('fr-FR')} colors={colors} last />
+              {stats && (
+                <InfoLine icon="eye" label="Vues" value={
+                  stats.view_count >= 1000
+                    ? `${(stats.view_count / 1000).toFixed(1)}k`
+                    : stats.view_count.toLocaleString('fr-FR')
+                } colors={colors} last />
               )}
             </View>
           </Animated.View>
@@ -584,6 +626,12 @@ const s = StyleSheet.create({
   synExpand:    { fontSize: 13, fontWeight: '700' },
 
   infoBlock:    { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, overflow: 'hidden' },
+
+  statsRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: 16, marginBottom: 4 },
+  statItem:     { flex: 1, alignItems: 'center', gap: 4 },
+  statVal:      { fontSize: 18, fontWeight: '800' },
+  statLabel:    { fontSize: 11, fontWeight: '500' },
+  statDivider:  { width: StyleSheet.hairlineWidth, height: 36 },
 });
 
 const pw = StyleSheet.create({
