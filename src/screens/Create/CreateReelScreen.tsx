@@ -202,18 +202,26 @@ const VideoPreview: React.FC<PreviewProps> = ({ videoUri, editResult, videoDurat
 // Composant principal
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, sourceReelUrl: _sourceReelUrl }) => {
+export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, sourceReelUrl }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
 
   const [caption,           setCaption]           = useState('');
   const [captionMentionIds, setCaptionMentionIds] = useState<string[]>([]);
-  const [videoUri,          setVideoUri]          = useState<string | null>(null);
+  const [videoUri,          setVideoUri]          = useState<string | null>(sourceReelUrl ?? null);
   const [videoDuration,     setVideoDuration]     = useState(0);
   const [loadingMeta,       setLoadingMeta]       = useState(false);
-  const [showEditor,        setShowEditor]        = useState(false);
+  const [showEditor,        setShowEditor]        = useState(!!sourceReelUrl);
   const [editResult,        setEditResult]        = useState<ReelEditResult | null>(null);
+
+  // Charge la durée de la vidéo source en arrière-plan
+  useEffect(() => {
+    if (!sourceReelUrl) return;
+    getVideoMetaData(sourceReelUrl)
+      .then(meta => setVideoDuration(meta.duration ?? 60))
+      .catch(() => setVideoDuration(60));
+  }, [sourceReelUrl]);
 
   const publishRef = useRef<{
     uri: string; cap: string; mentionIds: string[];
@@ -267,11 +275,13 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
   const handleEditorCancel = useCallback(() => {
     setShowEditor(false);
-    if (!editResult && videoUri) {
+    // Si c'est un remix et qu'on annule l'éditeur sans avoir confirmé,
+    // on reste sur la preview de la vidéo source (ne pas effacer)
+    if (!editResult && videoUri && !sourceReelUrl) {
       setVideoUri(null);
       setVideoDuration(0);
     }
-  }, [editResult, videoUri]);
+  }, [editResult, videoUri, sourceReelUrl]);
 
   const handlePublish = useCallback(() => {
     if (!videoUri) return;
@@ -342,7 +352,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         >
           <Icon name="x" size={19} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Nouveau Reel</Text>
+        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>{sourceReelId ? 'Remixer' : 'Nouveau Reel'}</Text>
         <TouchableOpacity
           style={[s.publishBtn, { opacity: canPublish ? 1 : 0.4 }]}
           onPress={handlePublish}
