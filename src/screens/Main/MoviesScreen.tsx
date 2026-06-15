@@ -603,29 +603,27 @@ export const MoviesScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Ligne 2 : recherche */}
-        <View style={[hdr.searchWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-          <Icon name="search" size={14} color={colors.textTertiary} />
-          <TextInput
-            style={[hdr.searchInput, { color: colors.textPrimary }]}
-            placeholder="Rechercher un film..."
-            placeholderTextColor={colors.textTertiary}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            onFocus={() => { setSearchFocused(true); setSearchHistory(searchHistoryService.getAll()); }}
-            onBlur={() => setSearchFocused(false)}
-            onSubmitEditing={() => { if (search.trim()) { searchHistoryService.add(search.trim()); setSearchHistory(searchHistoryService.getAll()); } }}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <View style={hdr.clearBtn}><Icon name="x" size={10} color="#fff" /></View>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Ligne 3 : bouton filtres */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: H_PAD, paddingBottom: 10, gap: 8 }}>
+        {/* Ligne 2 : recherche + bouton filtre */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: H_PAD, paddingBottom: 10 }}>
+          <View style={[hdr.searchWrap, { flex: 1, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+            <Icon name="search" size={14} color={colors.textTertiary} />
+            <TextInput
+              style={[hdr.searchInput, { color: colors.textPrimary }]}
+              placeholder="Rechercher un film..."
+              placeholderTextColor={colors.textTertiary}
+              value={search}
+              onChangeText={setSearch}
+              returnKeyType="search"
+              onFocus={() => { setSearchFocused(true); setSearchHistory(searchHistoryService.getAll()); }}
+              onBlur={() => setSearchFocused(false)}
+              onSubmitEditing={() => { if (search.trim()) { searchHistoryService.add(search.trim()); setSearchHistory(searchHistoryService.getAll()); } }}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <View style={hdr.clearBtn}><Icon name="x" size={10} color="#fff" /></View>
+              </TouchableOpacity>
+            )}
+          </View>
           <TouchableOpacity
             onPress={openFilter}
             activeOpacity={0.75}
@@ -635,28 +633,8 @@ export const MoviesScreen: React.FC = () => {
             }]}
           >
             <Icon name="sliders" size={15} color={hasActiveFilter ? '#fff' : colors.textSecondary} />
-            <Text style={[hdr.filterBtnTxt, { color: hasActiveFilter ? '#fff' : colors.textSecondary }]}>Filtres</Text>
             {hasActiveFilter && <View style={hdr.filterDot} />}
           </TouchableOpacity>
-          {/* Chips des filtres actifs */}
-          {genre ? (
-            <View style={[hdr.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
-              <Icon name="tag" size={10} color={colors.primary} />
-              <Text style={[hdr.activeChipTxt, { color: colors.primary }]}>{genre}</Text>
-              <TouchableOpacity onPress={() => setGenre('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                <Icon name="x" size={10} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          {country ? (
-            <View style={[hdr.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
-              <Icon name="map-pin" size={10} color={colors.primary} />
-              <Text style={[hdr.activeChipTxt, { color: colors.primary }]}>{country}</Text>
-              <TouchableOpacity onPress={() => setCountry('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                <Icon name="x" size={10} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
         </View>
       </View>
 
@@ -921,14 +899,11 @@ const hdr = StyleSheet.create({
   backBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   title:         { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   sub:           { fontSize: 11, fontWeight: '500', marginTop: 1 },
-  searchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: H_PAD, marginBottom: 10 },
+  searchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
   searchInput:   { flex: 1, fontSize: 14, padding: 0 },
   clearBtn:      { width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(128,128,128,0.5)', alignItems: 'center', justifyContent: 'center' },
-  filterBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
-  filterBtnTxt:  { fontSize: 13, fontWeight: '700' },
-  filterDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', marginLeft: 2 },
-  activeChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  activeChipTxt: { fontSize: 12, fontWeight: '600' },
+  filterBtn:     { width: 36, height: 36, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  filterDot:     { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
 });
 
 const mfl = StyleSheet.create({
