@@ -129,10 +129,27 @@ export const socialService = {
     await apiClient.post(Endpoints.social.share, data);
   },
 
+  async getFriendsWhoLiked(params: {
+    reel_id?: string;
+    event_id?: string;
+    concert_id?: string;
+    content_id?: string;
+    post_id?: string;
+  }): Promise<{ id: string; username: string; display_name?: string; avatar_url?: string; is_verified?: boolean }[]> {
+    const q = new URLSearchParams(
+      Object.entries(params)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, String(v)])
+    ).toString();
+    const res = await apiClient.get<any[]>(`${Endpoints.social.reactionFriends}?${q}`);
+    return res.data;
+  },
+
   async getReactionLikers(params: {
     event_id?: string;
     concert_id?: string;
     reel_id?: string;
+    post_id?: string;
     page?: number;
     limit?: number;
   }): Promise<PostLiker[]> {

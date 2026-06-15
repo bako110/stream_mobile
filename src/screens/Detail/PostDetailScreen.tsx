@@ -629,7 +629,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                   </Text>
                 </TouchableOpacity>
               )}
-              {commentCount > 0 && (
+              {!post?.comments_disabled && commentCount > 0 && (
                 <TouchableOpacity style={s.engageCountItem} onPress={() => setCommentsOpen(true)}>
                   <View style={[s.engageCountDot, { backgroundColor: colors.primary }]}>
                     <MCIcon name="comment-outline" size={10} color="#fff" />
@@ -660,16 +660,18 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             </TouchableOpacity>
 
             {/* Commenter */}
-            <TouchableOpacity activeOpacity={0.8} onPress={() => setCommentsOpen(true)}
-              style={[s.engageBtn, commentCount > 0
-                ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '40' }
-                : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
-            >
-              <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
-              <Text style={[s.engageBtnTxt, { color: commentCount > 0 ? colors.primary : colors.textSecondary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-                {commentCount > 0 ? (commentCount >= 1_000_000 ? `${(commentCount/1_000_000).toFixed(1)}M` : commentCount >= 1_000 ? `${(commentCount/1_000).toFixed(1)}K` : String(commentCount)) : 'Commenter'}
-              </Text>
-            </TouchableOpacity>
+            {!post?.comments_disabled && (
+              <TouchableOpacity activeOpacity={0.8} onPress={() => setCommentsOpen(true)}
+                style={[s.engageBtn, commentCount > 0
+                  ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '40' }
+                  : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+              >
+                <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
+                <Text style={[s.engageBtnTxt, { color: commentCount > 0 ? colors.primary : colors.textSecondary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+                  {commentCount > 0 ? (commentCount >= 1_000_000 ? `${(commentCount/1_000_000).toFixed(1)}M` : commentCount >= 1_000 ? `${(commentCount/1_000).toFixed(1)}K` : String(commentCount)) : 'Commenter'}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Partager */}
             <TouchableOpacity activeOpacity={0.8} onPress={handleShare}

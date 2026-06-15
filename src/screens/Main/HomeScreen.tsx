@@ -23,7 +23,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { localCache } from '../../utils/storage';
 import { useWs } from '../../context/WebSocketContext';
-import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, AvatarWithBadge } from '../../components/common';
+import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, AvatarWithBadge, FriendsWhoLiked } from '../../components/common';
 import {
   concertService, eventService, authService, searchService,
   socialService,
@@ -1059,6 +1059,7 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
   const genre      = concert?.genre ?? null;
   const accessType = concert?.access_type ?? event?.access_type ?? null;
   const price      = concert?.ticket_price ?? event?.ticket_price ?? null;
+  const commentsDisabled = (concert?.comments_disabled ?? event?.comments_disabled) ?? false;
 
   // Prix minimum toutes catégories confondues (badge "à partir de")
   const allPrices = [
@@ -1321,17 +1322,14 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
         </View>
       )}
 
-      {/* ── Compteur likes ─────────────────────────────────────────────────── */}
+      {/* ── Amis qui aiment ────────────────────────────────────────────────── */}
       {likeCount > 0 && (
-        <View style={s.postCounts}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <View style={[s.likeCountDot, { backgroundColor: colors.accentOrange }]}>
-              <Icon name="heart" size={9} color="#fff" />
-            </View>
-            <Text style={[s.postCountText, { color: colors.textTertiary }]}>
-              {likeCount} j'aime{likeCount > 1 ? 's' : ''}
-            </Text>
-          </View>
+        <View style={[s.postCounts, { paddingVertical: 8 }]}>
+          <FriendsWhoLiked
+            entityType={isConcert ? 'concert' : 'event'}
+            entityId={item.id}
+            totalLikes={likeCount}
+          />
         </View>
       )}
 
@@ -1350,10 +1348,12 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
           </TouchableOpacity>
         </Animated.View>
 
-        <TouchableOpacity style={s.actionBtn} onPress={onComment}>
-          <Icon name="message-circle" size={18} color={colors.textSecondary} />
-          <Text style={[s.actionText, { color: colors.textSecondary }]}>Commenter</Text>
-        </TouchableOpacity>
+        {!commentsDisabled && (
+          <TouchableOpacity style={s.actionBtn} onPress={onComment}>
+            <Icon name="message-circle" size={18} color={colors.textSecondary} />
+            <Text style={[s.actionText, { color: colors.textSecondary }]}>Commenter</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={s.actionBtn} onPress={handleShare}>
           <Icon name="share-2" size={18} color={colors.textSecondary} />

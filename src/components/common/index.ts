@@ -49,5 +49,6 @@ export { LinkPreviewCard }       from './LinkPreviewCard';
 export { InlineVideoPlayer }     from './InlineVideoPlayer';
 export { UploadProgressBanner }  from './UploadProgressBanner';
 export { LikersBottomSheet }     from './LikersBottomSheet';
+export { FriendsWhoLiked }       from './FriendsWhoLiked';
 export { BoostPrompt } from './BoostPrompt';
 export { GoFolyXLoader } from './GoFolyXLoader';

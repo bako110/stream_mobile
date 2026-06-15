@@ -26,7 +26,7 @@ import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { userService } from '../../services/userService';
 import {
-  CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader, ShareBottomSheet,
+  CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader, ShareBottomSheet, FriendsWhoLiked,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -971,6 +971,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [refInfo, setRefInfo] = useState<{ label: string; kind: string; thumbnail: string | null; color: string } | null>(null);
   const [skipLeftLabel,  setSkipLeftLabel]  = useState('');
   const [skipRightLabel, setSkipRightLabel] = useState('');
+  const [showOwnerMenu,     setShowOwnerMenu]     = useState(false);
+  const [commentsDisabledSt, setCommentsDisabledSt] = useState(reel.comments_disabled ?? false);
+  const [togglingComments,  setTogglingComments]  = useState(false);
 
   const likeInFlight  = useRef(false);
   const pausedRef     = useRef(false);
@@ -987,6 +990,17 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const STALL_TIMEOUT = 8_000;
 
   const isOwnReel = !!(currentUserId && reel.author?.id && currentUserId === String(reel.author.id));
+
+  const handleToggleFeedComments = useCallback(async () => {
+    setShowOwnerMenu(false);
+    if (togglingComments) return;
+    setTogglingComments(true);
+    try {
+      const res = await socialService.toggleEntityComments('reel', reel.id);
+      setCommentsDisabledSt(res.comments_disabled);
+    } catch { /**/ }
+    finally { setTogglingComments(false); }
+  }, [reel.id, togglingComments]);
 
   const videoUri = reel.hls_url;
   // Mémoïsé : même URI → même objet → useVideoPlayer ne recharge pas
@@ -1433,6 +1447,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           </View>
 
           {reel.caption ? <RichText text={reel.caption} textStyle={s.caption} primaryColor="#93C5FD" maxLines={3} /> : null}
+          {likes > 0 && (
+            <FriendsWhoLiked entityType="reel" entityId={reel.id} totalLikes={likes} lightText />
+          )}
         </View>
 
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
@@ -1440,11 +1457,16 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             <Icon name={muted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
           </TouchableOpacity>
           <ActionBtn icon="heart-outline" iconActive="heart" useMCIcon label={formatCount(likes)} color={liked ? '#E0389A' : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder="#E0389A" activeGlow="#E0389A" />
-          <ActionBtn icon="message-circle" label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />
+          {!commentsDisabledSt && <ActionBtn icon="message-circle" label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
           <ActionBtn icon="share-2" label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
           <ActionBtn icon="eye" label={formatCount(reel.view_count ?? 0)} color="#fff" />
           {!isOwnReel && <ActionBtn icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)} activeBackground="rgba(255,215,0,0.18)" activeBorder="rgba(255,215,0,0.5)" active />}
           {!isOwnReel && <ActionBtn icon="flag" label="" color="rgba(255,255,255,0.7)" onPress={() => setReportVisible(true)} />}
+          {isOwnReel && (
+            <TouchableOpacity style={s.actionBtn} onPress={() => setShowOwnerMenu(true)} activeOpacity={0.8}>
+              <Icon name="more-vertical" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
           {onAdd && (
             <TouchableOpacity style={[s.addActionBtn, { backgroundColor: colors.primary }]} onPress={onAdd}>
               <Icon name="plus" size={20} color="#fff" />
@@ -1453,6 +1475,18 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
 
         <ReportModal visible={reportVisible} contentType="reel" contentId={reel.id} onClose={() => setReportVisible(false)} />
+        <Modal visible={showOwnerMenu} transparent animationType="fade" onRequestClose={() => setShowOwnerMenu(false)}>
+          <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowOwnerMenu(false)}>
+            <View style={[s.ownerMenuCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+              <TouchableOpacity style={s.menuItem} onPress={handleToggleFeedComments} disabled={togglingComments}>
+                <MCIcon name={commentsDisabledSt ? 'comment-check-outline' : 'comment-off-outline'} size={20} color={colors.textPrimary} />
+                <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
+                  {commentsDisabledSt ? 'Activer les commentaires' : 'Desactiver les commentaires'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
         <ShareBottomSheet
           type="reel"
           reel={reel}
@@ -1473,7 +1507,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           </View>
         </KeyboardAvoidingView>
 
-        <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} reelId={reel.id} commentsDisabled={reel.comments_disabled ?? false} onCommentAdded={() => setCommentCount(v => v + 1)} onCommentCountChange={delta => setCommentCount(v => v + delta)} />
+        <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} reelId={reel.id} commentsDisabled={commentsDisabledSt} onCommentAdded={() => setCommentCount(v => v + 1)} onCommentCountChange={delta => setCommentCount(v => v + delta)} />
       </View>
     </View>
   );
@@ -1613,4 +1647,7 @@ const s = StyleSheet.create({
   skipRippleLeft:  { left: 0 },
   skipRippleRight: { right: 80 },
   skipRippleTxt:   { color: '#fff', fontSize: 15, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, overflow: 'hidden' },
+
+  modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  ownerMenuCard: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, minWidth: 220, overflow: 'hidden' },
 });

@@ -23,7 +23,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked } from '../../components/common';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
@@ -3168,6 +3168,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const isFree = isEvent ? event?.access_type === 'free' : concert?.access_type === 'free';
   const isLive = isConcert && concert?.status === 'live';
   const price  = isEvent ? event?.ticket_price : concert?.ticket_price;
+  const commentsDisabled = isEvent ? (event?.comments_disabled ?? false) : (concert?.comments_disabled ?? false);
 
   const accent   = colors.primary;
   const cardIcon = isEvent ? (EVENT_ICONS[event.event_type]  ?? 'calendar') : 'music';
@@ -3405,12 +3406,14 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       {(likeCount > 0 || commentCount > 0 || shareCount > 0) && (
         <View style={[fc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
-            <TouchableOpacity onPress={() => setLikersOpen(true)} style={fc.countChip}>
-              <View style={fc.likeIcon}><MCIcon name="heart" size={11} color="#fff" /></View>
-              <Text style={[fc.countText, { color: colors.textTertiary }]}>{likeCount.toLocaleString('fr')}</Text>
-            </TouchableOpacity>
+            <FriendsWhoLiked
+              entityType={isEvent ? 'event' : 'concert'}
+              entityId={item.id}
+              totalLikes={likeCount}
+              onPressLikers={() => setLikersOpen(true)}
+            />
           )}
-          {commentCount > 0 && (
+          {!commentsDisabled && commentCount > 0 && (
             <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={fc.countChip}>
               <View style={fc.commentIcon}><MCIcon name="comment-outline" size={11} color="#fff" /></View>
               <Text style={[fc.countText, { color: colors.textTertiary }]}>{commentCount.toLocaleString('fr')}</Text>
@@ -3442,7 +3445,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.8}>
+        {!commentsDisabled && <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.8}>
           <View style={[fc.actionPill,
             commentCount > 0
               ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
@@ -3453,7 +3456,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
               {commentCount > 0 ? fmtN(commentCount) : 'Commenter'}
             </Text>
           </View>
-        </TouchableOpacity>
+        </TouchableOpacity>}
 
         <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.8}>
           <View style={[fc.actionPill,

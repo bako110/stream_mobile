@@ -27,6 +27,7 @@ import { ShareBottomSheet } from './ShareBottomSheet';
 import { InlineVideoPlayer } from './InlineVideoPlayer';
 import { ReportModal } from './ReportModal';
 import { LikersBottomSheet } from './LikersBottomSheet';
+import { FriendsWhoLiked } from './FriendsWhoLiked';
 import { LinkPreviewCard } from './LinkPreviewCard';
 
 const { width: SW } = Dimensions.get('window');
@@ -438,14 +439,14 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {(likeCount > 0 || commentCount > 0) && (
         <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
-            <TouchableOpacity onPress={() => setLikersOpen(true)} style={pc.countChip}>
-              <View style={pc.likeCountIcon}>
-                <MCIcon name="heart" size={11} color="#fff" />
-              </View>
-              <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(likeCount)}</Text>
-            </TouchableOpacity>
+            <FriendsWhoLiked
+              entityType="post"
+              entityId={post.id}
+              totalLikes={likeCount}
+              onPressLikers={() => setLikersOpen(true)}
+            />
           )}
-          {commentCount > 0 && (
+          {!commentsDisabledSt && commentCount > 0 && (
             <TouchableOpacity onPress={() => setCommentsOpen(true)} style={[pc.countChip, { marginLeft: 'auto' as any }]}>
               <View style={pc.commentCountIcon}>
                 <MCIcon name="comment-outline" size={11} color="#fff" />
@@ -473,18 +474,20 @@ const PostCardInner: React.FC<PostCardProps> = ({
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={pc.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
-          <View style={[pc.actionPill,
-            commentCount > 0
-              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-          ]}>
-            <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-            <Text style={[pc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-              {commentCount > 0 ? fmtN(commentCount) : 'Commenter'}
-            </Text>
-          </View>
-        </TouchableOpacity>
+        {!commentsDisabledSt && (
+          <TouchableOpacity style={pc.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
+            <View style={[pc.actionPill,
+              commentCount > 0
+                ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
+                : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
+            ]}>
+              <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
+              <Text style={[pc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+                {commentCount > 0 ? fmtN(commentCount) : 'Commenter'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={pc.actionBtn} onPress={() => setShareOpen(true)} activeOpacity={0.8}>
           <View style={[pc.actionPill,

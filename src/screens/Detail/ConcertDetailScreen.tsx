@@ -13,7 +13,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFolyXLoader } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFolyXLoader, FriendsWhoLiked } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { concertService, socialService, authService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
@@ -333,7 +333,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
       }
       try {
         const user = await authService.getMe();
-        setIsOwner(user?.id === data.artist?.id);
+        setIsOwner(String(user?.id) === String(data.artist_id ?? data.artist?.id));
         const tickets = await concertService.getMyTickets();
         setIsRegistered((tickets as any[]).some((t: any) => t.concert_id === concertId));
       } catch { /**/ }
@@ -553,6 +553,13 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           )}
         </View>
 
+        {/* ── Amis qui aiment ─────────────────────────────────────── */}
+        {likeCount > 0 && (
+          <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+            <FriendsWhoLiked entityType="concert" entityId={concertId} totalLikes={likeCount} />
+          </View>
+        )}
+
         {/* ── Barre sociale ────────────────────────────────────────── */}
         <View style={[ds.socialBar, { borderTopColor: colors.divider, borderBottomColor: colors.divider }]}>
           <TouchableOpacity style={ds.socialBtn} onPress={handleLike} activeOpacity={0.7}>
@@ -565,10 +572,12 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               </Text>
             )}
           </TouchableOpacity>
-          <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
-          <TouchableOpacity style={ds.socialBtn} onPress={() => setShowComments(true)} activeOpacity={0.7}>
-            <MCIcon name="comment-outline" size={21} color={colors.textTertiary} />
-          </TouchableOpacity>
+          {!concert?.comments_disabled && <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />}
+          {!concert?.comments_disabled && (
+            <TouchableOpacity style={ds.socialBtn} onPress={() => setShowComments(true)} activeOpacity={0.7}>
+              <MCIcon name="comment-outline" size={21} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={handleNativeShare} activeOpacity={0.7}>
             <MCIcon name="share-outline" size={21} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
