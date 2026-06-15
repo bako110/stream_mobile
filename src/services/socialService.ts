@@ -60,6 +60,16 @@ export const socialService = {
     await apiClient.delete(Endpoints.social.commentById(commentId));
   },
 
+  async toggleEntityComments(
+    entityType: 'post' | 'reel' | 'event' | 'concert' | 'content',
+    entityId: string,
+  ): Promise<{ comments_disabled: boolean }> {
+    const res = await apiClient.patch<{ comments_disabled: boolean }>(
+      Endpoints.social.toggleEntityComments(entityType, entityId),
+    );
+    return res.data;
+  },
+
   // ── Réactions ─────────────────────────────────────────────────────────────
   async toggleReaction(data: {
     reaction_type: ReactionType;

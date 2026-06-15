@@ -363,8 +363,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const [saved,        setSaved]        = useState(false);
   const [reminded,     setReminded]     = useState(false);
   const [remindLoading,setRemindLoading]= useState(false);
-  const [showVideo,    setShowVideo]    = useState(false);
-  const [showComments, setShowComments] = useState(false);
+  const [showVideo,        setShowVideo]        = useState(false);
+  const [showComments,     setShowComments]     = useState(false);
+  const [showOwnerMenu,    setShowOwnerMenu]    = useState(false);
+  const [togglingComments, setTogglingComments] = useState(false);
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [ticketLoading,setTicketLoading]= useState(false);
   const [selectedTier, setSelectedTier] = useState<'simple' | 'vip' | 'vvip' | 'vvvip'>('simple');
@@ -464,6 +466,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       const fresh = (tickets as any[]).find((t: any) => t.event_id === eventId);
       if (fresh) nav.navigate('MyTicket' as any, { ticket: fresh.event ? fresh : { ...fresh, event } });
     } catch { /**/ } finally { setTicketLoading(false); }
+  };
+
+  const handleToggleComments = async () => {
+    if (!event) return;
+    setTogglingComments(true);
+    try {
+      const res = await socialService.toggleEntityComments('event', eventId);
+      setEvent(prev => prev ? { ...prev, comments_disabled: res.comments_disabled } : prev);
+    } catch { /**/ } finally { setTogglingComments(false); setShowOwnerMenu(false); }
   };
 
   const handleBuyTicket = () => {
@@ -748,6 +759,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               style={[ds.ctaSecondary, { paddingHorizontal: 18, backgroundColor: colors.primary + '14' }]}>
               <Icon name="edit-2" size={16} color={colors.primary} />
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowOwnerMenu(true)}
+              style={[ds.ctaSecondary, { paddingHorizontal: 18, backgroundColor: colors.surface }]}>
+              <Icon name="more-vertical" size={16} color={colors.textPrimary} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleDelete}
               style={[ds.ctaSecondary, { paddingHorizontal: 18, backgroundColor: colors.error + '14' }]}>
               <Icon name="trash-2" size={16} color={colors.error} />
@@ -799,6 +814,26 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           onBuy={(tierKey) => eventService.buyTicket(eventId, tierKey)}
         />
       )}
+      {/* Menu propriétaire */}
+      <Modal visible={showOwnerMenu} transparent animationType="fade" onRequestClose={() => setShowOwnerMenu(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setShowOwnerMenu(false)}>
+          <View style={{ position: 'absolute', bottom: 32, left: 16, right: 16, borderRadius: 16, backgroundColor: colors.surface, overflow: 'hidden' }}>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 16 }}
+              onPress={handleToggleComments}
+              disabled={togglingComments}
+            >
+              {togglingComments
+                ? <ActivityIndicator size="small" color={colors.primary} />
+                : <MCIcon name={event?.comments_disabled ? 'comment-check-outline' : 'comment-off-outline'} size={22} color={colors.primary} />
+              }
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
+                {event?.comments_disabled ? 'Activer les commentaires' : 'Desactiver les commentaires'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} eventId={eventId} commentsDisabled={event?.comments_disabled ?? false} />
     </View>
   );

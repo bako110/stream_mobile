@@ -176,6 +176,11 @@ export const Endpoints = {
     // Partages
     share:           `${V1}/social/shares`,
     shareCounts:     `${V1}/social/shares/counts`,
+    // Toggle commentaires par entité
+    toggleEntityComments: (entityType: string, entityId: string) =>
+      `${V1}/social/${entityType}/${entityId}/comments/toggle`,
+    // Toggle global commentaires (préférence utilisateur)
+    commentsSettings: `${V1}/social/comments/settings`,
   },
 
   // ── Posts (prefix: /api/v1/posts) ────────────────────────────────────────

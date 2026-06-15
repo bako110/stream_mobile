@@ -397,6 +397,15 @@ export const ReelsScreen: React.FC = () => {
     ]);
   }, []);
 
+  const handleToggleReelComments = useCallback(async (reel: Reel) => {
+    setMenuReel(null);
+    try {
+      const res = await socialService.toggleEntityComments('reel', reel.id);
+      setMyReels(prev => prev.map(r => r.id === reel.id ? { ...r, comments_disabled: res.comments_disabled } : r));
+      setReels(prev => prev.map(r => r.id === reel.id ? { ...r, comments_disabled: res.comments_disabled } : r));
+    } catch { /**/ }
+  }, []);
+
   const handleOpenEdit = useCallback((reel: Reel) => {
     setMenuReel(null);
     setEditCaption(reel.caption ?? '');
@@ -609,6 +618,13 @@ export const ReelsScreen: React.FC = () => {
               <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleOpenEdit(menuReel)}>
                 <Icon name="edit-2" size={18} color={colors.textPrimary} />
                 <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Modifier la description</Text>
+              </TouchableOpacity>
+              <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+              <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleToggleReelComments(menuReel)}>
+                <MCIcon name={menuReel?.comments_disabled ? 'comment-check-outline' : 'comment-off-outline'} size={18} color={colors.textPrimary} />
+                <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
+                  {menuReel?.comments_disabled ? 'Activer les commentaires' : 'Desactiver les commentaires'}
+                </Text>
               </TouchableOpacity>
               <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
               <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleDeleteReel(menuReel)}>

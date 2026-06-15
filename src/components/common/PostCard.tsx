@@ -20,6 +20,7 @@ import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
 import { favoriteService } from '../../services/favoriteService';
+import { socialService } from '../../services/socialService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 import { RichText } from './RichText';
 import { ShareBottomSheet } from './ShareBottomSheet';
@@ -191,15 +192,16 @@ const PostCardInner: React.FC<PostCardProps> = ({
   const insets   = useSafeAreaInsets();
   const isOwn    = !!(currentUserId && author?.id && currentUserId === author.id);
 
-  const [liked,        setLiked]        = useState(post.user_reaction === 'like');
-  const [likeCount,    setLikeCount]    = useState(post.like_count);
-  const [commentCount, setCommentCount] = useState(post.comment_count ?? 0);
-  const [shareCount,   setShareCount]   = useState(post.share_count ?? 0);
-  const [saved,        setSaved]        = useState(() => saveService.isPostSaved(post.id));
-  const [editOpen,     setEditOpen]     = useState(false);
-  const [editBody,     setEditBody]     = useState(post.body ?? '');
-  const [editSaving,   setEditSaving]   = useState(false);
-  const [menuOpen,     setMenuOpen]     = useState(false);
+  const [liked,             setLiked]             = useState(post.user_reaction === 'like');
+  const [likeCount,         setLikeCount]         = useState(post.like_count);
+  const [commentCount,      setCommentCount]       = useState(post.comment_count ?? 0);
+  const [shareCount,        setShareCount]         = useState(post.share_count ?? 0);
+  const [commentsDisabledSt,setCommentsDisabledSt] = useState(post.comments_disabled ?? false);
+  const [saved,             setSaved]             = useState(() => saveService.isPostSaved(post.id));
+  const [editOpen,          setEditOpen]          = useState(false);
+  const [editBody,          setEditBody]          = useState(post.body ?? '');
+  const [editSaving,        setEditSaving]        = useState(false);
+  const [menuOpen,          setMenuOpen]          = useState(false);
   const [reportOpen,   setReportOpen]   = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen,    setShareOpen]    = useState(false);
@@ -246,6 +248,14 @@ const PostCardInner: React.FC<PostCardProps> = ({
     } catch { Alert.alert('Erreur', 'Impossible de modifier.'); }
     finally { setEditSaving(false); }
   }, [editBody, post.id]);
+
+  const handleToggleComments = useCallback(async () => {
+    setMenuOpen(false);
+    try {
+      const res = await socialService.toggleEntityComments('post', post.id);
+      setCommentsDisabledSt(res.comments_disabled);
+    } catch { /**/ }
+  }, [post.id]);
 
   const handleSave = useCallback(() => {
     const n = !saved;
@@ -546,8 +556,18 @@ const PostCardInner: React.FC<PostCardProps> = ({
             {isOwn && (
               <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                 <MenuRow icon="edit-2" color={colors.primary} iconBg={colors.primary + '18'}
-                  label="Modifier" sub="Éditer le contenu" colors={colors}
+                  label="Modifier" sub="Editer le contenu" colors={colors}
                   onPress={() => { setMenuOpen(false); setEditOpen(true); }} />
+                <View style={[pc.menuDiv, { backgroundColor: colors.divider }]} />
+                <MenuRow
+                  icon={commentsDisabledSt ? 'message-circle' : 'message-square'}
+                  color={commentsDisabledSt ? '#10B981' : '#F59E0B'}
+                  iconBg={commentsDisabledSt ? '#10B98118' : '#F59E0B18'}
+                  label={commentsDisabledSt ? 'Activer les commentaires' : 'Desactiver les commentaires'}
+                  sub={commentsDisabledSt ? 'Permettre les commentaires' : 'Bloquer les commentaires'}
+                  colors={colors}
+                  onPress={handleToggleComments}
+                />
                 <View style={[pc.menuDiv, { backgroundColor: colors.divider }]} />
                 <MenuRow icon="trash-2" color="#EF4444" iconBg="#EF444418"
                   label="Supprimer" sub="Action irréversible" colors={colors}
@@ -585,7 +605,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
       <ReportModal visible={reportOpen} contentType="post" contentId={post.id} onClose={() => setReportOpen(false)} />
       <ShareBottomSheet type="post" visible={shareOpen} onClose={() => setShareOpen(false)} post={post} onShareCountChange={handleShareDone} />
       <CommentsBottomSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} postId={post.id}
-        commentsDisabled={post.comments_disabled ?? false}
+        commentsDisabled={commentsDisabledSt}
         onCommentCountChange={d => setCommentCount(c => Math.max(0, c + d))}
         onCountLoaded={n => setCommentCount(c => Math.max(c, n))} />
       <LikersBottomSheet visible={likersOpen} onClose={() => setLikersOpen(false)} postId={post.id}

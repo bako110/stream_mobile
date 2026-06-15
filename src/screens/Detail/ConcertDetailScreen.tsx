@@ -306,8 +306,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [likeCount,    setLikeCount]    = useState(0);
   const [shareCount,   setShareCount]   = useState(0);
   const [saved,        setSaved]        = useState(false);
-  const [showVideo,    setShowVideo]    = useState(false);
-  const [showComments, setShowComments] = useState(false);
+  const [showVideo,        setShowVideo]        = useState(false);
+  const [showComments,     setShowComments]     = useState(false);
+  const [showOwnerMenu,    setShowOwnerMenu]    = useState(false);
+  const [togglingComments, setTogglingComments] = useState(false);
   const [selectedTier, setSelectedTier] = useState<'simple' | 'vip' | 'vvip' | 'vvvip'>('simple');
   const [replayUrl,    setReplayUrl]    = useState<string | null>(null);
 
@@ -384,6 +386,15 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
       setShareCount(c => c + 1);
       socialService.share({ platform: 'external', concert_id: concertId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
     } catch { /**/ }
+  };
+
+  const handleToggleComments = async () => {
+    if (!concert) return;
+    setTogglingComments(true);
+    try {
+      const res = await socialService.toggleEntityComments('concert', concertId);
+      setConcert(prev => prev ? { ...prev, comments_disabled: res.comments_disabled } : prev);
+    } catch { /**/ } finally { setTogglingComments(false); setShowOwnerMenu(false); }
   };
 
   const handleEdit   = () => nav.navigate('CreateConcert' as any, { concertId });
@@ -655,6 +666,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <Icon name="edit-2" size={16} color={colors.primary} />
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Modifier</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowOwnerMenu(true)}
+              style={[ds.ctaSecondary, { paddingHorizontal: 18, backgroundColor: colors.surface }]}>
+              <Icon name="more-vertical" size={16} color={colors.textPrimary} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleDelete}
               style={[ds.ctaSecondary, { paddingHorizontal: 20, backgroundColor: colors.error + '14' }]}>
               <Icon name="trash-2" size={16} color={colors.error} />
@@ -699,6 +714,26 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         selectedTierKey={selectedTier}
         onBuy={(tierKey) => concertService.buyTicket(concertId, tierKey)}
       />
+      {/* Menu propriétaire */}
+      <Modal visible={showOwnerMenu} transparent animationType="fade" onRequestClose={() => setShowOwnerMenu(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setShowOwnerMenu(false)}>
+          <View style={{ position: 'absolute', bottom: 32, left: 16, right: 16, borderRadius: 16, backgroundColor: colors.surface, overflow: 'hidden' }}>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 16 }}
+              onPress={handleToggleComments}
+              disabled={togglingComments}
+            >
+              {togglingComments
+                ? <ActivityIndicator size="small" color={colors.primary} />
+                : <MCIcon name={concert?.comments_disabled ? 'comment-check-outline' : 'comment-off-outline'} size={22} color={colors.primary} />
+              }
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
+                {concert?.comments_disabled ? 'Activer les commentaires' : 'Desactiver les commentaires'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} concertId={concertId} commentsDisabled={concert?.comments_disabled ?? false} />
     </View>
   );
