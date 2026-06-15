@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, Image, RefreshControl,
-  StyleSheet, Dimensions, ScrollView, StatusBar, FlatList,
+  StyleSheet, Dimensions, ScrollView, StatusBar, FlatList, Modal,
 } from 'react-native';
 import Animated, {
   FadeIn,
@@ -445,7 +445,10 @@ export const FilmsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [genre,   setGenre]         = useState('');
   const [country, setCountry]       = useState('');
-  const [filterMode, setFilterMode] = useState<'genre' | 'country' | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  // Sélection temporaire dans le modal (appliquée seulement à "Appliquer")
+  const [draftGenre,   setDraftGenre]   = useState('');
+  const [draftCountry, setDraftCountry] = useState('');
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [hasActiveSub, setHasActiveSub] = useState(false);
 
@@ -485,6 +488,26 @@ export const FilmsScreen: React.FC = () => {
     setItems([]);
     load();
   }, [tab, genre, country]);
+
+  const openFilter = () => {
+    setDraftGenre(genre);
+    setDraftCountry(country);
+    setFilterOpen(true);
+  };
+
+  const applyFilter = () => {
+    setGenre(draftGenre);
+    setCountry(draftCountry);
+    setFilterOpen(false);
+  };
+
+  const resetFilter = () => {
+    setDraftGenre('');
+    setDraftCountry('');
+  };
+
+  const hasActiveFilter = !!(genre || country);
+  const hasDraftFilter  = !!(draftGenre || draftCountry);
 
   const goDetail = (item: FilmItem) => navigation.navigate('FilmDetail', { item });
 
@@ -537,90 +560,122 @@ export const FilmsScreen: React.FC = () => {
           </View>
         )}
 
-        {/* ── TABS ── */}
-        <View style={{ paddingHorizontal: H_PAD, paddingTop: 18, paddingBottom: 4 }}>
-          <TabSelector tab={tab} onChange={t => { setTab(t); setGenre(''); setCountry(''); }} colors={colors} />
+        {/* ── TABS + BOUTON FILTRE ── */}
+        <View style={{ paddingHorizontal: H_PAD, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <TabSelector tab={tab} onChange={t => { setTab(t); setGenre(''); setCountry(''); }} colors={colors} />
+          </View>
+          <TouchableOpacity
+            onPress={openFilter}
+            activeOpacity={0.75}
+            style={[filt.filterBtn, {
+              backgroundColor: hasActiveFilter ? colors.primary : colors.backgroundSecondary,
+              borderColor: hasActiveFilter ? colors.primary : colors.border,
+            }]}
+          >
+            <Icon name="sliders" size={16} color={hasActiveFilter ? '#fff' : colors.textSecondary} />
+            {hasActiveFilter && <View style={filt.filterDot} />}
+          </TouchableOpacity>
         </View>
 
-        {/* ── FILTRES genre / pays ── */}
-        <View style={{ paddingTop: 10, paddingBottom: 2 }}>
-          {/* Boutons mode filtre */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 8, flexDirection: 'row' }}>
-            <TouchableOpacity
-              onPress={() => setFilterMode(m => m === 'genre' ? null : 'genre')}
-              style={[filt.chip, { backgroundColor: filterMode === 'genre' || genre ? colors.primary + '22' : colors.backgroundSecondary, borderColor: genre ? colors.primary : colors.border }]}
-              activeOpacity={0.7}
-            >
-              <Icon name="tag" size={11} color={genre ? colors.primary : colors.textTertiary} />
-              <Text style={[filt.chipTxt, { color: genre ? colors.primary : colors.textTertiary }]}>
-                {genre || 'Genre'}
-              </Text>
-              {genre ? (
-                <TouchableOpacity onPress={() => { setGenre(''); setFilterMode(null); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+        {/* Chips filtres actifs */}
+        {hasActiveFilter && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: H_PAD, paddingBottom: 10 }}>
+            {genre ? (
+              <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
+                <Icon name="tag" size={10} color={colors.primary} />
+                <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{genre}</Text>
+                <TouchableOpacity onPress={() => setGenre('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
                   <Icon name="x" size={10} color={colors.primary} />
                 </TouchableOpacity>
-              ) : null}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setFilterMode(m => m === 'country' ? null : 'country')}
-              style={[filt.chip, { backgroundColor: filterMode === 'country' || country ? colors.primary + '22' : colors.backgroundSecondary, borderColor: country ? colors.primary : colors.border }]}
-              activeOpacity={0.7}
-            >
-              <Icon name="globe" size={11} color={country ? colors.primary : colors.textTertiary} />
-              <Text style={[filt.chipTxt, { color: country ? colors.primary : colors.textTertiary }]}>
-                {country || 'Pays'}
-              </Text>
-              {country ? (
-                <TouchableOpacity onPress={() => { setCountry(''); setFilterMode(null); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+              </View>
+            ) : null}
+            {country ? (
+              <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
+                <Icon name="map-pin" size={10} color={colors.primary} />
+                <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{country}</Text>
+                <TouchableOpacity onPress={() => setCountry('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
                   <Icon name="x" size={10} color={colors.primary} />
                 </TouchableOpacity>
-              ) : null}
-            </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+        )}
 
-            {(genre || country) && (
-              <TouchableOpacity
-                onPress={() => { setGenre(''); setCountry(''); setFilterMode(null); }}
-                style={[filt.chip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-                activeOpacity={0.7}
-              >
-                <Text style={[filt.chipTxt, { color: colors.textTertiary }]}>Tout effacer</Text>
+        {/* ── MODAL FILTRES ── */}
+        <Modal
+          visible={filterOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setFilterOpen(false)}
+        >
+          <TouchableOpacity style={filt.overlay} activeOpacity={1} onPress={() => setFilterOpen(false)} />
+          <View style={[filt.sheet, { backgroundColor: colors.surface }]}>
+            {/* Handle */}
+            <View style={[filt.handle, { backgroundColor: colors.border }]} />
+
+            {/* Header */}
+            <View style={filt.sheetHeader}>
+              <Text style={[filt.sheetTitle, { color: colors.textPrimary }]}>Filtres</Text>
+              <TouchableOpacity onPress={resetFilter} activeOpacity={0.7}>
+                <Text style={[filt.resetTxt, { color: hasDraftFilter ? colors.primary : colors.textTertiary }]}>Réinitialiser</Text>
               </TouchableOpacity>
-            )}
-          </ScrollView>
+            </View>
 
-          {/* Dropdown genres */}
-          {filterMode === 'genre' && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 7, flexDirection: 'row', paddingTop: 8 }}>
-              {GENRES.map(g => (
-                <TouchableOpacity
-                  key={g}
-                  onPress={() => { setGenre(g === genre ? '' : g); setFilterMode(null); }}
-                  style={[filt.tag, { backgroundColor: g === genre ? colors.primary : colors.backgroundSecondary, borderColor: g === genre ? colors.primary : colors.border }]}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[filt.tagTxt, { color: g === genre ? '#fff' : colors.textSecondary }]}>{g}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+              {/* Section Genre */}
+              <Text style={[filt.sectionTitle, { color: colors.textSecondary }]}>TYPE / GENRE</Text>
+              <View style={filt.tagsWrap}>
+                {GENRES.map(g => {
+                  const active = draftGenre === g;
+                  return (
+                    <TouchableOpacity
+                      key={g}
+                      onPress={() => setDraftGenre(active ? '' : g)}
+                      activeOpacity={0.75}
+                      style={[filt.tag, {
+                        backgroundColor: active ? colors.primary : colors.backgroundSecondary,
+                        borderColor: active ? colors.primary : colors.border,
+                      }]}
+                    >
+                      <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{g}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-          {/* Dropdown pays */}
-          {filterMode === 'country' && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 7, flexDirection: 'row', paddingTop: 8 }}>
-              {COUNTRIES.map(c => (
-                <TouchableOpacity
-                  key={c}
-                  onPress={() => { setCountry(c === country ? '' : c); setFilterMode(null); }}
-                  style={[filt.tag, { backgroundColor: c === country ? colors.primary : colors.backgroundSecondary, borderColor: c === country ? colors.primary : colors.border }]}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[filt.tagTxt, { color: c === country ? '#fff' : colors.textSecondary }]}>{c}</Text>
-                </TouchableOpacity>
-              ))}
+              {/* Section Pays / Zone */}
+              <Text style={[filt.sectionTitle, { color: colors.textSecondary, marginTop: 20 }]}>ZONE / PAYS</Text>
+              <View style={filt.tagsWrap}>
+                {COUNTRIES.map(c => {
+                  const active = draftCountry === c;
+                  return (
+                    <TouchableOpacity
+                      key={c}
+                      onPress={() => setDraftCountry(active ? '' : c)}
+                      activeOpacity={0.75}
+                      style={[filt.tag, {
+                        backgroundColor: active ? colors.primary : colors.backgroundSecondary,
+                        borderColor: active ? colors.primary : colors.border,
+                      }]}
+                    >
+                      <Text style={[filt.tagTxt, { color: active ? '#fff' : colors.textSecondary }]}>{c}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </ScrollView>
-          )}
-        </View>
+
+            {/* Bouton Appliquer */}
+            <TouchableOpacity
+              onPress={applyFilter}
+              activeOpacity={0.85}
+              style={[filt.applyBtn, { backgroundColor: colors.primary }]}
+            >
+              <Text style={filt.applyTxt}>Appliquer</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
 
         {/* ── SECTION HEADER ── */}
         {!loading && <SectionHeader label={label} count={items.length} colors={colors} />}
@@ -664,8 +719,20 @@ const ss = StyleSheet.create({
 });
 
 const filt = StyleSheet.create({
-  chip:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
-  chipTxt: { fontSize: 12, fontWeight: '600' },
-  tag:     { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
-  tagTxt:  { fontSize: 12, fontWeight: '600' },
+  filterBtn:    { width: 40, height: 40, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  filterDot:    { position: 'absolute', top: 7, right: 7, width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  activeChip:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  activeChipTxt:{ fontSize: 12, fontWeight: '600' },
+  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '80%' },
+  handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  sheetHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  sheetTitle:   { fontSize: 18, fontWeight: '800' },
+  resetTxt:     { fontSize: 13, fontWeight: '600' },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 12, paddingHorizontal: 2 },
+  tagsWrap:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
+  tagTxt:       { fontSize: 13, fontWeight: '600' },
+  applyBtn:     { marginTop: 20, marginBottom: 8, paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
+  applyTxt:     { color: '#fff', fontSize: 15, fontWeight: '800' },
 });
