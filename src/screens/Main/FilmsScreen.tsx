@@ -30,6 +30,19 @@ const HERO_N  = 6;
 
 type Tab = 'film' | 'serie';
 
+const GENRES = [
+  'Action', 'Aventure', 'Animation', 'Comédie', 'Documentaire',
+  'Drame', 'Fantastique', 'Horreur', 'Musical', 'Romance',
+  'Science-Fiction', 'Thriller', 'Western', 'Policier', 'Historique',
+];
+
+const COUNTRIES = [
+  'Sénégal', "Côte d'Ivoire", 'Mali', 'Cameroun', 'Nigeria',
+  'Ghana', 'Maroc', 'Algérie', 'Tunisie', 'Égypte',
+  'Afrique du Sud', 'Kenya', 'France', 'États-Unis', 'Royaume-Uni',
+  'Inde', 'Brésil', 'Mexique', 'Chine', 'Japon', 'Corée du Sud',
+];
+
 export interface FilmItem {
   id: string;
   type?: 'film' | 'serie';
@@ -41,6 +54,7 @@ export interface FilmItem {
   short_synopsis?: string | null;
   director?: string | null;
   cast?: unknown;
+  genre?: string | null;
   country?: string | null;
   rating?: string | null;
   thumbnail_url?: string | null;
@@ -429,6 +443,9 @@ export const FilmsScreen: React.FC = () => {
   const [items, setItems]           = useState<FilmItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [genre,   setGenre]         = useState('');
+  const [country, setCountry]       = useState('');
+  const [filterMode, setFilterMode] = useState<'genre' | 'country' | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [hasActiveSub, setHasActiveSub] = useState(false);
 
@@ -446,9 +463,14 @@ export const FilmsScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
+      const params = {
+        page: 1, limit: 40,
+        genre:   genre   || undefined,
+        country: country || undefined,
+      };
       const resp = tab === 'film'
-        ? await contentService.listFilms({ page: 1, limit: 40 })
-        : await contentService.listSeries({ page: 1, limit: 40 });
+        ? await contentService.listFilms(params)
+        : await contentService.listSeries(params);
       setItems(Array.isArray(resp) ? resp : (resp as any)?.items ?? []);
     } catch {
       setItems([]);
@@ -456,13 +478,13 @@ export const FilmsScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [tab]);
+  }, [tab, genre, country]);
 
   useEffect(() => {
     setLoading(true);
     setItems([]);
     load();
-  }, [tab]);
+  }, [tab, genre, country]);
 
   const goDetail = (item: FilmItem) => navigation.navigate('FilmDetail', { item });
 
@@ -517,7 +539,87 @@ export const FilmsScreen: React.FC = () => {
 
         {/* ── TABS ── */}
         <View style={{ paddingHorizontal: H_PAD, paddingTop: 18, paddingBottom: 4 }}>
-          <TabSelector tab={tab} onChange={t => setTab(t)} colors={colors} />
+          <TabSelector tab={tab} onChange={t => { setTab(t); setGenre(''); setCountry(''); }} colors={colors} />
+        </View>
+
+        {/* ── FILTRES genre / pays ── */}
+        <View style={{ paddingTop: 10, paddingBottom: 2 }}>
+          {/* Boutons mode filtre */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 8, flexDirection: 'row' }}>
+            <TouchableOpacity
+              onPress={() => setFilterMode(m => m === 'genre' ? null : 'genre')}
+              style={[filt.chip, { backgroundColor: filterMode === 'genre' || genre ? colors.primary + '22' : colors.backgroundSecondary, borderColor: genre ? colors.primary : colors.border }]}
+              activeOpacity={0.7}
+            >
+              <Icon name="tag" size={11} color={genre ? colors.primary : colors.textTertiary} />
+              <Text style={[filt.chipTxt, { color: genre ? colors.primary : colors.textTertiary }]}>
+                {genre || 'Genre'}
+              </Text>
+              {genre ? (
+                <TouchableOpacity onPress={() => { setGenre(''); setFilterMode(null); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <Icon name="x" size={10} color={colors.primary} />
+                </TouchableOpacity>
+              ) : null}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setFilterMode(m => m === 'country' ? null : 'country')}
+              style={[filt.chip, { backgroundColor: filterMode === 'country' || country ? colors.primary + '22' : colors.backgroundSecondary, borderColor: country ? colors.primary : colors.border }]}
+              activeOpacity={0.7}
+            >
+              <Icon name="globe" size={11} color={country ? colors.primary : colors.textTertiary} />
+              <Text style={[filt.chipTxt, { color: country ? colors.primary : colors.textTertiary }]}>
+                {country || 'Pays'}
+              </Text>
+              {country ? (
+                <TouchableOpacity onPress={() => { setCountry(''); setFilterMode(null); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <Icon name="x" size={10} color={colors.primary} />
+                </TouchableOpacity>
+              ) : null}
+            </TouchableOpacity>
+
+            {(genre || country) && (
+              <TouchableOpacity
+                onPress={() => { setGenre(''); setCountry(''); setFilterMode(null); }}
+                style={[filt.chip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                activeOpacity={0.7}
+              >
+                <Text style={[filt.chipTxt, { color: colors.textTertiary }]}>Tout effacer</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+
+          {/* Dropdown genres */}
+          {filterMode === 'genre' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 7, flexDirection: 'row', paddingTop: 8 }}>
+              {GENRES.map(g => (
+                <TouchableOpacity
+                  key={g}
+                  onPress={() => { setGenre(g === genre ? '' : g); setFilterMode(null); }}
+                  style={[filt.tag, { backgroundColor: g === genre ? colors.primary : colors.backgroundSecondary, borderColor: g === genre ? colors.primary : colors.border }]}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[filt.tagTxt, { color: g === genre ? '#fff' : colors.textSecondary }]}>{g}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Dropdown pays */}
+          {filterMode === 'country' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 7, flexDirection: 'row', paddingTop: 8 }}>
+              {COUNTRIES.map(c => (
+                <TouchableOpacity
+                  key={c}
+                  onPress={() => { setCountry(c === country ? '' : c); setFilterMode(null); }}
+                  style={[filt.tag, { backgroundColor: c === country ? colors.primary : colors.backgroundSecondary, borderColor: c === country ? colors.primary : colors.border }]}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[filt.tagTxt, { color: c === country ? '#fff' : colors.textSecondary }]}>{c}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
 
         {/* ── SECTION HEADER ── */}
@@ -559,4 +661,11 @@ const ss = StyleSheet.create({
   empty:      { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyTitle: { fontSize: 17, fontWeight: '800' },
   emptySub:   { fontSize: 13, fontWeight: '500' },
+});
+
+const filt = StyleSheet.create({
+  chip:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
+  chipTxt: { fontSize: 12, fontWeight: '600' },
+  tag:     { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
+  tagTxt:  { fontSize: 12, fontWeight: '600' },
 });

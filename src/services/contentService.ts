@@ -9,6 +9,8 @@ export const contentService = {
     limit?: number;
     year?: number;
     language?: string;
+    genre?: string;
+    country?: string;
     is_premium?: boolean;
     sort?: 'recent' | 'rating' | 'year' | 'views';
   }): Promise<ContentListResponse> {
@@ -18,6 +20,8 @@ export const contentService = {
     };
     if (params?.year       != null) p.year       = String(params.year);
     if (params?.language)           p.language   = params.language;
+    if (params?.genre)              p.genre      = params.genre;
+    if (params?.country)            p.country    = params.country;
     if (params?.is_premium != null) p.is_premium = String(params.is_premium);
     if (params?.sort)               p.sort       = params.sort;
     const res = await apiClient.get<ContentListResponse>(
@@ -37,6 +41,8 @@ export const contentService = {
     limit?: number;
     year?: number;
     language?: string;
+    genre?: string;
+    country?: string;
     is_premium?: boolean;
     sort?: 'recent' | 'rating' | 'year' | 'views' | 'seasons';
   }): Promise<ContentListResponse> {
@@ -46,6 +52,8 @@ export const contentService = {
     };
     if (params?.year       != null) p.year       = String(params.year);
     if (params?.language)           p.language   = params.language;
+    if (params?.genre)              p.genre      = params.genre;
+    if (params?.country)            p.country    = params.country;
     if (params?.is_premium != null) p.is_premium = String(params.is_premium);
     if (params?.sort)               p.sort       = params.sort;
     const res = await apiClient.get<ContentListResponse>(

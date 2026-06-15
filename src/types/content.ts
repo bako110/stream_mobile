@@ -14,6 +14,7 @@ export interface Content {
   director: string | null;
   cast: Record<string, string> | null;
   language: string;
+  genre: string | null;
   country: string | null;
   rating: string | null;
   thumbnail_url: string | null;
