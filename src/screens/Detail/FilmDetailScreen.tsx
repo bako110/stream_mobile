@@ -2,15 +2,15 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, Dimensions, StatusBar, ActivityIndicator, InteractionManager,
-  Modal, Alert, Share,
+  Modal, Alert,
 } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton } from '../../components/common';
+import { BackButton, ShareBottomSheet } from '../../components/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { contentService, socialService } from '../../services';
+import { contentService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { VideoMeta } from '../../types';
@@ -202,15 +202,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     ).then(r => setStats(r.data)).catch(() => {});
   }, [item.id]);
 
-  const handleShare = useCallback(async () => {
-    try {
-      await Share.share({
-        title:   item.title,
-        message: `${item.title}${item.release_year ? ` (${item.release_year})` : ''} — Disponible sur GoFolyX`,
-      });
-      socialService.share({ platform: 'external', content_id: item.id } as any).catch(() => {});
-    } catch { /**/ }
-  }, [item.id, item.title, item.release_year]);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const handleWatch = async () => {
     if (item.is_premium && !hasAccess) {
@@ -422,7 +414,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <TouchableOpacity
                 style={[s.ctaIconBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
                 activeOpacity={0.8}
-                onPress={handleShare}
+                onPress={() => setShareOpen(true)}
               >
                 <Icon name="share-2" size={16} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -589,6 +581,14 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+
+      <ShareBottomSheet
+        type="film"
+        film={item}
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        onShareCountChange={() => setStats(s => s ? { ...s, save_count: s.save_count } : s)}
+      />
 
     </View>
   );
