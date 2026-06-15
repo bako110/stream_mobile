@@ -368,7 +368,7 @@ const styles = (colors: any) => StyleSheet.create({
 
   // Modal
   modalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
-  modalBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  modalBg: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' },
   modalBox: {
     width: '100%', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, gap: 12,

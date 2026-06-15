@@ -85,7 +85,7 @@ export const ReportModal: React.FC<Props> = ({ visible, contentType, contentId, 
 
           {/* Détails (optionnel) */}
           <TextInput
-            style={[st.input, { backgroundColor: colors.inputBackground, color: colors.textPrimary, borderColor: colors.border }]}
+            style={[st.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
             placeholder="Détails supplémentaires (optionnel)"
             placeholderTextColor={colors.textTertiary}
             value={details}

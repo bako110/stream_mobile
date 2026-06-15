@@ -512,7 +512,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
           ) : (
             <View>
               {episodes.map((ep, index) => {
-                const locked = item.is_premium && !hasAccess && !ep.is_free;
+                const locked = !!(item.is_premium && !hasAccess && !ep.is_free);
                 return (
                   <EpisodeCard
                     key={ep.id}

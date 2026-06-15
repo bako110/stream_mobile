@@ -20,6 +20,7 @@ export interface AttachmentMeta {
   latitude?:      number;
   longitude?:     number;
   address?:       string | null;
+  hls_url?:       string;
 }
 
 export interface ConversationSummary {

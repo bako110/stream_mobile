@@ -1138,7 +1138,7 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
         ? favoriteService.save({ target_type: 'concert', target_id: item.id, target_title: ct.title, target_subtitle: ct.venue_city ?? ct.artist?.username, target_thumbnail: ct.thumbnail_url }).catch(() => {})
         : favoriteService.unsave('concert', item.id).catch(() => {});
     } else {
-      const ev = item.data as Event;
+      const ev = item.data as any;
       newSaved
         ? favoriteService.save({ target_type: 'event', target_id: item.id, target_title: ev.title, target_subtitle: ev.venue_city ?? ev.location, target_thumbnail: ev.thumbnail_url ?? ev.cover_url }).catch(() => {})
         : favoriteService.unsave('event', item.id).catch(() => {});
@@ -1148,7 +1148,7 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
   const handleShare = async () => {
     try {
       await Share.share({ title, message: `${title} — Découvrez sur GoFolyX !` });
-      const params = isConcert ? { concert_id: item.id } : { event_id: item.id };
+      const params = isConcert ? { platform: 'native', concert_id: item.id } : { platform: 'native', event_id: item.id };
       socialService.share(params).catch(() => {});
     } catch { /* annulé */ }
   };
@@ -1325,11 +1325,13 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
       {/* ── Amis qui aiment ────────────────────────────────────────────────── */}
       {likeCount > 0 && (
         <View style={[s.postCounts, { paddingVertical: 8 }]}>
-          <FriendsWhoLiked
-            entityType={isConcert ? 'concert' : 'event'}
-            entityId={item.id}
-            totalLikes={likeCount}
-          />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <FriendsWhoLiked
+              entityType={isConcert ? 'concert' : 'event'}
+              entityId={item.id}
+              totalLikes={likeCount}
+            />
+          </View>
         </View>
       )}
 

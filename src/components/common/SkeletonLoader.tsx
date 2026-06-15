@@ -19,7 +19,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const SkeletonBox: React.FC<{
   width?: number | string;
-  height?: number;
+  height?: number | string;
   borderRadius?: number;
   style?: object;
 }> = ({ width = '100%', height = 16, borderRadius: br = BorderRadius.sm, style }) => {

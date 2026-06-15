@@ -200,8 +200,8 @@ export const CallScreen: React.FC = () => {
   const getLocalStream = useCallback(async (): Promise<MediaStream> => {
     if (Platform.OS === 'android') {
       const perms = isVideo
-        ? [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, PermissionsAndroid.PERMISSIONS.CAMERA] as const
-        : [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] as const;
+        ? [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, PermissionsAndroid.PERMISSIONS.CAMERA]
+        : [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
       await PermissionsAndroid.requestMultiple(perms);
     }
     const stream = await mediaDevices.getUserMedia({

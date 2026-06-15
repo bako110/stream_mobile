@@ -86,11 +86,10 @@ const AdCard: React.FC<{
   onDelete: () => void;
 }> = ({ item, colors, onEdit, onToggle, onDelete }) => {
   const statusColor = adService.statusColor(item.status);
-  const remaining   = item.budget_eur - item.spent_eur;
   const pct         = item.budget_eur > 0 ? item.spent_eur / item.budget_eur : 0;
-  const coinsTotal  = eur2coins(item.budget_eur);
-  const coinsSpent  = eur2coins(item.spent_eur);
-  const coinsLeft   = eur2coins(remaining);
+  const coinsTotal  = (item as any).coins_debited  ?? eur2coins(item.budget_eur);
+  const coinsSpent  = (item as any).coins_spent    ?? eur2coins(item.spent_eur);
+  const coinsLeft   = (item as any).coins_remaining ?? Math.max(0, coinsTotal - coinsSpent);
   const cpmCoins    = eur2coins(item.cpm_eur ?? 2);
 
   const PLACEMENT_LABELS: Record<string, string> = {

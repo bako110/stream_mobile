@@ -447,4 +447,9 @@ export const Endpoints = {
     impression:  (id: string) => `${V1}/ads/${id}/impression`,
     click:       (id: string) => `${V1}/ads/${id}/click`,
   },
+
+  // ── Utilitaires ───────────────────────────────────────────────────────────
+  utils: {
+    linkPreview: (url: string) => `${V1}/utils/link-preview?url=${encodeURIComponent(url)}`,
+  },
 } as const;

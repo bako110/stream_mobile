@@ -425,13 +425,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {/* ── Apercu lien ────────────────────────────────────────────────────── */}
       {post.link_url ? (
         <View style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
-          <LinkPreviewCard
-            url={post.link_url}
-            title={post.link_preview_title}
-            description={post.link_preview_description}
-            image={post.link_preview_image}
-            colors={colors}
-          />
+          <LinkPreviewCard url={post.link_url} />
         </View>
       ) : null}
 
@@ -439,12 +433,14 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {(likeCount > 0 || commentCount > 0) && (
         <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
-            <FriendsWhoLiked
-              entityType="post"
-              entityId={post.id}
-              totalLikes={likeCount}
-              onPressLikers={() => setLikersOpen(true)}
-            />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <FriendsWhoLiked
+                entityType="post"
+                entityId={post.id}
+                totalLikes={likeCount}
+                onPressLikers={() => setLikersOpen(true)}
+              />
+            </View>
           )}
           {!commentsDisabledSt && commentCount > 0 && (
             <TouchableOpacity onPress={() => setCommentsOpen(true)} style={[pc.countChip, { marginLeft: 'auto' as any }]}>

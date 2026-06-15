@@ -18,7 +18,7 @@ export const layout = StyleSheet.create({
   fillCenter:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // Absolute fill
-  absoluteFill:   { ...StyleSheet.absoluteFillObject },
+  absoluteFill:   { ...StyleSheet.absoluteFill },
 
   // Scroll padding standard
   scrollContent:  { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24 },

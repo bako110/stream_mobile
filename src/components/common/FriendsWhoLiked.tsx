@@ -73,6 +73,12 @@ export const FriendsWhoLiked: React.FC<Props> = ({
     label = `${names[0]} et ${fmtCount(totalLikes - 1)} autre${totalLikes > 2 ? 's' : ''} aiment ceci`;
   }
 
+  const visibleFriends = friends.slice(0, 3);
+  // Largeur réelle occupée par les avatars empilés
+  const avatarsWidth = visibleFriends.length > 0
+    ? AVATAR_SIZE + (visibleFriends.length - 1) * OVERLAP
+    : 0;
+
   return (
     <TouchableOpacity
       style={s.row}
@@ -80,15 +86,15 @@ export const FriendsWhoLiked: React.FC<Props> = ({
       onPress={onPressLikers}
       disabled={!onPressLikers}
     >
-      {/* Avatars empilés */}
-      {friends.length > 0 && (
-        <View style={s.avatarsWrap}>
-          {friends.slice(0, 3).map((f, i) => (
+      {/* Avatars empilés — largeur exacte pour ne pas mordre sur le texte */}
+      {visibleFriends.length > 0 && (
+        <View style={[s.avatarsWrap, { width: avatarsWidth }]}>
+          {visibleFriends.map((f, i) => (
             <View
               key={f.id}
               style={[
                 s.avatarWrap,
-                { left: i * 14, zIndex: 3 - i, borderColor },
+                { left: i * OVERLAP, zIndex: 3 - i, borderColor },
               ]}
             >
               {f.avatar_url ? (
@@ -112,12 +118,13 @@ export const FriendsWhoLiked: React.FC<Props> = ({
   );
 };
 
-const AVATAR_SIZE = 24;
+const AVATAR_SIZE = 22;
+const OVERLAP     = 14; // décalage entre avatars empilés
 
 const s = StyleSheet.create({
-  row:          { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  avatarsWrap:  { width: AVATAR_SIZE + 14 * 2, height: AVATAR_SIZE, position: 'relative' },
-  avatarWrap:   {
+  row:           { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  avatarsWrap:   { height: AVATAR_SIZE, position: 'relative', flexShrink: 0 },
+  avatarWrap:    {
     position: 'absolute',
     width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2,
     overflow: 'hidden', borderWidth: 1.5,
@@ -125,5 +132,5 @@ const s = StyleSheet.create({
   avatar:        { width: '100%', height: '100%' },
   avatarFallback:{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontSize: 8, fontWeight: '800' },
-  label:         { fontSize: 12, flex: 1, lineHeight: 16 },
+  label:         { fontSize: 12, flex: 1, flexShrink: 1, lineHeight: 16 },
 });

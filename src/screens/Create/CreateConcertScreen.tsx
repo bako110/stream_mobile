@@ -259,7 +259,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
     const needsLive = (concertType === 'live' || concertType === 'live_and_replay') && !isEditing;
     if (needsLive) {
       try {
-        const cost = await apiClient.get('/api/v1/lives/cost');
+        const cost = await apiClient.get('/api/v1/lives/cost') as any;
         const { cost_coins, balance, sufficient } = cost;
         if (!sufficient) {
           Alert.alert(

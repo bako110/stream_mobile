@@ -109,6 +109,7 @@ export interface CommunityWsCommunityUpdated {
   avatar_url: string | null;
   banner_url: string | null;
   is_private: boolean;
+  members_only_chat?: boolean;
 }
 
 export interface CommunityWsCommunityDeleted {
@@ -190,6 +191,11 @@ export type CommunityWsPayload =
   | CommunityWsCommunityUpdated
   | CommunityWsCommunityDeleted
   | CommunityWsCommunityVerified
+  | { type: 'treasurer_election_launched'; [key: string]: unknown }
+  | { type: 'treasurer_vote_cast'; [key: string]: unknown }
+  | { type: 'treasurer_elected'; [key: string]: unknown }
+  | { type: 'community_cotisation_created'; cotisation: any }
+  | { type: 'community_cotisation_updated'; cotisation: any }
   | { type: 'pong' }
   | { type: 'error'; detail: string };
 

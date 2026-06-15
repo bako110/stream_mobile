@@ -671,7 +671,7 @@ export const ReelsScreen: React.FC = () => {
 
       <FlatList
         ref={listRef}
-        data={feedWithAds}
+        data={feedWithAds as any[]}
         keyExtractor={r => (r as any).id}
         style={{ flex: 1, marginTop: HEADER_H }}
         pagingEnabled={false}
@@ -878,32 +878,35 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
           resizeMode="cover"
         />
       ) : (
-        <LinearGradient
-          colors={['#7B3FF2', '#E0389A']}
-          style={{ position: 'absolute', width: screenW, height: screenH }}
-        />
+        <View style={{ position: 'absolute', width: screenW, height: screenH, backgroundColor: '#111' }} />
       )}
 
       {/* Gradient bas */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.92)']}
+        colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
         locations={[0.3, 0.65, 1]}
         style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.55 }}
       />
 
-      {/* Badge sponsorisé */}
-      <View style={{ position: 'absolute', top: 14, left: 14, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-        <Icon name="zap" size={11} color="#F59E0B" />
-        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>Sponsorisé</Text>
+      {/* Label Sponsorisé — sobre, top left */}
+      <View style={{ position: 'absolute', top: 52, left: 14, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600' }}>Sponsorisé</Text>
+        <Icon name="globe" size={10} color="rgba(255,255,255,0.45)" />
       </View>
 
       {/* Contenu bas */}
       <View style={{ position: 'absolute', bottom: 50, left: 16, right: 72 }}>
-        <Text style={{ color: '#fff', fontSize: 19, fontWeight: '800', marginBottom: 6, lineHeight: 24, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={2}>
-          {ad.title}
-        </Text>
+        {/* Annonceur */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+            <Icon name="zap" size={14} color="#fff" />
+          </View>
+          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
+            {ad.title}
+          </Text>
+        </View>
         {ad.description ? (
-          <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, lineHeight: 19, marginBottom: 14 }} numberOfLines={2}>
+          <Text style={{ color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 18, marginBottom: 14 }} numberOfLines={2}>
             {ad.description}
           </Text>
         ) : null}
@@ -914,12 +917,12 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
               apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
               if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
             }}
-            style={{ alignSelf: 'flex-start', backgroundColor: '#fff', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: 7 }}
+            style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
           >
-            <Icon name="external-link" size={13} color="#7B3FF2" />
-            <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 13 }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
               {ad.cta_text || 'En savoir plus'}
             </Text>
+            <Icon name="chevron-right" size={13} color="#fff" />
           </TouchableOpacity>
         ) : null}
       </View>

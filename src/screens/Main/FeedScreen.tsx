@@ -106,8 +106,8 @@ interface AdData {
   format: string;
 }
 
-const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (url: string) => void }> = React.memo(
-  ({ ad, onImpression, onPress }) => {
+const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (id: string, url: string) => void }> = React.memo(
+  ({ ad, colors, onImpression, onPress }) => {
     const firedRef = useRef<string | null>(null);
     useEffect(() => {
       if (ad?.id && firedRef.current !== ad.id) {
@@ -115,155 +115,97 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
         onImpression(ad.id);
       }
     }, [ad?.id, onImpression]);
-    const hasCreative = !!(ad.creative_url || ad.thumbnail_url);
-    const fullTitle = ad.title ?? '';
 
-    // ── Typewriter : lettres apparaissent une par une ──────────────────────
-    const [displayedTitle, setDisplayedTitle] = useState('');
-    const titleOpacity = useSharedValue(1);
-
-    useEffect(() => {
-      setDisplayedTitle('');
-      titleOpacity.value = 1;
-      let i = 0;
-      const iv = setInterval(() => {
-        i += 1;
-        setDisplayedTitle(fullTitle.slice(0, i));
-        if (i >= fullTitle.length) {
-          clearInterval(iv);
-          // Pulse lent une fois l'écriture terminée
-          titleOpacity.value = withRepeat(
-            withSequence(
-              withTiming(0.5, { duration: 1000 }),
-              withTiming(1,   { duration: 1000 }),
-            ), -1, false,
-          );
-        }
-      }, 40);
-      return () => clearInterval(iv);
-    }, [fullTitle]);
-
-    const titleAnimStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
-
-    // ── Ken Burns : zoom lent + légère dérive sur l'image ─────────────────
-    const imgScale = useSharedValue(1);
-    const imgX     = useSharedValue(0);
-    useEffect(() => {
-      imgScale.value = withRepeat(withTiming(1.08, { duration: 7000 }), -1, true);
-      imgX.value     = withRepeat(withTiming(-8,   { duration: 7000 }), -1, true);
-    }, []);
-    const imgAnimStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: imgScale.value }, { translateX: imgX.value }],
-    }));
+    const hasImage = !!(ad.creative_url || ad.thumbnail_url);
+    const imageUri = ad.creative_url || ad.thumbnail_url;
 
     return (
-      <TouchableOpacity
-        activeOpacity={0.95}
-        onPress={() => ad.cta_url && onPress(ad.cta_url)}
-        style={{
-          marginVertical: 6, marginHorizontal: 0, overflow: 'hidden',
-          shadowColor: '#7B3FF2', shadowOpacity: 0.18, shadowRadius: 20,
-          shadowOffset: { width: 0, height: 6 }, elevation: 6,
-        }}
-      >
-        {hasCreative ? (
-          <View style={{ height: 460, overflow: 'hidden' }}>
-            <Animated.Image
-              source={{ uri: (ad.creative_url || ad.thumbnail_url)! }}
-              style={[{ width: '100%', height: '100%' }, imgAnimStyle]}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.88)']}
-              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 230 }}
-              pointerEvents="none"
-            />
-            {/* Badge */}
-            <View style={{
-              position: 'absolute', top: 14, left: 14,
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              backgroundColor: 'rgba(0,0,0,0.6)',
-              paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
-            }}>
-              <Icon name="zap" size={9} color="#F59E0B" />
-              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>SPONSORISÉ</Text>
-            </View>
+      <View style={[adSt.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
 
-            {/* Contenu bas */}
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18 }}>
-              {/* Titre typewriter + pulse */}
-              <Animated.Text
-                style={[titleAnimStyle, {
-                  color: '#fff', fontSize: 21, fontWeight: '900', lineHeight: 27, marginBottom: 6,
-                  textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
-                }]}
-                numberOfLines={2}
-              >
-                {displayedTitle}
-              </Animated.Text>
-
-              {ad.description ? (
-                <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, lineHeight: 18, marginBottom: 14 }} numberOfLines={2}>
-                  {ad.description}
-                </Text>
-              ) : <View style={{ height: 10 }} />}
-
-              {ad.cta_url ? (
-                <LinearGradient
-                  colors={['#7B3FF2', '#E0389A']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                    gap: 8, paddingVertical: 13, borderRadius: 14 }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>
-                    {ad.cta_text ?? 'En savoir plus'}
-                  </Text>
-                  <Icon name="arrow-right" size={15} color="#fff" />
-                </LinearGradient>
-              ) : null}
+        {/* ── En-tête : logo annonceur + label Sponsorisé ── */}
+        <View style={adSt.header}>
+          <View style={[adSt.logoWrap, { backgroundColor: colors.primary + '18' }]}>
+            <Icon name="zap" size={16} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[adSt.advertiserName, { color: colors.textPrimary }]} numberOfLines={1}>
+              {ad.title}
+            </Text>
+            <View style={adSt.sponsoredRow}>
+              <Text style={[adSt.sponsoredLabel, { color: colors.textTertiary }]}>Sponsorisé</Text>
+              <Icon name="globe" size={10} color={colors.textTertiary} />
             </View>
           </View>
+          <TouchableOpacity style={adSt.moreBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
 
+        {/* ── Description courte ── */}
+        {ad.description ? (
+          <Text style={[adSt.description, { color: colors.textSecondary }]} numberOfLines={3}>
+            {ad.description}
+          </Text>
+        ) : null}
+
+        {/* ── Image créative ── */}
+        {hasImage ? (
+          <Image
+            source={{ uri: imageUri! }}
+            style={adSt.image}
+            resizeMode="cover"
+          />
         ) : (
-          <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={{ padding: 28, minHeight: 220, justifyContent: 'space-between' }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 }}>
-              <Icon name="zap" size={9} color="#F59E0B" />
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>SPONSORISÉ</Text>
-            </View>
-            <View>
-              {/* Titre typewriter + pulse */}
-              <Animated.Text
-                style={[titleAnimStyle, { color: '#fff', fontSize: 22, fontWeight: '900', lineHeight: 28, marginBottom: 8 }]}
-                numberOfLines={2}
-              >
-                {displayedTitle}
-              </Animated.Text>
-              {ad.description ? (
-                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 20, marginBottom: 20 }} numberOfLines={3}>
-                  {ad.description}
-                </Text>
-              ) : <View style={{ height: 16 }} />}
-              {ad.cta_url ? (
-                <View style={{ backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: 20,
-                  borderRadius: 14, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ color: '#7B3FF2', fontSize: 14, fontWeight: '800' }}>
-                    {ad.cta_text ?? 'En savoir plus'}
-                  </Text>
-                  <Icon name="arrow-right" size={14} color="#7B3FF2" />
-                </View>
-              ) : null}
-            </View>
-          </LinearGradient>
+          <View style={[adSt.imagePlaceholder, { backgroundColor: colors.primary + '14' }]}>
+            <Icon name="image" size={32} color={colors.primary + '60'} />
+          </View>
         )}
-      </TouchableOpacity>
+
+        {/* ── Pied : CTA + "En savoir plus" ── */}
+        <View style={[adSt.footer, { borderTopColor: colors.divider }]}>
+          <View style={{ flex: 1 }}>
+            {ad.cta_url ? (
+              <Text style={[adSt.ctaDomain, { color: colors.textTertiary }]} numberOfLines={1}>
+                {ad.cta_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+              </Text>
+            ) : null}
+            <Text style={[adSt.ctaTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              {ad.cta_text ?? 'En savoir plus'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[adSt.ctaBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+            activeOpacity={0.8}
+            onPress={() => ad.cta_url && onPress(ad.id, ad.cta_url)}
+          >
+            <Text style={[adSt.ctaBtnText, { color: colors.textPrimary }]}>
+              En savoir plus
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+      </View>
     );
   },
 );
+
+const adSt = StyleSheet.create({
+  card:           { marginVertical: 6, borderWidth: StyleSheet.hairlineWidth, borderRadius: 0 },
+  header:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  logoWrap:       { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  advertiserName: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
+  sponsoredRow:   { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  sponsoredLabel: { fontSize: 11 },
+  moreBtn:        { padding: 4 },
+  description:    { fontSize: 14, lineHeight: 20, paddingHorizontal: 14, paddingBottom: 10 },
+  image:          { width: '100%', height: 220 },
+  imagePlaceholder:{ width: '100%', height: 180, alignItems: 'center', justifyContent: 'center' },
+  footer:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  ctaDomain:      { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 1 },
+  ctaTitle:       { fontSize: 13, fontWeight: '600' },
+  ctaBtn:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 6, borderWidth: 1 },
+  ctaBtnText:     { fontSize: 13, fontWeight: '700' },
+});
 
 // ── LiveConcertCard — mémoïsé : re-rend uniquement si ses props changent ──────
 
@@ -890,10 +832,10 @@ export const FeedScreen: React.FC = () => {
             result.push({ kind: 'suggestions', id: `__suggestions__${suggestCount}`, data: null });
           }
 
-          // Publicité : toutes les AD_EVERY cartes (placeholder, data chargée async)
-          if (i > 0 && i % AD_EVERY === 0) {
+          // Publicité : une seule pub par feed, positionnée après la 8e carte
+          if (i === AD_EVERY - 1 && adCount === 0) {
             adCount += 1;
-            result.push({ kind: 'ad', id: `__ad__${adCount}`, data: null });
+            result.push({ kind: 'ad', id: '__ad__1', data: null });
           }
 
           // Communities : première à pos 10, puis toutes les COMM_EVERY
@@ -993,7 +935,7 @@ export const FeedScreen: React.FC = () => {
   useEffect(() => {
     if (!lastLiveStarted) return;
     liveService.getLives()
-      .then(lives => { if (mountedRef.current) setSpontLives(Array.isArray(lives) ? lives : []); })
+      .then(lives => { setSpontLives(Array.isArray(lives) ? lives : []); })
       .catch(() => {});
   }, [lastLiveStarted]);
 
@@ -1143,7 +1085,8 @@ export const FeedScreen: React.FC = () => {
     apiClient.post(`/api/v1/ads/${adId}/impression`).catch(() => {});
   }, []);
 
-  const handleAdPress = useCallback((url: string) => {
+  const handleAdPress = useCallback((adId: string, url: string) => {
+    apiClient.post(`/api/v1/ads/${adId}/click`).catch(() => {});
     Linking.openURL(url).catch(() => {});
   }, []);
 
@@ -3406,12 +3349,14 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       {(likeCount > 0 || commentCount > 0 || shareCount > 0) && (
         <View style={[fc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
-            <FriendsWhoLiked
-              entityType={isEvent ? 'event' : 'concert'}
-              entityId={item.id}
-              totalLikes={likeCount}
-              onPressLikers={() => setLikersOpen(true)}
-            />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <FriendsWhoLiked
+                entityType={isEvent ? 'event' : 'concert'}
+                entityId={item.id}
+                totalLikes={likeCount}
+                onPressLikers={() => setLikersOpen(true)}
+              />
+            </View>
           )}
           {!commentsDisabled && commentCount > 0 && (
             <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={fc.countChip}>

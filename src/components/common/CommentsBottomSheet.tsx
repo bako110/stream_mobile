@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, FlatList,
   TouchableOpacity, KeyboardAvoidingView, Platform, Image,
-  Animated, Pressable, Dimensions, Alert,
+  Animated, Pressable, Dimensions, Alert, TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';

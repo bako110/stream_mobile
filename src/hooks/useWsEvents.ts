@@ -56,7 +56,7 @@ export function useWsEvents(options: WsEventOptions) {
         optsRef.current.onFeedUpdated((payload.kind ?? 'post') as 'post' | 'reel');
       }
       if (payload.type === 'wallet_updated' && optsRef.current.onWalletUpdated) {
-        optsRef.current.onWalletUpdated(payload as WalletUpdatedPayload);
+        optsRef.current.onWalletUpdated(payload as unknown as WalletUpdatedPayload);
       }
     };
     addListener(handler);

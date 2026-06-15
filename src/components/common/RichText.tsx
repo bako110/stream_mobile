@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, Linking, StyleProp, TextStyle } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { LinkPreviewCard } from './LinkPreviewCard';
 
 // Matches URLs, @mentions, #hashtags in order
 const TOKEN_RE = /(https?:\/\/[^\s<>"']+|@[\w.]+|#[\wÀ-ɏ]+)/g;
@@ -25,6 +26,14 @@ function parse(text: string): Segment[] {
   return segs;
 }
 
+function getDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
 interface Props {
   text: string;
   maxLines?: number;
@@ -34,6 +43,7 @@ interface Props {
   lessLabel?: string;
   onMentionPress?: (username: string) => void;
   onHashtagPress?: (tag: string) => void;
+  showLinkPreview?: boolean;
 }
 
 // Safe wrapper — useNavigation crashes when called outside NavigationContainer (e.g. bare Modals).
@@ -55,6 +65,7 @@ export const RichText: React.FC<Props> = ({
   lessLabel = 'Voir moins',
   onMentionPress,
   onHashtagPress,
+  showLinkPreview = true,
 }) => {
   const nav = useSafeNavigation();
   const [expanded, setExpanded] = useState(false);
@@ -67,6 +78,9 @@ export const RichText: React.FC<Props> = ({
   }, [expanded, maxLines]);
 
   const segs = parse(text);
+
+  // Toutes les URLs dans le texte — on affiche une preview card pour chacune
+  const urls = segs.filter(s => s.type === 'url').map(s => s.text);
 
   const handleMention = (username: string) => {
     if (onMentionPress) { onMentionPress(username); return; }
@@ -84,10 +98,10 @@ export const RichText: React.FC<Props> = ({
         return (
           <Text
             key={i}
-            style={{ color: primaryColor, textDecorationLine: 'underline' }}
+            style={{ color: primaryColor, textDecorationLine: 'underline', fontWeight: '500' }}
             onPress={() => Linking.openURL(seg.text).catch(() => {})}
           >
-            {seg.text}
+            {getDomain(seg.text)}
           </Text>
         );
       case 'mention':
@@ -115,31 +129,44 @@ export const RichText: React.FC<Props> = ({
     }
   });
 
-  if (!maxLines) {
-    return <Text style={textStyle}>{renderSegs()}</Text>;
+  const textNode = (
+    <Text
+      style={textStyle}
+      numberOfLines={expanded ? undefined : (maxLines || undefined)}
+      ellipsizeMode="tail"
+      onTextLayout={maxLines > 0 ? onTextLayout : undefined}
+    >
+      {renderSegs()}
+    </Text>
+  );
+
+  const toggleNode = !maxLines ? null : isTruncated && !expanded ? (
+    <TouchableOpacity onPress={() => setExpanded(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}>
+      <Text style={[st.toggle, { color: primaryColor }]}>{moreLabel}</Text>
+    </TouchableOpacity>
+  ) : expanded ? (
+    <TouchableOpacity onPress={() => setExpanded(false)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}>
+      <Text style={[st.toggle, { color: primaryColor }]}>{lessLabel}</Text>
+    </TouchableOpacity>
+  ) : null;
+
+  // Pas d'URL ou preview désactivée — rendu simple
+  if (!showLinkPreview || urls.length === 0) {
+    if (!maxLines) return <Text style={textStyle}>{renderSegs()}</Text>;
+    return (
+      <View>
+        {textNode}
+        {toggleNode}
+      </View>
+    );
   }
 
   return (
     <View>
-      <Text
-        style={textStyle}
-        numberOfLines={expanded ? undefined : maxLines}
-        ellipsizeMode="tail"
-        onTextLayout={onTextLayout}
-      >
-        {renderSegs()}
-      </Text>
-
-      {isTruncated && !expanded && (
-        <TouchableOpacity onPress={() => setExpanded(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}>
-          <Text style={[st.toggle, { color: primaryColor }]}>{moreLabel}</Text>
-        </TouchableOpacity>
-      )}
-      {expanded && (
-        <TouchableOpacity onPress={() => setExpanded(false)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}>
-          <Text style={[st.toggle, { color: primaryColor }]}>{lessLabel}</Text>
-        </TouchableOpacity>
-      )}
+      {textNode}
+      {toggleNode}
+      {/* Preview card pour chaque URL — max 1 affichée pour ne pas surcharger */}
+      <LinkPreviewCard url={urls[0]} />
     </View>
   );
 };

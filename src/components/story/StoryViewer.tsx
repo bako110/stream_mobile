@@ -321,9 +321,8 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
     Animated.timing(prog, { toValue: 1, duration: 5000, useNativeDriver: false }).start();
   }, [prog]);
 
-  useEffect(() => {
-    apiClient.post(`/api/v1/ads/${ad.id}/impression`).catch(() => {});
-  }, [ad.id]);
+  // L'impression est déjà enregistrée dans goNext() au moment d'afficher la pub.
+  // On ne la refait pas ici pour éviter le double comptage.
 
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent>
@@ -345,7 +344,7 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
 
         {/* Gradient bas */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.92)']}
+          colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
           locations={[0.35, 0.65, 1]}
           style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.55 }}
         />
@@ -355,28 +354,34 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
           <Animated.View style={{ height: '100%', backgroundColor: '#fff', borderRadius: 2, width: prog.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
         </View>
 
-        {/* Badge + fermer */}
+        {/* Label Sponsorisé + bouton fermer */}
         <View style={{ position: 'absolute', top: 52, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-            <Icon name="zap" size={11} color="#F59E0B" />
-            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Sponsorisé</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600' }}>Sponsorisé</Text>
+            <Icon name="globe" size={10} color="rgba(255,255,255,0.45)" />
           </View>
           <TouchableOpacity
             onPress={onSkip}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, padding: 6 }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 16, padding: 6 }}
           >
-            <Icon name="x" size={20} color="#fff" />
+            <Icon name="x" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
 
         {/* Contenu bas */}
         <View style={{ position: 'absolute', bottom: 72, left: 20, right: 20 }}>
-          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 8, lineHeight: 28, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={2}>
-            {ad.title}
-          </Text>
+          {/* Ligne annonceur */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+              <Icon name="zap" size={16} color="#fff" />
+            </View>
+            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+              {ad.title}
+            </Text>
+          </View>
           {ad.description ? (
-            <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 14, lineHeight: 20, marginBottom: 18 }} numberOfLines={2}>{ad.description}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.78)', fontSize: 14, lineHeight: 20, marginBottom: 18 }} numberOfLines={2}>{ad.description}</Text>
           ) : null}
           {ad.cta_url ? (
             <TouchableOpacity
@@ -386,10 +391,10 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
                 if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
                 onSkip();
               }}
-              style={{ alignSelf: 'flex-start', backgroundColor: '#fff', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 7 }}
             >
-              <Icon name="external-link" size={14} color="#7B3FF2" />
-              <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 14 }}>{ad.cta_text || 'En savoir plus'}</Text>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{ad.cta_text || 'En savoir plus'}</Text>
+              <Icon name="chevron-right" size={14} color="#fff" />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -613,25 +618,6 @@ export const StoryViewer: React.FC<Props> = ({
     else setVideoReady(true);
   }, [story?.id, storyIdx, groupIdx]);  // reset aussi sur changement de groupe
 
-  // ── Progress ───────────────────────────────────────────────────────────────
-
-  const goNextRef = useRef(goNext);
-  useEffect(() => { goNextRef.current = goNext; }, [goNext]);
-
-  const startProgress = useCallback(() => {
-    progressAnim.stopAnimation();   // stopper toute animation en cours avant de redémarrer
-    progressAnim.setValue(0);
-    Animated.timing(progressAnim, {
-      toValue: 1, duration,
-      useNativeDriver: false,       // width% ne supporte pas native driver
-    }).start(({ finished }) => { if (finished) goNextRef.current(); });
-  }, [duration]);                   // plus de storyIdx/groupIdx → callback stable
-
-  useEffect(() => {
-    if (!paused && !menuOpen && !editMode && videoReady && !videoBuffering) startProgress();
-    else progressAnim.stopAnimation();
-  }, [storyIdx, groupIdx, paused, menuOpen, editMode, videoReady, videoBuffering]);
-
   // ── Navigation ─────────────────────────────────────────────────────────────
 
   const goNext = useCallback(() => {
@@ -662,6 +648,25 @@ export const StoryViewer: React.FC<Props> = ({
       onClose();
     }
   }, [storyIdx, total, groupIdx, groups.length, storyAd]);
+
+  // ── Progress ───────────────────────────────────────────────────────────────
+
+  const goNextRef = useRef(goNext);
+  useEffect(() => { goNextRef.current = goNext; }, [goNext]);
+
+  const startProgress = useCallback(() => {
+    progressAnim.stopAnimation();   // stopper toute animation en cours avant de redémarrer
+    progressAnim.setValue(0);
+    Animated.timing(progressAnim, {
+      toValue: 1, duration,
+      useNativeDriver: false,       // width% ne supporte pas native driver
+    }).start(({ finished }) => { if (finished) goNextRef.current(); });
+  }, [duration]);                   // plus de storyIdx/groupIdx → callback stable
+
+  useEffect(() => {
+    if (!paused && !menuOpen && !editMode && videoReady && !videoBuffering) startProgress();
+    else progressAnim.stopAnimation();
+  }, [storyIdx, groupIdx, paused, menuOpen, editMode, videoReady, videoBuffering]);
 
   const goPrev = useCallback(() => {
     progressAnim.stopAnimation();

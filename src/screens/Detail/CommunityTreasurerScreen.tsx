@@ -27,6 +27,7 @@ interface Treasurer {
 interface WithdrawalRequest {
   id: string; coins_amount: number; eur_amount: number;
   description?: string; status: string;
+  requested_by?: string;
   admin_approved: boolean; treasurer_approved: boolean;
   admin_approved_at?: string; treasurer_approved_at?: string;
   rejected_at?: string; rejection_note?: string;

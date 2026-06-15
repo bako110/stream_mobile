@@ -578,13 +578,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
         {/* Apercu lien */}
         {post.link_url ? (
-          <LinkPreviewCard
-            url={post.link_url}
-            title={post.link_preview_title}
-            description={post.link_preview_description}
-            image={post.link_preview_image}
-            colors={colors}
-          />
+          <LinkPreviewCard url={post.link_url} />
         ) : null}
 
         {/* Vidéo inline */}

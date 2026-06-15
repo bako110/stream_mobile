@@ -47,7 +47,7 @@ const VideoModal: React.FC<{ uri: string; onClose: () => void }> = ({ uri, onClo
   const player = useVideoPlayer({ uri }, p => { p.muted = false; p.play(); });
 
   useEffect(() => {
-    const sub = player.addListener('statusChange', ({ status }: any) => {
+    const sub = (player as any).addEventListener?.('statusChange', ({ status }: any) => {
       if (status === 'readyToPlay') setIsReady(true);
     });
     return () => sub?.remove?.();
@@ -468,7 +468,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Bouton retour flottant */}
-      <BackButton onPress={onBack} transparent color="#fff" />
+      <BackButton onPress={onBack ?? (() => {})} transparent color="#fff" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 

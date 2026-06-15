@@ -150,7 +150,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}
       >
         <Icon name="check-circle" size={64} color={colors.primary} />
-        <Text style={[st.doneTitle, { color: colors.text }]}>Mot de passe mis a jour !</Text>
+        <Text style={[st.doneTitle, { color: colors.textPrimary }]}>Mot de passe mis a jour !</Text>
         <Text style={[st.doneSub, { color: colors.textSecondary }]}>Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.</Text>
         <Button label="Continuer" onPress={() => onSuccess({})} style={{ marginTop: 24, width: '100%' }} />
       </LinearGradient>
@@ -168,18 +168,18 @@ export const PhoneOtpScreen: React.FC<Props> = ({
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(400)} style={st.header}>
           <TouchableOpacity onPress={goBackStep} style={st.back}>
-            <Icon name="arrow-left" size={22} color={colors.text} />
+            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <AppLogo size={40} />
+          <AppLogo size="sm" />
         </Animated.View>
 
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-          <Animated.View entering={FadeInUp.delay(100).duration(400)} style={[st.card, { backgroundColor: colors.card }]}>
+          <Animated.View entering={FadeInUp.delay(100).duration(400)} style={[st.card, { backgroundColor: colors.surface }]}>
 
             {/* ── Etape : phone ─────────────────────────────────────────────── */}
             {step === 'phone' && (
               <>
-                <Text style={[st.title, { color: colors.text }]}>{title}</Text>
+                <Text style={[st.title, { color: colors.textPrimary }]}>{title}</Text>
                 <Text style={[st.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
 
                 <PhoneInput
@@ -191,7 +191,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
                   placeholder="XX XX XX XX"
                 />
 
-                {!!error && <ErrorBox msg={error} color={colors.danger} />}
+                {!!error && <ErrorBox msg={error} color={colors.error} />}
 
                 <Button label="Recevoir le code SMS" onPress={handleSendOtp} loading={loading} style={{ marginTop: 8 }} />
 
@@ -205,7 +205,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
             {/* ── Etape : otp ───────────────────────────────────────────────── */}
             {step === 'otp' && (
               <>
-                <Text style={[st.title, { color: colors.text }]}>
+                <Text style={[st.title, { color: colors.textPrimary }]}>
                   {mode === 'forgot' ? 'Code de reinitialisation' : 'Code de verification'}
                 </Text>
                 <Text style={[st.subtitle, { color: colors.textSecondary }]}>
@@ -220,14 +220,14 @@ export const PhoneOtpScreen: React.FC<Props> = ({
                       style={[
                         st.otpBox,
                         {
-                          backgroundColor: colors.inputBackground,
+                          backgroundColor: colors.backgroundSecondary,
                           borderColor: otp.length === i
                             ? colors.primary
                             : otp.length > i ? colors.primary + '60' : colors.border,
                         },
                       ]}
                     >
-                      <Text style={[st.otpChar, { color: colors.text }]}>{otp[i] ?? ''}</Text>
+                      <Text style={[st.otpChar, { color: colors.textPrimary }]}>{otp[i] ?? ''}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -242,7 +242,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
                   autoFocus
                 />
 
-                {!!error && <ErrorBox msg={error} color={colors.danger} />}
+                {!!error && <ErrorBox msg={error} color={colors.error} />}
 
                 <Button
                   label="Valider le code"
@@ -266,7 +266,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
                 <View style={[st.iconCircle, { backgroundColor: colors.primary + '18' }]}>
                   <Icon name="lock" size={32} color={colors.primary} />
                 </View>
-                <Text style={[st.title, { color: colors.text }]}>Nouveau mot de passe</Text>
+                <Text style={[st.title, { color: colors.textPrimary }]}>Nouveau mot de passe</Text>
                 <Text style={[st.subtitle, { color: colors.textSecondary }]}>
                   Choisissez un nouveau mot de passe securise (min. 8 caracteres).
                 </Text>
@@ -298,7 +298,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
                   placeholder="••••••••"
                 />
 
-                {!!error && <ErrorBox msg={error} color={colors.danger} />}
+                {!!error && <ErrorBox msg={error} color={colors.error} />}
 
                 <Button
                   label="Enregistrer le mot de passe"

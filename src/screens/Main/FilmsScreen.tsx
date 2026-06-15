@@ -509,7 +509,7 @@ export const FilmsScreen: React.FC = () => {
     try {
       const params = {
         page: 1, limit: 40,
-        sort,
+        sort: sort as any,
         is_premium: filter === 'premium' ? true : filter === 'free' ? false : undefined,
         genre:      genre      || undefined,
         country:    country    || undefined,

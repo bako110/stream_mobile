@@ -798,7 +798,7 @@ export function CommunityEventsScreen({ route }: Props) {
       <BoostPrompt
         visible={boostVisible}
         contentType="event"
-        onBoost={() => { setBoostVisible(false); nav.navigate('CreateAd', { ad: null }); }}
+        onBoost={() => { setBoostVisible(false); navigation.navigate('CreateAd', { ad: null }); }}
         onDismiss={() => setBoostVisible(false)}
       />
     </View>

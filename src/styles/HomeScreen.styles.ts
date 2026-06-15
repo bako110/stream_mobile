@@ -271,7 +271,7 @@ export const homeStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   liveCardGrad: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   liveCardContent: {
     position: 'absolute',
@@ -396,7 +396,7 @@ export const homeStyles = StyleSheet.create({
     overflow:       'hidden',
   },
   postMediaImg:     { width: '100%', height: '100%' },
-  postMediaGrad:    { ...StyleSheet.absoluteFillObject },
+  postMediaGrad:    { ...StyleSheet.absoluteFill },
   postMediaOverlay: {
     position: 'absolute',
     bottom:   12,

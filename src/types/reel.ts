@@ -79,6 +79,7 @@ export interface CommentCreate {
 export interface ReactionCounts {
   likes: number;
   dislikes: number;
+  shares?: number;
 }
 
 export interface ShareCreate {

@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   uploadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',

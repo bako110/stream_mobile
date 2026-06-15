@@ -498,7 +498,7 @@ const st = StyleSheet.create({
   progressFill: { height: 6, borderRadius: 3 },
   statsRow:     { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
   empty:        { alignItems: 'center', paddingTop: 40, gap: 10, paddingHorizontal: 32 },
-  overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  overlay:      { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
   kav:          { position: 'absolute', bottom: 0, left: 0, right: 0 },
   sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
   handleWrap:   { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },

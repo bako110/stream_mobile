@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image,
   RefreshControl, StyleSheet, Dimensions, Linking,
@@ -34,78 +34,86 @@ const SearchAdCard: React.FC<{
   colors: any;
   onImpression: (id: string) => void;
 }> = ({ ad, colors, onImpression }) => {
+  const firedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (ad?.id) onImpression(ad.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ad?.id]);
-
-  const handlePress = () => {
-    if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
-  };
+    if (ad?.id && firedRef.current !== ad.id) {
+      firedRef.current = ad.id;
+      onImpression(ad.id);
+    }
+  }, [ad?.id, onImpression]);
 
   return (
-    <TouchableOpacity
-      onPress={handlePress}
-      activeOpacity={0.88}
-      style={[sAd.card, { backgroundColor: colors.surface, borderColor: '#7B3FF244' }]}
-    >
-      {/* Badge sponsorise */}
-      <View style={sAd.badge}>
-        <Icon name="zap" size={9} color="#F59E0B" />
-        <Text style={sAd.badgeTxt}>SPONSORISE</Text>
-      </View>
+    <View style={[sAd.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
 
-      <View style={sAd.row}>
-        {/* Visuel creatif optionnel */}
-        {(ad.creative_url || ad.thumbnail_url) ? (
-          <Image
-            source={{ uri: (ad.creative_url || ad.thumbnail_url)! }}
-            style={sAd.thumb}
-            resizeMode="cover"
-          />
-        ) : (
-          <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
-            style={sAd.thumbGrad}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          >
-            <Icon name="zap" size={18} color="rgba(255,255,255,0.85)" />
-          </LinearGradient>
-        )}
-
-        {/* Texte */}
+      {/* En-tête annonceur */}
+      <View style={sAd.header}>
+        <View style={[sAd.logoWrap, { backgroundColor: colors.primary + '18' }]}>
+          <Icon name="zap" size={14} color={colors.primary} />
+        </View>
         <View style={{ flex: 1 }}>
-          <Text style={[sAd.title, { color: colors.textPrimary }]} numberOfLines={2}>
+          <Text style={[sAd.advertiserName, { color: colors.textPrimary }]} numberOfLines={1}>
             {ad.title}
           </Text>
-          {!!ad.description && (
-            <Text style={[sAd.desc, { color: colors.textSecondary }]} numberOfLines={2}>
-              {ad.description}
-            </Text>
-          )}
-          {/* Bouton CTA */}
-          <View style={sAd.cta}>
-            <Text style={sAd.ctaTxt}>{ad.cta_text ?? 'En savoir plus'}</Text>
-            <Icon name="arrow-right" size={11} color="#fff" />
+          <View style={sAd.sponsoredRow}>
+            <Text style={[sAd.sponsoredLabel, { color: colors.textTertiary }]}>Sponsorisé</Text>
+            <Icon name="globe" size={9} color={colors.textTertiary} />
           </View>
         </View>
       </View>
-    </TouchableOpacity>
+
+      {/* Image ou placeholder */}
+      {(ad.creative_url || ad.thumbnail_url) ? (
+        <Image
+          source={{ uri: (ad.creative_url || ad.thumbnail_url)! }}
+          style={sAd.image}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      {/* Description */}
+      {!!ad.description && (
+        <Text style={[sAd.desc, { color: colors.textSecondary }]} numberOfLines={2}>
+          {ad.description}
+        </Text>
+      )}
+
+      {/* Pied : domaine + CTA */}
+      <View style={[sAd.footer, { borderTopColor: colors.divider }]}>
+        {ad.cta_url ? (
+          <Text style={[sAd.domain, { color: colors.textTertiary }]} numberOfLines={1}>
+            {ad.cta_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+          </Text>
+        ) : null}
+        <TouchableOpacity
+          style={[sAd.ctaBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+          activeOpacity={0.8}
+          onPress={() => {
+            if (!ad.cta_url) return;
+            apiClient.post(`/api/v1/ads/${ad.id}/click`).catch(() => {});
+            Linking.openURL(ad.cta_url).catch(() => {});
+          }}
+        >
+          <Text style={[sAd.ctaTxt, { color: colors.textPrimary }]}>{ad.cta_text ?? 'En savoir plus'}</Text>
+        </TouchableOpacity>
+      </View>
+
+    </View>
   );
 };
 
 const sAd = StyleSheet.create({
-  card:     { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 4 },
-  badge:    { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 8 },
-  badgeTxt: { color: '#F59E0B', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  row:      { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  thumb:    { width: 72, height: 72, borderRadius: 10 },
-  thumbGrad:{ width: 72, height: 72, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  title:    { fontSize: 14, fontWeight: '700', lineHeight: 19, marginBottom: 3 },
-  desc:     { fontSize: 12, lineHeight: 17, marginBottom: 6 },
-  cta:      { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-              backgroundColor: '#7B3FF2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  ctaTxt:   { color: '#fff', fontSize: 11, fontWeight: '700' },
+  card:           { borderWidth: StyleSheet.hairlineWidth, marginBottom: 8, marginHorizontal: 16 },
+  header:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingBottom: 8 },
+  logoWrap:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  advertiserName: { fontSize: 13, fontWeight: '700', lineHeight: 17 },
+  sponsoredRow:   { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
+  sponsoredLabel: { fontSize: 10 },
+  image:          { width: '100%', height: 160 },
+  desc:           { fontSize: 13, lineHeight: 18, paddingHorizontal: 12, paddingTop: 8 },
+  footer:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 8 },
+  domain:         { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.3, flex: 1 },
+  ctaBtn:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1 },
+  ctaTxt:         { fontSize: 12, fontWeight: '700' },
 });
 
 type Tab = 'content' | 'reels';
