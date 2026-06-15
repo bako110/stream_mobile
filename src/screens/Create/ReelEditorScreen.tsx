@@ -394,16 +394,8 @@ export const ReelEditorScreen: React.FC<Props> = ({
         <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.75)', 'transparent']} style={s.gradTop} />
         <LinearGradient pointerEvents="none" colors={['transparent', 'rgba(0,0,0,0.85)']} style={s.gradBottom} />
 
-        {/* Zone tap play/pause — centrée dans la zone vidéo visible (hors toolbar/panel) */}
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={togglePlay} activeOpacity={1}>
-          {!isPlaying && (
-            <View style={[s.playHint, { paddingBottom: PANEL_H + 120 }]} pointerEvents="none">
-              <View style={s.playCircle}>
-                <Icon name="play" size={32} color="#fff" />
-              </View>
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* Zone tap play/pause — couvre toute la vidéo pour détecter le tap */}
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={togglePlay} activeOpacity={1} />
 
         {/* Text layers draggables */}
         {layers.map(l => {
@@ -435,6 +427,21 @@ export const ReelEditorScreen: React.FC<Props> = ({
           );
         })}
       </View>
+
+      {/* Bouton play/pause — centré dans la zone vidéo visible */}
+      {!isPlaying && (
+        <View
+          pointerEvents="none"
+          style={[s.playHint, {
+            top: insets.top + 110,
+            bottom: (tool ? PANEL_H : 0) + insets.bottom + 60,
+          }]}
+        >
+          <View style={s.playCircle}>
+            <Icon name="play" size={32} color="#fff" />
+          </View>
+        </View>
+      )}
 
       {/* ══ HEADER ══ */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
@@ -704,7 +711,7 @@ const s = StyleSheet.create({
   gradTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 160, zIndex: 2 },
   gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 200, zIndex: 2 },
 
-  playHint: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 4 },
+  playHint: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center', zIndex: 4 },
   playCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' },
 
   textLayer:    { position: 'absolute', zIndex: 8 },
