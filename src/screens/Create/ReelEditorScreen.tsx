@@ -377,8 +377,8 @@ export const ReelEditorScreen: React.FC<Props> = ({
       <View style={[StyleSheet.absoluteFill, s.videoContainer]}>
         <VideoView
           player={player}
-          style={StyleSheet.absoluteFill}
-          resizeMode="contain"
+          style={s.videoView}
+          resizeMode="cover"
           controls={false}
         />
 
@@ -699,6 +699,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   videoContainer: { alignItems: 'center', justifyContent: 'center' },
+  videoView: { width: W, height: H },
 
   gradTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 160, zIndex: 2 },
   gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 200, zIndex: 2 },
