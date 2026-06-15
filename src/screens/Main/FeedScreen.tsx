@@ -344,7 +344,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
   onNavSpontStream, onNavSpontViewer,
   onNavEvent,
 }) => {
-  const showNearby = filter !== 'following' && nearbyEvents.length > 0;
+  const showNearby = filter === 'all' && nearbyEvents.length > 0;
   if (!liveConcerts.length && !spontLives.length && !showNearby) return null;
   return (
     <>
