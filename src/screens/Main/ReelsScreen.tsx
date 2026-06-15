@@ -1707,21 +1707,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   </View>
                 </TouchableOpacity>
 
-                {/* Voir mes invitations Cable */}
-                <TouchableOpacity
-                  style={s.menuItem}
-                  onPress={() => { setShowRemix(false); nav.navigate('CableInvites'); }}
-                >
-                  <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(96,165,250,0.1)' }]}>
-                    <Icon name="inbox" size={20} color="#60A5FA" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Mes invitations Cable</Text>
-                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Voir les invitations reçues et envoyées</Text>
-                  </View>
-                  <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                </TouchableOpacity>
-
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
 
                 {/* Voir le profil */}
