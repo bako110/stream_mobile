@@ -394,10 +394,10 @@ export const ReelEditorScreen: React.FC<Props> = ({
         <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.75)', 'transparent']} style={s.gradTop} />
         <LinearGradient pointerEvents="none" colors={['transparent', 'rgba(0,0,0,0.85)']} style={s.gradBottom} />
 
-        {/* Zone tap play/pause (centre) */}
+        {/* Zone tap play/pause — centrée dans la zone vidéo visible (hors toolbar/panel) */}
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={togglePlay} activeOpacity={1}>
           {!isPlaying && (
-            <View style={s.playHint} pointerEvents="none">
+            <View style={[s.playHint, { paddingBottom: PANEL_H + 120 }]} pointerEvents="none">
               <View style={s.playCircle}>
                 <Icon name="play" size={32} color="#fff" />
               </View>
