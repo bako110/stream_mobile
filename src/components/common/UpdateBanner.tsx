@@ -42,18 +42,17 @@ export const UpdateBanner: React.FC = () => {
 
   const handleInstall = () => {
     if (!info?.apk_url) return;
-    // Ouvre l'URL dans le navigateur par défaut →
-    // Android propose automatiquement de télécharger l'APK via le DownloadManager système.
-    // Aucune permission WRITE_EXTERNAL_STORAGE requise (obsolète sur Android 10+).
     Linking.openURL(info.apk_url).catch(() => {
       Alert.alert('Erreur', "Impossible d'ouvrir le lien de téléchargement.");
     });
   };
 
-  if (!info || dismissed) return null;
+  const visible = !!info && !dismissed;
 
   const c = theme.colors;
   const pb = Math.max(insets.bottom, 12);
+
+  if (!visible) return null;
 
   return (
     <Animated.View
