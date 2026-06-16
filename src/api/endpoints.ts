@@ -460,4 +460,8 @@ export const Endpoints = {
     cancelInvite:   (inviteId: string) => `${V1}/cable/invites/${inviteId}`,
     listInvites:    `${V1}/cable/invites`,
   },
+
+  app: {
+    version: `${V1}/app/version`,
+  },
 } as const;

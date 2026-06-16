@@ -17,6 +17,7 @@ import { useTheme }         from '../hooks/useTheme';
 import { decodeId }         from '../utils/slugId';
 import { setupFCM } from '../services/fcmService';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { UpdateBanner } from '../components/common/UpdateBanner';
 
 async function requestContactsPermission() {
   try {
@@ -256,6 +257,7 @@ export const RootNavigator: React.FC = () => {
               setAppState('auth');
             }}>
               <MainNavigator onLogout={handleLogout} />
+              <UpdateBanner />
             </WebSocketProvider>
           </UserProvider>
         )
