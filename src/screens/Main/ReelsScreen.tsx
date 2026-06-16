@@ -1610,12 +1610,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
               <View style={[s.menuSheet, { backgroundColor: colors.surface }]}>
                 <View style={[s.sheetHandle, { backgroundColor: colors.divider }]} />
 
-                {/* ── En-tête : auteur + miniature ── */}
+                {/* ── En-tête : avatar + auteur ── */}
                 {reel.author && (
                   <View style={s.sheetAuthorRow}>
-                    {reel.thumbnail_url
-                      ? <View style={s.sheetThumb}><View style={[StyleSheet.absoluteFill, { borderRadius: 10, overflow: 'hidden', backgroundColor: '#111' }]}><View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary, opacity: 0.4 }]} /></View></View>
-                      : null
+                    {reel.author.avatar_url
+                      ? <Image source={{ uri: reel.author.avatar_url }} style={s.sheetAvatar} />
+                      : <View style={[s.sheetAvatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{getAuthorInitial(reel.author)}</Text></View>
                     }
                     <View style={{ flex: 1 }}>
                       <Text style={[s.sheetAuthorName, { color: colors.textPrimary }]} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
