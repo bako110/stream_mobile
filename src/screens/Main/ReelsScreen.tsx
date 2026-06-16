@@ -462,7 +462,6 @@ export const ReelsScreen: React.FC = () => {
   );
 
   // ── Callbacks stables ─────────────────────────────────────────────────────
-  const onAddReel     = useCallback(() => nav.navigate('CreateReel'), [nav]);
   const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
 
   // Feed reels avec pub injectee toutes les 5 reels
@@ -502,13 +501,12 @@ export const ReelsScreen: React.FC = () => {
         colors={colors}
         currentUserId={myId ?? undefined}
         onToggleMute={toggleMute}
-        onAdd={onAddReel}
         onAuthorPress={onAuthorPress}
         onEnd={goNextReel}
         activePlayerRef={activePlayerRef}
       />
     );
-  }, [currentIndex, screenFocused, muted, HEADER_H, insets.bottom, colors, myId, toggleMute, onAddReel, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
+  }, [currentIndex, screenFocused, muted, HEADER_H, insets.bottom, colors, myId, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -943,7 +941,6 @@ interface VideoSlideProps {
   colors:         any;
   currentUserId?: string;
   onToggleMute:   () => void;
-  onAdd?:         () => void;
   onAuthorPress:  (userId: string) => void;
   onEnd:          () => void;
   activePlayerRef?: React.RefObject<{ pause: () => void } | null>;
@@ -951,7 +948,7 @@ interface VideoSlideProps {
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
   reel, isActive, muted, screenW, screenH, insetBottom,
-  colors, currentUserId, onToggleMute, onAdd, onAuthorPress, onEnd, activePlayerRef,
+  colors, currentUserId, onToggleMute, onAuthorPress, onEnd, activePlayerRef,
 }) => {
   const nav = useNavigation<Nav>();
 
@@ -1570,11 +1567,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
               </View>
             </TouchableOpacity>
           )}
-          {onAdd && (
-            <TouchableOpacity style={[s.addActionBtn, { backgroundColor: colors.primary }]} onPress={onAdd}>
-              <Icon name="plus" size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
         </View>
 
         <ReportModal visible={reportVisible} contentType="reel" contentId={reel.id} onClose={() => setReportVisible(false)} />
@@ -1878,7 +1870,6 @@ const s = StyleSheet.create({
   actionBtn:    { alignItems: 'center', gap: 4 },
   actionCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
   actionLabel:  { fontSize: 11, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  addActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   muteBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },

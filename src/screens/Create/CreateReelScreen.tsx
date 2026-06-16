@@ -210,6 +210,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   const [caption,           setCaption]           = useState('');
   const [captionMentionIds, setCaptionMentionIds] = useState<string[]>([]);
   const [videoUri,          setVideoUri]          = useState<string | null>(sourceReelUrl ?? null);
+  const [videoThumb,        setVideoThumb]        = useState<string | null>(null);
   const [videoDuration,     setVideoDuration]     = useState(0);
   const [loadingMeta,       setLoadingMeta]       = useState(false);
   const [showEditor,        setShowEditor]        = useState(!!sourceReelUrl);
@@ -247,6 +248,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       if (!dur) dur = 30;
 
       setVideoUri(asset.uri);
+      setVideoThumb(asset.uri); // on utilisera la première frame via l'URI vidéo directement
       setVideoDuration(dur);
       setEditResult(null);
       setLoadingMeta(false);
@@ -317,6 +319,8 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
           ...(edit && edit.endSec   < dur - 0.5  ? { trim_end:       Math.round(edit.endSec   * 1000) } : {}),
           ...(edit && edit.speed !== 1           ? { playback_speed: edit.speed    } : {}),
           ...(edit && edit.filter !== 'original' ? { filter:         edit.filter   } : {}),
+          ...(edit && edit.layers.length > 0     ? { text_layers:    JSON.stringify(edit.layers) } : {}),
+          ...(edit && edit.musicUri              ? { music_url:      edit.musicUri, music_name: edit.musicName } : {}),
           ...(sourceReelId ? { source_reel_id: sourceReelId, remix_type: 'remix' as const } : {}),
         });
       },
@@ -330,6 +334,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       <ReelEditorScreen
         uri={videoUri}
         durationSec={videoDuration}
+        thumbnailUri={videoThumb ?? undefined}
         initialResult={editResult ?? undefined}
         onConfirm={handleEditorConfirm}
         onCancel={handleEditorCancel}

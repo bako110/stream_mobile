@@ -94,6 +94,9 @@ export const reelService = {
     trim_end?:       number;
     playback_speed?: number;
     filter?:         string;
+    text_layers?:    string;
+    music_url?:      string;
+    music_name?:     string;
     source_reel_id?: string;
     remix_type?:     'repost' | 'remix';
   }): Promise<Reel> {
