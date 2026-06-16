@@ -1608,26 +1608,52 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowRemix(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={[s.menuSheet, { backgroundColor: colors.surface }]}>
-                {/* Handle */}
                 <View style={[s.sheetHandle, { backgroundColor: colors.divider }]} />
 
-                {/* En-tête auteur */}
+                {/* ── En-tête : auteur + miniature ── */}
                 {reel.author && (
                   <View style={s.sheetAuthorRow}>
-                    {reel.author.avatar_url
-                      ? <View style={s.sheetAvatar}><View style={[StyleSheet.absoluteFill, { borderRadius: 20, overflow: 'hidden' }]}><View style={{ flex: 1, backgroundColor: colors.primary }} /></View></View>
-                      : <View style={[s.sheetAvatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{getAuthorInitial(reel.author)}</Text></View>
+                    {reel.thumbnail_url
+                      ? <View style={s.sheetThumb}><View style={[StyleSheet.absoluteFill, { borderRadius: 10, overflow: 'hidden', backgroundColor: '#111' }]}><View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary, opacity: 0.4 }]} /></View></View>
+                      : null
                     }
                     <View style={{ flex: 1 }}>
                       <Text style={[s.sheetAuthorName, { color: colors.textPrimary }]} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
-                      <Text style={[s.sheetAuthorSub, { color: colors.textSecondary }]} numberOfLines={1}>{reel.caption ? reel.caption.slice(0, 60) : 'Reel'}</Text>
+                      <Text style={[s.sheetAuthorSub, { color: colors.textSecondary }]} numberOfLines={1}>{reel.caption ? reel.caption.slice(0, 55) : 'Reel'}</Text>
                     </View>
                   </View>
                 )}
 
+                {/* ── Stats remix / repost / cable ── */}
+                <View style={s.sheetStats}>
+                  <View style={s.sheetStat}>
+                    <Icon name="git-merge" size={14} color="#A78BFA" />
+                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(reel.remix_count ?? 0)}</Text>
+                    <Text style={[s.sheetStatLbl, { color: colors.textTertiary }]}>Remix</Text>
+                  </View>
+                  <View style={[s.sheetStatSep, { backgroundColor: colors.divider }]} />
+                  <View style={s.sheetStat}>
+                    <Icon name="repeat" size={14} color="#A78BFA" />
+                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(reel.repost_count ?? 0)}</Text>
+                    <Text style={[s.sheetStatLbl, { color: colors.textTertiary }]}>Reposts</Text>
+                  </View>
+                  <View style={[s.sheetStatSep, { backgroundColor: colors.divider }]} />
+                  <View style={s.sheetStat}>
+                    <Icon name="link-2" size={14} color="#60A5FA" />
+                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(reel.cable_count ?? 0)}</Text>
+                    <Text style={[s.sheetStatLbl, { color: colors.textTertiary }]}>Cable</Text>
+                  </View>
+                  <View style={[s.sheetStatSep, { backgroundColor: colors.divider }]} />
+                  <View style={s.sheetStat}>
+                    <Icon name="share-2" size={14} color={colors.textSecondary} />
+                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(shareCount)}</Text>
+                    <Text style={[s.sheetStatLbl, { color: colors.textTertiary }]}>Partages</Text>
+                  </View>
+                </View>
+
                 <View style={[s.menuDivider, { backgroundColor: colors.divider, marginHorizontal: 0 }]} />
 
-                {/* Republier */}
+                {/* ── Republier ── */}
                 <TouchableOpacity style={s.menuItem} onPress={handleRepost} disabled={remixLoading}>
                   <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
                     {remixLoading
@@ -1639,24 +1665,30 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Republier</Text>
                     <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Partage ce reel sur ton profil avec attribution</Text>
                   </View>
+                  {(reel.repost_count ?? 0) > 0 && (
+                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(167,139,250,0.15)', color: '#A78BFA' }]}>{formatCount(reel.repost_count ?? 0)}</Text>
+                  )}
                 </TouchableOpacity>
 
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
 
-                {/* Remixer */}
+                {/* ── Remixer ── */}
                 <TouchableOpacity style={s.menuItem} onPress={handleRemixer}>
                   <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
                     <Icon name="git-merge" size={20} color="#A78BFA" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Remixer</Text>
-                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Cree ta propre version de ce reel</Text>
+                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Crée ta propre version de ce reel</Text>
                   </View>
+                  {(reel.remix_count ?? 0) > 0 && (
+                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(167,139,250,0.15)', color: '#A78BFA' }]}>{formatCount(reel.remix_count ?? 0)}</Text>
+                  )}
                 </TouchableOpacity>
 
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
 
-                {/* Cable */}
+                {/* ── Cable ── */}
                 <TouchableOpacity
                   style={s.menuItem}
                   disabled={cableLoading}
@@ -1665,7 +1697,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                     const authorLabel = getAuthorLabel(reel.author);
                     Alert.alert(
                       'Invitation Cable',
-                      `Envoyer une invitation de collaboration a ${authorLabel} ?`,
+                      `Envoyer une invitation de collaboration à ${authorLabel} ?`,
                       [
                         { text: 'Annuler', style: 'cancel' },
                         {
@@ -1675,9 +1707,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                             setCableLoading(true);
                             try {
                               await cableService.sendInvite(reel.id, String(reel.author!.id));
-                              Alert.alert('Invitation envoyee', `${authorLabel} a recu ton invitation Cable.`);
+                              Alert.alert('Invitation envoyée', `${authorLabel} a reçu ton invitation Cable.`);
                             } catch (err: any) {
-                              const msg = err?.response?.data?.detail ?? 'Erreur lors de l\'envoi';
+                              const msg = err?.response?.data?.detail ?? "Erreur lors de l'envoi";
                               Alert.alert('Erreur', msg);
                             } finally {
                               setCableLoading(false);
@@ -1695,11 +1727,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Cable</Text>
-                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Invite ce createur a collaborer avec toi</Text>
+                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Invite ce créateur à collaborer avec toi</Text>
                   </View>
+                  {(reel.cable_count ?? 0) > 0 && (
+                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(96,165,250,0.15)', color: '#60A5FA' }]}>{formatCount(reel.cable_count ?? 0)}</Text>
+                  )}
                 </TouchableOpacity>
 
-                {/* Voir mes invitations Cable */}
+                {/* ── Mes invitations Cable ── */}
                 <TouchableOpacity
                   style={s.menuItem}
                   onPress={() => { setShowRemix(false); nav.navigate('CableInvites'); }}
@@ -1716,7 +1751,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
 
-                {/* Voir le profil */}
+                {/* ── Voir le profil ── */}
                 {reel.author?.id && (
                   <>
                     <TouchableOpacity
@@ -1732,7 +1767,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   </>
                 )}
 
-                {/* Signaler */}
+                {/* ── Signaler ── */}
                 <TouchableOpacity
                   style={s.menuItem}
                   onPress={() => { setShowRemix(false); setTimeout(() => setReportVisible(true), 300); }}
@@ -1900,9 +1935,16 @@ const s = StyleSheet.create({
 
   sheetHandle:     { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   sheetAuthorRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
+  sheetThumb:      { width: 44, height: 56, borderRadius: 10, overflow: 'hidden', flexShrink: 0 },
   sheetAvatar:     { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
   sheetAuthorName: { fontSize: 15, fontWeight: '700' },
   sheetAuthorSub:  { fontSize: 12, marginTop: 1 },
+  sheetStats:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, marginTop: 4, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)', paddingVertical: 12 },
+  sheetStat:       { flex: 1, alignItems: 'center', gap: 3 },
+  sheetStatVal:    { fontSize: 15, fontWeight: '800' },
+  sheetStatLbl:    { fontSize: 10, letterSpacing: 0.3, textTransform: 'uppercase' },
+  sheetStatSep:    { width: 1, height: 32, opacity: 0.25 },
+  sheetStatPill:   { fontSize: 11, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, overflow: 'hidden', marginLeft: 6 },
   sheetItemIcon:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   sheetItemSub:    { fontSize: 12, marginTop: 2 },
   editSheet:     { borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, paddingBottom: 36 },
