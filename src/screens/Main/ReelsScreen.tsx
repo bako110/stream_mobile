@@ -980,6 +980,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [showRemix,          setShowRemix]          = useState(false);
   const [remixLoading,       setRemixLoading]       = useState(false);
   const [cableLoading,       setCableLoading]       = useState(false);
+  const [remixCountSt,       setRemixCountSt]       = useState(reel.remix_count ?? 0);
+  const [repostCountSt,      setRepostCountSt]      = useState(reel.repost_count ?? 0);
+  const [cableCountSt,       setCableCountSt]       = useState(reel.cable_count ?? 0);
   const [showEditCaption,    setShowEditCaption]     = useState(false);
   const [editCaptionText,    setEditCaptionText]     = useState(reel.caption ?? '');
   const [savingCaption,      setSavingCaption]       = useState(false);
@@ -1017,6 +1020,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     setRemixLoading(true);
     try {
       await reelService.repost(reel.id);
+      setRepostCountSt(prev => prev + 1);
       setShowRemix(false);
       Alert.alert('Republié', 'Le reel a été republié sur votre profil.');
     } catch {
@@ -1628,19 +1632,19 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                 <View style={s.sheetStats}>
                   <View style={s.sheetStat}>
                     <Icon name="git-merge" size={14} color="#A78BFA" />
-                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(reel.remix_count ?? 0)}</Text>
+                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(remixCountSt)}</Text>
                     <Text style={[s.sheetStatLbl, { color: colors.textTertiary }]}>Remix</Text>
                   </View>
                   <View style={[s.sheetStatSep, { backgroundColor: colors.divider }]} />
                   <View style={s.sheetStat}>
                     <Icon name="repeat" size={14} color="#A78BFA" />
-                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(reel.repost_count ?? 0)}</Text>
+                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(repostCountSt)}</Text>
                     <Text style={[s.sheetStatLbl, { color: colors.textTertiary }]}>Reposts</Text>
                   </View>
                   <View style={[s.sheetStatSep, { backgroundColor: colors.divider }]} />
                   <View style={s.sheetStat}>
                     <Icon name="link-2" size={14} color="#60A5FA" />
-                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(reel.cable_count ?? 0)}</Text>
+                    <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(cableCountSt)}</Text>
                     <Text style={[s.sheetStatLbl, { color: colors.textTertiary }]}>Cable</Text>
                   </View>
                   <View style={[s.sheetStatSep, { backgroundColor: colors.divider }]} />
@@ -1665,8 +1669,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Republier</Text>
                     <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Partage ce reel sur ton profil avec attribution</Text>
                   </View>
-                  {(reel.repost_count ?? 0) > 0 && (
-                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(167,139,250,0.15)', color: '#A78BFA' }]}>{formatCount(reel.repost_count ?? 0)}</Text>
+                  {repostCountSt > 0 && (
+                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(167,139,250,0.15)', color: '#A78BFA' }]}>{formatCount(repostCountSt)}</Text>
                   )}
                 </TouchableOpacity>
 
@@ -1681,8 +1685,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Remixer</Text>
                     <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Crée ta propre version de ce reel</Text>
                   </View>
-                  {(reel.remix_count ?? 0) > 0 && (
-                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(167,139,250,0.15)', color: '#A78BFA' }]}>{formatCount(reel.remix_count ?? 0)}</Text>
+                  {remixCountSt > 0 && (
+                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(167,139,250,0.15)', color: '#A78BFA' }]}>{formatCount(remixCountSt)}</Text>
                   )}
                 </TouchableOpacity>
 
@@ -1707,6 +1711,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                             setCableLoading(true);
                             try {
                               await cableService.sendInvite(reel.id, String(reel.author!.id));
+                              setCableCountSt(prev => prev + 1);
                               Alert.alert('Invitation envoyée', `${authorLabel} a reçu ton invitation Cable.`);
                             } catch (err: any) {
                               const msg = err?.response?.data?.detail ?? "Erreur lors de l'envoi";
@@ -1729,8 +1734,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Cable</Text>
                     <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>Invite ce créateur à collaborer avec toi</Text>
                   </View>
-                  {(reel.cable_count ?? 0) > 0 && (
-                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(96,165,250,0.15)', color: '#60A5FA' }]}>{formatCount(reel.cable_count ?? 0)}</Text>
+                  {cableCountSt > 0 && (
+                    <Text style={[s.sheetStatPill, { backgroundColor: 'rgba(96,165,250,0.15)', color: '#60A5FA' }]}>{formatCount(cableCountSt)}</Text>
                   )}
                 </TouchableOpacity>
 
