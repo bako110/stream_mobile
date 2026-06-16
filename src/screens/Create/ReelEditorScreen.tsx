@@ -458,13 +458,14 @@ export const ReelEditorScreen: React.FC<Props> = ({
 
   const toggleTool = useCallback((k: ToolKey) => {
     if (k === 'text') {
+      if (textOverlay) { cancelText(); return; }
       setTool('text');
       openTextOverlay();
       return;
     }
     Keyboard.dismiss();
     setTool(prev => prev === k ? null : k);
-  }, [openTextOverlay]);
+  }, [openTextOverlay, textOverlay, cancelText]);
 
   const cycleAlign = useCallback(() => {
     setTxtAlign(a => a === 'left' ? 'center' : a === 'center' ? 'right' : 'left');
