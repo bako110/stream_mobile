@@ -6,6 +6,7 @@ import { Image as CompressorImage } from 'react-native-compressor';
 import { API_BASE_URL, STORAGE_KEYS } from '../utils/constants';
 import { storage } from '../utils/storage';
 import { compressVideo, cleanupTempVideos } from './videoCompressService';
+import { apiClient } from '../api/client';
 
 export type UploadFolder = 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'content';
 export type VideoFolder  = 'reels' | 'stories' | 'messages' | 'events' | 'concerts' | 'content' | 'posts';
@@ -227,12 +228,10 @@ export async function uploadVideoFromUri(
         // Progression pendant le poll : 70% → 95% sur 75 polls
         onProgress?.(Math.min(95, 70 + Math.round(i * 25 / MAX_POLLS)));
         try {
-          const statusRes = await ReactNativeBlobUtil.fetch(
-            'GET',
-            `${API_BASE_URL}/api/v1/upload/video/status/${jobId}`,
-            { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          const statusRes = await apiClient.get<any>(
+            `/api/v1/upload/video/status/${jobId}`,
           );
-          const status = statusRes.json() as any;
+          const status = statusRes.data;
           networkErrors = 0;
           if (status.status === 'done') {
             onProgress?.(100);
