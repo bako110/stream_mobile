@@ -48,6 +48,7 @@ export const Endpoints = {
     verifyRequest:       `${V1}/users/me/verify-request`,
     adminVerify: (id: string) => `${V1}/users/${id}/verify`,
     privacy:        `${V1}/users/me/privacy`,
+    playback:       `${V1}/users/me/playback`,
     // Admin
     matchContacts:  `${V1}/users/match-contacts`,
     list:           `${V1}/users`,

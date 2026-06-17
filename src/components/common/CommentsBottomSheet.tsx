@@ -807,7 +807,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
             borderTopColor: colors.border,
             backgroundColor: colors.background,
           }]}>
-            <Avatar author={currentUser as any} size={32} color={colors.primary} />
+            <Avatar author={currentUser as any} size={28} color={colors.primary} />
             <View style={[st.inputWrap, {
               backgroundColor: colors.surfaceElevated ?? colors.surface,
               borderColor: (replyTo || isEditMode) ? colors.primary : colors.border,
@@ -917,21 +917,21 @@ const st = StyleSheet.create({
 
   // Input
   inputRow: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 7,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   inputWrap: {
     flex: 1, flexDirection: 'row', alignItems: 'flex-end',
-    borderRadius: 22, borderWidth: 1,
-    paddingLeft: 14, paddingRight: 6, paddingVertical: 6,
+    borderRadius: 18, borderWidth: 1,
+    paddingLeft: 12, paddingRight: 4, paddingVertical: 4,
   },
   input: {
-    flex: 1, fontSize: 14, lineHeight: 20,
-    maxHeight: 90, paddingVertical: 2,
+    flex: 1, fontSize: 13, lineHeight: 18,
+    maxHeight: 72, paddingVertical: 2,
   },
   sendBtn: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center',
     marginLeft: 6,
   },

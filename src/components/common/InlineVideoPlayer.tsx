@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
+import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -30,21 +31,24 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   thumbnailUri,
   aspectRatio   = 16 / 9,
   borderRadius  = 12,
-  autoPlay      = false,
+  autoPlay,
   muted         = false,
   showControls  = false,
   isActive,
   onPress,
 }) => {
-  const [playing, setPlaying]       = useState(autoPlay);
-  const [started, setStarted]       = useState(autoPlay);
+  const { autoplay: userAutoplay } = getPlaybackPrefs();
+  const effectiveAutoPlay = autoPlay ?? userAutoplay;
+
+  const [playing, setPlaying]       = useState(effectiveAutoPlay);
+  const [started, setStarted]       = useState(effectiveAutoPlay);
   const [isMuted, setIsMuted]       = useState(muted);
   const [fullscreen, setFullscreen] = useState(false);
 
   const player = useVideoPlayer({ uri }, p => {
     p.loop  = false;
     p.muted = muted;
-    if (autoPlay) p.play();
+    if (effectiveAutoPlay) p.play();
   });
 
   const toggleMute = () => {
@@ -57,18 +61,18 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   // Autoplay/pause selon visibilité dans le feed
   useEffect(() => {
     if (isActive === undefined) return;
-    if (isActive) {
+    if (isActive && userAutoplay) {
       player.muted  = true;
       player.volume = 0;
       setIsMuted(true);
       setStarted(true);
       setPlaying(true);
       player.play();
-    } else {
+    } else if (!isActive) {
       player.pause();
       setPlaying(false);
     }
-  }, [isActive]);
+  }, [isActive, userAutoplay]);
 
   useEffect(() => {
     if (showControls) return;

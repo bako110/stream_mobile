@@ -9,6 +9,7 @@ import RNBlobUtil from 'react-native-blob-util';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
 
 interface Props {
   route: {
@@ -42,6 +43,8 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
   const [buffering, setBuffering] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
+  const { autoplay } = getPlaybackPrefs();
+
   const player = useVideoPlayer(
     {
       uri: url,
@@ -55,7 +58,7 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
     },
     p => {
       p.muted = false;
-      p.play();
+      if (autoplay) p.play();
     },
   );
 
