@@ -117,15 +117,15 @@ export const BoostPrompt: React.FC<Props> = ({ visible, contentType, onBoost, on
         </View>
 
         {/* CTA boost */}
-        <TouchableOpacity onPress={onBoost} activeOpacity={0.88} style={{ borderRadius: 16, overflow: 'hidden', marginTop: 4 }}>
+        <TouchableOpacity onPress={onBoost} activeOpacity={0.88} style={{ borderRadius: 14, overflow: 'hidden', marginTop: 4 }}>
           <LinearGradient
             colors={['#7B3FF2', '#E0389A']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.boostBtn}
           >
-            <Icon name="zap" size={18} color="#fff" />
+            <Icon name="zap" size={15} color="#fff" />
             <Text style={s.boostBtnTxt}>Booster maintenant</Text>
-            <Icon name="arrow-right" size={16} color="#fff" />
+            <Icon name="arrow-right" size={14} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
 
@@ -140,21 +140,21 @@ export const BoostPrompt: React.FC<Props> = ({ visible, contentType, onBoost, on
 };
 
 const s = StyleSheet.create({
-  sheet:        { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
-  handle:       { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  successRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 },
-  successIcon:  { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  successTitle: { fontSize: 17, fontWeight: '800' },
-  successSub:   { fontSize: 13, marginTop: 2 },
-  sep:          { height: StyleSheet.hairlineWidth, marginBottom: 18 },
-  boostTitle:   { fontSize: 18, fontWeight: '900', marginBottom: 6 },
-  boostSub:     { fontSize: 13, lineHeight: 19, marginBottom: 16 },
-  perks:        { gap: 10, marginBottom: 20 },
-  perkRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  perkIcon:     { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  perkText:     { fontSize: 13, flex: 1, lineHeight: 18 },
-  boostBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15, borderRadius: 16 },
-  boostBtnTxt:  { color: '#fff', fontSize: 16, fontWeight: '900' },
-  skipBtn:      { alignItems: 'center', paddingVertical: 14 },
-  skipTxt:      { fontSize: 14 },
+  sheet:        { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 28 },
+  handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  successRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  successIcon:  { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  successTitle: { fontSize: 15, fontWeight: '800' },
+  successSub:   { fontSize: 12, marginTop: 2 },
+  sep:          { height: StyleSheet.hairlineWidth, marginBottom: 12 },
+  boostTitle:   { fontSize: 15, fontWeight: '900', marginBottom: 4 },
+  boostSub:     { fontSize: 12, lineHeight: 17, marginBottom: 12 },
+  perks:        { gap: 7, marginBottom: 14 },
+  perkRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  perkIcon:     { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  perkText:     { fontSize: 12, flex: 1, lineHeight: 16 },
+  boostBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 14 },
+  boostBtnTxt:  { color: '#fff', fontSize: 14, fontWeight: '900' },
+  skipBtn:      { alignItems: 'center', paddingVertical: 10 },
+  skipTxt:      { fontSize: 13 },
 });
