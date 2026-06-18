@@ -437,28 +437,26 @@ export const ReelsScreen: React.FC = () => {
     }
   }, []);
 
-  // ── Viewability ───────────────────────────────────────────────────────────
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: Array<{ index: number | null; item: Reel }> }) => {
-      if (!viewableItems.length) return;
-      // Ignorer les callbacks déclenchés pendant un scroll programmé
-      if (isScrollingRef.current) return;
-      const idx = viewableItems[0].index ?? 0;
-      if (idx === currentIdxRef.current) return;
+  // ── Viewability — détection en temps réel via onScroll ───────────────────
+  const onViewableItemsChanged = useCallback(() => {}, []); // gardé pour éviter l'erreur FlatList
 
-      try { activePlayerRef.current?.pause(); } catch {}
+  const onScrollUpdate = useCallback((offsetY: number) => {
+    if (isScrollingRef.current) return;
+    const idx = Math.round(offsetY / SCREEN_H);
+    const bounded = Math.max(0, Math.min(idx, reelsRef.current.length - 1));
+    if (bounded === currentIdxRef.current) return;
 
-      currentIdxRef.current = idx;
-      setCurrentIndex(idx);
+    try { activePlayerRef.current?.pause(); } catch {}
 
-      sendViewForCurrent();
-      const cur = reelsRef.current[idx];
-      if (cur) currentReelRef.current = { id: cur.id, startTime: Date.now() };
+    currentIdxRef.current = bounded;
+    setCurrentIndex(bounded);
 
-      if (idx >= reelsRef.current.length - 3) loadMoreRef.current();
-    },
-    [sendViewForCurrent],
-  );
+    sendViewForCurrent();
+    const cur = reelsRef.current[bounded];
+    if (cur) currentReelRef.current = { id: cur.id, startTime: Date.now() };
+
+    if (bounded >= reelsRef.current.length - 3) loadMoreRef.current();
+  }, [SCREEN_H, sendViewForCurrent]);
 
   // ── Callbacks stables ─────────────────────────────────────────────────────
   const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
@@ -680,6 +678,7 @@ export const ReelsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         disableIntervalMomentum
+        onScroll={e => onScrollUpdate(e.nativeEvent.contentOffset.y)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig.current}
         onEndReached={loadMore}
