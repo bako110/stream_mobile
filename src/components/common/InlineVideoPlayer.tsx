@@ -1,4 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+/**
+ * InlineVideoPlayer — lecteur vidéo inline tap-to-play/pause.
+ * Utilisé dans PostCard, PostDetailScreen, et partout où une vidéo
+ * doit être jouée directement dans le flux sans naviguer vers un écran dédié.
+ */
+import React, { useState, useEffect } from 'react';
 import {
   View, TouchableOpacity, StyleSheet, Image, Dimensions,
   Modal, StatusBar, BackHandler,
@@ -8,10 +13,6 @@ import Icon from 'react-native-vector-icons/Feather';
 import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-
-// Bornes de hauteur style Facebook/Instagram
-const MIN_H = Math.round(SCREEN_W * (9 / 16));  // 16:9 paysage
-const MAX_H = Math.round(SCREEN_W * (5 / 4));   // 4:5 portrait (comme Instagram)
 
 interface Props {
   uri:           string;
@@ -28,7 +29,7 @@ interface Props {
 export const InlineVideoPlayer: React.FC<Props> = ({
   uri,
   thumbnailUri,
-  aspectRatio,
+  aspectRatio   = 16 / 9,
   borderRadius  = 12,
   autoPlay,
   muted         = false,
@@ -39,36 +40,16 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   const { autoplay: userAutoplay } = getPlaybackPrefs();
   const effectiveAutoPlay = autoPlay ?? userAutoplay;
 
-  const [playing,    setPlaying]    = useState(effectiveAutoPlay);
-  const [started,    setStarted]    = useState(effectiveAutoPlay);
-  const [isMuted,    setIsMuted]    = useState(muted);
+  const [playing, setPlaying]       = useState(effectiveAutoPlay);
+  const [started, setStarted]       = useState(effectiveAutoPlay);
+  const [isMuted, setIsMuted]       = useState(muted);
   const [fullscreen, setFullscreen] = useState(false);
-  // Hauteur dynamique selon le vrai ratio de la vidéo
-  const [videoH, setVideoH] = useState<number>(() => {
-    if (aspectRatio) return Math.round(SCREEN_W / aspectRatio);
-    return Math.round(SCREEN_W * (9 / 16));
-  });
 
   const player = useVideoPlayer({ uri }, p => {
     p.loop  = false;
     p.muted = muted;
     if (effectiveAutoPlay) p.play();
   });
-
-  // Récupère le vrai ratio dès que la vidéo est chargée
-  const handleLoad = useCallback((data: any) => {
-    const w = data?.width  ?? data?.naturalSize?.width;
-    const h = data?.height ?? data?.naturalSize?.height;
-    if (w && h && w > 0 && h > 0) {
-      const computed = Math.round(SCREEN_W * (h / w));
-      setVideoH(Math.max(MIN_H, Math.min(MAX_H, computed)));
-    }
-  }, []);
-
-  useEffect(() => {
-    const sub = (player as any).addEventListener?.('onLoad', handleLoad);
-    return () => sub?.remove?.();
-  }, [player, handleLoad]);
 
   const toggleMute = () => {
     const next = !isMuted;
@@ -103,6 +84,8 @@ export const InlineVideoPlayer: React.FC<Props> = ({
     }
   }, [playing, showControls]);
 
+  const height = Math.round(SCREEN_W / aspectRatio);
+
   // Ferme le fullscreen via le bouton Android back
   useEffect(() => {
     if (!fullscreen) return;
@@ -115,9 +98,9 @@ export const InlineVideoPlayer: React.FC<Props> = ({
 
   if (showControls) {
     return (
-      <View style={[styles.wrap, { height: videoH, borderRadius, overflow: 'hidden' }]}>
+      <View style={[styles.wrap, { height, borderRadius, overflow: 'hidden' }]}>
         {!started && thumbnailUri ? (
-          <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+          <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : null}
 
         <VideoView
@@ -127,6 +110,7 @@ export const InlineVideoPlayer: React.FC<Props> = ({
           controls={false}
         />
 
+        {/* Overlay play/pause central */}
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
@@ -144,16 +128,23 @@ export const InlineVideoPlayer: React.FC<Props> = ({
           )}
         </TouchableOpacity>
 
+        {/* Bouton volume — capture le touch avant l'overlay */}
         <View
           style={styles.muteBtn}
           onStartShouldSetResponder={() => true}
-          onResponderGrant={toggleMute}
+          onResponderGrant={() => {
+            const next = !isMuted;
+            setIsMuted(next);
+            player.muted  = next;
+            player.volume = next ? 0 : 1;
+          }}
         >
           <View style={styles.muteBtnInner}>
             <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
           </View>
         </View>
 
+        {/* Bouton plein écran */}
         <View
           style={styles.fullscreenBtn}
           onStartShouldSetResponder={() => true}
@@ -164,13 +155,25 @@ export const InlineVideoPlayer: React.FC<Props> = ({
           </View>
         </View>
 
+        {/* Modal plein écran */}
         <Modal visible={fullscreen} statusBarTranslucent animationType="fade" onRequestClose={() => setFullscreen(false)}>
           <StatusBar hidden />
           <View style={styles.fsRoot}>
-            <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls={false} />
+            <VideoView
+              player={player}
+              style={StyleSheet.absoluteFill}
+              resizeMode="contain"
+              controls={false}
+            />
+
+            {/* Bouton fermer */}
             <TouchableOpacity style={styles.fsClose} onPress={() => setFullscreen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <View style={styles.fsCloseCircle}><Icon name="x" size={20} color="#fff" /></View>
+              <View style={styles.fsCloseCircle}>
+                <Icon name="x" size={20} color="#fff" />
+              </View>
             </TouchableOpacity>
+
+            {/* Volume en plein écran */}
             <TouchableOpacity style={styles.fsMute} onPress={toggleMute} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={20} color="#fff" />
             </TouchableOpacity>
@@ -181,22 +184,26 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   }
 
   return (
-    <View style={[styles.wrap, { height: videoH, borderRadius, overflow: 'hidden' }]}>
+    <View style={[styles.wrap, { height, borderRadius, overflow: 'hidden' }]}>
 
       {/* Thumbnail avant le premier play */}
       {!started && thumbnailUri ? (
-        <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+        <Image
+          source={{ uri: thumbnailUri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
       ) : null}
 
-      {/* VideoView — contain pour voir la vidéo entière */}
+      {/* VideoView */}
       <VideoView
         player={player}
         style={StyleSheet.absoluteFill}
-        resizeMode="contain"
+        resizeMode="cover"
         controls={false}
       />
 
-      {/* Overlay tap — play/pause ou navigation */}
+      {/* Overlay tap central — play/pause ou navigation */}
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
         activeOpacity={1}
@@ -211,41 +218,21 @@ export const InlineVideoPlayer: React.FC<Props> = ({
         )}
       </TouchableOpacity>
 
-      {/* Bouton volume */}
+      {/* Bouton volume — capture le touch AVANT l'overlay via onStartShouldSetResponder */}
       <View
         style={styles.muteBtn}
         onStartShouldSetResponder={() => true}
-        onResponderGrant={toggleMute}
+        onResponderGrant={() => {
+          const next = !isMuted;
+          setIsMuted(next);
+          player.muted = next;
+          player.volume = next ? 0 : 1;
+        }}
       >
         <View style={styles.muteBtnInner}>
           <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
         </View>
       </View>
-
-      {/* Bouton plein écran */}
-      <View
-        style={styles.fullscreenBtn}
-        onStartShouldSetResponder={() => true}
-        onResponderGrant={() => setFullscreen(true)}
-      >
-        <View style={styles.muteBtnInner}>
-          <Icon name="maximize" size={16} color="#fff" />
-        </View>
-      </View>
-
-      {/* Modal plein écran */}
-      <Modal visible={fullscreen} statusBarTranslucent animationType="fade" onRequestClose={() => setFullscreen(false)}>
-        <StatusBar hidden />
-        <View style={styles.fsRoot}>
-          <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls={false} />
-          <TouchableOpacity style={styles.fsClose} onPress={() => setFullscreen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <View style={styles.fsCloseCircle}><Icon name="x" size={20} color="#fff" /></View>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.fsMute} onPress={toggleMute} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -269,6 +256,15 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
+  badge: {
+    position:        'absolute',
+    top:             10,
+    right:           10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius:    6,
+    paddingHorizontal: 6,
+    paddingVertical:   3,
+  },
   muteBtn: {
     position: 'absolute',
     bottom:   12,
@@ -286,10 +282,15 @@ const styles = StyleSheet.create({
     borderColor:     'rgba(255,255,255,0.18)',
   },
   fullscreenBtn: {
-    position: 'absolute',
-    bottom:   12,
-    right:    54,
-    zIndex:   10,
+    position:        'absolute',
+    bottom:          10,
+    right:           52,
+    width:           34,
+    height:          34,
+    borderRadius:    17,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems:      'center',
+    justifyContent:  'center',
   },
   fsRoot: {
     flex:            1,

@@ -277,11 +277,12 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {/* ── Hero media cliquable (comme FeedCard événement) ─────────────────── */}
       {hasMedia && (
         <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={{ position: 'relative' }}>
-          <View style={{ backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
+          <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
             {(post.hls_url ?? post.video_url) && images.length === 0 ? (
               <InlineVideoPlayer
                 uri={(post.hls_url ?? post.video_url)!}
                 thumbnailUri={post.thumbnail_url}
+                aspectRatio={HERO_H / SW}
                 borderRadius={0}
                 muted
                 isActive={isActive}
