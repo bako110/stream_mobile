@@ -1239,7 +1239,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       playTimerRef.current = setTimeout(() => {
         if (!mountedRef.current || pausedRef.current) return;
         if (endedRef.current) {
-          if (mountedRef.current) setEnded(true);
+          // Vidéo terminée — relancer depuis le début au lieu d'afficher "Revoir"
+          endedRef.current = false;
+          if (mountedRef.current) setEnded(false);
+          progressValue.value = 0;
+          try { player.seekTo(0); setTimeout(() => { try { player.play(); } catch {} }, 80); } catch {}
         } else {
           try { player.play(); } catch {}
         }
