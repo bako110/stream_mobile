@@ -968,6 +968,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [showControls, setShowControls] = useState(false);
   const stallingTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressValue     = useSharedValue(0);
+  const durationRef       = useRef(0);
   const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
   const [likes,        setLikes]        = useState(reel.like_count ?? 0);
   const [heartLikeAction, setHeartLikeAction] = useState(true);
@@ -1202,8 +1204,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     const subLoad  = player.addEventListener('onLoad', (data: any) => {
       if (!mountedRef.current) return;
       setVideoLoaded(true); setVideoError(false); retryCountRef.current = 0; clearStall();
+      if (data?.duration && data.duration > 0) { durationRef.current = data.duration; progressValue.value = 0; }
       if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
       if (isActiveRef.current && !pausedRef.current) player.play();
+    });
+    const subProgress = player.addEventListener('onProgress', (data: any) => {
+      if (!mountedRef.current || !isActiveRef.current) return;
+      const dur = durationRef.current;
+      if (dur > 0) progressValue.value = Math.min(data.currentTime / dur, 1);
     });
     const subState = player.addEventListener('onPlaybackStateChange', ({ isPlaying, isBuffering }: any) => {
       if (!mountedRef.current) return;
@@ -1215,7 +1223,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       clearStall();
       if (isActiveRef.current) doRetryRef.current();
     });
-    return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subState.remove(); subErr.remove(); };
+    return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subProgress.remove(); subState.remove(); subErr.remove(); };
   }, [player, clearStall]); // uniquement player — listeners stables
 
   // Play/Pause selon isActive — le preload charge en silence mais ne joue pas
@@ -1312,6 +1320,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const skipLeftScale    = useSharedValue(0.5);
   const skipRightOpacity = useSharedValue(0);
   const skipRightScale   = useSharedValue(0.5);
+
+  const progressBarAnim = useAnimatedStyle(() => ({
+    width: `${progressValue.value * 100}%` as any,
+  }));
 
   const playIconAnim = useAnimatedStyle(() => ({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -1453,6 +1465,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         controls={false}
         surfaceType="texture"
       />
+
+      {/* Barre de progression — tout en haut, sous le header */}
+      {isActive && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.2)', zIndex: 20 }}>
+          <Animated.View style={[{ height: 3, backgroundColor: '#E0389A', borderRadius: 2 }, progressBarAnim]} />
+        </View>
+      )}
 
       {/* Spinner uniquement si vrai stall réseau (>1.5s sans lecture) */}
       {isStalling && (
