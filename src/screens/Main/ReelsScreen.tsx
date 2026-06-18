@@ -493,6 +493,7 @@ export const ReelsScreen: React.FC = () => {
       <VideoSlide
         reel={item}
         isActive={index === currentIndex && screenFocused}
+        isPreload={index === currentIndex + 1 || index === currentIndex - 1}
         muted={muted}
         screenW={SCREEN_W}
         screenH={SCREEN_H}
@@ -940,6 +941,7 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
 interface VideoSlideProps {
   reel:           Reel;
   isActive:       boolean;
+  isPreload:      boolean;
   muted:          boolean;
   screenW:        number;
   screenH:        number;
@@ -953,7 +955,7 @@ interface VideoSlideProps {
 }
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
-  reel, isActive, muted, screenW, screenH, insetBottom,
+  reel, isActive, isPreload, muted, screenW, screenH, insetBottom,
   colors, currentUserId, onToggleMute, onAuthorPress, onEnd, activePlayerRef,
 }) => {
   const nav = useNavigation<Nav>();
@@ -1006,8 +1008,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const playTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasEndedOnActivate = useRef(false);
 
-  const MAX_RETRIES   = 3;
-  const STALL_TIMEOUT = 8_000;
+  const MAX_RETRIES   = 4;
+  const STALL_TIMEOUT = 5_000;
 
   const isOwnReel = !!(currentUserId && reel.author?.id && currentUserId === String(reel.author.id));
 
@@ -1078,18 +1080,21 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   }, [reel.id, editCaptionText, savingCaption]);
 
   const videoUri = reel.hls_url;
-  // Mémoïsé : même URI → même objet → useVideoPlayer ne recharge pas
-  const videoSource = useMemo(() => videoUri
+  // Charge la source dès que ce slide est actif OU en préchargement (slide suivant/précédent)
+  const videoSource = useMemo(() => (videoUri && (isActive || isPreload))
     ? {
         uri: videoUri,
         bufferConfig: {
-          minBufferMs: 1_500, maxBufferMs: 30_000,
-          bufferForPlaybackMs: 800, bufferForPlaybackAfterRebufferMs: 1_500,
-          backBufferDurationMs: 3_000, preferredForwardBufferDurationMs: 10_000,
+          minBufferMs: 2_000,
+          maxBufferMs: 50_000,
+          bufferForPlaybackMs: 1_500,
+          bufferForPlaybackAfterRebufferMs: 2_000,
+          backBufferDurationMs: 2_000,
+          preferredForwardBufferDurationMs: isActive ? 30_000 : 10_000,
         },
       }
     : 'about:blank',
-  [videoUri]); // eslint-disable-line
+  [videoUri, isActive, isPreload]); // eslint-disable-line
 
   const player = useVideoPlayer(videoSource, p => {
     p.loop = false; p.muted = muted; p.volume = muted ? 0 : 1.0;
@@ -1207,7 +1212,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subState.remove(); subErr.remove(); };
   }, [player, clearStall]); // uniquement player — listeners stables
 
-  // Play/Pause selon isActive
+  // Play/Pause selon isActive — le preload charge en silence mais ne joue pas
   useEffect(() => {
     if (!reel.hls_url) return;
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
@@ -1220,14 +1225,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       playTimerRef.current = setTimeout(() => {
         if (!mountedRef.current || pausedRef.current) return;
         if (endedRef.current) {
-          // Reel termine → afficher overlay "Revoir", ne pas relancer auto
           if (mountedRef.current) setEnded(true);
         } else {
-          // Reel en cours ou pas encore joue → reprend/demarre
           try { player.play(); } catch {}
         }
       }, 80);
     } else {
+      // Preload ou inactif → pause (le buffer continue de se remplir en silence)
       try { player.pause(); } catch {}
     }
     return () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); };
