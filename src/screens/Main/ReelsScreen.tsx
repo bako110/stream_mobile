@@ -128,12 +128,11 @@ export const ReelsScreen: React.FC = () => {
 
   // Scroll direct par offset — verrou isScrollingRef pour bloquer onViewableItemsChanged
   const scrollToIdx = useCallback((index: number, animated = false) => {
-    const itemH = SCREEN_H - HEADER_H;
     isScrollingRef.current = true;
     if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
     scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 400);
-    listRef.current?.scrollToOffset({ offset: itemH * index, animated });
-  }, [SCREEN_H, HEADER_H]);
+    listRef.current?.scrollToOffset({ offset: SCREEN_H * index, animated });
+  }, [SCREEN_H]);
 
   // ── View tracking ─────────────────────────────────────────────────────────
   const sendViewForCurrent = useCallback(() => {
@@ -486,7 +485,7 @@ export const ReelsScreen: React.FC = () => {
           isActive={index === currentIndex && screenFocused}
           muted={muted}
           screenW={SCREEN_W}
-          screenH={SCREEN_H - HEADER_H}
+          screenH={SCREEN_H}
         />
       );
     }
@@ -496,7 +495,7 @@ export const ReelsScreen: React.FC = () => {
         isActive={index === currentIndex && screenFocused}
         muted={muted}
         screenW={SCREEN_W}
-        screenH={SCREEN_H - HEADER_H}
+        screenH={SCREEN_H}
         insetBottom={insets.bottom}
         colors={colors}
         currentUserId={myId ?? undefined}
@@ -506,7 +505,7 @@ export const ReelsScreen: React.FC = () => {
         activePlayerRef={activePlayerRef}
       />
     );
-  }, [currentIndex, screenFocused, muted, HEADER_H, insets.bottom, colors, myId, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
+  }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -672,9 +671,9 @@ export const ReelsScreen: React.FC = () => {
         ref={listRef}
         data={feedWithAds as any[]}
         keyExtractor={r => (r as any).id}
-        style={{ flex: 1, marginTop: HEADER_H }}
+        style={{ flex: 1 }}
         pagingEnabled={false}
-        snapToInterval={SCREEN_H - HEADER_H}
+        snapToInterval={SCREEN_H}
         snapToAlignment="start"
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
@@ -685,7 +684,7 @@ export const ReelsScreen: React.FC = () => {
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         extraData={`${currentIndex}-${screenFocused}-${muted}`}
-        getItemLayout={(_, index) => ({ length: SCREEN_H - HEADER_H, offset: (SCREEN_H - HEADER_H) * index, index })}
+        getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
         onScrollToIndexFailed={({ index }) => {
           // Fallback via offset direct — ne nécessite pas que l'item soit rendu
           scrollToIdx(index);
@@ -703,6 +702,13 @@ export const ReelsScreen: React.FC = () => {
         maxToRenderPerBatch={2}
         windowSize={3}
         initialNumToRender={2}
+      />
+
+      {/* Gradient haut — assure lisibilité du header sur toute vidéo */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.0)']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 80, zIndex: 9 }}
+        pointerEvents="none"
       />
 
       {/* Header flottant */}
