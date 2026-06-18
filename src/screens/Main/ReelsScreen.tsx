@@ -493,7 +493,7 @@ export const ReelsScreen: React.FC = () => {
       <VideoSlide
         reel={item}
         isActive={index === currentIndex && screenFocused}
-        isPreload={index === currentIndex + 1 || index === currentIndex - 1}
+        isPreload={Math.abs(index - currentIndex) <= 3 && index !== currentIndex}
         muted={muted}
         screenW={SCREEN_W}
         screenH={SCREEN_H}
@@ -700,9 +700,9 @@ export const ReelsScreen: React.FC = () => {
         }}
         renderItem={renderVideoSlide}
         removeClippedSubviews={false}
-        maxToRenderPerBatch={2}
-        windowSize={3}
-        initialNumToRender={2}
+        maxToRenderPerBatch={3}
+        windowSize={7}
+        initialNumToRender={3}
       />
 
       {/* Gradient haut — assure lisibilité du header sur toute vidéo */}
