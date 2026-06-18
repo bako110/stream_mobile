@@ -1453,7 +1453,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
       {/* Spinner uniquement si vrai stall réseau (>1.5s sans lecture) */}
       {isStalling && (
-        <ActivityIndicator size="large" color="rgba(255,255,255,0.85)" style={{ position: 'absolute', alignSelf: 'center', top: '50%', marginTop: -20 }} />
+        <ActivityIndicator
+          size="large"
+          color="rgba(255,255,255,0.85)"
+          style={{ position: 'absolute', top: screenH / 2 - 20, left: 0, right: 0, alignItems: 'center' }}
+        />
       )}
 
       {videoError && (
