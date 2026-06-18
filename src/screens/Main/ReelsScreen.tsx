@@ -671,7 +671,7 @@ export const ReelsScreen: React.FC = () => {
         ref={listRef}
         data={feedWithAds as any[]}
         keyExtractor={r => (r as any).id}
-        style={{ flex: 1 }}
+        style={{ flex: 1, overflow: 'hidden' }}
         pagingEnabled={false}
         snapToInterval={SCREEN_H}
         snapToAlignment="start"
