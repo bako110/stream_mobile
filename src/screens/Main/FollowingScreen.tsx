@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, RefreshControl, Platform, Dimensions,
+  StyleSheet, ActivityIndicator, RefreshControl, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
@@ -16,12 +16,7 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-const { width: SW } = Dimensions.get('window');
-const GAP      = 12;
-const H_PAD    = 16;
-const CARD_W   = (SW - H_PAD * 2 - GAP) / 2;
-const COVER_H  = CARD_W * 0.45;
-const AVATAR_SZ = CARD_W * 0.38;
+const AVATAR_SZ = 48;
 
 export const FollowingScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -32,13 +27,13 @@ export const FollowingScreen: React.FC = () => {
   const routeUserId: string | undefined = route.params?.userId;
   const initialTab: 'followers' | 'following' = route.params?.tab ?? 'following';
 
-  const [myId,         setMyId]         = useState<string | null>(null);
-  const [tab,          setTab]          = useState<'followers' | 'following'>(initialTab);
-  const [followers,    setFollowers]    = useState<UserPublic[]>([]);
-  const [following,    setFollowing]    = useState<UserPublic[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [refreshing,   setRefreshing]   = useState(false);
-  const [followState,  setFollowState]  = useState<Record<string, boolean>>({});
+  const [myId,          setMyId]          = useState<string | null>(null);
+  const [tab,           setTab]           = useState<'followers' | 'following'>(initialTab);
+  const [followers,     setFollowers]     = useState<UserPublic[]>([]);
+  const [following,     setFollowing]     = useState<UserPublic[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [refreshing,    setRefreshing]    = useState(false);
+  const [followState,   setFollowState]   = useState<Record<string, boolean>>({});
   const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async (silent = false) => {
@@ -94,50 +89,35 @@ export const FollowingScreen: React.FC = () => {
   const list = tab === 'followers' ? followers : following;
 
   const renderSkeleton = () => (
-    <View style={st.grid}>
-      {[0, 1, 2, 3, 4, 5].map(i => (
-        <View key={i} style={[st.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
-          <View style={[st.cover, { backgroundColor: colors.surfaceElevated }]} />
-          <View style={[st.avatarWrap, { borderColor: colors.background, backgroundColor: colors.surfaceElevated, marginTop: -(AVATAR_SZ / 2) }]} />
-          <View style={st.cardBody}>
-            <View style={{ height: 13, width: '65%', borderRadius: 6, backgroundColor: colors.surfaceElevated, marginTop: AVATAR_SZ / 2 + 8 }} />
-            <View style={{ height: 10, width: '45%', borderRadius: 5, backgroundColor: colors.surfaceElevated, marginTop: 6 }} />
-            <View style={[st.btnSkeleton, { backgroundColor: colors.surfaceElevated }]} />
+    <View>
+      {[0, 1, 2, 3, 4, 5, 6].map(i => (
+        <View key={i} style={[st.row, { borderBottomColor: colors.divider }]}>
+          <View style={[st.avatarSkeleton, { backgroundColor: colors.surfaceElevated }]} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <View style={{ height: 13, width: '50%', borderRadius: 6, backgroundColor: colors.surfaceElevated }} />
+            <View style={{ height: 10, width: '35%', borderRadius: 5, backgroundColor: colors.surfaceElevated }} />
           </View>
+          <View style={[st.btnSkeleton, { backgroundColor: colors.surfaceElevated }]} />
         </View>
       ))}
     </View>
   );
 
-  const renderCard = ({ item }: { item: UserPublic }) => {
+  const renderItem = ({ item }: { item: UserPublic }) => {
     const isMe       = item.id === myId;
     const isFollowed = followState[item.id] ?? false;
-    const isLoading  = followLoading[item.id] ?? false;
+    const isLoad     = followLoading[item.id] ?? false;
     const name       = item.display_name || item.username || 'Utilisateur';
     const initials   = name[0]?.toUpperCase() ?? '?';
 
     return (
-      <View style={[st.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
-
-        {/* Cover gradient */}
-        <TouchableOpacity activeOpacity={0.9} onPress={() => nav.navigate('UserProfile', { userId: item.id })}>
-          <LinearGradient
-            colors={[colors.primary + 'DD', colors.primary + '44']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={st.cover}
-          >
-            {item.is_online && (
-              <View style={[st.onlineBadge, { backgroundColor: '#22c55e', borderColor: colors.surface }]} />
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Avatar chevauchant */}
-        <TouchableOpacity
-          style={[st.avatarWrap, { borderColor: colors.background, marginTop: -(AVATAR_SZ / 2) }]}
-          onPress={() => nav.navigate('UserProfile', { userId: item.id })}
-          activeOpacity={0.9}
-        >
+      <TouchableOpacity
+        style={[st.row, { borderBottomColor: colors.divider }]}
+        onPress={() => nav.navigate('UserProfile', { userId: item.id })}
+        activeOpacity={0.7}
+      >
+        {/* Avatar */}
+        <View style={st.avatarWrap}>
           {item.avatar_url ? (
             <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
           ) : (
@@ -145,64 +125,45 @@ export const FollowingScreen: React.FC = () => {
               <Text style={st.initial}>{initials}</Text>
             </LinearGradient>
           )}
-        </TouchableOpacity>
+          {item.is_online && <View style={[st.onlineDot, { borderColor: colors.background }]} />}
+        </View>
 
         {/* Infos */}
-        <View style={st.cardBody}>
+        <View style={st.info}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={[st.name, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+            {item.is_verified && <VerifiedBadge size={13} />}
+          </View>
+          {item.username ? (
+            <Text style={[st.handle, { color: colors.textTertiary }]} numberOfLines={1}>@{item.username}</Text>
+          ) : null}
+        </View>
+
+        {/* Bouton */}
+        {isMe ? (
+          <View style={[st.btn, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border }]}>
+            <Text style={[st.btnText, { color: colors.textSecondary }]}>Moi</Text>
+          </View>
+        ) : (
           <TouchableOpacity
-            onPress={() => nav.navigate('UserProfile', { userId: item.id })}
+            style={[st.btn, isFollowed
+              ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border }
+              : { backgroundColor: colors.primary },
+            ]}
+            onPress={() => handleFollow(item.id)}
+            disabled={isLoad}
             activeOpacity={0.8}
-            style={{ alignItems: 'center', width: '100%' }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-              <Text style={[st.name, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
-              {item.is_verified && <VerifiedBadge size={13} />}
-            </View>
-            {item.username && (
-              <Text style={[st.handle, { color: colors.textTertiary }]} numberOfLines={1}>@{item.username}</Text>
+            {isLoad ? (
+              <ActivityIndicator size="small" color={isFollowed ? colors.primary : '#fff'} />
+            ) : (
+              <Text style={[st.btnText, { color: isFollowed ? colors.textSecondary : '#fff' }]}>
+                {isFollowed ? 'Suivi' : 'Suivre'}
+              </Text>
             )}
           </TouchableOpacity>
-
-          {/* Bouton Suivre / Ne plus suivre */}
-          {isMe ? (
-            <TouchableOpacity
-              style={[st.followBtn, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border }]}
-              onPress={() => nav.navigate('UserProfile', { userId: item.id })}
-              activeOpacity={0.8}
-            >
-              <Icon name="user" size={13} color={colors.textSecondary} />
-              <Text style={[st.followText, { color: colors.textSecondary }]}>Mon profil</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[
-                st.followBtn,
-                isFollowed
-                  ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border }
-                  : { backgroundColor: colors.primary },
-              ]}
-              onPress={() => handleFollow(item.id)}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color={isFollowed ? colors.primary : '#fff'} />
-              ) : (
-                <>
-                  <Icon
-                    name={isFollowed ? 'user-check' : 'user-plus'}
-                    size={13}
-                    color={isFollowed ? colors.textSecondary : '#fff'}
-                  />
-                  <Text style={[st.followText, { color: isFollowed ? colors.textSecondary : '#fff' }]}>
-                    {isFollowed ? 'Suivi' : 'Suivre'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+        )}
+      </TouchableOpacity>
     );
   };
 
@@ -214,7 +175,7 @@ export const FollowingScreen: React.FC = () => {
         <TouchableOpacity onPress={() => nav.goBack()} style={st.backBtn}>
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[st.title, { color: colors.textPrimary }]}>Communaute</Text>
+        <Text style={[st.title, { color: colors.textPrimary }]}>Réseau</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -229,7 +190,7 @@ export const FollowingScreen: React.FC = () => {
           >
             <Text style={[st.tabText, { color: tab === t ? colors.primary : colors.textTertiary }]}>
               {t === 'followers'
-                ? `Abonnes${followers.length > 0 ? ` (${followers.length})` : ''}`
+                ? `Abonnés${followers.length > 0 ? ` (${followers.length})` : ''}`
                 : `Abonnements${following.length > 0 ? ` (${following.length})` : ''}`}
             </Text>
           </TouchableOpacity>
@@ -240,10 +201,8 @@ export const FollowingScreen: React.FC = () => {
         <FlatList
           data={list}
           keyExtractor={u => u.id}
-          renderItem={renderCard}
-          numColumns={2}
-          columnWrapperStyle={st.row}
-          contentContainerStyle={list.length === 0 ? st.emptyContainer : st.listContent}
+          renderItem={renderItem}
+          contentContainerStyle={list.length === 0 ? st.emptyContainer : { paddingBottom: 32 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -255,7 +214,7 @@ export const FollowingScreen: React.FC = () => {
             <View style={st.empty}>
               <Icon name="users" size={52} color={colors.textTertiary} />
               <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>
-                {tab === 'followers' ? 'Aucun abonne' : 'Aucun abonnement'}
+                {tab === 'followers' ? 'Aucun abonné' : 'Aucun abonnement'}
               </Text>
               <Text style={[st.emptyDesc, { color: colors.textTertiary }]}>
                 {tab === 'followers'
@@ -286,46 +245,39 @@ const st = StyleSheet.create({
   tab:     { flex: 1, paddingVertical: 14, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText: { fontSize: 14, fontWeight: '600' },
 
-  listContent: { padding: H_PAD, paddingBottom: 32 },
-  grid:        { flexDirection: 'row', flexWrap: 'wrap', padding: H_PAD, gap: GAP },
-  row:         { gap: GAP, marginBottom: GAP },
-
-  card:    { width: CARD_W, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  cover:   { width: '100%', height: COVER_H, position: 'relative' },
-
-  onlineBadge: {
-    position: 'absolute', bottom: 8, right: 8,
-    width: 10, height: 10, borderRadius: 5, borderWidth: 2,
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth, gap: 12,
   },
 
-  avatarWrap: {
-    width: AVATAR_SZ + 4, height: AVATAR_SZ + 4,
-    borderRadius: (AVATAR_SZ + 4) / 2,
-    borderWidth: 3, overflow: 'hidden', alignSelf: 'center',
-  },
-  avatarImg:  {
-    width: AVATAR_SZ, height: AVATAR_SZ,
-    borderRadius: AVATAR_SZ / 2,
+  avatarWrap: { position: 'relative' },
+  avatarImg: {
+    width: AVATAR_SZ, height: AVATAR_SZ, borderRadius: AVATAR_SZ / 2,
     alignItems: 'center', justifyContent: 'center',
   },
-  initial:    { color: '#fff', fontWeight: '800', fontSize: AVATAR_SZ * 0.38 },
-
-  cardBody:   {
-    alignItems: 'center', paddingHorizontal: 10,
-    paddingBottom: 14, paddingTop: AVATAR_SZ / 2 + 6, gap: 3,
+  initial: { color: '#fff', fontWeight: '800', fontSize: AVATAR_SZ * 0.38 },
+  onlineDot: {
+    position: 'absolute', bottom: 1, right: 1,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#22c55e', borderWidth: 2,
   },
-  name:       { fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  handle:     { fontSize: 11, textAlign: 'center' },
 
-  followBtn:  {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, marginTop: 8, borderRadius: 9, paddingVertical: 9, width: '100%',
+  info: { flex: 1, gap: 2 },
+  name:   { fontSize: 14, fontWeight: '700' },
+  handle: { fontSize: 12 },
+
+  btn: {
+    paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: 20, minWidth: 80, alignItems: 'center', justifyContent: 'center',
   },
-  followText: { fontSize: 13, fontWeight: '700' },
-  btnSkeleton:{ height: 36, borderRadius: 9, width: '100%', marginTop: 8 },
+  btnText: { fontSize: 13, fontWeight: '700' },
+
+  avatarSkeleton: { width: AVATAR_SZ, height: AVATAR_SZ, borderRadius: AVATAR_SZ / 2 },
+  btnSkeleton:    { width: 76, height: 34, borderRadius: 20 },
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  empty:      { alignItems: 'center', gap: 8, paddingTop: 80 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', marginTop: 12 },
-  emptyDesc:  { fontSize: 13, textAlign: 'center', paddingHorizontal: 40 },
+  empty:          { alignItems: 'center', gap: 8, paddingTop: 80 },
+  emptyTitle:     { fontSize: 16, fontWeight: '600', marginTop: 12 },
+  emptyDesc:      { fontSize: 13, textAlign: 'center', paddingHorizontal: 40 },
 });
