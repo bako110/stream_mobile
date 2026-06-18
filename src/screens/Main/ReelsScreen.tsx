@@ -1434,8 +1434,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         surfaceType="texture"
       />
 
-      {!videoPlaying && !videoError && !ended && isActive && (
+      {/* Spinner uniquement si la vidéo n'est pas encore chargée (preload = déjà chargée = pas de spinner) */}
+      {!videoLoaded && !videoError && !ended && isActive && (
         <GoFolyXLoader variant="reel" color="#ffffff" />
+      )}
+      {/* Petit indicateur discret si rebuffering en cours de lecture */}
+      {videoLoaded && !videoPlaying && !paused && !videoError && !ended && isActive && (
+        <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" style={{ position: 'absolute', bottom: 80, alignSelf: 'center' }} />
       )}
 
       {videoError && (
