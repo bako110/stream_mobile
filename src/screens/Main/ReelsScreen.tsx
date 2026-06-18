@@ -884,56 +884,40 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         <LinearGradient colors={['#1a0533', '#0d1b4b', '#0a2a1a']} style={{ position: 'absolute', width: screenW, height: screenH }} />
       )}
 
-      {/* ── Gradient haut ── */}
-      <LinearGradient
-        colors={['rgba(0,0,0,0.6)', 'transparent']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140 }}
-        pointerEvents="none"
-      />
-
       {/* ── Gradient bas ── */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.92)']}
+        colors={['transparent', '#00000080', '#000000EB']}
         locations={[0, 0.5, 1]}
         style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.6 }}
         pointerEvents="none"
       />
 
-      {/* ── Badge Sponsorisé ── */}
-      <View style={{ position: 'absolute', top: 52, left: 14 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }}>
-          <MCIcon name="lightning-bolt" size={11} color="#FFD700" />
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.4 }}>Sponsorisé</Text>
-        </View>
-      </View>
-
       {/* ── Contenu bas ── */}
-      <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, paddingHorizontal: 18 }}>
+      <View style={{ position: 'absolute', bottom: 36, left: 0, right: 0, paddingHorizontal: 18 }}>
 
         {/* Annonceur row */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          {/* Avatar annonceur */}
-          <View style={{ width: 44, height: 44, borderRadius: 22, overflow: 'hidden', borderWidth: 2, borderColor: '#fff' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <View style={{ width: 46, height: 46, borderRadius: 23, overflow: 'hidden', borderWidth: 2, borderColor: '#fff' }}>
             {ad.thumbnail_url ? (
-              <Image source={{ uri: ad.thumbnail_url }} style={{ width: 44, height: 44 }} resizeMode="cover" />
+              <Image source={{ uri: ad.thumbnail_url }} style={{ width: 46, height: 46 }} resizeMode="cover" />
             ) : (
-              <LinearGradient colors={['#9B65F5', '#E0389A']} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="zap" size={18} color="#fff" />
+              <LinearGradient colors={['#9B65F5', '#E0389A']} style={{ width: 46, height: 46, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="zap" size={20} color="#fff" />
               </LinearGradient>
             )}
           </View>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{ad.title}</Text>
               <MCIcon name="check-decagram" size={15} color="#4FC3F7" />
             </View>
-            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '500', marginTop: 1 }}>Publicité</Text>
+            <Text style={{ color: '#ffffff99', fontSize: 12, fontWeight: '500', marginTop: 2 }}>Publicité</Text>
           </View>
         </View>
 
         {/* Description */}
         {ad.description ? (
-          <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, lineHeight: 20, marginBottom: 18, fontWeight: '400' }} numberOfLines={3}>
+          <Text style={{ color: '#ffffffDD', fontSize: 14, lineHeight: 20, marginBottom: 16, fontWeight: '400' }} numberOfLines={3}>
             {ad.description}
           </Text>
         ) : null}
@@ -951,13 +935,6 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
               </Text>
               <MCIcon name="arrow-right" size={18} color="#fff" />
             </LinearGradient>
-          </TouchableOpacity>
-        ) : null}
-
-        {/* Lien discret */}
-        {ad.cta_url ? (
-          <TouchableOpacity onPress={handleCta} style={{ alignItems: 'center', marginTop: 10 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }} numberOfLines={1}>{ad.cta_url.replace(/^https?:\/\//, '')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
