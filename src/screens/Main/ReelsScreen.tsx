@@ -964,6 +964,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
   const [likes,        setLikes]        = useState(reel.like_count ?? 0);
+  const [heartLikeAction, setHeartLikeAction] = useState(true);
   const [commentCount, setCommentCount] = useState(reel.comment_count ?? 0);
   const [shareCount,   setShareCount]   = useState(reel.share_count ?? 0);
   const [showShare,    setShowShare]    = useState(false);
@@ -1317,18 +1318,23 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   }, [player, showPlayIconAnim]);
 
   const doLike = useCallback((x: number, y: number) => {
-    if (!likedRef.current && !likeInFlight.current) {
-      likedRef.current = true; likeInFlight.current = true;
-      if (mountedRef.current) { setLiked(true); setLikes(v => v + 1); }
+    if (!likeInFlight.current) {
+      const wasLiked = likedRef.current;
+      likedRef.current = !wasLiked; likeInFlight.current = true;
+      setHeartLikeAction(!wasLiked);
+      if (mountedRef.current) { setLiked(!wasLiked); setLikes(v => wasLiked ? v - 1 : v + 1); }
       socialService.toggleReaction({ reaction_type: 'like' as ReactionType, reel_id: reel.id })
-        .catch(() => {}).finally(() => { likeInFlight.current = false; });
+        .catch(() => {
+          likedRef.current = wasLiked;
+          if (mountedRef.current) { setLiked(wasLiked); setLikes(reel.like_count ?? 0); }
+        })
+        .finally(() => { likeInFlight.current = false; });
     }
     heartX.value = x; heartY.value = y;
     heartScale.value = 0;
-    heartOpacity.value = withTiming(1, { duration: 30 });
-    heartScale.value   = withSpring(1.2, { damping: 8, stiffness: 250 });
     heartOpacity.value = withSequence(withTiming(1, { duration: 30 }), withTiming(1, { duration: 350 }), withTiming(0, { duration: 200 }));
-  }, [reel.id, heartOpacity, heartScale, heartX, heartY]);
+    heartScale.value   = withSpring(1.2, { damping: 8, stiffness: 250 });
+  }, [reel.id, reel.like_count, heartOpacity, heartScale, heartX, heartY]);
 
   const handleLike = useCallback(async () => {
     if (likeInFlight.current) return;
@@ -1458,7 +1464,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       </Animated.View>
 
       <Animated.View pointerEvents="none" style={heartAnim}>
-        <MCIcon name="heart" size={88} color="#E0389A" />
+        {heartLikeAction
+          ? <MCIcon name="heart" size={88} color="#E0389A" />
+          : <MCIcon name="heart-broken" size={88} color="rgba(255,255,255,0.7)" />
+        }
       </Animated.View>
 
       {ended && (
