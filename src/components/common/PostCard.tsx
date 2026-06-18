@@ -269,7 +269,16 @@ const PostCardInner: React.FC<PostCardProps> = ({
   }, [saved, post]);
 
   const hasMedia = images.length > 0 || !!(post.hls_url ?? post.video_url);
-  const HERO_H   = Math.round(SW * 0.58);
+
+  // Calcul du ratio depuis les dimensions stockees, clamp portrait/paysage
+  const videoAspectRatio = (() => {
+    if (post.video_width && post.video_height && post.video_width > 0 && post.video_height > 0) {
+      const raw = post.video_width / post.video_height;
+      return Math.min(Math.max(raw, 4 / 5), 16 / 9);
+    }
+    return 16 / 9;
+  })();
+  const HERO_H = Math.round(SW / videoAspectRatio);
 
   return (
     <View style={[pc.card, { backgroundColor: colors.surface }]}>
@@ -282,7 +291,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
               <InlineVideoPlayer
                 uri={(post.hls_url ?? post.video_url)!}
                 thumbnailUri={post.thumbnail_url}
-                aspectRatio={HERO_H / SW}
+                aspectRatio={videoAspectRatio}
                 borderRadius={0}
                 muted
                 isActive={isActive}

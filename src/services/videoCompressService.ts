@@ -12,8 +12,10 @@ export interface CompressOptions {
 
 export interface CompressResult {
   uri:          string;
-  thumbnailUri: string | null; // file:// path du thumbnail généré
+  thumbnailUri: string | null;
   durationSec:  number;
+  width:        number | null;
+  height:       number | null;
   segments:     string[];
   isTempFile:   boolean;
 }
@@ -78,11 +80,15 @@ export async function compressVideo(
 
   onProgress?.(90);
 
-  // Durée réelle via metadata
+  // Durée et dimensions réelles via metadata
   let durationSec = 0;
+  let width: number | null = null;
+  let height: number | null = null;
   try {
     const meta = await getVideoMetaData(compressed);
     if (meta.duration && meta.duration > 0) durationSec = Math.round(meta.duration);
+    if (meta.width  && meta.width  > 0) width  = meta.width;
+    if (meta.height && meta.height > 0) height = meta.height;
   } catch {}
 
   // Si le thumbnail n'a pas pu être généré depuis l'original, fallback sur la vidéo compressée
@@ -97,6 +103,8 @@ export async function compressVideo(
     uri:          compressed,
     thumbnailUri,
     durationSec,
+    width,
+    height,
     segments:     [compressed],
     isTempFile:   compressed !== fileUri,
   };

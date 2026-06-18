@@ -29,6 +29,8 @@ export interface UploadJobResult {
   hlsUrl?:        string;
   thumbnailUrl?:  string;
   durationSec?:   number;
+  videoWidth?:    number | null;
+  videoHeight?:   number | null;
   imageUrls?:     string[];
 }
 
@@ -197,6 +199,8 @@ class BackgroundUploadService {
         hlsUrl:       result.hls_url,
         thumbnailUrl: result.thumbnail_url,
         durationSec:  result.duration,
+        videoWidth:   result.width  ?? null,
+        videoHeight:  result.height ?? null,
       };
 
       await opts.onDone(jobResult);
@@ -279,6 +283,8 @@ class BackgroundUploadService {
         hlsUrl:       videoResult.hls_url,
         thumbnailUrl: videoResult.thumbnail_url,
         durationSec:  videoResult.duration,
+        videoWidth:   videoResult.width  ?? null,
+        videoHeight:  videoResult.height ?? null,
         imageUrls,
       };
 

@@ -159,6 +159,8 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             feeling:       capturedFeeling,
             video_url:     result.videoUrl,
             thumbnail_url: result.thumbnailUrl,
+            video_width:   result.videoWidth,
+            video_height:  result.videoHeight,
             image_url:     result.imageUrls?.[0],
             image_urls:    result.imageUrls,
             mention_ids:   mentionIds.length ? mentionIds : undefined,
@@ -177,6 +179,8 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             feeling:       capturedFeeling,
             video_url:     result.videoUrl,
             thumbnail_url: result.thumbnailUrl,
+            video_width:   result.videoWidth,
+            video_height:  result.videoHeight,
             mention_ids:   mentionIds.length ? mentionIds : undefined,
           });
         },

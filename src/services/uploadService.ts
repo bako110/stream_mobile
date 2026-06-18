@@ -244,6 +244,8 @@ export async function uploadVideoFromUri(
               duration:      status.duration  ?? data.duration,
               thumbnail_url: status.thumbnail_url ?? undefined,
               hls_url:       status.hls_url   ?? undefined,
+              width:         compressed.width  ?? undefined,
+              height:        compressed.height ?? undefined,
             };
           }
           if (status.status === 'error') break;
@@ -266,6 +268,8 @@ export async function uploadVideoFromUri(
       duration:      data.duration  ?? undefined,
       thumbnail_url: data.thumbnail_url ?? undefined,
       hls_url:       fallbackHls,
+      width:         compressed.width  ?? undefined,
+      height:        compressed.height ?? undefined,
     };
   }
 
@@ -297,6 +301,8 @@ export async function uploadVideoFromUri(
     public_id:     public_url,
     duration:      compressed.durationSec,
     thumbnail_url: thumbnailPublicUrl,
+    width:         compressed.width  ?? undefined,
+    height:        compressed.height ?? undefined,
   };
 }
 

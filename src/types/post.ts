@@ -17,6 +17,8 @@ export interface Post {
   video_url?: string | null;
   hls_url?: string | null;
   thumbnail_url?: string | null;
+  video_width?: number | null;
+  video_height?: number | null;
   feeling?: string | null;
   link_url?: string | null;
   link_preview_title?: string | null;
@@ -38,6 +40,8 @@ export interface PostCreate {
   image_urls?: string[];
   video_url?: string;
   thumbnail_url?: string;
+  video_width?: number | null;
+  video_height?: number | null;
   feeling?: string;
   mention_ids?: string[];
 }
