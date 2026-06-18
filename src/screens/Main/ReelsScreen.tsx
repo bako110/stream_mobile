@@ -964,6 +964,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [videoLoaded,  setVideoLoaded]  = useState(false);
   const [videoError,   setVideoError]   = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
+  const [isStalling,   setIsStalling]   = useState(false);
+  const stallingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
   const [likes,        setLikes]        = useState(reel.like_count ?? 0);
   const [heartLikeAction, setHeartLikeAction] = useState(true);
@@ -1101,9 +1103,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   });
 
   const clearAllTimers = useCallback(() => {
-    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
-    if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
-    if (playTimerRef.current)  { clearTimeout(playTimerRef.current);  playTimerRef.current  = null; }
+    if (retryTimerRef.current)   { clearTimeout(retryTimerRef.current);   retryTimerRef.current   = null; }
+    if (stallTimerRef.current)   { clearTimeout(stallTimerRef.current);   stallTimerRef.current   = null; }
+    if (playTimerRef.current)    { clearTimeout(playTimerRef.current);    playTimerRef.current    = null; }
+    if (stallingTimerRef.current){ clearTimeout(stallingTimerRef.current); stallingTimerRef.current = null; }
   }, []);
 
   // Cleanup complet au démontage
@@ -1247,6 +1250,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       clearAllTimers(); clearStall();
     }
   }, [isActive, clearAllTimers, clearStall]);
+
+  // Stalling : afficher le spinner seulement si la vidéo est bloquée depuis >1.5s
+  useEffect(() => {
+    if (stallingTimerRef.current) { clearTimeout(stallingTimerRef.current); stallingTimerRef.current = null; }
+    if (videoPlaying || !isActive || paused || ended || videoError) {
+      setIsStalling(false);
+      return;
+    }
+    // Vidéo active mais pas en lecture — attendre 1.5s avant d'afficher le spinner
+    stallingTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) setIsStalling(true);
+    }, 1500);
+    return () => { if (stallingTimerRef.current) { clearTimeout(stallingTimerRef.current); stallingTimerRef.current = null; } };
+  }, [videoPlaying, isActive, paused, ended, videoError]);
 
   // Mute
   useEffect(() => {
@@ -1434,13 +1451,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         surfaceType="texture"
       />
 
-      {/* Spinner uniquement si la vidéo n'est pas encore chargée (preload = déjà chargée = pas de spinner) */}
-      {!videoLoaded && !videoError && !ended && isActive && (
-        <GoFolyXLoader variant="reel" color="#ffffff" />
-      )}
-      {/* Petit indicateur discret si rebuffering en cours de lecture */}
-      {videoLoaded && !videoPlaying && !paused && !videoError && !ended && isActive && (
-        <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" style={{ position: 'absolute', bottom: 80, alignSelf: 'center' }} />
+      {/* Spinner uniquement si vrai stall réseau (>1.5s sans lecture) */}
+      {isStalling && (
+        <ActivityIndicator size="large" color="rgba(255,255,255,0.85)" style={{ position: 'absolute', alignSelf: 'center', top: '50%', marginTop: -20 }} />
       )}
 
       {videoError && (
