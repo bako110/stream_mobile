@@ -90,10 +90,10 @@ const VideoModal: React.FC<{ uri: string; onClose: () => void }> = ({ uri, onClo
 const HeroCarousel: React.FC<{
   images: string[]; fallbackIcon: string; accent: string;
   title: string; eventType: string; isFree: boolean; isOnline: boolean;
-  organizerName?: string; hasVideo: boolean; onVideoPress: () => void;
+  organizerName?: string; organizerAvatar?: string; hasVideo: boolean; onVideoPress: () => void;
   colors: AppColors;
 }> = ({ images, fallbackIcon, accent, title, eventType, isFree, isOnline,
-        organizerName, hasVideo, onVideoPress, colors }) => {
+        organizerName, organizerAvatar, hasVideo, onVideoPress, colors }) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const flatRef = useRef<FlatList>(null);
 
@@ -171,10 +171,15 @@ const HeroCarousel: React.FC<{
         </Text>
         {organizerName && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <LinearGradient colors={[accent, accent + '88']}
-              style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 10, fontWeight: '900', color: '#fff' }}>{getInitials(organizerName)}</Text>
-            </LinearGradient>
+            <View style={{ width: 30, height: 30, borderRadius: 15, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' }}>
+              {organizerAvatar ? (
+                <Image source={{ uri: organizerAvatar }} style={{ width: 30, height: 30 }} resizeMode="cover" />
+              ) : (
+                <LinearGradient colors={[accent, accent + '88']} style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 10, fontWeight: '900', color: '#fff' }}>{getInitials(organizerName)}</Text>
+                </LinearGradient>
+              )}
+            </View>
             <Text style={{ fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>{organizerName}</Text>
           </View>
         )}
@@ -512,7 +517,8 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const accent       = cfg.color;
   const isFree       = event.access_type === 'free';
   const isInviteOnly = event.access_type === 'invite_only';
-  const organizerName = event.organizer?.display_name ?? event.organizer?.username;
+  const organizerName   = event.organizer?.display_name ?? event.organizer?.username;
+  const organizerAvatar = event.organizer?.avatar_url ?? undefined;
   const hasVideo     = !!(event.hls_url ?? event.video_url);
   const galleryImages = (event.gallery_urls ?? []).length > 0
     ? event.gallery_urls!
@@ -557,7 +563,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           images={galleryImages} fallbackIcon={cfg.icon} accent={accent}
           title={event.title} eventType={cfg.label}
           isFree={isFree} isOnline={!!event.is_online}
-          organizerName={organizerName ?? undefined} hasVideo={hasVideo}
+          organizerName={organizerName ?? undefined} organizerAvatar={organizerAvatar} hasVideo={hasVideo}
           onVideoPress={() => setShowVideo(true)}
           colors={colors}
         />
