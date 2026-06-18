@@ -188,11 +188,9 @@ class BackgroundUploadService {
         undefined,
         (pct) => {
           const status: UploadJobStatus = pct < 85 ? 'compressing' : 'uploading';
-          this.update(id, { status, progress: Math.round(pct * 0.9) });
+          this.update(id, { status, progress: Math.min(99, Math.round(pct * 0.9)) });
         },
       );
-
-      this.update(id, { status: 'uploading', progress: 92 });
 
       const jobResult: UploadJobResult = {
         videoUrl:     result.url,
@@ -203,10 +201,14 @@ class BackgroundUploadService {
         videoHeight:  result.height ?? null,
       };
 
-      await opts.onDone(jobResult);
-
+      // Marque done immediatement — le banner se met a jour sans attendre postService.create
       this.update(id, { status: 'done', progress: 100, result: jobResult });
       await this._notifyDone(opts.label);
+
+      // Cree le post en arriere-plan, sans bloquer le banner
+      opts.onDone(jobResult).catch(err => {
+        console.warn('[backgroundUpload] onDone error:', err?.message ?? err);
+      });
     } catch (err: any) {
       const message = err?.message ?? 'Erreur inconnue';
       this.update(id, { status: 'error', error: message });
@@ -261,7 +263,7 @@ class BackgroundUploadService {
         undefined,
         (pct) => {
           const status: UploadJobStatus = pct < 85 ? 'compressing' : 'uploading';
-          this.update(id, { status, progress: Math.round(pct * 0.75) });
+          this.update(id, { status, progress: Math.min(99, Math.round(pct * 0.75)) });
         },
       );
 
@@ -288,10 +290,12 @@ class BackgroundUploadService {
         imageUrls,
       };
 
-      await opts.onDone(jobResult);
-
       this.update(id, { status: 'done', progress: 100, result: jobResult });
       await this._notifyDone(opts.label);
+
+      opts.onDone(jobResult).catch(err => {
+        console.warn('[backgroundUpload] onDone error:', err?.message ?? err);
+      });
     } catch (err: any) {
       const message = err?.message ?? 'Erreur inconnue';
       this.update(id, { status: 'error', error: message });
