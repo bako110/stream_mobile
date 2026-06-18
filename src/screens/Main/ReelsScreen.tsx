@@ -909,7 +909,6 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{ad.title}</Text>
-              <MCIcon name="check-decagram" size={15} color="#4FC3F7" />
             </View>
             <Text style={{ color: '#ffffff99', fontSize: 12, fontWeight: '500', marginTop: 2 }}>Publicité</Text>
           </View>
