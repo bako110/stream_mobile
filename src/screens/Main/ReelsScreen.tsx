@@ -867,68 +867,97 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
     }
   }, [isActive, ad.id]);
 
+  const handleCta = () => {
+    apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
+    if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
+  };
+
   return (
-    <View style={{ width: screenW, height: screenH, backgroundColor: '#0a0a1a' }}>
-      {/* Media background */}
+    <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
+
+      {/* ── Media plein écran ── */}
       {isVideo && ad.creative_url ? (
-        <VideoView
-          player={player}
-          style={{ position: 'absolute', width: screenW, height: screenH }}
-          resizeMode="cover"
-          controls={false}
-        />
+        <VideoView player={player} style={{ position: 'absolute', width: screenW, height: screenH }} resizeMode="cover" controls={false} />
       ) : (ad.creative_url || ad.thumbnail_url) ? (
-        <Image
-          source={{ uri: ad.creative_url || ad.thumbnail_url }}
-          style={{ position: 'absolute', width: screenW, height: screenH }}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={{ position: 'absolute', width: screenW, height: screenH }} resizeMode="cover" />
       ) : (
-        <View style={{ position: 'absolute', width: screenW, height: screenH, backgroundColor: '#111' }} />
+        <LinearGradient colors={['#1a0533', '#0d1b4b', '#0a2a1a']} style={{ position: 'absolute', width: screenW, height: screenH }} />
       )}
 
-      {/* Gradient bas */}
+      {/* ── Gradient haut ── */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
-        locations={[0.3, 0.65, 1]}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.55 }}
+        colors={['rgba(0,0,0,0.6)', 'transparent']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140 }}
+        pointerEvents="none"
       />
 
-      {/* Label Sponsorisé — sobre, top left */}
-      <View style={{ position: 'absolute', top: 52, left: 14, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600' }}>Sponsorisé</Text>
-        <Icon name="globe" size={10} color="rgba(255,255,255,0.45)" />
+      {/* ── Gradient bas ── */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.92)']}
+        locations={[0, 0.5, 1]}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.6 }}
+        pointerEvents="none"
+      />
+
+      {/* ── Badge Sponsorisé ── */}
+      <View style={{ position: 'absolute', top: 52, left: 14 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }}>
+          <MCIcon name="lightning-bolt" size={11} color="#FFD700" />
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.4 }}>Sponsorisé</Text>
+        </View>
       </View>
 
-      {/* Contenu bas */}
-      <View style={{ position: 'absolute', bottom: 50, left: 16, right: 72 }}>
-        {/* Annonceur */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-            <Icon name="zap" size={14} color="#fff" />
+      {/* ── Contenu bas ── */}
+      <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, paddingHorizontal: 18 }}>
+
+        {/* Annonceur row */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          {/* Avatar annonceur */}
+          <View style={{ width: 44, height: 44, borderRadius: 22, overflow: 'hidden', borderWidth: 2, borderColor: '#fff' }}>
+            {ad.thumbnail_url ? (
+              <Image source={{ uri: ad.thumbnail_url }} style={{ width: 44, height: 44 }} resizeMode="cover" />
+            ) : (
+              <LinearGradient colors={['#9B65F5', '#E0389A']} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="zap" size={18} color="#fff" />
+              </LinearGradient>
+            )}
           </View>
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
-            {ad.title}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{ad.title}</Text>
+              <MCIcon name="check-decagram" size={15} color="#4FC3F7" />
+            </View>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '500', marginTop: 1 }}>Publicité</Text>
+          </View>
         </View>
+
+        {/* Description */}
         {ad.description ? (
-          <Text style={{ color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 18, marginBottom: 14 }} numberOfLines={2}>
+          <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, lineHeight: 20, marginBottom: 18, fontWeight: '400' }} numberOfLines={3}>
             {ad.description}
           </Text>
         ) : null}
+
+        {/* CTA button */}
         {ad.cta_url ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => {
-              apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
-              if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
-            }}
-            style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
-              {ad.cta_text || 'En savoir plus'}
-            </Text>
-            <Icon name="chevron-right" size={13} color="#fff" />
+          <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={{ overflow: 'hidden', borderRadius: 14 }}>
+            <LinearGradient
+              colors={['#9B65F5', '#E0389A']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, paddingHorizontal: 24 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 }}>
+                {ad.cta_text || 'En savoir plus'}
+              </Text>
+              <MCIcon name="arrow-right" size={18} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Lien discret */}
+        {ad.cta_url ? (
+          <TouchableOpacity onPress={handleCta} style={{ alignItems: 'center', marginTop: 10 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }} numberOfLines={1}>{ad.cta_url.replace(/^https?:\/\//, '')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
