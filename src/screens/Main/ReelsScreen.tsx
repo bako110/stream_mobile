@@ -965,7 +965,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [videoError,   setVideoError]   = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [isStalling,   setIsStalling]   = useState(false);
-  const stallingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showControls, setShowControls] = useState(false);
+  const stallingTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controlsTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
   const [likes,        setLikes]        = useState(reel.like_count ?? 0);
   const [heartLikeAction, setHeartLikeAction] = useState(true);
@@ -1107,6 +1109,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     if (stallTimerRef.current)   { clearTimeout(stallTimerRef.current);   stallTimerRef.current   = null; }
     if (playTimerRef.current)    { clearTimeout(playTimerRef.current);    playTimerRef.current    = null; }
     if (stallingTimerRef.current){ clearTimeout(stallingTimerRef.current); stallingTimerRef.current = null; }
+    if (controlsTimerRef.current){ clearTimeout(controlsTimerRef.current); controlsTimerRef.current = null; }
   }, []);
 
   // Cleanup complet au démontage
@@ -1244,9 +1247,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   useEffect(() => {
     if (!isActive) {
       pausedRef.current = false; retryCountRef.current = 0;
-      // endedRef + ended intentionnellement PAS remis a false :
-      // si la video etait terminee, au retour scroll on affiche "Revoir" directement
-      if (mountedRef.current) { setPaused(false); setVideoError(false); setVideoPlaying(false); }
+      if (mountedRef.current) { setPaused(false); setVideoError(false); setVideoPlaying(false); setShowControls(false); }
       clearAllTimers(); clearStall();
     }
   }, [isActive, clearAllTimers, clearStall]);
@@ -1338,6 +1339,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     showPlayIconAnim();
   }, [player, showPlayIconAnim]);
 
+  const triggerShowControls = useCallback(() => {
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    if (mountedRef.current) setShowControls(true);
+    controlsTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) setShowControls(false);
+    }, 3000);
+  }, []);
+
   const doLike = useCallback((x: number, y: number) => {
     if (!likeInFlight.current) {
       const wasLiked = likedRef.current;
@@ -1421,17 +1430,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
   const retryLoad = useCallback(() => { retryCountRef.current = 0; doRetry(); }, [doRetry]);
 
-  // Gestes — 3 zones style TikTok
-  const leftDoubleTap   = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true).onEnd(() => doSkipAnim(-10));
-  const leftSingleTap   = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
-  const leftGesture     = Gesture.Exclusive(leftDoubleTap, leftSingleTap);
-  const centerDoubleTap = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true).onEnd(e => doLike(e.x, e.y));
-  const centerSingleTap = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
-  const centerGesture   = Gesture.Exclusive(centerDoubleTap, centerSingleTap);
-  const rightDoubleTap  = Gesture.Tap().numberOfTaps(2).maxDuration(250).runOnJS(true).onEnd(() => doSkipAnim(10));
-  const rightSingleTap  = Gesture.Tap().maxDuration(250).runOnJS(true).onEnd(doPause);
-  const rightGesture    = Gesture.Exclusive(rightDoubleTap, rightSingleTap);
-  const hPanFail        = Gesture.Pan().activeOffsetX([-10, 10]).failOffsetY([-10, 10]).minDistance(10);
+  // Gestes — 1 tap = controls, 2 taps = like/unlike
+  const doubleTap  = Gesture.Tap().numberOfTaps(2).maxDuration(300).runOnJS(true).onEnd(e => doLike(e.x, e.y));
+  const singleTap  = Gesture.Tap().maxDuration(300).runOnJS(true).onEnd(() => { triggerShowControls(); doPause(); });
+  const tapGesture = Gesture.Exclusive(doubleTap, singleTap);
+  const hPanFail   = Gesture.Pan().activeOffsetX([-10, 10]).failOffsetY([-10, 10]).minDistance(10);
 
   const safeBottom    = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
   const COMMENT_BAR_H = 76;
@@ -1472,15 +1475,29 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
       )}
 
-      <GestureDetector gesture={Gesture.Simultaneous(hPanFail, leftGesture)}>
-        <View style={{ position: 'absolute', top: 0, left: 0, width: (screenW - 80) * 0.3, bottom: safeBottom + COMMENT_BAR_H }} />
+      <GestureDetector gesture={Gesture.Simultaneous(hPanFail, tapGesture)}>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 80, bottom: safeBottom + COMMENT_BAR_H }} />
       </GestureDetector>
-      <GestureDetector gesture={Gesture.Simultaneous(hPanFail, centerGesture)}>
-        <View style={{ position: 'absolute', top: 0, left: (screenW - 80) * 0.3, width: (screenW - 80) * 0.4, bottom: safeBottom + COMMENT_BAR_H }} />
-      </GestureDetector>
-      <GestureDetector gesture={Gesture.Simultaneous(hPanFail, rightGesture)}>
-        <View style={{ position: 'absolute', top: 0, left: (screenW - 80) * 0.7, right: 80, bottom: safeBottom + COMMENT_BAR_H }} />
-      </GestureDetector>
+
+      {/* Boutons prev/next visibles au 1er tap — disparaissent après 3s */}
+      {showControls && (
+        <View pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 80, bottom: safeBottom + COMMENT_BAR_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, zIndex: 8 }}>
+          <TouchableOpacity
+            onPress={() => { doSkipAnim(-10); triggerShowControls(); }}
+            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
+            activeOpacity={0.8}
+          >
+            <Icon name="rewind" size={26} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { doSkipAnim(10); triggerShowControls(); }}
+            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
+            activeOpacity={0.8}
+          >
+            <Icon name="fast-forward" size={26} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleLeft,  skipLeftAnim]}><Text style={s.skipRippleTxt}>{skipLeftLabel}</Text></Animated.View>
       <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleRight, skipRightAnim]}><Text style={s.skipRippleTxt}>{skipRightLabel}</Text></Animated.View>
