@@ -1468,8 +1468,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
       {/* Barre de progression — tout en haut, sous le header */}
       {isActive && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.2)', zIndex: 20 }}>
-          <Animated.View style={[{ height: 3, backgroundColor: '#E0389A', borderRadius: 2 }, progressBarAnim]} />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', zIndex: 20 }}>
+          <Animated.View style={[{ height: 3, backgroundColor: '#fff', borderRadius: 2 }, progressBarAnim]} />
         </View>
       )}
 
