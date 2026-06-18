@@ -28,6 +28,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -352,6 +353,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const insets = useSafeAreaInsets();
 
   const [event,        setEvent]        = useState<Event | null>(null);
   const [loading,      setLoading]      = useState(true);
@@ -547,9 +549,6 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
-      {/* Bouton retour flottant */}
-      <BackButton onPress={onBack ?? (() => {})} transparent color="#fff" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 
@@ -751,6 +750,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         )}
 
       </ScrollView>
+
+      {/* Bouton retour flottant — superposé sur le hero */}
+      <View style={{ position: 'absolute', top: insets.top + 8, left: 14, zIndex: 20 }} pointerEvents="box-none">
+        <BackButton onPress={onBack ?? (() => {})} transparent color="#fff" />
+      </View>
 
       {/* ── CTA flottant ─────────────────────────────────────────────── */}
       <View style={[ds.ctaBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
