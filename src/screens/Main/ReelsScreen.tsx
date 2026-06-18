@@ -87,7 +87,7 @@ export const ReelsScreen: React.FC = () => {
   const mountedRef        = useRef(true);
   const searchTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef    = useRef<TextInput>(null);
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 75 });
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
   const lastLoadedAtRef   = useRef<number>(0);
   const didFocusOnceRef   = useRef(false);
   const lastInitialReelRef = useRef<string | undefined>(undefined);
@@ -1244,15 +1244,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       playTimerRef.current = setTimeout(() => {
         if (!mountedRef.current || pausedRef.current) return;
         if (endedRef.current) {
-          // Vidéo terminée — relancer depuis le début au lieu d'afficher "Revoir"
           endedRef.current = false;
           if (mountedRef.current) setEnded(false);
           progressValue.value = 0;
-          try { player.seekTo(0); setTimeout(() => { try { player.play(); } catch {} }, 80); } catch {}
+          try { player.seekTo(0); setTimeout(() => { try { player.play(); } catch {} }, 30); } catch {}
         } else {
           try { player.play(); } catch {}
         }
-      }, 80);
+      }, 30);
     } else {
       // Preload ou inactif → pause (le buffer continue de se remplir en silence)
       try { player.pause(); } catch {}
