@@ -6,7 +6,7 @@
  * - Onglets: Publications (events+concerts) | Reels | À propos
  * - Liste followers/following en modal
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, ActivityIndicator, Alert, FlatList, Dimensions, Modal, StatusBar,
@@ -135,6 +135,27 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     return () => task.cancel();
   }, [load]);
 
+  const isMounted = useRef(false);
+  useEffect(() => {
+    if (!isMounted.current) { isMounted.current = true; return; }
+    const unsub = navigation.addListener('focus', () => { load(); });
+    return unsub;
+  }, [navigation, load]);
+
+  // Sync avatar/banner instantanément si c'est mon propre profil
+  useEffect(() => {
+    if (!currentUser || !profile) return;
+    if (String(currentUser.id) !== String(userId)) return;
+    setProfile(prev => prev ? {
+      ...prev,
+      avatar_url: currentUser.avatar_url ?? prev.avatar_url,
+      banner_url: currentUser.banner_url ?? prev.banner_url,
+      display_name: currentUser.display_name ?? prev.display_name,
+      username: currentUser.username ?? prev.username,
+      bio: currentUser.bio ?? prev.bio,
+    } : prev);
+  }, [currentUser?.avatar_url, currentUser?.banner_url, currentUser?.display_name]);
+
   const isMe = myId !== null && String(myId) === String(userId);
 
   const handleFollow = async () => {
@@ -256,11 +277,19 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             )}
           </TouchableOpacity>
           <View style={styles.headerOverlay}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-              <Icon name="arrow-left" size={22} color="#fff" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle} numberOfLines={1}>{displayName}</Text>
-            <View style={{ width: 40 }} />
+            {/* Haut : bouton retour */}
+            <View style={{ flexDirection: 'row', paddingTop: 48, paddingHorizontal: 16 }}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+                <Icon name="arrow-left" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {/* Bas : nom sur degrade */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.6)']}
+              style={{ paddingHorizontal: 16, paddingBottom: 12, paddingTop: 30 }}
+            >
+              <Text style={styles.headerTitle} numberOfLines={1}>{displayName}</Text>
+            </LinearGradient>
           </View>
         </View>
 
@@ -915,12 +944,11 @@ const styles = StyleSheet.create({
   bannerWrap: { height: 180, position: 'relative', overflow: 'hidden' },
   banner: { width: '100%', height: '100%', resizeMode: 'cover' },
   headerOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 48, paddingHorizontal: 16,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    flexDirection: 'column', justifyContent: 'space-between',
   },
   headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: '#fff', fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
+  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0.2 },
 
   avatarSection: { alignItems: 'center', marginTop: -44 },
   avatarRing: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, overflow: 'hidden' },

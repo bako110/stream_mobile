@@ -47,6 +47,7 @@ export interface PickResult {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function normalizeUri(uri: string): Promise<string> {
+  if (!uri) throw new Error('URI image invalide');
   if (Platform.OS !== 'android' || !uri.startsWith('content://')) return uri;
   const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload_${Date.now()}.tmp`;
   try {
@@ -114,7 +115,8 @@ async function compressAndNormalizeImage(uri: string): Promise<string> {
 }
 
 async function uploadAsset(asset: Asset, folder: string): Promise<UploadedImage> {
-  const uri         = await compressAndNormalizeImage(asset.uri!);
+  if (!asset.uri) throw new Error('URI asset manquante');
+  const uri         = await compressAndNormalizeImage(asset.uri);
   const contentType = 'image/jpeg';
   const filename    = `photo_${Date.now()}.jpg`;
   const { upload_url, public_url } = await getPresignedUrl(folder, filename, contentType);
