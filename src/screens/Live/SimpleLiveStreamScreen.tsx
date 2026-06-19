@@ -429,7 +429,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const nav                  = useNavigation<Nav>();
   const remoteParticipants   = allParticipants.filter(p => !p.isLocal);
 
-  const [muted,        setMuted]        = useState(false);
   const [videoOff,     setVideoOff]     = useState(false);
   const [camFront,     setCamFront]     = useState(true);
   const [elapsed,      setElapsed]      = useState(0);
@@ -798,23 +797,14 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   }, [chatInput, sending, liveId, currentUser]);
 
   const toggleMute = useCallback(async () => {
-    const next = !muted;
-    setMuted(next);
+    // Source de vérité : état LiveKit, pas l'état local
+    const next = !isMicrophoneEnabled;
     try {
-      const micPub = localParticipant.getTrackPublication(Track.Source.Microphone);
-      const track  = micPub?.track;
-      if (track) {
-        // mute/unmute sur la track existante — ne ferme pas la peer connection
-        next ? await track.mute() : await track.unmute();
-      } else {
-        // Pas encore de track — activer le micro
-        await localParticipant.setMicrophoneEnabled(true);
-      }
+      await localParticipant.setMicrophoneEnabled(next);
     } catch (e) {
       if (__DEV__) console.warn('[toggleMute]', e);
-      setMuted(!next);
     }
-  }, [muted, localParticipant]);
+  }, [isMicrophoneEnabled, localParticipant]);
 
   const toggleVideo = useCallback(async () => {
     const next = !videoOff;
