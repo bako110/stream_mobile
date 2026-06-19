@@ -421,7 +421,7 @@ const JoinToast: React.FC<{ name: string }> = ({ name }) => (
 // ── Contenu principal ─────────────────────────────────────────────────────────
 
 const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: boolean }> = ({ liveId, onEnd, isPrivate = false }) => {
-  const { localParticipant } = useLocalParticipant();
+  const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
   const room                 = useRoomContext();
   const allParticipants      = useParticipants();
   const { currentUser }      = useUser();
@@ -891,8 +891,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         onGift={(id, name) => giftRef.current?.openGift(id, name)}
         onDemote={handleDemote}
         onBan={handleBan}
-        isMuted={muted}
-        isVideoOff={videoOff}
+        isMuted={!isMicrophoneEnabled}
+        isVideoOff={!isCameraEnabled}
       />
 
       {/* ── GRADIENTS ─────────────────────────────────────────────────── */}
@@ -1013,8 +1013,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
 
         {/* Flip caméra */}
         <TouchableOpacity
-          style={[st.sideItem, videoOff && { opacity: 0.38 }]}
-          onPress={videoOff ? undefined : flipCam}
+          style={[st.sideItem, !isCameraEnabled && { opacity: 0.38 }]}
+          onPress={!isCameraEnabled ? undefined : flipCam}
           activeOpacity={0.8}
         >
           <View style={st.sideCircle}>
@@ -1025,18 +1025,22 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
 
         {/* Micro */}
         <TouchableOpacity style={st.sideItem} onPress={toggleMute} activeOpacity={0.8}>
-          <View style={[st.sideCircle, muted && st.sideCircleOff]}>
-            <Icon name={muted ? 'mic-off' : 'mic'} size={22} color={muted ? '#F0365A' : '#fff'} />
+          <View style={[st.sideCircle, !isMicrophoneEnabled && st.sideCircleOff]}>
+            <Icon name={isMicrophoneEnabled ? 'mic' : 'mic-off'} size={22} color={isMicrophoneEnabled ? '#fff' : '#F0365A'} />
           </View>
-          <Text style={[st.sideLabel, muted && { color: '#F0365A' }]}>{muted ? 'Micro off' : 'Micro'}</Text>
+          <Text style={[st.sideLabel, !isMicrophoneEnabled && { color: '#F0365A' }]}>
+            {isMicrophoneEnabled ? 'Micro' : 'Micro off'}
+          </Text>
         </TouchableOpacity>
 
         {/* Caméra */}
         <TouchableOpacity style={st.sideItem} onPress={toggleVideo} activeOpacity={0.8}>
-          <View style={[st.sideCircle, videoOff && st.sideCircleOff]}>
-            <Icon name={videoOff ? 'video-off' : 'video'} size={22} color={videoOff ? '#F0365A' : '#fff'} />
+          <View style={[st.sideCircle, !isCameraEnabled && st.sideCircleOff]}>
+            <Icon name={isCameraEnabled ? 'video' : 'video-off'} size={22} color={isCameraEnabled ? '#fff' : '#F0365A'} />
           </View>
-          <Text style={[st.sideLabel, videoOff && { color: '#F0365A' }]}>{videoOff ? 'Cam off' : 'Cam'}</Text>
+          <Text style={[st.sideLabel, !isCameraEnabled && { color: '#F0365A' }]}>
+            {isCameraEnabled ? 'Cam' : 'Cam off'}
+          </Text>
         </TouchableOpacity>
 
         {/* Réactions */}
@@ -1291,8 +1295,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         onClose={() => setShowSettings(false)}
         live={liveData}
         liveId={liveId}
-        camOn={!videoOff}
-        micOn={!muted}
+        camOn={isCameraEnabled}
+        micOn={isMicrophoneEnabled}
         onToggleCam={toggleVideo}
         onToggleMic={toggleMute}
         handRequests={handRequests.map(r => ({ identity: r.identity, name: r.displayName, avatar: r.avatarUrl }))}
