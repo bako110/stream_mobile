@@ -49,6 +49,8 @@ import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../..
 import { useUser } from '../../context/UserContext';
 import { useWs } from '../../context/WebSocketContext';
 import { BoostPrompt } from '../../components/common';
+import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
+import type { LiveStream } from '../../services/liveService';
 
 // ── LiveKit quality config ─────────────────────────────────────────────────────
 
@@ -329,12 +331,21 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const [showOnStage,  setShowOnStage]  = useState(false);
   const [onStage,      setOnStage]      = useState<Set<string>>(new Set());
 
+  const [showSettings, setShowSettings] = useState(false);
+  const [liveData,     setLiveData]     = useState<LiveStream | null>(null);
+
   const chatRef     = useRef<FlatList>(null);
   const wsRef       = useRef<WebSocket | null>(null);
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showLaunchBanner, setShowLaunchBanner] = useState(true);
   const [showBoost,        setShowBoost]        = useState(false);
   const giftRef  = useRef<LiveGiftOverlayRef>(null);
+
+  useEffect(() => {
+    liveService.getById(liveId)
+      .then((l: LiveStream) => setLiveData(l))
+      .catch(() => {});
+  }, [liveId]);
 
   const addSysMsg = useCallback((text: string) => {
     const id = `sys-${Date.now()}`;
@@ -726,10 +737,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
     <View style={st.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Emojis flottants */}
-      <ReactionFloaters floaters={floaters} />
-
-      {/* Vidéo */}
+      {/* ── VIDEO PLEIN ÉCRAN ────────────────────────────────────────── */}
       <HostVideoView
         mirror={camFront}
         liveId={liveId}
@@ -743,30 +751,68 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         isVideoOff={videoOff}
       />
 
-      {/* Gradients */}
-      <LinearGradient colors={['rgba(0,0,0,0.72)', 'transparent']} style={st.gradTop} pointerEvents="none" />
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={st.gradBottom} pointerEvents="none" />
+      {/* ── GRADIENTS ─────────────────────────────────────────────────── */}
+      <LinearGradient
+        colors={['rgba(5,0,16,0.82)', 'rgba(5,0,16,0.18)', 'transparent']}
+        style={st.gradTop}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(5,0,16,0.55)', 'rgba(5,0,16,0.88)']}
+        style={st.gradBottom}
+        pointerEvents="none"
+      />
 
-      {/* ── BANNER LANCEMENT ─────────────────────────────────────────────── */}
+      {/* ── EMOJIS FLOTTANTS ─────────────────────────────────────────── */}
+      <ReactionFloaters floaters={floaters} />
+
+      {/* ── BANNER LANCEMENT ─────────────────────────────────────────── */}
       {showLaunchBanner && (
         <Animated.View
           entering={FadeIn.springify().damping(16).stiffness(180)}
-          exiting={FadeOut.duration(350)}
+          exiting={FadeOut.duration(400)}
           style={st.launchBanner}
           pointerEvents="none"
         >
           <View style={st.launchDot} />
-          <Text style={st.launchTxt}>🎙 Live lancé · tu es en direct !</Text>
+          <Text style={st.launchTxt}>Tu es en direct !</Text>
         </Animated.View>
       )}
 
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      {/* ── TOASTS arrivées ──────────────────────────────────────────── */}
+      <View style={st.toastsContainer} pointerEvents="none">
+        {joinToasts.map(t => <JoinToast key={t.id} name={t.name} />)}
+      </View>
+
+      {/* ── GIFT TICKER (gauche, au dessus du chat) ───────────────────── */}
+      {giftTicker.length > 0 && (
+        <View style={st.giftTickerZone} pointerEvents="none">
+          {giftTicker.map(t => (
+            <Animated.View key={t.id} entering={FadeIn.duration(300)} exiting={FadeOut.duration(400)} style={st.giftTickerRow}>
+              <LinearGradient colors={['#F0365A', '#9B65F5']} style={st.giftTickerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Text style={st.giftTickerEmoji}>{t.emoji}</Text>
+                <Text style={st.giftTickerText} numberOfLines={1}>
+                  <Text style={st.giftTickerSender}>{t.senderName}</Text>
+                  {' · '}{t.giftName}
+                </Text>
+                <Text style={st.giftTickerCoins}>{t.coins} 🪙</Text>
+              </LinearGradient>
+            </Animated.View>
+          ))}
+        </View>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* ── HEADER ────────────────────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════════ */}
       <View style={st.header}>
-        <TouchableOpacity onPress={askEnd} style={st.backBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
+        {/* Gauche : bouton fermer */}
+        <TouchableOpacity onPress={askEnd} style={st.closeBtn} activeOpacity={0.8} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Icon name="x" size={20} color="#fff" />
         </TouchableOpacity>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {/* Centre : LIVE pill + timer + badge abonnés */}
+        <View style={st.headerCenter}>
           <View style={st.livePill}>
             <View style={st.liveDot} />
             <Text style={st.liveText}>LIVE</Text>
@@ -774,62 +820,127 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
           </View>
           {isPrivate && (
             <View style={st.privatePill}>
-              <MCIcon name="lock" size={10} color="#fff" />
+              <MCIcon name="lock-outline" size={9} color="#fff" />
               <Text style={st.privateText}>Abonnés</Text>
             </View>
           )}
         </View>
 
-        <View style={st.viewerPill}>
-          <Icon name="eye" size={12} color="#fff" />
-          <Text style={st.viewerCount}>{viewerCount}</Text>
-        </View>
-
-        {/* Avatars viewers */}
-        <View style={st.viewerAvatars}>
-          {remoteParticipants.slice(0, 5).map((p, i) => (
+        {/* Droite : viewers + avatars */}
+        <View style={st.headerRight}>
+          <View style={st.viewerPill}>
+            <Icon name="eye" size={11} color="rgba(255,255,255,0.8)" />
+            <Text style={st.viewerCount}>{viewerCount}</Text>
+          </View>
+          {remoteParticipants.slice(0, 4).map((p, i) => (
             <TouchableOpacity
               key={p.identity}
-              style={[st.viewerAvatar, { marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }]}
+              style={[st.viewerAvatar, { marginLeft: i === 0 ? 4 : -7, zIndex: 10 - i }]}
               onPress={() => giftRef.current?.openGift(p.identity, p.name || p.identity || '?')}
               activeOpacity={0.75}
             >
               <Text style={st.viewerAvatarText}>{(p.name || p.identity || '?')[0].toUpperCase()}</Text>
             </TouchableOpacity>
           ))}
-          {viewerCount > 5 && (
-            <View style={[st.viewerAvatar, { marginLeft: -8, backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-              <Text style={[st.viewerAvatarText, { fontSize: 9 }]}>+{viewerCount - 5}</Text>
+          {viewerCount > 4 && (
+            <View style={[st.viewerAvatar, { marginLeft: -7, backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+              <Text style={[st.viewerAvatarText, { fontSize: 8 }]}>+{viewerCount - 4}</Text>
             </View>
           )}
         </View>
+      </View>
 
-        <View style={{ flex: 1 }} />
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* ── COLONNE DROITE — 5 actions host ─────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      <View style={st.sideCol}>
+
+        {/* Flip caméra */}
+        <TouchableOpacity
+          style={[st.sideItem, videoOff && { opacity: 0.38 }]}
+          onPress={videoOff ? undefined : flipCam}
+          activeOpacity={0.8}
+        >
+          <View style={st.sideCircle}>
+            <Icon name="refresh-cw" size={22} color="#fff" />
+          </View>
+          <Text style={st.sideLabel}>Retourner</Text>
+        </TouchableOpacity>
+
+        {/* Micro */}
+        <TouchableOpacity style={st.sideItem} onPress={toggleMute} activeOpacity={0.8}>
+          <View style={[st.sideCircle, muted && st.sideCircleOff]}>
+            <Icon name={muted ? 'mic-off' : 'mic'} size={22} color={muted ? '#F0365A' : '#fff'} />
+          </View>
+          <Text style={[st.sideLabel, muted && { color: '#F0365A' }]}>{muted ? 'Micro off' : 'Micro'}</Text>
+        </TouchableOpacity>
+
+        {/* Caméra */}
+        <TouchableOpacity style={st.sideItem} onPress={toggleVideo} activeOpacity={0.8}>
+          <View style={[st.sideCircle, videoOff && st.sideCircleOff]}>
+            <Icon name={videoOff ? 'video-off' : 'video'} size={22} color={videoOff ? '#F0365A' : '#fff'} />
+          </View>
+          <Text style={[st.sideLabel, videoOff && { color: '#F0365A' }]}>{videoOff ? 'Cam off' : 'Cam'}</Text>
+        </TouchableOpacity>
+
+        {/* Réactions */}
+        <View style={[st.sideItem, { zIndex: 30, overflow: 'visible' }]}>
+          <View style={st.sideCircle}>
+            <LiveReactionPicker onReact={(emoji) => { spawn(emoji); handleReact(emoji); }} />
+          </View>
+          <Text style={st.sideLabel}>Réagir</Text>
+        </View>
+
+        {/* Paramètres — badge si demandes en attente */}
+        <TouchableOpacity style={st.sideItem} onPress={() => setShowSettings(true)} activeOpacity={0.8}>
+          <View style={[st.sideCircle, st.sideCircleSettings]}>
+            <Icon name="settings" size={22} color="#9B65F5" />
+            {pendingCount > 0 && (
+              <View style={st.sideBadge}>
+                <Text style={st.sideBadgeText}>{pendingCount}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[st.sideLabel, { color: '#9B65F5' }]}>
+            {pendingCount > 0 ? `${pendingCount} main${pendingCount > 1 ? 's' : ''}` : 'Paramètres'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Cadeaux reçus (affiché uniquement si > 0) */}
+        {giftHistory.length > 0 && (
+          <TouchableOpacity style={st.sideItem} onPress={() => setShowGifts(v => !v)} activeOpacity={0.8}>
+            <View style={[st.sideCircle, { backgroundColor: 'rgba(255,215,0,0.14)', borderColor: 'rgba(255,215,0,0.4)' }]}>
+              <Icon name="gift" size={22} color="#FFD700" />
+              <View style={[st.sideBadge, { backgroundColor: '#FFD700' }]}>
+                <Text style={[st.sideBadgeText, { color: '#000' }]}>{giftHistory.length}</Text>
+              </View>
+            </View>
+            <Text style={[st.sideLabel, { color: '#FFD700' }]}>Cadeaux</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Scène (affiché uniquement si invités présents) */}
+        {onStage.size > 0 && (
+          <TouchableOpacity style={st.sideItem} onPress={() => { setShowOnStage(v => !v); setShowRequests(false); }} activeOpacity={0.8}>
+            <View style={[st.sideCircle, { backgroundColor: 'rgba(63,237,182,0.12)', borderColor: 'rgba(63,237,182,0.4)' }]}>
+              <Icon name="users" size={22} color="#3FEDB6" />
+              <View style={[st.sideBadge, { backgroundColor: '#3FEDB6' }]}>
+                <Text style={[st.sideBadgeText, { color: '#000' }]}>{onStage.size}</Text>
+              </View>
+            </View>
+            <Text style={[st.sideLabel, { color: '#3FEDB6' }]}>Scène</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Like count */}
         <LiveLikeButton ref={likeRef} total={likeCount} onLike={() => {}} />
       </View>
 
-      {/* ── GIFT TICKER ──────────────────────────────────────────────── */}
-      {giftTicker.length > 0 && (
-        <View style={gt.container} pointerEvents="none">
-          {giftTicker.map(t => (
-            <Animated.View key={t.id} entering={FadeIn.duration(300)} exiting={FadeOut.duration(400)} style={gt.row}>
-              <Text style={gt.emoji}>{t.emoji}</Text>
-              <View style={gt.info}>
-                <Text style={gt.sender} numberOfLines={1}>{t.senderName}</Text>
-                <Text style={gt.detail}>{t.giftName} · {t.coins} pièces</Text>
-              </View>
-            </Animated.View>
-          ))}
-        </View>
-      )}
-
-      {/* ── TOASTS join ──────────────────────────────────────────────── */}
-      <View style={st.toastsContainer} pointerEvents="none">
-        {joinToasts.map(t => <JoinToast key={t.id} name={t.name} />)}
-      </View>
-
-      {/* ── CHAT bas gauche ──────────────────────────────────────────── */}
-      <View style={st.chatZone}>
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* ── ZONE BAS — chat + barre saisie ────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      <View style={st.bottomZone}>
+        {/* Messages */}
         <FlatList
           ref={chatRef}
           data={messages}
@@ -849,17 +960,17 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
                 </Animated.View>
               );
             }
-            const myId = currentUser?.id ? String(currentUser.id) : null;
+            const myId   = currentUser?.id ? String(currentUser.id) : null;
             const canMod = !!item.userId && item.userId !== myId;
             return (
-              <Animated.View entering={FadeIn.duration(200)} style={st.chatBubble}>
+              <Animated.View entering={FadeIn.duration(200)} style={st.chatRow}>
                 {item.avatar
                   ? <Image source={{ uri: item.avatar }} style={st.chatAvatar} />
-                  : <Av name={item.user} size={24} />
+                  : <Av name={item.user} size={26} />
                 }
                 <View style={{ flex: 1 }}>
-                  <View style={st.chatBubbleInner}>
-                    <Text style={st.chatUser}>{item.user}</Text>
+                  <View style={st.chatBubble}>
+                    <Text style={st.chatUser}>{item.user} </Text>
                     <Text style={st.chatText}>{item.text}</Text>
                   </View>
                   {canMod && (
@@ -909,119 +1020,36 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
           }}
           style={st.chatList}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ justifyContent: 'flex-end' }}
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingTop: 6 }}
         />
 
-        {showInput ? (
-          <View style={st.inputRow}>
-            <TextInput
-              value={chatInput} onChangeText={setChatInput}
-              placeholder="Répondre..." placeholderTextColor="rgba(255,255,255,0.4)"
-              style={st.chatInput} onSubmitEditing={sendChat} returnKeyType="send"
-              autoFocus onBlur={() => { if (!chatInput.trim()) setShowInput(false); }}
-            />
-            {chatInput.trim().length > 0 && (
-              <TouchableOpacity onPress={sendChat} style={st.sendBtn} disabled={sending}>
-                <Icon name="send" size={15} color="#fff" />
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
-          <TouchableOpacity style={st.chatPlaceholder} onPress={() => setShowInput(true)} activeOpacity={0.8}>
-            <Icon name="message-circle" size={14} color="rgba(255,255,255,0.55)" />
-            <Text style={st.chatPlaceholderText}>Répondre...</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* ── CONTRÔLES DROITE ────────────────────────────────────────── */}
-      <View style={st.sideControls}>
-
-        {/* Réactions emoji */}
-        <View style={[st.sideBtn, { zIndex: 30, overflow: 'visible' }]}>
-          <LiveReactionPicker onReact={(emoji) => { spawn(emoji); handleReact(emoji); }} />
-          <Text style={st.sideBtnLabel}>Réagir</Text>
+        {/* Barre saisie */}
+        <View style={st.inputBar}>
+          {showInput ? (
+            <View style={st.inputRow}>
+              <TextInput
+                value={chatInput} onChangeText={setChatInput}
+                placeholder="Écris un message..." placeholderTextColor="rgba(255,255,255,0.38)"
+                style={st.chatInput} onSubmitEditing={sendChat} returnKeyType="send"
+                autoFocus onBlur={() => { if (!chatInput.trim()) setShowInput(false); }}
+              />
+              {chatInput.trim().length > 0 && (
+                <TouchableOpacity onPress={sendChat} style={st.sendBtn} disabled={sending}>
+                  <Icon name="send" size={16} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity style={st.chatPill} onPress={() => setShowInput(true)} activeOpacity={0.8}>
+              <Icon name="message-circle" size={15} color="rgba(255,255,255,0.5)" />
+              <Text style={st.chatPillText}>Commenter...</Text>
+            </TouchableOpacity>
+          )}
         </View>
-
-        {/* Demandes — badge si en attente */}
-        <TouchableOpacity style={st.sideBtn} onPress={() => { setShowRequests(v => !v); setShowOnStage(false); }} activeOpacity={0.8}>
-          <View style={[st.sideBtnCircle, pendingCount > 0 && st.sideBtnPending]}>
-            <Text style={{ fontSize: 20 }}>✋</Text>
-            {pendingCount > 0 && (
-              <View style={st.badge}><Text style={st.badgeText}>{pendingCount}</Text></View>
-            )}
-          </View>
-          <Text style={[st.sideBtnLabel, pendingCount > 0 && { color: '#FFD700' }]}>
-            {pendingCount > 0 ? `${pendingCount} demande${pendingCount > 1 ? 's' : ''}` : 'Demandes'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Sur scène — visible si au moins 1 participant invité */}
-        {onStage.size > 0 && (
-          <TouchableOpacity style={st.sideBtn} onPress={() => { setShowOnStage(v => !v); setShowRequests(false); }} activeOpacity={0.8}>
-            <View style={[st.sideBtnCircle, { borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.15)' }]}>
-              <Icon name="users" size={20} color="#4ade80" />
-              <View style={[st.badge, { backgroundColor: '#4ade80' }]}>
-                <Text style={st.badgeText}>{onStage.size}</Text>
-              </View>
-            </View>
-            <Text style={[st.sideBtnLabel, { color: '#4ade80' }]}>Scène</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Flip — grisé si caméra off */}
-        <TouchableOpacity
-          style={[st.sideBtn, videoOff && { opacity: 0.35 }]}
-          onPress={videoOff ? undefined : flipCam}
-          activeOpacity={0.8}
-        >
-          <View style={[st.sideBtnCircle, videoOff && st.sideBtnOff]}>
-            <Icon name="refresh-cw" size={20} color={videoOff ? '#F0365A' : '#fff'} />
-          </View>
-          <Text style={[st.sideBtnLabel, videoOff && { color: '#F0365A' }]}>Flip</Text>
-        </TouchableOpacity>
-
-        {/* Micro */}
-        <TouchableOpacity style={st.sideBtn} onPress={toggleMute} activeOpacity={0.8}>
-          <View style={[st.sideBtnCircle, muted && st.sideBtnOff]}>
-            <Icon name={muted ? 'mic-off' : 'mic'} size={20} color={muted ? '#F0365A' : '#fff'} />
-          </View>
-          <Text style={[st.sideBtnLabel, muted && { color: '#F0365A' }]}>
-            {muted ? 'Muet' : 'Micro'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Caméra */}
-        <TouchableOpacity style={st.sideBtn} onPress={toggleVideo} activeOpacity={0.8}>
-          <View style={[st.sideBtnCircle, videoOff && st.sideBtnOff]}>
-            <Icon name={videoOff ? 'video-off' : 'video'} size={20} color={videoOff ? '#F0365A' : '#fff'} />
-          </View>
-          <Text style={[st.sideBtnLabel, videoOff && { color: '#F0365A' }]}>
-            {videoOff ? 'Cam off' : 'Cam'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Cadeaux reçus */}
-        {giftHistory.length > 0 && (
-          <TouchableOpacity style={st.sideBtn} onPress={() => setShowGifts(v => !v)} activeOpacity={0.8}>
-            <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(255,215,0,0.15)', borderColor: 'rgba(255,215,0,0.5)' }]}>
-              <Icon name="gift" size={20} color="#FFD700" />
-              <View style={st.badge}><Text style={st.badgeText}>{giftHistory.length}</Text></View>
-            </View>
-            <Text style={[st.sideBtnLabel, { color: '#FFD700' }]}>Recu</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Fin */}
-        <TouchableOpacity style={st.sideBtn} onPress={askEnd} activeOpacity={0.8}>
-          <View style={[st.sideBtnCircle, st.endCircle]}>
-            <Icon name="x" size={22} color="#fff" />
-          </View>
-          <Text style={[st.sideBtnLabel, { color: '#F0365A' }]}>Fin</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* ── PANEL DEMANDES DE SCÈNE ──────────────────────────────────── */}
+      {/* ── PANELS latéraux ──────────────────────────────────────────── */}
+
       {showRequests && (
         <HandRequestsPanel
           requests={handRequests}
@@ -1031,36 +1059,34 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         />
       )}
 
-      {/* ── PANEL CADEAUX REÇUS ─────────────────────────────────────── */}
       {showGifts && giftHistory.length > 0 && (
-        <Animated.View entering={SlideInRight.duration(280)} exiting={SlideOutRight.duration(220)} style={os.panel}>
+        <Animated.View entering={SlideInRight.duration(260)} exiting={SlideOutRight.duration(200)} style={os.panel}>
           <View style={os.header}>
-            <Text style={os.title}>Cadeaux recu ({giftHistory.length})</Text>
+            <Text style={os.title}>Cadeaux ({giftHistory.length})</Text>
+            <Text style={[os.title, { color: '#FFD700', fontSize: 12 }]}>
+              {giftHistory.reduce((s, t) => s + t.coins, 0)} 🪙 total
+            </Text>
             <TouchableOpacity onPress={() => setShowGifts(false)} style={os.closeBtn}>
               <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
           </View>
-          <Text style={{ color: '#FFD700', fontSize: 12, paddingHorizontal: 14, paddingBottom: 6 }}>
-            Total : {giftHistory.reduce((s, t) => s + t.coins, 0)} 🪙
-          </Text>
-          <View style={{ paddingHorizontal: 14, gap: 8 }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 12, gap: 10 }}>
             {giftHistory.slice(0, 20).map((t, i) => (
               <View key={`${t.id}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Text style={{ fontSize: 22 }}>{t.emoji}</Text>
+                <Text style={{ fontSize: 24 }}>{t.emoji}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{t.senderName}</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{t.giftName}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>{t.giftName}</Text>
                 </View>
-                <Text style={{ color: '#FFD700', fontSize: 12, fontWeight: '700' }}>{t.coins} 🪙</Text>
+                <Text style={{ color: '#FFD700', fontSize: 13, fontWeight: '800' }}>{t.coins} 🪙</Text>
               </View>
             ))}
-          </View>
+          </ScrollView>
         </Animated.View>
       )}
 
-      {/* ── PANEL SUR SCÈNE ──────────────────────────────────────────── */}
       {showOnStage && onStage.size > 0 && (
-        <Animated.View entering={SlideInRight.duration(280)} exiting={SlideOutRight.duration(220)} style={os.panel}>
+        <Animated.View entering={SlideInRight.duration(260)} exiting={SlideOutRight.duration(200)} style={os.panel}>
           <View style={os.header}>
             <Text style={os.title}>Sur scène ({onStage.size})</Text>
             <TouchableOpacity onPress={() => setShowOnStage(false)} style={os.closeBtn}>
@@ -1073,10 +1099,10 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
               const name = p?.name || identity;
               return (
                 <View key={identity} style={os.row}>
-                  <Av name={name} size={36} color="#4ade80" />
+                  <Av name={name} size={36} color="#3FEDB6" />
                   <Text style={os.name} numberOfLines={1}>{name}</Text>
                   <TouchableOpacity style={os.demoteBtn} onPress={() => handleDemote(identity, name)} activeOpacity={0.8}>
-                    <Icon name="arrow-down" size={13} color="#fff" />
+                    <Icon name="arrow-down" size={12} color="#fff" />
                     <Text style={os.demoteText}>Descendre</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={os.banBtn} onPress={() => handleBan(identity, name)} activeOpacity={0.8}>
@@ -1089,7 +1115,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         </Animated.View>
       )}
 
-      {/* Cadeaux */}
+      {/* ── OVERLAYS ─────────────────────────────────────────────────── */}
       <LiveGiftOverlay
         ref={giftRef}
         liveId={liveId}
@@ -1102,6 +1128,25 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         contentType="live"
         onBoost={() => { setShowBoost(false); nav.navigate('CreateAd', { ad: null }); }}
         onDismiss={() => setShowBoost(false)}
+      />
+
+      <LiveSettingsSheet
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        live={liveData}
+        liveId={liveId}
+        camOn={!videoOff}
+        micOn={!muted}
+        onToggleCam={toggleVideo}
+        onToggleMic={toggleMute}
+        handRequests={handRequests.map(r => ({ identity: r.identity, name: r.displayName, avatar: r.avatarUrl }))}
+        onInvite={(identity) => {
+          const req = handRequests.find(r => r.identity === identity);
+          if (req) handleAccept(req);
+        }}
+        onDismissHand={handleRefuse}
+        onStopLive={onEnd}
+        onMonetizationUpdated={(updated) => setLiveData(prev => prev ? { ...prev, ...updated } : prev)}
       />
     </View>
   );
@@ -1244,123 +1289,177 @@ const mv = StyleSheet.create({
 // ── Styles page ───────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  gradTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 180, zIndex: 5 },
-  gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 240, zIndex: 5 },
+  container:  { flex: 1, backgroundColor: '#050010' },
+  gradTop:    { position: 'absolute', top: 0,    left: 0, right: 0, height: 200, zIndex: 5 },
+  gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 280, zIndex: 5 },
 
+  // ── Header ────────────────────────────────────────────────────────────────────
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    paddingTop: Platform.OS === 'ios' ? 52 : 34,
-    paddingHorizontal: 14, paddingBottom: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10,
+    paddingTop: Platform.OS === 'ios' ? 54 : 36,
+    paddingHorizontal: 14, paddingBottom: 10,
+    flexDirection: 'row', alignItems: 'center',
+    zIndex: 10,
   },
-  backBtn: { padding: 6 },
+  closeBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  headerRight:  { flexDirection: 'row', alignItems: 'center' },
+
   livePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: '#F0365A', borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 4,
+    paddingHorizontal: 9, paddingVertical: 5,
+    shadowColor: '#F0365A', shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
   },
-  liveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  liveText:    { color: '#fff', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
-  timerText:   { color: 'rgba(255,255,255,0.85)', fontSize: 11 },
+  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveText:  { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 1 },
+  timerText: { color: 'rgba(255,255,255,0.88)', fontSize: 11, fontWeight: '600' },
+
   privatePill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#7B3FF2D9', borderRadius: 10,
+    backgroundColor: 'rgba(155,101,245,0.75)', borderRadius: 10,
     paddingHorizontal: 7, paddingVertical: 4,
   },
   privateText: { color: '#fff', fontWeight: '700', fontSize: 10 },
-  viewerPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12,
-    paddingHorizontal: 8, paddingVertical: 4,
-  },
-  viewerCount:    { color: '#fff', fontSize: 12, fontWeight: '700' },
-  viewerAvatars:  { flexDirection: 'row', alignItems: 'center' },
-  viewerAvatar:   { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
-  viewerAvatarText:{ color: '#fff', fontSize: 10, fontWeight: '800' },
 
+  viewerPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12,
+    paddingHorizontal: 7, paddingVertical: 4, marginRight: 4,
+  },
+  viewerCount:     { color: '#fff', fontSize: 11, fontWeight: '700' },
+  viewerAvatar:    { width: 26, height: 26, borderRadius: 13, backgroundColor: '#9B65F5', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#050010' },
+  viewerAvatarText:{ color: '#fff', fontSize: 9, fontWeight: '800' },
+
+  // ── Launch banner ─────────────────────────────────────────────────────────────
   launchBanner: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 42,
+    top: Platform.OS === 'ios' ? 112 : 88,
     left: 20, right: 20, zIndex: 99,
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(229,62,62,0.92)',
+    backgroundColor: '#F0365A',
     borderRadius: 14, paddingVertical: 11, paddingHorizontal: 16,
-    shadowColor: '#E53E3E', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    shadowColor: '#F0365A', shadowOpacity: 0.6, shadowRadius: 14, shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
   },
   launchDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
-  launchTxt: { color: '#fff', fontSize: 14, fontWeight: '700', flex: 1 },
-  toastsContainer: { position: 'absolute', top: Platform.OS === 'ios' ? 115 : 95, left: 14, zIndex: 30, gap: 4 },
+  launchTxt: { color: '#fff', fontSize: 14, fontWeight: '800', flex: 1 },
+
+  // ── Toasts ────────────────────────────────────────────────────────────────────
+  toastsContainer: { position: 'absolute', top: Platform.OS === 'ios' ? 116 : 92, left: 14, zIndex: 30, gap: 4 },
   joinToast: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20,
+    backgroundColor: 'rgba(5,0,16,0.7)', borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  joinToastText: { color: '#fff', fontSize: 12 },
+  joinToastText: { color: 'rgba(255,255,255,0.9)', fontSize: 12 },
 
-  chatZone: {
-    position: 'absolute', bottom: 0, left: 0, right: 100,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
-    paddingLeft: 12, zIndex: 20,
+  // ── Gift ticker ───────────────────────────────────────────────────────────────
+  giftTickerZone: {
+    position: 'absolute', left: 12, right: 90,
+    bottom: Platform.OS === 'ios' ? 170 : 150,
+    zIndex: 22, gap: 6,
   },
-  chatList: { maxHeight: 220, marginBottom: 6 },
-  chatBubble: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 5 },
-  chatAvatar: { width: 24, height: 24, borderRadius: 12 },
-  chatBubbleInner: {
-    backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12,
-    paddingHorizontal: 8, paddingVertical: 4, maxWidth: 200,
+  giftTickerRow:  { borderRadius: 20, overflow: 'hidden', alignSelf: 'flex-start', maxWidth: 240 },
+  giftTickerGrad: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
   },
-  chatUser: { color: '#F0365A', fontSize: 11, fontWeight: '700' },
-  chatText: { color: '#fff', fontSize: 13 },
-  sysRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
-  sysText:  { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
-  giftMsg:  { backgroundColor: 'rgba(255,215,0,0.18)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, alignSelf: 'flex-start' },
-  giftMsgText: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
-  chatPlaceholder: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
+  giftTickerEmoji:  { fontSize: 16 },
+  giftTickerText:   { flex: 1, color: '#fff', fontSize: 12 },
+  giftTickerSender: { fontWeight: '800' },
+  giftTickerCoins:  { color: '#fff', fontSize: 11, fontWeight: '700' },
+
+  // ── Colonne droite ────────────────────────────────────────────────────────────
+  sideCol: {
+    position: 'absolute', right: 10,
+    bottom: Platform.OS === 'ios' ? 100 : 78,
+    alignItems: 'center', gap: 16, zIndex: 20, overflow: 'visible',
+  },
+  sideItem:   { alignItems: 'center', gap: 4 },
+  sideCircle: {
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 24, paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-start',
-  },
-  chatPlaceholderText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 24, paddingLeft: 14, paddingRight: 4, paddingVertical: 2, marginRight: 4,
-  },
-  chatInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 7 },
-  sendBtn:   { backgroundColor: '#F0365A', borderRadius: 20, padding: 7, margin: 3 },
-
-  sideControls: {
-    position: 'absolute', right: 12,
-    bottom: Platform.OS === 'ios' ? 80 : 60,
-    alignItems: 'center', gap: 14, zIndex: 20,
-    overflow: 'visible',
-  },
-  sideBtn:       { alignItems: 'center', gap: 4 },
-  sideBtnCircle: {
-    width: 50, height: 50, borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
   },
-  sideBtnPending: { borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.2)' },
-  sideBtnOff:     { borderColor: '#F0365A', backgroundColor: 'rgba(240,54,90,0.18)' },
-  endCircle:      { backgroundColor: '#F0365A', borderColor: '#F0365A' },
-  sideBtnLabel:   { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '600' },
-
-  // Badge nombre de demandes
-  badge: {
-    position: 'absolute', top: -2, right: -2,
-    width: 18, height: 18, borderRadius: 9,
+  sideCircleOff:      { borderColor: '#F0365A', backgroundColor: 'rgba(240,54,90,0.15)' },
+  sideCircleSettings: { borderColor: 'rgba(155,101,245,0.5)', backgroundColor: 'rgba(155,101,245,0.12)' },
+  sideLabel:   { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  sideBadge: {
+    position: 'absolute', top: -3, right: -3,
+    minWidth: 18, height: 18, borderRadius: 9,
     backgroundColor: '#F0365A',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#000',
+    paddingHorizontal: 3,
+    borderWidth: 1.5, borderColor: '#050010',
   },
+  sideBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+
+  // kept for hand-requests panel (hr.panel uses st.badge/badgeText indirectly — safe to keep)
+  badge:     { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#050010' },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+
+  // kept for compatibility
+  sideBtnCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
+  sideBtnLabel:  { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '600' },
+
+  // ── Zone bas (chat + input) ───────────────────────────────────────────────────
+  bottomZone: {
+    position: 'absolute', bottom: 0, left: 0, right: 76,
+    paddingBottom: Platform.OS === 'ios' ? 38 : 22,
+    paddingHorizontal: 12, zIndex: 20,
+  },
+  chatList: { maxHeight: 230, marginBottom: 8 },
+  chatRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginBottom: 6 },
+  chatAvatar: { width: 26, height: 26, borderRadius: 13, marginTop: 2 },
+  chatBubble: {
+    backgroundColor: 'rgba(5,0,16,0.55)', borderRadius: 14,
+    paddingHorizontal: 10, paddingVertical: 5,
+    flexDirection: 'row', flexWrap: 'wrap', maxWidth: 210,
+  },
+  chatUser:    { color: '#F0365A', fontSize: 12, fontWeight: '800' },
+  chatText:    { color: '#fff', fontSize: 13, flexShrink: 1 },
+  sysRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  sysText:     { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
+  giftMsg:     { backgroundColor: 'rgba(255,215,0,0.16)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, alignSelf: 'flex-start' },
+  giftMsgText: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
+
+  inputBar: { paddingTop: 4 },
+  chatPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 26, paddingHorizontal: 16, paddingVertical: 11,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    alignSelf: 'stretch',
+  },
+  chatPillText: { color: 'rgba(255,255,255,0.45)', fontSize: 14, flex: 1 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 26, paddingLeft: 16, paddingRight: 4, paddingVertical: 2,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+  },
+  chatInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8 },
+  sendBtn:   {
+    backgroundColor: '#F0365A', borderRadius: 22, padding: 9, margin: 3,
+    shadowColor: '#F0365A', shadowOpacity: 0.5, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+  },
+
   modRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, paddingLeft: 2 },
-  modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.15)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
+  modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.12)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
   modBtnText: { color: '#F0365A', fontSize: 10, fontWeight: '700' as const },
+
+  // unused but kept to avoid breaking anything
+  settingsBtn:       { marginRight: 6 },
+  settingsBtnCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(155,101,245,0.35)', borderWidth: 1, borderColor: 'rgba(155,101,245,0.6)', alignItems: 'center', justifyContent: 'center' },
 });
 
 // ── Styles panel "Sur scène" ──────────────────────────────────────────────────
@@ -1401,26 +1500,3 @@ const os = StyleSheet.create({
   },
 });
 
-// ── Styles gift ticker ────────────────────────────────────────────────────────
-
-const gt = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 115 : 95,
-    right: 76,
-    zIndex: 25,
-    gap: 6,
-    alignItems: 'flex-end',
-  },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,
-    borderWidth: 1, borderColor: 'rgba(255,215,0,0.55)',
-    maxWidth: 190,
-  },
-  emoji:  { fontSize: 18 },
-  info:   { flex: 1 },
-  sender: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
-  detail: { color: 'rgba(255,255,255,0.65)', fontSize: 10 },
-});
