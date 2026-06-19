@@ -758,9 +758,11 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     return () => { if (elapsedRef.current) clearInterval(elapsedRef.current); };
   }, [liveId]);
 
-  // Charger le token LiveKit dès que l'accès est accordé
+  // Charger le token LiveKit dès que l'accès est accordé (live monétisé)
   useEffect(() => {
-    if (!accessGranted || !live?.is_monetized) return;
+    if (!accessGranted) return;
+    // token déjà chargé (ex: accès déjà accordé au chargement initial)
+    if (token) return;
     (async () => {
       try {
         const t = await liveService.getToken(liveId);
@@ -768,7 +770,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         setWsUrl(t.livekit_url);
         const storedUserId = storage.getItem(STORAGE_KEYS.LAST_USER_ID);
         if (storedUserId) setMyIdentity(storedUserId);
-        const startMs = new Date(live.started_at).getTime();
+        // live peut ne pas être encore dans le state — on le recharge si besoin
+        const currentLive = live ?? await liveService.getById(liveId);
+        const startMs = new Date(currentLive.started_at).getTime();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
         elapsedRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - startMs) / 1000)), 1000);
       } catch {}
     })();
@@ -1050,17 +1055,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     );
   }
 
-  if (!token || !wsUrl) {
-    return (
-      <View style={[st.root, st.center]}>
-        <ActivityIndicator size="large" color="#F0365A" />
-        <Text style={st.connectText}>Connexion...</Text>
-      </View>
-    );
-  }
-
-  // Live monétisé sans accès encore accordé → afficher le verrou
-  if (live?.is_monetized && !accessGranted) {
+  // Live monétisé sans accès encore accordé → afficher le verrou EN PREMIER
+  if (live?.is_monetized && !accessGranted && !isHost) {
     return (
       <LiveAccessGate
         live={live}
@@ -1070,6 +1066,15 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         setChecking={setAccessChecking}
         liveId={liveId}
       />
+    );
+  }
+
+  if (!token || !wsUrl) {
+    return (
+      <View style={[st.root, st.center]}>
+        <ActivityIndicator size="large" color="#F0365A" />
+        <Text style={st.connectText}>Connexion...</Text>
+      </View>
     );
   }
 
