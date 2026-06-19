@@ -8,11 +8,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Image, Alert, ActivityIndicator, FlatList, StatusBar,
+  Image, Alert, ActivityIndicator, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
@@ -38,6 +39,7 @@ export const LiveAccessGate: React.FC<Props> = ({
 }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const navigation = useNavigation<any>();
 
   const isGift  = live.monetization_type === 'gift';
   const isCoins = live.monetization_type === 'coins';
@@ -51,6 +53,23 @@ export const LiveAccessGate: React.FC<Props> = ({
   const requiredGiftEmoji = live.monetization_gift_emoji ?? '🎁';
   const requiredCoins     = live.monetization_coins ?? 0;
 
+  const showInsufficientFunds = (msg: string) => {
+    Alert.alert(
+      'Solde insuffisant',
+      msg,
+      [
+        { text: 'Pas maintenant', style: 'cancel' },
+        {
+          text: 'Recharger',
+          onPress: () => {
+            onLeave();
+            navigation.navigate('Wallet');
+          },
+        },
+      ],
+    );
+  };
+
   const handlePayCoins = async () => {
     setChecking(true);
     try {
@@ -58,11 +77,16 @@ export const LiveAccessGate: React.FC<Props> = ({
       if (r.access_granted) {
         onAccessGranted();
       } else {
-        Alert.alert('Accès refusé', 'Coins insuffisants ou paiement échoué.');
+        showInsufficientFunds('Coins insuffisants. Recharge ton portefeuille pour continuer.');
       }
     } catch (e: any) {
+      const status = e?.response?.status;
       const msg = e?.response?.data?.detail ?? 'Impossible d\'effectuer le paiement.';
-      Alert.alert('Erreur', msg);
+      if (status === 402) {
+        showInsufficientFunds(msg);
+      } else {
+        Alert.alert('Erreur', msg);
+      }
     }
     setChecking(false);
   };
@@ -75,11 +99,16 @@ export const LiveAccessGate: React.FC<Props> = ({
       if (r.access_granted) {
         onAccessGranted();
       } else {
-        Alert.alert('Accès refusé', 'Le cadeau n\'a pas été accepté.');
+        showInsufficientFunds('Coins insuffisants pour envoyer ce cadeau. Recharge ton portefeuille.');
       }
     } catch (e: any) {
+      const status = e?.response?.status;
       const msg = e?.response?.data?.detail ?? 'Impossible d\'envoyer le cadeau.';
-      Alert.alert('Erreur', msg);
+      if (status === 402) {
+        showInsufficientFunds(msg);
+      } else {
+        Alert.alert('Erreur', msg);
+      }
     }
     setChecking(false);
   };
