@@ -467,4 +467,13 @@ export const Endpoints = {
   app: {
     version: `${V1}/app/version`,
   },
+
+  sounds: {
+    list:    `${V1}/sounds`,
+    popular: `${V1}/sounds/popular`,
+    my:      `${V1}/sounds/my`,
+    create:  `${V1}/sounds`,
+    get:     (id: string) => `${V1}/sounds/${id}`,
+    use:     (id: string) => `${V1}/sounds/${id}/use`,
+  },
 } as const;

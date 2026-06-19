@@ -8,9 +8,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { apiClient } from '../../api';
+import { Endpoints } from '../../api/endpoints';
 import type { AppColors } from '../../theme/colors';
 
-type SoundTab = 'local' | 'online';
+type SoundTab = 'local' | 'popular' | 'search';
 
 interface OnlineTrack {
   id: string;
@@ -19,13 +20,14 @@ interface OnlineTrack {
   duration: number;
   thumbnail: string | null;
   url: string;
+  usage_count?: number;
 }
 
 interface Props {
   colors: AppColors;
   onGoBack: () => void;
   onSelectLocal: () => void;
-  onSelectOnline: (url: string) => void;
+  onSelectOnline: (url: string, title?: string) => void;
 }
 
 const FALLBACK_TRACKS: OnlineTrack[] = [
@@ -39,34 +41,64 @@ const FALLBACK_TRACKS: OnlineTrack[] = [
   { id: '8', title: 'EDM Drop', artist: 'Free Music', duration: 15, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
 ];
 
+function mapSound(s: any): OnlineTrack {
+  return {
+    id: s.id,
+    title: s.title,
+    artist: s.artist_name ?? 'Inconnu',
+    duration: s.duration_seconds ?? 0,
+    thumbnail: s.cover_url ?? null,
+    url: s.file_url,
+    usage_count: s.usage_count ?? 0,
+  };
+}
+
 export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, onSelectOnline }) => {
-  const [tab, setTab] = useState<SoundTab>('local');
+  const [tab, setTab] = useState<SoundTab>('popular');
   const [search, setSearch] = useState('');
   const [tracks, setTracks] = useState<OnlineTrack[]>([]);
   const [loading, setLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  const searchOnline = useCallback(async (q: string) => {
-    if (!q.trim()) { setTracks(FALLBACK_TRACKS); return; }
+  const loadPopular = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<{ tracks: OnlineTrack[] }>(
-        `/api/v1/music/search?q=${encodeURIComponent(q.trim())}&limit=20`,
+      const res = await apiClient.get<any[]>(Endpoints.sounds.popular);
+      const data = Array.isArray(res.data) ? res.data : [];
+      setTracks(data.length > 0 ? data.map(mapSound) : FALLBACK_TRACKS);
+    } catch {
+      setTracks(FALLBACK_TRACKS);
+    } finally { setLoading(false); }
+  }, []);
+
+  const searchOnline = useCallback(async (q: string) => {
+    if (!q.trim()) { setTracks([]); return; }
+    setLoading(true);
+    try {
+      const res = await apiClient.get<any[]>(
+        `${Endpoints.sounds.list}?q=${encodeURIComponent(q.trim())}`,
       );
-      setTracks(Array.isArray(res.data?.tracks) ? res.data.tracks : FALLBACK_TRACKS);
+      setTracks(Array.isArray(res.data) ? res.data.map(mapSound) : FALLBACK_TRACKS);
     } catch {
       setTracks(FALLBACK_TRACKS);
     } finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
-    if (tab === 'online') {
+    if (tab === 'popular') { loadPopular(); }
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab === 'search') {
       const timer = setTimeout(() => searchOnline(search), 400);
       return () => clearTimeout(timer);
     }
   }, [search, tab]);
 
-  const handleSelect = (track: OnlineTrack) => { onSelectOnline(track.url); };
+  const handleSelect = (track: OnlineTrack) => {
+    onSelectOnline(track.url, track.title);
+    apiClient.post(Endpoints.sounds.use(track.id)).catch(() => {});
+  };
 
   return (
     <View style={[sp.root, { backgroundColor: colors.background }]}>
@@ -81,18 +113,94 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
 
       {/* Tabs */}
       <View style={[sp.tabRow, { borderBottomColor: colors.divider ?? colors.border }]}>
-        {(['local', 'online'] as SoundTab[]).map(t => {
+        {([
+          { key: 'popular' as SoundTab, icon: 'trending-up', label: 'Populaires' },
+          { key: 'search'  as SoundTab, icon: 'search',       label: 'Rechercher' },
+          { key: 'local'   as SoundTab, icon: 'smartphone',   label: 'Mes fichiers' },
+        ]).map(({ key: t, icon, label }) => {
           const active = tab === t;
           return (
             <TouchableOpacity key={t} style={[sp.tab, active && sp.tabActive]} onPress={() => setTab(t)} activeOpacity={0.7}>
-              <Icon name={t === 'local' ? 'smartphone' : 'globe'} size={16} color={active ? colors.primary : colors.textSecondary} />
+              <Icon name={icon} size={16} color={active ? colors.primary : colors.textSecondary} />
               <Text style={[sp.tabLabel, { color: active ? colors.primary : colors.textSecondary }]}>
-                {t === 'local' ? 'Mes fichiers' : 'En ligne'}
+                {label}
               </Text>
             </TouchableOpacity>
           );
         })}
       </View>
+
+      {/* Popular / Search list */}
+      {(tab === 'popular' || tab === 'search') && (
+        <View style={{ flex: 1 }}>
+          {tab === 'search' && (
+            <View style={[sp.searchRow, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary, borderColor: colors.border }]}>
+              <Icon name="search" size={16} color={colors.textTertiary} />
+              <TextInput
+                style={[sp.searchInput, { color: colors.textPrimary }]}
+                placeholder="Titre, artiste..."
+                placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
+                value={search}
+                onChangeText={setSearch}
+                returnKeyType="search"
+                autoFocus
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Icon name="x" size={16} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />}
+          <FlatList
+            data={tracks}
+            keyExtractor={t => t.id}
+            renderItem={({ item }) => {
+              const mins = Math.floor(item.duration / 60);
+              const secs = Math.floor(item.duration % 60);
+              const isPlaying = playingId === item.id;
+              return (
+                <TouchableOpacity
+                  style={[sp.trackRow, { borderBottomColor: colors.divider ?? colors.border }]}
+                  onPress={() => handleSelect(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[sp.trackThumb, { backgroundColor: colors.backgroundSecondary ?? '#1a1a2e' }]}>
+                    <MaterialIcon name="music-note" size={18} color={colors.primary} />
+                  </View>
+                  <View style={sp.trackInfo}>
+                    <Text style={[sp.trackTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
+                    <Text style={[sp.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {item.artist}{(item.usage_count ?? 0) > 0 ? ` · ${item.usage_count} utilisations` : ''}
+                    </Text>
+                  </View>
+                  {item.duration > 0 && (
+                    <Text style={[sp.trackDur, { color: colors.textTertiary }]}>{mins}:{String(secs).padStart(2, '0')}</Text>
+                  )}
+                  <TouchableOpacity
+                    style={[sp.trackPlayBtn, { backgroundColor: colors.backgroundSecondary ?? 'rgba(255,255,255,0.1)' }]}
+                    onPress={() => setPlayingId(prev => prev === item.id ? null : item.id)}
+                  >
+                    <Icon name={isPlaying ? 'pause' : 'play'} size={14} color={colors.primary} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              !loading ? (
+                <View style={sp.empty}>
+                  <MaterialIcon name="music-note-off" size={36} color={colors.textTertiary} />
+                  <Text style={[sp.emptyText, { color: colors.textTertiary }]}>
+                    {tab === 'search' && !search.trim() ? 'Tapez pour rechercher' : 'Aucun résultat'}
+                  </Text>
+                </View>
+              ) : null
+            }
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
+          />
+        </View>
+      )}
 
       {/* Local */}
       {tab === 'local' && (
@@ -117,72 +225,6 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
         </ScrollView>
       )}
 
-      {/* Online */}
-      {tab === 'online' && (
-        <View style={{ flex: 1 }}>
-          <View style={[sp.searchRow, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary, borderColor: colors.border }]}>
-            <Icon name="search" size={16} color={colors.textTertiary} />
-            <TextInput
-              style={[sp.searchInput, { color: colors.textPrimary }]}
-              placeholder="Rechercher une musique..."
-              placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
-              value={search}
-              onChangeText={setSearch}
-              returnKeyType="search"
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Icon name="x" size={16} color={colors.textTertiary} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />}
-
-          <FlatList
-            data={tracks}
-            keyExtractor={t => t.id}
-            renderItem={({ item }) => {
-              const mins = Math.floor(item.duration / 60);
-              const secs = Math.floor(item.duration % 60);
-              const isPlaying = playingId === item.id;
-              return (
-                <TouchableOpacity
-                  style={[sp.trackRow, { borderBottomColor: colors.divider ?? colors.border }]}
-                  onPress={() => handleSelect(item)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[sp.trackThumb, { backgroundColor: colors.backgroundSecondary ?? '#1a1a2e' }]}>
-                    <MaterialIcon name="music-note" size={18} color={colors.primary} />
-                  </View>
-                  <View style={sp.trackInfo}>
-                    <Text style={[sp.trackTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
-                    <Text style={[sp.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>{item.artist}</Text>
-                  </View>
-                  <Text style={[sp.trackDur, { color: colors.textTertiary }]}>{mins}:{String(secs).padStart(2, '0')}</Text>
-                  <TouchableOpacity
-                    style={[sp.trackPlayBtn, { backgroundColor: colors.backgroundSecondary ?? 'rgba(255,255,255,0.1)' }]}
-                    onPress={() => setPlayingId(prev => prev === item.id ? null : item.id)}
-                  >
-                    <Icon name={isPlaying ? 'pause' : 'play'} size={14} color={colors.primary} />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            }}
-            ListEmptyComponent={
-              !loading ? (
-                <View style={sp.empty}>
-                  <MaterialIcon name="music-note-off" size={36} color={colors.textTertiary} />
-                  <Text style={[sp.emptyText, { color: colors.textTertiary }]}>
-                    {search.trim() ? 'Aucun résultat' : 'Recherchez une musique'}
-                  </Text>
-                </View>
-              ) : null
-            }
-            contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
-          />
-        </View>
-      )}
     </View>
   );
 };
