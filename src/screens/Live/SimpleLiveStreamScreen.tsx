@@ -429,7 +429,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const nav                  = useNavigation<Nav>();
   const remoteParticipants   = allParticipants.filter(p => !p.isLocal);
 
-  const [videoOff,     setVideoOff]     = useState(false);
+  const [videoOff,     setVideoOff]     = useState(false); // used only to optimistically flip icon; real truth = isCameraEnabled
   const [camFront,     setCamFront]     = useState(true);
   const [elapsed,      setElapsed]      = useState(0);
   const [messages,     setMessages]     = useState<ChatMsg[]>([]);
@@ -510,21 +510,21 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
     const bannerTimer = setTimeout(() => setShowLaunchBanner(false), 4000);
-    // Propose le boost 5s après le lancement (après que le banner ait disparu)
     const boostTimer  = setTimeout(() => setShowBoost(true), 5500);
-    return () => { clearTimeout(bannerTimer); clearTimeout(boostTimer); };
 
     // Couper la caméra en background pour éviter le crash Android
     const handleAppState = (next: AppStateStatus) => {
       if (next === 'background' || next === 'inactive') {
         localParticipant.setCameraEnabled(false).catch(() => {});
       } else if (next === 'active') {
-        localParticipant.setCameraEnabled(true).catch(() => {});
+        if (!videoOff) localParticipant.setCameraEnabled(true).catch(() => {});
       }
     };
     const sub = AppState.addEventListener('change', handleAppState);
 
     return () => {
+      clearTimeout(bannerTimer);
+      clearTimeout(boostTimer);
       sub.remove();
       if (timerRef.current) clearInterval(timerRef.current);
       localParticipant.setCameraEnabled(false).catch(() => {});
@@ -807,17 +807,15 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   }, [isMicrophoneEnabled, localParticipant]);
 
   const toggleVideo = useCallback(async () => {
-    const next = !videoOff;
-    setVideoOff(next);
+    const next = !isCameraEnabled;
+    setVideoOff(!next);
     try {
-      // setCameraEnabled(false) coupe vraiment le capteur physique (LED éteinte)
-      // setCameraEnabled(true) le réactive avec la même configuration
-      await localParticipant.setCameraEnabled(!next);
+      await localParticipant.setCameraEnabled(next);
     } catch (e) {
       if (__DEV__) console.warn('[toggleVideo]', e);
-      setVideoOff(!next);
+      setVideoOff(!!isCameraEnabled);
     }
-  }, [videoOff, localParticipant]);
+  }, [isCameraEnabled, localParticipant]);
 
   const flipCam = useCallback(async () => {
     const next = !camFront;
