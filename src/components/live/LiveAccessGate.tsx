@@ -91,11 +91,11 @@ export const LiveAccessGate: React.FC<Props> = ({
       if (r.access_granted) {
         onAccessGranted();
       } else {
-        showInsufficientFunds('Coins insuffisants. Recharge ton portefeuille pour continuer.');
+        showInsufficientFunds('Solde insuffisant. Recharge ton portefeuille pour continuer.');
       }
     } catch (e: any) {
-      const status = e?.response?.status;
-      const msg = e?.response?.data?.detail ?? 'Impossible d\'effectuer le paiement.';
+      const status = e?.status ?? e?.response?.status;
+      const msg = e?.message ?? e?.response?.data?.detail ?? 'Erreur lors du paiement.';
       if (status === 402) {
         showInsufficientFunds(msg);
       } else {
@@ -113,11 +113,11 @@ export const LiveAccessGate: React.FC<Props> = ({
       if (r.access_granted) {
         onAccessGranted();
       } else {
-        showInsufficientFunds('Coins insuffisants pour envoyer ce cadeau. Recharge ton portefeuille.');
+        showInsufficientFunds('Solde insuffisant pour envoyer ce cadeau. Recharge ton portefeuille.');
       }
     } catch (e: any) {
-      const status = e?.response?.status;
-      const msg = e?.response?.data?.detail ?? 'Impossible d\'envoyer le cadeau.';
+      const status = e?.status ?? e?.response?.status;
+      const msg = e?.message ?? e?.response?.data?.detail ?? 'Erreur lors de l\'envoi du cadeau.';
       if (status === 402) {
         showInsufficientFunds(msg);
       } else {
