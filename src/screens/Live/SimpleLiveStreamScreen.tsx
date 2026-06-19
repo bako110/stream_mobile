@@ -19,7 +19,10 @@ import {
   Platform, Alert, ActivityIndicator, FlatList, TextInput,
   Image, ScrollView, AppState, AppStateStatus,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutRight } from 'react-native-reanimated';
+import Animated, {
+  FadeIn, FadeOut, SlideInRight, SlideOutRight,
+  useAnimatedStyle, useSharedValue, withRepeat, withTiming, withSequence, Easing,
+} from 'react-native-reanimated';
 import {
   LiveKitRoom,
   useLocalParticipant,
@@ -101,6 +104,99 @@ const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, si
   </View>
 );
 
+// ── Anneau pulsant "parle en ce moment" ──────────────────────────────────────
+
+const SpeakingRing: React.FC<{ color?: string; size: number; borderWidth?: number }> = ({
+  color = '#3FEDB6', size, borderWidth = 3,
+}) => {
+  const scale   = useSharedValue(1);
+  const opacity = useSharedValue(0.9);
+
+  useEffect(() => {
+    scale.value   = withRepeat(withSequence(
+      withTiming(1.12, { duration: 380, easing: Easing.out(Easing.quad) }),
+      withTiming(1,    { duration: 380, easing: Easing.in(Easing.quad) }),
+    ), -1, false);
+    opacity.value = withRepeat(withSequence(
+      withTiming(0.35, { duration: 380 }),
+      withTiming(0.9,  { duration: 380 }),
+    ), -1, false);
+  }, []);
+
+  const ring = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity:   opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[ring, {
+        position: 'absolute', top: 0, left: 0,
+        width: size, height: size, borderRadius: size / 2,
+        borderWidth, borderColor: color,
+        pointerEvents: 'none',
+      }]}
+    />
+  );
+};
+
+// ── Toast "X parle" affiché en overlay bas-gauche ────────────────────────────
+
+const ActiveSpeakerToast: React.FC<{
+  name: string;
+  avatarUrl?: string | null;
+  isLocal: boolean;
+}> = ({ name, avatarUrl, isLocal }) => {
+  const barW = useSharedValue(0.4);
+
+  useEffect(() => {
+    barW.value = withRepeat(withSequence(
+      withTiming(1,   { duration: 220, easing: Easing.out(Easing.ease) }),
+      withTiming(0.3, { duration: 220, easing: Easing.in(Easing.ease) }),
+      withTiming(0.8, { duration: 180 }),
+      withTiming(0.2, { duration: 180 }),
+    ), -1, false);
+  }, []);
+
+  const bar1 = useAnimatedStyle(() => ({ height: 4 + barW.value * 12 }));
+  const bar2 = useAnimatedStyle(() => ({ height: 4 + ((1 - barW.value) * 0.8) * 12 }));
+  const bar3 = useAnimatedStyle(() => ({ height: 4 + barW.value * 0.6 * 12 }));
+
+  return (
+    <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(280)} style={spk.toast}>
+      {avatarUrl
+        ? <Image source={{ uri: avatarUrl }} style={spk.avatar} />
+        : <View style={[spk.avatar, { backgroundColor: isLocal ? '#F0365A' : '#9B65F5', alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>{(name || '?')[0].toUpperCase()}</Text>
+          </View>
+      }
+      <Text style={spk.name} numberOfLines={1}>{isLocal ? 'Toi' : name}</Text>
+      {/* Barres audio animées */}
+      <View style={spk.bars}>
+        <Animated.View style={[spk.bar, bar1, { backgroundColor: '#3FEDB6' }]} />
+        <Animated.View style={[spk.bar, bar2, { backgroundColor: '#9B65F5' }]} />
+        <Animated.View style={[spk.bar, bar3, { backgroundColor: '#3FEDB6' }]} />
+      </View>
+    </Animated.View>
+  );
+};
+
+const spk = StyleSheet.create({
+  toast: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(5,0,16,0.82)',
+    borderRadius: 22, paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1.5, borderColor: '#3FEDB6',
+    alignSelf: 'flex-start', maxWidth: 200,
+    shadowColor: '#3FEDB6', shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 2 },
+    elevation: 8,
+  },
+  avatar: { width: 28, height: 28, borderRadius: 14 },
+  name:   { color: '#fff', fontSize: 12, fontWeight: '700', flex: 1 },
+  bars:   { flexDirection: 'row', alignItems: 'center', gap: 3, height: 20, overflow: 'hidden' },
+  bar:    { width: 3, borderRadius: 2, minHeight: 4 },
+});
+
 // ── Zone vidéo host ───────────────────────────────────────────────────────────
 
 const HostVideoView: React.FC<{
@@ -115,8 +211,9 @@ const HostVideoView: React.FC<{
   isMuted:       boolean;
   isVideoOff:    boolean;
 }> = ({ mirror, hostName, hostAvatarUrl, onStage, onGift, onDemote, onBan, isMuted, isVideoOff }) => {
-  const allTracks       = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  const allTracks            = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const { localParticipant } = useLocalParticipant();
+  const allParticipants      = useParticipants();
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
   const localTrack      = allTracks.find(t => t.participant.isLocal) ?? null;
@@ -126,6 +223,10 @@ const HostVideoView: React.FC<{
   const showLocalPip    = spotlightTrack && !spotlightTrack.participant.isLocal && localTrack;
   const spotlightName   = spotlightTrack ? (spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity)) : '';
   const spotlightCamOn  = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
+
+  const isSpeaking = (identity: string) =>
+    allParticipants.find(p => p.identity === identity)?.isSpeaking ?? false;
+  const localSpeaking = localParticipant.isSpeaking;
 
   // Pas encore connecté à la room
   if (!localParticipant.sid && allTracks.length === 0) {
@@ -183,24 +284,30 @@ const HostVideoView: React.FC<{
             ? <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} mirror={mirror} objectFit="cover" />
             : <View style={[StyleSheet.absoluteFill, mv.thumbNoCam]}><Av name="Toi" size={40} /></View>
           }
+          {/* Anneau pulsant si le host parle */}
+          {localSpeaking && <SpeakingRing color="#F0365A" size={mv.pip.width as number} borderWidth={3} />}
           <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={mv.pipGrad}>
-            <Text style={mv.pipLabel}>Toi</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+              {localSpeaking && <View style={mv.pipSpeakDot} />}
+              <Text style={mv.pipLabel}>Toi</Text>
+            </View>
           </LinearGradient>
         </TouchableOpacity>
       )}
 
-      {/* Vignettes viewers */}
+      {/* Vignettes viewers (sur scène) */}
       {thumbnailTracks.length > 0 && (
         <View style={mv.thumbsCol}>
           {thumbnailTracks.map(t => {
-            const camOn   = !t.publication?.isMuted;
-            const tName   = t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity);
-            const isLocal = t.participant.isLocal;
+            const camOn     = !t.publication?.isMuted;
+            const tName     = t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity);
+            const isLocal   = t.participant.isLocal;
             const isOnStage = !isLocal && onStage.has(t.participant.identity);
+            const talking   = isLocal ? localSpeaking : isSpeaking(t.participant.identity);
             return (
               <TouchableOpacity
                 key={t.participant.identity}
-                style={[mv.thumb, isOnStage && mv.thumbOnStage]}
+                style={[mv.thumb, isOnStage && mv.thumbOnStage, talking && mv.thumbSpeaking]}
                 onPress={() => setSpotlightId(t.participant.identity)}
                 onLongPress={() => {
                   if (isLocal) return;
@@ -221,12 +328,16 @@ const HostVideoView: React.FC<{
                   ? <VideoTrack trackRef={t} style={StyleSheet.absoluteFill} objectFit="cover" />
                   : <View style={[StyleSheet.absoluteFill, mv.thumbNoCam]}><Av name={tName} size={40} /></View>
                 }
+                {/* Anneau pulsant vert si parle */}
+                {talking && <SpeakingRing color="#3FEDB6" size={mv.thumb.width as number} borderWidth={2.5} />}
                 <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={mv.thumbGrad}>
-                  <Text style={mv.thumbLabel} numberOfLines={1}>{tName}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                    {talking && <View style={mv.thumbSpeakDot} />}
+                    <Text style={mv.thumbLabel} numberOfLines={1}>{tName}</Text>
+                  </View>
                 </LinearGradient>
-                {/* Icône micro si sur scène */}
                 {isOnStage && (
-                  <View style={mv.thumbStageDot}>
+                  <View style={[mv.thumbStageDot, talking && { backgroundColor: '#3FEDB6' }]}>
                     <Icon name="mic" size={9} color="#fff" />
                   </View>
                 )}
@@ -331,7 +442,9 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const [showOnStage,  setShowOnStage]  = useState(false);
   const [onStage,      setOnStage]      = useState<Set<string>>(new Set());
 
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings,   setShowSettings]   = useState(false);
+  const [activeSpeaker,  setActiveSpeaker]  = useState<{ identity: string; name: string; avatarUrl?: string | null; isLocal: boolean } | null>(null);
+  const activeSpeakerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [liveData,     setLiveData]     = useState<LiveStream | null>(null);
 
   const chatRef     = useRef<FlatList>(null);
@@ -353,6 +466,33 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
     setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
     setTimeout(() => setMessages(prev => prev.filter(m => m.id !== id)), 4000);
   }, []);
+
+  // Parleur actif — écoute RoomEvent.ActiveSpeakersChanged
+  useEffect(() => {
+    if (!room) return;
+    const onSpeakers = (speakers: any[]) => {
+      if (!speakers || speakers.length === 0) {
+        if (activeSpeakerTimer.current) clearTimeout(activeSpeakerTimer.current);
+        activeSpeakerTimer.current = setTimeout(() => setActiveSpeaker(null), 1200);
+        return;
+      }
+      if (activeSpeakerTimer.current) clearTimeout(activeSpeakerTimer.current);
+      const top = speakers[0];
+      const isLocal = top.identity === localParticipant.identity;
+      setActiveSpeaker({
+        identity:  top.identity,
+        name:      top.name || top.identity || '',
+        avatarUrl: top.metadata ? undefined : null,
+        isLocal,
+      });
+      activeSpeakerTimer.current = setTimeout(() => setActiveSpeaker(null), 2500);
+    };
+    room.on(RoomEvent.ActiveSpeakersChanged, onSpeakers);
+    return () => {
+      room.off(RoomEvent.ActiveSpeakersChanged, onSpeakers);
+      if (activeSpeakerTimer.current) clearTimeout(activeSpeakerTimer.current);
+    };
+  }, [room, localParticipant]);
 
   // Démarrer cam + mic
   useEffect(() => {
@@ -783,6 +923,18 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
       <View style={st.toastsContainer} pointerEvents="none">
         {joinToasts.map(t => <JoinToast key={t.id} name={t.name} />)}
       </View>
+
+      {/* ── PARLEUR ACTIF ────────────────────────────────────────────── */}
+      {activeSpeaker && (
+        <View style={st.activeSpeakerWrap} pointerEvents="none">
+          <ActiveSpeakerToast
+            key={activeSpeaker.identity}
+            name={activeSpeaker.name}
+            avatarUrl={activeSpeaker.avatarUrl}
+            isLocal={activeSpeaker.isLocal}
+          />
+        </View>
+      )}
 
       {/* ── GIFT TICKER (gauche, au dessus du chat) ───────────────────── */}
       {giftTicker.length > 0 && (
@@ -1283,7 +1435,10 @@ const mv = StyleSheet.create({
     position: 'absolute', top: 4, left: 4,
     backgroundColor: '#4ade80', borderRadius: 8, padding: 2,
   },
-  thumbGiftBtn: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 2 },
+  thumbGiftBtn:  { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 2 },
+  thumbSpeaking: { borderColor: '#3FEDB6', borderWidth: 2.5 },
+  thumbSpeakDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#3FEDB6' },
+  pipSpeakDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#F0365A' },
 });
 
 // ── Styles page ───────────────────────────────────────────────────────────────
@@ -1352,7 +1507,8 @@ const st = StyleSheet.create({
   launchTxt: { color: '#fff', fontSize: 14, fontWeight: '800', flex: 1 },
 
   // ── Toasts ────────────────────────────────────────────────────────────────────
-  toastsContainer: { position: 'absolute', top: Platform.OS === 'ios' ? 116 : 92, left: 14, zIndex: 30, gap: 4 },
+  toastsContainer:   { position: 'absolute', top: Platform.OS === 'ios' ? 116 : 92, left: 14, zIndex: 30, gap: 4 },
+  activeSpeakerWrap: { position: 'absolute', bottom: Platform.OS === 'ios' ? 210 : 190, left: 14, zIndex: 25 },
   joinToast: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(5,0,16,0.7)', borderRadius: 20,
