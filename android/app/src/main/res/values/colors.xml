@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Couleur de fond de l'icône adaptative Gofolyx -->
-    <color name="ic_launcher_background">#0D0D1A</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Couleur d'accent des notifications -->
+    <color name="notification_color">#7B3FF2</color>
 </resources>

@@ -55,7 +55,7 @@ export const SettingsNotificationsScreen: React.FC = () => {
       ])
         .then(([prefsRes, count]) => {
           if (cancelled) return;
-          setPrefs(prefsRes.data ?? DEFAULT_PREFS);
+          setPrefs({ ...DEFAULT_PREFS, ...(prefsRes.data ?? {}) });
           setUnreadCount(typeof count === 'number' ? count : 0);
         })
         .catch(() => {

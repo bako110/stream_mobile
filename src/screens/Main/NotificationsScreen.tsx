@@ -11,6 +11,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonFeed } from '../../components/common';
 import { notificationService, NotifItem } from '../../services/notificationService';
@@ -68,6 +69,7 @@ export const NotificationsScreen: React.FC = () => {
   const { theme }  = useTheme();
   const { colors, fontSize } = theme;
   const nav = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { addListener, removeListener, clearUnreadNotifications } = useWs();
 
   const [items,       setItems]       = useState<NotifItem[]>([]);
@@ -241,44 +243,50 @@ export const NotificationsScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
-      <LinearGradient colors={[colors.surface, colors.background]} style={s.header}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Notifications</Text>
-        {unreadCount > 0 && !selectMode && (
-          <View style={[s.unreadBadge, { backgroundColor: colors.primary }]}>
-            <Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-          </View>
-        )}
-        <View style={{ flex: 1 }} />
+      <LinearGradient colors={[colors.surface, colors.background]} style={[s.header, { paddingTop: insets.top + 12 }]}>
+        {/* Ligne 1 : retour + titre + badge */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Notifications</Text>
+          {unreadCount > 0 && !selectMode && (
+            <View style={[s.unreadBadge, { backgroundColor: colors.primary }]}>
+              <Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Ligne 2 : actions */}
         {!selectMode ? (
-          <>
-            {unreadCount > 0 && (
-              <TouchableOpacity onPress={markAllRead} style={[s.readAllBtn, { borderColor: colors.border }]}>
-                <Icon name="check" size={14} color={colors.primary} />
-                <Text style={[s.readAllText, { color: colors.primary }]}>Tout lire</Text>
-              </TouchableOpacity>
-            )}
-            {items.length > 0 && (
-              <>
-                <TouchableOpacity onPress={deleteAll} style={[s.readAllBtn, { borderColor: '#FF3B30', marginLeft: 6 }]}>
-                  <Icon name="trash-2" size={14} color="#FF3B30" />
-                  <Text style={[s.readAllText, { color: '#FF3B30' }]}>Tout supprimer</Text>
+          (unreadCount > 0 || items.length > 0) && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              {unreadCount > 0 && (
+                <TouchableOpacity onPress={markAllRead} style={[s.readAllBtn, { borderColor: colors.border }]}>
+                  <Icon name="check" size={14} color={colors.primary} />
+                  <Text style={[s.readAllText, { color: colors.primary }]}>Tout lire</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setSelectMode(true)} style={[s.readAllBtn, { borderColor: colors.border, marginLeft: 6 }]}>
-                  <Icon name="check-square" size={14} color={colors.textSecondary} />
-                  <Text style={[s.readAllText, { color: colors.textSecondary }]}>Sélectionner</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </>
+              )}
+              {items.length > 0 && (
+                <>
+                  <TouchableOpacity onPress={deleteAll} style={[s.readAllBtn, { borderColor: '#FF3B30' }]}>
+                    <Icon name="trash-2" size={14} color="#FF3B30" />
+                    <Text style={[s.readAllText, { color: '#FF3B30' }]}>Tout supprimer</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setSelectMode(true)} style={[s.readAllBtn, { borderColor: colors.border }]}>
+                    <Icon name="check-square" size={14} color={colors.textSecondary} />
+                    <Text style={[s.readAllText, { color: colors.textSecondary }]}>Selectionner</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
             <TouchableOpacity onPress={toggleSelectAll} style={[s.readAllBtn, { borderColor: colors.primary }]}>
               <Icon name={allSelected ? 'check-square' : 'square'} size={14} color={colors.primary} />
               <Text style={[s.readAllText, { color: colors.primary }]}>
-                {allSelected ? 'Désélectionner' : 'Tout sélectionner'}
+                {allSelected ? 'Deselectionner' : 'Tout selectionner'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={deleteSelected} disabled={selectedIds.size === 0}
@@ -513,8 +521,8 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
 
 const s = StyleSheet.create({
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, gap: 10,
+    flexDirection: 'column',
+    paddingHorizontal: 16, paddingBottom: 12,
   },
   headerTitle:  { fontSize: 26, fontWeight: '800' },
   unreadBadge:  { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },

@@ -164,6 +164,16 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   style={{ width: '100%', height: '100%' }}
                 />
               )}
+              {/* Nom sur la banniere */}
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.55)']}
+                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, justifyContent: 'flex-end', paddingHorizontal: 14, paddingBottom: 8 }}
+              >
+                <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.2 }} numberOfLines={1}>
+                  {displayName}
+                </Text>
+              </LinearGradient>
+
               {/* Bouton modifier la bannière */}
               <TouchableOpacity
                 onPress={onEditProfile}

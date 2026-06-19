@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView,
   Platform, TouchableOpacity, StatusBar, TextInput,
-  Dimensions, ScrollView,
+  Dimensions, ScrollView, Image,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withSpring,
@@ -13,9 +13,10 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
+import { Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
+import { getLogo } from '../../assets';
 
 const { width } = Dimensions.get('window');
 
@@ -88,7 +89,7 @@ const Step1: React.FC<{
   return (
     <Animated.View entering={SlideInRight.springify().damping(18)} exiting={SlideOutLeft.springify().damping(18)} style={s.stepWrap}>
       <Animated.Text entering={FadeInDown.delay(80).duration(400)} style={[s.stepTitle, { color: colors.textPrimary }]}>
-        Comment vous appelez-vous ? 👋
+        Comment vous appelez-vous ?
       </Animated.Text>
       <Animated.Text entering={FadeInDown.delay(140).duration(400)} style={[s.stepSubtitle, { color: colors.textSecondary }]}>
         Votre identité sur GoFolyX
@@ -254,7 +255,7 @@ const Step3: React.FC<{
   return (
     <Animated.View entering={SlideInRight.springify().damping(18)} exiting={SlideOutLeft.springify().damping(18)} style={s.stepWrap}>
       <Animated.Text entering={FadeInDown.delay(80).duration(400)} style={[s.stepTitle, { color: colors.textPrimary }]}>
-        Sécurisez votre compte 🔐
+        Sécurisez votre compte
       </Animated.Text>
       <Animated.Text entering={FadeInDown.delay(140).duration(400)} style={[s.stepSubtitle, { color: colors.textSecondary }]}>
         Choisissez un mot de passe fort
@@ -324,7 +325,7 @@ const Step3: React.FC<{
       </Animated.Text>
 
       <Animated.View entering={FadeInDown.delay(380).springify()} style={{ marginTop: 20 }}>
-        <Button label="Créer mon compte 🎉" onPress={onSubmit} loading={loading} size="lg" />
+        <Button label="Créer mon compte" onPress={onSubmit} loading={loading} size="lg" />
       </Animated.View>
     </Animated.View>
   );
@@ -443,7 +444,9 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
             <TouchableOpacity onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.backBtn}>
               <Text style={[s.backIcon, { color: colors.primary }]}>←</Text>
             </TouchableOpacity>
-            <AppLogo size="sm" style={{ flex: 0 }} />
+            <View style={s.logoCircle}>
+              <Image source={getLogo(isDark)} style={s.logoImg} resizeMode="contain" />
+            </View>
             <View style={{ width: 40 }} />
           </Animated.View>
 
@@ -492,6 +495,14 @@ const s = StyleSheet.create({
   scroll:      { flexGrow: 1, paddingHorizontal: 24, paddingTop: 52, paddingBottom: 40 },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  logoCircle:  {
+    width: 48, height: 48, borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#7B3FF2', shadowOpacity: 0.4,
+    shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  logoImg: { width: 48, height: 48 },
   backIcon:    { fontSize: 24, fontWeight: '600' },
   stepLabel:   { fontSize: 12, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
   stepWrap:    {},

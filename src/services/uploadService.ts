@@ -218,7 +218,7 @@ export async function uploadVideoFromUri(
     const data = res!.json() as any;
     const jobId: string | undefined = data.job_id;
 
-    // Poll le statut HLS jusqu'à done (max 5min, poll toutes les 4s)
+    // Poll HLS jusqu'à done pour tous les dossiers vidéo
     if (jobId) {
       const MAX_POLLS = 75;
       const POLL_INTERVAL_MS = 4_000;

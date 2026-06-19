@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import Svg, { Path, G } from 'react-native-svg';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
@@ -20,6 +21,19 @@ GoogleSignin.configure({
   webClientId: '633145914883-2ka459achh16hhlak6h3pk58bpcsm4t2.apps.googleusercontent.com',
   offlineAccess: false,
 });
+
+const anim80  = FadeInDown.delay(80).springify();
+const anim160 = FadeInDown.delay(160).duration(500);
+const anim220 = FadeInDown.delay(220).duration(500);
+const anim280 = FadeInDown.delay(280).springify();
+const anim340 = FadeInDown.delay(340).duration(350);
+const anim400 = FadeInDown.delay(400).springify();
+const anim460 = FadeInDown.delay(460).duration(350);
+const anim500 = FadeInDown.delay(500).springify();
+const anim560 = FadeInUp.delay(560).duration(400);
+const anim580 = FadeInUp.delay(580).duration(400);
+const anim600 = FadeInUp.delay(600).duration(400);
+const animErr = FadeInDown.duration(250);
 
 type LoginMethod = 'email' | 'phone';
 
@@ -183,23 +197,13 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Logo */}
-          <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.logoWrap}>
-            <AppLogo size="md" />
-          </Animated.View>
-
-          <Animated.Text entering={FadeInDown.delay(160).duration(500)}
-            style={[styles.title, { color: colors.textPrimary }]}>
-            Bon retour ! 👋
-          </Animated.Text>
-
-          <Animated.Text entering={FadeInDown.delay(220).duration(500)}
+          <Animated.Text entering={anim220}
             style={[styles.subtitle, { color: colors.textSecondary }]}>
             Connectez-vous à votre compte GoFolyX
           </Animated.Text>
 
           {/* QR Code — connexion rapide */}
-          <Animated.View entering={FadeInDown.delay(280).springify()}>
+          <Animated.View entering={anim280}>
             <TouchableOpacity
               onPress={() => setShowScanner(true)}
               style={[styles.qrBtn, { borderColor: colors.primary + '50', backgroundColor: colors.primary + '0C' }]}
@@ -217,14 +221,14 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
           </Animated.View>
 
           {/* Séparateur */}
-          <Animated.View entering={FadeInDown.delay(340).duration(350)} style={styles.sep}>
+          <Animated.View entering={anim340} style={styles.sep}>
             <View style={[styles.line, { backgroundColor: colors.divider }]} />
             <Text style={[styles.orLabel, { color: colors.textTertiary }]}>ou</Text>
             <View style={[styles.line, { backgroundColor: colors.divider }]} />
           </Animated.View>
 
           {/* Champs */}
-          <Animated.View entering={FadeInDown.delay(400).springify()}>
+          <Animated.View entering={anim400}>
             {isEmail ? (
               <Input
                 label="Adresse email ou nom d'utilisateur"
@@ -281,7 +285,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
 
           {/* Compte bloqué par un admin */}
           {blockedInfo ? (
-            <Animated.View entering={FadeInDown.duration(250)}
+            <Animated.View entering={animErr}
               style={[styles.blockedBox, { backgroundColor: '#EF44441A', borderColor: '#EF444440' }]}>
               <Icon name="slash" size={20} color="#EF4444" style={{ marginBottom: 6 }} />
               <Text style={[styles.blockedTitle, { color: '#EF4444' }]}>Compte bloqué</Text>
@@ -316,21 +320,21 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
 
           {/* Erreur */}
           {error ? (
-            <Animated.Text entering={FadeInDown.duration(250)}
+            <Animated.Text entering={animErr}
               style={[styles.errorMsg, { color: colors.error, backgroundColor: colors.errorBg }]}>
               {error}
             </Animated.Text>
           ) : null}
 
           {/* Mot de passe oublié */}
-          <Animated.View entering={FadeInDown.delay(460).duration(350)} style={styles.forgotRow}>
+          <Animated.View entering={anim460} style={styles.forgotRow}>
             <TouchableOpacity onPress={onGoForgotPassword} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={[styles.forgotText, { color: colors.primary }]}>Mot de passe oublié ?</Text>
             </TouchableOpacity>
           </Animated.View>
 
           {/* Bouton connexion */}
-          <Animated.View entering={FadeInDown.delay(500).springify()}>
+          <Animated.View entering={anim500}>
             <Button
               label="Se connecter"
               onPress={handleLogin}
@@ -341,7 +345,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
           </Animated.View>
 
           {/* Lien inscription */}
-          <Animated.View entering={FadeInUp.delay(560).duration(400)} style={styles.registerRow}>
+          <Animated.View entering={anim560} style={styles.registerRow}>
             <Text style={[styles.registerLabel, { color: colors.textSecondary }]}>
               Pas encore de compte ?{'  '}
             </Text>
@@ -352,7 +356,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
 
           {/* CGU & Politique */}
           {(onGoCGU || onGoPrivacy) && (
-            <Animated.View entering={FadeInUp.delay(580).duration(400)} style={styles.cguRow}>
+            <Animated.View entering={anim580} style={styles.cguRow}>
               <Text style={[styles.cguText, { color: colors.textTertiary }]}>En continuant, vous acceptez nos{' '}</Text>
               {onGoCGU && (
                 <TouchableOpacity onPress={onGoCGU} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -371,7 +375,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
           )}
 
           {/* Boutons sociaux */}
-          <Animated.View entering={FadeInUp.delay(600).duration(400)} style={styles.socialRow}>
+          <Animated.View entering={anim600} style={styles.socialRow}>
             <View style={styles.socialDividerRow}>
               <View style={[styles.socialDivider, { backgroundColor: colors.divider }]} />
               <Text style={[styles.socialOrText, { color: colors.textTertiary }]}>ou continuer avec</Text>
@@ -388,12 +392,18 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                 {socialLoading === 'google' ? (
                   <ActivityIndicator size={18} color="#DB4437" />
                 ) : (
-                  <Text style={styles.googleIcon}>G</Text>
+                  <Svg width={18} height={18} viewBox="0 0 48 48">
+                    <Path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <Path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <Path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <Path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    <Path fill="none" d="M0 0h48v48H0z"/>
+                  </Svg>
                 )}
                 <Text style={[styles.socialBtnText, { color: colors.textPrimary }]}>Google</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.divider }]}
                 onPress={() => setShowPhoneOtp(true)}
                 disabled={!!socialLoading}
@@ -401,7 +411,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
               >
                 <Icon name="smartphone" size={18} color={colors.primary} />
                 <Text style={[styles.socialBtnText, { color: colors.textPrimary }]}>SMS</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
           </Animated.View>
         </ScrollView>
@@ -458,7 +468,6 @@ const styles = StyleSheet.create({
   socialBtns:       { flexDirection: 'row', gap: 12 },
   socialBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 14, borderWidth: 1 },
   socialBtnText:    { fontSize: 14, fontWeight: '700' },
-  googleIcon:       { fontSize: 16, fontWeight: '900', color: '#DB4437', fontFamily: 'serif' },
   cguRow:           { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', marginTop: 16 },
   cguText:          { fontSize: 12 },
   cguLink:          { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },

@@ -41,6 +41,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const [localUris,     setLocalUris]     = useState<string[]>([]);
   const [videoUri,      setVideoUri]      = useState<string | null>(null);
   const [showFeelings,  setShowFeelings]  = useState(false);
+  const [posting,       setPosting]       = useState(false);
 
   const handleBodyChange = useCallback((text: string, ids: string[]) => {
     setBody(text);
@@ -102,7 +103,8 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   // ── Publier ─────────────────────────────────────────────────────────────────
 
   const handlePost = () => {
-    if (!canPost) return;
+    if (!canPost || posting) return;
+    setPosting(true);
 
     const capturedBody    = body.trim();
     const capturedFeeling = feeling;
@@ -274,9 +276,9 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         </TouchableOpacity>
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Créer un post</Text>
         <TouchableOpacity
-          style={[s.publishBtn, { backgroundColor: canPost ? colors.primary : colors.primary + '44' }]}
+          style={[s.publishBtn, { backgroundColor: (canPost && !posting) ? colors.primary : colors.primary + '44' }]}
           onPress={handlePost}
-          disabled={!canPost}
+          disabled={!canPost || posting}
           activeOpacity={0.8}
         >
           <Text style={s.publishBtnText}>Publier</Text>

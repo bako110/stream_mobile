@@ -1,33 +1,15 @@
 /**
- * Barre d'envoi globale — style WhatsApp/Facebook.
- * Affichée en bas, au-dessus de la tab bar, pendant qu'un upload tourne.
- * Reste visible 3s après la fin pour confirmer "En ligne !".
+ * Mini chip d'upload — invisible pendant la progression.
+ * Apparait uniquement quand status === 'done' ou 'error'.
+ * Disparait automatiquement 3s apres.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  View, Text, StyleSheet, Animated, TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import type { UploadJob } from '../../services/backgroundUploadService';
 
-const TYPE_ICON: Record<string, string> = {
-  reel:    'film',
-  post:    'image',
-  event:   'calendar',
-  concert: 'music',
-};
-
-const STATUS_LABEL: Record<UploadJob['status'], string> = {
-  queued:      'En attente…',
-  compressing: 'Compression vidéo…',
-  uploading:   'Envoi en cours…',
-  done:        'Publication en ligne !',
-  error:       'Échec de la publication',
-};
-
-// ── Un seul job affiché (le plus récent actif, sinon le plus récent done/error)
 function pickJob(jobs: UploadJob[]): UploadJob | null {
   if (jobs.length === 0) return null;
   const active = jobs.filter(j => j.status !== 'done' && j.status !== 'error');
@@ -35,170 +17,98 @@ function pickJob(jobs: UploadJob[]): UploadJob | null {
   return jobs[jobs.length - 1];
 }
 
-// ── Composant barre
-const BAR_H = 58;
-
-export const UploadProgressBar: React.FC<{ bottomOffset?: number }> = ({ bottomOffset = 0 }) => {
+export const UploadProgressBar: React.FC<{ bottomOffset?: number }> = () => {
   const insets = useSafeAreaInsets();
   const { visibleJobs } = useBackgroundUpload();
   const job = pickJob(visibleJobs);
 
-  const slideY = useRef(new Animated.Value(BAR_H + 20)).current;
-  const prevJobId = useRef<string | null>(null);
+  const slideY  = useRef(new Animated.Value(-60)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
+  const prevStatus = useRef<string | null>(null);
+  const hideTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (job) {
+    const status = job?.status ?? null;
+    const shouldShow = status === 'done' || status === 'error';
+
+    if (shouldShow && prevStatus.current !== status) {
+      prevStatus.current = status;
       setMounted(true);
-      if (job.id !== prevJobId.current) {
-        prevJobId.current = job.id;
-        Animated.spring(slideY, {
-          toValue:  0,
-          useNativeDriver: true,
-          friction: 9,
-          tension:  60,
-        }).start();
-      }
-    } else {
-      Animated.timing(slideY, {
-        toValue:  BAR_H + 20,
-        useNativeDriver: true,
-        duration: 250,
-      }).start(() => {
-        prevJobId.current = null;
-        setMounted(false);
-      });
+
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+
+      Animated.parallel([
+        Animated.spring(slideY, { toValue: 0, useNativeDriver: true, friction: 10, tension: 80 }),
+        Animated.timing(opacity, { toValue: 1, useNativeDriver: true, duration: 200 }),
+      ]).start();
+
+      hideTimer.current = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(slideY, { toValue: -60, useNativeDriver: true, duration: 300 }),
+          Animated.timing(opacity, { toValue: 0,  useNativeDriver: true, duration: 300 }),
+        ]).start(() => {
+          prevStatus.current = null;
+          setMounted(false);
+        });
+      }, 3000);
     }
-  }, [job?.id, !!job]);
 
-  if (!mounted && !job) return null;
+    if (!job) {
+      prevStatus.current = null;
+    }
 
-  const isDone   = job?.status === 'done';
-  const isError  = job?.status === 'error';
-  const progress = job?.progress ?? 0;
-  const accent   = isError ? '#ef4444' : isDone ? '#10b981' : '#7B3FF2';
-  const icon     = TYPE_ICON[job?.type ?? 'post'] ?? 'upload-cloud';
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, [job?.id, job?.status]);
+
+  if (!mounted) return null;
+
+  const isDone = job?.status === 'done';
+  const accent = isDone ? '#10b981' : '#ef4444';
 
   return (
     <Animated.View
-      style={[
-        styles.wrapper,
-        {
-          bottom: bottomOffset + insets.bottom + 60,
-          transform: [{ translateY: slideY }],
-        },
-      ]}
-      pointerEvents="box-none"
+      style={[styles.wrapper, { top: insets.top + 8, transform: [{ translateY: slideY }], opacity }]}
+      pointerEvents="none"
     >
-      <View style={[styles.card, { borderColor: accent + '40' }]}>
-        {/* Icône type */}
-        <View style={[styles.iconBox, { backgroundColor: accent + '22' }]}>
-          <Icon name={isDone ? 'check-circle' : isError ? 'alert-circle' : icon} size={17} color={accent} />
-        </View>
-
-        {/* Texte */}
-        <View style={styles.textBox}>
-          <Text style={styles.label} numberOfLines={1}>
-            {job?.label ?? ''}
-          </Text>
-          <Text style={[styles.statusTxt, { color: accent }]}>
-            {job ? STATUS_LABEL[job.status] : ''}
-            {!isDone && !isError && progress > 0 ? `  ${progress}%` : ''}
-          </Text>
-        </View>
-
-        {/* Indicateur droit */}
-        {isDone && <Icon name="check" size={16} color="#10b981" />}
-        {isError && (
-          <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="refresh-cw" size={15} color="#ef4444" />
-          </TouchableOpacity>
-        )}
-        {!isDone && !isError && (
-          <Text style={[styles.pct, { color: accent }]}>{progress}%</Text>
-        )}
+      <View style={[styles.chip, { borderColor: accent + '50' }]}>
+        <Icon name={isDone ? 'check-circle' : 'alert-circle'} size={13} color={accent} />
+        <Text style={[styles.chipText, { color: '#fff' }]} numberOfLines={1}>
+          {isDone ? 'Publication en ligne !' : 'Echec de la publication'}
+        </Text>
       </View>
-
-      {/* Track de progression */}
-      {!isDone && !isError && (
-        <View style={styles.track}>
-          <Animated.View
-            style={[
-              styles.fill,
-              {
-                backgroundColor: accent,
-                width: `${progress}%` as any,
-              },
-            ]}
-          />
-        </View>
-      )}
     </Animated.View>
   );
 };
 
-// Alias pour rétrocompatibilité
 export const UploadProgressBanner = UploadProgressBar;
 
 const styles = StyleSheet.create({
   wrapper: {
-    position:  'absolute',
-    left:      12,
-    right:     12,
-    zIndex:    9999,
-    elevation: 20,
+    position:   'absolute',
+    alignSelf:  'center',
+    zIndex:     9999,
+    elevation:  20,
+    alignItems: 'center',
   },
-  card: {
-    flexDirection:    'row',
-    alignItems:       'center',
-    gap:              10,
-    backgroundColor:  '#12101F',
-    borderWidth:      1,
-    borderRadius:     16,
-    paddingVertical:  11,
-    paddingHorizontal: 13,
-    shadowColor:      '#000',
-    shadowOpacity:    0.35,
-    shadowOffset:     { width: 0, height: 6 },
-    shadowRadius:     14,
+  chip: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               6,
+    backgroundColor:   'rgba(18,16,31,0.93)',
+    borderWidth:       1,
+    borderRadius:      20,
+    paddingVertical:   7,
+    paddingHorizontal: 14,
+    shadowColor:       '#000',
+    shadowOpacity:     0.3,
+    shadowOffset:      { width: 0, height: 3 },
+    shadowRadius:      8,
   },
-  iconBox: {
-    width:          36,
-    height:         36,
-    borderRadius:   18,
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
-  },
-  textBox: {
-    flex: 1,
-    gap:  2,
-  },
-  label: {
-    color:      '#F0EFF8',
-    fontSize:   13,
-    fontWeight: '700',
-  },
-  statusTxt: {
-    fontSize:   11,
+  chipText: {
+    fontSize:   12,
     fontWeight: '600',
-  },
-  pct: {
-    fontSize:   13,
-    fontWeight: '800',
-    minWidth:   36,
-    textAlign:  'right',
-  },
-  track: {
-    height:           3,
-    backgroundColor:  '#2A2840',
-    borderRadius:     2,
-    marginTop:        5,
-    marginHorizontal: 2,
-    overflow:         'hidden',
-  },
-  fill: {
-    height:       3,
-    borderRadius: 2,
   },
 });
