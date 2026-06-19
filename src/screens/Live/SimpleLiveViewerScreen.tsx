@@ -34,6 +34,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { LiveAccessGate } from '../../components/live/LiveAccessGate';
+import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
@@ -224,6 +225,12 @@ const MultiVideoView: React.FC<{
 
 // ── Contenu dans LiveKitRoom ──────────────────────────────────────────────────
 
+interface HandRequest {
+  identity: string;
+  name: string;
+  avatar?: string | null;
+}
+
 const RoomContent: React.FC<{
   live:         LiveStream | null;
   liveId:       string;
@@ -253,25 +260,31 @@ const RoomContent: React.FC<{
   elapsed:      number;
   goOnStageRef:  { current: (() => void) | null };
   leaveStageRef: { current: (() => void) | null };
+  handRequests:  HandRequest[];
+  onHandDismiss: (identity: string) => void;
+  onLiveUpdated: (patch: Partial<LiveStream>) => void;
+  onStopLive:    () => void;
 }> = ({
   live, liveId, myIdentity, isHost, viewerCount, messages, chatInput, setChatInput,
   sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, onDeleteMsg, onEditMsg,
   giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike, likeRef,
   reactionSpawnRef, onReact,
   elapsed, goOnStageRef, leaveStageRef,
+  handRequests, onHandDismiss, onLiveUpdated, onStopLive,
 }) => {
   const { localParticipant } = useLocalParticipant();
   const { floaters, spawn }  = useReactionFloaters();
 
   // Exposer spawn au parent pour les réactions WS des autres
   React.useEffect(() => { reactionSpawnRef.current = spawn; }, [spawn, reactionSpawnRef]);
-  const [onStage,    setOnStage]    = useState(false);
-  const [camOn,      setCamOn]      = useState(false);
-  const [micOn,      setMicOn]      = useState(false);
-  const [handRaised, setHandRaised] = useState(false);
-  const [showInput,  setShowInput]  = useState(false);
-  const [showGifts,  setShowGifts]  = useState(false);
-  const [editTarget, setEditTarget] = useState<{ id: string; text: string } | null>(null);
+  const [onStage,      setOnStage]      = useState(false);
+  const [camOn,        setCamOn]        = useState(false);
+  const [micOn,        setMicOn]        = useState(false);
+  const [handRaised,   setHandRaised]   = useState(false);
+  const [showInput,    setShowInput]    = useState(false);
+  const [showGifts,    setShowGifts]    = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editTarget,   setEditTarget]   = useState<{ id: string; text: string } | null>(null);
   const giftRef = useRef<LiveGiftOverlayRef>(null);
 
   const hostId   = live?.user_id ?? '';
@@ -302,6 +315,11 @@ const RoomContent: React.FC<{
     goOnStageRef.current  = goOnStage;
     leaveStageRef.current = leaveStage;
   }, [goOnStage, leaveStage, goOnStageRef, leaveStageRef]);
+
+  // Le host est publisher dès le début — marquer comme sur scène
+  useEffect(() => {
+    if (isHost) { setOnStage(true); setCamOn(true); setMicOn(true); }
+  }, [isHost]);
 
   // Couper la caméra en background pour éviter le crash Android
   useEffect(() => {
@@ -403,6 +421,20 @@ const RoomContent: React.FC<{
           <Icon name="eye" size={12} color="#fff" />
           <Text style={st.viewerCount}>{viewerCount}</Text>
         </View>
+        {isHost && (
+          <TouchableOpacity
+            style={st.settingsBtn}
+            onPress={() => setShowSettings(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {handRequests.length > 0 && (
+              <View style={st.settingsBadge}>
+                <Text style={st.settingsBadgeText}>{handRequests.length}</Text>
+              </View>
+            )}
+            <Icon name="settings" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
         <View style={st.likeWrap}>
           <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
         </View>
@@ -670,6 +702,28 @@ const RoomContent: React.FC<{
         incomingNotifs={giftNotifs}
         onNotifShown={onGiftNotifShown}
       />
+
+      {isHost && (
+        <LiveSettingsSheet
+          visible={showSettings}
+          onClose={() => setShowSettings(false)}
+          live={live}
+          liveId={liveId}
+          camOn={camOn}
+          micOn={micOn}
+          onToggleCam={toggleCam}
+          onToggleMic={toggleMic}
+          handRequests={handRequests}
+          onInvite={async (identity) => {
+            try { await apiClient.post(Endpoints.lives.invite(liveId, identity)); }
+            catch {}
+            onHandDismiss(identity);
+          }}
+          onDismissHand={onHandDismiss}
+          onStopLive={onStopLive}
+          onMonetizationUpdated={onLiveUpdated}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -699,8 +753,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   // identity LiveKit du viewer (= userId stocké)
   const [myIdentity,  setMyIdentity]  = useState('');
   // Accès monétisé
-  const [accessGranted, setAccessGranted] = useState(false);
+  const [accessGranted,  setAccessGranted]  = useState(false);
   const [accessChecking, setAccessChecking] = useState(false);
+  // Demandes de scène (mains levées) — host uniquement
+  const [handRequests,   setHandRequests]   = useState<HandRequest[]>([]);
 
   const chatRef      = useRef<FlatList>(null);
   const wsRef        = useRef<WebSocket | null>(null);
@@ -801,6 +857,20 @@ export const SimpleLiveViewerScreen: React.FC = () => {
       if (d.type === 'live_guest_demoted' && d.identity === myIdentity) {
         addSysMsg('Tu as été redescendu de scène.');
         leaveStageRef.current?.();
+      }
+      // Demande de scène — ajouter à la liste du host
+      if (d.type === 'live_hand_raise' && d.live_id === liveId) {
+        setHandRequests(prev => {
+          if (prev.find(r => r.identity === d.identity)) return prev;
+          return [...prev, { identity: d.identity, name: d.display_name ?? d.identity, avatar: d.avatar_url ?? null }];
+        });
+      }
+      // Quand le host invite ou que l'utilisateur descend, retirer la demande
+      if (d.type === 'live_guest_invited' && d.live_id === liveId) {
+        setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
+      }
+      if (d.type === 'live_guest_demoted' && d.live_id === liveId) {
+        setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
       }
     };
     addListener(handler);
@@ -1010,6 +1080,19 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     }, 500);
   }, [liveId]);
 
+  const handleHandDismiss = useCallback((identity: string) => {
+    setHandRequests(prev => prev.filter(r => r.identity !== identity));
+  }, []);
+
+  const handleLiveUpdated = useCallback((patch: Partial<LiveStream>) => {
+    setLive(prev => prev ? { ...prev, ...patch } : prev);
+  }, []);
+
+  const handleStopLive = useCallback(async () => {
+    try { await liveService.stopLive(liveId); } catch {}
+    handleLeave();
+  }, [liveId, handleLeave]);
+
   const handleReact = useCallback((emoji: string) => {
     if (reactionThrottle.current) return;
     reactionThrottle.current = setTimeout(() => { reactionThrottle.current = null; }, 500);
@@ -1109,6 +1192,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         elapsed={elapsed}
         goOnStageRef={goOnStageRef}
         leaveStageRef={leaveStageRef}
+        handRequests={handRequests}
+        onHandDismiss={handleHandDismiss}
+        onLiveUpdated={handleLiveUpdated}
+        onStopLive={handleStopLive}
       />
     </LiveKitRoom>
   );
@@ -1200,7 +1287,15 @@ const st = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4,
   },
   viewerCount: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  likeWrap: { marginLeft: 4 },
+  likeWrap:    { marginLeft: 4 },
+  settingsBtn: { padding: 6, position: 'relative' },
+  settingsBadge: {
+    position: 'absolute', top: 2, right: 2,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center',
+    zIndex: 1,
+  },
+  settingsBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 
   // Badge "sur scène"
   onStageBadge: {
