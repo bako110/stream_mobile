@@ -104,12 +104,13 @@ const StageAccessSheet: React.FC<{
   const [myBalance, setMyBalance] = useState<number | null>(null);
   const [loading,   setLoading]   = useState(false);
 
-  const isCoins = live.monetization_type === 'coins';
-  const isGift  = live.monetization_type === 'gift';
-  const requiredCoins     = live.monetization_coins ?? 0;
-  const requiredGiftId    = live.monetization_gift_id;
-  const requiredGiftName  = live.monetization_gift_name ?? 'Cadeau';
-  const requiredGiftEmoji = live.monetization_gift_emoji ?? '🎁';
+  // Lire les champs stage_* (montée sur scène), pas les champs d'accès au live
+  const isCoins = live.stage_type === 'coins';
+  const isGift  = live.stage_type === 'gift';
+  const requiredCoins     = live.stage_coins ?? 0;
+  const requiredGiftId    = live.stage_gift_id;
+  const requiredGiftName  = live.stage_gift_name ?? 'Cadeau';
+  const requiredGiftEmoji = live.stage_gift_emoji ?? '🎁';
   const hostName          = live.user?.display_name ?? live.user?.username ?? 'le host';
 
   const effectiveCost = isCoins ? requiredCoins : 0;
@@ -543,11 +544,11 @@ const RoomContent: React.FC<{
 
   const handleHandRaise = useCallback(async () => {
     if (handRaised) { setHandRaised(false); return; }
-    // Live monetise → afficher la gate (gere paiement + demande en un seul appel backend)
-    if (live?.is_monetized) { setShowStageGate(true); return; }
-    // Live non monetise → lever la main directement
+    // Scène monétisée → afficher la gate de paiement
+    if (live?.stage_monetized) { setShowStageGate(true); return; }
+    // Scène gratuite → lever la main directement
     await doRaiseHand();
-  }, [handRaised, live?.is_monetized, doRaiseHand]);
+  }, [handRaised, live?.stage_monetized, doRaiseHand]);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -890,7 +891,7 @@ const RoomContent: React.FC<{
       )}
 
       {/* ── GATE scène monétisée ────────────────────────────────────── */}
-      {showStageGate && live?.is_monetized && (
+      {showStageGate && live?.stage_monetized && (
         <StageAccessSheet
           live={live}
           liveId={liveId}

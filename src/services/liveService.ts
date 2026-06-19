@@ -17,13 +17,20 @@ export interface LiveStream {
   is_private: boolean;
   started_at: string;
   ended_at?: string | null;
-  // Monétisation
+  // Monétisation accès au live (rejoindre)
   is_monetized?: boolean;
   monetization_type?: MonetizationType | null;
   monetization_coins?: number | null;
   monetization_gift_id?: string | null;
   monetization_gift_name?: string | null;
   monetization_gift_emoji?: string | null;
+  // Monétisation montée sur scène (hand-raise)
+  stage_monetized?: boolean;
+  stage_type?: MonetizationType | null;
+  stage_coins?: number | null;
+  stage_gift_id?: string | null;
+  stage_gift_name?: string | null;
+  stage_gift_emoji?: string | null;
   user?: {
     id: string;
     username?: string | null;

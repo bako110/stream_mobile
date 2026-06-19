@@ -359,12 +359,14 @@ export const Endpoints = {
     globalBan:     (id: string, userId: string)   => `${V1}/lives/${id}/global-ban/${userId}`,
     like:          (id: string) => `${V1}/lives/${id}/like`,
     react:         (id: string) => `${V1}/lives/${id}/react`,
-    handRaise:     (id: string, identity: string) => `${V1}/lives/${id}/hand-raise/${identity}`,
-    invite:        (id: string, identity: string) => `${V1}/lives/${id}/invite/${identity}`,
-    demote:        (id: string, identity: string) => `${V1}/lives/${id}/demote/${identity}`,
-    blockUser:     (userId: string) => `${V1}/lives/block/${userId}`,
-    unblockUser:   (userId: string) => `${V1}/lives/block/${userId}`,  // DELETE via apiClient.delete()
-    listBlocks:    `${V1}/lives/blocks`,
+    handRaise:           (id: string, identity: string) => `${V1}/lives/${id}/hand-raise/${identity}`,
+    invite:              (id: string, identity: string) => `${V1}/lives/${id}/invite/${identity}`,
+    demote:              (id: string, identity: string) => `${V1}/lives/${id}/demote/${identity}`,
+    blockUser:           (userId: string) => `${V1}/lives/block/${userId}`,
+    unblockUser:         (userId: string) => `${V1}/lives/block/${userId}`,
+    listBlocks:          `${V1}/lives/blocks`,
+    monetization:        (id: string) => `${V1}/lives/${id}/monetization`,
+    stageMonetization:   (id: string) => `${V1}/lives/${id}/stage-monetization`,
   },
 
   // ── Favoris (prefix: /api/v1/favorites) ──────────────────────────────────
