@@ -13,6 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useTheme } from '../../hooks/useTheme';
 import { SoundPicker } from './SoundPicker';
@@ -300,11 +301,14 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   const pickAudioFile = async () => {
     try {
-      const res = await launchImageLibrary({ mediaType: 'mixed' as any, selectionLimit: 1 });
-      if (res.didCancel || !res.assets?.[0]?.uri) return;
-      setAudioUri(res.assets[0].uri);
+      const [file] = await pick({ type: [types.audio], allowMultiSelection: false });
+      if (!file?.uri) return;
+      setAudioUri(file.uri);
       setStep('preview');
-    } catch (e: any) { Alert.alert('Erreur', e?.message); }
+    } catch (e) {
+      if (isErrorWithCode(e, errorCodes.OPERATION_CANCELED)) return;
+      Alert.alert('Erreur', "Impossible d'accéder aux fichiers audio.");
+    }
   };
 
   // ── Voice recording ───────────────────────────────────────────────────────
@@ -660,7 +664,10 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           colors={colors}
           onGoBack={goBack}
           onSelectLocal={pickAudioFile}
-          onSelectOnline={(uri: string) => { setAudioUri(uri); setStep('preview'); }}
+          onSelectOnline={(uri: string, title?: string) => {
+            setAudioUri(uri);
+            setStep('preview');
+          }}
         />
       )}
 

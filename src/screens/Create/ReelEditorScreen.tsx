@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Sound from 'react-native-sound';
+import { SoundPicker } from '../../components/story/SoundPicker';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
@@ -195,9 +196,10 @@ export const ReelEditorScreen: React.FC<Props> = ({
   const [tool,    setTool]    = useState<ToolKey | null>(null);
 
   // ── Musique ───────────────────────────────────────────────────────────────
-  const [musicUri,     setMusicUri]     = useState<string | undefined>(init?.musicUri);
-  const [musicName,    setMusicName]    = useState<string | undefined>(init?.musicName);
-  const [musicPicking, setMusicPicking] = useState(false);
+  const [musicUri,       setMusicUri]       = useState<string | undefined>(init?.musicUri);
+  const [musicName,      setMusicName]      = useState<string | undefined>(init?.musicName);
+  const [musicPicking,   setMusicPicking]   = useState(false);
+  const [showSoundPicker, setShowSoundPicker] = useState(false);
   const soundRef = useRef<Sound | null>(null);
 
   const stopSound = useCallback(() => {
@@ -214,7 +216,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
     });
   }, [stopSound]);
 
-  const handlePickMusic = useCallback(async () => {
+  const handlePickMusicLocal = useCallback(async () => {
     setMusicPicking(true);
     try {
       const [file] = await pick({ type: [types.audio], allowMultiSelection: false });
@@ -744,9 +746,22 @@ export const ReelEditorScreen: React.FC<Props> = ({
               </View>
             ) : null}
 
+            {/* Bibliothèque en ligne (sons populaires + recherche) */}
             <TouchableOpacity
-              style={[s.musicPickBtn, musicPicking && { opacity: 0.6 }]}
-              onPress={handlePickMusic}
+              style={s.musicPickBtn}
+              onPress={() => setShowSoundPicker(true)}
+              activeOpacity={0.8}
+            >
+              <Icon name="globe" size={18} color="#A78BFA" />
+              <Text style={s.musicPickTxt}>
+                {musicUri ? 'Changer (bibliothèque)' : 'Sons populaires'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Fichier local */}
+            <TouchableOpacity
+              style={[s.musicPickBtn, { marginTop: 8 }, musicPicking && { opacity: 0.6 }]}
+              onPress={handlePickMusicLocal}
               disabled={musicPicking}
               activeOpacity={0.8}
             >
@@ -755,7 +770,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
                 : <Icon name="folder" size={18} color="#A78BFA" />
               }
               <Text style={s.musicPickTxt}>
-                {musicUri ? 'Changer le son' : 'Choisir depuis ma bibliothèque'}
+                Mes fichiers
               </Text>
             </TouchableOpacity>
           </View>
@@ -869,9 +884,44 @@ export const ReelEditorScreen: React.FC<Props> = ({
         </View>
       )}
 
+      {/* ══ SOUND PICKER plein écran ══ */}
+      {showSoundPicker && (
+        <View style={StyleSheet.absoluteFill}>
+          <SoundPicker
+            colors={DARK_COLORS}
+            onGoBack={() => setShowSoundPicker(false)}
+            onSelectLocal={() => {
+              setShowSoundPicker(false);
+              handlePickMusicLocal();
+            }}
+            onSelectOnline={(uri: string, title?: string) => {
+              setMusicUri(uri);
+              setMusicName(title ?? uri.split('/').pop() ?? 'Son');
+              playMusicPreview(uri);
+              setShowSoundPicker(false);
+            }}
+          />
+        </View>
+      )}
+
     </View>
   );
 };
+
+// Couleurs dark pour SoundPicker (ReelEditor est toujours dark)
+const DARK_COLORS = {
+  background:          '#0F0F0F',
+  backgroundSecondary: '#1A1A1A',
+  surface:             '#1A1A1A',
+  border:              'rgba(255,255,255,0.12)',
+  divider:             'rgba(255,255,255,0.08)',
+  primary:             '#A78BFA',
+  textPrimary:         '#FFFFFF',
+  textSecondary:       'rgba(255,255,255,0.65)',
+  textTertiary:        'rgba(255,255,255,0.4)',
+  textDisabled:        'rgba(255,255,255,0.25)',
+  inputBg:             '#2A2A2A',
+} as any;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Styles
