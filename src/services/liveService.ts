@@ -1,6 +1,8 @@
 import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 
+export type MonetizationType = 'coins' | 'gift';
+
 export interface LiveStream {
   id: string;
   user_id: string;
@@ -15,6 +17,13 @@ export interface LiveStream {
   is_private: boolean;
   started_at: string;
   ended_at?: string | null;
+  // Monétisation
+  is_monetized?: boolean;
+  monetization_type?: MonetizationType | null;
+  monetization_coins?: number | null;
+  monetization_gift_id?: string | null;
+  monetization_gift_name?: string | null;
+  monetization_gift_emoji?: string | null;
   user?: {
     id: string;
     username?: string | null;
@@ -45,8 +54,31 @@ async function getById(id: string): Promise<LiveStream> {
   return r.data;
 }
 
-async function startLive(payload: { title: string; description?: string; is_private?: boolean }): Promise<{ live: LiveStream; token: string; livekit_url: string }> {
+async function startLive(payload: {
+  title: string;
+  description?: string;
+  is_private?: boolean;
+  is_monetized?: boolean;
+  monetization_type?: MonetizationType;
+  monetization_coins?: number;
+  monetization_gift_id?: string;
+}): Promise<{ live: LiveStream; token: string; livekit_url: string }> {
   const r = await apiClient.post<{ live: LiveStream; token: string; livekit_url: string }>(Endpoints.lives.start, payload);
+  return r.data;
+}
+
+async function sendGiftForAccess(liveId: string, giftId: string): Promise<{ access_granted: boolean }> {
+  const r = await apiClient.post<{ access_granted: boolean }>(`/api/v1/lives/${liveId}/access/gift`, { gift_id: giftId });
+  return r.data;
+}
+
+async function payCoinsForAccess(liveId: string): Promise<{ access_granted: boolean }> {
+  const r = await apiClient.post<{ access_granted: boolean }>(`/api/v1/lives/${liveId}/access/coins`);
+  return r.data;
+}
+
+async function checkAccess(liveId: string): Promise<{ has_access: boolean }> {
+  const r = await apiClient.get<{ has_access: boolean }>(`/api/v1/lives/${liveId}/access`);
   return r.data;
 }
 
@@ -101,4 +133,5 @@ export const liveService = {
   getLives, getById, startLive, stopLive, getToken, getStatus, stopAllMine,
   blockUserFromLives, unblockUserFromLives,
   invite, demote, ban, globalBan, getLiveCost,
+  sendGiftForAccess, payCoinsForAccess, checkAccess,
 };

@@ -3398,7 +3398,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           ]}>
             <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
             <Text style={[fc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-              {commentCount > 0 ? fmtN(commentCount) : 'Commenter'}
+              {commentCount > 0 ? fmtN(commentCount) : 'Comm…'}
             </Text>
           </View>
         </TouchableOpacity>}

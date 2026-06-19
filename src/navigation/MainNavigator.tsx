@@ -106,6 +106,7 @@ import MonetisationRequestScreen   from '../screens/Wallet/MonetisationRequestSc
 import { AdsScreen }              from '../screens/Wallet/AdsScreen';
 import { CreateAdScreen }         from '../screens/Wallet/CreateAdScreen';
 import { WebQRScannerScreen } from '../screens/Auth/WebQRScannerScreen';
+import { ImageViewerScreen }  from '../screens/Detail/ImageViewerScreen';
 import { SettingsWalletScreen }        from '../screens/Settings/SettingsWalletScreen';
 import { SettingsMonetisationScreen }  from '../screens/Settings/SettingsMonetisationScreen';
 import { SettingsAbonnementScreen }    from '../screens/Settings/SettingsAbonnementScreen';
@@ -203,6 +204,7 @@ export type MainStackParamList = {
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
   PostDetail:      { postId: string; initialPost?: any };
   ImageGallery:    { urls: string[]; initialIndex?: number };
+  ImageViewer:     { url: string; label?: string };
   CreatePost:      undefined;
   Wallet:          undefined;
   BuyCoins:        { reason?: string; missingCoins?: number; returnTo?: keyof MainStackParamList } | undefined;
@@ -453,6 +455,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="ConcertDetail"  component={ConcertDetailWrapper}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="EventDetail"    component={EventDetailWrapper}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="UserProfile"    component={UserProfileScreen}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="ImageViewer"    component={ImageViewerScreen}     options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="EditProfile"    component={EditProfileScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreateReel"     component={CreateReelWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="Messages"       component={MessagesScreen}        options={{ animation: 'slide_from_right' }} />

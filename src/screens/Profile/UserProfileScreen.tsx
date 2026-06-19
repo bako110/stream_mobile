@@ -9,7 +9,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, Alert, FlatList, Dimensions, Modal, StatusBar,
+  StyleSheet, ActivityIndicator, Alert, FlatList, Dimensions,
   InteractionManager,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -55,7 +55,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const [myId, setMyId] = useState<string | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
-  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const openViewer = (url: string, label: string) => {
+    navigation.navigate('ImageViewer', { url, label });
+  };
 
   // Content tabs
   const [activeTab, setActiveTab] = useState<ContentTab>('publications');
@@ -262,7 +264,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={styles.bannerWrap}>
           <TouchableOpacity
             activeOpacity={profile.banner_url ? 0.85 : 1}
-            onPress={() => profile.banner_url && setViewerUrl(profile.banner_url)}
+            onPress={() => profile.banner_url && openViewer(profile.banner_url, 'Photo de couverture')}
             style={{ flex: 1 }}
           >
             {profile.banner_url ? (
@@ -297,7 +299,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={styles.avatarSection}>
           <TouchableOpacity
             activeOpacity={profile.avatar_url ? 0.85 : 1}
-            onPress={() => profile.avatar_url && setViewerUrl(profile.avatar_url)}
+            onPress={() => profile.avatar_url && openViewer(profile.avatar_url, 'Photo de profil')}
           >
             <View style={[styles.avatarRing, { borderColor: colors.background }]}>
               {profile.avatar_url ? (
@@ -859,34 +861,6 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         ) : null}
       </ScrollView>
 
-      {/* ── Image viewer plein écran ───────────────────────────────── */}
-      <Modal
-        visible={!!viewerUrl}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setViewerUrl(null)}
-      >
-        <View style={styles.imgViewer}>
-          <StatusBar hidden />
-          <TouchableOpacity
-            style={styles.imgViewerClose}
-            onPress={() => setViewerUrl(null)}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <View style={styles.imgViewerCloseInner}>
-              <Icon name="x" size={22} color="#fff" />
-            </View>
-          </TouchableOpacity>
-          {viewerUrl && (
-            <Image
-              source={{ uri: viewerUrl }}
-              style={styles.imgViewerImage}
-              resizeMode="contain"
-            />
-          )}
-        </View>
-      </Modal>
 
       {/* ── Followers/Following list modal ─────────────────────────── */}
       {showList && (
@@ -1094,21 +1068,6 @@ const styles = StyleSheet.create({
     padding: 12, borderRadius: 10, marginTop: 4,
   },
   privacyNoteText: { fontSize: 12, flex: 1, lineHeight: 16 },
-
-  // Image viewer plein écran
-  imgViewer: {
-    flex: 1, backgroundColor: '#000',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  imgViewerImage: { width: '100%', height: '100%' },
-  imgViewerClose: {
-    position: 'absolute', top: 52, right: 20, zIndex: 10,
-  },
-  imgViewerCloseInner: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center', justifyContent: 'center',
-  },
 
   // Followers/Following modal
   listOverlay: {

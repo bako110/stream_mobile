@@ -662,7 +662,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               >
                 <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
                 <Text style={[s.engageBtnTxt, { color: commentCount > 0 ? colors.primary : colors.textSecondary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-                  {commentCount > 0 ? (commentCount >= 1_000_000 ? `${(commentCount/1_000_000).toFixed(1)}M` : commentCount >= 1_000 ? `${(commentCount/1_000).toFixed(1)}K` : String(commentCount)) : 'Commenter'}
+                  {commentCount > 0 ? (commentCount >= 1_000_000 ? `${(commentCount/1_000_000).toFixed(1)}M` : commentCount >= 1_000 ? `${(commentCount/1_000).toFixed(1)}K` : String(commentCount)) : 'Comm…'}
                 </Text>
               </TouchableOpacity>
             )}

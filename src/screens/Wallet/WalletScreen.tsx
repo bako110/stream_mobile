@@ -444,7 +444,7 @@ const WalletScreen: React.FC = () => {
             { icon: 'shopping-cart', label: 'Acheter',    color: '#3B82F6', screen: 'BuyCoins',          show: true },
             { icon: 'send',          label: 'Transférer', color: '#7B3FF2', screen: 'Transfer',           show: true },
             { icon: 'bar-chart-2',   label: 'Créateur',   color: '#E85DAD', screen: 'CreatorDashboard',   show: isMonetized },
-            { icon: 'arrow-up-right',label: 'Retirer',    color: '#3FEDB6', screen: 'Withdraw',           show: isMonetized },
+            { icon: 'arrow-up-right',label: 'Retirer',    color: '#3FEDB6', screen: 'Withdraw',           show: true },
             { icon: 'gift',          label: 'Parrainage', color: '#F59E0B', screen: 'Referral',           show: true },
             { icon: 'bullhorn',      label: 'Pub',        color: '#EC4899', screen: 'Ads',                show: true, mci: true },
           ].filter(a => a.show).map(a => (

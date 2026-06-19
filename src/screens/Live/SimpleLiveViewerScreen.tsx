@@ -33,6 +33,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
+import { LiveAccessGate } from '../../components/live/LiveAccessGate';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
@@ -697,6 +698,9 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [elapsed,     setElapsed]     = useState(0);
   // identity LiveKit du viewer (= userId stocké)
   const [myIdentity,  setMyIdentity]  = useState('');
+  // Accès monétisé
+  const [accessGranted, setAccessGranted] = useState(false);
+  const [accessChecking, setAccessChecking] = useState(false);
 
   const chatRef      = useRef<FlatList>(null);
   const wsRef        = useRef<WebSocket | null>(null);
@@ -729,11 +733,20 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         if (l.status !== 'active') { setEnded(true); setLoading(false); return; }
         setViewerCount(l.current_viewers + 1);
 
+        // Si le live est monétisé, vérifier si l'utilisateur a déjà l'accès
+        if (l.is_monetized) {
+          try {
+            const access = await liveService.checkAccess(liveId);
+            if (access.has_access) setAccessGranted(true);
+          } catch { /* accès non accordé — afficher le verrou */ }
+          setLoading(false);
+          return; // ne pas charger le token LiveKit encore
+        }
+
         const t = await liveService.getToken(liveId);
         setToken(t.token);
         setWsUrl(t.livekit_url);
 
-        // Identity LiveKit = userId stocké localement (même valeur que le token `sub`)
         const storedUserId = storage.getItem(STORAGE_KEYS.LAST_USER_ID);
         if (storedUserId) setMyIdentity(storedUserId);
 
@@ -744,6 +757,22 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     })();
     return () => { if (elapsedRef.current) clearInterval(elapsedRef.current); };
   }, [liveId]);
+
+  // Charger le token LiveKit dès que l'accès est accordé
+  useEffect(() => {
+    if (!accessGranted || !live?.is_monetized) return;
+    (async () => {
+      try {
+        const t = await liveService.getToken(liveId);
+        setToken(t.token);
+        setWsUrl(t.livekit_url);
+        const storedUserId = storage.getItem(STORAGE_KEYS.LAST_USER_ID);
+        if (storedUserId) setMyIdentity(storedUserId);
+        const startMs = new Date(live.started_at).getTime();
+        elapsedRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - startMs) / 1000)), 1000);
+      } catch {}
+    })();
+  }, [accessGranted]);
 
   useEffect(() => {
     if (lastLiveEnded === liveId) { setEnded(true); setToken(null); }
@@ -1027,6 +1056,20 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         <ActivityIndicator size="large" color="#F0365A" />
         <Text style={st.connectText}>Connexion...</Text>
       </View>
+    );
+  }
+
+  // Live monétisé sans accès encore accordé → afficher le verrou
+  if (live?.is_monetized && !accessGranted) {
+    return (
+      <LiveAccessGate
+        live={live}
+        checking={accessChecking}
+        onAccessGranted={() => setAccessGranted(true)}
+        onLeave={handleLeave}
+        setChecking={setAccessChecking}
+        liveId={liveId}
+      />
     );
   }
 

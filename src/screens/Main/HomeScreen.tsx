@@ -1353,7 +1353,7 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
         {!commentsDisabled && (
           <TouchableOpacity style={s.actionBtn} onPress={onComment}>
             <Icon name="message-circle" size={18} color={colors.textSecondary} />
-            <Text style={[s.actionText, { color: colors.textSecondary }]}>Commenter</Text>
+            <Text style={[s.actionText, { color: colors.textSecondary }]}>Comm…</Text>
           </TouchableOpacity>
         )}
 
