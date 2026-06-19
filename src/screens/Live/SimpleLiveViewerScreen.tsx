@@ -364,10 +364,7 @@ const RoomContent: React.FC<{
     <KeyboardAvoidingView style={st.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Emojis flottants — dans le root pour être au-dessus de tout */}
-      <ReactionFloaters floaters={floaters} />
-
-      {/* Vidéo */}
+      {/* ── VIDÉO PLEIN ÉCRAN ──────────────────────────────────────────── */}
       <MultiVideoView
         hostName={hostName}
         hostAvatarUrl={live?.user?.avatar_url}
@@ -375,52 +372,85 @@ const RoomContent: React.FC<{
         onTap={() => likeRef.current?.trigger()}
       />
 
-      {/* Zone de tap coeur — absoluteFill sous tous les overlays (zIndex 1).
-          Les overlays (header zIndex 10, chat, sidebar) sont au-dessus et
-          interceptent leurs propres taps. Les zones vides déclenchent le coeur. */}
+      {/* Zone tap coeur */}
       <TouchableWithoutFeedback onPress={() => likeRef.current?.trigger()}>
         <View style={[StyleSheet.absoluteFill, { zIndex: 1 }]} />
       </TouchableWithoutFeedback>
 
-      {/* Gradients */}
-      <LinearGradient colors={['rgba(0,0,0,0.72)', 'transparent']} style={st.gradTop} pointerEvents="none" />
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={st.gradBottom} pointerEvents="none" />
+      {/* Floaters réactions */}
+      <ReactionFloaters floaters={floaters} />
 
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      {/* ── GRADIENTS PREMIUM ─────────────────────────────────────────── */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.85)', 'rgba(0,0,0,0.3)', 'transparent']}
+        style={st.gradTop}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(10,4,20,0.55)', 'rgba(10,4,20,0.92)']}
+        style={st.gradBottom}
+        pointerEvents="none"
+      />
+
+      {/* ── HEADER PREMIUM ────────────────────────────────────────────── */}
       <View style={st.header}>
-        <TouchableOpacity onPress={onLeave} style={st.backBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
+        {/* Bouton retour */}
+        <TouchableOpacity onPress={onLeave} style={st.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <View style={st.backBtnCircle}>
+            <Icon name="arrow-left" size={18} color="#fff" />
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={st.hostInfo} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
-          {live?.user?.avatar_url
-            ? <Image source={{ uri: live.user.avatar_url }} style={st.hostAvatar} />
-            : <Av name={hostName} size={40} color="#F0365A" />
-          }
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <View style={st.livePill}>
+        {/* Host info */}
+        <TouchableOpacity
+          style={st.hostInfo}
+          onPress={() => giftRef.current?.openGift(hostId, hostName)}
+          activeOpacity={0.85}
+        >
+          <View style={st.hostAvatarWrap}>
+            {live?.user?.avatar_url
+              ? <Image source={{ uri: live.user.avatar_url }} style={st.hostAvatar} />
+              : <Av name={hostName} size={38} color="#F0365A" />
+            }
+            <View style={st.liveIndicator} />
+          </View>
+          <View style={st.hostMeta}>
+            <Text style={st.hostName} numberOfLines={1}>{hostName}</Text>
+            <View style={st.hostMetaRow}>
+              <LinearGradient colors={['#F0365A', '#9B65F5']} style={st.livePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                 <View style={st.liveDot} />
                 <Text style={st.liveText}>LIVE</Text>
                 <Text style={st.timerText}>{fmt(elapsed)}</Text>
-              </View>
+              </LinearGradient>
               {live?.is_private && (
                 <View style={st.privatePill}>
-                  <MCIcon name="lock" size={9} color="#fff" />
-                  <Text style={st.privateText}>Abonnés</Text>
+                  <MCIcon name="lock" size={8} color="#fff" />
+                  <Text style={st.privateText}>Privé</Text>
+                </View>
+              )}
+              {live?.is_monetized && (
+                <View style={st.monetPill}>
+                  <Text style={st.monetPillText}>🔒 Payant</Text>
                 </View>
               )}
             </View>
-            <Text style={st.hostName} numberOfLines={1}>{hostName}</Text>
           </View>
         </TouchableOpacity>
 
         <View style={{ flex: 1 }} />
 
+        {/* Viewers */}
         <View style={st.viewerPill}>
-          <Icon name="eye" size={12} color="#fff" />
+          <Icon name="eye" size={11} color="rgba(255,255,255,0.8)" />
           <Text style={st.viewerCount}>{viewerCount}</Text>
         </View>
+
+        {/* Coeur */}
+        <View style={st.likeWrap}>
+          <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
+        </View>
+
+        {/* Engrenage host */}
         {isHost && (
           <TouchableOpacity
             style={st.settingsBtn}
@@ -432,264 +462,236 @@ const RoomContent: React.FC<{
                 <Text style={st.settingsBadgeText}>{handRequests.length}</Text>
               </View>
             )}
-            <Icon name="settings" size={20} color="#fff" />
+            <View style={st.settingsBtnCircle}>
+              <Icon name="settings" size={17} color="#fff" />
+            </View>
           </TouchableOpacity>
         )}
-        <View style={st.likeWrap}>
-          <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
-        </View>
       </View>
 
-      {/* ── GIFT TICKER (bas gauche, au-dessus du chat) ───────────────── */}
+      {/* ── BADGE SUR SCÈNE ───────────────────────────────────────────── */}
+      {onStage && !isHost && (
+        <Animated.View entering={SlideInUp.duration(350)} exiting={SlideOutDown.duration(250)} style={st.onStageBadge}>
+          <LinearGradient colors={['#3FEDB6', '#22d3a5']} style={st.onStagePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <View style={st.onStageDot} />
+            <Text style={st.onStageText}>Tu es sur scène</Text>
+          </LinearGradient>
+        </Animated.View>
+      )}
+
+      {/* ── GIFT TICKER ───────────────────────────────────────────────── */}
       {giftTicker.length > 0 && (
         <View style={gt.container} pointerEvents="none">
           {giftTicker.map(t => (
-            <Animated.View key={t.id} entering={FadeIn.duration(300)} exiting={FadeOut.duration(400)} style={gt.row}>
-              <Text style={gt.emoji}>{t.emoji}</Text>
-              <View style={gt.info}>
-                <Text style={gt.sender} numberOfLines={1}>{t.senderName}</Text>
-                <Text style={gt.detail}>{t.giftName} · {t.coins} pièces</Text>
-              </View>
+            <Animated.View key={t.id} entering={FadeIn.duration(250)} exiting={FadeOut.duration(400)} style={gt.row}>
+              <LinearGradient colors={['rgba(155,101,245,0.85)', 'rgba(240,54,90,0.85)']} style={gt.pill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Text style={gt.emoji}>{t.emoji}</Text>
+                <View style={gt.info}>
+                  <Text style={gt.sender} numberOfLines={1}>{t.senderName}</Text>
+                  <Text style={gt.detail}>{t.giftName} · {t.coins} coins</Text>
+                </View>
+              </LinearGradient>
             </Animated.View>
           ))}
         </View>
       )}
 
-      {/* ── BADGE "SUR SCÈNE" ─────────────────────────────────────────── */}
-      {onStage && (
-        <Animated.View entering={SlideInUp.duration(350)} exiting={SlideOutDown.duration(250)} style={st.onStageBadge}>
-          <View style={st.onStageDot} />
-          <Text style={st.onStageText}>Tu es sur scène</Text>
-        </Animated.View>
-      )}
+      {/* ── ZONE CHAT + BARRE ACTIONS ─────────────────────────────────── */}
+      <View style={st.bottomZone}>
 
-      {/* ── CHAT (bas gauche) ─────────────────────────────────────────── */}
-      <View style={st.chatZone}>
-        <FlatList
-          ref={chatRef}
-          data={messages}
-          keyExtractor={m => m.id}
-          renderItem={({ item }) => {
-            if (item.isJoin || item.isSys) {
+        {/* Chat flottant */}
+        <View style={st.chatZone}>
+          <FlatList
+            ref={chatRef}
+            data={messages}
+            keyExtractor={m => m.id}
+            renderItem={({ item }) => {
+              if (item.isJoin || item.isSys) {
+                return (
+                  <Animated.View entering={FadeIn.duration(250)} style={st.sysRow}>
+                    <Text style={st.sysText}>{item.text}</Text>
+                  </Animated.View>
+                );
+              }
+              const isMine      = item.isLocal === true || (!!myIdentity && item.userId === myIdentity);
+              const canModerate = isHost && !!item.userId && item.userId !== myIdentity;
               return (
-                <Animated.View entering={FadeIn.duration(250)} style={st.sysRow}>
-                  <Text style={st.sysText}>{item.text}</Text>
+                <Animated.View entering={FadeIn.duration(180)} style={st.chatRow}>
+                  {item.avatar
+                    ? <Image source={{ uri: item.avatar }} style={st.chatAvatar} />
+                    : <Av name={item.user} size={26} color="#9B65F5" />
+                  }
+                  <View style={{ flex: 1 }}>
+                    <TouchableOpacity
+                      style={[st.chatBubble, isMine && st.chatBubbleMine]}
+                      activeOpacity={(isMine || canModerate) ? 0.75 : 1}
+                      onLongPress={() => {
+                        if (isMine) {
+                          Alert.alert('Mon message', item.text, [
+                            { text: 'Annuler', style: 'cancel' },
+                            { text: 'Modifier', onPress: () => { setEditTarget({ id: item.id, text: item.text }); setChatInput(item.text); setShowInput(true); } },
+                            { text: 'Supprimer', style: 'destructive', onPress: () => onDeleteMsg(item.id) },
+                          ]);
+                        }
+                      }}
+                      delayLongPress={400}
+                    >
+                      <Text style={[st.chatUser, isMine && { color: '#3FEDB6' }]}>{item.user} </Text>
+                      <Text style={st.chatText}>{item.text}{item.edited ? ' ✏' : ''}</Text>
+                    </TouchableOpacity>
+                    {canModerate && (
+                      <View style={st.modRow}>
+                        <TouchableOpacity style={st.modBtn} onPress={() => onDeleteMsg(item.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                          <Icon name="trash-2" size={10} color="#F0365A" />
+                          <Text style={st.modBtnText}>Supp.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={st.modBtn} onPress={() => onDemoteUser(item.userId!, item.user)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                          <Icon name="arrow-down-circle" size={10} color="#FFD700" />
+                          <Text style={[st.modBtnText, { color: '#FFD700' }]}>Desc.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={st.modBtn} onPress={() => onBanUser(item.userId!, item.user)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                          <Icon name="slash" size={10} color="#F0365A" />
+                          <Text style={st.modBtnText}>Ban</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 </Animated.View>
               );
-            }
-            const isMine      = item.isLocal === true || (!!myIdentity && item.userId === myIdentity);
-            const canModerate = isHost && !!item.userId && item.userId !== myIdentity;
-            return (
-              <Animated.View entering={FadeIn.duration(200)} style={st.chatRow}>
-                {item.avatar
-                  ? <Image source={{ uri: item.avatar }} style={st.chatAvatar} />
-                  : <Av name={item.user} size={24} />
-                }
-                <View style={{ flex: 1 }}>
-                  <TouchableOpacity
-                    style={[st.chatBubble, isMine && st.chatBubbleMine]}
-                    activeOpacity={(isMine || canModerate) ? 0.7 : 1}
-                    onLongPress={() => {
-                      if (isMine) {
-                        Alert.alert('Mon message', item.text, [
-                          { text: 'Annuler', style: 'cancel' },
-                          {
-                            text: 'Modifier', onPress: () => {
-                              setEditTarget({ id: item.id, text: item.text });
-                              setChatInput(item.text);
-                              setShowInput(true);
-                            },
-                          },
-                          { text: 'Supprimer', style: 'destructive', onPress: () => onDeleteMsg(item.id) },
-                        ]);
-                        return;
-                      }
-                    }}
-                    delayLongPress={400}
-                  >
-                    <Text style={st.chatUser}>{item.user} </Text>
-                    <Text style={st.chatText}>{item.text}{item.edited ? ' ✏' : ''}</Text>
-                  </TouchableOpacity>
-
-                  {/* Boutons modération host — inline sous le message */}
-                  {canModerate && (
-                    <View style={st.modRow}>
-                      <TouchableOpacity
-                        style={st.modBtn}
-                        onPress={() => onDeleteMsg(item.id)}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      >
-                        <Icon name="trash-2" size={11} color="#F0365A" />
-                        <Text style={st.modBtnText}>Supprimer</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={st.modBtn}
-                        onPress={() => onDemoteUser(item.userId!, item.user)}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      >
-                        <Icon name="arrow-down-circle" size={11} color="#FFD700" />
-                        <Text style={[st.modBtnText, { color: '#FFD700' }]}>Descendre</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={st.modBtn}
-                        onPress={() => onBanUser(item.userId!, item.user)}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      >
-                        <Icon name="slash" size={11} color="#F0365A" />
-                        <Text style={st.modBtnText}>Bannir</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              </Animated.View>
-            );
-          }}
-          style={st.chatList}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 4 }}
-        />
-
-        {showInput ? (
-          <View style={st.inputRow}>
-            {editTarget && (
-              <TouchableOpacity onPress={() => { setEditTarget(null); setChatInput(''); setShowInput(false); }} style={st.editCancelBtn}>
-                <Icon name="x" size={14} color="rgba(255,255,255,0.6)" />
-              </TouchableOpacity>
-            )}
-            <TextInput
-              value={chatInput}
-              onChangeText={setChatInput}
-              placeholder={editTarget ? 'Modifier...' : 'Message...'}
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              style={st.chatField}
-              onSubmitEditing={() => {
-                if (editTarget) {
-                  onEditMsg(editTarget.id, chatInput.trim());
-                  setEditTarget(null);
-                  setChatInput('');
-                  setShowInput(false);
-                } else {
-                  onSend();
-                  setShowInput(false);
-                }
-              }}
-              returnKeyType="send"
-              autoFocus
-              onBlur={() => { if (!chatInput.trim()) { setShowInput(false); setEditTarget(null); } }}
-            />
-            <TouchableOpacity
-              onPress={() => {
-                if (editTarget) {
-                  onEditMsg(editTarget.id, chatInput.trim());
-                  setEditTarget(null); setChatInput(''); setShowInput(false);
-                } else {
-                  onSend(); setShowInput(false);
-                }
-              }}
-              style={[st.sendBtn, editTarget && { backgroundColor: '#4ade80' }]}
-              disabled={sending || !chatInput.trim()}
-            >
-              <Icon name={editTarget ? 'check' : 'send'} size={15} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity style={st.chatPlaceholder} onPress={() => setShowInput(true)} activeOpacity={0.8}>
-            <Icon name="message-circle" size={14} color="rgba(255,255,255,0.55)" />
-            <Text style={st.chatPlaceholderText}>Message...</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* ── CONTRÔLES DROITE ──────────────────────────────────────────── */}
-      <View style={st.sideControls}>
-        {/* Réactions emoji */}
-        <View style={[st.sideBtn, { zIndex: 30, overflow: 'visible' }]}>
-          <LiveReactionPicker onReact={(emoji) => { spawn(emoji); onReact(emoji); }} />
-          <Text style={st.sideBtnLabel}>Réagir</Text>
+            }}
+            style={st.chatList}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 6 }}
+          />
         </View>
 
-        {/* Cadeau — envoyer */}
-        <TouchableOpacity style={st.sideBtn} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
-          <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' }]}>
-            <Text style={{ fontSize: 22 }}>🎁</Text>
+        {/* ── BARRE D'ACTIONS ───────────────────────────────────────── */}
+        <View style={st.actionBar}>
+          {/* Input / placeholder */}
+          <View style={st.inputWrap}>
+            {showInput ? (
+              <>
+                {editTarget && (
+                  <TouchableOpacity onPress={() => { setEditTarget(null); setChatInput(''); setShowInput(false); }} style={st.editCancelBtn}>
+                    <Icon name="x" size={13} color="rgba(255,255,255,0.6)" />
+                  </TouchableOpacity>
+                )}
+                <TextInput
+                  value={chatInput}
+                  onChangeText={setChatInput}
+                  placeholder={editTarget ? 'Modifier...' : 'Envoyer un message...'}
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  style={st.chatField}
+                  onSubmitEditing={() => {
+                    if (editTarget) { onEditMsg(editTarget.id, chatInput.trim()); setEditTarget(null); setChatInput(''); setShowInput(false); }
+                    else { onSend(); setShowInput(false); }
+                  }}
+                  returnKeyType="send"
+                  autoFocus
+                  onBlur={() => { if (!chatInput.trim()) { setShowInput(false); setEditTarget(null); } }}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    if (editTarget) { onEditMsg(editTarget.id, chatInput.trim()); setEditTarget(null); setChatInput(''); setShowInput(false); }
+                    else { onSend(); setShowInput(false); }
+                  }}
+                  style={[st.sendBtn, editTarget && { backgroundColor: '#3FEDB6' }]}
+                  disabled={sending || !chatInput.trim()}
+                >
+                  <Icon name={editTarget ? 'check' : 'send'} size={15} color="#fff" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={st.chatPlaceholder} onPress={() => setShowInput(true)} activeOpacity={0.8}>
+                <Icon name="message-circle" size={15} color="rgba(255,255,255,0.5)" />
+                <Text style={st.chatPlaceholderText}>Message...</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={st.sideBtnLabel}>Cadeau</Text>
-        </TouchableOpacity>
 
-        {/* Cadeaux reçus — historique */}
-        {giftHistory.length > 0 && (
-          <TouchableOpacity style={st.sideBtn} onPress={() => setShowGifts(v => !v)} activeOpacity={0.8}>
-            <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(255,215,0,0.15)', borderColor: 'rgba(255,215,0,0.5)' }]}>
-              <Icon name="star" size={20} color="#FFD700" />
-              <View style={st.giftBadge}><Text style={st.giftBadgeText}>{giftHistory.length}</Text></View>
+          {/* Réactions */}
+          <View style={[st.actionIconWrap, { zIndex: 30, overflow: 'visible' }]}>
+            <LiveReactionPicker onReact={(emoji) => { spawn(emoji); onReact(emoji); }} />
+          </View>
+
+          {/* Cadeau */}
+          <TouchableOpacity style={st.actionIconWrap} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
+            <LinearGradient colors={['rgba(255,215,0,0.25)', 'rgba(255,165,0,0.15)']} style={st.actionIconCircle}>
+              <Text style={{ fontSize: 20 }}>🎁</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Historique cadeaux reçus */}
+          {giftHistory.length > 0 && (
+            <TouchableOpacity style={st.actionIconWrap} onPress={() => setShowGifts(v => !v)} activeOpacity={0.8}>
+              <View style={[st.actionIconCircle, { backgroundColor: 'rgba(255,215,0,0.15)', borderColor: 'rgba(255,215,0,0.4)' }]}>
+                <Icon name="star" size={18} color="#FFD700" />
+                <View style={st.giftBadge}><Text style={st.giftBadgeText}>{giftHistory.length}</Text></View>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* Contrôles scène */}
+          {onStage ? (
+            <>
+              <TouchableOpacity style={st.actionIconWrap} onPress={toggleMic} activeOpacity={0.8}>
+                <View style={[st.actionIconCircle, !micOn && { backgroundColor: 'rgba(240,54,90,0.25)', borderColor: '#F0365A' }]}>
+                  <Icon name={micOn ? 'mic' : 'mic-off'} size={18} color={micOn ? '#3FEDB6' : '#F0365A'} />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={st.actionIconWrap} onPress={toggleCam} activeOpacity={0.8}>
+                <View style={[st.actionIconCircle, !camOn && { backgroundColor: 'rgba(240,54,90,0.25)', borderColor: '#F0365A' }]}>
+                  <Icon name={camOn ? 'video' : 'video-off'} size={18} color={camOn ? '#3FEDB6' : '#F0365A'} />
+                </View>
+              </TouchableOpacity>
+              {!isHost && (
+                <TouchableOpacity style={st.actionIconWrap} onPress={leaveStage} activeOpacity={0.8}>
+                  <View style={[st.actionIconCircle, { backgroundColor: 'rgba(240,54,90,0.2)', borderColor: '#F0365A' }]}>
+                    <Icon name="arrow-down" size={18} color="#F0365A" />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            !isHost && (
+              <TouchableOpacity style={st.actionIconWrap} onPress={handleHandRaise} activeOpacity={0.8}>
+                <View style={[st.actionIconCircle, handRaised && { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' }]}>
+                  <Text style={{ fontSize: 18 }}>{handRaised ? '✋' : '🖐️'}</Text>
+                </View>
+              </TouchableOpacity>
+            )
+          )}
+
+          {/* Quitter */}
+          <TouchableOpacity style={st.actionIconWrap} onPress={onLeave} activeOpacity={0.8}>
+            <View style={[st.actionIconCircle, { backgroundColor: 'rgba(240,54,90,0.18)', borderColor: 'rgba(240,54,90,0.5)' }]}>
+              <Icon name="x" size={18} color="#F0365A" />
             </View>
-            <Text style={[st.sideBtnLabel, { color: '#FFD700' }]}>Envoye</Text>
           </TouchableOpacity>
-        )}
-
-        {onStage ? (
-          <>
-            <TouchableOpacity style={st.sideBtn} onPress={toggleMic} activeOpacity={0.8}>
-              <View style={[st.sideBtnCircle, !micOn && st.sideBtnOff]}>
-                <Icon name={micOn ? 'mic' : 'mic-off'} size={20} color={micOn ? '#4ade80' : '#F0365A'} />
-              </View>
-              <Text style={st.sideBtnLabel}>{micOn ? 'Micro' : 'Muet'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={st.sideBtn} onPress={toggleCam} activeOpacity={0.8}>
-              <View style={[st.sideBtnCircle, !camOn && st.sideBtnOff]}>
-                <Icon name={camOn ? 'video' : 'video-off'} size={20} color={camOn ? '#4ade80' : '#F0365A'} />
-              </View>
-              <Text style={st.sideBtnLabel}>{camOn ? 'Cam' : 'Cam off'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={st.sideBtn} onPress={leaveStage} activeOpacity={0.8}>
-              <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(240,54,90,0.2)', borderColor: '#F0365A' }]}>
-                <Icon name="arrow-down" size={20} color="#F0365A" />
-              </View>
-              <Text style={[st.sideBtnLabel, { color: '#F0365A' }]}>Descendre</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity style={st.sideBtn} onPress={handleHandRaise} activeOpacity={0.8}>
-            <Animated.View style={[st.sideBtnCircle, handRaised && st.sideBtnHandActive]}>
-              <Text style={{ fontSize: 22 }}>{handRaised ? '✋' : '🖐️'}</Text>
-            </Animated.View>
-            <Text style={[st.sideBtnLabel, handRaised && { color: '#FFD700' }]}>
-              {handRaised ? 'En attente...' : 'Lever la main'}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={st.sideBtn} onPress={onLeave} activeOpacity={0.8}>
-          <View style={[st.sideBtnCircle, { backgroundColor: 'rgba(240,54,90,0.2)', borderColor: '#F0365A' }]}>
-            <Icon name="log-out" size={20} color="#F0365A" />
-          </View>
-          <Text style={[st.sideBtnLabel, { color: '#F0365A' }]}>Quitter</Text>
-        </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── PANEL CADEAUX REÇUS ───────────────────────────────────────── */}
       {showGifts && (
         <Animated.View entering={SlideInUp.duration(280)} exiting={SlideOutDown.duration(220)} style={gp.panel}>
           <View style={gp.header}>
-            <Text style={gp.title}>Cadeaux envoyes ({giftHistory.length})</Text>
+            <LinearGradient colors={['#9B65F5', '#F0365A']} style={gp.titleGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <Text style={gp.title}>Cadeaux reçus</Text>
+              <Text style={gp.totalBadge}>{giftHistory.reduce((s, t) => s + t.coins, 0)} coins</Text>
+            </LinearGradient>
             <TouchableOpacity onPress={() => setShowGifts(false)} style={gp.closeBtn}>
               <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
           </View>
-          <Text style={gp.total}>
-            Total : {giftHistory.reduce((s, t) => s + t.coins, 0)} pièces
-          </Text>
           <View style={gp.list}>
             {giftHistory.slice(0, 20).map((t, i) => (
               <View key={`${t.id}-${i}`} style={gp.row}>
-                <Text style={gp.rowEmoji}>{t.emoji}</Text>
+                <View style={gp.rowIconWrap}><Text style={gp.rowEmoji}>{t.emoji}</Text></View>
                 <View style={gp.rowInfo}>
                   <Text style={gp.rowSender} numberOfLines={1}>{t.senderName}</Text>
                   <Text style={gp.rowGift}>{t.giftName}</Text>
                 </View>
-                <Text style={gp.rowCoins}>{t.coins}</Text>
+                <Text style={gp.rowCoins}>+{t.coins}</Text>
               </View>
             ))}
           </View>
@@ -1250,137 +1252,176 @@ const mv = StyleSheet.create({
 // ── Styles page ───────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: '#000' },
+  root:        { flex: 1, backgroundColor: '#050010' },
   center:      { justifyContent: 'center', alignItems: 'center' },
-  connectText: { color: '#999', marginTop: 12, fontSize: 14 },
+  connectText: { color: 'rgba(255,255,255,0.5)', marginTop: 14, fontSize: 14, fontWeight: '500' },
 
-  gradTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 180, zIndex: 5 } as any,
-  gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 240, zIndex: 5 } as any,
+  gradTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 200, zIndex: 5 } as any,
+  gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 320, zIndex: 5 } as any,
 
+  // ── Header ──────────────────────────────────────────────────────────────
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    paddingTop: Platform.OS === 'ios' ? 52 : 34,
-    paddingHorizontal: 14, paddingBottom: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10,
+    paddingTop: Platform.OS === 'ios' ? 54 : 36,
+    paddingHorizontal: 14, paddingBottom: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 20,
   },
-  backBtn:    { padding: 6 },
-  hostInfo:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  hostAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#F0365A' },
+  backBtnCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  backBtn: { marginRight: 2 },
+
+  hostInfo:      { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  hostAvatarWrap:{ position: 'relative' },
+  hostAvatar:    { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: '#F0365A' },
+  liveIndicator: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#F0365A', borderWidth: 2, borderColor: '#050010',
+  },
+  hostMeta:    { flex: 1 },
+  hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3, flexWrap: 'wrap' },
+  hostName:    { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
+
   livePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#F0365A', borderRadius: 10,
-    paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3,
+    alignSelf: 'flex-start',
   },
-  liveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  liveText:    { color: '#fff', fontWeight: '800', fontSize: 10, letterSpacing: 0.5 },
-  timerText:   { color: 'rgba(255,255,255,0.85)', fontSize: 10 },
-  hostName:    { color: '#fff', fontSize: 12, fontWeight: '600' },
+  liveDot:  { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.9)' },
+  liveText: { color: '#fff', fontWeight: '900', fontSize: 9, letterSpacing: 1 },
+  timerText:{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '600' },
+
   privatePill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: '#7B3FF2D9', borderRadius: 10,
-    paddingHorizontal: 6, paddingVertical: 3, alignSelf: 'flex-start',
+    backgroundColor: 'rgba(123,63,242,0.7)', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 3,
   },
   privateText: { color: '#fff', fontWeight: '700', fontSize: 9 },
+  monetPill: {
+    backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.5)',
+  },
+  monetPillText: { color: '#F59E0B', fontSize: 9, fontWeight: '700' },
+
   viewerPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 12,
-    paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12,
+    paddingHorizontal: 9, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  viewerCount: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  likeWrap:    { marginLeft: 4 },
-  settingsBtn: { padding: 6, position: 'relative' },
+  viewerCount: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  likeWrap:    { marginLeft: 2 },
+
+  settingsBtn:       { padding: 4, position: 'relative' },
+  settingsBtnCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
   settingsBadge: {
-    position: 'absolute', top: 2, right: 2,
-    minWidth: 16, height: 16, borderRadius: 8,
+    position: 'absolute', top: 0, right: 0,
+    minWidth: 15, height: 15, borderRadius: 8,
     backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center',
-    zIndex: 1,
+    zIndex: 1, borderWidth: 1.5, borderColor: '#050010',
   },
-  settingsBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  settingsBadgeText: { color: '#fff', fontSize: 8, fontWeight: '900' },
 
-  // Badge "sur scène"
+  // ── Badge sur scène ──────────────────────────────────────────────────────
   onStageBadge: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 110 : 92,
+    position: 'absolute', zIndex: 30,
+    top: Platform.OS === 'ios' ? 116 : 96,
     alignSelf: 'center',
+  },
+  onStagePill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(74,222,128,0.2)',
-    borderWidth: 1, borderColor: '#4ade80',
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6,
-    zIndex: 30,
+    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 7,
   },
-  onStageDot:  { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
-  onStageText: { color: '#4ade80', fontSize: 13, fontWeight: '700' },
+  onStageDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  onStageText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
 
-  // Chat
-  chatZone: {
-    position: 'absolute', bottom: 0, left: 0, right: 90,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 18,
-    paddingLeft: 12, zIndex: 10,
+  // ── Zone bas (chat + barre actions) ─────────────────────────────────────
+  bottomZone: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    zIndex: 15, paddingBottom: Platform.OS === 'ios' ? 28 : 14,
   },
-  chatList: { flexGrow: 0, maxHeight: 220, marginBottom: 8 },
-  chatRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginBottom: 5 },
-  chatAvatar: { width: 24, height: 24, borderRadius: 12 },
+  chatZone:  { paddingHorizontal: 12, paddingRight: 10 },
+  chatList:  { flexGrow: 0, maxHeight: 200, marginBottom: 10 },
+  chatRow:   { flexDirection: 'row', alignItems: 'flex-end', gap: 7, marginBottom: 6 },
+  chatAvatar:{ width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: 'rgba(155,101,245,0.5)' },
   chatBubble: {
-    backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14,
-    paddingHorizontal: 10, paddingVertical: 5, maxWidth: 220,
-    flexDirection: 'row', flexWrap: 'wrap',
+    backgroundColor: 'rgba(8,4,20,0.65)',
+    borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6,
+    maxWidth: 230, flexDirection: 'row', flexWrap: 'wrap',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
   },
-  chatBubbleMine: { backgroundColor: 'rgba(240,54,90,0.25)', borderWidth: 1, borderColor: 'rgba(240,54,90,0.4)' },
-  chatUser: { color: '#F0365A', fontSize: 12, fontWeight: '700' },
-  chatText: { color: '#fff', fontSize: 13 },
-  editCancelBtn: { padding: 6 },
+  chatBubbleMine: {
+    backgroundColor: 'rgba(240,54,90,0.18)',
+    borderColor: 'rgba(240,54,90,0.35)',
+  },
+  chatUser: { color: '#9B65F5', fontSize: 12, fontWeight: '800' },
+  chatText: { color: 'rgba(255,255,255,0.92)', fontSize: 13 },
+
+  sysRow:  { marginBottom: 3, alignSelf: 'flex-start' },
+  sysText: { color: 'rgba(255,255,255,0.38)', fontSize: 10, fontStyle: 'italic' },
+
+  modRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
+  modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.12)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  modBtnText: { color: '#F0365A', fontSize: 9, fontWeight: '700' as const },
+
+  // ── Barre d'actions ──────────────────────────────────────────────────────
+  actionBar: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, gap: 7, marginTop: 4,
+  },
+  inputWrap: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 26, paddingLeft: 14, paddingRight: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    minHeight: 42,
+  },
+  chatField: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: Platform.OS === 'ios' ? 10 : 6 },
+  sendBtn:   {
+    backgroundColor: '#F0365A', borderRadius: 20, padding: 8, margin: 2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  editCancelBtn: { padding: 5 },
+  chatPlaceholder: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, paddingVertical: 10 },
+  chatPlaceholderText: { color: 'rgba(255,255,255,0.38)', fontSize: 13 },
+
+  actionIconWrap:   { alignItems: 'center', justifyContent: 'center' },
+  actionIconCircle: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+
   giftBadge: {
     position: 'absolute', top: -2, right: -2,
-    width: 16, height: 16, borderRadius: 8,
+    width: 15, height: 15, borderRadius: 8,
     backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: '#000',
+    borderWidth: 1.5, borderColor: '#050010',
   },
-  giftBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
-  sysRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4, alignSelf: 'flex-start' },
-  sysText:  { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
-  modRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, paddingLeft: 2 },
-  modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.15)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
-  modBtnText: { color: '#F0365A', fontSize: 10, fontWeight: '700' as const },
-  giftMsg:  { backgroundColor: 'rgba(255,215,0,0.18)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 4, alignSelf: 'flex-start' },
-  giftText: { color: '#FFD700', fontSize: 12, fontWeight: '700' },
-  chatPlaceholder: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 24, paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-start',
-  },
-  chatPlaceholderText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 24, paddingLeft: 14, paddingRight: 4,
-  },
-  chatField: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: Platform.OS === 'ios' ? 10 : 7 },
-  sendBtn:   { backgroundColor: '#F0365A', borderRadius: 20, padding: 8, margin: 3 },
+  giftBadgeText: { color: '#fff', fontSize: 7, fontWeight: '900' },
 
-  // Contrôles droite
-  sideControls: {
-    position: 'absolute', right: 12,
-    bottom: Platform.OS === 'ios' ? 80 : 60,
-    alignItems: 'center', gap: 14, zIndex: 20,
-    overflow: 'visible',
+  // ── Ended ────────────────────────────────────────────────────────────────
+  endedCard: {
+    alignItems: 'center', gap: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 28, padding: 40, marginHorizontal: 28,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  sideBtn:       { alignItems: 'center', gap: 4 },
-  sideBtnCircle: {
-    width: 50, height: 50, borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)',
-  },
-  sideBtnOff:        { borderColor: '#F0365A', backgroundColor: 'rgba(240,54,90,0.15)' },
-  sideBtnHandActive: { borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.2)' },
-  sideBtnLabel:      { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '600' },
-
-  // Ended
-  endedCard:    { alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 24, padding: 36, marginHorizontal: 32 },
-  endedTitle:   { color: '#fff', fontSize: 20, fontWeight: '800' },
-  endedSub:     { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' },
-  endedBtn:     { marginTop: 8, backgroundColor: '#F0365A', borderRadius: 24, paddingHorizontal: 36, paddingVertical: 13 },
-  endedBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  endedTitle:   { color: '#fff', fontSize: 22, fontWeight: '900' },
+  endedSub:     { color: 'rgba(255,255,255,0.45)', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  endedBtn:     { marginTop: 8, backgroundColor: '#F0365A', borderRadius: 26, paddingHorizontal: 40, paddingVertical: 14 },
+  endedBtnText: { color: '#fff', fontWeight: '900', fontSize: 15, letterSpacing: 0.3 },
 });
 
 // ── Styles gift ticker ────────────────────────────────────────────────────────
@@ -1388,23 +1429,18 @@ const st = StyleSheet.create({
 const gt = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 290 : 270,
-    left: 12,
-    zIndex: 40,
-    gap: 6,
-    alignItems: 'flex-start',
+    bottom: Platform.OS === 'ios' ? 130 : 115,
+    left: 12, zIndex: 40, gap: 6, alignItems: 'flex-start',
   },
-  row: {
+  row:   { maxWidth: 210 },
+  pill: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,
-    borderWidth: 1, borderColor: 'rgba(255,215,0,0.6)',
-    maxWidth: 200,
+    borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8,
   },
-  emoji:  { fontSize: 18 },
+  emoji:  { fontSize: 20 },
   info:   { flex: 1 },
-  sender: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
-  detail: { color: 'rgba(255,255,255,0.65)', fontSize: 10 },
+  sender: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  detail: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
 });
 
 // ── Styles panel cadeaux reçus ────────────────────────────────────────────────
@@ -1412,36 +1448,44 @@ const gt = StyleSheet.create({
 const gp = StyleSheet.create({
   panel: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 80 : 60,
-    right: 76,
-    width: 220, maxHeight: 320,
-    backgroundColor: 'rgba(15,15,25,0.96)',
-    borderRadius: 18,
-    borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
+    bottom: Platform.OS === 'ios' ? 80 : 64,
+    right: 10, left: 10,
+    maxHeight: 300,
+    backgroundColor: 'rgba(10,5,22,0.97)',
+    borderRadius: 22,
+    borderWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
     zIndex: 50, overflow: 'hidden',
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)',
+    paddingRight: 10,
   },
-  title:    { color: '#FFD700', fontSize: 13, fontWeight: '800' },
-  closeBtn: { padding: 4 },
-  total: {
-    color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600',
-    paddingHorizontal: 14, paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)',
+  titleGrad: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12,
   },
-  list: { paddingHorizontal: 10, paddingTop: 4 },
+  title:      { color: '#fff', fontSize: 14, fontWeight: '900' },
+  totalBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 3,
+    color: '#fff', fontSize: 11, fontWeight: '800',
+  },
+  closeBtn: { padding: 6 },
+  list: { paddingHorizontal: 12, paddingTop: 4 },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 7,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  rowIconWrap: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(155,101,245,0.15)',
+    alignItems: 'center', justifyContent: 'center',
   },
   rowEmoji:  { fontSize: 20 },
   rowInfo:   { flex: 1 },
-  rowSender: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  rowGift:   { color: 'rgba(255,255,255,0.5)', fontSize: 10 },
-  rowCoins:  { color: '#FFD700', fontSize: 12, fontWeight: '800' },
+  rowSender: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  rowGift:   { color: 'rgba(255,255,255,0.45)', fontSize: 10, marginTop: 1 },
+  rowCoins:  { color: '#3FEDB6', fontSize: 13, fontWeight: '900' },
 });
