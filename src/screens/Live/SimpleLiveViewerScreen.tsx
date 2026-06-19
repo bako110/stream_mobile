@@ -15,7 +15,7 @@ import {
   ActivityIndicator, Image, Alert, AppState, AppStateStatus,
 } from 'react-native';
 import Animated, {
-  FadeIn, FadeOut, SlideInUp, SlideOutDown,
+  FadeIn, FadeOut, SlideInUp, SlideOutDown, SlideInDown,
 } from 'react-native-reanimated';
 import {
   LiveKitRoom,
@@ -90,6 +90,182 @@ const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, si
     <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.38 }}>{(name || '?')[0].toUpperCase()}</Text>
   </View>
 );
+
+// ── Sheet "condition pour monter sur scène" ───────────────────────────────────
+
+const StageAccessSheet: React.FC<{
+  live:          LiveStream;
+  liveId:        string;
+  onPaid:        () => void;   // accès accordé → lever la main
+  onClose:       () => void;
+}> = ({ live, liveId, onPaid, onClose }) => {
+  const navigation = useNavigation<any>();
+  const [myBalance, setMyBalance] = useState<number | null>(null);
+  const [loading,   setLoading]   = useState(false);
+
+  const isCoins = live.monetization_type === 'coins';
+  const isGift  = live.monetization_type === 'gift';
+  const requiredCoins     = live.monetization_coins ?? 0;
+  const requiredGiftId    = live.monetization_gift_id;
+  const requiredGiftName  = live.monetization_gift_name ?? 'Cadeau';
+  const requiredGiftEmoji = live.monetization_gift_emoji ?? '🎁';
+  const hostName          = live.user?.display_name ?? live.user?.username ?? 'le host';
+
+  const effectiveCost = isCoins ? requiredCoins : 0;
+  const hasEnough     = myBalance !== null && (isCoins ? myBalance >= effectiveCost : true);
+
+  useEffect(() => {
+    apiClient.get(Endpoints.wallet.balance)
+      .then((r: any) => setMyBalance(r.data?.coins_balance ?? r.data?.balance ?? 0))
+      .catch(() => setMyBalance(null));
+  }, []);
+
+  const showInsufficientFunds = (msg: string) => {
+    Alert.alert('Solde insuffisant', msg, [
+      { text: 'Pas maintenant', style: 'cancel' },
+      { text: 'Recharger', onPress: () => { onClose(); navigation.navigate('Wallet'); } },
+    ]);
+  };
+
+  const handlePay = async () => {
+    setLoading(true);
+    try {
+      if (isCoins) {
+        const r = await liveService.payCoinsForAccess(liveId);
+        if (r.access_granted) { onPaid(); return; }
+        showInsufficientFunds('Solde insuffisant pour monter sur scène.');
+      } else if (isGift && requiredGiftId) {
+        const r = await liveService.sendGiftForAccess(liveId, requiredGiftId);
+        if (r.access_granted) { onPaid(); return; }
+        showInsufficientFunds('Solde insuffisant pour envoyer ce cadeau.');
+      }
+    } catch (e: any) {
+      const status  = e?.status ?? e?.response?.status;
+      const msg     = e?.message ?? e?.response?.data?.detail ?? 'Une erreur est survenue.';
+      if (status === 402) { showInsufficientFunds(msg); }
+      else { Alert.alert('Erreur', msg); }
+    }
+    setLoading(false);
+  };
+
+  return (
+    <View style={sas.overlay}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+      <Animated.View entering={SlideInDown.springify().damping(22).stiffness(200)} style={sas.sheet}>
+        {/* Handle */}
+        <View style={sas.handle} />
+
+        {/* Titre */}
+        <View style={sas.titleRow}>
+          <LinearGradient colors={['#F0365A', '#9B65F5']} style={sas.lockIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <Text style={{ fontSize: 18 }}>🎤</Text>
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={sas.title}>Monter sur scène</Text>
+            <Text style={sas.subtitle}>{hostName} a monétisé l'accès à la scène</Text>
+          </View>
+        </View>
+
+        {/* Condition requise */}
+        <View style={sas.conditionBox}>
+          <Text style={sas.conditionEmoji}>{isCoins ? '🪙' : requiredGiftEmoji}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={sas.conditionLabel}>Condition requise</Text>
+            <Text style={sas.conditionValue}>
+              {isCoins ? `${requiredCoins} coins` : requiredGiftName}
+            </Text>
+          </View>
+        </View>
+
+        {/* Solde actuel */}
+        {myBalance !== null && (
+          <View style={[sas.balanceRow, !hasEnough && isCoins && { borderColor: '#F0365A', backgroundColor: 'rgba(240,54,90,0.07)' }]}>
+            <Text style={sas.balanceLabel}>Ton solde actuel</Text>
+            <Text style={[sas.balanceValue, !hasEnough && isCoins && { color: '#F0365A' }]}>
+              {myBalance} coins
+            </Text>
+            {isCoins && !hasEnough && (
+              <Text style={sas.balanceShort}> · manque {effectiveCost - myBalance}</Text>
+            )}
+          </View>
+        )}
+
+        {/* CTA */}
+        <TouchableOpacity
+          style={[sas.payBtn, loading && { opacity: 0.55 }]}
+          onPress={handlePay}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={isCoins ? ['#F59E0B', '#F97316'] : ['#F0365A', '#9B65F5']}
+            style={sas.payBtnGrad}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <>
+                  <Text style={{ fontSize: 18 }}>{isCoins ? '🪙' : requiredGiftEmoji}</Text>
+                  <Text style={sas.payBtnText}>
+                    {isCoins ? `Payer ${requiredCoins} coins` : `Envoyer ${requiredGiftName}`}
+                  </Text>
+                </>
+            }
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={onClose} style={sas.cancelBtn}>
+          <Text style={sas.cancelText}>Pas maintenant</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+};
+
+const sas = StyleSheet.create({
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 80, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#0D0820',
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 22, paddingBottom: Platform.OS === 'ios' ? 46 : 28, paddingTop: 16,
+    borderWidth: 1, borderBottomWidth: 0,
+    borderColor: 'rgba(155,101,245,0.3)',
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 20,
+  },
+  titleRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
+  lockIcon:   { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  title:      { color: '#fff', fontSize: 18, fontWeight: '900' },
+  subtitle:   { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 },
+
+  conditionBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    padding: 16, marginBottom: 12,
+  },
+  conditionEmoji: { fontSize: 32 },
+  conditionLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', marginBottom: 3 },
+  conditionValue: { color: '#F59E0B', fontSize: 18, fontWeight: '800' },
+
+  balanceRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 16, paddingVertical: 12, marginBottom: 20,
+  },
+  balanceLabel: { flex: 1, color: 'rgba(255,255,255,0.55)', fontSize: 13 },
+  balanceValue: { color: '#3FEDB6', fontSize: 15, fontWeight: '800' },
+  balanceShort: { color: '#F0365A', fontSize: 12, fontWeight: '700' },
+
+  payBtn:      { borderRadius: 18, overflow: 'hidden', marginBottom: 10 },
+  payBtnGrad:  { height: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  payBtnText:  { color: '#fff', fontSize: 16, fontWeight: '800' },
+  cancelBtn:   { alignItems: 'center', paddingVertical: 10 },
+  cancelText:  { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
+});
 
 // ── Zone vidéo multi-participants ─────────────────────────────────────────────
 
@@ -281,10 +457,11 @@ const RoomContent: React.FC<{
   const [camOn,        setCamOn]        = useState(false);
   const [micOn,        setMicOn]        = useState(false);
   const [handRaised,   setHandRaised]   = useState(false);
-  const [showInput,    setShowInput]    = useState(false);
-  const [showGifts,    setShowGifts]    = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [editTarget,   setEditTarget]   = useState<{ id: string; text: string } | null>(null);
+  const [showInput,     setShowInput]     = useState(false);
+  const [showGifts,     setShowGifts]     = useState(false);
+  const [showSettings,  setShowSettings]  = useState(false);
+  const [showStageGate, setShowStageGate] = useState(false);
+  const [editTarget,    setEditTarget]    = useState<{ id: string; text: string } | null>(null);
   const giftRef = useRef<LiveGiftOverlayRef>(null);
 
   const hostId   = live?.user_id ?? '';
@@ -345,18 +522,21 @@ const RoomContent: React.FC<{
     try { await localParticipant.setMicrophoneEnabled(!micOn); setMicOn(v => !v); } catch {}
   }, [micOn, onStage, localParticipant]);
 
-  const handleHandRaise = useCallback(async () => {
-    if (handRaised) {
-      setHandRaised(false);
-      return;
-    }
+  const doRaiseHand = useCallback(async () => {
     setHandRaised(true);
     try {
       await apiClient.post(Endpoints.lives.handRaise(liveId, myIdentity));
     } catch {
       setHandRaised(false);
     }
-  }, [handRaised, liveId, myIdentity]);
+  }, [liveId, myIdentity]);
+
+  const handleHandRaise = useCallback(async () => {
+    if (handRaised) { setHandRaised(false); return; }
+    // Live monétisé → afficher la gate avant de lever la main
+    if (live?.is_monetized) { setShowStageGate(true); return; }
+    await doRaiseHand();
+  }, [handRaised, live?.is_monetized, doRaiseHand]);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -696,6 +876,16 @@ const RoomContent: React.FC<{
             ))}
           </View>
         </Animated.View>
+      )}
+
+      {/* ── GATE scène monétisée ────────────────────────────────────── */}
+      {showStageGate && live?.is_monetized && (
+        <StageAccessSheet
+          live={live}
+          liveId={liveId}
+          onPaid={() => { setShowStageGate(false); doRaiseHand(); }}
+          onClose={() => setShowStageGate(false)}
+        />
       )}
 
       <LiveGiftOverlay
