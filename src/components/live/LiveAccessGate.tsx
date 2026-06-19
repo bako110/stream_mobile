@@ -5,7 +5,7 @@
  * - Affiche les conditions (coins ou cadeau requis)
  * - Bouton d'action pour payer/envoyer le cadeau
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Image, Alert, ActivityIndicator, StatusBar,
@@ -17,6 +17,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
+import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
 
 interface GiftType {
   id: string;
@@ -47,11 +49,23 @@ export const LiveAccessGate: React.FC<Props> = ({
   const hostName   = live.user?.display_name ?? live.user?.username ?? 'Créateur';
   const hostAvatar = live.user?.avatar_url ?? null;
 
-  // Pour type "gift" avec grille de cadeaux (cas où le host a mis un cadeau spécifique)
   const requiredGiftId    = live.monetization_gift_id;
   const requiredGiftName  = live.monetization_gift_name ?? '';
   const requiredGiftEmoji = live.monetization_gift_emoji ?? '🎁';
   const requiredCoins     = live.monetization_coins ?? 0;
+
+  const [myBalance, setMyBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiClient.get(Endpoints.wallet.balance)
+      .then(r => setMyBalance(r.data?.coins_balance ?? r.data?.balance ?? 0))
+      .catch(() => setMyBalance(null));
+  }, []);
+
+  // Coût effectif selon le type (pour le cadeau on ne connait pas encore le coins_cost ici,
+  // mais le backend retourne 402 avec le montant exact — on utilise requiredCoins comme proxy)
+  const effectiveCost = isCoins ? requiredCoins : 0;
+  const hasEnough = myBalance !== null && (isCoins ? myBalance >= effectiveCost : true);
 
   const showInsufficientFunds = (msg: string) => {
     Alert.alert(
@@ -187,6 +201,25 @@ export const LiveAccessGate: React.FC<Props> = ({
           )}
         </View>
 
+        {/* Solde actuel */}
+        {myBalance !== null && (
+          <View style={[
+            s.balanceRow,
+            { borderColor: isCoins && !hasEnough ? '#F0365A' : colors.border,
+              backgroundColor: isCoins && !hasEnough ? 'rgba(240,54,90,0.08)' : colors.backgroundSecondary },
+          ]}>
+            <Text style={[s.balanceLabel, { color: colors.textSecondary }]}>Ton solde</Text>
+            <Text style={[s.balanceValue, { color: isCoins && !hasEnough ? '#F0365A' : '#3FEDB6' }]}>
+              {myBalance} coins
+            </Text>
+            {isCoins && !hasEnough && (
+              <Text style={s.balanceShort}>
+                {`  (manque ${effectiveCost - myBalance} coins)`}
+              </Text>
+            )}
+          </View>
+        )}
+
         {/* Bouton d'action */}
         <TouchableOpacity
           style={[s.actionBtn, checking && { opacity: 0.5 }]}
@@ -270,6 +303,15 @@ const s = StyleSheet.create({
   conditionEmoji: { fontSize: 32 },
   conditionLabel: { fontSize: 12, fontWeight: '600', marginBottom: 3 },
   conditionValue: { fontSize: 18, fontWeight: '800' },
+
+  balanceRow: {
+    width: '100%', flexDirection: 'row', alignItems: 'center',
+    borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10,
+    marginBottom: 16,
+  },
+  balanceLabel: { fontSize: 13, fontWeight: '500', flex: 1 },
+  balanceValue: { fontSize: 15, fontWeight: '800' },
+  balanceShort: { fontSize: 12, color: '#F0365A', fontWeight: '600' },
 
   actionBtn:     { width: '100%', borderRadius: 20, overflow: 'hidden', marginBottom: 12 },
   actionBtnGrad: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
