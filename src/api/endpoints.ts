@@ -473,6 +473,7 @@ export const Endpoints = {
     popular: `${V1}/sounds/popular`,
     my:      `${V1}/sounds/my`,
     create:  `${V1}/sounds`,
+    upload:  `${V1}/sounds/upload`,
     get:     (id: string) => `${V1}/sounds/${id}`,
     use:     (id: string) => `${V1}/sounds/${id}/use`,
   },
