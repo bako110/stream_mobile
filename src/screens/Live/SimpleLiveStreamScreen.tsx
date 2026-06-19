@@ -241,23 +241,33 @@ const HostVideoView: React.FC<{
   if ((!localCamOn || isVideoOff) && allTracks.filter(t => !t.participant.isLocal).length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noCamBg]}>
-        {hostAvatarUrl
-          ? <Image source={{ uri: hostAvatarUrl }} style={mv.noCamAvatar} />
-          : <Av name={hostName} size={100} />
-        }
+        {/* Avatar avec badge caméra barré */}
+        <View style={mv.noCamAvatarWrap}>
+          {hostAvatarUrl
+            ? <Image source={{ uri: hostAvatarUrl }} style={mv.noCamAvatar} />
+            : <Av name={hostName} size={100} />
+          }
+          {/* Badge rouge caméra coupée — positionné en bas-droite de l'avatar */}
+          <View style={mv.noCamCamBadge}>
+            <Icon name="video-off" size={14} color="#fff" />
+          </View>
+        </View>
+
         <Text style={mv.noCamName}>{hostName}</Text>
 
-        {/* Badges état micro + caméra */}
+        {/* Pill "Caméra coupée" bien visible */}
+        <View style={mv.noCamCamPill}>
+          <Icon name="video-off" size={15} color="#F0365A" />
+          <Text style={mv.noCamCamPillText}>Caméra désactivée</Text>
+        </View>
+
+        {/* Badge micro */}
         <View style={mv.noCamBadgeRow}>
           <View style={[mv.noCamBadge, isMuted && mv.noCamBadgeOff]}>
             <Icon name={isMuted ? 'mic-off' : 'mic'} size={13} color={isMuted ? '#F0365A' : 'rgba(255,255,255,0.9)'} />
             <Text style={[mv.noCamBadgeText, isMuted && { color: '#F0365A' }]}>
               {isMuted ? 'Micro coupé' : 'Micro actif'}
             </Text>
-          </View>
-          <View style={[mv.noCamBadge, mv.noCamBadgeOff]}>
-            <Icon name="video-off" size={13} color="#F0365A" />
-            <Text style={[mv.noCamBadgeText, { color: '#F0365A' }]}>Caméra désactivée</Text>
           </View>
         </View>
       </View>
@@ -810,15 +820,9 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
     const next = !videoOff;
     setVideoOff(next);
     try {
-      const camPub = localParticipant.getTrackPublication(Track.Source.Camera);
-      const track  = camPub?.track;
-      if (track) {
-        // mute/unmute sur la track existante — ne ferme pas la peer connection
-        next ? await track.mute() : await track.unmute();
-      } else {
-        // Pas encore de track — activer la caméra
-        await localParticipant.setCameraEnabled(true);
-      }
+      // setCameraEnabled(false) coupe vraiment le capteur physique (LED éteinte)
+      // setCameraEnabled(true) le réactive avec la même configuration
+      await localParticipant.setCameraEnabled(!next);
     } catch (e) {
       if (__DEV__) console.warn('[toggleVideo]', e);
       setVideoOff(!next);
@@ -1413,6 +1417,22 @@ const mv = StyleSheet.create({
   noCamBadgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 16 },
   noCamBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   noCamBadgeOff: { backgroundColor: 'rgba(240,54,90,0.15)' },
+  noCamAvatarWrap: { position: 'relative' },
+  noCamCamBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#F0365A',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#0a0a12',
+  },
+  noCamCamPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: 'rgba(240,54,90,0.15)',
+    borderRadius: 20, borderWidth: 1.5, borderColor: '#F0365A',
+    paddingHorizontal: 14, paddingVertical: 7,
+    marginBottom: 6,
+  },
+  noCamCamPillText: { color: '#F0365A', fontSize: 13, fontWeight: '700' },
   noCamBadgeText:{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
   spotName:     { color: '#fff', fontSize: 16, fontWeight: '700' },
   pip: {
