@@ -96,9 +96,10 @@ const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, si
 const StageAccessSheet: React.FC<{
   live:          LiveStream;
   liveId:        string;
-  onPaid:        () => void;   // accès accordé → lever la main
+  identity:      string;        // identité LiveKit du viewer
+  onRequested:   () => void;    // demande envoyée avec paiement escrow
   onClose:       () => void;
-}> = ({ live, liveId, onPaid, onClose }) => {
+}> = ({ live, liveId, identity, onRequested, onClose }) => {
   const navigation = useNavigation<any>();
   const [myBalance, setMyBalance] = useState<number | null>(null);
   const [loading,   setLoading]   = useState(false);
@@ -130,22 +131,18 @@ const StageAccessSheet: React.FC<{
   const handlePay = async () => {
     setLoading(true);
     try {
-      if (isCoins) {
-        const r = await liveService.payCoinsForAccess(liveId);
-        if (r.access_granted) { onPaid(); return; }
-        showInsufficientFunds('Solde insuffisant pour monter sur scène.');
-      } else if (isGift && requiredGiftId) {
-        const r = await liveService.sendGiftForAccess(liveId, requiredGiftId);
-        if (r.access_granted) { onPaid(); return; }
-        showInsufficientFunds('Solde insuffisant pour envoyer ce cadeau.');
-      }
+      // Le backend gère le paiement en escrow + la demande en une seule étape
+      await apiClient.post(Endpoints.lives.handRaise(liveId, identity));
+      onRequested();
     } catch (e: any) {
-      const status  = e?.status ?? e?.response?.status;
-      const msg     = e?.message ?? e?.response?.data?.detail ?? 'Une erreur est survenue.';
+      const status = e?.status ?? e?.response?.status;
+      const msg    = e?.response?.data?.detail ?? e?.message ?? 'Une erreur est survenue.';
       if (status === 402) { showInsufficientFunds(msg); }
+      else if (status === 409) { Alert.alert('Demande existante', 'Tu as déjà une demande en attente.'); onClose(); }
       else { Alert.alert('Erreur', msg); }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -190,11 +187,18 @@ const StageAccessSheet: React.FC<{
           </View>
         )}
 
+        {/* Note remboursement */}
+        {isCoins && requiredCoins > 0 && (
+          <Text style={sas.refundNote}>
+            Les coins sont reserves en attendant l'acceptation du host. Rembourses automatiquement si le live se termine.
+          </Text>
+        )}
+
         {/* CTA */}
         <TouchableOpacity
           style={[sas.payBtn, loading && { opacity: 0.55 }]}
           onPress={handlePay}
-          disabled={loading}
+          disabled={loading || (isCoins && !hasEnough)}
           activeOpacity={0.85}
         >
           <LinearGradient
@@ -207,7 +211,9 @@ const StageAccessSheet: React.FC<{
               : <>
                   <Text style={{ fontSize: 18 }}>{isCoins ? '🪙' : requiredGiftEmoji}</Text>
                   <Text style={sas.payBtnText}>
-                    {isCoins ? `Payer ${requiredCoins} coins` : `Envoyer ${requiredGiftName}`}
+                    {isCoins
+                      ? `Payer ${requiredCoins} coins · Lever la main`
+                      : `Envoyer ${requiredGiftName} · Lever la main`}
                   </Text>
                 </>
             }
@@ -260,6 +266,10 @@ const sas = StyleSheet.create({
   balanceValue: { color: '#3FEDB6', fontSize: 15, fontWeight: '800' },
   balanceShort: { color: '#F0365A', fontSize: 12, fontWeight: '700' },
 
+  refundNote: {
+    color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center',
+    marginBottom: 12, lineHeight: 16, paddingHorizontal: 8,
+  },
   payBtn:      { borderRadius: 18, overflow: 'hidden', marginBottom: 10 },
   payBtnGrad:  { height: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   payBtnText:  { color: '#fff', fontSize: 16, fontWeight: '800' },
@@ -533,8 +543,9 @@ const RoomContent: React.FC<{
 
   const handleHandRaise = useCallback(async () => {
     if (handRaised) { setHandRaised(false); return; }
-    // Live monétisé → afficher la gate avant de lever la main
+    // Live monetise → afficher la gate (gere paiement + demande en un seul appel backend)
     if (live?.is_monetized) { setShowStageGate(true); return; }
+    // Live non monetise → lever la main directement
     await doRaiseHand();
   }, [handRaised, live?.is_monetized, doRaiseHand]);
 
@@ -883,7 +894,8 @@ const RoomContent: React.FC<{
         <StageAccessSheet
           live={live}
           liveId={liveId}
-          onPaid={() => { setShowStageGate(false); doRaiseHand(); }}
+          identity={myIdentity}
+          onRequested={() => { setShowStageGate(false); setHandRaised(true); }}
           onClose={() => setShowStageGate(false)}
         />
       )}
