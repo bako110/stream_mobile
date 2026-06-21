@@ -326,13 +326,12 @@ export const ReelsScreen: React.FC = () => {
   // ── Focus — gère uniquement screen focus/blur, sans params ─────────────
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
-    const hasTarget = !!(route.params as any)?.initialReelId;
-    if (!didFocusOnceRef.current) {
-      // Premier focus — laisser le useEffect[params.initialReelId] gérer si un id est présent
-      if (!hasTarget) load(false);
-    } else {
-      // Retour sur l'onglet — refresh silencieux si données trop vieilles, sauf si navigation avec id
-      if (!hasTarget) {
+    // Ne jamais écraser si une cible feed est en attente de consommation
+    const hasPending = !!pendingTargetRef.current;
+    if (!hasPending) {
+      if (!didFocusOnceRef.current) {
+        load(false);
+      } else {
         const age = Date.now() - lastLoadedAtRef.current;
         if (age > 90_000) load(true);
       }
@@ -364,11 +363,25 @@ export const ReelsScreen: React.FC = () => {
     // Consommer les params immédiatement — évite double déclenchement au focus suivant
     nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
 
-    // Stocker la cible — onLayout la consommera dès que la FlatList est prête
+    // Stocker la cible
     pendingTargetRef.current = { id: newInitialId, reel: newReel };
-
-    // Charger le feed avec la cible en background (enrichit la liste sans bouger l'affichage)
     lastInitialReelRef.current = newInitialId;
+
+    // Tenter de consommer immédiatement si le reel est déjà dans la liste
+    // (2ème clic depuis feed : FlatList déjà montée, onLayout ne re-fire pas)
+    const existingIdx = reelsRef.current.findIndex(r => r.id === newInitialId);
+    if (existingIdx >= 0) {
+      pendingTargetRef.current = null;
+      currentIdxRef.current = existingIdx;
+      setCurrentIndex(existingIdx);
+      isScrollingRef.current = true;
+      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
+      listRef.current?.scrollToOffset({ offset: SCREEN_H * existingIdx, animated: false });
+      return;
+    }
+
+    // Reel absent — enrichir la liste en background, useEffect[reels] ou onLayout consommeront
     load(true);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
