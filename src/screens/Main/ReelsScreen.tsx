@@ -194,13 +194,18 @@ export const ReelsScreen: React.FC = () => {
       lastLoadedAtRef.current = Date.now();
 
       if (!silent) {
-        setReels(finalReels);
-        viewedReelsRef.current = new Set();
+        // Verrouiller onScrollUpdate avant de changer les données + l'index
+        isScrollingRef.current = true;
+        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
-        // Remount FlatList avec initialScrollIndex — plus fiable que scrollToOffset
+        setReels(finalReels);
+        viewedReelsRef.current = new Set();
         if (targetIdx > 0) {
-          setListKey(`reels-load-${targetId ?? Date.now()}`);
+          listRef.current?.scrollToOffset({ offset: SCREEN_H * targetIdx, animated: false });
+        } else {
+          listRef.current?.scrollToOffset({ offset: 0, animated: false });
         }
       } else if (targetId) {
         // Mode arrière-plan avec reel cible — on NE remplace PAS la liste
@@ -363,18 +368,24 @@ export const ReelsScreen: React.FC = () => {
 
     const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
     if (idx >= 0) {
-      // Reel déjà dans la liste — remount FlatList avec initialScrollIndex au bon index
+      // Reel déjà dans la liste — verrou scroll puis offset direct
       currentIdxRef.current = idx;
       setCurrentIndex(idx);
-      setListKey(`reels-${newInitialId}`);
+      isScrollingRef.current = true;
+      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
+      listRef.current?.scrollToOffset({ offset: SCREEN_H * idx, animated: false });
     } else if (newReel?.hls_url) {
-      // Reel pas dans la liste — injecter en tête (index 0) puis remount
+      // Reel pas dans la liste — injecter en tête, verrouiller scroll, puis offset 0
+      isScrollingRef.current = true;
+      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
       const injected = [newReel, ...reelsRef.current.filter(r => r.id !== newInitialId)];
       reelsRef.current = injected;
       currentIdxRef.current = 0;
       setCurrentIndex(0);
       setReels(injected);
-      setListKey(`reels-${newInitialId}`);
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
       lastInitialReelRef.current = newInitialId;
       load(true, newInitialId, newReel);
     } else {
@@ -790,7 +801,6 @@ export const ReelsScreen: React.FC = () => {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <FlatList
-        key={listKey}
         ref={listRef}
         data={feedWithAds as any[]}
         keyExtractor={r => (r as any).id}
@@ -802,7 +812,6 @@ export const ReelsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         disableIntervalMomentum
-        initialScrollIndex={currentIndex}
         onScroll={e => onScrollUpdate(e.nativeEvent.contentOffset.y)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig.current}
