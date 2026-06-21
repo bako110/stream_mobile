@@ -24,7 +24,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { reelService } from '../../services';
 import { MentionInput } from '../../components/common/MentionInput';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
-import { ReelEditorScreen, type ReelEditResult, type FilterKey } from './ReelEditorScreen';
+import { ReelEditorScreen, type ReelEditResult, type FilterKey, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from './ReelEditorScreen';
 
 const { width: W } = Dimensions.get('window');
 const PREVIEW_H = Math.round(W * 16 / 9);
@@ -34,29 +34,6 @@ interface Props {
   sourceReelId?: string;
   sourceReelUrl?: string;
 }
-
-// Correspondance filtre → overlay couleur (doit rester synchro avec ReelEditorScreen)
-const FILTER_OVERLAY: Record<FilterKey, { color: string; opacity: number }> = {
-  original: { color: 'transparent', opacity: 0 },
-  vivid:    { color: '#FF3CAC',     opacity: 0.15 },
-  warm:     { color: '#FF7E00',     opacity: 0.18 },
-  cold:     { color: '#00BFFF',     opacity: 0.18 },
-  fade:     { color: '#FFFFFF',     opacity: 0.20 },
-  noir:     { color: '#000000',     opacity: 0.55 },
-  drama:    { color: '#1A003A',     opacity: 0.35 },
-  golden:   { color: '#FFD700',     opacity: 0.14 },
-};
-
-const FILTER_LABELS: Record<FilterKey, string> = {
-  original: 'Normal',
-  vivid:    'Vivid',
-  warm:     'Warm',
-  cold:     'Cold',
-  fade:     'Fade',
-  noir:     'Noir',
-  drama:    'Drama',
-  golden:   'Golden',
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Preview interne — player pausé sur la première frame, avec overlay filtre
@@ -99,14 +76,18 @@ const VideoPreview: React.FC<PreviewProps> = ({ videoUri, editResult, videoDurat
   // Chips résumé édition
   const editChips: { icon: string; label: string }[] = [];
   if (editResult) {
-    if (editResult.filter !== 'original') editChips.push({ icon: 'sliders', label: FILTER_LABELS[editResult.filter] });
+    const filterDef = FILTERS.find(f => f.key === editResult.filter);
+    if (editResult.filter !== 'original') editChips.push({ icon: 'sliders', label: filterDef?.label ?? editResult.filter });
     if (editResult.speed !== 1)           editChips.push({ icon: 'zap',     label: `${editResult.speed}×` });
     if (editResult.layers.length > 0)     editChips.push({ icon: 'type',    label: `${editResult.layers.length} texte${editResult.layers.length > 1 ? 's' : ''}` });
+    if ((editResult.stickers?.length ?? 0) > 0) editChips.push({ icon: 'smile', label: `${editResult.stickers.length}` });
+    if ((editResult.drawings?.length ?? 0) > 0) editChips.push({ icon: 'edit-2', label: 'Dessin' });
     const trimSec = editResult.endSec - editResult.startSec;
     if (Math.abs(trimSec - videoDuration) > 1) editChips.push({ icon: 'scissors', label: `${Math.round(trimSec)}s` });
   }
 
-  const filterOv = editResult ? FILTER_OVERLAY[editResult.filter] : null;
+  const filterDef = editResult ? FILTERS.find(f => f.key === editResult.filter) : null;
+  const filterOp  = editResult ? (FILTER_VIDEO_OPACITY[editResult.filter as FilterKey] ?? 0) : 0;
 
   return (
     <View style={s.videoPreview}>
@@ -117,12 +98,12 @@ const VideoPreview: React.FC<PreviewProps> = ({ videoUri, editResult, videoDurat
         controls={false}
       />
 
-      {/* Overlay filtre — reflète ce que l'utilisateur a choisi dans l'éditeur */}
-      {filterOv && filterOv.opacity > 0 && (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: filterOv.color, opacity: filterOv.opacity }]} />
+      {/* Overlay filtre principal */}
+      {filterDef && filterOp > 0 && (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: filterDef.overlay, opacity: filterOp }]} />
       )}
-      {editResult?.filter === 'noir' && (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: 0.45 }]} />
+      {filterDef?.overlay2 && (FILTER_VIDEO_OPACITY2?.[editResult!.filter as FilterKey] ?? 0) > 0 && (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: filterDef.overlay2, opacity: FILTER_VIDEO_OPACITY2[editResult!.filter as FilterKey] }]} />
       )}
 
       {/* Text layers en preview (non interactifs) */}
@@ -132,17 +113,25 @@ const VideoPreview: React.FC<PreviewProps> = ({ videoUri, editResult, videoDurat
             color:             l.color,
             fontSize:          l.fontSize,
             fontWeight:        l.bold ? '800' : '400',
+            fontStyle:         l.italic ? 'italic' : 'normal',
             textAlign:         l.align ?? 'center',
-            backgroundColor:   l.bg ? 'rgba(0,0,0,0.6)' : 'transparent',
+            backgroundColor:   l.bg && l.bgColor !== 'transparent' ? l.bgColor : 'transparent',
             paddingHorizontal: l.bg ? 10 : 0,
             paddingVertical:   l.bg ? 4 : 0,
-            borderRadius:      l.bg ? 6 : 0,
+            borderRadius:      l.bg ? 8 : 0,
             textShadowColor:   'rgba(0,0,0,0.9)',
             textShadowOffset:  { width: 0, height: 1 },
             textShadowRadius:  4,
           }}>
             {l.text}
           </Text>
+        </View>
+      ))}
+
+      {/* Stickers en preview */}
+      {editResult?.stickers?.map(st => (
+        <View key={st.id} pointerEvents="none" style={{ position: 'absolute', left: st.x, top: st.y }}>
+          <Text style={{ fontSize: 44 * (st.scale ?? 1) }}>{st.emoji}</Text>
         </View>
       ))}
 
@@ -325,7 +314,10 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
           ...(edit && edit.endSec   < dur - 0.5  ? { trim_end:       Math.round(edit.endSec   * 1000) } : {}),
           ...(edit && edit.speed !== 1           ? { playback_speed: edit.speed    } : {}),
           ...(edit && edit.filter !== 'original' ? { filter:         edit.filter   } : {}),
-          ...(edit && edit.layers.length > 0     ? { text_layers:    JSON.stringify(edit.layers) } : {}),
+          ...(edit && edit.layers.length > 0     ? { text_layers:    JSON.stringify(edit.layers)    } : {}),
+          ...(edit && (edit.stickers?.length ?? 0) > 0  ? { sticker_layers: JSON.stringify(edit.stickers) } : {}),
+          ...(edit && (edit.drawings?.length ?? 0) > 0  ? { draw_layers:    JSON.stringify(edit.drawings)  } : {}),
+          ...(edit?.adjust && Object.values(edit.adjust).some(v => v !== 0) ? { video_adjust: JSON.stringify(edit.adjust) } : {}),
           ...(edit && edit.musicUri              ? { music_url:      edit.musicUri, music_name: edit.musicName } : {}),
           ...(sourceReelId ? { source_reel_id: sourceReelId, remix_type: 'remix' as const } : {}),
         });

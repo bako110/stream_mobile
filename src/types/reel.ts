@@ -30,6 +30,9 @@ export interface Reel {
   remix_type?: 'repost' | 'remix' | null;
   filter_name?: string | null;
   text_layers?: string | null;
+  sticker_layers?: string | null;
+  draw_layers?: string | null;
+  video_adjust?: string | null;
   source_reel_id?: string | null;
   source_reel?: {
     id: string;

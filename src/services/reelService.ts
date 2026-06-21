@@ -95,6 +95,9 @@ export const reelService = {
     playback_speed?: number;
     filter?:         string;
     text_layers?:    string;
+    sticker_layers?: string;
+    draw_layers?:    string;
+    video_adjust?:   string;
     music_url?:      string;
     music_name?:     string;
     source_reel_id?: string;

@@ -32,22 +32,7 @@ import {
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import type { FilterKey } from '../Create/ReelEditorScreen';
-
-type Nav = NativeStackNavigationProp<MainStackParamList>;
-
-// ─── Filter overlays — doit rester synchro avec CreateReelScreen ─────────────
-
-const FILTER_OVERLAY: Record<FilterKey, { color: string; opacity: number }> = {
-  original: { color: 'transparent', opacity: 0 },
-  vivid:    { color: '#FF3CAC',     opacity: 0.15 },
-  warm:     { color: '#FF7E00',     opacity: 0.18 },
-  cold:     { color: '#00BFFF',     opacity: 0.18 },
-  fade:     { color: '#FFFFFF',     opacity: 0.20 },
-  noir:     { color: '#000000',     opacity: 0.55 },
-  drama:    { color: '#1A003A',     opacity: 0.35 },
-  golden:   { color: '#FFD700',     opacity: 0.14 },
-};
+import { type FilterKey, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1487,60 +1472,87 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         surfaceType="texture"
       />
 
-      {/* Overlay filtre couleur — appliqué au-dessus de la vidéo, zIndex 1 */}
-      {reel.filter_name && reel.filter_name !== 'original' && FILTER_OVERLAY[reel.filter_name as FilterKey] && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: FILTER_OVERLAY[reel.filter_name as FilterKey].color,
-            opacity: FILTER_OVERLAY[reel.filter_name as FilterKey].opacity,
-            zIndex: 1,
-          }}
-        />
-      )}
+      {/* Overlay filtre principal — zIndex 1 */}
+      {(() => {
+        if (!reel.filter_name || reel.filter_name === 'original') return null;
+        const fDef = FILTERS.find(f => f.key === reel.filter_name);
+        const op   = FILTER_VIDEO_OPACITY[reel.filter_name as FilterKey] ?? 0;
+        const op2  = FILTER_VIDEO_OPACITY2[reel.filter_name as FilterKey] ?? 0;
+        if (!fDef || op === 0) return null;
+        return (
+          <>
+            <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: fDef.overlay, opacity: op, zIndex: 1 }} />
+            {fDef.overlay2 && op2 > 0 && (
+              <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: fDef.overlay2, opacity: op2, zIndex: 2 }} />
+            )}
+          </>
+        );
+      })()}
 
-      {/* Text layers — positionnés exactement comme dans l'éditeur, zIndex 2 */}
+      {/* Text layers — positionnés exactement comme dans l'éditeur, zIndex 3 */}
       {reel.text_layers ? (() => {
         try {
           const layers: Array<{
             id: string; text: string; x: number; y: number;
             color: string; fontSize: number; bold: boolean; italic: boolean;
-            background?: string;
+            bg: boolean; bgColor: string; align: string; outline: boolean;
           }> = JSON.parse(reel.text_layers);
           return layers.map(l => (
-            <View
-              key={l.id}
-              pointerEvents="none"
-              style={{
-                position: 'absolute', left: l.x, top: l.y, zIndex: 2,
-                maxWidth: screenW - l.x - 8,
-              }}
-            >
-              {l.background ? (
-                <View style={{ backgroundColor: l.background, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{
-                    color: l.color, fontSize: l.fontSize,
-                    fontWeight: l.bold ? '800' : '400',
-                    fontStyle: l.italic ? 'italic' : 'normal',
-                  }}>
-                    {l.text}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={{
-                  color: l.color, fontSize: l.fontSize,
-                  fontWeight: l.bold ? '800' : '400',
-                  fontStyle: l.italic ? 'italic' : 'normal',
-                  textShadowColor: 'rgba(0,0,0,0.6)',
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 3,
-                }}>
-                  {l.text}
-                </Text>
-              )}
+            <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: l.x, top: l.y, zIndex: 3, maxWidth: screenW - l.x - 8 }}>
+              <Text style={{
+                color:             l.color,
+                fontSize:          l.fontSize,
+                fontWeight:        l.bold ? '800' : '400',
+                fontStyle:         l.italic ? 'italic' : 'normal',
+                textAlign:         (l.align as any) ?? 'center',
+                backgroundColor:   l.bg && l.bgColor !== 'transparent' ? l.bgColor : 'transparent',
+                paddingHorizontal: l.bg ? 10 : 0,
+                paddingVertical:   l.bg ? 5 : 0,
+                borderRadius:      l.bg ? 8 : 0,
+                textShadowColor:   l.outline ? (l.color === '#FFFFFF' ? '#000' : '#fff') : 'rgba(0,0,0,0.85)',
+                textShadowOffset:  { width: l.outline ? 1 : 0, height: 1 },
+                textShadowRadius:  l.outline ? 2 : 4,
+              }}>
+                {l.text}
+              </Text>
             </View>
           ));
+        } catch { return null; }
+      })() : null}
+
+      {/* Sticker layers — zIndex 4 */}
+      {reel.sticker_layers ? (() => {
+        try {
+          const stickers: Array<{ id: string; emoji: string; x: number; y: number; scale: number }> = JSON.parse(reel.sticker_layers);
+          return stickers.map(st => (
+            <View key={st.id} pointerEvents="none" style={{ position: 'absolute', left: st.x, top: st.y, zIndex: 4 }}>
+              <Text style={{ fontSize: 44 * (st.scale ?? 1) }}>{st.emoji}</Text>
+            </View>
+          ));
+        } catch { return null; }
+      })() : null}
+
+      {/* Dessin libre — zIndex 5 */}
+      {reel.draw_layers ? (() => {
+        try {
+          const paths: Array<{ id: string; color: string; width: number; points: { x: number; y: number }[] }> = JSON.parse(reel.draw_layers);
+          return paths.map(path =>
+            path.points.slice(0, -1).map((pt, i) => {
+              const next = path.points[i + 1];
+              const dx = next.x - pt.x; const dy = next.y - pt.y;
+              const len = Math.sqrt(dx * dx + dy * dy);
+              const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+              return (
+                <View key={`${path.id}_${i}`} pointerEvents="none" style={{
+                  position: 'absolute', left: pt.x, top: pt.y - path.width / 2,
+                  width: len, height: path.width, borderRadius: path.width / 2,
+                  backgroundColor: path.color, zIndex: 5,
+                  transform: [{ rotate: `${angle}deg` }],
+                  transformOrigin: 'left center',
+                }} />
+              );
+            })
+          );
         } catch { return null; }
       })() : null}
 
