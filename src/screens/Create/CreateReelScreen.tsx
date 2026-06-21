@@ -102,9 +102,12 @@ const VideoPreview: React.FC<PreviewProps> = ({ videoUri, editResult, videoDurat
       {filterDef && filterOp > 0 && (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: filterDef.overlay, opacity: filterOp }]} />
       )}
-      {filterDef?.overlay2 && (FILTER_VIDEO_OPACITY2?.[editResult!.filter as FilterKey] ?? 0) > 0 && (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: filterDef.overlay2, opacity: FILTER_VIDEO_OPACITY2[editResult!.filter as FilterKey] }]} />
-      )}
+      {(() => {
+        const op2 = filterDef ? (FILTER_VIDEO_OPACITY2[editResult!.filter as FilterKey] ?? 0) : 0;
+        return filterDef?.overlay2 && op2 > 0
+          ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: filterDef.overlay2, opacity: op2 }]} />
+          : null;
+      })()}
 
       {/* Text layers en preview (non interactifs) */}
       {editResult?.layers.map(l => (
@@ -134,6 +137,40 @@ const VideoPreview: React.FC<PreviewProps> = ({ videoUri, editResult, videoDurat
           <Text style={{ fontSize: 44 * (st.scale ?? 1) }}>{st.emoji}</Text>
         </View>
       ))}
+
+      {/* Drawings en preview */}
+      {editResult?.drawings?.map(path =>
+        path.points.slice(0, -1).map((pt, i) => {
+          const next = path.points[i + 1];
+          const dx = next.x - pt.x; const dy = next.y - pt.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+          return (
+            <View key={`${path.id}_${i}`} pointerEvents="none" style={{
+              position: 'absolute', left: pt.x, top: pt.y - path.width / 2,
+              width: len, height: path.width, borderRadius: path.width / 2,
+              backgroundColor: path.color,
+              transform: [{ rotate: `${angle}deg` }],
+              transformOrigin: 'left center',
+            }} />
+          );
+        })
+      )}
+
+      {/* Video adjust overlays en preview — simulés via couches de couleur */}
+      {editResult?.adjust && (() => {
+        const { brightness, contrast, saturation, temperature } = editResult.adjust;
+        return (
+          <>
+            {brightness > 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(255,255,255,${brightness * 0.35})` }]} />}
+            {brightness < 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${Math.abs(brightness) * 0.45})` }]} />}
+            {temperature > 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(255,120,0,${temperature * 0.18})` }]} />}
+            {temperature < 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,120,255,${Math.abs(temperature) * 0.18})` }]} />}
+            {saturation < 0  && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(128,128,128,${Math.abs(saturation) * 0.45})` }]} />}
+            {contrast   > 0  && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${contrast * 0.12})` }]} />}
+          </>
+        );
+      })()}
 
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.45)', 'transparent']} style={[StyleSheet.absoluteFill, { height: 80 }]} />
       <LinearGradient pointerEvents="none" colors={['transparent', 'rgba(0,0,0,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 }} />
@@ -314,10 +351,10 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
           ...(edit && edit.endSec   < dur - 0.5  ? { trim_end:       Math.round(edit.endSec   * 1000) } : {}),
           ...(edit && edit.speed !== 1           ? { playback_speed: edit.speed    } : {}),
           ...(edit && edit.filter !== 'original' ? { filter:         edit.filter   } : {}),
-          ...(edit && edit.layers.length > 0     ? { text_layers:    JSON.stringify(edit.layers)    } : {}),
-          ...(edit && (edit.stickers?.length ?? 0) > 0  ? { sticker_layers: JSON.stringify(edit.stickers) } : {}),
-          ...(edit && (edit.drawings?.length ?? 0) > 0  ? { draw_layers:    JSON.stringify(edit.drawings)  } : {}),
-          ...(edit?.adjust && Object.values(edit.adjust).some(v => v !== 0) ? { video_adjust: JSON.stringify(edit.adjust) } : {}),
+          ...(edit && edit.layers.length > 0   ? { text_layers:    JSON.stringify(edit.layers)    } : {}),
+          ...(edit && edit.stickers.length > 0 ? { sticker_layers: JSON.stringify(edit.stickers) } : {}),
+          ...(edit && edit.drawings.length > 0 ? { draw_layers:    JSON.stringify(edit.drawings)  } : {}),
+          ...(edit && Object.values(edit.adjust).some(v => v !== 0) ? { video_adjust: JSON.stringify(edit.adjust) } : {}),
           ...(edit && edit.musicUri              ? { music_url:      edit.musicUri, music_name: edit.musicName } : {}),
           ...(sourceReelId ? { source_reel_id: sourceReelId, remix_type: 'remix' as const } : {}),
         });

@@ -1556,6 +1556,25 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         } catch { return null; }
       })() : null}
 
+      {/* Video adjust — simulé via couches de couleur, zIndex 6 */}
+      {reel.video_adjust ? (() => {
+        try {
+          const { brightness, contrast, saturation, temperature }
+            : { brightness: number; contrast: number; saturation: number; temperature: number }
+            = JSON.parse(reel.video_adjust);
+          return (
+            <>
+              {brightness > 0 && <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: `rgba(255,255,255,${brightness * 0.35})`, zIndex: 6 }} />}
+              {brightness < 0 && <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: `rgba(0,0,0,${Math.abs(brightness) * 0.45})`, zIndex: 6 }} />}
+              {temperature > 0 && <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: `rgba(255,120,0,${temperature * 0.18})`, zIndex: 6 }} />}
+              {temperature < 0 && <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: `rgba(0,120,255,${Math.abs(temperature) * 0.18})`, zIndex: 6 }} />}
+              {saturation < 0  && <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: `rgba(128,128,128,${Math.abs(saturation) * 0.45})`, zIndex: 6 }} />}
+              {contrast   > 0  && <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: `rgba(0,0,0,${contrast * 0.12})`, zIndex: 6 }} />}
+            </>
+          );
+        } catch { return null; }
+      })() : null}
+
       {/* Barre de progression — tout en haut, sous le header */}
       {isActive && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', zIndex: 20 }}>
