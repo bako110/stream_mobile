@@ -1145,73 +1145,69 @@ export const CommunitiesScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => !creating && setCreateOpen(false)}
       >
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, justifyContent: 'flex-end' }}
+        >
           <TouchableOpacity
             style={S.overlay}
             activeOpacity={1}
             onPress={() => !creating && setCreateOpen(false)}
           />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ width: '100%' }}
-          >
-            <View style={[S.sheet, { backgroundColor: colors.background }]}>
-              {/* Handle */}
-              <View style={S.handleWrap}>
-                <View style={[S.handle, { backgroundColor: colors.divider }]} />
-              </View>
-
-              {/* Header modal */}
-              <View style={[S.sheetHeader, { borderBottomColor: colors.divider }]}>
-                {step === 'settings' ? (
-                  <TouchableOpacity onPress={() => setStep('info')} style={S.sheetNavBtn}>
-                    <Icon name="chevron-left" size={22} color={colors.textPrimary} />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => { setCreateOpen(false); resetForm(); }}
-                    style={S.sheetNavBtn}
-                  >
-                    <Icon name="x" size={20} color={colors.textPrimary} />
-                  </TouchableOpacity>
-                )}
-
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={[S.sheetTitle, { color: colors.textPrimary }]}>
-                    {step === 'info' ? 'Nouvelle communauté' : 'Configuration'}
-                  </Text>
-                  {/* Indicateur étapes */}
-                  <View style={S.stepDots}>
-                    {[0, 1].map(i => {
-                      const cur = step === 'info' ? 0 : 1;
-                      return (
-                        <View
-                          key={i}
-                          style={[S.stepDot, {
-                            backgroundColor: cur >= i ? colors.primary : colors.divider,
-                            width: cur === i ? 20 : 6,
-                          }]}
-                        />
-                      );
-                    })}
-                  </View>
-                </View>
-
-                <View style={{ width: 72 }} />
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                bounces={false}
-                style={{ flex: 1 }}
-                contentContainerStyle={{ flexGrow: 1 }}
-              >
-                {step === 'info' ? renderStepInfo() : renderStepSettings()}
-              </ScrollView>
+          <View style={[S.sheet, { backgroundColor: colors.background }]}>
+            {/* Handle */}
+            <View style={S.handleWrap}>
+              <View style={[S.handle, { backgroundColor: colors.divider }]} />
             </View>
-          </KeyboardAvoidingView>
-        </View>
+
+            {/* Header modal */}
+            <View style={[S.sheetHeader, { borderBottomColor: colors.divider }]}>
+              {step === 'settings' ? (
+                <TouchableOpacity onPress={() => setStep('info')} style={S.sheetNavBtn}>
+                  <Icon name="chevron-left" size={22} color={colors.textPrimary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => { setCreateOpen(false); resetForm(); }}
+                  style={S.sheetNavBtn}
+                >
+                  <Icon name="x" size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
+              )}
+
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={[S.sheetTitle, { color: colors.textPrimary }]}>
+                  {step === 'info' ? 'Nouvelle communauté' : 'Configuration'}
+                </Text>
+                <View style={S.stepDots}>
+                  {[0, 1].map(i => {
+                    const cur = step === 'info' ? 0 : 1;
+                    return (
+                      <View
+                        key={i}
+                        style={[S.stepDot, {
+                          backgroundColor: cur >= i ? colors.primary : colors.divider,
+                          width: cur === i ? 20 : 6,
+                        }]}
+                      />
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={{ width: 72 }} />
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              {step === 'info' ? renderStepInfo() : renderStepSettings()}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Modal : choisir un template ── */}
@@ -1465,7 +1461,7 @@ const S = StyleSheet.create({
 
   // Modal
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)' },
-  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '94%', flex: 1 },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '94%' },
   handleWrap: { alignItems: 'center', paddingTop: 12, paddingBottom: 6 },
   handle: { width: 40, height: 4, borderRadius: 2 },
   sheetHeader: {
@@ -1479,7 +1475,7 @@ const S = StyleSheet.create({
   sheetTitle: { fontSize: 16, fontWeight: '800' },
   stepDots: { flexDirection: 'row', gap: 5, marginTop: 5 },
   stepDot: { height: 4, borderRadius: 2 },
-  sheetBody: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 40 },
+  sheetBody: { paddingHorizontal: 16, paddingTop: 18 },
 
   // Banner/avatar picker dans modal
   bannerPicker: { height: 120, borderRadius: 16, overflow: 'hidden' },
