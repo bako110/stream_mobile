@@ -327,13 +327,28 @@ export const CommunitiesScreen: React.FC = () => {
       setJoinCode('');
       load();
       if (res.data?.joined) {
-        nav.navigate('CommunityDetail', { communityId: res.data.community_id, autoEnter: true });
+        Alert.alert('Bienvenue !', `Tu as rejoint la communauté.`, [
+          { text: 'OK', onPress: () => nav.navigate('CommunityDetail', { communityId: res.data.community_id, autoEnter: true }) },
+        ]);
       } else if (res.data?.pending) {
-        Alert.alert('Demande envoyée', 'Ta demande est en cours d\'examen par l\'admin.');
+        Alert.alert('Demande envoyée', 'Ta demande est en cours d\'examen. Tu seras notifié dès que l\'admin accepte.');
+      } else if (res.data?.error === 'already_member') {
+        Alert.alert('Déjà membre', 'Tu es déjà membre de cette communauté.');
+      } else if (res.data?.error === 'already_pending') {
+        Alert.alert('Demande en cours', 'Ta demande est déjà en cours d\'examen.');
       }
     } catch (e: any) {
-      const detail = e?.response?.data?.detail ?? 'Code invalide ou expiré.';
-      Alert.alert('Erreur', detail);
+      const detail: string = e?.response?.data?.detail ?? '';
+      const status: number = e?.response?.status ?? 0;
+      if (status === 404) {
+        Alert.alert('Code invalide', 'Ce code d\'invitation n\'existe pas ou a expiré.');
+      } else if (status === 402 || detail.toLowerCase().includes('coins')) {
+        Alert.alert('Coins insuffisants', 'Tu n\'as pas assez de coins pour rejoindre cette communauté.');
+      } else if (status === 403) {
+        Alert.alert('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
+      } else {
+        Alert.alert('Erreur', detail || 'Impossible de rejoindre avec ce code.');
+      }
     } finally { setJoining(false); }
   };
 
@@ -385,18 +400,27 @@ export const CommunitiesScreen: React.FC = () => {
       if (res.pending) {
         Alert.alert(
           'Demande envoyée',
-          `Votre demande pour rejoindre "${item.name}" est en attente d'approbation.`,
+          `Ta demande pour rejoindre "${item.name}" est en attente d'approbation. Tu seras notifié dès que l'admin accepte.`,
         );
+      } else if (res.joined) {
+        Alert.alert('Bienvenue !', `Tu as rejoint "${item.name}".`);
+      } else if (res.error === 'already_member') {
+        Alert.alert('Déjà membre', `Tu es déjà membre de "${item.name}".`);
+      } else if (res.error === 'already_pending') {
+        Alert.alert('Demande en cours', `Ta demande pour "${item.name}" est déjà en cours d'examen.`);
       }
       load();
     } catch (e: any) {
-      const msg = (e?.response?.data?.detail ?? '').toLowerCase();
-      if (msg.includes('insufficient') || msg.includes('coins')) {
-        Alert.alert('Coins insuffisants', 'Vous n\'avez pas assez de coins pour rejoindre cette communauté.');
-      } else if (msg.includes('blocked')) {
-        Alert.alert('Accès refusé', 'Vous avez été bloqué de cette communauté.');
+      const detail: string = e?.response?.data?.detail ?? '';
+      const status: number = e?.response?.status ?? 0;
+      if (status === 402 || detail.toLowerCase().includes('coins')) {
+        Alert.alert('Coins insuffisants', `Il te faut ${item.entry_price_coins ?? '?'} coins pour rejoindre cette communauté.`);
+      } else if (status === 403) {
+        Alert.alert('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
+      } else if (status === 404) {
+        Alert.alert('Introuvable', 'Cette communauté n\'existe plus.');
       } else {
-        Alert.alert('Erreur', 'Impossible de rejoindre cette communauté.');
+        Alert.alert('Erreur', detail || 'Impossible de rejoindre cette communauté.');
       }
     }
   };
