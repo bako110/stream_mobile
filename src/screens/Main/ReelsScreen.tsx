@@ -198,7 +198,10 @@ export const ReelsScreen: React.FC = () => {
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
         if (targetIdx > 0) {
-          pendingScrollIdx.current = targetIdx;
+          // Scroll après que la FlatList ait rendu les nouvelles données
+          setTimeout(() => {
+            if (mountedRef.current) scrollToIdx(targetIdx);
+          }, 80);
         }
       } else if (targetId) {
         // Mode arrière-plan avec reel cible — on NE remplace PAS la liste
@@ -363,18 +366,25 @@ export const ReelsScreen: React.FC = () => {
     if (idx >= 0) {
       currentIdxRef.current = idx;
       setCurrentIndex(idx);
-      scrollToIdx(idx);
+      // Délai court pour laisser la FlatList se positionner après changement d'onglet
+      setTimeout(() => {
+        if (mountedRef.current) scrollToIdx(idx);
+      }, 80);
     } else if (newReel?.hls_url) {
-      isScrollingRef.current = true;
-      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 500);
-      listRef.current?.scrollToOffset({ offset: 0, animated: false });
-
+      // Injecter en tête puis scroller — setReels d'abord, scroll après rendu
       const injected = [newReel, ...reelsRef.current.filter(r => r.id !== newInitialId)];
       reelsRef.current = injected;
       currentIdxRef.current = 0;
       setCurrentIndex(0);
       setReels(injected);
+
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        isScrollingRef.current = true;
+        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 500);
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }, 80);
 
       lastInitialReelRef.current = newInitialId;
       load(true, newInitialId, newReel);
