@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 
-const SHARE_BASE = 'https://gofolyx.app/join';
+const SHARE_BASE = 'https://gofolyx.com/join';
 
 export const CommunityInviteScreen: React.FC = () => {
   const { theme: { colors } } = useTheme();
