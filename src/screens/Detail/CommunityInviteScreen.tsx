@@ -36,10 +36,19 @@ export const CommunityInviteScreen: React.FC = () => {
   const load = useCallback(async () => {
     try {
       const res = await apiClient.get<any>(`/api/v1/communities/${communityId}`);
-      setCode(res.data?.invite_code ?? '');
+      const fetchedCode: string = res.data?.invite_code ?? '';
+      if (!fetchedCode && isAdmin) {
+        // Aucun code en base — en générer un automatiquement
+        const gen = await apiClient.post<{ invite_code: string }>(
+          `/api/v1/communities/${communityId}/invite-code`,
+        );
+        setCode(gen.data.invite_code ?? '');
+      } else {
+        setCode(fetchedCode);
+      }
     } catch { }
     finally { setLoading(false); }
-  }, [communityId]);
+  }, [communityId, isAdmin]);
 
   useEffect(() => { if (!initialCode) load(); }, [load, initialCode]);
 
