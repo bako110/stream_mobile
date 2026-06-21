@@ -92,7 +92,9 @@ export const ReelsScreen: React.FC = () => {
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
   const lastLoadedAtRef   = useRef<number>(0);
   const didFocusOnceRef   = useRef(false);
-  const lastInitialReelRef = useRef<string | undefined>(undefined);
+  const lastInitialReelRef  = useRef<string | undefined>(undefined);
+  // Reel demandé depuis FeedScreen — consommé dans onLayout (FlatList montée = garantie)
+  const pendingTargetRef    = useRef<{ id: string; reel?: Reel } | null>(null);
   // ── State ─────────────────────────────────────────────────────────────────
   const seedReel = useRef(
     params.initialReel?.hls_url ? [params.initialReel as Reel] : []
@@ -125,8 +127,23 @@ export const ReelsScreen: React.FC = () => {
   const pendingScrollIdx  = useRef<number | null>(null);
   const isScrollingRef    = useRef(false);
   const scrollLockTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => { reelsRef.current = reels; },    [reels]);
+  useEffect(() => { reelsRef.current = reels; }, [reels]);
   useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
+
+  // Quand la liste change, tenter de résoudre pendingTarget si onLayout l'a manqué
+  useEffect(() => {
+    const target = pendingTargetRef.current;
+    if (!target) return;
+    const idx = reels.findIndex(r => r.id === target.id);
+    if (idx < 0) return; // pas encore là — attendre le prochain update
+    pendingTargetRef.current = null;
+    currentIdxRef.current = idx;
+    setCurrentIndex(idx);
+    isScrollingRef.current = true;
+    if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+    scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
+    listRef.current?.scrollToOffset({ offset: SCREEN_H * idx, animated: false });
+  }, [reels, SCREEN_H]);
 
   const toggleMute = useCallback(() => setMuted(v => !v), []);
 
@@ -164,7 +181,7 @@ export const ReelsScreen: React.FC = () => {
   // ── Load ──────────────────────────────────────────────────────────────────
   // targetId : reel à afficher en priorité (peut changer à chaque navigation)
   // silent   : garder le contenu actuel visible pendant le chargement background
-  const load = useCallback(async (silent = false, targetId?: string, targetReel?: Reel) => {
+  const load = useCallback(async (silent = false) => {
     if (!mountedRef.current) return;
     if (!silent) setLoading(true);
     pageRef.current = 1;
@@ -176,51 +193,25 @@ export const ReelsScreen: React.FC = () => {
 
       const filtered = (data.items ?? []).filter((r: Reel) => !!r.hls_url);
 
-      // Chercher le reel cible dans le feed chargé
-      let finalReels = filtered;
-      let targetIdx  = 0;
-      if (targetId) {
-        const idx = filtered.findIndex((r: Reel) => r.id === targetId);
-        if (idx >= 0) {
-          targetIdx = idx;
-        } else if (targetReel?.hls_url) {
-          // Pas dans le feed → l'injecter en tête
-          finalReels = [targetReel, ...filtered.filter(r => r.id !== targetId)];
-          targetIdx  = 0;
-        }
-      }
-
       setHasMore(data.has_more);
       lastLoadedAtRef.current = Date.now();
 
       if (!silent) {
-        // Verrouiller onScrollUpdate avant de changer les données + l'index
-        isScrollingRef.current = true;
-        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
-        currentIdxRef.current = targetIdx;
-        setCurrentIndex(targetIdx);
-        setReels(finalReels);
+        // CAS FOOTER — reset complet, index 0
+        currentIdxRef.current = 0;
+        setCurrentIndex(0);
+        setReels(filtered);
         viewedReelsRef.current = new Set();
-        if (targetIdx > 0) {
-          listRef.current?.scrollToOffset({ offset: SCREEN_H * targetIdx, animated: false });
-        } else {
-          listRef.current?.scrollToOffset({ offset: 0, animated: false });
-        }
-      } else if (targetId) {
-        // Mode arrière-plan avec reel cible — on NE remplace PAS la liste
-        // on ajoute juste les reels du feed qui ne sont pas encore présents
-        // L'utilisateur reste sur le reel injecté sans aucun déplacement
+      } else {
+        // CAS FEED — enrichir la liste sans toucher à l'index ni au scroll
+        // pendingTargetRef + useEffect[reels] gèrent la navigation vers le bon reel
         const existingIds = new Set(reelsRef.current.map(r => r.id));
-        const toAppend = finalReels.filter(r => r.id !== targetId && !existingIds.has(r.id));
-        if (toAppend.length > 0) {
-          const merged = [...reelsRef.current, ...toAppend];
+        const toAdd = filtered.filter(r => !existingIds.has(r.id));
+        if (toAdd.length > 0) {
+          const merged = [...reelsRef.current, ...toAdd];
           reelsRef.current = merged;
           setReels(merged);
         }
-      } else {
-        // Silent sans cible — mise à jour silencieuse sans bouger l'index
-        setReels(finalReels);
       }
 
       // Charger la pub reels en arriere-plan
@@ -355,7 +346,9 @@ export const ReelsScreen: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
 
-  // ── Params — réagit à initialReelId/reelPublished séparément ────────────
+  // ── Params — navigation depuis FeedScreen vers un reel précis ────────────
+  // Principe : stocker la cible dans pendingTargetRef, la consommer dans onLayout
+  // (seul endroit garanti après que la FlatList soit montée et mesurée)
   useEffect(() => {
     const freshParams  = (route.params ?? {}) as typeof params;
     const newInitialId = freshParams.initialReelId;
@@ -368,35 +361,16 @@ export const ReelsScreen: React.FC = () => {
     }
     if (!newInitialId) return;
 
-    // Consommer immédiatement pour éviter double traitement au prochain focus
+    // Consommer les params immédiatement — évite double déclenchement au focus suivant
     nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
 
-    const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
-    if (idx >= 0) {
-      // Reel déjà dans la liste — verrou scroll puis offset direct
-      currentIdxRef.current = idx;
-      setCurrentIndex(idx);
-      isScrollingRef.current = true;
-      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
-      listRef.current?.scrollToOffset({ offset: SCREEN_H * idx, animated: false });
-    } else if (newReel?.hls_url) {
-      // Reel pas dans la liste — injecter en tête, verrouiller scroll, puis offset 0
-      isScrollingRef.current = true;
-      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
-      const injected = [newReel, ...reelsRef.current.filter(r => r.id !== newInitialId)];
-      reelsRef.current = injected;
-      currentIdxRef.current = 0;
-      setCurrentIndex(0);
-      setReels(injected);
-      listRef.current?.scrollToOffset({ offset: 0, animated: false });
-      lastInitialReelRef.current = newInitialId;
-      load(true, newInitialId, newReel);
-    } else {
-      lastInitialReelRef.current = newInitialId;
-      load(false, newInitialId, undefined);
-    }
+    // Stocker la cible — onLayout la consommera dès que la FlatList est prête
+    pendingTargetRef.current = { id: newInitialId, reel: newReel };
+
+    // Charger le feed avec la cible en background (enrichit la liste sans bouger l'affichage)
+    lastInitialReelRef.current = newInitialId;
+    load(true);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.initialReelId, params.reelPublished]);
 
@@ -826,6 +800,36 @@ export const ReelsScreen: React.FC = () => {
         getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
         onScrollToIndexFailed={({ index }) => {
           scrollToIdx(index);
+        }}
+        onLayout={() => {
+          const target = pendingTargetRef.current;
+          if (!target) return;
+          pendingTargetRef.current = null;
+
+          // Chercher le reel dans la liste courante
+          const list = reelsRef.current;
+          const idx  = list.findIndex(r => r.id === target.id);
+
+          if (idx >= 0) {
+            // Reel trouvé — scroll direct avec verrou
+            currentIdxRef.current = idx;
+            setCurrentIndex(idx);
+            isScrollingRef.current = true;
+            if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+            scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
+            listRef.current?.scrollToOffset({ offset: SCREEN_H * idx, animated: false });
+          } else if (target.reel?.hls_url) {
+            // Reel pas encore chargé — injecter en tête et afficher
+            const injected = [target.reel, ...list.filter(r => r.id !== target.id)];
+            reelsRef.current = injected;
+            setReels(injected);
+            currentIdxRef.current = 0;
+            setCurrentIndex(0);
+            isScrollingRef.current = true;
+            if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+            scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
+            listRef.current?.scrollToOffset({ offset: 0, animated: false });
+          }
         }}
         renderItem={renderVideoSlide}
         removeClippedSubviews={false}
