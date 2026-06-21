@@ -323,12 +323,39 @@ export const ReelsScreen: React.FC = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Focus — gère uniquement screen focus/blur, sans params ─────────────
+  // ── Focus ─────────────────────────────────────────────────────────────────
+  // useFocusEffect fire AVANT useEffect — on lit route.params ici directement
+  // pour éviter que load(false) écrase une navigation depuis FeedScreen.
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
-    // Ne jamais écraser si une cible feed est en attente de consommation
-    const hasPending = !!pendingTargetRef.current;
-    if (!hasPending) {
+
+    // Lire les params au moment exact du focus (avant tout useEffect)
+    const p            = (route.params ?? {}) as typeof params;
+    const targetId     = p.initialReelId;
+    const targetReel   = p.initialReel as Reel | undefined;
+    const hasTarget    = !!targetId;
+
+    if (hasTarget) {
+      // CAS FEED — effacer les params, consommer la cible
+      nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
+      lastInitialReelRef.current = targetId;
+
+      // Reel déjà dans la liste → scroll direct
+      const existingIdx = reelsRef.current.findIndex(r => r.id === targetId);
+      if (existingIdx >= 0) {
+        currentIdxRef.current = existingIdx;
+        setCurrentIndex(existingIdx);
+        isScrollingRef.current = true;
+        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
+        listRef.current?.scrollToOffset({ offset: SCREEN_H * existingIdx, animated: false });
+      } else {
+        // Pas encore chargé → stocker dans pendingTargetRef, enrichir la liste
+        pendingTargetRef.current = { id: targetId, reel: targetReel };
+        load(true);
+      }
+    } else {
+      // CAS FOOTER — navigation normale
       if (!didFocusOnceRef.current) {
         load(false);
       } else {
@@ -336,6 +363,7 @@ export const ReelsScreen: React.FC = () => {
         if (age > 90_000) load(true);
       }
     }
+
     didFocusOnceRef.current = true;
     return () => {
       setScreenFocused(false);
@@ -345,47 +373,15 @@ export const ReelsScreen: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
 
-  // ── Params — navigation depuis FeedScreen vers un reel précis ────────────
-  // Principe : stocker la cible dans pendingTargetRef, la consommer dans onLayout
-  // (seul endroit garanti après que la FlatList soit montée et mesurée)
+  // ── Params — reelPublished uniquement (publication depuis CreateReel) ─────
   useEffect(() => {
-    const freshParams  = (route.params ?? {}) as typeof params;
-    const newInitialId = freshParams.initialReelId;
-    const newReel      = freshParams.initialReel as Reel | undefined;
-
-    if (freshParams.reelPublished) {
+    const p = (route.params ?? {}) as typeof params;
+    if (p.reelPublished) {
       nav.setParams({ reelPublished: undefined } as any);
       load(false);
-      return;
     }
-    if (!newInitialId) return;
-
-    // Consommer les params immédiatement — évite double déclenchement au focus suivant
-    nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
-
-    // Stocker la cible
-    pendingTargetRef.current = { id: newInitialId, reel: newReel };
-    lastInitialReelRef.current = newInitialId;
-
-    // Tenter de consommer immédiatement si le reel est déjà dans la liste
-    // (2ème clic depuis feed : FlatList déjà montée, onLayout ne re-fire pas)
-    const existingIdx = reelsRef.current.findIndex(r => r.id === newInitialId);
-    if (existingIdx >= 0) {
-      pendingTargetRef.current = null;
-      currentIdxRef.current = existingIdx;
-      setCurrentIndex(existingIdx);
-      isScrollingRef.current = true;
-      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
-      listRef.current?.scrollToOffset({ offset: SCREEN_H * existingIdx, animated: false });
-      return;
-    }
-
-    // Reel absent — enrichir la liste en background, useEffect[reels] ou onLayout consommeront
-    load(true);
-
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.initialReelId, params.reelPublished]);
+  }, [params.reelPublished]);
 
   // ── Edit / Delete ─────────────────────────────────────────────────────────
   const handleDeleteReel = useCallback((reel: Reel) => {
