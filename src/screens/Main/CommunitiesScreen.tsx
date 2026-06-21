@@ -122,49 +122,49 @@ const CommunityCard = React.memo(function CommunityCard({
 }) {
   const joinStatus: JoinStatus = isMine ? 'member' : (item.join_status ?? 'none');
   const isPrivateOrApproval = item.is_private || item.requires_approval;
+  const price = item.entry_price_coins ?? 0;
 
-  const renderAction = () => {
+  const subline = (() => {
+    if (item.description) return item.description;
+    const parts: string[] = [];
+    if (item.is_private) parts.push('Privee');
+    else parts.push('Publique');
+    if (isPrivateOrApproval) parts.push('sur invitation');
+    if (price > 0) parts.push(`${price} coins`);
+    return parts.join(' · ');
+  })();
+
+  const renderRight = () => {
     if (joinStatus === 'member') {
-      return null;
+      return (
+        <View style={CS.rightMeta}>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </View>
+      );
     }
-
     if (joinStatus === 'pending') {
       return (
-        <TouchableOpacity
-          onPress={onCancelRequest}
-          activeOpacity={0.8}
-          style={[CS.btnSuivre, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B', borderWidth: 1 }]}
-        >
-          <Text style={[CS.btnSuivreText, { color: '#F59E0B' }]}>En attente</Text>
+        <TouchableOpacity onPress={onCancelRequest} activeOpacity={0.8} style={CS.pillPending}>
+          <Text style={CS.pillPendingTxt}>En attente</Text>
         </TouchableOpacity>
       );
     }
-
     return (
-      <TouchableOpacity
-        onPress={onJoin}
-        activeOpacity={0.8}
-        style={[CS.btnSuivre, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, borderWidth: 1 }]}
-      >
-        <Text style={[CS.btnSuivreText, { color: colors.textPrimary }]}>
-          {isPrivateOrApproval ? 'Demander' : 'Rejoindre'}
+      <TouchableOpacity onPress={onJoin} activeOpacity={0.8} style={CS.pillJoin}>
+        <Text style={CS.pillJoinTxt}>
+          {isPrivateOrApproval ? 'Demander' : price > 0 ? `${price} coins` : 'Rejoindre'}
         </Text>
-        {(item.entry_price_coins ?? 0) > 0 && (
-          <Text style={{ color: '#F59E0B', fontSize: 10, fontWeight: '700', marginLeft: 3 }}>
-            · {item.entry_price_coins}
-          </Text>
-        )}
       </TouchableOpacity>
     );
   };
 
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
+      activeOpacity={0.65}
       onPress={onPress}
-      style={CS.row}
+      style={[CS.row, { backgroundColor: colors.background }]}
     >
-      {/* Avatar rond */}
+      {/* Avatar */}
       <View style={CS.avatarWrap}>
         {item.avatar_url ? (
           <Image source={{ uri: item.avatar_url }} style={CS.avatar} />
@@ -180,38 +180,35 @@ const CommunityCard = React.memo(function CommunityCard({
         )}
       </View>
 
-      {/* Infos */}
-      <View style={CS.info}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <Text style={[CS.name, { color: colors.textPrimary }]} numberOfLines={1}>
-            {item.name}
+      {/* Contenu + separateur indenté */}
+      <View style={[CS.inner, { borderBottomColor: colors.divider }]}>
+        {/* Ligne 1 : nom + badges + membres */}
+        <View style={CS.row1}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
+            <Text style={[CS.name, { color: colors.textPrimary }]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            {item.is_verified && <Icon name="check-circle" size={12} color="#3B82F6" />}
+            {(item as any).tier === 'pro' && (
+              <View style={CS.badgePro}><Text style={CS.badgeProTxt}>PRO</Text></View>
+            )}
+            {(item as any).tier === 'elite' && (
+              <View style={CS.badgeElite}><Text style={CS.badgeEliteTxt}>ELITE</Text></View>
+            )}
+          </View>
+          <Text style={[CS.membersCount, { color: colors.textTertiary }]}>
+            {fmtCount(item.members_count ?? 0)}
           </Text>
-          {item.is_verified && (
-            <Icon name="check-circle" size={13} color="#3B82F6" />
-          )}
-          {(item as any).tier === 'pro' && (
-            <View style={{ backgroundColor: '#7B3FF222', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-              <Text style={{ color: '#7B3FF2', fontSize: 9, fontWeight: '800' }}>PRO</Text>
-            </View>
-          )}
-          {(item as any).tier === 'elite' && (
-            <View style={{ backgroundColor: '#F59E0B22', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-              <Text style={{ color: '#F59E0B', fontSize: 9, fontWeight: '800' }}>ELITE</Text>
-            </View>
-          )}
         </View>
-        <Text style={[CS.followers, { color: colors.textTertiary }]}>
-          {fmtCount(item.members_count ?? 0)} membres
-        </Text>
-        {item.description ? (
-          <Text style={[CS.desc, { color: colors.textTertiary }]} numberOfLines={1}>
-            {item.description}
-          </Text>
-        ) : null}
-      </View>
 
-      {/* Bouton */}
-      {renderAction()}
+        {/* Ligne 2 : description / sous-titre */}
+        <View style={CS.row2}>
+          <Text style={[CS.subline, { color: colors.textTertiary }]} numberOfLines={1}>
+            {subline}
+          </Text>
+          {renderRight()}
+        </View>
+      </View>
     </TouchableOpacity>
   );
 });
@@ -1621,57 +1618,70 @@ const S = StyleSheet.create({
 // Styles card communauté
 // ─────────────────────────────────────────────────────────────────────────────
 const CS = StyleSheet.create({
-  // Ligne liste
+  // Ligne WhatsApp-style : avatar a gauche, contenu avec separateur indenté
   row: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    paddingHorizontal: 16,
-    paddingVertical:   12,
-    gap: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 16,
   },
 
-  // Avatar rond
-  avatarWrap: { position: 'relative' },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-  },
-  avatarGrad: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // Avatar
+  avatarWrap: { position: 'relative', marginRight: 14 },
+  avatar:     { width: 52, height: 52, borderRadius: 26 },
+  avatarGrad: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 20 },
   verifiedDot: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    position: 'absolute', bottom: 0, right: 0,
+    width: 16, height: 16, borderRadius: 8,
     backgroundColor: '#3B82F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#fff',
   },
 
-  // Texte
-  info: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
-  followers: { fontSize: 12, marginTop: 2 },
-  desc: { fontSize: 11, marginTop: 1 },
-
-  // Bouton Suivre
-  btnSuivre: {
-    paddingHorizontal: 16,
-    paddingVertical:    8,
-    borderRadius:      20,
-    flexDirection:     'row',
-    alignItems:        'center',
+  // Zone droite avec le séparateur qui ne touche pas le bord gauche
+  inner: {
+    flex: 1,
+    paddingVertical: 13,
+    paddingRight: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 3,
   },
-  btnSuivreText: { fontSize: 13, fontWeight: '600' },
+
+  // Ligne 1 : nom + membres
+  row1: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2, flexShrink: 1 },
+  membersCount: { fontSize: 12, fontWeight: '500', marginLeft: 6 },
+
+  // Ligne 2 : sous-titre + action
+  row2: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  subline: { fontSize: 13, flex: 1, marginRight: 8 },
+
+  // Chevron membre
+  rightMeta: { paddingLeft: 4 },
+
+  // Pilule "Rejoindre"
+  pillJoin: {
+    backgroundColor: '#7B3FF2',
+    paddingHorizontal: 13,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  pillJoinTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
+
+  // Pilule "En attente"
+  pillPending: {
+    backgroundColor: '#F59E0B18',
+    borderWidth: 1,
+    borderColor: '#F59E0B60',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  pillPendingTxt: { color: '#F59E0B', fontSize: 12, fontWeight: '600' },
+
+  // Badges tier
+  badgePro:      { backgroundColor: '#7B3FF222', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
+  badgeProTxt:   { color: '#7B3FF2', fontSize: 9, fontWeight: '800' },
+  badgeElite:    { backgroundColor: '#F59E0B22', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
+  badgeEliteTxt: { color: '#F59E0B', fontSize: 9, fontWeight: '800' },
 });
