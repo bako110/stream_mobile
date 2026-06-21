@@ -146,7 +146,11 @@ export const CommunityInviteScreen: React.FC = () => {
             {loading ? (
               <ActivityIndicator color="#fff" size="large" style={{ marginVertical: 8 }} />
             ) : (
-              <Text style={{ color: '#fff', fontSize: 30, fontWeight: '900', letterSpacing: 5 }}>
+              <Text
+                style={{ color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: 3, textAlign: 'center' }}
+                adjustsFontSizeToFit
+                numberOfLines={1}
+              >
                 {code || '—'}
               </Text>
             )}
