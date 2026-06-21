@@ -1493,7 +1493,6 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 communityId,
                 communityName: community.name,
                 myRole,
-                inviteCode: community.invite_code ?? undefined,
               })}
               style={s.headerIcon}
             >

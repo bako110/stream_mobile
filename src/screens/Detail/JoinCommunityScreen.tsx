@@ -1,14 +1,6 @@
-/**
- * JoinCommunityScreen — Atterrissage depuis un lien d'invitation.
- * gofolyx://join/GOFOLIX-A3K9F  ou  https://gofolyx.app/join/GOFOLIX-A3K9F
- *
- * Charge les infos de la communauté via le code, puis :
- * - Si déjà membre → redirige vers le chat
- * - Sinon → affiche une card d'invitation et propose de rejoindre
- */
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Alert,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Alert, ScrollView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -29,8 +21,9 @@ export const JoinCommunityScreen: React.FC = () => {
   const [joining,   setJoining]   = useState(false);
   const [error,     setError]     = useState<string | null>(null);
 
+  // Toujours charger depuis l'API — ne jamais se fier au code passé en param
   useEffect(() => {
-    const code = inviteCode?.toUpperCase();
+    const code = inviteCode?.trim().toUpperCase();
     if (!code) { setError('Code invalide.'); setLoading(false); return; }
 
     apiClient.get(`/api/v1/communities/join/${code}`)
@@ -44,27 +37,47 @@ export const JoinCommunityScreen: React.FC = () => {
 
   const handleJoin = async () => {
     if (!community) return;
+    const code = inviteCode.trim().toUpperCase();
 
-    // Déjà membre → aller directement au chat
     if (community.join_status === 'member') {
       nav.replace('CommunityChat', { communityId: community.id, communityName: community.name });
       return;
     }
 
+    const price: number = community.entry_price_coins ?? 0;
+    if (price > 0) {
+      Alert.alert(
+        'Adhésion payante',
+        `Cette communauté coûte ${price} coins pour rejoindre. Continuer ?`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: `Payer ${price} coins`, onPress: () => _doJoin(code) },
+        ],
+      );
+      return;
+    }
+
+    _doJoin(code);
+  };
+
+  const _doJoin = async (code: string) => {
     setJoining(true);
     try {
-      const res = await apiClient.post<any>(`/api/v1/communities/join/${inviteCode.toUpperCase()}`);
+      const res = await apiClient.post<any>(`/api/v1/communities/join/${code}`);
       if (res.data?.joined) {
         nav.replace('CommunityChat', { communityId: res.data.community_id, communityName: community.name });
       } else if (res.data?.pending) {
         Alert.alert(
-          'Demande envoyée !',
-          'L\'admin doit approuver ta demande. Tu seras notifié dès que tu auras accès.',
+          'Demande envoyee',
+          "L'admin doit approuver ta demande. Tu seras notifie des que tu auras acces.",
           [{ text: 'OK', onPress: () => nav.goBack() }],
         );
+      } else if (res.data?.error === 'insufficient_coins') {
+        Alert.alert('Coins insuffisants', `Il te faut ${community.entry_price_coins} coins pour rejoindre cette communaute.`);
       }
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de rejoindre.');
+      const detail = e?.response?.data?.detail ?? 'Impossible de rejoindre.';
+      Alert.alert('Erreur', detail);
     } finally { setJoining(false); }
   };
 
@@ -74,7 +87,7 @@ export const JoinCommunityScreen: React.FC = () => {
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="#7B3FF2" size="large" />
         <Text style={{ color: colors.textTertiary, marginTop: 12, fontSize: 14 }}>
-          Chargement de la communauté…
+          Chargement de la communaute...
         </Text>
       </View>
     );
@@ -83,7 +96,8 @@ export const JoinCommunityScreen: React.FC = () => {
   // ── Erreur ──
   if (error || !community) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center',
+        justifyContent: 'center', padding: 32, gap: 16 }}>
         <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#EF444415',
           alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="alert-circle" size={36} color="#EF4444" />
@@ -92,7 +106,7 @@ export const JoinCommunityScreen: React.FC = () => {
           Lien invalide
         </Text>
         <Text style={{ color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
-          {error ?? 'Ce code d\'invitation est invalide ou a expiré.'}
+          {error ?? "Ce code d'invitation est invalide ou a expire."}
         </Text>
         <TouchableOpacity onPress={() => nav.goBack()} style={{ marginTop: 8 }}>
           <Text style={{ color: '#7B3FF2', fontWeight: '700', fontSize: 15 }}>Retour</Text>
@@ -101,12 +115,20 @@ export const JoinCommunityScreen: React.FC = () => {
     );
   }
 
-  const alreadyMember  = community.join_status === 'member';
+  const alreadyMember   = community.join_status === 'member';
   const pendingApproval = community.join_status === 'pending';
+  const price: number   = community.entry_price_coins ?? 0;
+  const needsApproval   = community.requires_approval || community.is_private;
+
+  const joinLabel = () => {
+    if (needsApproval) return 'Demander a rejoindre';
+    if (price > 0) return `Rejoindre · ${price} coins`;
+    return 'Rejoindre';
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Bannière */}
+      {/* Banniere */}
       <View style={{ height: 220, backgroundColor: '#000' }}>
         {community.banner_url ? (
           <Image source={{ uri: community.banner_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -116,7 +138,6 @@ export const JoinCommunityScreen: React.FC = () => {
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']}
           style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 }} />
 
-        {/* Bouton fermer */}
         <TouchableOpacity onPress={() => nav.goBack()}
           style={{ position: 'absolute', top: insets.top + 12, right: 16,
             width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)',
@@ -125,8 +146,7 @@ export const JoinCommunityScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <View style={{ flex: 1, padding: 24, gap: 16 }}>
-
+      <ScrollView contentContainerStyle={{ padding: 24, gap: 16, paddingBottom: 40 }}>
         {/* Avatar + nom */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: -20 }}>
           {community.avatar_url ? (
@@ -146,7 +166,7 @@ export const JoinCommunityScreen: React.FC = () => {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
               <Icon name={community.is_private ? 'lock' : 'globe'} size={12} color={colors.textTertiary} />
               <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
-                {community.is_private ? 'Communauté privée' : 'Communauté publique'}
+                {community.is_private ? 'Communaute privee' : 'Communaute publique'}
                 {' · '}{community.members_count} membre{community.members_count !== 1 ? 's' : ''}
               </Text>
             </View>
@@ -160,18 +180,39 @@ export const JoinCommunityScreen: React.FC = () => {
 
         {/* Description */}
         {community.description ? (
-          <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }} numberOfLines={3}>
+          <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }} numberOfLines={4}>
             {community.description}
           </Text>
         ) : null}
 
         {/* Badge invitation */}
-        <View style={[st.inviteBadge, { backgroundColor: '#7B3FF210', borderColor: '#7B3FF230' }]}>
+        <View style={[st.badge, { backgroundColor: '#7B3FF210', borderColor: '#7B3FF230' }]}>
           <Icon name="key" size={14} color="#7B3FF2" />
           <Text style={{ color: '#7B3FF2', fontSize: 13, fontWeight: '600' }}>
-            Vous avez été invité via le code <Text style={{ fontWeight: '900' }}>{inviteCode?.toUpperCase()}</Text>
+            Invite via le code{' '}
+            <Text style={{ fontWeight: '900' }}>{inviteCode?.trim().toUpperCase()}</Text>
           </Text>
         </View>
+
+        {/* Badge prix */}
+        {price > 0 && !alreadyMember && !pendingApproval && (
+          <View style={[st.badge, { backgroundColor: '#F59E0B10', borderColor: '#F59E0B30' }]}>
+            <Icon name="zap" size={14} color="#F59E0B" />
+            <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '600' }}>
+              Adhésion : <Text style={{ fontWeight: '900' }}>{price} coins</Text>
+            </Text>
+          </View>
+        )}
+
+        {/* Badge approbation */}
+        {needsApproval && !alreadyMember && !pendingApproval && (
+          <View style={[st.badge, { backgroundColor: '#3B82F610', borderColor: '#3B82F630' }]}>
+            <Icon name="shield" size={14} color="#3B82F6" />
+            <Text style={{ color: '#3B82F6', fontSize: 13, fontWeight: '600' }}>
+              Communaute sur approbation — l'admin doit accepter
+            </Text>
+          </View>
+        )}
 
         {/* Bouton principal */}
         {alreadyMember ? (
@@ -183,9 +224,12 @@ export const JoinCommunityScreen: React.FC = () => {
             </LinearGradient>
           </TouchableOpacity>
         ) : pendingApproval ? (
-          <View style={[st.mainBtn, { backgroundColor: '#F59E0B15', borderWidth: 1.5, borderColor: '#F59E0B40', borderRadius: 16 }]}>
+          <View style={[st.mainBtn, { backgroundColor: '#F59E0B15', borderWidth: 1.5,
+            borderColor: '#F59E0B40', borderRadius: 16 }]}>
             <Icon name="clock" size={18} color="#F59E0B" />
-            <Text style={{ color: '#F59E0B', fontWeight: '700', fontSize: 15 }}>Demande en cours d'examen</Text>
+            <Text style={{ color: '#F59E0B', fontWeight: '700', fontSize: 15 }}>
+              Demande en cours d'examen
+            </Text>
           </View>
         ) : (
           <TouchableOpacity onPress={handleJoin} disabled={joining} activeOpacity={0.85}
@@ -195,9 +239,9 @@ export const JoinCommunityScreen: React.FC = () => {
               {joining
                 ? <ActivityIndicator color="#fff" size="small" />
                 : <>
-                    <Icon name="user-plus" size={20} color="#fff" />
+                    <Icon name={price > 0 ? 'zap' : 'user-plus'} size={20} color="#fff" />
                     <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>
-                      {community.requires_approval ? 'Demander à rejoindre' : 'Rejoindre'}
+                      {joinLabel()}
                     </Text>
                   </>
               }
@@ -205,17 +249,17 @@ export const JoinCommunityScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        {community.requires_approval && !alreadyMember && !pendingApproval && (
+        {needsApproval && !alreadyMember && !pendingApproval && price === 0 && (
           <Text style={{ color: colors.textTertiary, fontSize: 12, textAlign: 'center', marginTop: -8 }}>
             L'admin devra approuver ta demande
           </Text>
         )}
-      </View>
+      </ScrollView>
     </View>
   );
 };
 
 const st = StyleSheet.create({
-  inviteBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12 },
-  mainBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
+  badge:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12 },
+  mainBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
 });

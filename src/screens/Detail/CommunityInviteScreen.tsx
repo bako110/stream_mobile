@@ -18,11 +18,11 @@ export const CommunityInviteScreen: React.FC = () => {
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { communityId, communityName, myRole, inviteCode: initialCode } = route.params;
+  const { communityId, communityName, myRole } = route.params;
   const isAdmin = myRole === 'admin' || myRole === 'moderator';
 
-  const [code,         setCode]         = useState<string>(initialCode ?? '');
-  const [loading,      setLoading]      = useState(!initialCode);
+  const [code,         setCode]         = useState<string>('');
+  const [loading,      setLoading]      = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [copiedCode,   setCopiedCode]   = useState(false);
   const [copiedLink,   setCopiedLink]   = useState(false);
@@ -50,7 +50,7 @@ export const CommunityInviteScreen: React.FC = () => {
     finally { setLoading(false); }
   }, [communityId, isAdmin]);
 
-  useEffect(() => { if (!initialCode) load(); }, [load, initialCode]);
+  useEffect(() => { load(); }, [load]);
 
   const handleRegenerate = () => {
     Alert.alert(
