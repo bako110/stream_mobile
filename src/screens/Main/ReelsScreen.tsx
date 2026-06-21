@@ -111,6 +111,7 @@ export const ReelsScreen: React.FC = () => {
   const [tab,           setTab]           = useState<'feed' | 'mine'>('feed');
   const [myId,          setMyId]          = useState<string | null>(null);
   const [currentIndex,  setCurrentIndex]  = useState(0);
+  const [listKey,       setListKey]       = useState('reels-0');
   const [screenFocused, setScreenFocused] = useState(true);
   const [muted,         setMuted]         = useState(false);
   const [searchOpen,    setSearchOpen]    = useState(false);
@@ -197,11 +198,9 @@ export const ReelsScreen: React.FC = () => {
         viewedReelsRef.current = new Set();
         currentIdxRef.current = targetIdx;
         setCurrentIndex(targetIdx);
+        // Remount FlatList avec initialScrollIndex — plus fiable que scrollToOffset
         if (targetIdx > 0) {
-          // Scroll après que la FlatList ait rendu les nouvelles données
-          setTimeout(() => {
-            if (mountedRef.current) scrollToIdx(targetIdx);
-          }, 80);
+          setListKey(`reels-load-${targetId ?? Date.now()}`);
         }
       } else if (targetId) {
         // Mode arrière-plan avec reel cible — on NE remplace PAS la liste
@@ -364,28 +363,18 @@ export const ReelsScreen: React.FC = () => {
 
     const idx = reelsRef.current.findIndex(r => r.id === newInitialId);
     if (idx >= 0) {
+      // Reel déjà dans la liste — remount FlatList avec initialScrollIndex au bon index
       currentIdxRef.current = idx;
       setCurrentIndex(idx);
-      // Délai court pour laisser la FlatList se positionner après changement d'onglet
-      setTimeout(() => {
-        if (mountedRef.current) scrollToIdx(idx);
-      }, 80);
+      setListKey(`reels-${newInitialId}`);
     } else if (newReel?.hls_url) {
-      // Injecter en tête puis scroller — setReels d'abord, scroll après rendu
+      // Reel pas dans la liste — injecter en tête (index 0) puis remount
       const injected = [newReel, ...reelsRef.current.filter(r => r.id !== newInitialId)];
       reelsRef.current = injected;
       currentIdxRef.current = 0;
       setCurrentIndex(0);
       setReels(injected);
-
-      setTimeout(() => {
-        if (!mountedRef.current) return;
-        isScrollingRef.current = true;
-        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 500);
-        listRef.current?.scrollToOffset({ offset: 0, animated: false });
-      }, 80);
-
+      setListKey(`reels-${newInitialId}`);
       lastInitialReelRef.current = newInitialId;
       load(true, newInitialId, newReel);
     } else {
@@ -801,6 +790,7 @@ export const ReelsScreen: React.FC = () => {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <FlatList
+        key={listKey}
         ref={listRef}
         data={feedWithAds as any[]}
         keyExtractor={r => (r as any).id}
@@ -812,6 +802,7 @@ export const ReelsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         disableIntervalMomentum
+        initialScrollIndex={currentIndex}
         onScroll={e => onScrollUpdate(e.nativeEvent.contentOffset.y)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig.current}
@@ -820,16 +811,7 @@ export const ReelsScreen: React.FC = () => {
         extraData={`${currentIndex}-${screenFocused}-${muted}`}
         getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
         onScrollToIndexFailed={({ index }) => {
-          // Fallback via offset direct — ne nécessite pas que l'item soit rendu
           scrollToIdx(index);
-        }}
-        onLayout={() => {
-          // FlatList prête — exécuter le scroll en attente s'il y en a un
-          if (pendingScrollIdx.current !== null) {
-            const idx = pendingScrollIdx.current;
-            pendingScrollIdx.current = null;
-            scrollToIdx(idx);
-          }
         }}
         renderItem={renderVideoSlide}
         removeClippedSubviews={false}
