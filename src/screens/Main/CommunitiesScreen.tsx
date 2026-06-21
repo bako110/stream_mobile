@@ -1267,7 +1267,7 @@ export const CommunitiesScreen: React.FC = () => {
               placeholderTextColor={colors.textTertiary}
               autoCapitalize="characters"
               autoFocus
-              maxLength={11}
+              maxLength={20}
             />
             <TouchableOpacity onPress={handleJoinByCode} disabled={joining}
               activeOpacity={0.85} style={{ borderRadius: 14, overflow: 'hidden' }}>
