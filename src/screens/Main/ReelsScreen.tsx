@@ -77,6 +77,9 @@ export const ReelsScreen: React.FC = () => {
   const nav    = useNavigation<Nav>();
   const route  = useRoute();
   const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean };
+  // paramsRef toujours à jour — lisible depuis useFocusEffect (closure figée sur [])
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const listRef           = useRef<FlatList>(null);
@@ -323,62 +326,41 @@ export const ReelsScreen: React.FC = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // feedNavActiveRef = true pendant toute la durée d'une navigation depuis FeedScreen
-  // Bloque useFocusEffect pour qu'il ne fasse pas load(false) par-dessus
-  const feedNavActiveRef = useRef(false);
-
-  // ── Focus — CAS FOOTER uniquement ─────────────────────────────────────────
+  // ── Focus ─────────────────────────────────────────────────────────────────
+  // paramsRef.current est toujours frais (mis à jour à chaque render, avant useFocusEffect)
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
-    if (!feedNavActiveRef.current) {
-      if (!didFocusOnceRef.current) {
-        load(false);
-      } else {
-        const age = Date.now() - lastLoadedAtRef.current;
-        if (age > 90_000) load(true);
-      }
-    }
-    didFocusOnceRef.current = true;
-    return () => {
-      setScreenFocused(false);
-      feedNavActiveRef.current = false; // reset au blur — prêt pour la prochaine navigation
-      try { activePlayerRef.current?.pause(); } catch {}
-      requestAnimationFrame(() => sendViewForCurrent());
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []));
 
-  // ── Params — CAS FEED : navigation depuis FeedScreen ─────────────────────
-  // useEffect fire APRÈS useFocusEffect, mais on bloque useFocusEffect via feedNavActiveRef
-  // qu'on pose ici avant que React re-render (synchrone dans le même cycle)
-  useEffect(() => {
-    const p        = (route.params ?? {}) as typeof params;
-    const targetId = p.initialReelId;
+    const p          = paramsRef.current;
+    const targetId   = p.initialReelId;
     const targetReel = p.initialReel as Reel | undefined;
 
     if (p.reelPublished) {
       nav.setParams({ reelPublished: undefined } as any);
       load(false);
-      return;
+      didFocusOnceRef.current = true;
+      return () => {
+        setScreenFocused(false);
+        try { activePlayerRef.current?.pause(); } catch {}
+        requestAnimationFrame(() => sendViewForCurrent());
+      };
     }
-    if (!targetId) return;
 
-    // Signaler la navigation feed — bloque useFocusEffect
-    feedNavActiveRef.current = true;
-    nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
+    if (targetId) {
+      // CAS FEED — effacer les params tout de suite
+      nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
 
-    // Reel déjà dans la liste → scroll direct
-    const existingIdx = reelsRef.current.findIndex(r => r.id === targetId);
-    if (existingIdx >= 0) {
-      currentIdxRef.current = existingIdx;
-      setCurrentIndex(existingIdx);
-      isScrollingRef.current = true;
-      if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-      scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
-      listRef.current?.scrollToOffset({ offset: SCREEN_H * existingIdx, animated: false });
-    } else {
-      // Pas dans la liste → injecter en tête si on a le reel, sinon charger
-      if (targetReel?.hls_url) {
+      const existingIdx = reelsRef.current.findIndex(r => r.id === targetId);
+      if (existingIdx >= 0) {
+        // Reel déjà dans la liste → scroll direct
+        currentIdxRef.current = existingIdx;
+        setCurrentIndex(existingIdx);
+        isScrollingRef.current = true;
+        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
+        listRef.current?.scrollToOffset({ offset: SCREEN_H * existingIdx, animated: false });
+      } else if (targetReel?.hls_url) {
+        // Reel absent mais on a l'objet → injecter en tête
         const injected = [targetReel, ...reelsRef.current.filter(r => r.id !== targetId)];
         reelsRef.current = injected;
         setReels(injected);
@@ -389,12 +371,37 @@ export const ReelsScreen: React.FC = () => {
         scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
         listRef.current?.scrollToOffset({ offset: 0, animated: false });
       } else {
-        pendingTargetRef.current = { id: targetId, reel: targetReel };
+        // Pas d'objet reel — charger en background
+        pendingTargetRef.current = { id: targetId };
         load(true);
       }
+    } else {
+      // CAS FOOTER — navigation normale
+      if (!didFocusOnceRef.current) {
+        load(false);
+      } else {
+        const age = Date.now() - lastLoadedAtRef.current;
+        if (age > 90_000) load(true);
+      }
+    }
+
+    didFocusOnceRef.current = true;
+    return () => {
+      setScreenFocused(false);
+      try { activePlayerRef.current?.pause(); } catch {}
+      requestAnimationFrame(() => sendViewForCurrent());
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []));
+
+  // ── reelPublished via useEffect (cas où l'écran est déjà focus) ───────────
+  useEffect(() => {
+    if (params.reelPublished) {
+      nav.setParams({ reelPublished: undefined } as any);
+      load(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.initialReelId, params.reelPublished]);
+  }, [params.reelPublished]);
 
   // ── Edit / Delete ─────────────────────────────────────────────────────────
   const handleDeleteReel = useCallback((reel: Reel) => {
