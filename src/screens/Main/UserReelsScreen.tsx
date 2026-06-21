@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userService } from '../../services/userService';
 import type { Reel } from '../../types';
 import { useTheme } from '../../hooks/useTheme';
+import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
+import type { FilterKey } from '../Create/ReelEditorScreen';
 
 const { width: SW, height: SH } = Dimensions.get('screen');
 
@@ -51,33 +53,86 @@ const Slide: React.FC<SlideProps> = memo(({ reel, isActive, muted, onToggleMute 
 
   useEffect(() => { if (!isActive) setPaused(false); }, [isActive]);
 
+  const filterKey = reel.filter_name as FilterKey | undefined;
+  const filtDef   = filterKey ? FILTERS.find(f => f.key === filterKey) : null;
+  const filtOp    = filterKey ? (FILTER_VIDEO_OPACITY[filterKey] ?? 0) : 0;
+  const filtOp2   = filterKey ? (FILTER_VIDEO_OPACITY2[filterKey] ?? 0) : 0;
+
+  let textLayers: any[]    = [];
+  let stickerLayers: any[] = [];
+  let drawLayers: any[]    = [];
+  try { if (reel.text_layers)    textLayers    = JSON.parse(reel.text_layers);    } catch {}
+  try { if (reel.sticker_layers) stickerLayers = JSON.parse(reel.sticker_layers); } catch {}
+  try { if (reel.draw_layers)    drawLayers    = JSON.parse(reel.draw_layers);    } catch {}
+
   return (
     <View style={{ width: SW, height: SH, backgroundColor: '#000' }}>
       {reel.thumbnail_url && (
         <Image source={{ uri: reel.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       )}
       <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />
-      {/* Tap pour pause — View sans pointerEvents="none" capte le tap mais laisse le scroll parent */}
+
+      {/* Tap pour pause */}
       <TouchableOpacity
         activeOpacity={1}
         style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
         onPress={() => setPaused(v => !v)}
       />
+
+      {/* Overlay filtre */}
+      {filtDef && filtOp > 0 && (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: filtDef.overlay, opacity: filtOp, zIndex: 2 }} />
+      )}
+      {filtDef && (filtDef as any).overlay2 && filtOp2 > 0 && (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: (filtDef as any).overlay2, opacity: filtOp2, zIndex: 2 }} />
+      )}
+
+      {/* Text layers */}
+      {textLayers.map((l: any) => (
+        <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: l.x, top: l.y, zIndex: 3, transform: [{ rotate: `${l.rotation ?? 0}deg` }, { scale: l.scale ?? 1 }] }}>
+          <Text style={{ color: l.color, fontSize: l.fontSize, fontWeight: l.bold ? '800' : '600', fontStyle: l.italic ? 'italic' : 'normal', textDecorationLine: l.underline ? 'underline' : 'none', backgroundColor: l.background ? 'rgba(0,0,0,0.5)' : 'transparent', paddingHorizontal: l.background ? 6 : 0, paddingVertical: l.background ? 2 : 0, borderRadius: l.background ? 4 : 0, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+            {l.text}
+          </Text>
+        </View>
+      ))}
+
+      {/* Sticker layers */}
+      {stickerLayers.map((st: any) => (
+        <View key={st.id} pointerEvents="none" style={{ position: 'absolute', left: st.x, top: st.y, zIndex: 4, transform: [{ rotate: `${st.rotation ?? 0}deg` }, { scale: st.scale ?? 1 }] }}>
+          <Text style={{ fontSize: 44 }}>{st.emoji}</Text>
+        </View>
+      ))}
+
+      {/* Draw layers */}
+      {drawLayers.map((seg: any, i: number) => {
+        if (!seg || !seg.x1) return null;
+        const dx  = seg.x2 - seg.x1;
+        const dy  = seg.y2 - seg.y1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        return (
+          <View key={i} pointerEvents="none" style={{ position: 'absolute', left: seg.x1, top: seg.y1 - (seg.size ?? 4) / 2, width: len, height: seg.size ?? 4, zIndex: 5, transform: [{ translateX: len / 2 }, { rotate: `${angle}deg` }, { translateX: -len / 2 }], backgroundColor: seg.color ?? '#fff', borderRadius: (seg.size ?? 4) / 2, opacity: seg.opacity ?? 1 }} />
+        );
+      })}
+
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.75)']}
-        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', zIndex: 2 }}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', zIndex: 6 }}
         pointerEvents="none"
       />
+
       {/* Caption */}
       {reel.caption ? (
         <View style={st.caption} pointerEvents="none">
           <Text style={st.captionTxt} numberOfLines={3}>{reel.caption}</Text>
         </View>
       ) : null}
+
       {/* Mute */}
       <TouchableOpacity style={st.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
         <Icon name={muted ? 'volume-x' : 'volume-2'} size={20} color="#fff" />
       </TouchableOpacity>
+
       {/* Pause indicator */}
       {paused && (
         <View style={st.pauseIcon} pointerEvents="none">

@@ -96,10 +96,13 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [editBanner, setEditBanner] = useState<string | null>(null);
 
   // Onglet Sécurité
-  const [editPrivate,     setEditPrivate]     = useState(false);
-  const [editApproval,    setEditApproval]    = useState(false);
-  const [editMembersOnly, setEditMembersOnly] = useState(false);
-  const [editEntryPrice,  setEditEntryPrice]  = useState('0');
+  const [editPrivate,              setEditPrivate]              = useState(false);
+  const [editApproval,             setEditApproval]             = useState(false);
+  const [editMembersOnly,          setEditMembersOnly]          = useState(false);
+  const [editEntryPrice,           setEditEntryPrice]           = useState('0');
+  const [editMembersHiddenPublic,  setEditMembersHiddenPublic]  = useState(true);
+  const [editMembersHiddenAll,     setEditMembersHiddenAll]     = useState(true);
+  const [editInviteOnlyAdmin,      setEditInviteOnlyAdmin]      = useState(true);
 
   // Onglet Membres
   const [roleLoading,    setRoleLoading]    = useState<string | null>(null);
@@ -109,6 +112,17 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   const isAdmin  = myRole === 'admin';
   const isMod    = myRole === 'moderator';
+
+  // Visibilité du bouton/section membres selon les flags de la communauté
+  const canShowMembersBtn = isGlobalAdmin || isAdmin || isMod || (() => {
+    if (!community) return true;
+    const hiddenPublic  = !!community.members_list_hidden_public;
+    const hiddenMembers = !!community.members_list_hidden_members;
+    const isMemberOrAbove = joinStatus === 'member' || isAdmin || isMod;
+    if (hiddenPublic  && !isMemberOrAbove) return false;
+    if (hiddenMembers && !isAdmin && !isMod) return false;
+    return true;
+  })();
 
   const { addListener, removeListener } = useWs();
   const loadRef      = useRef<() => void>(() => {});
@@ -154,7 +168,17 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         nav.replace('CommunityChat', { communityId, communityName: c.name });
         return;
       }
-      const canSeeMembers = !c.is_private || js === 'member' || role === 'admin' || role === 'moderator' || globalAdmin;
+      const hiddenPublic  = !!c.members_list_hidden_public;
+      const hiddenMembers = !!c.members_list_hidden_members;
+      const isMemberOrAbove = js === 'member' || role === 'admin' || role === 'moderator';
+      const canSeeMembers =
+        globalAdmin ||
+        role === 'admin' || role === 'moderator' ||
+        (
+          (!c.is_private || isMemberOrAbove) &&
+          !(hiddenPublic  && !isMemberOrAbove) &&
+          !(hiddenMembers && role !== 'admin' && role !== 'moderator')
+        );
       if (canSeeMembers) {
         communityService.getMembers(communityId)
           .then(list => setMembers(Array.isArray(list) ? list : []))
@@ -189,6 +213,11 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   function openSettings() {
     if (!community) return;
+    console.log('[openSettings] community flags:', JSON.stringify({
+      members_list_hidden_public:  community.members_list_hidden_public,
+      members_list_hidden_members: community.members_list_hidden_members,
+      invite_only_admin:           community.invite_only_admin,
+    }));
     setEditName(community.name);
     setEditDesc(community.description ?? '');
     setEditAvatar(null);
@@ -197,6 +226,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     setEditApproval(!!community.requires_approval);
     setEditMembersOnly(!!community.members_only_chat);
     setEditEntryPrice(String(community.entry_price_coins ?? 0));
+    setEditMembersHiddenPublic(!!community.members_list_hidden_public);
+    setEditMembersHiddenAll(!!community.members_list_hidden_members);
+    setEditInviteOnlyAdmin(!!community.invite_only_admin);
     setSettingsTab('info');
     setSettingsOpen(true);
   }
@@ -234,14 +266,14 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           editAvatar ? uploadImage(editAvatar) : Promise.resolve(null),
           editBanner ? uploadImage(editBanner) : Promise.resolve(null),
         ]);
-        await communityService.update(communityId, {
+        const updated = await communityService.update(communityId, {
           name:        editName.trim(),
           description: editDesc.trim() || undefined,
           ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
           ...(bannerUrl ? { banner_url: bannerUrl } : {}),
         });
+        setCommunity(updated);
         setSettingsOpen(false);
-        load();
       } catch (e: any) {
         Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
       } finally { setSaving(false); }
@@ -252,17 +284,28 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         return;
       }
       setSaving(true);
+      const payload = {
+        is_private:                  editPrivate,
+        requires_approval:           editApproval,
+        members_only_chat:           editMembersOnly,
+        entry_price_coins:           price,
+        members_list_hidden_public:  editMembersHiddenPublic,
+        members_list_hidden_members: editMembersHiddenAll,
+        invite_only_admin:           editInviteOnlyAdmin,
+      };
+      console.log('[Settings] SEND payload:', JSON.stringify(payload));
       try {
-        await communityService.update(communityId, {
-          is_private:        editPrivate,
-          requires_approval: editApproval,
-          members_only_chat: editMembersOnly,
-          entry_price_coins: price,
-        });
+        const updated = await communityService.update(communityId, payload);
+        console.log('[Settings] RECV updated:', JSON.stringify({
+          members_list_hidden_public:  updated.members_list_hidden_public,
+          members_list_hidden_members: updated.members_list_hidden_members,
+          invite_only_admin:           updated.invite_only_admin,
+        }));
+        setCommunity(updated);
         setSettingsOpen(false);
-        load();
         Alert.alert('Enregistré', 'Les paramètres ont été mis à jour.');
       } catch (e: any) {
+        console.log('[Settings] ERROR:', e?.message, e?.response?.data);
         Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
       } finally { setSaving(false); }
     }
@@ -1129,6 +1172,74 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           />
         </View>
 
+        {/* ── MEMBRES ── */}
+        <Text style={[s.secSection, { color: colors.textTertiary, marginTop: 20 }]}>MEMBRES</Text>
+
+        <View style={[s.secRow, {
+          backgroundColor: editMembersHiddenPublic ? '#7B3FF210' : colors.backgroundSecondary,
+          borderColor: editMembersHiddenPublic ? '#7B3FF240' : colors.divider,
+        }]}>
+          <View style={[s.secIcon, { backgroundColor: '#7B3FF220' }]}>
+            <Icon name="eye-off" size={18} color="#7B3FF2" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Masqué aux non-membres</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>
+              Les personnes extérieures ne voient pas la liste des membres
+            </Text>
+          </View>
+          <Switch
+            value={editMembersHiddenPublic}
+            onValueChange={setEditMembersHiddenPublic}
+            trackColor={{ false: colors.divider, true: '#7B3FF255' }}
+            thumbColor={editMembersHiddenPublic ? '#7B3FF2' : colors.textTertiary}
+          />
+        </View>
+
+        <View style={[s.secRow, {
+          backgroundColor: editMembersHiddenAll ? '#E0389A10' : colors.backgroundSecondary,
+          borderColor: editMembersHiddenAll ? '#E0389A40' : colors.divider,
+          marginTop: 8,
+        }]}>
+          <View style={[s.secIcon, { backgroundColor: '#E0389A20' }]}>
+            <Icon name="users" size={18} color="#E0389A" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Masqué aux membres</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>
+              Les membres ne voient pas les autres — seul l'admin voit tout
+            </Text>
+          </View>
+          <Switch
+            value={editMembersHiddenAll}
+            onValueChange={setEditMembersHiddenAll}
+            trackColor={{ false: colors.divider, true: '#E0389A55' }}
+            thumbColor={editMembersHiddenAll ? '#E0389A' : colors.textTertiary}
+          />
+        </View>
+
+        <View style={[s.secRow, {
+          backgroundColor: editInviteOnlyAdmin ? '#10B98110' : colors.backgroundSecondary,
+          borderColor: editInviteOnlyAdmin ? '#10B98140' : colors.divider,
+          marginTop: 8,
+        }]}>
+          <View style={[s.secIcon, { backgroundColor: '#10B98120' }]}>
+            <Icon name="user-plus" size={18} color="#10B981" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Ajout par admin uniquement</Text>
+            <Text style={[s.secDesc, { color: colors.textTertiary }]}>
+              Seul l'admin peut inviter de nouveaux membres
+            </Text>
+          </View>
+          <Switch
+            value={editInviteOnlyAdmin}
+            onValueChange={setEditInviteOnlyAdmin}
+            trackColor={{ false: colors.divider, true: '#10B98155' }}
+            thumbColor={editInviteOnlyAdmin ? '#10B981' : colors.textTertiary}
+          />
+        </View>
+
         {/* ── ACCÈS RAPIDE ── */}
         <Text style={[s.secSection, { color: colors.textTertiary, marginTop: 20 }]}>ACCÈS RAPIDE</Text>
 
@@ -1538,19 +1649,21 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       <Icon name="message-circle" size={16} color="#fff" />
                       <Text style={[s.actionTxt, { color: '#fff' }]}>Discussion</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[s.actionBtn, {
-                        borderWidth: 1.5,
-                        borderColor: colors.primary,
-                        flex: 0,
-                        paddingHorizontal: 16,
-                      }]}
-                      onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name })}
-                      activeOpacity={0.8}
-                    >
-                      <Icon name="users" size={15} color={colors.primary} />
-                      <Text style={[s.actionTxt, { color: colors.primary }]}>Membres</Text>
-                    </TouchableOpacity>
+                    {canShowMembersBtn && (
+                      <TouchableOpacity
+                        style={[s.actionBtn, {
+                          borderWidth: 1.5,
+                          borderColor: colors.primary,
+                          flex: 0,
+                          paddingHorizontal: 16,
+                        }]}
+                        onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name, myRole, membersListHiddenPublic: community.members_list_hidden_public ?? false, membersListHiddenMembers: community.members_list_hidden_members ?? false })}
+                        activeOpacity={0.8}
+                      >
+                        <Icon name="users" size={15} color={colors.primary} />
+                        <Text style={[s.actionTxt, { color: colors.primary }]}>Membres</Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                       style={[s.actionBtn, {
                         borderWidth: 1,
@@ -1800,17 +1913,19 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       <Icon name="chevron-right" size={13} color={colors.textTertiary} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-                      onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name })}
-                      activeOpacity={0.75}
-                    >
-                      <View style={[s.navIcon, { backgroundColor: '#3B82F620' }]}>
-                        <Icon name="users" size={20} color="#3B82F6" />
-                      </View>
-                      <Text style={[s.navLabel, { color: colors.textPrimary }]}>Annuaire</Text>
-                      <Icon name="chevron-right" size={13} color={colors.textTertiary} />
-                    </TouchableOpacity>
+                    {canShowMembersBtn && (
+                      <TouchableOpacity
+                        style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                        onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name, myRole, membersListHiddenPublic: community.members_list_hidden_public ?? false, membersListHiddenMembers: community.members_list_hidden_members ?? false })}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[s.navIcon, { backgroundColor: '#3B82F620' }]}>
+                          <Icon name="users" size={20} color="#3B82F6" />
+                        </View>
+                        <Text style={[s.navLabel, { color: colors.textPrimary }]}>Annuaire</Text>
+                        <Icon name="chevron-right" size={13} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    )}
 
                     {(isAdmin || isMod) && (
                       <TouchableOpacity
@@ -1874,9 +1989,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>
                       MEMBRES ({fmtCount(community.members_count ?? 0)})
                     </Text>
-                    {members.length > 5 && (
+                    {members.length > 5 && canShowMembersBtn && (
                       <TouchableOpacity
-                        onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name })}
+                        onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name, myRole, membersListHiddenPublic: community.members_list_hidden_public ?? false, membersListHiddenMembers: community.members_list_hidden_members ?? false })}
                       >
                         <Text style={[s.seeAll, { color: colors.primary }]}>Voir tous</Text>
                       </TouchableOpacity>
@@ -1928,7 +2043,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           members.length > 5 ? (
             <TouchableOpacity
               style={[s.seeAllRow, { borderTopColor: colors.divider }]}
-              onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name })}
+              onPress={() => (nav as any).navigate('CommunityMembers', { communityId, communityName: community.name, myRole, membersListHiddenPublic: community.members_list_hidden_public ?? false, membersListHiddenMembers: community.members_list_hidden_members ?? false })}
               activeOpacity={0.7}
             >
               <Text style={[s.seeAllTxt, { color: colors.primary }]}>

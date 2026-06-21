@@ -20,6 +20,7 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useTheme } from '../../hooks/useTheme';
 import { RichText } from '../../components/common/RichText';
 import { apiClient } from '../../api';
@@ -32,7 +33,9 @@ import {
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import { type FilterKey, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
+import { type FilterKey, type ReelEditResult, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2, ReelEditorScreen } from '../Create/ReelEditorScreen';
+
+type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -102,6 +105,7 @@ export const ReelsScreen: React.FC = () => {
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
   const [editCaption,   setEditCaption]   = useState('');
   const [editSaving,    setEditSaving]    = useState(false);
+  const [fullEditReel,  setFullEditReel]  = useState<Reel | null>(null); // édition effets visuels
   const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId);
   const [hasMore,       setHasMore]       = useState(true);
   const [tab,           setTab]           = useState<'feed' | 'mine'>('feed');
@@ -291,6 +295,11 @@ export const ReelsScreen: React.FC = () => {
     Keyboard.dismiss();
   }, []);
 
+  // Clic sur une carte "Mes Reels" → page dédiée plein écran
+  const handlePlayFromMine = useCallback((r: Reel) => {
+    nav.navigate('ReelPlayer', { reel: r });
+  }, [nav]);
+
   const pickSearchResult = useCallback((r: Reel) => {
     closeSearch();
     const idx = reelsRef.current.findIndex(x => x.id === r.id);
@@ -409,6 +418,38 @@ export const ReelsScreen: React.FC = () => {
     setMenuReel(null);
     setEditCaption(reel.caption ?? '');
     setEditReel(reel);
+  }, []);
+
+  const handleOpenFullEdit = useCallback((reel: Reel) => {
+    setMenuReel(null);
+    setFullEditReel(reel);
+  }, []);
+
+  const handleFullEditConfirm = useCallback(async (result: ReelEditResult, reel: Reel) => {
+    try {
+      await reelService.update(reel.id, {
+        caption:       reel.caption ?? undefined,
+        filter:        result.filter !== 'original' ? result.filter : undefined,
+        text_layers:   result.layers.length   > 0 ? JSON.stringify(result.layers)    : undefined,
+        sticker_layers: result.stickers.length > 0 ? JSON.stringify(result.stickers) : undefined,
+        draw_layers:   result.drawings.length > 0 ? JSON.stringify(result.drawings)  : undefined,
+        video_adjust:  Object.values(result.adjust).some(v => v !== 0) ? JSON.stringify(result.adjust) : undefined,
+      });
+      // Mettre à jour localement
+      const patch = {
+        filter_name:    result.filter !== 'original' ? result.filter : null,
+        text_layers:    result.layers.length   > 0 ? JSON.stringify(result.layers)    : null,
+        sticker_layers: result.stickers.length > 0 ? JSON.stringify(result.stickers) : null,
+        draw_layers:    result.drawings.length > 0 ? JSON.stringify(result.drawings)  : null,
+        video_adjust:   Object.values(result.adjust).some(v => v !== 0) ? JSON.stringify(result.adjust) : null,
+      };
+      setReels(prev  => prev.map(r  => r.id === reel.id ? { ...r, ...patch } : r));
+      setMyReels(prev => prev.map(r => r.id === reel.id ? { ...r, ...patch } : r));
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder les modifications.');
+    } finally {
+      setFullEditReel(null);
+    }
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
@@ -554,15 +595,21 @@ export const ReelsScreen: React.FC = () => {
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-        <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.mineHeader}>
-          <TouchableOpacity onPress={() => setTab('feed')} style={s.mineIconBtn}>
-            <Icon name="arrow-left" size={22} color="#fff" />
+        <View style={[s.mineHeader, { backgroundColor: colors.background, borderBottomColor: colors.divider }]}>
+          <TouchableOpacity onPress={() => setTab('feed')} style={s.mineBackBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={s.mineHeaderTitle}>Mes Reels</Text>
-          <TouchableOpacity onPress={() => nav.navigate('CreateReel')} style={s.mineIconBtn}>
-            <Icon name="plus" size={22} color="#fff" />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.mineHeaderTitle, { color: colors.textPrimary }]}>Mes Reels</Text>
+            {myReels.length > 0 && (
+              <Text style={[s.mineHeaderSub, { color: colors.textSecondary }]}>{myReels.length} video{myReels.length > 1 ? 's' : ''}</Text>
+            )}
+          </View>
+          <TouchableOpacity onPress={() => nav.navigate('CreateReel')} style={[s.mineCreateBtn, { backgroundColor: colors.primary }]}>
+            <Icon name="plus" size={18} color="#fff" />
+            <Text style={s.mineCreateBtnText}>Nouveau</Text>
           </TouchableOpacity>
-        </LinearGradient>
+        </View>
 
         {myReels.length === 0 ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
@@ -580,31 +627,74 @@ export const ReelsScreen: React.FC = () => {
             numColumns={2}
             contentContainerStyle={s.mineGrid}
             columnWrapperStyle={s.mineRow}
-            renderItem={({ item }) => (
-              <View style={s.mineCard}>
-                {item.thumbnail_url
-                  ? <Image source={{ uri: item.thumbnail_url }} style={s.mineThumb} resizeMode="cover" />
-                  : <View style={[s.mineThumbFallback, { backgroundColor: colors.backgroundSecondary }]}>
-                      <Icon name="film" size={28} color={colors.textDisabled} />
+            renderItem={({ item }) => {
+              const filterKey = item.filter_name as FilterKey | undefined;
+              const filtDef   = filterKey ? FILTERS.find(f => f.key === filterKey) : null;
+              const filtOp    = filterKey ? (FILTER_VIDEO_OPACITY[filterKey] ?? 0) : 0;
+              const filtOp2V  = filterKey ? (FILTER_VIDEO_OPACITY2[filterKey] ?? 0) : 0;
+              const hasEffects = !!(item.filter_name || item.text_layers || item.sticker_layers);
+              return (
+                <TouchableOpacity
+                  style={s.mineCard}
+                  activeOpacity={0.88}
+                  onPress={() => handlePlayFromMine(item)}
+                >
+                  {/* Thumbnail de base */}
+                  {item.thumbnail_url
+                    ? <Image source={{ uri: item.thumbnail_url }} style={s.mineThumb} resizeMode="cover" />
+                    : <View style={[s.mineThumbFallback, { backgroundColor: colors.backgroundSecondary }]}>
+                        <Icon name="film" size={28} color={colors.textDisabled} />
+                      </View>
+                  }
+
+                  {/* Overlay filtre */}
+                  {filtDef && filtOp > 0 && (
+                    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 12, backgroundColor: filtDef.overlay, opacity: filtOp }]} />
+                  )}
+                  {filtDef && filtDef.overlay2 && filtOp2V > 0 && (
+                    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 12, backgroundColor: filtDef.overlay2, opacity: filtOp2V }]} />
+                  )}
+
+                  {/* Indicateur effets actifs */}
+                  {hasEffects && (
+                    <View pointerEvents="none" style={s.mineEffectBadge}>
+                      <Icon name="sliders" size={9} color="#fff" />
                     </View>
-                }
-                <View style={s.mineOverlay}>
-                  <View style={{ flexDirection: 'row', gap: 12, flex: 1 }}>
-                    <View style={s.mineStat}>
-                      <Icon name="play" size={10} color="#fff" />
-                      <Text style={s.mineStatText}>{formatCount(item.view_count)}</Text>
+                  )}
+
+                  {/* Texte layers en miniature */}
+                  {item.text_layers && (() => {
+                    try {
+                      const ls = JSON.parse(item.text_layers);
+                      return ls.slice(0, 3).map((l: any) => (
+                        <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: `${(l.x / 390) * 100}%` as any, top: `${(l.y / 844) * 100}%` as any }}>
+                          <Text style={{ color: l.color, fontSize: Math.max(7, Math.round(l.fontSize * 0.28)), fontWeight: l.bold ? '800' : '600', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>
+                            {l.text}
+                          </Text>
+                        </View>
+                      ));
+                    } catch { return null; }
+                  })()}
+
+                  {/* Stats + menu */}
+                  <View style={s.mineOverlay}>
+                    <View style={{ flexDirection: 'row', gap: 12, flex: 1 }}>
+                      <View style={s.mineStat}>
+                        <Icon name="play" size={10} color="#fff" />
+                        <Text style={s.mineStatText}>{formatCount(item.view_count)}</Text>
+                      </View>
+                      <View style={s.mineStat}>
+                        <MCIcon name="heart" size={10} color="#fff" />
+                        <Text style={s.mineStatText}>{formatCount(item.like_count)}</Text>
+                      </View>
                     </View>
-                    <View style={s.mineStat}>
-                      <MCIcon name="heart" size={10} color="#fff" />
-                      <Text style={s.mineStatText}>{formatCount(item.like_count)}</Text>
-                    </View>
+                    <TouchableOpacity onPress={() => setMenuReel(item)} style={s.mineMenuBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Icon name="more-vertical" size={20} color="#fff" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity onPress={() => setMenuReel(item)} style={s.mineMenuBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <Icon name="more-vertical" size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+                </TouchableOpacity>
+              );
+            }}
           />
         )}
 
@@ -614,6 +704,11 @@ export const ReelsScreen: React.FC = () => {
               <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleOpenEdit(menuReel)}>
                 <Icon name="edit-2" size={18} color={colors.textPrimary} />
                 <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Modifier la description</Text>
+              </TouchableOpacity>
+              <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+              <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleOpenFullEdit(menuReel)}>
+                <Icon name="sliders" size={18} color={colors.textPrimary} />
+                <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Modifier les effets</Text>
               </TouchableOpacity>
               <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
               <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleToggleReelComments(menuReel)}>
@@ -656,6 +751,36 @@ export const ReelsScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Editeur effets visuels — dans le bloc mine pour etre visible */}
+        {fullEditReel && fullEditReel.hls_url && (
+          <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <ReelEditorScreen
+              uri={fullEditReel.hls_url}
+              durationSec={fullEditReel.duration_sec ?? 60}
+              thumbnailUri={fullEditReel.thumbnail_url ?? undefined}
+              initialResult={(() => {
+                const r = fullEditReel;
+                try {
+                  return {
+                    startSec:  0,
+                    endSec:    r.duration_sec ?? 60,
+                    speed:     1,
+                    filter:    (r.filter_name as FilterKey) ?? 'original',
+                    layers:    r.text_layers     ? JSON.parse(r.text_layers)     : [],
+                    stickers:  r.sticker_layers  ? JSON.parse(r.sticker_layers)  : [],
+                    drawings:  r.draw_layers     ? JSON.parse(r.draw_layers)     : [],
+                    adjust:    r.video_adjust    ? JSON.parse(r.video_adjust)    : { brightness: 0, contrast: 0, saturation: 0, temperature: 0 },
+                    musicUri:  undefined,
+                    musicName: undefined,
+                  } as ReelEditResult;
+                } catch { return undefined; }
+              })()}
+              onConfirm={(result) => handleFullEditConfirm(result, fullEditReel)}
+              onCancel={() => setFullEditReel(null)}
+            />
+          </View>
+        )}
       </View>
     );
   }
@@ -2105,14 +2230,18 @@ const s = StyleSheet.create({
   commentBarInput: { flex: 1, fontSize: 13, color: '#fff', padding: 0, maxHeight: 60 },
   commentBarSend:  { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
-  mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 48, paddingBottom: 14, paddingHorizontal: 16, gap: 12 },
-  mineIconBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
-  mineHeaderTitle:   { flex: 1, color: '#fff', fontSize: 20, fontWeight: '800' },
+  mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  mineBackBtn:       { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  mineHeaderSub:     { fontSize: 12, fontWeight: '400', marginTop: 1 },
+  mineCreateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  mineCreateBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   mineGrid:          { padding: 8, paddingTop: 12 },
   mineRow:           { gap: 8, marginBottom: 8 },
   mineCard:          { flex: 1, overflow: 'hidden', borderRadius: 12 },
   mineThumb:         { width: '100%', aspectRatio: 9 / 14 },
   mineThumbFallback: { width: '100%', aspectRatio: 9 / 14, alignItems: 'center', justifyContent: 'center' },
+  mineEffectBadge:   { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, padding: 3 },
   mineOverlay:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.55)' },
   mineMenuBtn:       { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)' },
   mineStat:          { flexDirection: 'row', alignItems: 'center', gap: 4 },

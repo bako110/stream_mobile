@@ -123,6 +123,7 @@ import { SettingsVerificationScreen }         from '../screens/Settings/Settings
 import { SettingsSecurityScreen }            from '../screens/Settings/SettingsSecurityScreen';
 import { SupportScreen }                      from '../screens/Main/SupportScreen';
 import { SupportChatScreen }                  from '../screens/Main/SupportChatScreen';
+import { ReelPlayerScreen }                  from '../screens/Main/ReelPlayerScreen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -171,7 +172,7 @@ export type MainStackParamList = {
   CommunityChat:           { communityId: string; communityName: string };
   Communities:             undefined;
   CommunityDetail:         { communityId: string; autoEnter?: boolean };
-  CommunityMembers:        { communityId: string; communityName: string };
+  CommunityMembers:        { communityId: string; communityName: string; myRole?: string | null; membersListHiddenPublic?: boolean; membersListHiddenMembers?: boolean };
   CommunityStats:          { communityId: string; communityName: string };
   CommunityEvents:         { communityId: string; communityName: string; myRole?: string | null };
   CommunityFund:           { communityId: string; communityName: string; myRole?: string | null };
@@ -202,6 +203,7 @@ export type MainStackParamList = {
   MyStories:       undefined;
   StoryViewers:    { storyId: string; viewCount: number; myId?: string };
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
+  ReelPlayer:      { reel: any };
   PostDetail:      { postId: string; initialPost?: any };
   ImageGallery:    { urls: string[]; initialIndex?: number };
   ImageViewer:     { url: string; label?: string };
@@ -498,6 +500,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="LiveStream"     component={LiveStreamWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="LiveViewer"     component={LiveViewerWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserReels"      component={UserReelsScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="ReelPlayer"    component={ReelPlayerScreen}      options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreatePost"     component={CreatePostWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="PostDetail"     component={PostDetailWrapper}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ImageGallery"   options={{ presentation: 'fullScreenModal', animation: 'fade', headerShown: false }}>

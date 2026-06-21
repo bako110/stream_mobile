@@ -46,6 +46,8 @@ import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
 import { feedStyles as s, fS } from '../../styles/FeedScreen.styles';
+import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
+import type { FilterKey } from '../Create/ReelEditorScreen';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -1814,9 +1816,18 @@ export const FeedScreen: React.FC = () => {
                   {(searchFilter === 'all' || searchFilter === 'reels') && (searchResults!.reels?.length ?? 0) > 0 && (
                     <View>
                       <SrSection icon="video" label="Reels" count={searchResults!.reels!.length} accent="#10B981" />
-                      {searchResults!.reels!.map((r: any, i: number) => (
+                      {searchResults!.reels!.map((r: any, i: number) => {
+                        const rfKey = r.filter_name as FilterKey | undefined;
+                        const rfDef = rfKey ? FILTERS.find(f => f.key === rfKey) : null;
+                        const rfOp  = rfKey ? (FILTER_VIDEO_OPACITY[rfKey] ?? 0) : 0;
+                        return (
                         <SrRow key={r.id} last={i === searchResults!.reels!.length - 1}>
-                          <SrThumb uri={r.thumbnail_url} icon="video" accent="#10B981" />
+                          <View style={{ width: 52, height: 52, borderRadius: 12, overflow: 'hidden' }}>
+                            <SrThumb uri={r.thumbnail_url} icon="video" accent="#10B981" />
+                            {rfDef && rfOp > 0 && (
+                              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: rfDef.overlay, opacity: rfOp }]} />
+                            )}
+                          </View>
                           <View style={{ flex: 1 }}>
                             <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={2}>{r.caption ?? 'Reel'}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
@@ -1828,7 +1839,8 @@ export const FeedScreen: React.FC = () => {
                             <Icon name="play" size={13} color="#10B981" />
                           </View>
                         </SrRow>
-                      ))}
+                        );
+                      })}
                     </View>
                   )}
 
@@ -2239,6 +2251,35 @@ const MiniReelPlayer: React.FC<{
         </View>
       )}
 
+      {/* Overlay filtre */}
+      {(() => {
+        const fKey = reel.filter_name as FilterKey | undefined;
+        const fDef = fKey ? FILTERS.find(f => f.key === fKey) : null;
+        const fOp  = fKey ? (FILTER_VIDEO_OPACITY[fKey] ?? 0) : 0;
+        const fOp2 = fKey ? (FILTER_VIDEO_OPACITY2[fKey] ?? 0) : 0;
+        if (!fDef || fOp === 0) return null;
+        return (
+          <>
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 14, backgroundColor: fDef.overlay, opacity: fOp }]} />
+            {(fDef as any).overlay2 && fOp2 > 0 && (
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 14, backgroundColor: (fDef as any).overlay2, opacity: fOp2 }]} />
+            )}
+          </>
+        );
+      })()}
+
+      {/* Text layers miniature */}
+      {reel.text_layers && (() => {
+        try {
+          const ls = JSON.parse(reel.text_layers);
+          return ls.slice(0, 2).map((l: any) => (
+            <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: (l.x / 390) * w, top: (l.y / 844) * h, zIndex: 2 }}>
+              <Text style={{ color: l.color, fontSize: Math.max(6, Math.round(l.fontSize * (w / 390))), fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>{l.text}</Text>
+            </View>
+          ));
+        } catch { return null; }
+      })()}
+
       <LinearGradient colors={['transparent', 'transparent', 'rgba(0,0,0,0.8)']} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} />
 
       {/* Badge REEL */}
@@ -2528,6 +2569,13 @@ const ReelRowCard: React.FC<{
     const author   = reel.author;
     const name     = author?.display_name ?? author?.username ?? '';
     const initials = (name || '?')[0].toUpperCase();
+    const br = large ? 18 : 14;
+    const fKey  = reel.filter_name as FilterKey | undefined;
+    const fDef  = fKey ? FILTERS.find(f => f.key === fKey) : null;
+    const fOp   = fKey ? (FILTER_VIDEO_OPACITY[fKey] ?? 0) : 0;
+    const fOp2  = fKey ? (FILTER_VIDEO_OPACITY2[fKey] ?? 0) : 0;
+    let txtLayers: any[] = [];
+    try { if (reel.text_layers) txtLayers = JSON.parse(reel.text_layers); } catch {}
     return (
       <TouchableOpacity
         activeOpacity={0.88}
@@ -2535,12 +2583,27 @@ const ReelRowCard: React.FC<{
         style={[rrS.thumb, { width: w, height: h }]}
       >
         {reel.thumbnail_url ? (
-          <Image source={{ uri: reel.thumbnail_url }} style={[StyleSheet.absoluteFill, { borderRadius: large ? 18 : 14 }]} resizeMode="cover" />
+          <Image source={{ uri: reel.thumbnail_url }} style={[StyleSheet.absoluteFill, { borderRadius: br }]} resizeMode="cover" />
         ) : (
-          <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: large ? 18 : 14 }]}>
+          <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: br }]}>
             <Icon name="film" size={large ? 48 : 28} color="rgba(255,255,255,0.18)" />
           </View>
         )}
+
+        {/* Overlay filtre */}
+        {fDef && fOp > 0 && (
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: br, backgroundColor: fDef.overlay, opacity: fOp }]} />
+        )}
+        {fDef && (fDef as any).overlay2 && fOp2 > 0 && (
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: br, backgroundColor: (fDef as any).overlay2, opacity: fOp2 }]} />
+        )}
+
+        {/* Text layers miniature */}
+        {txtLayers.slice(0, 2).map((l: any) => (
+          <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: (l.x / 390) * w, top: (l.y / 844) * h, zIndex: 2 }}>
+            <Text style={{ color: l.color, fontSize: Math.max(6, Math.round(l.fontSize * (w / 390))), fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>{l.text}</Text>
+          </View>
+        ))}
 
         {/* Dégradé bas */}
         <LinearGradient
@@ -2758,6 +2821,35 @@ const ReelFeedCard: React.FC<{
             <Icon name="film" size={40} color="rgba(255,255,255,0.18)" />
           </View>
         )}
+
+        {/* Overlay filtre */}
+        {(() => {
+          const fKey = reel.filter_name as FilterKey | undefined;
+          const fDef = fKey ? FILTERS.find(f => f.key === fKey) : null;
+          const fOp  = fKey ? (FILTER_VIDEO_OPACITY[fKey] ?? 0) : 0;
+          const fOp2 = fKey ? (FILTER_VIDEO_OPACITY2[fKey] ?? 0) : 0;
+          if (!fDef || fOp === 0) return null;
+          return (
+            <>
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: fDef.overlay, opacity: fOp }]} />
+              {(fDef as any).overlay2 && fOp2 > 0 && (
+                <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: (fDef as any).overlay2, opacity: fOp2 }]} />
+              )}
+            </>
+          );
+        })()}
+
+        {/* Text layers miniature */}
+        {reel.text_layers && (() => {
+          try {
+            const ls = JSON.parse(reel.text_layers);
+            return ls.slice(0, 3).map((l: any) => (
+              <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: `${(l.x / 390) * 100}%` as any, top: `${(l.y / 844) * 100}%` as any, zIndex: 2 }}>
+                <Text style={{ color: l.color, fontSize: Math.max(8, Math.round(l.fontSize * 0.35)), fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>{l.text}</Text>
+              </View>
+            ));
+          } catch { return null; }
+        })()}
 
         {/* Gradient haut → bas */}
         <LinearGradient

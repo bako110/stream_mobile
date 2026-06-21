@@ -16,7 +16,13 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type RoleFilter = 'all' | 'admin' | 'moderator' | 'member';
 
-interface RouteParams { communityId: string; communityName: string; }
+interface RouteParams {
+  communityId: string;
+  communityName: string;
+  myRole?: string | null;
+  membersListHiddenPublic?: boolean;
+  membersListHiddenMembers?: boolean;
+}
 interface Props { route: { params: RouteParams }; }
 
 const ROLE_FILTERS: { key: RoleFilter; label: string }[] = [
@@ -166,7 +172,20 @@ const MemberCard: React.FC<{ member: CommunityMemberData; rank?: number; onPress
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function CommunityMembersScreen({ route }: Props) {
-  const { communityId, communityName } = route.params;
+  const {
+    communityId, communityName,
+    myRole = null,
+    membersListHiddenPublic  = false,
+    membersListHiddenMembers = false,
+  } = route.params;
+
+  const isAdmin   = myRole === 'admin';
+  const isMod     = myRole === 'moderator';
+  const isMember  = !!myRole; // null = non-membre
+
+  // Contrôle d'accès
+  const blockedForPublic  = !isMember && membersListHiddenPublic;
+  const blockedForMembers = isMember && !isAdmin && !isMod && membersListHiddenMembers;
   const { theme: { colors } } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
@@ -215,6 +234,30 @@ export default function CommunityMembersScreen({ route }: Props) {
   const top3 = sorted.slice(0, 3);
   const maxCoins = (top3[0] as any)?.coins ?? 0;
   const showPodium = roleFilter === 'all' && search.trim() === '' && top3.length === 3 && maxCoins > 0;
+
+  if (blockedForPublic || blockedForMembers) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', gap: 12, paddingHorizontal: 32 }}>
+        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="lock" size={28} color={colors.textTertiary} />
+        </View>
+        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '800', textAlign: 'center' }}>
+          Liste privée
+        </Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+          {blockedForPublic
+            ? 'Rejoins la communauté pour voir les membres.'
+            : "Seul l'administrateur peut consulter la liste des membres."}
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ marginTop: 8, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 20, backgroundColor: colors.primary }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Retour</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (loading) {
     return (

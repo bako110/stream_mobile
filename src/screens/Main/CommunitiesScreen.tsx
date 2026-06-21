@@ -274,8 +274,11 @@ export const CommunitiesScreen: React.FC = () => {
   const [createName,       setCreateName]       = useState('');
   const [createDesc,       setCreateDesc]       = useState('');
   const [createPrivate,    setCreatePrivate]    = useState(false);
-  const [createInviteOnly, setCreateInviteOnly] = useState(false);
-  const [createPriceCoins, setCreatePriceCoins] = useState('');
+  const [createInviteOnly,          setCreateInviteOnly]          = useState(false);
+  const [createMembersHiddenPublic, setCreateMembersHiddenPublic] = useState(true);
+  const [createMembersHiddenAll,    setCreateMembersHiddenAll]    = useState(true);
+  const [createInviteOnlyAdmin,     setCreateInviteOnlyAdmin]     = useState(true);
+  const [createPriceCoins,          setCreatePriceCoins]          = useState('');
   const [createAvatarUri,  setCreateAvatarUri]  = useState<string | null>(null);
   const [createBannerUri,  setCreateBannerUri]  = useState<string | null>(null);
   const [creating,         setCreating]         = useState(false);
@@ -287,6 +290,9 @@ export const CommunitiesScreen: React.FC = () => {
     setCreateDesc('');
     setCreatePrivate(false);
     setCreateInviteOnly(false);
+    setCreateMembersHiddenPublic(true);
+    setCreateMembersHiddenAll(true);
+    setCreateInviteOnlyAdmin(true);
     setCreatePriceCoins('');
     setCreateAvatarUri(null);
     setCreateBannerUri(null);
@@ -459,14 +465,17 @@ export const CommunitiesScreen: React.FC = () => {
         createBannerUri ? uploadImage(createBannerUri) : null,
       ]);
       const payload: CreateCommunityPayload & { template?: string } = {
-        name:              createName.trim(),
-        description:       createDesc.trim() || undefined,
-        is_private:        createPrivate,
-        requires_approval: createInviteOnly,
-        entry_price_coins: parseInt(createPriceCoins, 10) || 0,
-        avatar_url:        avatarUrl ?? undefined,
-        banner_url:        bannerUrl ?? undefined,
-        template:          selectedTemplate?.id,
+        name:                        createName.trim(),
+        description:                 createDesc.trim() || undefined,
+        is_private:                  createPrivate,
+        requires_approval:           createInviteOnly,
+        members_list_hidden_public:  createMembersHiddenPublic,
+        members_list_hidden_members: createMembersHiddenAll,
+        invite_only_admin:           createInviteOnlyAdmin,
+        entry_price_coins:           parseInt(createPriceCoins, 10) || 0,
+        avatar_url:                  avatarUrl ?? undefined,
+        banner_url:                  bannerUrl ?? undefined,
+        template:                    selectedTemplate?.id,
       };
       const created = await communityService.create(payload);
       setCreateOpen(false);
@@ -960,6 +969,60 @@ export const CommunitiesScreen: React.FC = () => {
         />
       </View>
 
+      {/* Visibilité des membres */}
+      <Text style={[S.sectionLbl, { color: colors.textTertiary, marginTop: 6 }]}>MEMBRES</Text>
+
+      <TouchableOpacity
+        onPress={() => setCreateMembersHiddenPublic(v => !v)}
+        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createMembersHiddenPublic ? '#7B3FF280' : colors.border }]}
+        activeOpacity={0.8}
+      >
+        <View style={[S.optIcon, { backgroundColor: '#7B3FF220' }]}>
+          <Icon name="eye-off" size={18} color="#7B3FF2" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[S.optLabel, { color: colors.textPrimary }]}>Masqué aux non-membres</Text>
+          <Text style={[S.optSub, { color: colors.textTertiary }]}>
+            Les personnes extérieures ne voient pas la liste des membres
+          </Text>
+        </View>
+        <CustomToggle value={createMembersHiddenPublic} onChange={setCreateMembersHiddenPublic} color="#7B3FF2" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => setCreateMembersHiddenAll(v => !v)}
+        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createMembersHiddenAll ? '#E0389A80' : colors.border }]}
+        activeOpacity={0.8}
+      >
+        <View style={[S.optIcon, { backgroundColor: '#E0389A20' }]}>
+          <Icon name="users" size={18} color="#E0389A" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[S.optLabel, { color: colors.textPrimary }]}>Masqué aux membres</Text>
+          <Text style={[S.optSub, { color: colors.textTertiary }]}>
+            Même les membres ne voient pas les autres — seul l'admin voit tout
+          </Text>
+        </View>
+        <CustomToggle value={createMembersHiddenAll} onChange={setCreateMembersHiddenAll} color="#E0389A" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => setCreateInviteOnlyAdmin(v => !v)}
+        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createInviteOnlyAdmin ? '#10B98180' : colors.border }]}
+        activeOpacity={0.8}
+      >
+        <View style={[S.optIcon, { backgroundColor: '#10B98120' }]}>
+          <Icon name="user-plus" size={18} color="#10B981" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[S.optLabel, { color: colors.textPrimary }]}>Ajout par admin uniquement</Text>
+          <Text style={[S.optSub, { color: colors.textTertiary }]}>
+            Seul l'admin peut inviter de nouveaux membres
+          </Text>
+        </View>
+        <CustomToggle value={createInviteOnlyAdmin} onChange={setCreateInviteOnlyAdmin} color="#10B981" />
+      </TouchableOpacity>
+
       {/* Footer étape 2 */}
       <View style={[S.footerRow, { marginTop: 24 }]}>
         <TouchableOpacity
@@ -1141,6 +1204,8 @@ export const CommunitiesScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 bounces={false}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ flexGrow: 1 }}
               >
                 {step === 'info' ? renderStepInfo() : renderStepSettings()}
               </ScrollView>
@@ -1400,7 +1465,7 @@ const S = StyleSheet.create({
 
   // Modal
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)' },
-  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '94%' },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '94%', flex: 1 },
   handleWrap: { alignItems: 'center', paddingTop: 12, paddingBottom: 6 },
   handle: { width: 40, height: 4, borderRadius: 2 },
   sheetHeader: {
@@ -1414,7 +1479,7 @@ const S = StyleSheet.create({
   sheetTitle: { fontSize: 16, fontWeight: '800' },
   stepDots: { flexDirection: 'row', gap: 5, marginTop: 5 },
   stepDot: { height: 4, borderRadius: 2 },
-  sheetBody: { paddingHorizontal: 16, paddingTop: 18 },
+  sheetBody: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 40 },
 
   // Banner/avatar picker dans modal
   bannerPicker: { height: 120, borderRadius: 16, overflow: 'hidden' },

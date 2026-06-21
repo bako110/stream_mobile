@@ -24,6 +24,9 @@ export interface CommunityData {
     avatar_url: string | null;
   } | null;
   created_at: string | null;
+  members_list_hidden_public: boolean;
+  members_list_hidden_members: boolean;
+  invite_only_admin: boolean;
 }
 
 export interface JoinRequest {
@@ -55,6 +58,9 @@ export interface CreateCommunityPayload {
   entry_price_coins?: number;
   avatar_url?: string;
   banner_url?: string;
+  members_list_hidden_public?: boolean;
+  members_list_hidden_members?: boolean;
+  invite_only_admin?: boolean;
 }
 
 export interface BlockedMemberData {
