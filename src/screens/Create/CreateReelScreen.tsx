@@ -215,6 +215,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   const [loadingMeta,       setLoadingMeta]       = useState(false);
   const [showEditor,        setShowEditor]        = useState(!!sourceReelUrl);
   const [editResult,        setEditResult]        = useState<ReelEditResult | null>(null);
+  const editResultRef = useRef<ReelEditResult | null>(null);
 
   // Charge la durée de la vidéo source en arrière-plan
   useEffect(() => {
@@ -264,6 +265,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
           setVideoUri(null);
           setVideoDuration(0);
           setEditResult(null);
+          editResultRef.current = null;
           setShowEditor(false);
         },
       },
@@ -271,6 +273,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   }, []);
 
   const handleEditorConfirm = useCallback((result: ReelEditResult) => {
+    editResultRef.current = result;
     setEditResult(result);
     setShowEditor(false);
   }, []);
@@ -288,11 +291,14 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   const handlePublish = useCallback(() => {
     if (!videoUri) return;
 
+    // Lire depuis la ref pour éviter la closure stale sur editResult
+    const freshEdit = editResultRef.current;
+
     publishRef.current = {
       uri:        videoUri,
       cap:        caption.trim(),
       mentionIds: [...captionMentionIds],
-      edit:       editResult,
+      edit:       freshEdit,
       dur:        videoDuration,
     };
 
