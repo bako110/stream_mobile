@@ -197,7 +197,7 @@ export const RootNavigator: React.FC = () => {
   }
 
   const linking = {
-    prefixes: ['gofolyx://', 'https://gofolyx.com', 'https://www.gofolyx.com'],
+    prefixes: ['gofolyx://', 'https://gofolyx.com', 'https://www.gofolyx.com', 'https://gofolyx.app'],
     config: {
       screens: {
         Tabs: {
@@ -208,7 +208,7 @@ export const RootNavigator: React.FC = () => {
         PostDetail:    'posts/:postId',
         EventDetail:   'events/:eventId',
         ConcertDetail: 'concerts/:concertId',
-        JoinCommunity: 'communities/:id/invite',
+        JoinCommunity: ['communities/:id/invite', 'join/:inviteCode'],
         UserProfile:   'user/:userId',
       },
     },

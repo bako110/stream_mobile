@@ -27,6 +27,7 @@ export interface CommunityData {
   members_list_hidden_public: boolean;
   members_list_hidden_members: boolean;
   invite_only_admin: boolean;
+  invite_code: string | null;
 }
 
 export interface JoinRequest {
