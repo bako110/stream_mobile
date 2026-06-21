@@ -388,6 +388,47 @@ const StickerLayerView: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AdjustSlider — slider horizontal draggable (-1 → +1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SLIDER_W = W - 48 - 14 - 68 - 36 - 40; // approx width disponible
+
+const AdjustSlider: React.FC<{
+  value: number;
+  onChange: (v: number) => void;
+}> = ({ value, onChange }) => {
+  const startValRef = useRef(value);
+
+  const pan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder:  () => true,
+    onPanResponderGrant: () => { startValRef.current = value; },
+    onPanResponderMove: (_, g) => {
+      const delta = g.dx / SLIDER_W;
+      const next = Math.max(-1, Math.min(1, +(startValRef.current + delta * 2).toFixed(2)));
+      onChange(next);
+    },
+  })).current;
+
+  const pct = (value + 1) * 50; // 0% = -1, 50% = 0, 100% = +1
+  const fillLeft  = value < 0 ? `${50 + value * 50}%` : '50%';
+  const fillWidth = `${Math.abs(value) * 50}%`;
+
+  return (
+    <View style={sAdj.track} {...pan.panHandlers}>
+      <View style={[sAdj.fill, { left: fillLeft, width: fillWidth }]} />
+      <View style={[sAdj.thumb, { left: `${pct}%` }]} />
+    </View>
+  );
+};
+
+const sAdj = StyleSheet.create({
+  track: { flex: 1, height: 28, justifyContent: 'center' },
+  fill:  { position: 'absolute', height: 4, borderRadius: 2, backgroundColor: '#A78BFA' },
+  thumb: { position: 'absolute', width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', marginLeft: -10, top: 4, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 5 },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Composant principal
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -573,55 +614,53 @@ export const ReelEditorScreen: React.FC<Props> = ({
   ).current;
 
   // ── Text layers draggables ────────────────────────────────────────────────
-  const layerPans = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
+  // La ref stocke la position de départ au moment du GRANT (pas la position initiale du layer)
+  const dragStartRef = useRef<Record<string, { x: number; y: number }>>({});
 
-  const getLayerPan = useCallback((id: string, ix: number, iy: number) => {
-    if (!layerPans.current[id]) {
-      const startPos = { x: ix, y: iy };
-      layerPans.current[id] = PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4,
-        onPanResponderGrant: () => {
-          setLayers(prev => {
-            const l = prev.find(x => x.id === id);
-            if (l) { startPos.x = l.x; startPos.y = l.y; }
-            return prev;
-          });
-        },
-        onPanResponderMove: (_, g) => {
-          setLayers(prev => prev.map(l =>
-            l.id === id ? { ...l, x: startPos.x + g.dx, y: startPos.y + g.dy } : l,
-          ));
-        },
-      });
-    }
-    return layerPans.current[id];
+  const getLayerPan = useCallback((id: string) => {
+    const startPos = dragStartRef.current[id] ?? { x: 0, y: 0 };
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
+      onPanResponderGrant: () => {
+        setLayers(prev => {
+          const l = prev.find(x => x.id === id);
+          if (l) dragStartRef.current[id] = { x: l.x, y: l.y };
+          return prev;
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        const s = dragStartRef.current[id];
+        if (!s) return;
+        setLayers(prev => prev.map(l =>
+          l.id === id ? { ...l, x: s.x + g.dx, y: s.y + g.dy } : l,
+        ));
+      },
+    });
   }, []);
 
   // ── Sticker layers draggables ─────────────────────────────────────────────
-  const stickerPans = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
+  const stickerDragStartRef = useRef<Record<string, { x: number; y: number }>>({});
 
-  const getStickerPan = useCallback((id: string, ix: number, iy: number) => {
-    if (!stickerPans.current[id]) {
-      const startPos = { x: ix, y: iy };
-      stickerPans.current[id] = PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4,
-        onPanResponderGrant: () => {
-          setStickers(prev => {
-            const st = prev.find(x => x.id === id);
-            if (st) { startPos.x = st.x; startPos.y = st.y; }
-            return prev;
-          });
-        },
-        onPanResponderMove: (_, g) => {
-          setStickers(prev => prev.map(st =>
-            st.id === id ? { ...st, x: startPos.x + g.dx, y: startPos.y + g.dy } : st,
-          ));
-        },
-      });
-    }
-    return stickerPans.current[id];
+  const getStickerPan = useCallback((id: string) => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
+      onPanResponderGrant: () => {
+        setStickers(prev => {
+          const st = prev.find(x => x.id === id);
+          if (st) stickerDragStartRef.current[id] = { x: st.x, y: st.y };
+          return prev;
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        const s = stickerDragStartRef.current[id];
+        if (!s) return;
+        setStickers(prev => prev.map(st =>
+          st.id === id ? { ...st, x: s.x + g.dx, y: s.y + g.dy } : st,
+        ));
+      },
+    });
   }, []);
 
   // ── Dessin PanResponder ───────────────────────────────────────────────────
@@ -783,6 +822,14 @@ export const ReelEditorScreen: React.FC<Props> = ({
           <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: activeFilt.overlay2, opacity: videoFiltOp2, zIndex: 2 }]} />
         )}
 
+        {/* Overlays réglages vidéo — feedback temps réel dans l'éditeur */}
+        {adjust.brightness > 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(255,255,255,${adjust.brightness * 0.35})`, zIndex: 3 }]} />}
+        {adjust.brightness < 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${Math.abs(adjust.brightness) * 0.45})`, zIndex: 3 }]} />}
+        {adjust.temperature > 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(255,120,0,${adjust.temperature * 0.18})`, zIndex: 3 }]} />}
+        {adjust.temperature < 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,120,255,${Math.abs(adjust.temperature) * 0.18})`, zIndex: 3 }]} />}
+        {adjust.saturation  < 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(128,128,128,${Math.abs(adjust.saturation) * 0.45})`, zIndex: 3 }]} />}
+        {adjust.contrast    > 0 && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${adjust.contrast * 0.12})`, zIndex: 3 }]} />}
+
         {/* Gradients */}
         <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.80)', 'transparent']} style={s.gradTop} />
         <LinearGradient pointerEvents="none" colors={['transparent', 'rgba(0,0,0,0.85)']} style={s.gradBottom} />
@@ -830,7 +877,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
             layer={l}
             onPress={() => openTextOverlay(l)}
             onLongPress={() => deleteLayer(l.id)}
-            panHandlers={getLayerPan(l.id, l.x, l.y).panHandlers}
+            panHandlers={getLayerPan(l.id).panHandlers}
           />
         ))}
 
@@ -840,7 +887,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
             key={st.id}
             sticker={st}
             onLongPress={() => deleteSticker(st.id)}
-            panHandlers={getStickerPan(st.id, st.x, st.y).panHandlers}
+            panHandlers={getStickerPan(st.id).panHandlers}
           />
         ))}
       </View>
@@ -1016,14 +1063,19 @@ export const ReelEditorScreen: React.FC<Props> = ({
                 {'  '}<Text style={{ fontWeight: '800' }}>{fmt(trimSec)}</Text>
               </Text>
             </View>
-            <View style={s.frameBar}>
-              {Array.from({ length: 28 }).map((_, i) => (
-                <View key={i} style={[s.frameCell, { opacity: 0.35 + (i % 3) * 0.15 }]} />
-              ))}
-              <View style={[s.dimL, { width: selLeft }]} />
-              <View style={[s.dimR, { left: selLeft + selWidth }]} />
-              <View style={[s.selBox, { left: selLeft, width: selWidth }, !trimValid && { borderColor: '#EF4444' }]} />
-              {isPlaying && <View style={[s.cursor, { left: Math.max(0, cursorX) }]} />}
+            {/* frameBarOuter n'a PAS overflow:hidden pour que les handles soient touchables */}
+            <View style={s.frameBarOuter}>
+              {/* frameBarInner coupe visuellement les frames décoratives */}
+              <View style={s.frameBar} pointerEvents="none">
+                {Array.from({ length: 28 }).map((_, i) => (
+                  <View key={i} style={[s.frameCell, { opacity: 0.35 + (i % 3) * 0.15 }]} />
+                ))}
+                <View style={[s.dimL, { width: selLeft }]} />
+                <View style={[s.dimR, { left: selLeft + selWidth }]} />
+                <View style={[s.selBox, { left: selLeft, width: selWidth }, !trimValid && { borderColor: '#EF4444' }]} />
+                {isPlaying && <View style={[s.cursor, { left: Math.max(0, cursorX) }]} />}
+              </View>
+              {/* Handles en dehors du inner pour ne pas être coupés */}
               <View style={[s.handle, s.handleL, { left: selLeft }]} {...leftPan.panHandlers}>
                 <View style={s.handlePip} />
               </View>
@@ -1067,30 +1119,21 @@ export const ReelEditorScreen: React.FC<Props> = ({
               </TouchableOpacity>
             </View>
             {([
-              { key: 'brightness', label: 'Luminosité', icon: 'sun'     },
-              { key: 'contrast',   label: 'Contraste',  icon: 'circle'  },
-              { key: 'saturation', label: 'Saturation', icon: 'droplet' },
+              { key: 'brightness', label: 'Luminosité', icon: 'sun'         },
+              { key: 'contrast',   label: 'Contraste',  icon: 'circle'      },
+              { key: 'saturation', label: 'Saturation', icon: 'droplet'     },
               { key: 'temperature',label: 'Temp.',       icon: 'thermometer' },
             ] as const).map(({ key, label, icon }) => (
               <View key={key} style={s.adjustRow}>
                 <Icon name={icon} size={14} color="rgba(255,255,255,0.55)" />
                 <Text style={s.adjustLabel}>{label}</Text>
-                <View style={s.adjustTrack}>
-                  <View style={[s.adjustFill, {
-                    left:  adjust[key] < 0 ? `${50 + adjust[key] * 50}%` : '50%',
-                    width: `${Math.abs(adjust[key]) * 50}%`,
-                  }]} />
-                  <View style={[s.adjustThumb, { left: `${(adjust[key] + 1) * 50}%` }]} />
-                </View>
-                <Text style={s.adjustVal}>{adjust[key] > 0 ? `+${(adjust[key] * 100).toFixed(0)}` : (adjust[key] * 100).toFixed(0)}</Text>
-                <View style={s.adjustBtns}>
-                  <TouchableOpacity style={s.adjustStepBtn} onPress={() => setAdjust(a => ({ ...a, [key]: Math.max(-1, +(a[key] - 0.1).toFixed(1)) }))}>
-                    <Icon name="minus" size={11} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.adjustStepBtn} onPress={() => setAdjust(a => ({ ...a, [key]: Math.min(1, +(a[key] + 0.1).toFixed(1)) }))}>
-                    <Icon name="plus" size={11} color="#fff" />
-                  </TouchableOpacity>
-                </View>
+                <AdjustSlider
+                  value={adjust[key]}
+                  onChange={v => setAdjust(a => ({ ...a, [key]: v }))}
+                />
+                <Text style={s.adjustVal}>
+                  {adjust[key] > 0 ? `+${(adjust[key] * 100).toFixed(0)}` : (adjust[key] * 100).toFixed(0)}
+                </Text>
               </View>
             ))}
           </View>
@@ -1391,7 +1434,8 @@ const s = StyleSheet.create({
   trimPanel:  { paddingHorizontal: 24, paddingTop: 16, gap: 10 },
   trimHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   trimDurTxt: { color: '#A78BFA', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  frameBar:   { height: 56, borderRadius: 10, overflow: 'hidden', flexDirection: 'row', position: 'relative', backgroundColor: '#1A1830' },
+  frameBarOuter: { height: 56, position: 'relative' },
+  frameBar:      { ...StyleSheet.absoluteFillObject, borderRadius: 10, overflow: 'hidden', flexDirection: 'row', backgroundColor: '#1A1830' },
   frameCell:  { flex: 1, height: 56, backgroundColor: '#2A2848', borderRightWidth: 0.5, borderRightColor: '#0A0814' },
   dimL:       { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 1 },
   dimR:       { position: 'absolute', top: 0, bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 1 },
@@ -1421,14 +1465,9 @@ const s = StyleSheet.create({
   adjustHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   adjustResetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.07)' },
   adjustResetTxt: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '600' },
-  adjustRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  adjustLabel:    { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600', width: 68 },
-  adjustTrack:    { flex: 1, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', position: 'relative', overflow: 'visible' },
-  adjustFill:     { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#A78BFA', borderRadius: 2 },
-  adjustThumb:    { position: 'absolute', top: -6, width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', marginLeft: -8, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
-  adjustVal:      { color: '#A78BFA', fontSize: 11, fontWeight: '700', width: 30, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  adjustBtns:     { flexDirection: 'row', gap: 4 },
-  adjustStepBtn:  { width: 26, height: 26, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  adjustRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  adjustLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600', width: 68 },
+  adjustVal:   { color: '#A78BFA', fontSize: 11, fontWeight: '700', width: 30, textAlign: 'right', fontVariant: ['tabular-nums'] },
 
   // Vitesse
   speedPanel:     { paddingHorizontal: 20, paddingTop: 16, gap: 14 },
