@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, Image,
-  Animated, Dimensions, Clipboard, Alert, ActivityIndicator,
+  Animated, Dimensions, Alert, ActivityIndicator,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RNBlobUtil from 'react-native-blob-util';

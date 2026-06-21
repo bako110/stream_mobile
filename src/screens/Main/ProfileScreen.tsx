@@ -2,8 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  ActivityIndicator, StyleSheet, Clipboard, ToastAndroid, Platform, Alert,
+  ActivityIndicator, StyleSheet, ToastAndroid, Platform, Alert,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';

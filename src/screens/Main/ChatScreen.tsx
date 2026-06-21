@@ -781,8 +781,8 @@ export const ChatScreen: React.FC = () => {
 
   const copyMessage = () => {
     if (!selectedMsg) return;
-    const { Clipboard } = require('react-native');
-    Clipboard?.setString?.(selectedMsg.content);
+    const Clipboard = require('@react-native-clipboard/clipboard').default;
+    Clipboard.setString(selectedMsg.content);
     setShowActions(false);
     setSelectedMsg(null);
   };

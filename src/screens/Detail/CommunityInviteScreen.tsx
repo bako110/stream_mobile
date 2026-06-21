@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Share, Alert,
-  Clipboard, ActivityIndicator, Linking, ScrollView,
+  ActivityIndicator, Linking, ScrollView,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton } from '../../components/common';
