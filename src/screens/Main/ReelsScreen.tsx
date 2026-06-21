@@ -32,8 +32,22 @@ import {
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import type { FilterKey } from '../Create/ReelEditorScreen';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
+
+// ─── Filter overlays — doit rester synchro avec CreateReelScreen ─────────────
+
+const FILTER_OVERLAY: Record<FilterKey, { color: string; opacity: number }> = {
+  original: { color: 'transparent', opacity: 0 },
+  vivid:    { color: '#FF3CAC',     opacity: 0.15 },
+  warm:     { color: '#FF7E00',     opacity: 0.18 },
+  cold:     { color: '#00BFFF',     opacity: 0.18 },
+  fade:     { color: '#FFFFFF',     opacity: 0.20 },
+  noir:     { color: '#000000',     opacity: 0.55 },
+  drama:    { color: '#1A003A',     opacity: 0.35 },
+  golden:   { color: '#FFD700',     opacity: 0.14 },
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1472,6 +1486,63 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         controls={false}
         surfaceType="texture"
       />
+
+      {/* Overlay filtre couleur — appliqué au-dessus de la vidéo, zIndex 1 */}
+      {reel.filter_name && reel.filter_name !== 'original' && FILTER_OVERLAY[reel.filter_name as FilterKey] && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: FILTER_OVERLAY[reel.filter_name as FilterKey].color,
+            opacity: FILTER_OVERLAY[reel.filter_name as FilterKey].opacity,
+            zIndex: 1,
+          }}
+        />
+      )}
+
+      {/* Text layers — positionnés exactement comme dans l'éditeur, zIndex 2 */}
+      {reel.text_layers ? (() => {
+        try {
+          const layers: Array<{
+            id: string; text: string; x: number; y: number;
+            color: string; fontSize: number; bold: boolean; italic: boolean;
+            background?: string;
+          }> = JSON.parse(reel.text_layers);
+          return layers.map(l => (
+            <View
+              key={l.id}
+              pointerEvents="none"
+              style={{
+                position: 'absolute', left: l.x, top: l.y, zIndex: 2,
+                maxWidth: screenW - l.x - 8,
+              }}
+            >
+              {l.background ? (
+                <View style={{ backgroundColor: l.background, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{
+                    color: l.color, fontSize: l.fontSize,
+                    fontWeight: l.bold ? '800' : '400',
+                    fontStyle: l.italic ? 'italic' : 'normal',
+                  }}>
+                    {l.text}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{
+                  color: l.color, fontSize: l.fontSize,
+                  fontWeight: l.bold ? '800' : '400',
+                  fontStyle: l.italic ? 'italic' : 'normal',
+                  textShadowColor: 'rgba(0,0,0,0.6)',
+                  textShadowOffset: { width: 0, height: 1 },
+                  textShadowRadius: 3,
+                }}>
+                  {l.text}
+                </Text>
+              )}
+            </View>
+          ));
+        } catch { return null; }
+      })() : null}
 
       {/* Barre de progression — tout en haut, sous le header */}
       {isActive && (

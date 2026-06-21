@@ -28,6 +28,8 @@ export interface Reel {
   author?: import('./user').User;
   user_reaction?: 'like' | 'dislike' | null;
   remix_type?: 'repost' | 'remix' | null;
+  filter_name?: string | null;
+  text_layers?: string | null;
   source_reel_id?: string | null;
   source_reel?: {
     id: string;
