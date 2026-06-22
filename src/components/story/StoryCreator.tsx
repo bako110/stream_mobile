@@ -65,7 +65,13 @@ const FONT_STYLES: { key: string; label: string; fontFamily?: string; fontWeight
 
 type StoryMode = 'text' | 'image' | 'video' | 'voice';
 type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'compose';
-type Tool = 'none' | 'crop' | 'draw' | 'text' | 'sticker' | 'caption' | 'trim';
+type Tool = 'none' | 'crop' | 'draw' | 'text' | 'sticker' | 'caption' | 'trim' | 'mask';
+
+interface CropState {
+  scale: number;
+  translateX: number;
+  translateY: number;
+}
 
 interface ModeOption {
   key: StoryMode; icon: string; iconLib: 'feather'|'material';
@@ -251,7 +257,56 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   // ── Outil actif ───────────────────────────────────────────────────────────
   const [activeTool, setActiveTool] = useState<Tool>('none');
 
-  const resetCrop = () => {};
+  // ── Crop (pan + pinch non-destructif) ────────────────────────────────────
+  const [cropState, setCropState] = useState<CropState>({ scale: 1, translateX: 0, translateY: 0 });
+  const cropStateRef   = useRef<CropState>({ scale: 1, translateX: 0, translateY: 0 });
+  const cropBaseRef    = useRef<CropState>({ scale: 1, translateX: 0, translateY: 0 });
+  const cropInitDistRef = useRef(0);
+
+  const setCrop = useCallback((next: CropState) => {
+    cropStateRef.current = next;
+    setCropState(next);
+  }, []);
+
+  const resetCrop = useCallback(() => {
+    const init = { scale: 1, translateX: 0, translateY: 0 };
+    setCrop(init);
+    cropBaseRef.current = init;
+  }, [setCrop]);
+
+  const cropPan = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => activeToolRef.current === 'crop',
+    onMoveShouldSetPanResponder:  () => activeToolRef.current === 'crop',
+    onPanResponderGrant: () => {
+      cropBaseRef.current = { ...cropStateRef.current };
+      cropInitDistRef.current = 0;
+    },
+    onPanResponderMove: (e, gs) => {
+      const touches = e.nativeEvent.touches;
+      if (touches.length === 2) {
+        const t1 = touches[0], t2 = touches[1];
+        const dist = Math.hypot(t2.pageX - t1.pageX, t2.pageY - t1.pageY);
+        if (cropInitDistRef.current === 0) {
+          cropInitDistRef.current = dist;
+          cropBaseRef.current = { ...cropStateRef.current };
+        }
+        const newScale = Math.max(1, Math.min(4, cropBaseRef.current.scale * (dist / cropInitDistRef.current)));
+        setCrop({ ...cropStateRef.current, scale: newScale });
+      } else {
+        cropInitDistRef.current = 0;
+        const base = cropBaseRef.current;
+        const maxX = (base.scale - 1) * canvasW / 2;
+        const maxY = (base.scale - 1) * canvasH / 2;
+        const clampX = Math.max(-maxX, Math.min(maxX, base.translateX + gs.dx));
+        const clampY = Math.max(-maxY, Math.min(maxY, base.translateY + gs.dy));
+        setCrop({ scale: base.scale, translateX: clampX, translateY: clampY });
+      }
+    },
+    onPanResponderRelease: () => {
+      cropBaseRef.current = { ...cropStateRef.current };
+      cropInitDistRef.current = 0;
+    },
+  }), []);
 
   // ── Dessin ────────────────────────────────────────────────────────────────
   const [drawColor,   setDrawColor]   = useState(DRAW_COLORS[0]);
@@ -289,6 +344,44 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       setLivePath('');
     },
   }), []);
+
+  // ── Masques ───────────────────────────────────────────────────────────────
+  const [masks,        setMasks]        = useState<MaskRect[]>([]);
+  const [liveMask,     setLiveMask]     = useState<MaskRect | null>(null);
+  const maskStartRef   = useRef<{ x: number; y: number } | null>(null);
+
+  const maskPan = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => activeToolRef.current === 'mask',
+    onMoveShouldSetPanResponder:  () => activeToolRef.current === 'mask',
+    onPanResponderGrant: e => {
+      maskStartRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
+      setLiveMask({ id: 'live', x: e.nativeEvent.locationX, y: e.nativeEvent.locationY, w: 0, h: 0 });
+    },
+    onPanResponderMove: e => {
+      if (!maskStartRef.current) return;
+      const sx = maskStartRef.current.x, sy = maskStartRef.current.y;
+      const cx = e.nativeEvent.locationX, cy = e.nativeEvent.locationY;
+      setLiveMask({ id: 'live', x: Math.min(sx, cx), y: Math.min(sy, cy), w: Math.abs(cx - sx), h: Math.abs(cy - sy) });
+    },
+    onPanResponderRelease: () => {
+      setLiveMask(prev => {
+        if (prev && prev.w > 20 && prev.h > 20) {
+          const norm: MaskRect = {
+            id: Date.now().toString(),
+            x: prev.x / canvasW,
+            y: prev.y / canvasH,
+            w: prev.w / canvasW,
+            h: prev.h / canvasH,
+          };
+          setMasks(m => [...m, norm]);
+        }
+        maskStartRef.current = null;
+        return null;
+      });
+    },
+  }), []);
+
+  const removeLastMask = () => setMasks(m => m.slice(0, -1));
 
   // ── Texte overlay ─────────────────────────────────────────────────────────
   const [textLayers,    setTextLayers]    = useState<TextLayer[]>([]);
@@ -341,7 +434,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setStep('pick_mode'); setMode('text'); setLocalUri(null); setAudioUri(null);
     setCaption(''); setBgColor(BG_COLORS[0]); setFontStyleKey('classic');
     setActiveTool('none'); setDrawPaths([]); setLivePath(''); setErasing(false);
-    setTextLayers([]); setStickers([]);
+    setTextLayers([]); setStickers([]); setMasks([]); setLiveMask(null);
+    resetCrop();
     setShowTrimmer(false); setVideoDuration(0);
     setAudienceType('everyone'); setSelectedUsers([]);
     setShowCaptionInput(false); setShowSuccess(false);
@@ -493,8 +587,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     const _caption = caption, _bgColor = bgColor, _fontStyleKey = fontStyleKey;
     const _audienceType = audienceType, _selectedUsers = [...selectedUsers];
     const _tempFiles = [...tempFiles.current]; tempFiles.current = [];
-    const _overlaysJson = (drawPaths.length > 0 || textLayers.length > 0 || stickers.length > 0)
-      ? JSON.stringify({ textLayers, drawPaths, masks: [], stickers })
+    const _overlaysJson = (drawPaths.length > 0 || textLayers.length > 0 || stickers.length > 0 || masks.length > 0)
+      ? JSON.stringify({ textLayers, drawPaths, masks, stickers })
       : undefined;
 
     onCreated(); resetAndClose();
@@ -663,10 +757,46 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         <View style={s.composeRoot}>
           <StatusBar hidden />
 
-          {/* FOND / MEDIA */}
+          {/* FOND / MEDIA — avec crop interactif */}
           {mode === 'text' && <View style={[StyleSheet.absoluteFill,{backgroundColor:bgColor}]} />}
-          {mode === 'image' && localUri && <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />}
-          {mode === 'video' && localUri && <VideoPreview uri={localUri} playerRef={playerRef} />}
+          {(mode === 'image' || mode === 'video') && localUri && (
+            <View
+              style={[StyleSheet.absoluteFill, {overflow:'hidden'}]}
+              {...(activeTool === 'crop' ? cropPan.panHandlers : {})}
+            >
+              <View style={{
+                flex: 1,
+                transform: [
+                  { scale: cropState.scale },
+                  { translateX: cropState.translateX },
+                  { translateY: cropState.translateY },
+                ],
+              }}>
+                {mode === 'image'
+                  ? <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  : <VideoPreview uri={localUri} playerRef={playerRef} />
+                }
+              </View>
+              {/* Grille de crop visible uniquement quand l'outil crop est actif */}
+              {activeTool === 'crop' && (
+                <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                  {/* Lignes horizontales */}
+                  <View style={{position:'absolute',top:'33.3%',left:0,right:0,height:1,backgroundColor:'rgba(255,255,255,0.45)'}} />
+                  <View style={{position:'absolute',top:'66.6%',left:0,right:0,height:1,backgroundColor:'rgba(255,255,255,0.45)'}} />
+                  {/* Lignes verticales */}
+                  <View style={{position:'absolute',left:'33.3%',top:0,bottom:0,width:1,backgroundColor:'rgba(255,255,255,0.45)'}} />
+                  <View style={{position:'absolute',left:'66.6%',top:0,bottom:0,width:1,backgroundColor:'rgba(255,255,255,0.45)'}} />
+                  {/* Coins */}
+                  {[{t:0,l:0},{t:0,r:0},{b:0,l:0},{b:0,r:0}].map((pos,i) => (
+                    <View key={i} style={[{position:'absolute',width:22,height:22,...pos as any}]}>
+                      <View style={{position:'absolute',top:0,left:0,width:22,height:3,backgroundColor:'#fff'}} />
+                      <View style={{position:'absolute',top:0,left:0,width:3,height:22,backgroundColor:'#fff'}} />
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
           {mode === 'voice' && (
             <LinearGradient colors={['#0F0C29','#302B63']} style={StyleSheet.absoluteFill}>
               <View style={{flex:1,alignItems:'center',justifyContent:'center'}}>
@@ -674,6 +804,42 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
               </View>
             </LinearGradient>
           )}
+
+          {/* MASQUES FIGES + live mask */}
+          <View
+            style={StyleSheet.absoluteFill}
+            pointerEvents={activeTool === 'mask' ? 'box-only' : 'none'}
+            {...(activeTool === 'mask' ? maskPan.panHandlers : {})}
+          >
+            {masks.map(m => (
+              <TouchableOpacity
+                key={m.id}
+                activeOpacity={0.8}
+                onPress={() => setMasks(prev => prev.filter(x => x.id !== m.id))}
+                style={{
+                  position: 'absolute',
+                  left: m.x * canvasW, top: m.y * canvasH,
+                  width: m.w * canvasW, height: m.h * canvasH,
+                  backgroundColor: 'rgba(0,0,0,0.85)', borderRadius: 4,
+                  borderWidth: activeTool === 'mask' ? 1 : 0,
+                  borderColor: 'rgba(255,255,255,0.4)',
+                }}
+              >
+                {activeTool === 'mask' && (
+                  <View style={{position:'absolute',top:-8,right:-8,width:16,height:16,borderRadius:8,backgroundColor:'#E91E63',alignItems:'center',justifyContent:'center'}}>
+                    <Icon name="x" size={8} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+            {liveMask && liveMask.w > 0 && liveMask.h > 0 && (
+              <View style={{
+                position:'absolute', left:liveMask.x, top:liveMask.y, width:liveMask.w, height:liveMask.h,
+                backgroundColor:'rgba(0,0,0,0.75)', borderRadius:4, borderWidth:1, borderColor:'rgba(255,255,255,0.6)',
+                borderStyle:'dashed',
+              }} />
+            )}
+          </View>
 
           {/* DESSIN SVG */}
           <View
@@ -746,6 +912,10 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                 <Icon name="crop" size={20} color={activeTool==='crop'?'#7B3FF2':'#fff'} />
               </TouchableOpacity>
             )}
+            {/* Masque */}
+            <TouchableOpacity onPress={()=>setActiveTool(t=>t==='mask'?'none':'mask')} style={[s.toolBtn,activeTool==='mask'&&s.toolBtnOn]}>
+              <MaterialIcon name="blur" size={20} color={activeTool==='mask'?'#7B3FF2':'#fff'} />
+            </TouchableOpacity>
             {/* Dessin */}
             <TouchableOpacity onPress={()=>setActiveTool(t=>t==='draw'?'none':'draw')} style={[s.toolBtn,activeTool==='draw'&&s.toolBtnOn]}>
               <Icon name="edit-2" size={20} color={activeTool==='draw'?'#7B3FF2':'#fff'} />
@@ -760,7 +930,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             </TouchableOpacity>
             {/* Caption / légende */}
             <TouchableOpacity onPress={()=>{setActiveTool('caption');setShowCaptionInput(true);}} style={[s.toolBtn,activeTool==='caption'&&s.toolBtnOn]}>
-              <Icon name="type" size={18} color={activeTool==='caption'?'#7B3FF2':'rgba(255,255,255,0.7)'} />
+              <MaterialIcon name="subtitles" size={20} color={activeTool==='caption'?'#7B3FF2':'rgba(255,255,255,0.7)'} />
             </TouchableOpacity>
             {/* Trim vidéo */}
             {mode==='video' && (
@@ -783,11 +953,31 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           {/* PANNEAU CROP */}
           {activeTool === 'crop' && (
             <View style={s.hintPanel}>
-              <Text style={s.hintText}>Pincez pour zoomer · glissez pour repositionner</Text>
+              <View style={{flex:1}}>
+                <Text style={s.hintText}>Pincez pour zoomer · glissez pour recadrer</Text>
+                {cropState.scale > 1 && (
+                  <Text style={[s.hintText,{fontSize:11,opacity:0.6,marginTop:2}]}>Zoom x{cropState.scale.toFixed(1)}</Text>
+                )}
+              </View>
               <TouchableOpacity onPress={resetCrop} style={s.hintBtn}>
                 <Icon name="refresh-cw" size={14} color="#fff" />
-                <Text style={s.hintBtnLabel}>Réinitialiser</Text>
+                <Text style={s.hintBtnLabel}>Reinitialiser</Text>
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* PANNEAU MASQUE */}
+          {activeTool === 'mask' && (
+            <View style={s.hintPanel}>
+              <View style={{flex:1}}>
+                <Text style={s.hintText}>Glissez pour masquer une zone · appuyez sur un masque pour le supprimer</Text>
+              </View>
+              {masks.length > 0 && (
+                <TouchableOpacity onPress={removeLastMask} style={s.hintBtn}>
+                  <Icon name="corner-ccw" size={14} color="#fff" />
+                  <Text style={s.hintBtnLabel}>Annuler</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 

@@ -440,13 +440,14 @@ const StoryOverlaysRenderer: React.FC<{ overlaysJson: string }> = ({ overlaysJso
         </Svg>
       )}
 
-      {/* Masques */}
+      {/* Masques — coordonnees normalisees 0-1 */}
       {masks.map(m => (
         <View
           key={m.id}
           style={{
             position: 'absolute',
-            left: m.x, top: m.y, width: m.w, height: m.h,
+            left: m.x * W, top: m.y * H,
+            width: m.w * W, height: m.h * H,
             backgroundColor: 'rgba(0,0,0,0.85)',
             borderRadius: 4,
           }}
