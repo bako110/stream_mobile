@@ -1,18 +1,11 @@
-/**
- * VideoTrimmer — style WhatsApp
- * Poignées glissables sur barre de frames → coupe locale via FFmpeg.
- * onConfirm reçoit l'URI du fichier déjà coupé.
- */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
-  PanResponder, Dimensions, Platform,
+  View, Text, TouchableOpacity, StyleSheet,
+  PanResponder, Dimensions,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
-import ReactNativeBlobUtil from 'react-native-blob-util';
 
 const { width: W }  = Dimensions.get('window');
 const MAX_DURATION  = 90;
@@ -35,9 +28,6 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
   const [endRatio,   setEndRatio]   = useState(clampedEnd / duration);
   const [isPlaying,  setIsPlaying]  = useState(false);
   const [playRatio,  setPlayRatio]  = useState(0);
-  const [cutting,    setCutting]    = useState(false);
-  const [cutError,   setCutError]   = useState('');
-
   const startRef  = useRef(0);
   const endRef    = useRef(clampedEnd / duration);
   const seekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,49 +114,11 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
     })
   ).current;
 
-  // ── Coupe locale FFmpeg ───────────────────────────────────────────────────
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     const startSec = startRef.current * duration;
     const endSec   = endRef.current   * duration;
-    const trimSec  = endSec - startSec;
-
-    setCutting(true);
-    setCutError('');
     pause();
-
-    try {
-      // Normaliser l'URI source (content:// → file:// sur Android)
-      let srcUri = uri;
-      if (Platform.OS === 'android' && uri.startsWith('content://')) {
-        const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/trim_src_${Date.now()}.mp4`;
-        try { await ReactNativeBlobUtil.fs.cp(uri, dest); }
-        catch {
-          const data = await ReactNativeBlobUtil.fs.readFile(uri, 'base64');
-          await ReactNativeBlobUtil.fs.writeFile(dest, data, 'base64');
-        }
-        srcUri = `file://${dest}`;
-      }
-
-      const outPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/trimmed_${Date.now()}.mp4`;
-      // -ss avant -i = seek rapide (keyframe), -t = durée du segment, -c copy = sans ré-encodage
-      const cmd = `-ss ${startSec.toFixed(3)} -i "${srcUri.replace('file://', '')}" -t ${trimSec.toFixed(3)} -c copy -avoid_negative_ts make_zero "${outPath}"`;
-
-      const session = await FFmpegKit.execute(cmd);
-      const rc      = await session.getReturnCode();
-
-      if (ReturnCode.isSuccess(rc)) {
-        onConfirm(`file://${outPath}`, startSec, endSec);
-      } else {
-        const logs = await session.getAllLogsAsString();
-        setCutError('Erreur lors de la coupe. Réessaie.');
-        console.warn('FFmpeg error:', logs);
-      }
-    } catch (e: any) {
-      setCutError('Erreur inattendue.');
-      console.warn('Trim error:', e);
-    } finally {
-      setCutting(false);
-    }
+    onConfirm(uri, startSec, endSec);
   };
 
   // ── Dérivés ───────────────────────────────────────────────────────────────
@@ -199,7 +151,7 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={onCancel} style={s.headerBtn} disabled={cutting}>
+          <TouchableOpacity onPress={onCancel} style={s.headerBtn}>
             <Icon name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
           <View style={s.badge}>
@@ -210,7 +162,7 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
         </View>
 
         {/* Bouton play */}
-        <TouchableOpacity style={s.playBtn} onPress={togglePlay} activeOpacity={0.8} disabled={cutting}>
+        <TouchableOpacity style={s.playBtn} onPress={togglePlay} activeOpacity={0.8}>
           <View style={s.playBtnInner}>
             <Icon name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" />
           </View>
@@ -248,19 +200,11 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
           </View>
         </View>
 
-        {/* Erreur FFmpeg */}
-        {cutError ? (
-          <View style={s.errorRow}>
-            <Icon name="alert-triangle" size={13} color="#EF4444" />
-            <Text style={s.errorText}>{cutError}</Text>
-          </View>
-        ) : null}
-
         {/* Bouton confirmer */}
         <TouchableOpacity
-          style={[s.confirmBtn, (invalid || cutting) && { opacity: 0.5 }]}
+          style={[s.confirmBtn, invalid && { opacity: 0.5 }]}
           onPress={handleConfirm}
-          disabled={invalid || cutting}
+          disabled={invalid}
           activeOpacity={0.85}
         >
           <LinearGradient
@@ -268,21 +212,12 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.confirmInner}
           >
-            {cutting ? (
-              <>
-                <ActivityIndicator size={16} color="#fff" />
-                <Text style={s.confirmText}>Découpe en cours…</Text>
-              </>
-            ) : (
-              <>
-                <Icon name="check" size={16} color="#fff" />
-                <Text style={s.confirmText}>
-                  {invalid
-                    ? (tooShort ? 'Segment trop court' : 'Trop long — max 1m30s')
-                    : 'Utiliser ce segment'}
-                </Text>
-              </>
-            )}
+            <Icon name="check" size={16} color="#fff" />
+            <Text style={s.confirmText}>
+              {invalid
+                ? (tooShort ? 'Segment trop court' : 'Trop long — max 1m30s')
+                : 'Utiliser ce segment'}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -298,7 +233,7 @@ const s = StyleSheet.create({
   gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 },
 
   header: {
-    position: 'absolute', top: Platform.OS === 'android' ? 44 : 56,
+    position: 'absolute', top: 44,
     left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', paddingHorizontal: 12,
@@ -347,7 +282,7 @@ const s = StyleSheet.create({
   trimArea: {
     backgroundColor: '#0A0A0A',
     paddingHorizontal: BAR_PADDING,
-    paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+    paddingTop: 20, paddingBottom: 28,
     gap: 16,
   },
 

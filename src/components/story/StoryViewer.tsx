@@ -418,6 +418,7 @@ const StoryOverlaysRenderer: React.FC<{ overlaysJson: string }> = ({ overlaysJso
   let overlays: Overlays | null = null;
   try { overlays = JSON.parse(overlaysJson) as Overlays; } catch { return null; }
   if (!overlays) return null;
+  console.log('[StoryViewer] overlays:', overlays.textLayers?.length, 'texts,', overlays.drawPaths?.length, 'paths,', overlays.stickers?.length, 'stickers');
 
   const { textLayers, drawPaths, masks, stickers } = overlays;
 
@@ -994,8 +995,7 @@ export const StoryViewer: React.FC<Props> = ({
             pointerEvents="none"
           />
         )}
-        {(story.media_type === 'image' || story.media_type === 'video') &&
-          story.overlays_json && (
+        {!!story.overlays_json && (
           <StoryOverlaysRenderer overlaysJson={story.overlays_json} />
         )}
         {story.media_type === 'audio' && (

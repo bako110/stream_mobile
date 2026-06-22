@@ -339,27 +339,45 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       type:     'reel',
       label:    snap.cap || 'Nouveau Reel',
       onDone: async (result) => {
-        if (!result.hlsUrl) return;
+        if (!result.hlsUrl) {
+          Alert.alert(
+            'Publication echouee',
+            'La video a ete uploadee mais le lien de lecture est manquant. Reessaie dans quelques minutes.',
+          );
+          return;
+        }
         const { edit, dur, cap, mentionIds } = snap;
-        await reelService.create({
-          hls_url:       result.hlsUrl,
-          caption:       cap || undefined,
-          thumbnail_url: result.thumbnailUrl,
-          duration_sec:  result.durationSec ? Math.round(result.durationSec) : undefined,
-          mention_ids:   mentionIds.length ? mentionIds : undefined,
-          ...(edit && edit.startSec > 0.5        ? { trim_start:     Math.round(edit.startSec * 1000) } : {}),
-          ...(edit && edit.endSec   < dur - 0.5  ? { trim_end:       Math.round(edit.endSec   * 1000) } : {}),
-          ...(edit && edit.speed !== 1           ? { playback_speed: edit.speed    } : {}),
-          ...(edit && edit.filter !== 'original' ? { filter:         edit.filter   } : {}),
-          ...(edit && edit.layers.length > 0   ? { text_layers:    JSON.stringify(edit.layers)    } : {}),
-          ...(edit && edit.stickers.length > 0 ? { sticker_layers: JSON.stringify(edit.stickers) } : {}),
-          ...(edit && edit.drawings.length > 0 ? { draw_layers:    JSON.stringify(edit.drawings)  } : {}),
-          ...(edit && Object.values(edit.adjust).some(v => v !== 0) ? { video_adjust: JSON.stringify(edit.adjust) } : {}),
-          ...(edit && edit.musicUri              ? { music_url:      edit.musicUri, music_name: edit.musicName } : {}),
-          ...(sourceReelId ? { source_reel_id: sourceReelId, remix_type: 'remix' as const } : {}),
-        });
+        try {
+          await reelService.create({
+            hls_url:       result.hlsUrl,
+            caption:       cap || undefined,
+            thumbnail_url: result.thumbnailUrl,
+            duration_sec:  result.durationSec ? Math.round(result.durationSec) : undefined,
+            mention_ids:   mentionIds.length ? mentionIds : undefined,
+            ...(edit && edit.startSec > 0.5        ? { trim_start:     Math.round(edit.startSec * 1000) } : {}),
+            ...(edit && edit.endSec   < dur - 0.5  ? { trim_end:       Math.round(edit.endSec   * 1000) } : {}),
+            ...(edit && edit.speed !== 1           ? { playback_speed: edit.speed    } : {}),
+            ...(edit && edit.filter !== 'original' ? { filter:         edit.filter   } : {}),
+            ...(edit && edit.layers.length > 0   ? { text_layers:    JSON.stringify(edit.layers)    } : {}),
+            ...(edit && edit.stickers.length > 0 ? { sticker_layers: JSON.stringify(edit.stickers) } : {}),
+            ...(edit && edit.drawings.length > 0 ? { draw_layers:    JSON.stringify(edit.drawings)  } : {}),
+            ...(edit && Object.values(edit.adjust).some(v => v !== 0) ? { video_adjust: JSON.stringify(edit.adjust) } : {}),
+            ...(edit && edit.musicUri              ? { music_url:      edit.musicUri, music_name: edit.musicName } : {}),
+            ...(sourceReelId ? { source_reel_id: sourceReelId, remix_type: 'remix' as const } : {}),
+          });
+        } catch (err: any) {
+          Alert.alert(
+            'Publication echouee',
+            err?.message ?? 'Erreur inconnue lors de la creation du reel.',
+          );
+        }
       },
-      onError: (err) => { console.warn('[CreateReel] upload error:', err.message); },
+      onError: (err) => {
+        Alert.alert(
+          'Upload echoue',
+          err?.message ?? 'Erreur inconnue lors de l\'upload de la video.',
+        );
+      },
     });
   }, [videoUri, caption, captionMentionIds, editResult, videoDuration, onBack, sourceReelId]);
 
@@ -515,7 +533,7 @@ const s = StyleSheet.create({
   videoPreview: { width: W, height: PREVIEW_H, backgroundColor: '#000', overflow: 'hidden' },
   previewTextLayer: { position: 'absolute', zIndex: 8 },
 
-  playOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)' },
+  playOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)' },
   playCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)' },
 
   editChips: { position: 'absolute', top: 12, left: 12, flexDirection: 'row', gap: 6, flexWrap: 'wrap' },

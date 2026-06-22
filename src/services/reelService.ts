@@ -122,7 +122,14 @@ export const reelService = {
     });
   },
 
-  async update(id: string, payload: { caption?: string }): Promise<Reel> {
+  async update(id: string, payload: {
+    caption?:       string;
+    filter?:        string;
+    text_layers?:   string;
+    sticker_layers?: string;
+    draw_layers?:   string;
+    video_adjust?:  string;
+  }): Promise<Reel> {
     const res = await apiClient.patch<Reel>(Endpoints.reels.update(id), payload);
     return res.data;
   },

@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  TextInput, PanResponder, Dimensions, Platform,
+  TextInput, PanResponder, Animated as RNAnimated, Dimensions, Platform,
   StatusBar, Alert, Keyboard, ActivityIndicator, Image,
 } from 'react-native';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
@@ -263,69 +263,28 @@ const FilterThumb: React.FC<{
 // AnimatedTextLayer — applique l'animation choisie
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Calcule la distance entre 2 touches
+function _dist(t1: any, t2: any): number {
+  const dx = t1.pageX - t2.pageX;
+  const dy = t1.pageY - t2.pageY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 const AnimatedTextLayer: React.FC<{
   layer: TextLayer;
+  pan: RNAnimated.ValueXY;
+  scale: RNAnimated.Value;
   onPress: () => void;
   onLongPress: () => void;
   panHandlers: object;
-}> = ({ layer, onPress, onLongPress, panHandlers }) => {
-  const opacity   = useSharedValue(1);
-  const translateY = useSharedValue(0);
-  const scale     = useSharedValue(1);
-
-  useEffect(() => {
-    opacity.value    = 1;
-    translateY.value = 0;
-    scale.value      = 1;
-
-    switch (layer.anim) {
-      case 'fade':
-        opacity.value = withRepeat(
-          withSequence(withTiming(0.2, { duration: 700 }), withTiming(1, { duration: 700 })),
-          -1, true,
-        );
-        break;
-      case 'slide':
-        translateY.value = withRepeat(
-          withSequence(withTiming(-8, { duration: 600 }), withTiming(0, { duration: 600 })),
-          -1, true,
-        );
-        break;
-      case 'bounce':
-        translateY.value = withRepeat(
-          withSequence(
-            withSpring(-12, { damping: 4, stiffness: 300 }),
-            withSpring(0,   { damping: 4, stiffness: 300 }),
-          ), -1, false,
-        );
-        break;
-      case 'pulse':
-        scale.value = withRepeat(
-          withSequence(withTiming(1.18, { duration: 400 }), withTiming(1, { duration: 400 })),
-          -1, true,
-        );
-        break;
-      case 'wave':
-        translateY.value = withRepeat(
-          withSequence(
-            withTiming(-6, { duration: 300, easing: Easing.sin }),
-            withTiming(6,  { duration: 300, easing: Easing.sin }),
-            withTiming(0,  { duration: 300, easing: Easing.sin }),
-          ), -1, false,
-        );
-        break;
-    }
-  }, [layer.anim]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity:   opacity.value,
-    transform: [{ translateY: translateY.value }, { scale: scale.value }],
-  }));
-
+}> = ({ layer, pan, scale, onPress, onLongPress, panHandlers }) => {
   const fontStyle = TEXT_FONTS.find(f => f.key === layer.font)?.style ?? {};
 
   return (
-    <Animated.View style={[s.textLayer, { left: layer.x, top: layer.y }, animStyle]} {...panHandlers}>
+    <RNAnimated.View
+      style={[s.textLayer, pan.getLayout(), { transform: [{ scale }] }]}
+      {...panHandlers}
+    >
       <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.85}>
         <Text
           style={[
@@ -356,7 +315,7 @@ const AnimatedTextLayer: React.FC<{
           {layer.text}
         </Text>
       </TouchableOpacity>
-    </Animated.View>
+    </RNAnimated.View>
   );
 };
 
@@ -366,24 +325,17 @@ const AnimatedTextLayer: React.FC<{
 
 const StickerLayerView: React.FC<{
   sticker: StickerLayer;
+  pan: RNAnimated.ValueXY;
+  scale: RNAnimated.Value;
   onLongPress: () => void;
   panHandlers: object;
-}> = ({ sticker, onLongPress, panHandlers }) => {
-  const bounceVal = useSharedValue(1);
-  useEffect(() => {
-    bounceVal.value = withRepeat(
-      withSequence(withSpring(1.12, { damping: 3, stiffness: 400 }), withSpring(1, { damping: 3, stiffness: 400 })),
-      -1, true,
-    );
-  }, []);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: bounceVal.value * sticker.scale }] }));
-
+}> = ({ sticker, pan, scale, onLongPress, panHandlers }) => {
   return (
-    <Animated.View style={[s.stickerLayer, { left: sticker.x, top: sticker.y }, animStyle]} {...panHandlers}>
+    <RNAnimated.View style={[s.stickerLayer, pan.getLayout(), { transform: [{ scale }] }]} {...panHandlers}>
       <TouchableOpacity onLongPress={onLongPress} activeOpacity={0.85}>
         <Text style={{ fontSize: 44 }}>{sticker.emoji}</Text>
       </TouchableOpacity>
-    </Animated.View>
+    </RNAnimated.View>
   );
 };
 
@@ -613,55 +565,119 @@ export const ReelEditorScreen: React.FC<Props> = ({
     }),
   ).current;
 
-  // ── Text layers draggables ────────────────────────────────────────────────
-  // La ref stocke la position de départ au moment du GRANT (pas la position initiale du layer)
-  const dragStartRef = useRef<Record<string, { x: number; y: number }>>({});
+  // ── Drag + Pinch-to-scale — textes et stickers ───────────────────────────
+  type ItemDrag = {
+    pan:          RNAnimated.ValueXY;
+    scale:        RNAnimated.Value;
+    responder:    ReturnType<typeof PanResponder.create>;
+    dragging:     boolean;
+    cur:          { x: number; y: number };
+    curScale:     number;
+    pinchDist:    number | null; // distance initiale au grant du 2e doigt
+  };
 
-  const getLayerPan = useCallback((id: string) => {
-    const startPos = dragStartRef.current[id] ?? { x: 0, y: 0 };
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
-      onPanResponderGrant: () => {
-        setLayers(prev => {
-          const l = prev.find(x => x.id === id);
-          if (l) dragStartRef.current[id] = { x: l.x, y: l.y };
-          return prev;
-        });
-      },
-      onPanResponderMove: (_, g) => {
-        const s = dragStartRef.current[id];
-        if (!s) return;
-        setLayers(prev => prev.map(l =>
-          l.id === id ? { ...l, x: s.x + g.dx, y: s.y + g.dy } : l,
-        ));
-      },
-    });
+  function _makeDrag(
+    id: string,
+    initX: number, initY: number, initScale: number,
+    onRelease: (finalX: number, finalY: number, finalScale: number) => void,
+  ): ItemDrag {
+    const pan   = new RNAnimated.ValueXY({ x: initX, y: initY });
+    const scale = new RNAnimated.Value(initScale);
+    const entry: ItemDrag = {
+      pan, scale,
+      dragging: false, cur: { x: initX, y: initY },
+      curScale: initScale, pinchDist: null,
+      responder: PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder:  () => true,
+        onPanResponderGrant: (evt) => {
+          const d = entry;
+          d.dragging = true;
+          d.pinchDist = null;
+          pan.setOffset({ x: d.cur.x, y: d.cur.y });
+          pan.setValue({ x: 0, y: 0 });
+        },
+        onPanResponderMove: (evt, g) => {
+          const d = entry;
+          const touches = evt.nativeEvent.touches;
+          if (touches.length >= 2) {
+            // Pinch — calculer le ratio
+            const dist = _dist(touches[0], touches[1]);
+            if (d.pinchDist === null) {
+              d.pinchDist = dist;
+            } else {
+              const ratio = dist / d.pinchDist;
+              const next  = Math.max(0.3, Math.min(4, d.curScale * ratio));
+              scale.setValue(next);
+            }
+          } else {
+            // 1 doigt — déplacement normal
+            d.pinchDist = null;
+            pan.x.setValue(g.dx);
+            pan.y.setValue(g.dy);
+          }
+        },
+        onPanResponderRelease: (evt, g) => {
+          const d = entry;
+          pan.flattenOffset();
+          const finalX = d.cur.x + (d.pinchDist !== null ? 0 : g.dx);
+          const finalY = d.cur.y + (d.pinchDist !== null ? 0 : g.dy);
+          // Lire le scale courant depuis l'Animated.Value via listener ponctuel
+          let finalScale = d.curScale;
+          const id2 = scale.addListener(({ value }) => { finalScale = value; });
+          scale.removeListener(id2);
+          d.cur = { x: finalX, y: finalY };
+          d.curScale = finalScale;
+          d.dragging = false;
+          d.pinchDist = null;
+          onRelease(finalX, finalY, finalScale);
+        },
+      }),
+    };
+    return entry;
+  }
+
+  const layerDragsRef   = useRef<Record<string, ItemDrag>>({});
+  const stickerDragsRef = useRef<Record<string, ItemDrag>>({});
+
+  const getLayerDrag = useCallback((id: string, initX: number, initY: number): ItemDrag => {
+    if (!layerDragsRef.current[id]) {
+      layerDragsRef.current[id] = _makeDrag(id, initX, initY, 1, (fx, fy, fs) => {
+        setLayers(prev => prev.map(l => l.id === id ? { ...l, x: fx, y: fy, fontSize: Math.round(l.fontSize * fs / (layerDragsRef.current[id]?.curScale || 1) * fs) } : l));
+        // plus simple : juste stocker x,y — la scale reste dans l'Animated.Value
+        setLayers(prev => prev.map(l => l.id === id ? { ...l, x: fx, y: fy } : l));
+      });
+    }
+    return layerDragsRef.current[id];
   }, []);
 
-  // ── Sticker layers draggables ─────────────────────────────────────────────
-  const stickerDragStartRef = useRef<Record<string, { x: number; y: number }>>({});
-
-  const getStickerPan = useCallback((id: string) => {
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
-      onPanResponderGrant: () => {
-        setStickers(prev => {
-          const st = prev.find(x => x.id === id);
-          if (st) stickerDragStartRef.current[id] = { x: st.x, y: st.y };
-          return prev;
-        });
-      },
-      onPanResponderMove: (_, g) => {
-        const s = stickerDragStartRef.current[id];
-        if (!s) return;
-        setStickers(prev => prev.map(st =>
-          st.id === id ? { ...st, x: s.x + g.dx, y: s.y + g.dy } : st,
-        ));
-      },
-    });
+  const getStickerDrag = useCallback((id: string, initX: number, initY: number, initScale: number): ItemDrag => {
+    if (!stickerDragsRef.current[id]) {
+      stickerDragsRef.current[id] = _makeDrag(id, initX, initY, initScale, (fx, fy, fs) => {
+        setStickers(prev => prev.map(st => st.id === id ? { ...st, x: fx, y: fy, scale: fs } : st));
+      });
+    }
+    return stickerDragsRef.current[id];
   }, []);
+
+  // Sync depuis l'extérieur (ajout/suppression)
+  useEffect(() => {
+    layers.forEach(l => {
+      const d = layerDragsRef.current[l.id];
+      if (d && !d.dragging) { d.cur = { x: l.x, y: l.y }; d.pan.setValue({ x: l.x, y: l.y }); }
+    });
+    const ids = new Set(layers.map(l => l.id));
+    Object.keys(layerDragsRef.current).forEach(id => { if (!ids.has(id)) delete layerDragsRef.current[id]; });
+  }, [layers]);
+
+  useEffect(() => {
+    stickers.forEach(st => {
+      const d = stickerDragsRef.current[st.id];
+      if (d && !d.dragging) { d.cur = { x: st.x, y: st.y }; d.pan.setValue({ x: st.x, y: st.y }); }
+    });
+    const ids = new Set(stickers.map(st => st.id));
+    Object.keys(stickerDragsRef.current).forEach(id => { if (!ids.has(id)) delete stickerDragsRef.current[id]; });
+  }, [stickers]);
 
   // ── Dessin PanResponder ───────────────────────────────────────────────────
   const drawPan = useRef(
@@ -850,13 +866,22 @@ export const ReelEditorScreen: React.FC<Props> = ({
                   const dx = next.x - pt.x; const dy = next.y - pt.y;
                   const len = Math.sqrt(dx * dx + dy * dy);
                   const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                  // Centrer sur le point de départ : translateX(-len/2) puis rotate, puis translateX(len/2)
+                  // Equivalent à transformOrigin: 'left center' sans utiliser transformOrigin
                   return (
                     <View key={`${path.id}_${i}`} pointerEvents="none" style={{
-                      position: 'absolute', left: pt.x, top: pt.y - path.width / 2,
-                      width: len, height: path.width, borderRadius: path.width / 2,
+                      position: 'absolute',
+                      left: pt.x,
+                      top: pt.y - path.width / 2,
+                      width: len,
+                      height: path.width,
+                      borderRadius: path.width / 2,
                       backgroundColor: path.color,
-                      transform: [{ rotate: `${angle}deg` }, { translateX: 0 }],
-                      transformOrigin: 'left center',
+                      transform: [
+                        { translateX: len / 2 },
+                        { rotate: `${angle}deg` },
+                        { translateX: -len / 2 },
+                      ],
                     }} />
                   );
                 })
@@ -870,26 +895,36 @@ export const ReelEditorScreen: React.FC<Props> = ({
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={togglePlay} activeOpacity={1} />
         )}
 
-        {/* Text layers animés */}
-        {!textOverlay && layers.map(l => (
-          <AnimatedTextLayer
-            key={l.id}
-            layer={l}
-            onPress={() => openTextOverlay(l)}
-            onLongPress={() => deleteLayer(l.id)}
-            panHandlers={getLayerPan(l.id).panHandlers}
-          />
-        ))}
+        {/* Text layers draggables + pinch-to-scale */}
+        {!textOverlay && layers.map(l => {
+          const drag = getLayerDrag(l.id, l.x, l.y);
+          return (
+            <AnimatedTextLayer
+              key={l.id}
+              layer={l}
+              pan={drag.pan}
+              scale={drag.scale}
+              onPress={() => openTextOverlay(l)}
+              onLongPress={() => deleteLayer(l.id)}
+              panHandlers={drag.responder.panHandlers}
+            />
+          );
+        })}
 
-        {/* Stickers */}
-        {stickers.map(st => (
-          <StickerLayerView
-            key={st.id}
-            sticker={st}
-            onLongPress={() => deleteSticker(st.id)}
-            panHandlers={getStickerPan(st.id).panHandlers}
-          />
-        ))}
+        {/* Stickers draggables + pinch-to-scale */}
+        {stickers.map(st => {
+          const drag = getStickerDrag(st.id, st.x, st.y, st.scale);
+          return (
+            <StickerLayerView
+              key={st.id}
+              sticker={st}
+              pan={drag.pan}
+              scale={drag.scale}
+              onLongPress={() => deleteSticker(st.id)}
+              panHandlers={drag.responder.panHandlers}
+            />
+          );
+        })}
       </View>
 
       {/* Bouton play/pause centré */}
@@ -1435,7 +1470,7 @@ const s = StyleSheet.create({
   trimHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   trimDurTxt: { color: '#A78BFA', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
   frameBarOuter: { height: 56, position: 'relative' },
-  frameBar:      { ...StyleSheet.absoluteFillObject, borderRadius: 10, overflow: 'hidden', flexDirection: 'row', backgroundColor: '#1A1830' },
+  frameBar:      { ...StyleSheet.absoluteFill, borderRadius: 10, overflow: 'hidden', flexDirection: 'row', backgroundColor: '#1A1830' },
   frameCell:  { flex: 1, height: 56, backgroundColor: '#2A2848', borderRightWidth: 0.5, borderRightColor: '#0A0814' },
   dimL:       { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 1 },
   dimR:       { position: 'absolute', top: 0, bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 1 },

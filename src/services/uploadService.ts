@@ -220,21 +220,20 @@ export async function uploadVideoFromUri(
 
     // Poll HLS jusqu'à done pour tous les dossiers vidéo
     if (jobId) {
-      const MAX_POLLS = 75;
+      const MAX_POLLS        = 90;   // 90 × 4s = 6 min max
       const POLL_INTERVAL_MS = 4_000;
-      const MAX_NETWORK_ERRORS = 3;
-      let networkErrors = 0;
+      const MAX_REAL_ERRORS  = 5;    // vraies erreurs réseau (pas les 404 "job pas encore prêt")
+      let realErrors = 0;
 
       for (let i = 0; i < MAX_POLLS; i++) {
         await new Promise<void>(r => setTimeout(() => r(), POLL_INTERVAL_MS));
-        // Progression pendant le poll : 70% → 95% sur 75 polls
         onProgress?.(Math.min(95, 70 + Math.round(i * 25 / MAX_POLLS)));
         try {
           const statusRes = await apiClient.get<any>(
             `/api/v1/upload/video/status/${jobId}`,
           );
           const status = statusRes.data;
-          networkErrors = 0;
+          realErrors = 0;
           if (status.status === 'done') {
             onProgress?.(100);
             return {
@@ -248,12 +247,23 @@ export async function uploadVideoFromUri(
               height:        compressed.height ?? undefined,
             };
           }
-          if (status.status === 'error') break;
-        } catch {
-          networkErrors++;
-          if (networkErrors >= MAX_NETWORK_ERRORS) break;
+          if (status.status === 'error') {
+            throw new Error(status.detail ?? 'Erreur de traitement video cote serveur');
+          }
+          // status === 'processing' → continuer le poll
+        } catch (pollErr: any) {
+          // 404 = job pas encore écrit dans Redis (BackgroundTask pas encore exécutée)
+          // On ne compte pas ça comme une vraie erreur réseau
+          const is404 = pollErr?.status === 404 || pollErr?.message?.includes('404');
+          if (!is404) {
+            realErrors++;
+            if (realErrors >= MAX_REAL_ERRORS) {
+              throw new Error(`Upload interrompu apres ${MAX_REAL_ERRORS} erreurs reseau : ${pollErr?.message ?? 'erreur inconnue'}`);
+            }
+          }
         }
       }
+      throw new Error('Timeout : la video est en cours de traitement. Reessaie dans quelques minutes.');
     }
 
     // Fallback : hls_url si disponible, sinon erreur (plus de MP4)
