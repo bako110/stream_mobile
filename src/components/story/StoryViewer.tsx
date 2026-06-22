@@ -448,7 +448,8 @@ const StoryOverlaysRenderer: React.FC<{ overlaysJson: string }> = ({ overlaysJso
             position: 'absolute',
             left: m.x * W, top: m.y * H,
             width: m.w * W, height: m.h * H,
-            backgroundColor: 'rgba(0,0,0,0.85)',
+            backgroundColor: m.color ?? '#000000',
+            opacity: m.opacity ?? 0.88,
             borderRadius: 4,
           }}
         />

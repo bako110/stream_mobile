@@ -34,7 +34,7 @@ export interface DrawPath {
   id: string; d: string; color: string; width: number;
 }
 export interface MaskRect {
-  id: string; x: number; y: number; w: number; h: number;
+  id: string; x: number; y: number; w: number; h: number; color?: string; opacity?: number;
 }
 export interface StickerLayer {
   id: string; emoji: string; x: number; y: number; scale: number; rotation: number;

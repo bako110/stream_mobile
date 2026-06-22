@@ -44,7 +44,7 @@ interface TextLayer {
   bold: boolean; rotation: number; scale: number;
 }
 interface DrawPath { id: string; d: string; color: string; width: number; }
-interface MaskRect { id: string; x: number; y: number; w: number; h: number; }
+interface MaskRect { id: string; x: number; y: number; w: number; h: number; color?: string; opacity?: number; }
 interface StickerLayer { id: string; emoji: string; x: number; y: number; scale: number; rotation: number; }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -52,6 +52,14 @@ interface StickerLayer { id: string; emoji: string; x: number; y: number; scale:
 const DRAW_COLORS = ['#FFFFFF','#000000','#E91E63','#2196F3','#4CAF50','#FF9800','#9C27B0','#F44336','#FFEB3B','#00BCD4'];
 const TEXT_COLORS = ['#FFFFFF','#000000','#E91E63','#2196F3','#4CAF50','#FF9800','#9C27B0','#FFEB3B'];
 const TEXT_BG_COLORS_EDITOR = ['#000000','#FFFFFF','#7B3FF2','#E91E63','#2196F3','#4CAF50'];
+const MASK_COLORS: { label: string; color: string; opacity: number }[] = [
+  { label: 'Noir',    color: '#000000', opacity: 0.88 },
+  { label: 'Blanc',   color: '#FFFFFF', opacity: 0.80 },
+  { label: 'Violet',  color: '#7B3FF2', opacity: 0.80 },
+  { label: 'Rose',    color: '#E91E63', opacity: 0.80 },
+  { label: 'Bleu',    color: '#1565C0', opacity: 0.80 },
+  { label: 'Flou',    color: '#000000', opacity: 0.55 },
+];
 const STICKER_LIST = ['😂','❤️','🔥','👍','😍','🎉','💯','😭','🤔','👀','✨','💀','🙏','😤','💪','🥳','😊','🤣','👏','💥','🎵','🌈','⚡','🦋','🌸','🍕','🏆','🎯','🌙','💎'];
 const BG_COLORS = ['#7B3FF2','#E91E63','#FF5722','#009688','#2196F3','#4CAF50','#FF9800','#795548','#000000','#1A237E'];
 
@@ -295,8 +303,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       } else {
         cropInitDistRef.current = 0;
         const base = cropBaseRef.current;
-        const maxX = (base.scale - 1) * canvasW / 2;
-        const maxY = (base.scale - 1) * canvasH / 2;
+        const maxX = (base.scale - 1) * W / 2;
+        const maxY = (base.scale - 1) * H / 2;
         const clampX = Math.max(-maxX, Math.min(maxX, base.translateX + gs.dx));
         const clampY = Math.max(-maxY, Math.min(maxY, base.translateY + gs.dy));
         setCrop({ scale: base.scale, translateX: clampX, translateY: clampY });
@@ -348,6 +356,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   // ── Masques ───────────────────────────────────────────────────────────────
   const [masks,        setMasks]        = useState<MaskRect[]>([]);
   const [liveMask,     setLiveMask]     = useState<MaskRect | null>(null);
+  const [maskColorIdx, setMaskColorIdx] = useState(0);
+  const maskColorIdxRef = useRef(0);
+  maskColorIdxRef.current = maskColorIdx;
   const maskStartRef   = useRef<{ x: number; y: number } | null>(null);
 
   const maskPan = useMemo(() => PanResponder.create({
@@ -366,12 +377,15 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     onPanResponderRelease: () => {
       setLiveMask(prev => {
         if (prev && prev.w > 20 && prev.h > 20) {
+          const mc = MASK_COLORS[maskColorIdxRef.current];
           const norm: MaskRect = {
             id: Date.now().toString(),
-            x: prev.x / canvasW,
-            y: prev.y / canvasH,
-            w: prev.w / canvasW,
-            h: prev.h / canvasH,
+            x: prev.x / W,
+            y: prev.y / H,
+            w: prev.w / W,
+            h: prev.h / H,
+            color: mc.color,
+            opacity: mc.opacity,
           };
           setMasks(m => [...m, norm]);
         }
@@ -757,40 +771,57 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         <View style={s.composeRoot}>
           <StatusBar hidden />
 
-          {/* FOND / MEDIA — avec crop interactif */}
+          {/* FOND / MEDIA */}
           {mode === 'text' && <View style={[StyleSheet.absoluteFill,{backgroundColor:bgColor}]} />}
+
+          {/* IMAGE / VIDEO — un seul bloc, jamais démonté */}
           {(mode === 'image' || mode === 'video') && localUri && (
             <View
               style={[StyleSheet.absoluteFill, {overflow:'hidden'}]}
               {...(activeTool === 'crop' ? cropPan.panHandlers : {})}
             >
-              <View style={{
-                flex: 1,
-                transform: [
-                  { scale: cropState.scale },
-                  { translateX: cropState.translateX },
-                  { translateY: cropState.translateY },
-                ],
-              }}>
-                {mode === 'image'
+              {/* Sans crop : image plein écran normale */}
+              {cropState.scale === 1 && cropState.translateX === 0 && cropState.translateY === 0 ? (
+                mode === 'image'
                   ? <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   : <VideoPreview uri={localUri} playerRef={playerRef} />
-                }
-              </View>
-              {/* Grille de crop visible uniquement quand l'outil crop est actif */}
+              ) : (
+                /* Avec crop actif : transform appliqué */
+                <View style={{
+                  position: 'absolute',
+                  width: canvasW,
+                  height: canvasH,
+                  transform: [
+                    { scale: cropState.scale },
+                    { translateX: cropState.translateX },
+                    { translateY: cropState.translateY },
+                  ],
+                }}>
+                  {mode === 'image'
+                    ? <Image source={{uri:localUri}} style={{width:canvasW, height:canvasH}} resizeMode="cover" />
+                    : <VideoPreview uri={localUri} playerRef={playerRef} />
+                  }
+                </View>
+              )}
+
+              {/* Grille + bords — visibles uniquement en mode crop */}
               {activeTool === 'crop' && (
                 <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                  {/* Lignes horizontales */}
-                  <View style={{position:'absolute',top:'33.3%',left:0,right:0,height:1,backgroundColor:'rgba(255,255,255,0.45)'}} />
-                  <View style={{position:'absolute',top:'66.6%',left:0,right:0,height:1,backgroundColor:'rgba(255,255,255,0.45)'}} />
-                  {/* Lignes verticales */}
-                  <View style={{position:'absolute',left:'33.3%',top:0,bottom:0,width:1,backgroundColor:'rgba(255,255,255,0.45)'}} />
-                  <View style={{position:'absolute',left:'66.6%',top:0,bottom:0,width:1,backgroundColor:'rgba(255,255,255,0.45)'}} />
-                  {/* Coins */}
-                  {[{t:0,l:0},{t:0,r:0},{b:0,l:0},{b:0,r:0}].map((pos,i) => (
-                    <View key={i} style={[{position:'absolute',width:22,height:22,...pos as any}]}>
-                      <View style={{position:'absolute',top:0,left:0,width:22,height:3,backgroundColor:'#fff'}} />
-                      <View style={{position:'absolute',top:0,left:0,width:3,height:22,backgroundColor:'#fff'}} />
+                  {/* Tiers */}
+                  <View style={{position:'absolute',top:'33.3%',left:0,right:0,height:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.55)'}} />
+                  <View style={{position:'absolute',top:'66.6%',left:0,right:0,height:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.55)'}} />
+                  <View style={{position:'absolute',left:'33.3%',top:0,bottom:0,width:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.55)'}} />
+                  <View style={{position:'absolute',left:'66.6%',top:0,bottom:0,width:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.55)'}} />
+                  {/* Bordure */}
+                  <View style={{position:'absolute',top:0,left:0,right:0,height:2,backgroundColor:'#fff'}} />
+                  <View style={{position:'absolute',bottom:0,left:0,right:0,height:2,backgroundColor:'#fff'}} />
+                  <View style={{position:'absolute',left:0,top:0,bottom:0,width:2,backgroundColor:'#fff'}} />
+                  <View style={{position:'absolute',right:0,top:0,bottom:0,width:2,backgroundColor:'#fff'}} />
+                  {/* Coins épais */}
+                  {([{top:0,left:0},{top:0,right:0},{bottom:0,left:0},{bottom:0,right:0}] as any[]).map((pos,i)=>(
+                    <View key={i} style={{position:'absolute',width:30,height:30,...pos}}>
+                      <View style={{position:'absolute',top:0,left:0,width:30,height:4,backgroundColor:'#7B3FF2'}} />
+                      <View style={{position:'absolute',top:0,left:0,width:4,height:30,backgroundColor:'#7B3FF2'}} />
                     </View>
                   ))}
                 </View>
@@ -814,20 +845,22 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             {masks.map(m => (
               <TouchableOpacity
                 key={m.id}
-                activeOpacity={0.8}
-                onPress={() => setMasks(prev => prev.filter(x => x.id !== m.id))}
+                activeOpacity={activeTool === 'mask' ? 0.7 : 1}
+                onPress={activeTool === 'mask' ? () => setMasks(prev => prev.filter(x => x.id !== m.id)) : undefined}
                 style={{
                   position: 'absolute',
                   left: m.x * canvasW, top: m.y * canvasH,
                   width: m.w * canvasW, height: m.h * canvasH,
-                  backgroundColor: 'rgba(0,0,0,0.85)', borderRadius: 4,
-                  borderWidth: activeTool === 'mask' ? 1 : 0,
-                  borderColor: 'rgba(255,255,255,0.4)',
+                  backgroundColor: m.color ?? '#000000',
+                  opacity: m.opacity ?? 0.88,
+                  borderRadius: 4,
+                  borderWidth: activeTool === 'mask' ? 1.5 : 0,
+                  borderColor: '#fff',
                 }}
               >
                 {activeTool === 'mask' && (
-                  <View style={{position:'absolute',top:-8,right:-8,width:16,height:16,borderRadius:8,backgroundColor:'#E91E63',alignItems:'center',justifyContent:'center'}}>
-                    <Icon name="x" size={8} color="#fff" />
+                  <View style={{position:'absolute',top:-9,right:-9,width:18,height:18,borderRadius:9,backgroundColor:'#E91E63',alignItems:'center',justifyContent:'center'}}>
+                    <Icon name="x" size={10} color="#fff" />
                   </View>
                 )}
               </TouchableOpacity>
@@ -835,8 +868,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             {liveMask && liveMask.w > 0 && liveMask.h > 0 && (
               <View style={{
                 position:'absolute', left:liveMask.x, top:liveMask.y, width:liveMask.w, height:liveMask.h,
-                backgroundColor:'rgba(0,0,0,0.75)', borderRadius:4, borderWidth:1, borderColor:'rgba(255,255,255,0.6)',
-                borderStyle:'dashed',
+                backgroundColor: MASK_COLORS[maskColorIdx].color,
+                opacity: MASK_COLORS[maskColorIdx].opacity,
+                borderRadius:4, borderWidth:1.5, borderColor:'rgba(255,255,255,0.8)',
               }} />
             )}
           </View>
@@ -952,32 +986,72 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
           {/* PANNEAU CROP */}
           {activeTool === 'crop' && (
-            <View style={s.hintPanel}>
-              <View style={{flex:1}}>
-                <Text style={s.hintText}>Pincez pour zoomer · glissez pour recadrer</Text>
-                {cropState.scale > 1 && (
-                  <Text style={[s.hintText,{fontSize:11,opacity:0.6,marginTop:2}]}>Zoom x{cropState.scale.toFixed(1)}</Text>
-                )}
+            <View style={[s.hintPanel, {flexDirection:'column', alignItems:'stretch', gap:10}]}>
+              <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
+                <View style={{flex:1}}>
+                  <Text style={s.hintText}>Pincez pour zoomer · glissez pour recadrer</Text>
+                  <Text style={[s.hintText,{fontSize:11,opacity:0.55,marginTop:2}]}>
+                    Zoom {cropState.scale.toFixed(1)}x{cropState.scale > 1 ? ` · decal. ${Math.round(cropState.translateX)}/${Math.round(cropState.translateY)}` : ''}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={resetCrop} style={s.hintBtn}>
+                  <Icon name="refresh-cw" size={14} color="#fff" />
+                  <Text style={s.hintBtnLabel}>Reinit.</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={()=>setActiveTool('none')} style={[s.hintBtn,{backgroundColor:'rgba(123,63,242,0.5)'}]}>
+                  <Icon name="check" size={14} color="#fff" />
+                  <Text style={s.hintBtnLabel}>OK</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={resetCrop} style={s.hintBtn}>
-                <Icon name="refresh-cw" size={14} color="#fff" />
-                <Text style={s.hintBtnLabel}>Reinitialiser</Text>
-              </TouchableOpacity>
+              {/* Zoom rapide */}
+              <View style={{flexDirection:'row',gap:8,justifyContent:'center'}}>
+                {[1,1.5,2,3].map(z => (
+                  <TouchableOpacity
+                    key={z}
+                    onPress={() => setCrop({ scale: z, translateX: 0, translateY: 0 })}
+                    style={[{paddingHorizontal:14,paddingVertical:6,borderRadius:14,backgroundColor:'rgba(255,255,255,0.12)'},cropState.scale===z&&{backgroundColor:'rgba(123,63,242,0.6)'}]}
+                  >
+                    <Text style={{color:'#fff',fontSize:13,fontWeight:'700'}}>{z}x</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           )}
 
           {/* PANNEAU MASQUE */}
           {activeTool === 'mask' && (
-            <View style={s.hintPanel}>
-              <View style={{flex:1}}>
-                <Text style={s.hintText}>Glissez pour masquer une zone · appuyez sur un masque pour le supprimer</Text>
+            <View style={[s.drawPanel, {gap:8}]}>
+              <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+                <Text style={[s.hintText,{flex:1,fontSize:12}]}>Glissez pour masquer · appuyez pour supprimer</Text>
+                {masks.length > 0 && (
+                  <TouchableOpacity onPress={removeLastMask} style={s.hintBtn}>
+                    <Icon name="corner-ccw" size={13} color="#fff" />
+                    <Text style={s.hintBtnLabel}>Annuler</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              {masks.length > 0 && (
-                <TouchableOpacity onPress={removeLastMask} style={s.hintBtn}>
-                  <Icon name="corner-ccw" size={14} color="#fff" />
-                  <Text style={s.hintBtnLabel}>Annuler</Text>
-                </TouchableOpacity>
-              )}
+              {/* Palette couleur masque */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8,paddingHorizontal:4,alignItems:'center'}}>
+                {MASK_COLORS.map((mc, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => setMaskColorIdx(idx)}
+                    style={[{
+                      width: 34, height: 34, borderRadius: 17,
+                      backgroundColor: mc.color,
+                      opacity: mc.opacity,
+                      borderWidth: maskColorIdx === idx ? 3 : 1.5,
+                      borderColor: maskColorIdx === idx ? '#7B3FF2' : 'rgba(255,255,255,0.5)',
+                      alignItems: 'center', justifyContent: 'center',
+                    }]}
+                  >
+                    {maskColorIdx === idx && <Icon name="check" size={14} color={mc.color === '#000000' ? '#fff' : '#000'} />}
+                  </TouchableOpacity>
+                ))}
+                <View style={{marginLeft:4}}>
+                  <Text style={{color:'rgba(255,255,255,0.5)',fontSize:10}}>{MASK_COLORS[maskColorIdx].label}</Text>
+                </View>
+              </ScrollView>
             </View>
           )}
 
