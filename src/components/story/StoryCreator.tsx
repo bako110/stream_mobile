@@ -852,6 +852,17 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                 <Text style={s.addTextLabel}>Legende</Text>
               </TouchableOpacity>
 
+              {/* Bouton Modifier — retour à l'éditeur depuis la preview */}
+              {(mode === 'image' || mode === 'video') && localUri && (
+                <TouchableOpacity
+                  style={s.addTextBtn}
+                  onPress={() => setStep('edit')}
+                >
+                  <Icon name="edit-2" size={16} color="#fff" />
+                  <Text style={s.addTextLabel}>Modifier</Text>
+                </TouchableOpacity>
+              )}
+
               {mode !== 'voice' && (
                 <TouchableOpacity
                   style={[s.addTextBtn, audioUri && s.addTextBtnActive]}
