@@ -497,8 +497,6 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       ? JSON.stringify({ textLayers, drawPaths, masks: [], stickers })
       : undefined;
 
-    console.log('[StoryCreator] overlays_json:', _overlaysJson ? 'present (' + (drawPaths.length + textLayers.length + stickers.length) + ' elements)' : 'undefined');
-
     onCreated(); resetAndClose();
     storyUploadState.setUploading(true);
     (async () => {
