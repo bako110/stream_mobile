@@ -25,6 +25,10 @@ export interface Story {
   background_color: string | null;
   audio_url: string | null;
   font_style: string | null;
+  filter_key: string | null;
+  filter_overlay_color: string | null;
+  filter_overlay_opacity: number | null;
+  overlays_json: string | null;
   author: StoryAuthor | null;
   viewed_by_me: boolean;
 }
@@ -46,10 +50,12 @@ export interface StoryCreate {
   background_color?: string;
   audio_url?: string;
   font_style?: string;
+  filter_key?: string;
+  filter_overlay_color?: string;
+  filter_overlay_opacity?: number;
+  overlays_json?: string;
   audience_type?: StoryAudienceType;
   audience_user_ids?: string[];
-  trim_start_sec?: number; // segment sélectionné — découpé côté backend
-  trim_end_sec?: number;
 }
 
 export interface StoryUpdate {

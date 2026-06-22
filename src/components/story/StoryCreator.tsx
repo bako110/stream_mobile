@@ -26,7 +26,7 @@ import { compressVideo, cleanupTempVideos } from '../../services/videoCompressSe
 import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { VideoTrimmer } from './VideoTrimmer';
-import { StoryMediaEditor, STORY_FILTERS, type FilterKey } from './StoryMediaEditor';
+import { StoryMediaEditor, STORY_FILTERS, type FilterKey, type EditorResult } from './StoryMediaEditor';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -181,8 +181,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [uploadPct,     setUploadPct]     = useState(0);
   const [showTrimmer,   setShowTrimmer]   = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
-  const [editorFilterKey, setEditorFilterKey] = useState<FilterKey>('none');
-  const [editorTrimData,  setEditorTrimData]  = useState<{ start: number; end: number } | undefined>();
+  const [editorFilterKey,    setEditorFilterKey]    = useState<FilterKey>('none');
+  const [editorTrimData,     setEditorTrimData]     = useState<{ start: number; end: number } | undefined>();
+  const [editorOverlaysJson, setEditorOverlaysJson] = useState<string | undefined>();
   const tempFilesRef = useRef<string[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [recording,     setRecording]     = useState(false);
@@ -213,7 +214,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setShowTextInput(false); setUploading(false); setRecording(false);
     setRecordTime('00:00'); setShowSuccess(false);
     setShowTrimmer(false); setVideoDuration(0);
-    setEditorFilterKey('none'); setEditorTrimData(undefined);
+    setEditorFilterKey('none'); setEditorTrimData(undefined); setEditorOverlaysJson(undefined);
     setAudienceType('everyone'); setSelectedUsers([]);
     stopAudioPreview();
     onClose();
@@ -422,6 +423,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     const _fontStyleKey= fontStyleKey;
     const _audienceType= audienceType;
     const _selectedUsers = selectedUsers;
+    const _filterKey      = editorFilterKey;
+    const _overlaysJson   = editorOverlaysJson;
     const _tempFiles = [...tempFilesRef.current];
     tempFilesRef.current = [];
 
@@ -469,11 +472,16 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           duration_sec = 15;
         }
 
+        const activeFilter = STORY_FILTERS.find(f => f.key === _filterKey);
         await storyService.create({
           media_url, media_type, thumbnail_url,
           caption: _caption.trim() || undefined,
           duration_sec, background_color, audio_url,
           font_style: _mode === 'text' ? _fontStyleKey : undefined,
+          filter_key: _filterKey !== 'none' ? _filterKey : undefined,
+          filter_overlay_color: activeFilter && activeFilter.opacity > 0 ? activeFilter.overlay : undefined,
+          filter_overlay_opacity: activeFilter && activeFilter.opacity > 0 ? activeFilter.opacity : undefined,
+          overlays_json: _overlaysJson,
           audience_type: _audienceType,
           audience_user_ids: _audienceType !== 'everyone' ? _selectedUsers : [],
         });
@@ -683,13 +691,28 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           uri={localUri}
           mediaType={mode === 'video' ? 'video' : 'image'}
           duration={videoDuration}
-          onConfirm={(result) => {
+          onConfirm={(result: EditorResult) => {
             if (result.uri !== localUri) {
               tempFilesRef.current.push(result.uri);
               setLocalUri(result.uri);
             }
             setEditorFilterKey(result.filterKey);
             if (result.trimData) setEditorTrimData(result.trimData);
+            const hasOverlays =
+              result.textLayers.length > 0 ||
+              result.drawPaths.length > 0 ||
+              result.masks.length > 0 ||
+              result.stickers.length > 0;
+            if (hasOverlays) {
+              setEditorOverlaysJson(JSON.stringify({
+                textLayers: result.textLayers,
+                drawPaths:  result.drawPaths,
+                masks:      result.masks,
+                stickers:   result.stickers,
+              }));
+            } else {
+              setEditorOverlaysJson(undefined);
+            }
             setStep('preview');
           }}
           onCancel={goBack}

@@ -5,6 +5,8 @@ import {
   TouchableWithoutFeedback, Alert, TextInput, Modal, Platform,
   FlatList, ActivityIndicator, Easing, Linking,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import type { TextLayer, DrawPath, MaskRect, StickerLayer } from './StoryMediaEditor';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import type { VideoPlayerStatus } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
@@ -400,6 +402,102 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
         </View>
       </View>
     </Modal>
+  );
+};
+
+// ── StoryOverlaysRenderer — affiche les overlays sauvegardes sur une story ───
+
+interface Overlays {
+  textLayers: TextLayer[];
+  drawPaths:  DrawPath[];
+  masks:      MaskRect[];
+  stickers:   StickerLayer[];
+}
+
+const StoryOverlaysRenderer: React.FC<{ overlaysJson: string }> = ({ overlaysJson }) => {
+  let overlays: Overlays | null = null;
+  try { overlays = JSON.parse(overlaysJson) as Overlays; } catch { return null; }
+  if (!overlays) return null;
+
+  const { textLayers, drawPaths, masks, stickers } = overlays;
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Dessins SVG */}
+      {drawPaths.length > 0 && (
+        <Svg width={W} height={H} style={StyleSheet.absoluteFill}>
+          {drawPaths.map(p => (
+            <Path
+              key={p.id}
+              d={p.d}
+              stroke={p.color}
+              strokeWidth={p.width}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+        </Svg>
+      )}
+
+      {/* Masques */}
+      {masks.map(m => (
+        <View
+          key={m.id}
+          style={{
+            position: 'absolute',
+            left: m.x, top: m.y, width: m.w, height: m.h,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            borderRadius: 4,
+          }}
+        />
+      ))}
+
+      {/* Textes */}
+      {textLayers.map(l => {
+        const bgStyle = l.bg === 'none'
+          ? {}
+          : { backgroundColor: l.bg === 'solid' ? l.bgColor : l.bgColor + 'BB', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 };
+        return (
+          <View
+            key={l.id}
+            style={[{
+              position: 'absolute',
+              left: l.x * W,
+              top:  l.y * H,
+              transform: [{ scale: l.scale }, { rotate: `${l.rotation}rad` }],
+            }, bgStyle]}
+          >
+            <Text style={{
+              color:      l.color,
+              fontSize:   l.fontSize,
+              fontWeight: l.bold ? 'bold' : 'normal',
+              textShadowColor:  l.bg === 'none' ? 'rgba(0,0,0,0.7)' : 'transparent',
+              textShadowOffset: { width: 1, height: 1 },
+              textShadowRadius: 3,
+            }}>
+              {l.text}
+            </Text>
+          </View>
+        );
+      })}
+
+      {/* Stickers */}
+      {stickers.map(s => (
+        <Text
+          key={s.id}
+          style={{
+            position:  'absolute',
+            left:      s.x * W - 24,
+            top:       s.y * H - 24,
+            fontSize:  42,
+            transform: [{ scale: s.scale }, { rotate: `${s.rotation}rad` }],
+          }}
+        >
+          {s.emoji}
+        </Text>
+      ))}
+    </View>
   );
 };
 
@@ -885,6 +983,20 @@ export const StoryViewer: React.FC<Props> = ({
           <StoryVideoView key={story.id} uri={story.media_url} paused={paused}
             onReady={() => setVideoReady(true)}
             onBuffering={setVideoBuffering} />
+        )}
+        {(story.media_type === 'image' || story.media_type === 'video') &&
+          story.filter_overlay_color && (story.filter_overlay_opacity ?? 0) > 0 && (
+          <View
+            style={[StyleSheet.absoluteFill, {
+              backgroundColor: story.filter_overlay_color,
+              opacity: story.filter_overlay_opacity!,
+            }]}
+            pointerEvents="none"
+          />
+        )}
+        {(story.media_type === 'image' || story.media_type === 'video') &&
+          story.overlays_json && (
+          <StoryOverlaysRenderer overlaysJson={story.overlays_json} />
         )}
         {story.media_type === 'audio' && (
           <LinearGradient colors={[story.background_color ?? '#FF9800', '#000']} style={s.media}>
