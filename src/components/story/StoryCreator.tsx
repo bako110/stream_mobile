@@ -26,6 +26,7 @@ import { compressVideo, cleanupTempVideos } from '../../services/videoCompressSe
 import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { VideoTrimmer } from './VideoTrimmer';
+import { StoryMediaEditor, STORY_FILTERS, type FilterKey } from './StoryMediaEditor';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -51,7 +52,7 @@ const FONT_STYLES: {
 ];
 
 type StoryMode = 'text' | 'image' | 'video' | 'voice';
-type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'preview';
+type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'edit' | 'preview';
 
 interface ModeOption {
   key:       StoryMode;
@@ -180,6 +181,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [uploadPct,     setUploadPct]     = useState(0);
   const [showTrimmer,   setShowTrimmer]   = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [editorFilterKey, setEditorFilterKey] = useState<FilterKey>('none');
+  const [editorTrimData,  setEditorTrimData]  = useState<{ start: number; end: number } | undefined>();
   const tempFilesRef = useRef<string[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [recording,     setRecording]     = useState(false);
@@ -210,6 +213,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setShowTextInput(false); setUploading(false); setRecording(false);
     setRecordTime('00:00'); setShowSuccess(false);
     setShowTrimmer(false); setVideoDuration(0);
+    setEditorFilterKey('none'); setEditorTrimData(undefined);
     setAudienceType('everyone'); setSelectedUsers([]);
     stopAudioPreview();
     onClose();
@@ -224,7 +228,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     if (step === 'preview') {
       if (mode === 'text')       { setStep('pick_mode'); setCaption(''); }
       else if (mode === 'voice') { setStep('record_voice'); setAudioUri(null); }
-      else { setLocalUri(null); setAudioUri(null); setStep('pick_media'); }
+      else { setStep('edit'); }
+    } else if (step === 'edit') {
+      setLocalUri(null); setAudioUri(null); setStep('pick_media');
     } else if (step === 'pick_audio') {
       setStep('preview'); setAudioUri(null);
     } else if (['pick_media', 'record_voice'].includes(step)) {
@@ -274,7 +280,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       });
       if (res.didCancel || !res.assets?.[0]?.uri) return;
       setLocalUri(res.assets[0].uri);
-      setStep('preview');
+      setStep('edit');
     } catch (e: any) { Alert.alert('Erreur', e?.message); }
   };
 
@@ -286,15 +292,15 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       if (res.didCancel || !res.assets?.[0]?.uri) return;
       const asset    = res.assets[0];
       const rawUri   = asset.uri!;
-      const duration = (asset.duration ?? 0) / 1000; // ms → s
+      const duration = (asset.duration ?? 0) / 1000;
 
-      // Ouvrir immédiatement avec l'URI brut — normalisation faite plus tard à l'upload
       setLocalUri(rawUri);
       setVideoDuration(duration);
+      // Trim obligatoire si > 90s, sinon éditeur direct
       if (duration > 90) {
         setShowTrimmer(true);
       } else {
-        setStep('preview');
+        setStep('edit');
       }
     } catch (e: any) { Alert.alert('Erreur', e?.message); }
   };
@@ -306,7 +312,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       setAudioUri(file.uri);
       setStep('preview');
     } catch (e) {
-      if (isErrorWithCode(e, errorCodes.OPERATION_CANCELED)) return;
+      if (isErrorWithCode(e) && (e as any).code === errorCodes.OPERATION_CANCELED) return;
       Alert.alert('Erreur', "Impossible d'accéder aux fichiers audio.");
     }
   };
@@ -671,6 +677,25 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         />
       )}
 
+      {/* ══════════════ STEP EDIT — Filtres / Recadrer / Rogner ═════════════ */}
+      {!showTrimmer && step === 'edit' && localUri && (
+        <StoryMediaEditor
+          uri={localUri}
+          mediaType={mode === 'video' ? 'video' : 'image'}
+          duration={videoDuration}
+          onConfirm={(result) => {
+            if (result.uri !== localUri) {
+              tempFilesRef.current.push(result.uri);
+              setLocalUri(result.uri);
+            }
+            setEditorFilterKey(result.filterKey);
+            if (result.trimData) setEditorTrimData(result.trimData);
+            setStep('preview');
+          }}
+          onCancel={goBack}
+        />
+      )}
+
       {/* ══════════════ TRIMMER — si vidéo > 60s ════════════════════════════ */}
       {showTrimmer && localUri && (
         <VideoTrimmer
@@ -678,9 +703,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           duration={videoDuration}
           onConfirm={(trimmedUri) => {
             setLocalUri(trimmedUri);
-            tempFilesRef.current.push(trimmedUri); // nettoyé après upload
+            tempFilesRef.current.push(trimmedUri);
             setShowTrimmer(false);
-            setStep('preview');
+            setStep('edit');
           }}
           onCancel={() => {
             setShowTrimmer(false);
@@ -697,12 +722,28 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
           {/* Fond selon le mode */}
           {mode === 'text' && <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor }]} />}
-          {(mode === 'image') && localUri && (
-            <Image source={{ uri: localUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          )}
-          {mode === 'video' && localUri && (
-            <StoryVideoPreview uri={localUri} active={videoActive} />
-          )}
+          {(mode === 'image') && localUri && (() => {
+            const activeFilter = STORY_FILTERS.find(f => f.key === editorFilterKey);
+            return (
+              <>
+                <Image source={{ uri: localUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                {activeFilter && activeFilter.opacity > 0 && (
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: activeFilter.overlay, opacity: activeFilter.opacity }]} pointerEvents="none" />
+                )}
+              </>
+            );
+          })()}
+          {mode === 'video' && localUri && (() => {
+            const activeFilter = STORY_FILTERS.find(f => f.key === editorFilterKey);
+            return (
+              <>
+                <StoryVideoPreview uri={localUri} active={videoActive} />
+                {activeFilter && activeFilter.opacity > 0 && (
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: activeFilter.overlay, opacity: activeFilter.opacity }]} pointerEvents="none" />
+                )}
+              </>
+            );
+          })()}
           {mode === 'voice' && (
             <LinearGradient colors={['#0F0C29', '#302B63']} style={StyleSheet.absoluteFill}>
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
