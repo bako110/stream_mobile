@@ -1,6 +1,7 @@
 import { Video, createVideoThumbnail, getVideoMetaData } from 'react-native-compressor';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { Platform } from 'react-native';
+import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
 
 const CACHE = ReactNativeBlobUtil.fs.dirs.CacheDir;
 
@@ -108,6 +109,39 @@ export async function compressVideo(
     segments:     [compressed],
     isTempFile:   compressed !== fileUri,
   };
+}
+
+/**
+ * Coupe la video entre startSec et endSec avec FFmpeg (stream copy — instantane, sans reencoder).
+ * Retourne l'URI du fichier tronque dans le cache.
+ */
+export async function trimVideo(
+  inputUri: string,
+  startSec: number,
+  endSec: number,
+): Promise<string> {
+  const { fileUri, isCopy } = await toFileUri(inputUri);
+  const duration = endSec - startSec;
+  const outPath  = `${CACHE}/trim_${Date.now()}.mp4`;
+  const outUri   = `file://${outPath}`;
+
+  // -ss avant -i = seek rapide (keyframe), -t = duree, -c copy = pas de reencoder
+  const cmd = `-ss ${startSec.toFixed(3)} -i "${fileUri}" -t ${duration.toFixed(3)} -c copy -avoid_negative_ts make_zero -movflags +faststart "${outPath}"`;
+
+  const session    = await FFmpegKit.execute(cmd);
+  const returnCode = await session.getReturnCode();
+
+  if (isCopy) {
+    const path = fileUri.startsWith('file://') ? fileUri.slice(7) : fileUri;
+    ReactNativeBlobUtil.fs.unlink(path).catch(() => {});
+  }
+
+  if (!ReturnCode.isSuccess(returnCode)) {
+    const logs = await session.getAllLogsAsString();
+    throw new Error(`FFmpeg trim failed: ${logs?.slice(-300)}`);
+  }
+
+  return outUri;
 }
 
 export async function splitVideo(

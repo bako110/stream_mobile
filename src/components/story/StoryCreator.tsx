@@ -25,7 +25,7 @@ import { storyService } from '../../services/storyService';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import type { StoryMediaType, StoryAudienceType } from '../../types/story';
-import { compressVideo, cleanupTempVideos } from '../../services/videoCompressService';
+import { compressVideo, trimVideo, cleanupTempVideos } from '../../services/videoCompressService';
 import ImageEditor from '@react-native-community/image-editor';
 import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
 import { storyUploadState } from '../../services/storyUploadState';
@@ -259,6 +259,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [caption,      setCaption]      = useState('');
   const [showTrimmer,  setShowTrimmer]  = useState(false);
   const [videoDuration,setVideoDuration]= useState(0);
+  const [trimStart,    setTrimStart]    = useState<number | null>(null);
+  const [trimEnd,      setTrimEnd]      = useState<number | null>(null);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [recording,    setRecording]    = useState(false);
   const [recordTime,   setRecordTime]   = useState('00:00');
@@ -476,7 +478,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setActiveTool('none'); setDrawPaths([]); setLivePath(''); setErasing(false);
     setTextLayers([]); setStickers([]); setMasks([]); setLiveMask(null);
     resetCrop();
-    setShowTrimmer(false); setVideoDuration(0);
+    setShowTrimmer(false); setVideoDuration(0); setTrimStart(null); setTrimEnd(null);
     setAudienceType('everyone'); setSelectedUsers([]);
     setShowCaptionInput(false); setShowSuccess(false);
     history.current = [];
@@ -630,7 +632,12 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     return (await uploadImageFromUri(finalUri, 'stories', `s_${Date.now()}.jpg`)).url;
   };
   const doUploadVideo = async (uri: string) => {
-    const c = await compressVideo(uri, { maxDurationSec:90, crf:23, onProgress:()=>{} });
+    let sourceUri = uri;
+    if (trimStart !== null && trimEnd !== null && trimEnd > trimStart) {
+      sourceUri = await trimVideo(uri, trimStart, trimEnd);
+      tempFiles.current.push(sourceUri);
+    }
+    const c = await compressVideo(sourceUri, { maxDurationSec:90, crf:23, onProgress:()=>{} });
     tempFiles.current.push(c.uri);
     const r = await uploadVideoFromUri(c.uri, 'stories', `s_${Date.now()}.mp4`, 'video/mp4');
     let thumbnailUrl: string|undefined;
@@ -817,7 +824,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         <VideoTrimmer
           uri={localUri}
           duration={videoDuration}
-          onConfirm={trimmedUri => { setLocalUri(trimmedUri); tempFiles.current.push(trimmedUri); setShowTrimmer(false); setStep('compose'); }}
+          onConfirm={(trimmedUri, startSec, endSec) => { setLocalUri(trimmedUri); setTrimStart(startSec); setTrimEnd(endSec); tempFiles.current.push(trimmedUri); setShowTrimmer(false); setStep('compose'); }}
           onCancel={() => { setShowTrimmer(false); setLocalUri(null); setStep('pick_media'); }}
         />
       )}
