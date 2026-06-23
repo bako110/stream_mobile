@@ -69,11 +69,11 @@ const BUFFER_CFG = {
 const StoryImageView = React.memo(({ uri, bgColor }: { uri: string; bgColor?: string }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   return (
-    <View style={[s.media, { backgroundColor: bgColor ?? '#111' }]}>
+    <View style={[s.media, { backgroundColor: bgColor ?? '#000' }]}>
       <Animated.Image
         source={{ uri }}
         style={[s.media, { opacity }]}
-        resizeMode="cover"
+        resizeMode="contain"
         onLoad={() => Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start()}
       />
     </View>
@@ -449,7 +449,7 @@ const StoryOverlaysRenderer: React.FC<{ overlaysJson: string }> = ({ overlaysJso
             left: m.x * W, top: m.y * H,
             width: m.w * W, height: m.h * H,
             backgroundColor: m.color ?? '#000000',
-            opacity: m.opacity ?? 0.88,
+            opacity: m.opacity ?? 1,
             borderRadius: 4,
           }}
         />

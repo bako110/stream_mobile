@@ -627,12 +627,12 @@ export const ReelsScreen: React.FC = () => {
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-        <View style={[s.mineHeader, { backgroundColor: colors.background, borderBottomColor: colors.divider }]}>
+        <View style={[s.mineHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => setTab('feed')} style={s.mineBackBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+            <Icon name="arrow-left" size={22} color={colors.primary} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={[s.mineHeaderTitle, { color: colors.textPrimary }]}>Mes Reels</Text>
+            <Text style={[s.mineHeaderTitle, { color: colors.primary }]}>Mes Reels</Text>
             {myReels.length > 0 && (
               <Text style={[s.mineHeaderSub, { color: colors.textSecondary }]}>{myReels.length} video{myReels.length > 1 ? 's' : ''}</Text>
             )}

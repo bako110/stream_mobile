@@ -9,7 +9,7 @@ import Animated, {
   FadeIn, FadeInDown, FadeInRight,
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -26,6 +26,7 @@ import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import type { StoryMediaType, StoryAudienceType } from '../../types/story';
 import { compressVideo, cleanupTempVideos } from '../../services/videoCompressService';
+import ImageEditor from '@react-native-community/image-editor';
 import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { VideoTrimmer } from './VideoTrimmer';
@@ -35,6 +36,10 @@ const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecor
 const audioRecorder = new AudioRecorderPlayerClass();
 
 const { width: W, height: H } = Dimensions.get('window');
+const CROP_PAD_H = 40;
+const CROP_PAD_V = 80;
+const CROP_FW = W - CROP_PAD_H * 2;
+const CROP_FH = H - CROP_PAD_V * 2;
 
 // ── Types overlays ────────────────────────────────────────────────────────────
 
@@ -53,12 +58,11 @@ const DRAW_COLORS = ['#FFFFFF','#000000','#E91E63','#2196F3','#4CAF50','#FF9800'
 const TEXT_COLORS = ['#FFFFFF','#000000','#E91E63','#2196F3','#4CAF50','#FF9800','#9C27B0','#FFEB3B'];
 const TEXT_BG_COLORS_EDITOR = ['#000000','#FFFFFF','#7B3FF2','#E91E63','#2196F3','#4CAF50'];
 const MASK_COLORS: { label: string; color: string; opacity: number }[] = [
-  { label: 'Noir',    color: '#000000', opacity: 0.88 },
-  { label: 'Blanc',   color: '#FFFFFF', opacity: 0.80 },
-  { label: 'Violet',  color: '#7B3FF2', opacity: 0.80 },
-  { label: 'Rose',    color: '#E91E63', opacity: 0.80 },
-  { label: 'Bleu',    color: '#1565C0', opacity: 0.80 },
-  { label: 'Flou',    color: '#000000', opacity: 0.55 },
+  { label: 'Noir',   color: '#000000', opacity: 1 },
+  { label: 'Blanc',  color: '#FFFFFF', opacity: 1 },
+  { label: 'Violet', color: '#7B3FF2', opacity: 1 },
+  { label: 'Rose',   color: '#E91E63', opacity: 1 },
+  { label: 'Bleu',   color: '#1565C0', opacity: 1 },
 ];
 const STICKER_LIST = ['😂','❤️','🔥','👍','😍','🎉','💯','😭','🤔','👀','✨','💀','🙏','😤','💪','🥳','😊','🤣','👏','💥','🎵','🌈','⚡','🦋','🌸','🍕','🏆','🎯','🌙','💎'];
 const BG_COLORS = ['#7B3FF2','#E91E63','#FF5722','#009688','#2196F3','#4CAF50','#FF9800','#795548','#000000','#1A237E'];
@@ -75,11 +79,6 @@ type StoryMode = 'text' | 'image' | 'video' | 'voice';
 type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'compose';
 type Tool = 'none' | 'crop' | 'draw' | 'text' | 'sticker' | 'caption' | 'trim' | 'mask';
 
-interface CropState {
-  scale: number;
-  translateX: number;
-  translateY: number;
-}
 
 interface ModeOption {
   key: StoryMode; icon: string; iconLib: 'feather'|'material';
@@ -95,13 +94,19 @@ const MODE_OPTIONS: ModeOption[] = [
 
 interface Props { visible: boolean; onClose: () => void; onCreated: () => void; }
 
-function normalizeUri(uri: string): Promise<string> {
-  if (Platform.OS !== 'android' || !uri.startsWith('content://')) return Promise.resolve(uri);
-  const ext = uri.includes('.') ? uri.split('.').pop() : 'tmp';
+async function normalizeUri(uri: string): Promise<string> {
+  if (Platform.OS !== 'android' || !uri.startsWith('content://')) return uri;
+  const ext  = uri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
   const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/story_${Date.now()}.${ext}`;
-  return ReactNativeBlobUtil.fs.cp(uri, dest)
-    .catch(() => ReactNativeBlobUtil.fs.readFile(uri, 'base64').then(d => ReactNativeBlobUtil.fs.writeFile(dest, d, 'base64')))
-    .then(() => `file://${dest}`);
+  try {
+    const data = await ReactNativeBlobUtil.fs.readFile(uri, 'base64');
+    await ReactNativeBlobUtil.fs.writeFile(dest, data, 'base64');
+  } catch {
+    await ReactNativeBlobUtil.fetch('GET', uri).then(r => r.base64()).then(b64 =>
+      ReactNativeBlobUtil.fs.writeFile(dest, b64, 'base64')
+    );
+  }
+  return `file://${dest}`;
 }
 
 function pointsToPath(pts: {x:number;y:number}[]): string {
@@ -186,38 +191,47 @@ const DraggableSticker: React.FC<{
   onUpdate: (id: string, x: number, y: number, scale: number, rotation: number) => void;
   onRemove: (id: string) => void;
 }> = ({ sticker, containerW, containerH, onUpdate, onRemove }) => {
-  const x = useSharedValue(sticker.x * containerW);
-  const y = useSharedValue(sticker.y * containerH);
-  const sc = useSharedValue(sticker.scale);
+  const x   = useSharedValue(sticker.x * containerW);
+  const y   = useSharedValue(sticker.y * containerH);
+  const sc  = useSharedValue(sticker.scale);
   const rot = useSharedValue(sticker.rotation);
-  const sx = useSharedValue(sticker.x * containerW);
-  const sy = useSharedValue(sticker.y * containerH);
+  const sx  = useSharedValue(sticker.x * containerW);
+  const sy  = useSharedValue(sticker.y * containerH);
   const ssc = useSharedValue(sticker.scale);
   const srot = useSharedValue(sticker.rotation);
 
+  const id = sticker.id;
+
   const pan = Gesture.Pan()
+    .runOnJS(true)
     .onStart(() => { sx.value = x.value; sy.value = y.value; })
     .onUpdate(e => { x.value = sx.value + e.translationX; y.value = sy.value + e.translationY; })
-    .onEnd(() => onUpdate(sticker.id, x.value/containerW, y.value/containerH, sc.value, rot.value));
+    .onEnd(() => onUpdate(id, x.value / containerW, y.value / containerH, sc.value, rot.value));
+
   const pinch = Gesture.Pinch()
+    .runOnJS(true)
     .onStart(() => { ssc.value = sc.value; })
-    .onUpdate(e => { sc.value = Math.max(0.3, Math.min(4, ssc.value * e.scale)); })
-    .onEnd(() => onUpdate(sticker.id, x.value/containerW, y.value/containerH, sc.value, rot.value));
+    .onUpdate(e => { sc.value = Math.max(0.3, Math.min(5, ssc.value * e.scale)); })
+    .onEnd(() => onUpdate(id, x.value / containerW, y.value / containerH, sc.value, rot.value));
+
   const rotate = Gesture.Rotation()
+    .runOnJS(true)
     .onStart(() => { srot.value = rot.value; })
     .onUpdate(e => { rot.value = srot.value + e.rotation; })
-    .onEnd(() => onUpdate(sticker.id, x.value/containerW, y.value/containerH, sc.value, rot.value));
+    .onEnd(() => onUpdate(id, x.value / containerW, y.value / containerH, sc.value, rot.value));
 
   const style = useAnimatedStyle(() => ({
-    position: 'absolute', left: x.value - 24, top: y.value - 24,
+    position: 'absolute',
+    left: x.value - 28,
+    top:  y.value - 28,
     transform: [{ scale: sc.value }, { rotate: `${rot.value}rad` }],
   }));
 
   return (
-    <GestureDetector gesture={Gesture.Simultaneous(pan, pinch, rotate)}>
+    <GestureDetector gesture={Gesture.Simultaneous(pan, Gesture.Simultaneous(pinch, rotate))}>
       <Animated.View style={style}>
-        <Text style={{ fontSize: 42 }}>{sticker.emoji}</Text>
-        <TouchableOpacity onPress={() => onRemove(sticker.id)} style={ol.rmBtn}>
+        <Text style={{ fontSize: 48 }}>{sticker.emoji}</Text>
+        <TouchableOpacity onPress={() => onRemove(id)} style={ol.rmBtn}>
           <Icon name="x" size={8} color="#fff" />
         </TouchableOpacity>
       </Animated.View>
@@ -265,55 +279,67 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   // ── Outil actif ───────────────────────────────────────────────────────────
   const [activeTool, setActiveTool] = useState<Tool>('none');
 
-  // ── Crop (pan + pinch non-destructif) ────────────────────────────────────
-  const [cropState, setCropState] = useState<CropState>({ scale: 1, translateX: 0, translateY: 0 });
-  const cropStateRef   = useRef<CropState>({ scale: 1, translateX: 0, translateY: 0 });
-  const cropBaseRef    = useRef<CropState>({ scale: 1, translateX: 0, translateY: 0 });
-  const cropInitDistRef = useRef(0);
-
-  const setCrop = useCallback((next: CropState) => {
-    cropStateRef.current = next;
-    setCropState(next);
-  }, []);
+  // ── Crop style WhatsApp — rectangle redimensionnable ─────────────────────
+  const MIN_CROP = 80;
+  const FULL      = { x: 0,  y: 0,  w: W, h: H };
+  // rectangle initial avec marge pour le header (haut) et les boutons (bas)
+  const CROP_INIT = { x: 16, y: 80, w: W - 32, h: H - 180 };
+  const [cropRect,    setCropRect]    = useState(CROP_INIT);
+  const cropRectRef   = useRef(CROP_INIT);
+  const [appliedCrop, setAppliedCrop] = useState(FULL);
+  const dragHandleRef = useRef<string | null>(null);
+  const dragStartRef  = useRef({ x: 0, y: 0, rect: CROP_INIT });
 
   const resetCrop = useCallback(() => {
-    const init = { scale: 1, translateX: 0, translateY: 0 };
-    setCrop(init);
-    cropBaseRef.current = init;
-  }, [setCrop]);
+    setCropRect(CROP_INIT); cropRectRef.current = CROP_INIT;
+    setAppliedCrop(FULL);
+  }, []);
+
+  const applyCrop = useCallback(() => {
+    setAppliedCrop({ ...cropRectRef.current });
+  }, []);
 
   const cropPan = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => activeToolRef.current === 'crop',
-    onMoveShouldSetPanResponder:  () => activeToolRef.current === 'crop',
-    onPanResponderGrant: () => {
-      cropBaseRef.current = { ...cropStateRef.current };
-      cropInitDistRef.current = 0;
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder:  () => true,
+    onPanResponderGrant: e => {
+      const tx = e.nativeEvent.pageX;
+      const ty = e.nativeEvent.pageY;
+      const r  = cropRectRef.current;
+      const HIT = 36;
+      const nearL = Math.abs(tx - r.x) < HIT;
+      const nearR = Math.abs(tx - (r.x + r.w)) < HIT;
+      const nearT = Math.abs(ty - r.y) < HIT;
+      const nearB = Math.abs(ty - (r.y + r.h)) < HIT;
+      if      (nearT && nearL) dragHandleRef.current = 'tl';
+      else if (nearT && nearR) dragHandleRef.current = 'tr';
+      else if (nearB && nearL) dragHandleRef.current = 'bl';
+      else if (nearB && nearR) dragHandleRef.current = 'br';
+      else if (nearT)          dragHandleRef.current = 't';
+      else if (nearB)          dragHandleRef.current = 'b';
+      else if (nearL)          dragHandleRef.current = 'l';
+      else if (nearR)          dragHandleRef.current = 'r';
+      else                     dragHandleRef.current = null;
+      dragStartRef.current = { x: tx, y: ty, rect: { ...r } };
     },
-    onPanResponderMove: (e, gs) => {
-      const touches = e.nativeEvent.touches;
-      if (touches.length === 2) {
-        const t1 = touches[0], t2 = touches[1];
-        const dist = Math.hypot(t2.pageX - t1.pageX, t2.pageY - t1.pageY);
-        if (cropInitDistRef.current === 0) {
-          cropInitDistRef.current = dist;
-          cropBaseRef.current = { ...cropStateRef.current };
-        }
-        const newScale = Math.max(1, Math.min(4, cropBaseRef.current.scale * (dist / cropInitDistRef.current)));
-        setCrop({ ...cropStateRef.current, scale: newScale });
-      } else {
-        cropInitDistRef.current = 0;
-        const base = cropBaseRef.current;
-        const maxX = (base.scale - 1) * W / 2;
-        const maxY = (base.scale - 1) * H / 2;
-        const clampX = Math.max(-maxX, Math.min(maxX, base.translateX + gs.dx));
-        const clampY = Math.max(-maxY, Math.min(maxY, base.translateY + gs.dy));
-        setCrop({ scale: base.scale, translateX: clampX, translateY: clampY });
-      }
+    onPanResponderMove: e => {
+      const handle = dragHandleRef.current;
+      if (!handle) return;
+      const dx = e.nativeEvent.pageX - dragStartRef.current.x;
+      const dy = e.nativeEvent.pageY - dragStartRef.current.y;
+      const s  = dragStartRef.current.rect;
+      let nx = s.x, ny = s.y, nw = s.w, nh = s.h;
+      if (handle === 'l'  || handle === 'tl' || handle === 'bl') { nx = Math.min(s.x + dx, s.x + s.w - MIN_CROP); nw = s.w - (nx - s.x); }
+      if (handle === 'r'  || handle === 'tr' || handle === 'br') { nw = Math.max(MIN_CROP, s.w + dx); }
+      if (handle === 't'  || handle === 'tl' || handle === 'tr') { ny = Math.min(s.y + dy, s.y + s.h - MIN_CROP); nh = s.h - (ny - s.y); }
+      if (handle === 'b'  || handle === 'bl' || handle === 'br') { nh = Math.max(MIN_CROP, s.h + dy); }
+      nx = Math.max(0, nx); ny = Math.max(0, ny);
+      nw = Math.min(nw, W - nx); nh = Math.min(nh, H - ny);
+      const nr = { x: nx, y: ny, w: nw, h: nh };
+      cropRectRef.current = nr;
+      setCropRect(nr);
     },
-    onPanResponderRelease: () => {
-      cropBaseRef.current = { ...cropStateRef.current };
-      cropInitDistRef.current = 0;
-    },
+    onPanResponderRelease: () => { dragHandleRef.current = null; },
   }), []);
 
   // ── Dessin ────────────────────────────────────────────────────────────────
@@ -575,9 +601,33 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   };
 
   // ── Upload ────────────────────────────────────────────────────────────────
-  const doUploadImage = async (uri: string) => {
-    const n = await normalizeUri(uri);
-    return (await uploadImageFromUri(n, 'stories', `s_${Date.now()}.jpg`)).url;
+  const doUploadImage = async (uri: string, crop?: typeof FULL) => {
+    let finalUri = uri;
+    const isCropped = crop && !(crop.x === 0 && crop.y === 0 && crop.w === W && crop.h === H);
+    if (isCropped) {
+      try {
+        if (Platform.OS === 'android' && finalUri.startsWith('content://')) {
+          const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/story_src_${Date.now()}.jpg`;
+          const b64  = await ReactNativeBlobUtil.fetch('GET', finalUri).then(r => r.base64());
+          await ReactNativeBlobUtil.fs.writeFile(dest, b64, 'base64');
+          finalUri = `file://${dest}`;
+        }
+        console.log('[crop] uri=', finalUri, 'crop=', JSON.stringify(crop));
+        const { width: imgW, height: imgH } = await new Promise<{width:number;height:number}>((res, rej) =>
+          Image.getSize(finalUri, (w, h) => res({width:w, height:h}), rej)
+        );
+        console.log('[crop] imgSize=', imgW, imgH);
+        const scaleX = imgW / W;
+        const scaleY = imgH / H;
+        const cropped = await ImageEditor.cropImage(finalUri, {
+          offset: { x: Math.round(crop!.x * scaleX), y: Math.round(crop!.y * scaleY) },
+          size:   { width: Math.round(crop!.w * scaleX), height: Math.round(crop!.h * scaleY) },
+        });
+        finalUri = typeof cropped === 'string' ? cropped : (cropped as any).uri ?? finalUri;
+        console.log('[crop] result=', finalUri);
+      } catch (e) { console.error('[crop native ERROR]', e); }
+    }
+    return (await uploadImageFromUri(finalUri, 'stories', `s_${Date.now()}.jpg`)).url;
   };
   const doUploadVideo = async (uri: string) => {
     const c = await compressVideo(uri, { maxDurationSec:90, crf:23, onProgress:()=>{} });
@@ -601,6 +651,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     const _caption = caption, _bgColor = bgColor, _fontStyleKey = fontStyleKey;
     const _audienceType = audienceType, _selectedUsers = [...selectedUsers];
     const _tempFiles = [...tempFiles.current]; tempFiles.current = [];
+    const _appliedCrop = { ...appliedCrop };
     const _overlaysJson = (drawPaths.length > 0 || textLayers.length > 0 || stickers.length > 0 || masks.length > 0)
       ? JSON.stringify({ textLayers, drawPaths, masks, stickers })
       : undefined;
@@ -614,7 +665,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         let duration_sec = 5, background_color: string|undefined;
 
         if (_mode === 'text')  { media_type = 'text'; background_color = _bgColor; }
-        else if (_mode === 'image') { media_url = await doUploadImage(_localUri!); media_type = 'image'; thumbnail_url = media_url; }
+        else if (_mode === 'image') { media_url = await doUploadImage(_localUri!, _appliedCrop); media_type = 'image'; thumbnail_url = media_url; }
         else if (_mode === 'video') {
           const v = await doUploadVideo(_localUri!);
           media_url = v.url; media_type = 'video';
@@ -640,7 +691,11 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           audience_user_ids: _audienceType!=='everyone' ? _selectedUsers : [],
         });
         await cleanupTempVideos(_tempFiles);
-      } catch { await cleanupTempVideos(_tempFiles); }
+      } catch (e) {
+        console.error('[publish] error:', e);
+        Alert.alert('Erreur', String((e as any)?.message ?? e));
+        await cleanupTempVideos(_tempFiles);
+      }
       finally { storyUploadState.setUploading(false); }
     })();
   };
@@ -661,25 +716,26 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={goBack} statusBarTranslucent>
+      <GestureHandlerRootView style={{flex:1}}>
       <View style={{flex:1}}>
 
       {/* ── STEP pick_mode ───────────────────────────────────────────────── */}
       {step === 'pick_mode' && !showTrimmer && (
         <View style={[s.root, { backgroundColor: colors.background }]}>
           <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-          <LinearGradient colors={['#0F0C29','#302B63','#24243E']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.pickHeader}>
+          <View style={[s.pickHeader, { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={resetAndClose} style={s.closeBtn}>
-              <Icon name="x" size={20} color="rgba(255,255,255,0.8)" />
+              <Icon name="x" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
             <View style={s.pickHeaderText}>
-              <Text style={s.pickTitle}>Nouvelle story</Text>
-              <Text style={s.pickSub}>Que souhaitez-vous partager ?</Text>
+              <Text style={[s.pickTitle, { color: colors.textPrimary }]}>Nouvelle story</Text>
+              <Text style={[s.pickSub, { color: colors.textSecondary }]}>Que souhaitez-vous partager ?</Text>
             </View>
-          </LinearGradient>
+          </View>
           <ScrollView style={{flex:1,backgroundColor:colors.background}} contentContainerStyle={s.modeList} showsVerticalScrollIndicator={false}>
             {MODE_OPTIONS.map((opt,i) => (
               <Animated.View key={opt.key} entering={FadeInRight.delay(i*60).springify()}>
-                <TouchableOpacity style={[s.modeRow,{backgroundColor:colors.surface??colors.background}]} onPress={()=>selectMode(opt.key)} activeOpacity={0.75}>
+                <TouchableOpacity style={[s.modeRow,{backgroundColor:colors.surface}]} onPress={()=>selectMode(opt.key)} activeOpacity={0.75}>
                   <View style={[s.modeAccentBar,{backgroundColor:opt.accent}]} />
                   <LinearGradient colors={opt.gradient} style={s.modeIconBox}>
                     {opt.iconLib==='material' ? <MaterialIcon name={opt.icon} size={22} color="#fff" /> : <Icon name={opt.icon} size={20} color="#fff" />}
@@ -710,8 +766,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
               { source:'gallery' as const, icon:mode==='video'?'film':'image', label:'Galerie', sub:'Depuis vos photos', gradient:['#1565C0','#2196F3'] as [string,string] },
               { source:'camera'  as const, icon:mode==='video'?'video':'camera', label:mode==='video'?'Filmer':'Photographier', sub:'Utiliser la camera', gradient:['#AD1457','#E91E63'] as [string,string] },
             ].map((opt,i) => (
-              <Animated.View key={opt.source} entering={FadeInDown.delay(i*90).springify()} style={{flex:1}}>
-                <TouchableOpacity style={s.sourceCard} onPress={()=>mode==='video'?pickVideo(opt.source):pickImage(opt.source)} activeOpacity={0.8}>
+              <Animated.View key={opt.source} entering={FadeInDown.delay(i*90).springify()} style={{flex:1,height:160}}>
+                <TouchableOpacity style={[s.sourceCard,{height:160}]} onPress={()=>mode==='video'?pickVideo(opt.source):pickImage(opt.source)} activeOpacity={0.8}>
                   <LinearGradient colors={opt.gradient} start={{x:0,y:0}} end={{x:0,y:1}} style={s.sourceCardInner}>
                     <View style={s.sourceIconWrap}><Icon name={opt.icon} size={24} color="#fff" /></View>
                     <Text style={s.sourceLabel}>{opt.label}</Text>
@@ -774,60 +830,46 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           {/* FOND / MEDIA */}
           {mode === 'text' && <View style={[StyleSheet.absoluteFill,{backgroundColor:bgColor}]} />}
 
-          {/* IMAGE / VIDEO — un seul bloc, jamais démonté */}
-          {(mode === 'image' || mode === 'video') && localUri && (
-            <View
-              style={[StyleSheet.absoluteFill, {overflow:'hidden'}]}
-              {...(activeTool === 'crop' ? cropPan.panHandlers : {})}
-            >
-              {/* Sans crop : image plein écran normale */}
-              {cropState.scale === 1 && cropState.translateX === 0 && cropState.translateY === 0 ? (
-                mode === 'image'
-                  ? <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  : <VideoPreview uri={localUri} playerRef={playerRef} />
-              ) : (
-                /* Avec crop actif : transform appliqué */
-                <View style={{
-                  position: 'absolute',
-                  width: canvasW,
-                  height: canvasH,
-                  transform: [
-                    { scale: cropState.scale },
-                    { translateX: cropState.translateX },
-                    { translateY: cropState.translateY },
-                  ],
-                }}>
+          {/* IMAGE / VIDEO — clippée par appliedCrop */}
+          {(mode === 'image' || mode === 'video') && localUri && (() => {
+            const ac = appliedCrop;
+            const isFull = ac.x === 0 && ac.y === 0 && ac.w === W && ac.h === H;
+            if (isFull) {
+              return (
+                <View style={StyleSheet.absoluteFill}>
                   {mode === 'image'
-                    ? <Image source={{uri:localUri}} style={{width:canvasW, height:canvasH}} resizeMode="cover" />
+                    ? <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />
                     : <VideoPreview uri={localUri} playerRef={playerRef} />
                   }
                 </View>
-              )}
-
-              {/* Grille + bords — visibles uniquement en mode crop */}
-              {activeTool === 'crop' && (
-                <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                  {/* Tiers */}
-                  <View style={{position:'absolute',top:'33.3%',left:0,right:0,height:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.55)'}} />
-                  <View style={{position:'absolute',top:'66.6%',left:0,right:0,height:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.55)'}} />
-                  <View style={{position:'absolute',left:'33.3%',top:0,bottom:0,width:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.55)'}} />
-                  <View style={{position:'absolute',left:'66.6%',top:0,bottom:0,width:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.55)'}} />
-                  {/* Bordure */}
-                  <View style={{position:'absolute',top:0,left:0,right:0,height:2,backgroundColor:'#fff'}} />
-                  <View style={{position:'absolute',bottom:0,left:0,right:0,height:2,backgroundColor:'#fff'}} />
-                  <View style={{position:'absolute',left:0,top:0,bottom:0,width:2,backgroundColor:'#fff'}} />
-                  <View style={{position:'absolute',right:0,top:0,bottom:0,width:2,backgroundColor:'#fff'}} />
-                  {/* Coins épais */}
-                  {([{top:0,left:0},{top:0,right:0},{bottom:0,left:0},{bottom:0,right:0}] as any[]).map((pos,i)=>(
-                    <View key={i} style={{position:'absolute',width:30,height:30,...pos}}>
-                      <View style={{position:'absolute',top:0,left:0,width:30,height:4,backgroundColor:'#7B3FF2'}} />
-                      <View style={{position:'absolute',top:0,left:0,width:4,height:30,backgroundColor:'#7B3FF2'}} />
-                    </View>
-                  ))}
+              );
+            }
+            // Zone rognée affichée a sa taille reelle, centree, fond noir
+            return (
+              <View style={[StyleSheet.absoluteFill, {backgroundColor:'#000'}]}>
+                <View style={{
+                  position: 'absolute',
+                  left: (W - ac.w) / 2,
+                  top:  (H - ac.h) / 2,
+                  width: ac.w,
+                  height: ac.h,
+                  overflow: 'hidden',
+                }}>
+                  <Image
+                    source={{uri: localUri}}
+                    style={{
+                      position: 'absolute',
+                      left: -ac.x,
+                      top:  -ac.y,
+                      width: W,
+                      height: H,
+                    }}
+                    resizeMode="cover"
+                  />
                 </View>
-              )}
-            </View>
-          )}
+              </View>
+            );
+          })()}
           {mode === 'voice' && (
             <LinearGradient colors={['#0F0C29','#302B63']} style={StyleSheet.absoluteFill}>
               <View style={{flex:1,alignItems:'center',justifyContent:'center'}}>
@@ -836,44 +878,90 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             </LinearGradient>
           )}
 
+          {/* OVERLAY CROP style WhatsApp */}
+          {(mode === 'image' || mode === 'video') && localUri && activeTool === 'crop' && (
+            <View style={StyleSheet.absoluteFill} {...cropPan.panHandlers}>
+              {/* Zones sombres autour du rectangle */}
+              <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <View style={{position:'absolute',left:0,top:0,right:0,height:cropRect.y,backgroundColor:'rgba(0,0,0,0.6)'}} />
+                <View style={{position:'absolute',left:0,top:cropRect.y+cropRect.h,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.6)'}} />
+                <View style={{position:'absolute',left:0,top:cropRect.y,width:cropRect.x,height:cropRect.h,backgroundColor:'rgba(0,0,0,0.6)'}} />
+                <View style={{position:'absolute',left:cropRect.x+cropRect.w,top:cropRect.y,right:0,height:cropRect.h,backgroundColor:'rgba(0,0,0,0.6)'}} />
+                {/* Cadre + grille */}
+                <View style={{position:'absolute',left:cropRect.x,top:cropRect.y,width:cropRect.w,height:cropRect.h,borderWidth:1.5,borderColor:'#fff'}}>
+                  <View style={{position:'absolute',top:'33.3%',left:0,right:0,height:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.5)'}} />
+                  <View style={{position:'absolute',top:'66.6%',left:0,right:0,height:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.5)'}} />
+                  <View style={{position:'absolute',left:'33.3%',top:0,bottom:0,width:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.5)'}} />
+                  <View style={{position:'absolute',left:'66.6%',top:0,bottom:0,width:StyleSheet.hairlineWidth,backgroundColor:'rgba(255,255,255,0.5)'}} />
+                </View>
+                {/* Poignees coins */}
+                <View style={{position:'absolute',top:cropRect.y-2,left:cropRect.x-2,width:24,height:4,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y-2,left:cropRect.x-2,width:4,height:24,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y-2,left:cropRect.x+cropRect.w-22,width:24,height:4,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y-2,left:cropRect.x+cropRect.w-2,width:4,height:24,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y+cropRect.h-2,left:cropRect.x-2,width:24,height:4,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y+cropRect.h-24,left:cropRect.x-2,width:4,height:24,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y+cropRect.h-2,left:cropRect.x+cropRect.w-22,width:24,height:4,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y+cropRect.h-24,left:cropRect.x+cropRect.w-2,width:4,height:24,backgroundColor:'#7B3FF2'}} />
+                {/* Poignees bords milieu */}
+                <View style={{position:'absolute',top:cropRect.y-2,left:cropRect.x+cropRect.w/2-12,width:24,height:4,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y+cropRect.h-2,left:cropRect.x+cropRect.w/2-12,width:24,height:4,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y+cropRect.h/2-12,left:cropRect.x-2,width:4,height:24,backgroundColor:'#7B3FF2'}} />
+                <View style={{position:'absolute',top:cropRect.y+cropRect.h/2-12,left:cropRect.x+cropRect.w-2,width:4,height:24,backgroundColor:'#7B3FF2'}} />
+              </View>
+            </View>
+          )}
+
           {/* MASQUES FIGES + live mask */}
-          <View
-            style={StyleSheet.absoluteFill}
-            pointerEvents={activeTool === 'mask' ? 'box-only' : 'none'}
-            {...(activeTool === 'mask' ? maskPan.panHandlers : {})}
-          >
+          {/* Masques — rendu opaque */}
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
             {masks.map(m => (
-              <TouchableOpacity
+              <View
                 key={m.id}
-                activeOpacity={activeTool === 'mask' ? 0.7 : 1}
-                onPress={activeTool === 'mask' ? () => setMasks(prev => prev.filter(x => x.id !== m.id)) : undefined}
                 style={{
                   position: 'absolute',
                   left: m.x * canvasW, top: m.y * canvasH,
                   width: m.w * canvasW, height: m.h * canvasH,
                   backgroundColor: m.color ?? '#000000',
-                  opacity: m.opacity ?? 0.88,
+                  opacity: 1,
                   borderRadius: 4,
                   borderWidth: activeTool === 'mask' ? 1.5 : 0,
                   borderColor: '#fff',
                 }}
-              >
-                {activeTool === 'mask' && (
-                  <View style={{position:'absolute',top:-9,right:-9,width:18,height:18,borderRadius:9,backgroundColor:'#E91E63',alignItems:'center',justifyContent:'center'}}>
-                    <Icon name="x" size={10} color="#fff" />
-                  </View>
-                )}
-              </TouchableOpacity>
+              />
             ))}
             {liveMask && liveMask.w > 0 && liveMask.h > 0 && (
               <View style={{
                 position:'absolute', left:liveMask.x, top:liveMask.y, width:liveMask.w, height:liveMask.h,
                 backgroundColor: MASK_COLORS[maskColorIdx].color,
-                opacity: MASK_COLORS[maskColorIdx].opacity,
+                opacity: 1,
                 borderRadius:4, borderWidth:1.5, borderColor:'rgba(255,255,255,0.8)',
               }} />
             )}
           </View>
+          {/* Zone de dessin du masque — PanResponder */}
+          {activeTool === 'mask' && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-only" {...maskPan.panHandlers} />
+          )}
+          {/* Croix de suppression — au-dessus du PanResponder */}
+          {activeTool === 'mask' && masks.map(m => (
+            <TouchableOpacity
+              key={`del-${m.id}`}
+              onPress={() => setMasks(prev => prev.filter(x => x.id !== m.id))}
+              style={{
+                position: 'absolute',
+                left: m.x * canvasW + m.w * canvasW - 9,
+                top:  m.y * canvasH - 9,
+                width: 22, height: 22,
+                borderRadius: 11,
+                backgroundColor: '#E91E63',
+                alignItems: 'center', justifyContent: 'center',
+                zIndex: 999,
+              }}
+            >
+              <Icon name="x" size={12} color="#fff" />
+            </TouchableOpacity>
+          ))}
 
           {/* DESSIN SVG */}
           <View
@@ -921,25 +1009,31 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             </View>
           )}
 
-          {/* GRADIENTS UI */}
-          <LinearGradient colors={['rgba(0,0,0,0.65)','transparent']} style={s.gradTop} pointerEvents="none" />
-          <LinearGradient colors={['transparent','rgba(0,0,0,0.75)']} style={s.gradBottom} pointerEvents="none" />
+          {/* GRADIENTS UI — masqués en mode crop */}
+          {activeTool !== 'crop' && (
+            <>
+              <LinearGradient colors={['rgba(0,0,0,0.65)','transparent']} style={s.gradTop} pointerEvents="none" />
+              <LinearGradient colors={['transparent','rgba(0,0,0,0.75)']} style={s.gradBottom} pointerEvents="none" />
+            </>
+          )}
 
-          {/* HEADER */}
-          <View style={[s.composeHeader,{paddingTop:Math.max(insets.top,16)+6}]}>
-            <TouchableOpacity onPress={goBack} style={s.hBtn}><Icon name="arrow-left" size={20} color="#fff" /></TouchableOpacity>
-            <TouchableOpacity onPress={undo} style={s.hBtn}><Icon name="corner-ccw" size={18} color="#fff" /></TouchableOpacity>
-            <View style={{flex:1}} />
-            <TouchableOpacity onPress={handlePublish} disabled={!canPublish} style={[s.publishBtn,!canPublish&&{opacity:0.4}]} activeOpacity={0.85}>
-              <LinearGradient colors={['#7B3FF2','#E0389A']} start={{x:0,y:0}} end={{x:1,y:0}} style={s.publishBtnInner}>
-                <Icon name="send" size={14} color="#fff" />
-                <Text style={s.publishLabel}>Publier</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+          {/* HEADER — masqué en mode crop */}
+          {activeTool !== 'crop' && (
+            <View style={[s.composeHeader,{paddingTop:Math.max(insets.top,16)+6}]}>
+              <TouchableOpacity onPress={goBack} style={s.hBtn}><Icon name="arrow-left" size={20} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity onPress={undo} style={s.hBtn}><Icon name="corner-ccw" size={18} color="#fff" /></TouchableOpacity>
+              <View style={{flex:1}} />
+              <TouchableOpacity onPress={handlePublish} disabled={!canPublish} style={[s.publishBtn,!canPublish&&{opacity:0.4}]} activeOpacity={0.85}>
+                <LinearGradient colors={['#7B3FF2','#E0389A']} start={{x:0,y:0}} end={{x:1,y:0}} style={s.publishBtnInner}>
+                  <Icon name="send" size={14} color="#fff" />
+                  <Text style={s.publishLabel}>Publier</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
 
-          {/* BARRE OUTILS DROITE (style WhatsApp) */}
-          <View style={[s.toolsRight,{top:Math.max(insets.top,16)+60}]}>
+          {/* BARRE OUTILS DROITE — masquée en mode crop */}
+          {activeTool !== 'crop' && <View style={[s.toolsRight,{top:Math.max(insets.top,16)+60}]}>
             {/* Crop — image et video seulement */}
             {(mode==='image'||mode==='video') && (
               <TouchableOpacity onPress={()=>setActiveTool(t=>t==='crop'?'none':'crop')} style={[s.toolBtn,activeTool==='crop'&&s.toolBtnOn]}>
@@ -982,39 +1076,28 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             <TouchableOpacity onPress={openAudience} style={s.toolBtn}>
               <Icon name={audienceType==='everyone'?'globe':audienceType==='selected'?'users':'eye-off'} size={18} color="#fff" />
             </TouchableOpacity>
-          </View>
+          </View>}
 
           {/* PANNEAU CROP */}
           {activeTool === 'crop' && (
-            <View style={[s.hintPanel, {flexDirection:'column', alignItems:'stretch', gap:10}]}>
-              <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
-                <View style={{flex:1}}>
-                  <Text style={s.hintText}>Pincez pour zoomer · glissez pour recadrer</Text>
-                  <Text style={[s.hintText,{fontSize:11,opacity:0.55,marginTop:2}]}>
-                    Zoom {cropState.scale.toFixed(1)}x{cropState.scale > 1 ? ` · decal. ${Math.round(cropState.translateX)}/${Math.round(cropState.translateY)}` : ''}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={resetCrop} style={s.hintBtn}>
-                  <Icon name="refresh-cw" size={14} color="#fff" />
-                  <Text style={s.hintBtnLabel}>Reinit.</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={()=>setActiveTool('none')} style={[s.hintBtn,{backgroundColor:'rgba(123,63,242,0.5)'}]}>
-                  <Icon name="check" size={14} color="#fff" />
-                  <Text style={s.hintBtnLabel}>OK</Text>
-                </TouchableOpacity>
-              </View>
-              {/* Zoom rapide */}
-              <View style={{flexDirection:'row',gap:8,justifyContent:'center'}}>
-                {[1,1.5,2,3].map(z => (
-                  <TouchableOpacity
-                    key={z}
-                    onPress={() => setCrop({ scale: z, translateX: 0, translateY: 0 })}
-                    style={[{paddingHorizontal:14,paddingVertical:6,borderRadius:14,backgroundColor:'rgba(255,255,255,0.12)'},cropState.scale===z&&{backgroundColor:'rgba(123,63,242,0.6)'}]}
-                  >
-                    <Text style={{color:'#fff',fontSize:13,fontWeight:'700'}}>{z}x</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <View style={{
+              position:'absolute', bottom: Math.max(insets.bottom, 16) + 12,
+              left: 0, right: 0, flexDirection:'row', justifyContent:'center', gap: 16,
+            }}>
+              <TouchableOpacity
+                onPress={resetCrop}
+                style={{paddingHorizontal:20,paddingVertical:10,borderRadius:24,backgroundColor:'rgba(0,0,0,0.7)',flexDirection:'row',alignItems:'center',gap:6}}
+              >
+                <Icon name="refresh-cw" size={15} color="#fff" />
+                <Text style={{color:'#fff',fontSize:14,fontWeight:'600'}}>Reinit.</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => { applyCrop(); setActiveTool('none'); }}
+                style={{paddingHorizontal:24,paddingVertical:10,borderRadius:24,backgroundColor:'rgba(123,63,242,0.9)',flexDirection:'row',alignItems:'center',gap:6}}
+              >
+                <Icon name="check" size={15} color="#fff" />
+                <Text style={{color:'#fff',fontSize:14,fontWeight:'700'}}>OK</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -1249,6 +1332,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       </Modal>
 
       </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };
@@ -1276,8 +1360,8 @@ const s = StyleSheet.create({
   subHeaderBtn: { width:40,height:40,alignItems:'center',justifyContent:'center' },
   subHeaderTitle: { fontSize:16,fontWeight:'700' },
 
-  sourceGrid: { flex:1, flexDirection:'row',gap:12,paddingHorizontal:16,paddingTop:20,paddingBottom:28,alignItems:'flex-start' },
-  sourceCard: { flex:1,borderRadius:20,overflow:'hidden',height:180,elevation:7 },
+  sourceGrid: { flexDirection:'row',gap:12,paddingHorizontal:16,paddingTop:24,paddingBottom:28,alignItems:'flex-start' },
+  sourceCard: { flex:1,borderRadius:20,overflow:'hidden',height:160,elevation:4 },
   sourceCardInner: { flex:1,alignItems:'center',justifyContent:'center',paddingVertical:14,gap:8 },
   sourceIconWrap: { width:52,height:52,borderRadius:26,backgroundColor:'rgba(255,255,255,0.22)',alignItems:'center',justifyContent:'center' },
   sourceLabel: { fontSize:14,fontWeight:'800',color:'#fff' },

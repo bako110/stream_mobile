@@ -49,13 +49,9 @@ export interface PickResult {
 async function normalizeUri(uri: string): Promise<string> {
   if (!uri) throw new Error('URI image invalide');
   if (Platform.OS !== 'android' || !uri.startsWith('content://')) return uri;
-  const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload_${Date.now()}.tmp`;
-  try {
-    await ReactNativeBlobUtil.fs.cp(uri, dest);
-  } catch {
-    const data = await ReactNativeBlobUtil.fs.readFile(uri, 'base64');
-    await ReactNativeBlobUtil.fs.writeFile(dest, data, 'base64');
-  }
+  const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload_${Date.now()}.jpg`;
+  const b64  = await ReactNativeBlobUtil.fetch('GET', uri).then(r => r.base64());
+  await ReactNativeBlobUtil.fs.writeFile(dest, b64, 'base64');
   return `file://${dest}`;
 }
 
@@ -150,12 +146,29 @@ export async function uploadImageFromUri(
   folder: UploadFolder,
   fileName?: string,
 ): Promise<UploadedImage> {
-  const compressed  = await compressAndNormalizeImage(uri);
-  const contentType = 'image/jpeg';
-  const filename    = fileName ?? `photo_${Date.now()}.jpg`;
-  const { upload_url, public_url } = await getPresignedUrl(folder, filename, contentType);
-  await putToR2(upload_url, compressed, contentType);
-  return { url: public_url, public_id: public_url };
+  const compressed = await compressAndNormalizeImage(uri);
+  const token      = getToken();
+  const filename   = fileName ?? `photo_${Date.now()}.jpg`;
+  const path       = compressed.startsWith('file://') ? compressed.slice(7) : compressed;
+  const res = await ReactNativeBlobUtil.fetch(
+    'POST',
+    `${API_BASE_URL}/api/v1/upload/image?folder=${folder}`,
+    {
+      Accept: 'application/json',
+      'Content-Type': 'multipart/form-data',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    [{ name: 'file', filename, type: 'image/jpeg', data: ReactNativeBlobUtil.wrap(path) as any }],
+  );
+  if (res.respInfo.status >= 300) {
+    let detail = `Upload error ${res.respInfo.status}`;
+    try { detail = (res.json() as any)?.detail ?? detail; } catch {}
+    throw new Error(detail);
+  }
+  const json = res.json() as any;
+  const url = json?.uploaded?.[0]?.url ?? json?.url ?? json?.public_url;
+  if (!url) throw new Error('Upload: pas de URL retournée');
+  return { url, public_id: url };
 }
 
 export async function uploadMessageImage(uri: string, fileName?: string): Promise<UploadedImage> {
