@@ -6,7 +6,7 @@ import {
   View, Text, StyleSheet, FlatList, Dimensions,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
   Platform, Alert, Modal, TextInput,
-  KeyboardAvoidingView, Keyboard, AppState, Linking,
+  KeyboardAvoidingView, Keyboard, AppState, Linking, BackHandler,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle,
@@ -314,6 +314,15 @@ export const ReelsScreen: React.FC = () => {
       setCurrentIndex(0);
     }
   }, [closeSearch]);
+
+  // ── BackHandler : retour depuis "mes reels" → feed au lieu de quitter ─────
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (tab === 'mine') { setTab('feed'); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [tab]);
 
   // ── Mount / Unmount — cleanup uniquement ─────────────────────────────────
   // Le chargement est géré par useFocusEffect ci-dessous (évite le double load)
