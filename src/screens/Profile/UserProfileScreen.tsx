@@ -16,7 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
-import { SkeletonUserProfile, VerifiedBadge } from '../../components/common';
+import { BackButton, SkeletonUserProfile, VerifiedBadge } from '../../components/common';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { postService } from '../../services/postService';
@@ -281,9 +281,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.headerOverlay}>
             {/* Haut : bouton retour */}
             <View style={{ flexDirection: 'row', paddingTop: 48, paddingHorizontal: 16 }}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-                <Icon name="arrow-left" size={22} color="#fff" />
-              </TouchableOpacity>
+              <BackButton onPress={() => navigation.goBack()} />
             </View>
             {/* Bas : nom sur degrade */}
             <LinearGradient
@@ -921,7 +919,6 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     flexDirection: 'column', justifyContent: 'space-between',
   },
-  headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0.2 },
 
   avatarSection: { alignItems: 'center', marginTop: -44 },

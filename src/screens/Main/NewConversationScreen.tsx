@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { BorderRadius, Spacing } from '../../theme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
+import { BackButton } from '../../components/common';
 
 interface UserResult {
   id:          string;
@@ -103,9 +104,7 @@ export const NewConversationScreen: React.FC = () => {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, paddingTop: STATUS_H + 8 }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => nav.goBack()}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => nav.goBack()} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Nouvelle conversation</Text>
         </View>
 
@@ -207,7 +206,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing[3] },
-  backBtn:   { padding: 6 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
 
   searchBar: {

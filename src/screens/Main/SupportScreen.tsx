@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 
 interface Props {
   navigation: any;
@@ -64,9 +65,7 @@ export const SupportScreen: React.FC<Props> = ({ navigation }) => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Assistance</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -171,7 +170,6 @@ export const SupportScreen: React.FC<Props> = ({ navigation }) => {
 const s = StyleSheet.create({
   root:         { flex: 1 },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 18, fontWeight: '800' },
 
   hero:         { margin: 16, borderRadius: 20, padding: 24, alignItems: 'center', gap: 10 },

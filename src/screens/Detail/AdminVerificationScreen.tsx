@@ -10,6 +10,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import type { VerificationRequest } from '../../services/communityService';
 import LinearGradient from 'react-native-linear-gradient';
+import { BackButton } from '../../components/common';
 
 type FilterStatus = 'pending' | 'approved' | 'rejected';
 
@@ -177,9 +178,7 @@ export const AdminVerificationScreen: React.FC = () => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8, backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Vérification des communautés</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -280,8 +279,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1,
   },
-  backBtn: { width: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' },
+headerTitle: { fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' },
 
   filterBar: { flexDirection: 'row', borderBottomWidth: 1 },
   filterBtn: { flex: 1, alignItems: 'center', paddingVertical: 12 },

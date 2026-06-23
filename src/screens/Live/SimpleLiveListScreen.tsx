@@ -16,6 +16,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { liveService, type LiveStream } from '../../services/liveService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { BackButton } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 const { width: W } = Dimensions.get('window');
@@ -139,9 +140,7 @@ export const SimpleLiveListScreen: React.FC = () => {
 
       {/* Header */}
       <View style={[st.header, { backgroundColor: colors.surface }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={st.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={st.headerDot} />
           <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Lives</Text>
@@ -201,8 +200,7 @@ const st = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 44 : 56,
     paddingBottom: 12,
   },
-  backBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
+headerTitle: { fontSize: 18, fontWeight: '800' },
   headerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#F0365A' },
   goLiveBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,

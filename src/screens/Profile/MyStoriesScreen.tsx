@@ -14,6 +14,7 @@ import { StoryViewer } from '../../components/story/StoryViewer';
 import { StoryCreator } from '../../components/story/StoryCreator';
 import { storyService } from '../../services/storyService';
 import { authService } from '../../services/authService';
+import { BackButton } from '../../components/common';
 import type { Story, StoryGroup } from '../../types/story';
 
 interface Props { navigation: any }
@@ -219,10 +220,8 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* ── Header ── */}
-      <View style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.title, { color: colors.textPrimary }]}>Mon statut</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -338,7 +337,6 @@ const s = StyleSheet.create({
     paddingBottom: 14, paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 20, fontWeight: '700' },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 40, paddingTop: 80 },

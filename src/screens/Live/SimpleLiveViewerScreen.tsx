@@ -48,6 +48,7 @@ import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
+import { BackButton } from '../../components/common';
 
 // ── LiveKit quality config ─────────────────────────────────────────────────────
 
@@ -657,11 +658,7 @@ const RoomContent: React.FC<{
       {/* ── HEADER PREMIUM ────────────────────────────────────────────── */}
       <View style={st.header}>
         {/* Bouton retour */}
-        <TouchableOpacity onPress={onLeave} style={st.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <View style={st.backBtnCircle}>
-            <Icon name="arrow-left" size={18} color="#fff" />
-          </View>
-        </TouchableOpacity>
+        <BackButton onPress={onLeave} transparent />
 
         {/* Host info */}
         <TouchableOpacity
@@ -1583,14 +1580,6 @@ const st = StyleSheet.create({
     paddingHorizontal: 14, paddingBottom: 14,
     flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 20,
   },
-  backBtnCircle: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-  },
-  backBtn: { marginRight: 2 },
-
   hostInfo:      { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   hostAvatarWrap:{ position: 'relative' },
   hostAvatar:    { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: '#F0365A' },

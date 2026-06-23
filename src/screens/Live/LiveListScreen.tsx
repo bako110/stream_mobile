@@ -12,7 +12,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonLiveList } from '../../components/common';
+import { SkeletonLiveList, BackButton } from '../../components/common';
 import { concertService } from '../../services';
 import { useUser } from '../../context/UserContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -197,9 +197,7 @@ export const LiveListScreen: React.FC = () => {
       <View style={[st.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
         <View style={[st.header, { backgroundColor: colors.surface }]}>
-          <TouchableOpacity onPress={() => nav.goBack()} style={st.backBtn}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => nav.goBack()} />
           <Text style={[st.headerTitle, { color: colors.textPrimary }]}>En direct</Text>
           <View style={{ width: 38 }} />
         </View>
@@ -214,9 +212,7 @@ export const LiveListScreen: React.FC = () => {
 
       {/* Header */}
       <View style={[st.header, { backgroundColor: colors.surface }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={st.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="radio" size={20} color="#EF4444" />
           <Text style={[st.headerTitle, { color: colors.textPrimary }]}>En direct</Text>
@@ -305,10 +301,6 @@ const st = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 44 : 56,
     paddingBottom: 12,
-  },
-  backBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: 18, fontWeight: '800' },
 

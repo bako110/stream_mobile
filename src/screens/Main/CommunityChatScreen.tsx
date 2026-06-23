@@ -21,7 +21,7 @@ import type { CommunityMessageData } from '../../services/communityService';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Geolocation from '@react-native-community/geolocation';
 import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
-import { BoostPrompt } from '../../components/common';
+import { BoostPrompt, BackButton } from '../../components/common';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -1443,9 +1443,7 @@ export const CommunityChatScreen: React.FC = () => {
         colors={[colors.surface, colors.surface]}
         style={[S.header, { paddingTop: STATUS_H + 8, borderBottomColor: colors.divider }]}
       >
-        <TouchableOpacity onPress={() => nav.goBack()} style={S.headerBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
 
         <TouchableOpacity
           style={{ flex: 1, marginLeft: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}
@@ -2334,7 +2332,6 @@ const S = StyleSheet.create({
 
   // Header
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerBack: { padding: 6, marginRight: 2 },
   headerAvatar: { width: 38, height: 38, borderRadius: 12, overflow: 'hidden', position: 'relative' },
   headerAvatarDot: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#fff' },
   headerTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },

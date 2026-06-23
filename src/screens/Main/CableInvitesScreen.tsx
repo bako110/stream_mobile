@@ -11,6 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { cableService } from '../../services/cableService';
 import type { CableInvite } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { BackButton } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -195,9 +196,7 @@ export const CableInvitesScreen: React.FC = () => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={s.headerTitle}>
           <Icon name="link-2" size={18} color="#60A5FA" />
           <Text style={[s.headerTitleTxt, { color: colors.textPrimary }]}>Invitations Cable</Text>

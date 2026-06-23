@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services';
+import { BackButton } from '../../components/common';
 
 interface Props {
   onLoginSuccess: () => void;
@@ -90,9 +91,7 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
 
         {/* Barre haute */}
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={onClose} style={styles.backBtn}>
-            <Icon name="arrow-left" size={22} color="#fff" />
-          </TouchableOpacity>
+          <BackButton onPress={onClose} transparent />
           <Text style={styles.headerTitle}>Scanner le QR</Text>
           <View style={{ width: 40 }} />
         </View>
@@ -119,12 +118,7 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
         style={[styles.root, { backgroundColor: colors.background }]}
       >
         <View style={[styles.root, { backgroundColor: colors.background, justifyContent: 'center', paddingHorizontal: 28 }]}>
-          <TouchableOpacity
-            onPress={retry}
-            style={[styles.backBtnDark, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
-          >
-            <Icon name="arrow-left" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={retry} transparent />
 
           <Animated.View entering={FadeInDown} style={{ alignItems: 'center', gap: 16 }}>
             <View style={[styles.resultCircle, { backgroundColor: colors.primary + '18' }]}>
@@ -223,7 +217,6 @@ const styles = StyleSheet.create({
     paddingTop: 52, paddingHorizontal: 20, paddingBottom: 16,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  backBtn:        { padding: 6 },
   headerTitle:    { color: '#fff', fontSize: 17, fontWeight: '700' },
   bottomBar:      {
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -234,7 +227,6 @@ const styles = StyleSheet.create({
   manualLink:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   manualLinkText: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
 
-  backBtnDark:  { alignSelf: 'flex-start', width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 32 },
   manualInput:  { width: '100%', borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 14, marginTop: 4 },
   resultCircle: { borderRadius: 50, padding: 16 },
   resultText:   { fontSize: 18, fontWeight: '700', textAlign: 'center' },

@@ -9,7 +9,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader } from '../../components/common';
+import { GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { JoinRequest } from '../../services/communityService';
 
@@ -184,9 +184,7 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
         backgroundColor: colors.surface,
         borderBottomColor: colors.divider,
       }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={s.headerIcon}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }}>
           <Text style={[s.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             Demandes d'adhésion
@@ -320,7 +318,6 @@ const styles = (colors: any) => StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '700' },
   headerSub: { fontSize: 12, marginTop: 1 },
   badge: {

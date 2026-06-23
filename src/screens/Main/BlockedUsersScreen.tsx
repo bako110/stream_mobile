@@ -6,7 +6,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonUserList } from '../../components/common';
+import { SkeletonUserList, BackButton } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
 import { userService } from '../../services/userService';
 
@@ -76,9 +76,7 @@ export const BlockedUsersScreen: React.FC = () => {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header — même pattern que PrivacyScreen */}
       <View style={[styles.header, { backgroundColor: colors.surface }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Utilisateurs bloqués</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -153,8 +151,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingTop: Platform.OS === 'android' ? 48 : 56, paddingBottom: 14, paddingHorizontal: 16,
   },
-  backBtn:           { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:       { fontSize: 18, fontWeight: '800' },
+headerTitle:       { fontSize: 18, fontWeight: '800' },
   center:            { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyContainer:    { flex: 1 },
   emptyTitle:        { fontSize: 17, fontWeight: '700', marginTop: 16, textAlign: 'center' },

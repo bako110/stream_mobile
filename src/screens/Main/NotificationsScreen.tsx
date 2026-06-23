@@ -13,7 +13,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonFeed } from '../../components/common';
+import { SkeletonFeed, BackButton } from '../../components/common';
 import { notificationService, NotifItem } from '../../services/notificationService';
 import { useWs } from '../../context/WebSocketContext';
 
@@ -246,9 +246,7 @@ export const NotificationsScreen: React.FC = () => {
       <LinearGradient colors={[colors.surface, colors.background]} style={[s.header, { paddingTop: insets.top + 12 }]}>
         {/* Ligne 1 : retour + titre + badge */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => nav.goBack()} />
           <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Notifications</Text>
           {unreadCount > 0 && !selectMode && (
             <View style={[s.unreadBadge, { backgroundColor: colors.primary }]}>
@@ -542,11 +540,6 @@ const s = StyleSheet.create({
     borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
   tabText: { fontSize: 13, fontWeight: '600' },
-
-  backBtn: {
-    marginRight: 4,
-    padding: 4,
-  },
 
   swipeHint: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

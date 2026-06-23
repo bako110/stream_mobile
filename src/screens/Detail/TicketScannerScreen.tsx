@@ -7,6 +7,7 @@ import { Camera, CameraType } from 'react-native-camera-kit';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 import { eventService } from '../../services/eventService';
 import type { TicketScanResult } from '../../types';
 
@@ -105,10 +106,7 @@ export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBa
         colors={[colors.gradientStart, colors.gradientEnd]}
         style={[st.header, { paddingTop: Platform.OS === 'ios' ? 56 : 42 }]}
       >
-        <TouchableOpacity onPress={onBack} style={st.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color="#fff" />
-        </TouchableOpacity>
+        <BackButton onPress={onBack} transparent />
         <View style={{ flex: 1, marginHorizontal: 12 }}>
           <Text style={st.headerTitle} numberOfLines={1}>Scanner les billets</Text>
           <Text style={st.headerSub} numberOfLines={1}>{eventTitle}</Text>
@@ -298,7 +296,6 @@ const InfoRow: React.FC<{
 const CORNER = 24;
 const st = StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16 },
-  backBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 16, fontWeight: '800', color: '#fff' },
   headerSub:    { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
 

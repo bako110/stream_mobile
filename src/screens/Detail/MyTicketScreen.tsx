@@ -12,6 +12,7 @@ import type { EventTicket } from '../../types/event';
 import { getAuthToken } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
 import { Endpoints } from '../../api/endpoints';
+import { BackButton } from '../../components/common';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -121,9 +122,7 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
 
       {/* Header */}
       <LinearGradient colors={th.gradient} style={[st.header, { paddingTop: Platform.OS === 'ios' ? 52 : 38 }]}>
-        <TouchableOpacity onPress={onBack} style={st.hBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="arrow-left" size={20} color="#fff" />
-        </TouchableOpacity>
+        <BackButton onPress={onBack} transparent />
         <View style={{ alignItems: 'center' }}>
           <Text style={st.hTitle}>Mon billet</Text>
           <Text style={st.hSub}>{th.label}</Text>

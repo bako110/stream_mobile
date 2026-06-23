@@ -152,7 +152,7 @@ export async function uploadImageFromUri(
   const path       = compressed.startsWith('file://') ? compressed.slice(7) : compressed;
   const res = await ReactNativeBlobUtil.fetch(
     'POST',
-    `${API_BASE_URL}/api/v1/upload/image?folder=${folder}`,
+    `${API_BASE_URL}/api/v1/upload/images?folder=${folder}`,
     {
       Accept: 'application/json',
       'Content-Type': 'multipart/form-data',

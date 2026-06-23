@@ -15,7 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader } from '../../components/common';
+import { GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityMemberProfile } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -131,9 +131,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
   if (!member) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <TouchableOpacity style={styles.backBtnInner} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Icon name="user-x" size={44} color={colors.textTertiary} />
         <Text style={[{ color: colors.textTertiary, marginTop: 12, fontSize: 15 }]}>
           Profil introuvable
@@ -181,15 +179,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
           end={{ x: 1, y: 1 }}
           style={[styles.hero, { paddingTop: insets.top + 8 }]}
         >
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <View style={styles.backBtnInner}>
-              <Icon name="arrow-left" size={20} color="#fff" />
-            </View>
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} transparent />
 
           <View style={styles.communityPill}>
             <Icon name="users" size={11} color="rgba(255,255,255,0.8)" />
@@ -367,20 +357,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 32,
     paddingHorizontal: 20,
-  },
-  backBtn: {
-    position: 'absolute',
-    top: 0,
-    left: 16,
-    zIndex: 10,
-  },
-  backBtnInner: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   communityPill: {
     flexDirection: 'row',

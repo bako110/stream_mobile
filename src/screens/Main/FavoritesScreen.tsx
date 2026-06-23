@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { favoriteService } from '../../services/favoriteService';
 import type { FavoriteType } from '../../services/favoriteService';
+import { BackButton } from '../../components/common';
 
 type Tab = 'events' | 'concerts' | 'reels' | 'posts' | 'communities' | 'films' | 'series';
 
@@ -140,9 +141,7 @@ export const FavoritesScreen: React.FC = () => {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Favoris</Text>
         <View style={{ width: 38 }} />
       </View>
@@ -244,7 +243,6 @@ const styles = StyleSheet.create({
   root:         { flex: 1 },
 
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  backBtn:      { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 17, fontWeight: '700' },
 
   tabsWrap:     { borderBottomWidth: StyleSheet.hairlineWidth },

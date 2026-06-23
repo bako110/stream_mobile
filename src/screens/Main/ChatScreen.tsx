@@ -30,6 +30,7 @@ import { useWs } from '../../context/WebSocketContext';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { ConversationSummary } from '../../services/messageService';
+import { BackButton } from '../../components/common';
 
 interface RouteParams {
   partnerId:   string;
@@ -1164,9 +1165,7 @@ export const ChatScreen: React.FC = () => {
 
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, paddingTop: STATUS_H + 8, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => nav.goBack()}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
 
         <View style={styles.headerInfo}>
           <Text style={[styles.headerName, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -1775,7 +1774,6 @@ const styles = StyleSheet.create({
     gap: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn:    { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   callBtn:    { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   moreBtn:    { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerInfo: { flex: 1 },

@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 
 interface Props {
   onBack: () => void;
@@ -334,9 +335,7 @@ export const PolitiqueConfidentialiteScreen: React.FC<Props> = ({ onBack }) => {
 
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={onBack} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Politique de confidentialité</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -446,8 +445,7 @@ const s = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 48 : 56,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { fontSize: 17, fontWeight: '800', flex: 1, textAlign: 'center' },
+headerTitle:  { fontSize: 17, fontWeight: '800', flex: 1, textAlign: 'center' },
   scroll:       { padding: 16, paddingBottom: 56, gap: 14 },
 
   // Intro

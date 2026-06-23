@@ -7,6 +7,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 import { storyService } from '../../services/storyService';
 import type { StoryViewerUser } from '../../types/story';
 
@@ -43,9 +44,7 @@ export const StoryViewersScreen: React.FC = () => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[s.header, { borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => nav.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={s.headerCenter}>
           <Icon name="eye" size={18} color={colors.primary} />
           <Text style={[s.headerTitle, { color: colors.textPrimary }]}>
@@ -111,7 +110,6 @@ const s = StyleSheet.create({
     paddingBottom: 14, paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 40, alignItems: 'flex-start' },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
   row: {

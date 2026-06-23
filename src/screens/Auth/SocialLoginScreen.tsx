@@ -1,13 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ActivityIndicator, Alert,
+  View, Text, StyleSheet, StatusBar, ActivityIndicator, Alert,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useTheme } from '../../hooks/useTheme';
-import { AppLogo, SocialAuthButton } from '../../components/common';
+import { AppLogo, SocialAuthButton, BackButton } from '../../components/common';
 import { authService } from '../../services/authService';
 
 GoogleSignin.configure({
@@ -69,9 +69,7 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess, on
 
       {/* Bouton retour */}
       <Animated.View entering={FadeInDown.delay(60).springify()} style={styles.backRow}>
-        <TouchableOpacity onPress={onGoBack} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-          <Icon name="arrow-left" size={18} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={onGoBack} />
       </Animated.View>
 
       <View style={styles.content}>
@@ -131,7 +129,6 @@ const styles = StyleSheet.create({
   orbTR:     { position: 'absolute', top: -100, right: -80, width: 280, height: 280, borderRadius: 140, overflow: 'hidden' },
   orbBL:     { position: 'absolute', bottom: -80, left: -60, width: 240, height: 240, borderRadius: 120, overflow: 'hidden' },
   backRow:   { paddingTop: 56, paddingHorizontal: 20 },
-  backBtn:   { alignSelf: 'flex-start', padding: 10, borderRadius: 12, borderWidth: 1 },
   content:   { flex: 1, paddingHorizontal: 28, paddingTop: 20, paddingBottom: 40 },
   logoWrap:  { alignItems: 'center', marginBottom: 20 },
   title:     { fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 8 },

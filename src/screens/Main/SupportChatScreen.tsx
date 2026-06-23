@@ -11,6 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
+import { BackButton } from '../../components/common';
 
 interface Props { navigation: any }
 
@@ -494,9 +495,7 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
         style={[s.header, { paddingTop: insets.top + 6 }]}
       >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <View style={s.headerMid}>
           <View style={s.headerAvtWrap}>
             <Icon name={phase === 'agent' ? 'headphones' : 'life-buoy'} size={17} color="#fff" />
@@ -582,7 +581,6 @@ const AVT = 28;
 const s = StyleSheet.create({
   root:          { flex: 1 },
   header:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 14 },
-  backBtn:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerMid:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvtWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerName:    { color: '#fff', fontSize: 15, fontWeight: '800' },

@@ -21,6 +21,7 @@ import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { FilmItem } from './FilmsScreen';
 import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
+import { BackButton } from '../../components/common';
 
 type NavProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -615,9 +616,7 @@ export const MoviesScreen: React.FC = () => {
       <View style={[hdr.wrap, { paddingTop: insets.top + 6, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         {/* Ligne 1 : back + titre + compteur */}
         <View style={hdr.row1}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={hdr.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <View style={{ flex: 1 }}>
             <Text style={[hdr.title, { color: colors.textPrimary }]}>Films</Text>
             {!loading && total > 0 && (
@@ -948,7 +947,6 @@ const ms = StyleSheet.create({
 const hdr = StyleSheet.create({
   wrap:          { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 0 },
   row1:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: H_PAD, paddingBottom: 10 },
-  backBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   title:         { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   sub:           { fontSize: 11, fontWeight: '500', marginTop: 1 },
   searchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },

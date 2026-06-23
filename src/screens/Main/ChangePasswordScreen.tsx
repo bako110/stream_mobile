@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services/authService';
+import { BackButton } from '../../components/common';
 
 interface Props { navigation: any; }
 
@@ -77,11 +78,9 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => {
+        <BackButton onPress={() => {
           if (step === 2) { setStep(1); } else { navigation.goBack(); }
-        }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        }} />
         <Text style={[styles.title, { color: colors.textPrimary }]}>Changer le mot de passe</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -272,7 +271,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 48 : 56, paddingBottom: 14,
     paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title:   { fontSize: 17, fontWeight: '800' },
 
   stepsRow: {

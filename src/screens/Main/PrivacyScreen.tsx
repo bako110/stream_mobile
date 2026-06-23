@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 import { userService } from '../../services/userService';
 import type { PrivacySettings } from '../../services/userService';
 
@@ -112,9 +113,7 @@ export const PrivacyScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.title, { color: colors.textPrimary }]}>Confidentialité</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -229,7 +228,6 @@ const s = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 48 : 56, paddingBottom: 14,
     paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title:   { fontSize: 18, fontWeight: '800' },
   sectionTitle: {
     fontSize: 11, fontWeight: '700', letterSpacing: 0.8,

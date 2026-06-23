@@ -22,6 +22,7 @@ import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import type { Concert } from '../../types';
+import { BackButton } from '../../components/common';
 
 interface Props {
   concertId: string;
@@ -217,9 +218,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
         {/* Top overlay */}
         <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={styles.topOverlay}>
-          <TouchableOpacity onPress={handleLeave} style={styles.backBtn}>
-            <Icon name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
+          <BackButton onPress={handleLeave} transparent />
           <View style={styles.topCenter}>
             <View style={styles.liveBadge}>
               <View style={styles.liveDot} />
@@ -289,7 +288,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     zIndex: 10,
   },
-  backBtn: { padding: 8 },
   topCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginHorizontal: 8 },
   liveBadge: {
     flexDirection: 'row', alignItems: 'center',

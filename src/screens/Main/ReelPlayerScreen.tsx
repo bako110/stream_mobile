@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import type { Reel } from '../../types';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
+import { BackButton } from '../../components/common';
 
 const { width: SW, height: SH } = Dimensions.get('screen');
 
@@ -172,9 +173,7 @@ export const ReelPlayerScreen: React.FC = () => {
 
       {/* Header : retour + mute */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
-        <TouchableOpacity onPress={() => nav.goBack()} style={s.headerBtn} activeOpacity={0.8}>
-          <Icon name="arrow-left" size={22} color="#fff" />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }} />
         <TouchableOpacity onPress={() => setMuted(v => !v)} style={s.headerBtn} activeOpacity={0.8}>
           <Icon name={muted ? 'volume-x' : 'volume-2'} size={20} color="#fff" />

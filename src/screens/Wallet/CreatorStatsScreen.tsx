@@ -533,9 +533,7 @@ export function CreatorStatsScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Mes statistiques</Text>
         <View style={{ width: 38 }} />
       </View>
@@ -670,7 +668,6 @@ const styles = StyleSheet.create({
   retryBtn:     { marginTop: 8, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#7B3FF2', borderRadius: 20 },
   retryTxt:     { color: '#fff', fontWeight: '600' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
   scroll:       { paddingHorizontal: 16, paddingTop: 16 },
   hero:         { borderRadius: 16, borderWidth: 1, padding: 20, marginBottom: 20 },

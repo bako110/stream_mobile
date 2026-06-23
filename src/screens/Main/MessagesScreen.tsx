@@ -22,6 +22,7 @@ import type { CallRecord } from '../../services/callHistoryService';
 import type { ConversationSummary } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { BackButton } from '../../components/common';
 
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -370,9 +371,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
           ) : (
             // ── Mode normal ──
             <>
-              <TouchableOpacity style={styles.iconBtn} onPress={onBack ?? (() => nav.goBack())}>
-                <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-              </TouchableOpacity>
+              <BackButton onPress={onBack ?? (() => nav.goBack())} />
 
               <View style={styles.headerCenter}>
                 <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>

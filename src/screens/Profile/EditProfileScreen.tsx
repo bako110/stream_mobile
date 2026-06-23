@@ -12,7 +12,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonEditProfile } from '../../components/common';
+import { BackButton, SkeletonEditProfile } from '../../components/common';
 import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
@@ -184,9 +184,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Modifier le profil</Text>
         <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.headerBtn}>
           {saving ? (

@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader } from '../../components/common';
+import { GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { MemberCreatorStats } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -144,9 +144,7 @@ export function CommunityMemberCreatorStatsScreen({ route }: Props) {
         styles.header,
         { paddingTop: insets.top + 6, borderBottomColor: colors.border, backgroundColor: colors.surface, opacity: headerAnim },
       ]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => nav.goBack()}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Statistiques créateur</Text>
           <Text style={[styles.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
@@ -328,8 +326,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 13, borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 40, height: 40, alignItems: 'flex-start', justifyContent: 'center' },
-  headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
+headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
   headerTitle: { fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
   headerSub: { fontSize: 11, fontWeight: '500' },
 

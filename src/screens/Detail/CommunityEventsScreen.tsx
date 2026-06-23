@@ -22,7 +22,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { ExpandableText, BoostPrompt, GoFolyXLoader } from '../../components/common';
+import { ExpandableText, BoostPrompt, GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityEvent } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -667,9 +667,7 @@ export function CommunityEventsScreen({ route }: Props) {
 
       {/* Header */}
       <Animated.View style={[styles.header, { paddingTop: insets.top + 6, backgroundColor: colors.background, borderBottomColor: colors.border, opacity: headerFade }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
 
         <View style={styles.headerMiddle}>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Événements</Text>
@@ -811,7 +809,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
 
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
-  backBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   headerMiddle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   headerTitle: { fontSize: 18, fontWeight: '700', letterSpacing: 0.2 },
   countBadge: { minWidth: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },

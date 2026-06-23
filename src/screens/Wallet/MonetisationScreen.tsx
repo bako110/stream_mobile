@@ -112,9 +112,7 @@ export function MonetisationScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={[styles.backBtn, { backgroundColor: colors.backgroundSecondary }]}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monétisation</Text>
         <View style={{ width: 38 }} />
       </View>
@@ -166,7 +164,6 @@ const gateStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 17, fontWeight: '700' },
   scroll:       { padding: 16 },
   section:      { marginBottom: 8 },

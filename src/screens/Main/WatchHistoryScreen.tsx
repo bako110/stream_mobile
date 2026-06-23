@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { BackButton } from '../../components/common';
 
 interface HistoryEntry {
   _id: string;
@@ -148,9 +149,7 @@ export const WatchHistoryScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Historique</Text>
       </View>
 
@@ -197,7 +196,6 @@ export const WatchHistoryScreen: React.FC<Props> = ({ navigation }) => {
 const s = StyleSheet.create({
   container:    { flex: 1 },
   header:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  backBtn:      { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 20, fontWeight: '800' },
 
   empty:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },

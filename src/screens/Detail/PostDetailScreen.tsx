@@ -359,13 +359,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
       <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: insets.top }]}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
         <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
-            onPress={onBack}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={[s.topBtn, { backgroundColor: colors.backgroundSecondary }]}
-          >
-            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={onBack} />
           <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
           <View style={[s.topBtn, { backgroundColor: 'transparent' }]} />
         </View>

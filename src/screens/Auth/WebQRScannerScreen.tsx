@@ -17,6 +17,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 
@@ -109,9 +110,7 @@ export const WebQRScannerScreen: React.FC = () => {
 
         {/* Barre haute */}
         <View style={st.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
-            <Icon name="arrow-left" size={22} color="#fff" />
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} transparent />
           <Text style={st.topTitle}>Scanner le QR web</Text>
           <View style={{ width: 40 }} />
         </View>
@@ -264,7 +263,6 @@ const st = StyleSheet.create({
     paddingTop: 52, paddingHorizontal: 20, paddingBottom: 16,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  backBtn:      { padding: 6 },
   topTitle:     { color: '#fff', fontSize: 17, fontWeight: '700' },
 
   bottomBar:   {

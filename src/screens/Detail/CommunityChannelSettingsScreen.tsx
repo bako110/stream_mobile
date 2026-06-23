@@ -10,6 +10,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, CommunityChannelMember, CommunityMemberData, ChannelType, UpdateChannelPayload } from '../../services/communityService';
@@ -237,9 +238,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
       <LinearGradient colors={[colors.surface, colors.surface]}
         style={[S.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}
       >
-        <TouchableOpacity onPress={() => nav.goBack()} style={S.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }}>
           <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Paramètres du canal</Text>
           <Text style={[S.headerSub, { color: colors.textTertiary }]}>{communityName}</Text>
@@ -588,7 +587,6 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
 const S = StyleSheet.create({
   root:        { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
-  backBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '800' },
   headerSub:   { fontSize: 12, marginTop: 1 },
 

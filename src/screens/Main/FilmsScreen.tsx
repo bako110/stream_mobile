@@ -17,6 +17,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { BackButton } from '../../components/common';
 
 type NavProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -573,13 +574,7 @@ export const FilmsScreen: React.FC = () => {
 
       {/* ── HEADER FIXE : retour + tabs + filtre ── */}
       <View style={{ backgroundColor: colors.background, paddingTop: insets.top + 8, paddingHorizontal: H_PAD, paddingBottom: hasActiveFilter ? 6 : 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <View style={{ flex: 1 }}>
           <TabSelector tab={tab} onChange={t => { setTab(t); setGenre(''); setCountry(''); }} colors={colors} />
         </View>

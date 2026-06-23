@@ -1439,7 +1439,6 @@ const cp = StyleSheet.create({
 const s = StyleSheet.create({
   root:        { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  backBtn:     { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 20, fontWeight: '800' },
   headerSub:   { fontSize: 11, marginTop: 2 },
   balancePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },

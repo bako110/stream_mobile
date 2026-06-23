@@ -20,7 +20,7 @@ import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
-import { GoFolyXLoader } from '../../components/common';
+import { GoFolyXLoader, BackButton } from '../../components/common';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -797,9 +797,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       {/* Header */}
       <LinearGradient colors={[colors.surface, colors.surface]}
         style={[C.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={C.headerBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         {channelAvatar
           ? <Image source={{ uri: channelAvatar }} style={[C.channelIconBox, { borderRadius: 10 }]} />
           : <View style={[C.channelIconBox, { backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }]}>
@@ -1165,7 +1163,6 @@ export const CommunityChannelChatScreen: React.FC = () => {
 const C = StyleSheet.create({
   root:   { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
-  headerBack: { padding: 6 },
   channelIconBox: { width: 32, height: 32 },
   headerTitle: { fontSize: 15, fontWeight: '800' },
   headerSub:   { fontSize: 11, marginTop: 1 },

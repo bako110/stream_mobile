@@ -20,7 +20,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { AppLogo, Button, PhoneInput, Input, DEFAULT_COUNTRY } from '../../components/common';
+import { AppLogo, BackButton, Button, PhoneInput, Input, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { phoneAuthService } from '../../services/phoneAuthService';
 import { apiClient } from '../../api/client';
@@ -167,9 +167,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
 
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(400)} style={st.header}>
-          <TouchableOpacity onPress={goBackStep} style={st.back}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={goBackStep} />
           <AppLogo size="sm" />
         </Animated.View>
 
@@ -326,7 +324,6 @@ const ErrorBox: React.FC<{ msg: string; color: string }> = ({ msg, color }) => (
 
 const st = StyleSheet.create({
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingHorizontal: 20, paddingBottom: 8 },
-  back:       { padding: 8 },
   card:       { margin: 20, borderRadius: 20, padding: 24, gap: 16, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
   title:      { fontSize: 22, fontWeight: '700' },
   subtitle:   { fontSize: 14, lineHeight: 20 },

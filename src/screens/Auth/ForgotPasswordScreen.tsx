@@ -7,7 +7,7 @@ import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated'
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
+import { AppLogo, BackButton, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
 import { phoneAuthService } from '../../services/phoneAuthService';
@@ -122,10 +122,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
 
   const renderHeader = () => (
     <Animated.View entering={FadeInDown.delay(40).springify()} style={s.header}>
-      <TouchableOpacity onPress={step === 'input' ? onGoBack : () => { setStep(step === 'code' ? 'input' : step === 'newpass' ? 'code' : 'input'); setError(''); }}
-        style={[s.backBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-        <Icon name="arrow-left" size={18} color={colors.textPrimary} />
-      </TouchableOpacity>
+      <BackButton onPress={step === 'input' ? onGoBack : () => { setStep(step === 'code' ? 'input' : step === 'newpass' ? 'code' : 'input'); setError(''); }} />
       <AppLogo size="sm" style={{ flex: 0 }} />
       <View style={{ width: 40 }} />
     </Animated.View>
@@ -370,7 +367,6 @@ const s = StyleSheet.create({
   root:       { flex: 1 },
   scroll:     { flexGrow: 1, paddingHorizontal: 24, paddingTop: 52, paddingBottom: 40 },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-  backBtn:    { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 
   iconCircle: { alignSelf: 'center', width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   title:      { fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 8 },

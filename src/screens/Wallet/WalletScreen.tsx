@@ -30,6 +30,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useWsEvents } from '../../hooks/useWsEvents';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { BackButton } from '../../components/common';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface WalletBalance {
@@ -408,9 +409,7 @@ const WalletScreen: React.FC = () => {
 
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { flex: 1, textAlign: 'center' }]}>Mon Portefeuille</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Withdraw')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="clock" size={22} color={colors.textSecondary} />

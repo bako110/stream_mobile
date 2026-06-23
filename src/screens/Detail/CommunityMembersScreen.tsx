@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader } from '../../components/common';
+import { GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityMemberData } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -274,9 +274,7 @@ export default function CommunityMembersScreen({ route }: Props) {
         colors={[colors.surface, colors.surface]}
         style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}
       >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800' }}>
             Membres · {members.length}
@@ -390,7 +388,6 @@ export default function CommunityMembersScreen({ route }: Props) {
 
 const st = StyleSheet.create({
   header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  backBtn:    { width: 40, height: 40, justifyContent: 'center' },
   searchBar:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, marginBottom: 2, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   filterPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   card:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, borderRadius: 14, borderWidth: 1, padding: 12 },

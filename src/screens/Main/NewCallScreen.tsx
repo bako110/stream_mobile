@@ -12,6 +12,7 @@ import { BorderRadius, Spacing } from '../../theme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackButton } from '../../components/common';
 
 interface UserResult {
   id:          string;
@@ -119,9 +120,7 @@ export const NewCallScreen: React.FC = () => {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => nav.goBack()}>
-            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => nav.goBack()} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Nouvel appel</Text>
           <View style={{ width: 36 }} />
         </View>
@@ -255,7 +254,6 @@ const styles = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'space-between',
   },
-  backBtn:     { padding: 6 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
 
   searchBar: {

@@ -11,6 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { VerifiedBadge } from '../../components/common/VerifiedBadge';
+import { BackButton } from '../../components/common';
 import type { UserPublic } from '../../types/user';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
@@ -172,9 +173,7 @@ export const FollowingScreen: React.FC = () => {
 
       {/* Header */}
       <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} style={st.backBtn}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[st.title, { color: colors.textPrimary }]}>Réseau</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -238,7 +237,6 @@ const st = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 40, alignItems: 'flex-start' },
   title:   { fontSize: 18, fontWeight: '700' },
 
   tabs:    { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },

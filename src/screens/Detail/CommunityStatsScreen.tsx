@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader } from '../../components/common';
+import { GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityStats } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -138,9 +138,7 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
 
   const renderHeader = () => (
     <LinearGradient colors={[colors.surface, colors.background]} style={[styles.header, { paddingTop: insets.top + 10 }]}>
-      <TouchableOpacity onPress={() => nav.goBack()} style={[styles.headerBtn, { backgroundColor: colors.backgroundSecondary }]} activeOpacity={0.7}>
-        <Icon name="arrow-left" size={20} color={colors.textPrimary} />
-      </TouchableOpacity>
+      <BackButton onPress={() => nav.goBack()} />
       <View style={styles.headerCenter}>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Statistiques</Text>
         <Text style={[styles.headerSub, { color: colors.textSecondary }]} numberOfLines={1}>{communityName}</Text>

@@ -34,6 +34,7 @@ import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { type FilterKey, type ReelEditResult, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2, ReelEditorScreen } from '../Create/ReelEditorScreen';
+import { BackButton } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -594,18 +595,7 @@ export const ReelsScreen: React.FC = () => {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
         {/* Bouton retour */}
-        <TouchableOpacity
-          onPress={() => nav.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={{
-            position: 'absolute', top: 52, left: 16, zIndex: 10,
-            width: 40, height: 40, borderRadius: 20,
-            backgroundColor: 'rgba(0,0,0,0.35)',
-            alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <Icon name="arrow-left" size={20} color="#fff" />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         {/* Contenu vide centré */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           <Icon name="film" size={48} color={colors.textDisabled} />
@@ -628,9 +618,7 @@ export const ReelsScreen: React.FC = () => {
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
         <View style={[s.mineHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => setTab('feed')} style={s.mineBackBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Icon name="arrow-left" size={22} color={colors.primary} />
-          </TouchableOpacity>
+          <BackButton onPress={() => setTab('feed')} />
           <View style={{ flex: 1 }}>
             <Text style={[s.mineHeaderTitle, { color: colors.primary }]}>Mes Reels</Text>
             {myReels.length > 0 && (
@@ -890,9 +878,7 @@ export const ReelsScreen: React.FC = () => {
 
       {/* Header flottant */}
       <View style={[s.floatingHeader, { top: insets.top + 6 }]} pointerEvents="box-none">
-        <TouchableOpacity onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)} style={s.iconBtn}>
-          <Icon name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)} transparent />
         <Text style={s.reelHeaderTitle}>Reels</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="box-none">
           <TouchableOpacity onPress={openSearch} style={s.iconBtn}>
@@ -912,9 +898,7 @@ export const ReelsScreen: React.FC = () => {
       {searchOpen && (
         <View style={[s.searchOverlay, { paddingTop: insets.top }]}>
           <View style={s.searchTopBar}>
-            <TouchableOpacity onPress={closeSearch} style={s.searchBackBtn}>
-              <Icon name="arrow-left" size={22} color="#fff" />
-            </TouchableOpacity>
+            <BackButton onPress={closeSearch} transparent />
             <View style={s.searchInputWrap}>
               <Icon name="search" size={15} color="rgba(255,255,255,0.4)" style={{ marginLeft: 12 }} />
               <TextInput
@@ -2284,8 +2268,7 @@ const s = StyleSheet.create({
   commentBarSend:  { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  mineBackBtn:       { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   mineHeaderSub:     { fontSize: 12, fontWeight: '400', marginTop: 1 },
   mineCreateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   mineCreateBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
@@ -2329,8 +2312,7 @@ const s = StyleSheet.create({
 
   searchOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0a0a', zIndex: 50 },
   searchTopBar:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
-  searchBackBtn:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
-  searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 22, height: 42, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 22, height: 42, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   searchInput:     { flex: 1, fontSize: 14, color: '#fff', paddingHorizontal: 10, paddingVertical: 0 },
   searchClearBtn:  { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', marginRight: 7 },
 

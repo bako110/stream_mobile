@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userService } from '../../services/userService';
 import type { Reel } from '../../types';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
 
@@ -234,9 +235,7 @@ export const UserReelsScreen: React.FC = () => {
 
       {/* Header flottant */}
       <View style={[st.header, { paddingTop: insets.top + 4 }]} pointerEvents="box-none">
-        <TouchableOpacity onPress={() => nav.goBack()} style={st.iconBtn}>
-          <Icon name="arrow-left" size={22} color="#fff" />
-        </TouchableOpacity>
+        <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={st.headerName}>{authorName}</Text>
           {reels.length > 1 && (
