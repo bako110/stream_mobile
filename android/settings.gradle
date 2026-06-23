@@ -6,11 +6,10 @@ include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
 
 dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google()
         mavenCentral()
-        maven {
-            url "https://raw.githubusercontent.com/arthenica/ffmpeg-kit/android/android/maven"
-        }
+        maven { url "https://raw.githubusercontent.com/arthenica/ffmpeg-kit/android/android/maven" }
     }
 }
