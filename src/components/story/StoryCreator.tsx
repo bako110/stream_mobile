@@ -631,10 +631,10 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     }
     return (await uploadImageFromUri(finalUri, 'stories', `s_${Date.now()}.jpg`)).url;
   };
-  const doUploadVideo = async (uri: string) => {
+  const doUploadVideo = async (uri: string, _trimStart: number | null, _trimEnd: number | null) => {
     let sourceUri = uri;
-    if (trimStart !== null && trimEnd !== null && trimEnd > trimStart) {
-      sourceUri = await trimVideo(uri, trimStart, trimEnd);
+    if (_trimStart !== null && _trimEnd !== null && _trimEnd > _trimStart) {
+      sourceUri = await trimVideo(uri, _trimStart, _trimEnd);
       tempFiles.current.push(sourceUri);
     }
     const c = await compressVideo(sourceUri, { maxDurationSec:90, crf:23, onProgress:()=>{} });
@@ -659,6 +659,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     const _audienceType = audienceType, _selectedUsers = [...selectedUsers];
     const _tempFiles = [...tempFiles.current]; tempFiles.current = [];
     const _appliedCrop = { ...appliedCrop };
+    const _trimStart = trimStart, _trimEnd = trimEnd;
     const _overlaysJson = (drawPaths.length > 0 || textLayers.length > 0 || stickers.length > 0 || masks.length > 0)
       ? JSON.stringify({ textLayers, drawPaths, masks, stickers })
       : undefined;
@@ -674,7 +675,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         if (_mode === 'text')  { media_type = 'text'; background_color = _bgColor; }
         else if (_mode === 'image') { media_url = await doUploadImage(_localUri!, _appliedCrop); media_type = 'image'; thumbnail_url = media_url; }
         else if (_mode === 'video') {
-          const v = await doUploadVideo(_localUri!);
+          const v = await doUploadVideo(_localUri!, _trimStart, _trimEnd);
           media_url = v.url; media_type = 'video';
           duration_sec = Math.min(Math.ceil(v.duration), 90); thumbnail_url = v.thumbnailUrl;
         } else if (_mode === 'voice') {

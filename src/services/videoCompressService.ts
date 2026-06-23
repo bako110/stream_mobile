@@ -121,24 +121,28 @@ export async function trimVideo(
   endSec: number,
 ): Promise<string> {
   const { fileUri, isCopy } = await toFileUri(inputUri);
-  const duration = endSec - startSec;
-  const outPath  = `${CACHE}/trim_${Date.now()}.mp4`;
-  const outUri   = `file://${outPath}`;
+  const trimDuration = Math.max(0.1, endSec - startSec);
+  const outPath      = `${CACHE}/trim_${Date.now()}.mp4`;
+  const outUri       = `file://${outPath}`;
 
-  // -ss avant -i = seek rapide (keyframe), -t = duree, -c copy = pas de reencoder
-  const cmd = `-ss ${startSec.toFixed(3)} -i "${fileUri}" -t ${duration.toFixed(3)} -c copy -avoid_negative_ts make_zero -movflags +faststart "${outPath}"`;
+  // Chemins sans file:// pour FFmpeg, espaces echappes
+  const inPath = fileUri.startsWith('file://') ? fileUri.slice(7) : fileUri;
+  const cmd = `-ss ${startSec.toFixed(3)} -i "${inPath}" -t ${trimDuration.toFixed(3)} -c copy -avoid_negative_ts make_zero -movflags +faststart "${outPath}"`;
 
-  const session    = await FFmpegKit.execute(cmd);
-  const returnCode = await session.getReturnCode();
-
-  if (isCopy) {
-    const path = fileUri.startsWith('file://') ? fileUri.slice(7) : fileUri;
-    ReactNativeBlobUtil.fs.unlink(path).catch(() => {});
+  let session;
+  try {
+    session = await FFmpegKit.execute(cmd);
+  } finally {
+    if (isCopy) {
+      ReactNativeBlobUtil.fs.unlink(inPath).catch(() => {});
+    }
   }
 
+  const returnCode = await session.getReturnCode();
   if (!ReturnCode.isSuccess(returnCode)) {
+    ReactNativeBlobUtil.fs.unlink(outPath).catch(() => {});
     const logs = await session.getAllLogsAsString();
-    throw new Error(`FFmpeg trim failed: ${logs?.slice(-300)}`);
+    throw new Error(`FFmpeg trim failed: ${logs?.slice(-400)}`);
   }
 
   return outUri;
