@@ -28,9 +28,11 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
   const [endRatio,   setEndRatio]   = useState(clampedEnd / duration);
   const [isPlaying,  setIsPlaying]  = useState(false);
   const [playRatio,  setPlayRatio]  = useState(0);
-  const startRef  = useRef(0);
-  const endRef    = useRef(clampedEnd / duration);
-  const seekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startRef      = useRef(0);
+  const endRef        = useRef(clampedEnd / duration);
+  const seekTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leftBaseRef   = useRef(0);
+  const rightBaseRef  = useRef(clampedEnd / duration);
 
   const player = useVideoPlayer({ uri }, p => {
     p.loop  = false;
@@ -82,9 +84,10 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder:  () => true,
+      onPanResponderGrant: () => { leftBaseRef.current = startRef.current; },
       onPanResponderMove: (_, g) => {
         const newRatio = Math.max(0, Math.min(
-          startRef.current + g.dx / BAR_W,
+          leftBaseRef.current + g.dx / BAR_W,
           endRef.current - 1 / duration,
         ));
         const maxEnd = Math.min(newRatio + MAX_DURATION / duration, 1);
@@ -101,10 +104,11 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder:  () => true,
+      onPanResponderGrant: () => { rightBaseRef.current = endRef.current; },
       onPanResponderMove: (_, g) => {
         const maxEnd  = Math.min(startRef.current + MAX_DURATION / duration, 1);
         const newRatio = Math.min(maxEnd, Math.max(
-          endRef.current + g.dx / BAR_W,
+          rightBaseRef.current + g.dx / BAR_W,
           startRef.current + 1 / duration,
         ));
         endRef.current = newRatio;

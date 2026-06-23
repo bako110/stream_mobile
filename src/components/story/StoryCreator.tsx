@@ -538,9 +538,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     }
     const res = await (source==='camera' ? launchCamera : launchImageLibrary)({ mediaType:'video', selectionLimit:1 });
     if (res.didCancel || !res.assets?.[0]?.uri) return;
-    const dur = (res.assets[0].duration ?? 0) / 1000;
+    const dur = res.assets[0].duration ?? 0;
     setLocalUri(res.assets[0].uri); setVideoDuration(dur);
-    if (dur > 90) { setShowTrimmer(true); } else { setStep('compose'); }
+    setShowTrimmer(true);
   };
 
   const pickAudioFile = async () => {
