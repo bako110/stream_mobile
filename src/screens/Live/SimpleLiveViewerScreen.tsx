@@ -1259,7 +1259,11 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 
         if (d.type === 'like_added') {
           const count = d.count ?? 1;
-          setLikeCount(c => c + count);
+          // Déduire les likes qu'on a déjà comptés localement (optimiste)
+          const ownPending = Math.min(pendingLikes.current, count);
+          pendingLikes.current = Math.max(0, pendingLikes.current - ownPending);
+          const netCount = count - ownPending;
+          if (netCount > 0) setLikeCount(c => c + netCount);
           for (let i = 0; i < Math.min(count, 3); i++) {
             setTimeout(() => remoteLikeRef.current?.triggerRemote(), i * 120);
           }
@@ -1384,8 +1388,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 
   const handleLike = useCallback(() => {
     pendingLikes.current += 1;
-    // Pas de setLikeCount ici — le WS like_added est la source de vérité
-    // (évite le double comptage : local + broadcast)
+    setLikeCount(c => c + 1);
     if (likeThrottle.current) return;
     likeThrottle.current = setTimeout(async () => {
       const batch = pendingLikes.current;
