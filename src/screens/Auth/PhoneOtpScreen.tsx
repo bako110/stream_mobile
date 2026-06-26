@@ -88,27 +88,35 @@ export const PhoneOtpScreen: React.FC<Props> = ({
     if (digits.length < 6) { setError('Numéro de téléphone invalide.'); return; }
     setError(''); setLoading(true);
     try {
-      await phoneAuthService.sendOtp(`${country.dial}${digits}`);
+      const phoneE164 = `${country.dial}${digits}`;
+      if (mode === 'forgot') {
+        // Mode forgot : utilise le backend (pas de reCAPTCHA Firebase)
+        await apiClient.post(Endpoints.auth.forgotPassword, { phone: phoneE164 });
+      } else {
+        // Mode login/verify : SDK Firebase natif
+        await phoneAuthService.sendOtp(phoneE164);
+      }
       setStep('otp');
       startResendTimer();
       setTimeout(() => otpRef.current?.focus(), 300);
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? e?.message ?? 'Impossible d\'envoyer le SMS.');
     } finally { setLoading(false); }
-  }, [phone, country]);
+  }, [phone, country, mode]);
 
   /* ── Etape 2 : confirmer le code OTP ──────────────────────────────────────── */
   const handleConfirmOtp = useCallback(async () => {
     if (otp.length !== OTP_LENGTH) { setError(`Le code fait ${OTP_LENGTH} chiffres.`); return; }
     setError(''); setLoading(true);
     try {
-      const result = await phoneAuthService.verifyOtp(otp, { firstName, lastName, referralCode });
-
       if (mode === 'forgot') {
+        // Mode forgot : vérifie le code via backend
+        await apiClient.post(Endpoints.auth.verifyResetCode, { token: otp });
         setStep('newpass');
         return;
       }
 
+      const result = await phoneAuthService.verifyOtp(otp, { firstName, lastName, referralCode });
       onSuccess({ isNewUser: result.is_new_user });
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? e?.message ?? 'Code incorrect ou expiré.');
@@ -121,7 +129,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
     if (newPass !== confirmPass) { setError('Les mots de passe ne correspondent pas.'); return; }
     setError(''); setLoading(true);
     try {
-      await apiClient.post(Endpoints.auth.resetPasswordMe, { new_password: newPass });
+      await apiClient.post(Endpoints.auth.resetPassword, { token: otp, new_password: newPass });
       setStep('done');
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? 'Une erreur est survenue.');

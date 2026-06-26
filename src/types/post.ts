@@ -4,6 +4,7 @@ export interface PostAuthor {
   display_name?: string | null;
   avatar_url?: string | null;
   is_verified?: boolean;
+  is_online?: boolean | null;
 }
 
 export interface Post {

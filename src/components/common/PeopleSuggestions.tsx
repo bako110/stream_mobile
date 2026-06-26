@@ -124,6 +124,9 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                         <Text style={st.initial}>{initials}</Text>
                       </LinearGradient>
                     )}
+                    {item.is_online && (
+                      <View style={[st.onlineDot, { borderColor: colors.background }]} />
+                    )}
                   </TouchableOpacity>
 
                   {/* Infos */}
@@ -187,9 +190,10 @@ const st = StyleSheet.create({
   cover:      { width: '100%', height: COVER_H },
   closeBtn:   { position: 'absolute', top: 8, right: 8, zIndex: 10, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
 
-  avatarWrap: { width: AVATAR_SZ + 4, height: AVATAR_SZ + 4, borderRadius: (AVATAR_SZ + 4) / 2, borderWidth: 3, overflow: 'hidden', alignSelf: 'center' },
-  avatarImg:  { width: AVATAR_SZ, height: AVATAR_SZ, borderRadius: AVATAR_SZ / 2, alignItems: 'center', justifyContent: 'center' },
+  avatarWrap: { width: AVATAR_SZ + 4, height: AVATAR_SZ + 4, borderRadius: (AVATAR_SZ + 4) / 2, borderWidth: 3, overflow: 'visible', alignSelf: 'center' },
+  avatarImg:  { width: AVATAR_SZ, height: AVATAR_SZ, borderRadius: AVATAR_SZ / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   initial:    { color: '#fff', fontWeight: '800', fontSize: AVATAR_SZ * 0.38 },
+  onlineDot:  { position: 'absolute', bottom: 2, right: 2, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22C55E', borderWidth: 2 },
 
   cardBody:   { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, paddingTop: AVATAR_SZ / 2 + 8, gap: 4 },
   name:       { fontSize: 14, fontWeight: '700', textAlign: 'center' },

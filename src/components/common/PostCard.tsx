@@ -342,13 +342,16 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {/* ── Header auteur (sous le media, comme FeedCard) ───────────────────── */}
       <View style={pc.header}>
         <TouchableOpacity style={pc.headerLeft} activeOpacity={0.75} onPress={onAuthorPress}>
-          {author?.avatar_url ? (
-            <Image source={{ uri: author.avatar_url }} style={pc.avatar} />
-          ) : (
-            <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={pc.avatar}>
-              <Text style={[pc.avatarText, { fontSize: 15 }]}>{initials}</Text>
-            </LinearGradient>
-          )}
+          <View style={pc.avatarWrap}>
+            {author?.avatar_url ? (
+              <Image source={{ uri: author.avatar_url }} style={pc.avatar} />
+            ) : (
+              <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={pc.avatar}>
+                <Text style={[pc.avatarText, { fontSize: 15 }]}>{initials}</Text>
+              </LinearGradient>
+            )}
+            {author?.is_online && <View style={pc.onlineDot} />}
+          </View>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Text style={[pc.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
@@ -663,8 +666,10 @@ const pc = StyleSheet.create({
   // Header
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   headerLeft:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarWrap:   { width: 42, height: 42 },
   avatar:       { width: 42, height: 42, borderRadius: 21, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   avatarText:   { color: '#fff', fontWeight: '800' },
+  onlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#fff' },
   authorName:   { fontSize: 14, fontWeight: '700', letterSpacing: -0.1 },
   time:         { fontSize: 11, fontWeight: '500' },
   dot:          { width: 3, height: 3, borderRadius: 1.5 },

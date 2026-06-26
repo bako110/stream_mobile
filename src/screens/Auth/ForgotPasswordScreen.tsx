@@ -10,7 +10,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, BackButton, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
-import { phoneAuthService } from '../../services/phoneAuthService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 
@@ -50,9 +49,8 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
     setError(''); setLoading(true);
     try {
       if (method === 'phone') {
-        // Backend appelle Firebase REST → envoie le SMS
         const e164 = `${country.dial}${value.trim().replace(/\D/g, '')}`;
-        await phoneAuthService.sendOtp(e164);
+        await authService.forgotPassword({ phone: e164 });
         setStep('code');
       } else {
         const payload =
@@ -86,18 +84,13 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
   const handleVerifyCode = useCallback(async () => {
     if (code.trim().length < 6) { setError('Le code doit faire au moins 6 caractères.'); return; }
     setError('');
-    if (method === 'phone') {
-      // Backend vérifie le code OTP Firebase → JWT → étape mdp
-      setLoading(true);
-      try {
-        await phoneAuthService.verifyOtp(code.trim());
-        setStep('newpass');
-      } catch (e: any) {
-        setError(e?.response?.data?.detail ?? e?.message ?? 'Code incorrect ou expiré.');
-      } finally { setLoading(false); }
-    } else {
+    setLoading(true);
+    try {
+      await apiClient.post(Endpoints.auth.verifyResetCode, { token: code.trim() });
       setStep('newpass');
-    }
+    } catch (e: any) {
+      setError(e?.response?.data?.detail ?? e?.message ?? 'Code incorrect ou expiré.');
+    } finally { setLoading(false); }
   }, [code, method]);
 
   /* ── Étape 3 : nouveau mot de passe ─────────────────────────────────────── */
@@ -106,12 +99,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
     if (newPass !== confirmPass) { setError('Les mots de passe ne correspondent pas.'); return; }
     setError(''); setLoading(true);
     try {
-      if (method === 'phone') {
-        // JWT déjà obtenu après OTP Firebase — reset direct sans ancien mdp
-        await apiClient.post(Endpoints.auth.resetPasswordMe, { new_password: newPass });
-      } else {
-        await authService.resetPassword(code.trim(), newPass);
-      }
+      await authService.resetPassword(code.trim(), newPass);
       setStep('done');
     } catch (e: any) {
       setError(e?.message ?? 'Code invalide ou expiré.');

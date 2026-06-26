@@ -22,6 +22,7 @@ import { authService } from '../../services/authService';
 import { postService } from '../../services/postService';
 import { offlineCacheService } from '../../services/offlineCacheService';
 import { useNetwork } from '../../context/NetworkContext';
+import { useWs } from '../../context/WebSocketContext';
 import type { UserPublicProfile, UserPublic } from '../../types/user';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
@@ -49,8 +50,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { userId } = route.params;
   const { currentUser } = useUser();
   const { isOnline, isInternetReachable } = useNetwork();
+  const { lastPresenceUpdate } = useWs();
 
   const [profile, setProfile]   = useState<UserPublicProfile | null>(() => offlineCacheService.getUserProfile(userId));
+  const [profileIsOnline, setProfileIsOnline] = useState<boolean>(false);
   const [loading, setLoading]   = useState(() => !offlineCacheService.getUserProfile(userId));
   const [followLoading, setFollowLoading] = useState(false);
   const [showList, setShowList] = useState<'followers' | 'following' | null>(null);
@@ -155,6 +158,18 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     const unsub = navigation.addListener('focus', () => { load(); });
     return unsub;
   }, [navigation, load]);
+
+  // Sync is_online initial depuis le profil chargé
+  useEffect(() => {
+    if (profile) setProfileIsOnline(profile.is_online === true);
+  }, [profile?.id, profile?.is_online]);
+
+  // Mise à jour temps réel du statut en ligne via WebSocket
+  useEffect(() => {
+    if (!lastPresenceUpdate) return;
+    if (String(lastPresenceUpdate.user_id) !== String(userId)) return;
+    setProfileIsOnline(lastPresenceUpdate.is_online === true);
+  }, [lastPresenceUpdate, userId]);
 
   // Sync avatar/banner instantanément si c'est mon propre profil
   useEffect(() => {
@@ -321,6 +336,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               )}
             </View>
           </TouchableOpacity>
+          {profileIsOnline && (
+            <View style={[styles.onlineBadge, { borderColor: colors.background }]} />
+          )}
           {profile.is_verified && (
             <View style={[styles.verifiedBadge, { backgroundColor: colors.primary }]}>
               <Icon name="check" size={10} color="#fff" />
@@ -939,6 +957,7 @@ const styles = StyleSheet.create({
   avatarFallback: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { color: '#fff', fontSize: 28, fontWeight: '800' },
   verifiedBadge: { position: 'absolute', bottom: 2, right: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  onlineBadge:   { position: 'absolute', bottom: 4, left: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#22C55E', borderWidth: 3 },
 
   infoSection: {
     alignItems: 'center', marginHorizontal: 16, marginTop: 10,
