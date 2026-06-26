@@ -1203,7 +1203,8 @@ export const FeedScreen: React.FC = () => {
       const myCommIds = new Set(
         (offlineCacheService.getCommunityList() ?? []).map(c => String(c.id))
       );
-      const comms = allComms.filter(c => !myCommIds.has(String(c.id)) && c.join_status !== 'member');
+      const JOINED = new Set(['member', 'admin', 'moderator']);
+      const comms = allComms.filter(c => !myCommIds.has(String(c.id)) && !JOINED.has(c.join_status as string));
       if (!comms.length) return null;
       const gradFor = (_name: string): [string, string] =>
         [colors.primary, colors.primaryLight];
