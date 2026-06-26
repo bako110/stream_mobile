@@ -16,6 +16,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
 import { socialService } from '../../services/socialService';
+import { offlineCacheService } from '../../services/offlineCacheService';
+import { useNetwork } from '../../context/NetworkContext';
 import { CommentsBottomSheet, ShareBottomSheet, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
 import { RichText } from '../../components/common/RichText';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
@@ -187,9 +189,11 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   const { theme: { colors } } = useTheme();
   const { currentUser }       = useUser();
   const insets                = useSafeAreaInsets();
+  const { isOnline, isInternetReachable } = useNetwork();
 
-  const [post,          setPost]          = useState<Post | null>(initialPost ?? null);
-  const [loading,       setLoading]       = useState(!initialPost);
+  const cachedPost = !initialPost ? offlineCacheService.getPost(postId) : null;
+  const [post,          setPost]          = useState<Post | null>(initialPost ?? cachedPost ?? null);
+  const [loading,       setLoading]       = useState(!initialPost && !cachedPost);
   const [liked,         setLiked]         = useState(initialPost?.user_reaction === 'like');
   const [likeCount,     setLikeCount]     = useState(initialPost?.like_count ?? 0);
   const [commentCount,  setCommentCount]  = useState(initialPost?.comment_count ?? 0);
@@ -227,9 +231,25 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   }, [postId]);
 
   const load = useCallback(async () => {
+    // Offline : servir le cache, pas d'alerte
+    if (!isOnline || !isInternetReachable) {
+      const cached = offlineCacheService.getPost(postId);
+      if (cached) {
+        setPost(cached);
+        setLiked(cached.user_reaction === 'like');
+        setLikeCount(cached.like_count ?? 0);
+        setCommentCount(cached.comment_count ?? 0);
+        if (cached.author?.id) {
+          authorIdRef.current = String(cached.author.id);
+        }
+      }
+      setLoading(false);
+      return;
+    }
     try {
       const res = await postService.getById(postId);
       setPost(res);
+      offlineCacheService.savePost(postId, res);
       setLiked(res.user_reaction === 'like');
       setLikeCount(res.like_count ?? 0);
       setCommentCount(res.comment_count ?? 0);
@@ -238,25 +258,44 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         loadAuthorPosts(String(res.author.id), 1, true);
       }
     } catch {
-      Alert.alert('Erreur', 'Impossible de charger le post.');
-      onBack();
+      // Erreur réseau — fallback cache silencieux
+      const cached = offlineCacheService.getPost(postId);
+      if (cached) {
+        setPost(cached);
+        setLiked(cached.user_reaction === 'like');
+        setLikeCount(cached.like_count ?? 0);
+        setCommentCount(cached.comment_count ?? 0);
+      } else {
+        Alert.alert('Erreur', 'Impossible de charger le post.');
+        onBack();
+      }
     } finally {
       setLoading(false);
     }
-  }, [postId, loadAuthorPosts, onBack]);
+  }, [postId, loadAuthorPosts, onBack, isOnline, isInternetReachable]);
 
   useEffect(() => {
     setAuthorPosts([]); setAuthorPage(1);
     setAuthorHasMore(true); authorIdRef.current = null;
 
     if (initialPost) {
-      // Données déjà disponibles — pas de fetch, on charge juste les posts de l'auteur
+      setPost(initialPost);
       if (initialPost.author?.id) {
         authorIdRef.current = String(initialPost.author.id);
         loadAuthorPosts(String(initialPost.author.id), 1, true);
       }
     } else {
-      setPost(null); setLoading(true);
+      const cached = offlineCacheService.getPost(postId);
+      if (cached) {
+        setPost(cached);
+        setLoading(false);
+        if (cached.author?.id) {
+          authorIdRef.current = String(cached.author.id);
+        }
+      } else {
+        setPost(null);
+        setLoading(true);
+      }
       load();
     }
   }, [postId]);

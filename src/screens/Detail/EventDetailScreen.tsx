@@ -22,6 +22,8 @@ import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFoly
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, authService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
+import { offlineCacheService } from '../../services/offlineCacheService';
+import { useNetwork } from '../../context/NetworkContext';
 import type { Event } from '../../types/event';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -359,9 +361,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const { colors } = theme;
   const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
+  const { isOnline, isInternetReachable } = useNetwork();
 
-  const [event,        setEvent]        = useState<Event | null>(null);
-  const [loading,      setLoading]      = useState(true);
+  const [event,        setEvent]        = useState<Event | null>(() => offlineCacheService.getEvent(eventId));
+  const [loading,      setLoading]      = useState(() => !offlineCacheService.getEvent(eventId));
   const [isOwner,      setIsOwner]      = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [liked,        setLiked]        = useState(false);
@@ -385,9 +388,16 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const saveStyle  = useAnimatedStyle(() => ({ transform: [{ scale: saveScale.value }] }));
 
   const loadEvent = useCallback(async () => {
+    if (!isOnline || !isInternetReachable) {
+      const cached = offlineCacheService.getEvent(eventId);
+      if (cached) setEvent(cached);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await eventService.getById(eventId);
       setEvent(data);
+      offlineCacheService.saveEvent(eventId, data);
       favoriteService.check('event', eventId).then(setSaved).catch(() => {});
       if (data.status === 'completed' && data.live_id) {
         try {
@@ -413,9 +423,12 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         const r = await eventService.getRemindStatus(eventId);
         setReminded(r.active);
       } catch { /**/ }
-    } catch { /**/ }
+    } catch {
+      const cached = offlineCacheService.getEvent(eventId);
+      if (cached) setEvent(cached);
+    }
     finally { setLoading(false); }
-  }, [eventId]);
+  }, [eventId, isOnline, isInternetReachable]);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => { loadEvent(); });

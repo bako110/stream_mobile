@@ -7,6 +7,8 @@ import type { Post } from '../types/post';
 import type { Reel } from '../types/reel';
 import type { CommunityMessageData } from './communityService';
 import type { Story } from '../types/story';
+import type { Concert } from '../types/concert';
+import type { Event } from '../types/event';
 
 // TTL par type de données — assez long pour couvrir une coupure réseau prolongée
 const TTL = {
@@ -17,6 +19,7 @@ const TTL = {
   COMMUNITY:     6  * 60 * 60 * 1000,  // 6h
   MY_STORIES:    24 * 60 * 60 * 1000,  // 24h (durée de vie d'une story)
   NOTIFICATIONS: 48 * 60 * 60 * 1000,  // 48h (plus long pour voir les notifs manquées)
+  DETAIL:        24 * 60 * 60 * 1000,  // 24h pour les pages détail (concert/event/post/profil)
 } as const;
 
 // Nombre max de messages gardés par conversation (évite de saturer MMKV)
@@ -35,6 +38,10 @@ const KEY = {
   MY_STORIES:      'offline:my_stories',
   NOTIFICATIONS:   'offline:notifications',
   NOTIF_BADGE:     'offline:notif_badge',
+  CONCERT:         (id: string) => `offline:concert:${id}`,
+  EVENT:           (id: string) => `offline:event:${id}`,
+  POST:            (id: string) => `offline:post:${id}`,
+  USER_PROFILE:    (id: string) => `offline:user_profile:${id}`,
 } as const;
 
 // Nombre max de notifications gardées en cache
@@ -247,5 +254,35 @@ export const offlineCacheService = {
   getOfflineUnreadCount(): number {
     const items = localCache.getPersistent<CachedNotification[]>(KEY.NOTIFICATIONS) ?? [];
     return items.filter(n => n.received_offline && !n.is_read).length;
+  },
+
+  // ── Pages Détail ─────────────────────────────────────────────────────────────
+
+  saveConcert(id: string, data: Concert): void {
+    try { localCache.set(KEY.CONCERT(id), data, TTL.DETAIL); } catch {}
+  },
+  getConcert(id: string): Concert | null {
+    return localCache.getPersistent<Concert>(KEY.CONCERT(id));
+  },
+
+  saveEvent(id: string, data: Event): void {
+    try { localCache.set(KEY.EVENT(id), data, TTL.DETAIL); } catch {}
+  },
+  getEvent(id: string): Event | null {
+    return localCache.getPersistent<Event>(KEY.EVENT(id));
+  },
+
+  savePost(id: string, data: Post): void {
+    try { localCache.set(KEY.POST(id), data, TTL.DETAIL); } catch {}
+  },
+  getPost(id: string): Post | null {
+    return localCache.getPersistent<Post>(KEY.POST(id));
+  },
+
+  saveUserProfile(id: string, data: any): void {
+    try { localCache.set(KEY.USER_PROFILE(id), data, TTL.DETAIL); } catch {}
+  },
+  getUserProfile(id: string): any | null {
+    return localCache.getPersistent<any>(KEY.USER_PROFILE(id));
   },
 };

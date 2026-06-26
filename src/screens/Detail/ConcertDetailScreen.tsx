@@ -17,6 +17,8 @@ import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFoly
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { concertService, socialService, authService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
+import { offlineCacheService } from '../../services/offlineCacheService';
+import { useNetwork } from '../../context/NetworkContext';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -296,9 +298,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { isOnline, isInternetReachable } = useNetwork();
 
-  const [concert,      setConcert]      = useState<Concert | null>(null);
-  const [loading,      setLoading]      = useState(true);
+  const [concert,      setConcert]      = useState<Concert | null>(() => offlineCacheService.getConcert(concertId));
+  const [loading,      setLoading]      = useState(() => !offlineCacheService.getConcert(concertId));
   const [isOwner,      setIsOwner]      = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [paySheetOpen, setPaySheetOpen] = useState(false);
@@ -319,11 +322,18 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const saveStyle  = useAnimatedStyle(() => ({ transform: [{ scale: saveScale.value }] }));
 
   const loadConcert = useCallback(async () => {
+    // Offline : servir le cache sans spinner
+    if (!isOnline || !isInternetReachable) {
+      const cached = offlineCacheService.getConcert(concertId);
+      if (cached) setConcert(cached);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await concertService.getById(concertId);
       setConcert(data);
+      offlineCacheService.saveConcert(concertId, data);
       favoriteService.check('concert', concertId).then(setSaved).catch(() => {});
-      // Charger le replay si le concert est termine et a un live associe
       if (data.status === 'ended' && data.live_id) {
         try {
           const { apiClient } = require('../../api/client');
@@ -344,9 +354,13 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         const myR = await socialService.getMyReaction({ concert_id: concertId });
         setLiked(myR.reaction_type === 'like');
       } catch { /**/ }
-    } catch { /**/ }
+    } catch {
+      // Erreur réseau inattendue — fallback cache
+      const cached = offlineCacheService.getConcert(concertId);
+      if (cached) setConcert(cached);
+    }
     finally { setLoading(false); }
-  }, [concertId]);
+  }, [concertId, isOnline, isInternetReachable]);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => { loadConcert(); });
