@@ -126,7 +126,9 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                         </LinearGradient>
                       )}
                     </TouchableOpacity>
-                    <View style={[st.onlineDot, { borderColor: colors.background, backgroundColor: item.is_online ? '#22C55E' : '#92400E' }]} />
+                    {item.is_online != null && (
+                      <View style={[st.onlineDot, { borderColor: colors.background, backgroundColor: item.is_online ? '#22C55E' : '#92400E' }]} />
+                    )}
                   </View>
 
                   {/* Infos */}

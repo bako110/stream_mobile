@@ -350,7 +350,9 @@ const PostCardInner: React.FC<PostCardProps> = ({
                 <Text style={[pc.avatarText, { fontSize: 15 }]}>{initials}</Text>
               </LinearGradient>
             )}
-            <View style={[pc.onlineDot, { backgroundColor: author?.is_online ? '#22C55E' : '#92400E' }]} />
+            {author?.is_online != null && (
+              <View style={[pc.onlineDot, { backgroundColor: author.is_online ? '#22C55E' : '#92400E' }]} />
+            )}
           </View>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -666,7 +668,7 @@ const pc = StyleSheet.create({
   // Header
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   headerLeft:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarWrap:   { width: 44, height: 44 },
+  avatarWrap:   { width: 44, height: 44, overflow: 'visible' },
   avatar:       { width: 42, height: 42, borderRadius: 21, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   avatarText:   { color: '#fff', fontWeight: '800' },
   onlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#fff', zIndex: 10 },

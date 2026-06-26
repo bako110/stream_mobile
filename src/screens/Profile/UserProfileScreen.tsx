@@ -53,7 +53,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { lastPresenceUpdate } = useWs();
 
   const [profile, setProfile]   = useState<UserPublicProfile | null>(() => offlineCacheService.getUserProfile(userId));
-  const [profileIsOnline, setProfileIsOnline] = useState<boolean>(false);
+  const [profileIsOnline, setProfileIsOnline] = useState<boolean | null>(null);
   const [loading, setLoading]   = useState(() => !offlineCacheService.getUserProfile(userId));
   const [followLoading, setFollowLoading] = useState(false);
   const [showList, setShowList] = useState<'followers' | 'following' | null>(null);
@@ -159,9 +159,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     return unsub;
   }, [navigation, load]);
 
-  // Sync is_online initial depuis le profil chargé
+  // Sync is_online initial depuis le profil chargé (null si backend n'a pas renvoyé la data)
   useEffect(() => {
-    if (profile) setProfileIsOnline(profile.is_online === true);
+    if (profile) setProfileIsOnline(profile.is_online == null ? null : profile.is_online === true);
   }, [profile?.id, profile?.is_online]);
 
   // Mise à jour temps réel du statut en ligne via WebSocket
@@ -336,7 +336,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               )}
             </View>
           </TouchableOpacity>
-          <View style={[styles.onlineBadge, { borderColor: colors.background, backgroundColor: profileIsOnline ? '#22C55E' : '#92400E' }]} />
+          {profileIsOnline != null && (
+            <View style={[styles.onlineBadge, { borderColor: colors.background, backgroundColor: profileIsOnline ? '#22C55E' : '#92400E' }]} />
+          )}
           {profile.is_verified && (
             <View style={[styles.verifiedBadge, { backgroundColor: colors.primary }]}>
               <Icon name="check" size={10} color="#fff" />
