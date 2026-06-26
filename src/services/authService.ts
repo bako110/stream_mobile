@@ -78,11 +78,28 @@ export const authService = {
     if (!forceRefresh && _cachedUser && (now - _cachedAt) < CACHE_TTL) {
       return _cachedUser;
     }
-    const res = await apiClient.get<User>(Endpoints.auth.me);
-    console.log('[getMe] gofolyx_id=', res.data?.gofolyx_id, 'raw keys=', Object.keys(res.data || {}));
-    _cachedUser = res.data;
-    _cachedAt = now;
-    return _cachedUser!;
+    try {
+      const res = await apiClient.get<User>(Endpoints.auth.me);
+      console.log('[getMe] gofolyx_id=', res.data?.gofolyx_id, 'raw keys=', Object.keys(res.data || {}));
+      _cachedUser = res.data;
+      _cachedAt = now;
+      // Persister dans MMKV pour lecture offline
+      try { storage.setItem(STORAGE_KEYS.CACHED_USER, JSON.stringify(res.data)); } catch {}
+      return _cachedUser!;
+    } catch (err) {
+      // Offline ou erreur réseau — retourner le user persisté en MMKV
+      if (_cachedUser) return _cachedUser;
+      try {
+        const raw = storage.getItem(STORAGE_KEYS.CACHED_USER);
+        if (raw) {
+          const saved = JSON.parse(raw) as User;
+          _cachedUser = saved;
+          _cachedAt = now;
+          return saved;
+        }
+      } catch {}
+      throw err;
+    }
   },
 
   async refresh(): Promise<AuthToken> {

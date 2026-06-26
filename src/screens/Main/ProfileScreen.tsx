@@ -54,29 +54,31 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      let me = await refreshUser();
-      if (!me) return;
+      // refreshUser retourne toujours un user (cache offline si pas de réseau)
+      const me = await refreshUser() ?? user;
+      if (!me) { setLoading(false); return; }
+
+      // gofolyx_id seulement si online (appel POST)
       if (!me.gofolyx_id) {
         try {
           const r = await apiClient.post<User>(Endpoints.users.generateGoFolyXId);
-          me = r.data;
           setCurrentUser(r.data);
         } catch {}
       }
 
       const [profile, evts, res, reelsRes, postsRes] = await Promise.allSettled([
-        userService.getPublicProfile(me!.id),
+        userService.getPublicProfile(me.id),
         eventService.getMyEvents(),
         concertService.getMyConcerts(),
-        apiClient.get<any>(`${Endpoints.reels.byUser(me!.id)}?page=1&limit=20`),
-        postService.getByUser(me!.id),
+        apiClient.get<any>(`${Endpoints.reels.byUser(me.id)}?page=1&limit=20`),
+        postService.getByUser(me.id),
       ]);
       if (profile.status === 'fulfilled') {
         setFollowersCount(profile.value.followers_count ?? 0);
         setFollowingCount(profile.value.following_count ?? 0);
       }
-      if (evts.status  === 'fulfilled') setMyEvents(evts.value);
-      if (res.status   === 'fulfilled') setMyConcerts(res.value);
+      if (evts.status     === 'fulfilled') setMyEvents(evts.value);
+      if (res.status      === 'fulfilled') setMyConcerts(res.value);
       if (reelsRes.status === 'fulfilled') {
         const d = reelsRes.value.data;
         setMyReels(Array.isArray(d) ? d : (d?.items ?? []));
@@ -86,7 +88,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
     } catch (err) {
       if (__DEV__) { console.warn('[ProfileScreen]', err); }
     } finally { setLoading(false); }
-  }, [refreshUser]);
+  }, [refreshUser, user]);
 
   useFocusEffect(useCallback(() => {
     if (!didMountRef.current) {

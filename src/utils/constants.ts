@@ -38,6 +38,7 @@ export const STORAGE_KEYS = {
   THEME_MODE:     'gofolyx_theme_mode',
   ONBOARDING_DONE:'gofolyx_onboarding_done',
   LAST_USER_ID:   'gofolyx_last_user_id',
+  CACHED_USER:    'gofolyx_cached_user',
 } as const;
 
 // ── Durées (ms) ────────────────────────────────────────────────────────────

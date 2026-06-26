@@ -26,8 +26,17 @@ const UserContext = createContext<UserContextValue>({
 export const useUser = () => useContext(UserContext);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Init immédiate depuis MMKV — photo et nom disponibles avant tout appel réseau
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const raw = storage.getItem(STORAGE_KEYS.CACHED_USER);
+      return raw ? (JSON.parse(raw) as User) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(() => {
+    try { return !storage.getItem(STORAGE_KEYS.CACHED_USER); }
+    catch { return true; }
+  });
 
   const refreshUser = useCallback(async (): Promise<User | null> => {
     try {
@@ -37,9 +46,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (me?.id) storage.setItem(STORAGE_KEYS.LAST_USER_ID, String(me.id));
       return me;
     } catch {
-      return null;
+      // Offline — garder le user déjà en state, ne pas retourner null
+      return currentUser;
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     authService.getMe().then(me => {
