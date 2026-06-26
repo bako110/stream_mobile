@@ -16,6 +16,7 @@ const TTL = {
   MESSAGES:      24 * 60 * 60 * 1000,  // 24h
   COMMUNITY:     6  * 60 * 60 * 1000,  // 6h
   MY_STORIES:    24 * 60 * 60 * 1000,  // 24h (durée de vie d'une story)
+  NOTIFICATIONS: 48 * 60 * 60 * 1000,  // 48h (plus long pour voir les notifs manquées)
 } as const;
 
 // Nombre max de messages gardés par conversation (évite de saturer MMKV)
@@ -31,7 +32,12 @@ const KEY = {
   COMMUNITY_MSGS:  (id: string) => `offline:community_msgs:${id}`,
   COMMUNITY_LIST:  'offline:community_list',
   MY_STORIES:      'offline:my_stories',
+  NOTIFICATIONS:   'offline:notifications',
+  NOTIF_BADGE:     'offline:notif_badge',
 } as const;
+
+// Nombre max de notifications gardées en cache
+const MAX_NOTIFICATIONS = 100;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,6 +83,22 @@ export interface CachedCommunity {
   avatar_url?:    string | null;
   members_count:  number;
   is_private:     boolean;
+}
+
+export interface CachedNotification {
+  id:                string;
+  notification_type: string;
+  title:             string;
+  body:              string;
+  ref_id:            string | null;
+  ref_type:          string | null;
+  is_read:           boolean;
+  created_at:        string;
+  actor:             { id: string; username: string; display_name: string; avatar_url: string | null } | null;
+  // Champs FCM additionnels pour navigation offline
+  fcm_type?:         string;
+  fcm_data?:         Record<string, string>;
+  received_offline?: boolean; // reçue pendant absence de connexion
 }
 
 // ── Feed ─────────────────────────────────────────────────────────────────────
@@ -154,5 +176,67 @@ export const offlineCacheService = {
   },
   getCommunityMessages(communityId: string): CommunityMessageData[] | null {
     return localCache.getPersistent<CommunityMessageData[]>(KEY.COMMUNITY_MSGS(communityId));
+  },
+
+  // Notifications
+  saveNotifications(items: CachedNotification[]): void {
+    try { localCache.set(KEY.NOTIFICATIONS, items.slice(0, MAX_NOTIFICATIONS), TTL.NOTIFICATIONS); } catch {}
+  },
+  getNotifications(): CachedNotification[] | null {
+    return localCache.getPersistent<CachedNotification[]>(KEY.NOTIFICATIONS);
+  },
+
+  // Prepend une nouvelle notif FCM reçue offline (en tête de liste, dédoublonnée par id)
+  prependNotification(notif: CachedNotification): void {
+    try {
+      const existing = localCache.getPersistent<CachedNotification[]>(KEY.NOTIFICATIONS) ?? [];
+      const deduped  = existing.filter(n => n.id !== notif.id);
+      const next     = [notif, ...deduped].slice(0, MAX_NOTIFICATIONS);
+      localCache.set(KEY.NOTIFICATIONS, next, TTL.NOTIFICATIONS);
+    } catch {}
+  },
+
+  // Badge persistant — survit aux redémarrages même sans connexion
+  saveBadge(count: number): void {
+    try { localCache.set(KEY.NOTIF_BADGE, count, TTL.NOTIFICATIONS); } catch {}
+  },
+  getBadge(): number {
+    return localCache.getPersistent<number>(KEY.NOTIF_BADGE) ?? 0;
+  },
+  clearBadge(): void {
+    try { localCache.set(KEY.NOTIF_BADGE, 0, TTL.NOTIFICATIONS); } catch {}
+  },
+
+  // Marquer une notif offline comme lue
+  markNotificationRead(id: string): void {
+    try {
+      const existing = localCache.getPersistent<CachedNotification[]>(KEY.NOTIFICATIONS) ?? [];
+      const next = existing.map(n => n.id === id ? { ...n, is_read: true } : n);
+      localCache.set(KEY.NOTIFICATIONS, next, TTL.NOTIFICATIONS);
+    } catch {}
+  },
+
+  // Marquer toutes comme lues
+  markAllNotificationsRead(): void {
+    try {
+      const existing = localCache.getPersistent<CachedNotification[]>(KEY.NOTIFICATIONS) ?? [];
+      const next = existing.map(n => ({ ...n, is_read: true }));
+      localCache.set(KEY.NOTIFICATIONS, next, TTL.NOTIFICATIONS);
+    } catch {}
+  },
+
+  // Supprimer une notif du cache
+  removeNotification(id: string): void {
+    try {
+      const existing = localCache.getPersistent<CachedNotification[]>(KEY.NOTIFICATIONS) ?? [];
+      const next = existing.filter(n => n.id !== id);
+      localCache.set(KEY.NOTIFICATIONS, next, TTL.NOTIFICATIONS);
+    } catch {}
+  },
+
+  // Nombre de notifs reçues offline non lues (reçues pendant déconnexion)
+  getOfflineUnreadCount(): number {
+    const items = localCache.getPersistent<CachedNotification[]>(KEY.NOTIFICATIONS) ?? [];
+    return items.filter(n => n.received_offline && !n.is_read).length;
   },
 };
