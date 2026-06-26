@@ -336,9 +336,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               )}
             </View>
           </TouchableOpacity>
-          {profileIsOnline && (
-            <View style={[styles.onlineBadge, { borderColor: colors.background }]} />
-          )}
+          <View style={[styles.onlineBadge, { borderColor: colors.background, backgroundColor: profileIsOnline ? '#22C55E' : '#92400E' }]} />
           {profile.is_verified && (
             <View style={[styles.verifiedBadge, { backgroundColor: colors.primary }]}>
               <Icon name="check" size={10} color="#fff" />

@@ -112,22 +112,22 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                   </TouchableOpacity>
 
                   {/* Avatar chevauchant */}
-                  <TouchableOpacity
-                    style={[st.avatarWrap, { borderColor: colors.background, marginTop: -(AVATAR_SZ / 2) }]}
-                    onPress={() => onUserPress(item.id)}
-                    activeOpacity={0.9}
-                  >
-                    {item.avatar_url ? (
-                      <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
-                    ) : (
-                      <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={st.avatarImg}>
-                        <Text style={st.initial}>{initials}</Text>
-                      </LinearGradient>
-                    )}
-                    {item.is_online && (
-                      <View style={[st.onlineDot, { borderColor: colors.background }]} />
-                    )}
-                  </TouchableOpacity>
+                  <View style={{ alignSelf: 'center', marginTop: -(AVATAR_SZ / 2) }}>
+                    <TouchableOpacity
+                      style={[st.avatarWrap, { borderColor: colors.background }]}
+                      onPress={() => onUserPress(item.id)}
+                      activeOpacity={0.9}
+                    >
+                      {item.avatar_url ? (
+                        <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
+                      ) : (
+                        <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={st.avatarImg}>
+                          <Text style={st.initial}>{initials}</Text>
+                        </LinearGradient>
+                      )}
+                    </TouchableOpacity>
+                    <View style={[st.onlineDot, { borderColor: colors.background, backgroundColor: item.is_online ? '#22C55E' : '#92400E' }]} />
+                  </View>
 
                   {/* Infos */}
                   <View style={st.cardBody}>
