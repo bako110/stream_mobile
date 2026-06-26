@@ -906,6 +906,8 @@ const Header: React.FC<HeaderProps> = ({
 
 // ── SearchResults ─────────────────────────────────────────────────────────────
 
+type SearchTab = 'all' | 'users' | 'events' | 'concerts';
+
 interface SearchResultsProps {
   loading:    boolean;
   users:      SearchUser[];
@@ -921,118 +923,180 @@ interface SearchResultsProps {
 const SearchResults: React.FC<SearchResultsProps> = ({
   loading, users, events, concerts, query, colors, onUser, onEvent, onConcert,
 }) => {
-  const hasResults = users.length > 0 || events.length > 0 || concerts.length > 0;
+  const [tab, setTab] = useState<SearchTab>('all');
+  const total = users.length + events.length + concerts.length;
+  const hasResults = total > 0;
+
+  const tabs: { key: SearchTab; label: string; count: number }[] = [
+    { key: 'all',      label: 'Tout',        count: total          },
+    { key: 'users',    label: 'Personnes',   count: users.length   },
+    { key: 'events',   label: 'Événements',  count: events.length  },
+    { key: 'concerts', label: 'Concerts',    count: concerts.length },
+  ];
+
+  const showUsers    = tab === 'all' || tab === 'users';
+  const showEvents   = tab === 'all' || tab === 'events';
+  const showConcerts = tab === 'all' || tab === 'concerts';
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ paddingBottom: 40 }}
-    >
-      {loading && (
-        <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 28 }} />
-      )}
-      {!loading && !hasResults && (
-        <Animated.View entering={FadeIn} style={{ alignItems: 'center', paddingVertical: 60 }}>
-          <Icon name="search" size={44} color={colors.textTertiary + '80'} />
-          <Text style={{ color: colors.textTertiary, marginTop: 12, fontSize: 14 }}>
-            Aucun résultat pour « {query} »
-          </Text>
-        </Animated.View>
-      )}
-
-      {users.length > 0 && (
-        <SearchSection label="PERSONNES">
-          {users.map(u => (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Tab bar */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 4, gap: 4 }}
+      >
+        {tabs.map(t => {
+          const active = tab === t.key;
+          return (
             <TouchableOpacity
-              key={u.id}
-              onPress={() => onUser(u.id)}
-              style={[s.searchRow, { borderBottomColor: colors.divider }]}
+              key={t.key}
+              onPress={() => setTab(t.key)}
+              style={[
+                s.srTab,
+                active && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+              ]}
             >
-              {u.avatar_url ? (
-                <Image source={{ uri: u.avatar_url }} style={s.searchAvatar} />
-              ) : (
-                <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={s.searchAvatar}>
-                  <Text style={s.searchAvatarText}>
-                    {(u.display_name || u.username || '?')[0].toUpperCase()}
+              <Text style={[s.srTabLabel, { color: active ? colors.primary : colors.textSecondary }]}>
+                {t.label}
+              </Text>
+              {t.count > 0 && (
+                <View style={[s.srTabBadge, { backgroundColor: active ? colors.primary : colors.textTertiary + '30' }]}>
+                  <Text style={[s.srTabBadgeText, { color: active ? '#fff' : colors.textTertiary }]}>
+                    {t.count}
                   </Text>
-                </LinearGradient>
+                </View>
               )}
-              <View style={{ flex: 1 }}>
-                <Text style={[s.searchRowTitle, { color: colors.textPrimary }]}>
-                  {u.display_name || u.username}
-                </Text>
-                <Text style={[s.searchRowSub, { color: colors.textTertiary }]}>@{u.username}</Text>
-              </View>
-              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
             </TouchableOpacity>
-          ))}
-        </SearchSection>
-      )}
+          );
+        })}
+      </ScrollView>
 
-      {concerts.length > 0 && (
-        <SearchSection label="CONCERTS">
-          {concerts.map((c: any) => (
-            <TouchableOpacity
-              key={c.id}
-              onPress={() => onConcert(c.id)}
-              style={[s.searchRow, { borderBottomColor: colors.divider }]}
-            >
-              <View style={[s.searchThumb, { backgroundColor: '#7B3FF222' }]}>
-                {c.thumbnail_url
-                  ? <Image source={{ uri: c.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  : <Icon name="music" size={18} color="#7B3FF2" />
-                }
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.searchRowTitle, { color: colors.textPrimary }]}>{c.title}</Text>
-                <Text style={[s.searchRowSub, { color: colors.textTertiary }]}>
-                  {[c.genre, c.venue_city].filter(Boolean).join(' · ') || 'Concert'}
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          ))}
-        </SearchSection>
-      )}
+      <ScrollView
+        style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {loading && (
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 32 }} />
+        )}
+        {!loading && !hasResults && (
+          <Animated.View entering={FadeIn} style={{ alignItems: 'center', paddingVertical: 72 }}>
+            <View style={[s.srEmptyIcon, { backgroundColor: colors.surface }]}>
+              <Icon name="search" size={28} color={colors.textTertiary} />
+            </View>
+            <Text style={[s.srEmptyTitle, { color: colors.textPrimary }]}>Aucun résultat</Text>
+            <Text style={[s.srEmptySub, { color: colors.textTertiary }]}>
+              Rien pour « {query} »
+            </Text>
+          </Animated.View>
+        )}
 
-      {events.length > 0 && (
-        <SearchSection label="ÉVÉNEMENTS">
-          {events.map((e: any) => (
-            <TouchableOpacity
-              key={e.id}
-              onPress={() => onEvent(e.id)}
-              style={[s.searchRow, { borderBottomColor: colors.divider }]}
-            >
-              <View style={[s.searchThumb, { backgroundColor: colors.primary + '22' }]}>
-                {e.thumbnail_url
-                  ? <Image source={{ uri: e.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  : <Icon name="calendar" size={18} color={colors.primary} />
-                }
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.searchRowTitle, { color: colors.textPrimary }]}>{e.title}</Text>
-                <Text style={[s.searchRowSub, { color: colors.textTertiary }]}>
-                  {[e.event_type, e.venue_city].filter(Boolean).join(' · ') || 'Événement'}
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          ))}
-        </SearchSection>
-      )}
-    </ScrollView>
+        {showUsers && users.length > 0 && (
+          <View style={s.srSection}>
+            {tab === 'all' && (
+              <Text style={[s.srSectionLabel, { color: colors.textTertiary }]}>PERSONNES</Text>
+            )}
+            {users.map(u => (
+              <TouchableOpacity
+                key={u.id}
+                onPress={() => onUser(u.id)}
+                activeOpacity={0.7}
+                style={[s.srUserRow, { borderBottomColor: colors.divider }]}
+              >
+                {u.avatar_url ? (
+                  <Image source={{ uri: u.avatar_url }} style={s.srAvatar} />
+                ) : (
+                  <LinearGradient colors={['#7B3FF2', '#A855F7']} style={s.srAvatar}>
+                    <Text style={s.srAvatarText}>
+                      {(u.display_name || u.username || '?')[0].toUpperCase()}
+                    </Text>
+                  </LinearGradient>
+                )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[s.srUserName, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {u.display_name || u.username}
+                  </Text>
+                  <Text style={[s.srUserHandle, { color: colors.textTertiary }]} numberOfLines={1}>
+                    @{u.username}
+                  </Text>
+                </View>
+                <View style={[s.srFollowBtn, { borderColor: colors.primary }]}>
+                  <Text style={[s.srFollowBtnText, { color: colors.primary }]}>Voir</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {showConcerts && concerts.length > 0 && (
+          <View style={s.srSection}>
+            {tab === 'all' && (
+              <Text style={[s.srSectionLabel, { color: colors.textTertiary }]}>CONCERTS</Text>
+            )}
+            {concerts.map((c: any) => (
+              <TouchableOpacity
+                key={c.id}
+                onPress={() => onConcert(c.id)}
+                activeOpacity={0.7}
+                style={[s.srCardRow, { backgroundColor: colors.surface }]}
+              >
+                <View style={[s.srCardThumb, { backgroundColor: '#7B3FF215' }]}>
+                  {c.thumbnail_url
+                    ? <Image source={{ uri: c.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    : <Icon name="music" size={20} color="#7B3FF2" />
+                  }
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[s.srCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {c.title}
+                  </Text>
+                  <Text style={[s.srCardSub, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {[c.genre, c.venue_city].filter(Boolean).join(' · ') || 'Concert'}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {showEvents && events.length > 0 && (
+          <View style={s.srSection}>
+            {tab === 'all' && (
+              <Text style={[s.srSectionLabel, { color: colors.textTertiary }]}>ÉVÉNEMENTS</Text>
+            )}
+            {events.map((e: any) => (
+              <TouchableOpacity
+                key={e.id}
+                onPress={() => onEvent(e.id)}
+                activeOpacity={0.7}
+                style={[s.srCardRow, { backgroundColor: colors.surface }]}
+              >
+                <View style={[s.srCardThumb, { backgroundColor: colors.primary + '15' }]}>
+                  {e.thumbnail_url
+                    ? <Image source={{ uri: e.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    : <Icon name="calendar" size={20} color={colors.primary} />
+                  }
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[s.srCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {e.title}
+                  </Text>
+                  <Text style={[s.srCardSub, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {[e.event_type, e.venue_city].filter(Boolean).join(' · ') || 'Événement'}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 };
-
-const SearchSection: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
-    <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: '#9390AB', marginBottom: 4 }}>
-      {label}
-    </Text>
-    {children}
-  </View>
-);
 
 // ── PostCard ───────────────────────────────────────────────────────────────────
 

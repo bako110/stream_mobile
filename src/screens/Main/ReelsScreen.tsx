@@ -25,6 +25,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { RichText } from '../../components/common/RichText';
 import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
+import { useNetwork } from '../../context/NetworkContext';
+import { offlineCacheService } from '../../services/offlineCacheService';
 import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
@@ -77,6 +79,7 @@ export const ReelsScreen: React.FC = () => {
   const { colors }        = theme;
   const nav    = useNavigation<Nav>();
   const route  = useRoute();
+  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
   const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean };
   // paramsRef toujours à jour — lisible depuis useFocusEffect (closure figée sur [])
   const paramsRef = useRef(params);
@@ -104,7 +107,12 @@ export const ReelsScreen: React.FC = () => {
     params.initialReel?.hls_url ? [params.initialReel as Reel] : []
   ).current;
 
-  const [reels,         setReels]         = useState<Reel[]>(seedReel);
+  // Init depuis cache si pas de seedReel — affichage immédiat sans skeleton
+  const cachedReels = useRef(
+    seedReel.length === 0 && !params.initialReelId ? (offlineCacheService.getReels() ?? []) : []
+  ).current;
+
+  const [reels,         setReels]         = useState<Reel[]>(seedReel.length > 0 ? seedReel : cachedReels);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
   const [reelAd,        setReelAd]        = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string } | null>(null);
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
@@ -112,7 +120,7 @@ export const ReelsScreen: React.FC = () => {
   const [editCaption,   setEditCaption]   = useState('');
   const [editSaving,    setEditSaving]    = useState(false);
   const [fullEditReel,  setFullEditReel]  = useState<Reel | null>(null); // édition effets visuels
-  const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId);
+  const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId && cachedReels.length === 0);
   const [hasMore,       setHasMore]       = useState(true);
   const [tab,           setTab]           = useState<'feed' | 'mine'>('feed');
   const [myId,          setMyId]          = useState<string | null>(null);
@@ -126,7 +134,7 @@ export const ReelsScreen: React.FC = () => {
   const [searching,     setSearching]     = useState(false);
 
   // Refs stables pour éviter les closures stales
-  const reelsRef        = useRef<Reel[]>([]);
+  const reelsRef        = useRef<Reel[]>(seedReel.length > 0 ? seedReel : cachedReels);
   const hasMoreRef      = useRef(true);
   const pendingScrollIdx  = useRef<number | null>(null);
   const isScrollingRef    = useRef(false);
@@ -187,9 +195,26 @@ export const ReelsScreen: React.FC = () => {
   // silent   : garder le contenu actuel visible pendant le chargement background
   const load = useCallback(async (silent = false) => {
     if (!mountedRef.current) return;
-    if (!silent) setLoading(true);
+    // Ne montrer le loading que si pas de contenu actuellement affiché
+    if (!silent && reelsRef.current.length === 0) setLoading(true);
     pageRef.current = 1;
     isLoadingMoreRef.current = false;
+
+    // Offline : servir le cache persistant (même si TTL expiré)
+    if (!isOnline || !isInternetReachable) {
+      if (mountedRef.current) {
+        const cached = offlineCacheService.getReels();
+        if (cached && cached.length > 0 && reelsRef.current.length === 0 && !silent) {
+          currentIdxRef.current = 0;
+          setCurrentIndex(0);
+          setReels(cached);
+          reelsRef.current = cached;
+          viewedReelsRef.current = new Set();
+        }
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       const data = await reelService.getFeed({ page: 1 });
@@ -217,6 +242,8 @@ export const ReelsScreen: React.FC = () => {
           setReels(merged);
         }
       }
+      // Persist pour mode offline
+      offlineCacheService.saveReels(filtered);
 
       // Charger la pub reels en arriere-plan
       apiClient.get<{ id: string; title: string } | null>('/api/v1/ads/feed/next?placement=reels')
@@ -233,11 +260,19 @@ export const ReelsScreen: React.FC = () => {
       }).catch(() => {});
 
     } catch {
-      if (mountedRef.current && !silent) setReels([]);
+      // Erreur réseau en ligne → fallback cache plutôt que liste vide
+      if (mountedRef.current && !silent) {
+        const cached = offlineCacheService.getReels();
+        if (cached && cached.length > 0) {
+          setReels(cached);
+          reelsRef.current = cached;
+        }
+        // Si pas de cache, garder les reels actuellement affichés (ne pas mettre [])
+      }
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, []); // pas de dépendances sur params — targetId passé en argument
+  }, [isOnline, isInternetReachable]); // pas de dépendances sur params — targetId passé en argument
 
   // ── Load more ─────────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -391,7 +426,7 @@ export const ReelsScreen: React.FC = () => {
         load(false);
       } else {
         const age = Date.now() - lastLoadedAtRef.current;
-        if (age > 90_000) load(true);
+        if (age > 90_000 && (isOnline && isInternetReachable)) load(true);
       }
     }
 
@@ -412,6 +447,13 @@ export const ReelsScreen: React.FC = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.reelPublished]);
+
+  // Sync au reconnect réseau
+  useEffect(() => {
+    const onReconnect = () => { if (mountedRef.current) load(true); };
+    addReconnectListener(onReconnect);
+    return () => removeReconnectListener(onReconnect);
+  }, [addReconnectListener, removeReconnectListener]);
 
   // ── Edit / Delete ─────────────────────────────────────────────────────────
   const handleDeleteReel = useCallback((reel: Reel) => {
@@ -598,15 +640,21 @@ export const ReelsScreen: React.FC = () => {
         <BackButton onPress={() => nav.goBack()} />
         {/* Contenu vide centré */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <Icon name="film" size={48} color={colors.textDisabled} />
-          <Text style={{ color: colors.textTertiary, fontSize: 14 }}>Aucun reel disponible</Text>
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8, borderRadius: 10 }}
-            onPress={() => nav.navigate('CreateReel')}
-          >
-            <Icon name="plus" size={18} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ajouter un reel</Text>
-          </TouchableOpacity>
+          <Icon name={!isOnline || !isInternetReachable ? 'wifi-off' : 'film'} size={48} color={colors.textDisabled} />
+          <Text style={{ color: colors.textTertiary, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 }}>
+            {!isOnline || !isInternetReachable
+              ? 'Hors ligne — aucun reel en cache'
+              : 'Aucun reel disponible'}
+          </Text>
+          {(isOnline && isInternetReachable) && (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8, borderRadius: 10 }}
+              onPress={() => nav.navigate('CreateReel')}
+            >
+              <Icon name="plus" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ajouter un reel</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -878,7 +926,7 @@ export const ReelsScreen: React.FC = () => {
 
       {/* Header flottant */}
       <View style={[s.floatingHeader, { top: insets.top + 6 }]} pointerEvents="box-none">
-        <BackButton onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)} transparent />
+        <BackButton onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)} transparent color="#fff" />
         <Text style={s.reelHeaderTitle}>Reels</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="box-none">
           <TouchableOpacity onPress={openSearch} style={s.iconBtn}>
@@ -893,6 +941,18 @@ export const ReelsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Bouton créer un reel — bas droite au-dessus de la barre de commentaire */}
+      {!searchOpen && (
+        <TouchableOpacity
+          onPress={() => nav.navigate('CreateReel')}
+          style={[s.createFab, { bottom: Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 0) + 76 + 16 }]}
+        >
+          <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.createFabInner}>
+            <Icon name="plus" size={22} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
 
       {/* Overlay recherche */}
       {searchOpen && (
@@ -2226,6 +2286,9 @@ const s = StyleSheet.create({
   reelHeaderTitle: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: 0.3 },
   myReelsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   myReelsBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  searchFab:      { position: 'absolute', right: 16, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  createFab:      { position: 'absolute', right: 16, width: 52, height: 52, borderRadius: 26, overflow: 'hidden', zIndex: 10 },
+  createFabInner: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
 
   playPauseCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   bufferOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)', zIndex: 6, gap: 10 },

@@ -435,10 +435,10 @@ export const CommentsBottomSheet: React.FC<Props> = ({
           // Commentaire racine
           setComments(prev => {
             if (prev.some(c => c.id === event.comment.id)) return prev;
-            onCommentCountChange?.(+1);
             setTotalCount(t => t + 1);
             return [{ ...event.comment, userReaction: null, replies: [], repliesLoaded: false, showReplies: false }, ...prev];
           });
+          onCommentCountChange?.(+1);
         }
         break;
       }
@@ -450,10 +450,11 @@ export const CommentsBottomSheet: React.FC<Props> = ({
           )};
         }));
         break;
-      case 'comment_deleted':
+      case 'comment_deleted': {
+        let wasRoot = false;
         setComments(prev => {
-          const wasRoot = prev.some(c => c.id === event.comment_id);
-          if (wasRoot) { onCommentCountChange?.(-1); setTotalCount(t => Math.max(0, t - 1)); }
+          wasRoot = prev.some(c => c.id === event.comment_id);
+          if (wasRoot) setTotalCount(t => Math.max(0, t - 1));
           return prev.filter(c => c.id !== event.comment_id).map(c => ({
             ...c,
             replies: (c.replies ?? []).filter(r => r.id !== event.comment_id),
@@ -461,7 +462,9 @@ export const CommentsBottomSheet: React.FC<Props> = ({
               ? (c.reply_count ?? 1) - 1 : c.reply_count,
           }));
         });
+        if (wasRoot) onCommentCountChange?.(-1);
         break;
+      }
       case 'reaction_updated':
         // Ignorer si une requete optimistic est encore en vol pour ce commentaire
         if (pendingLikes.current.has(event.comment_id)) break;
@@ -573,7 +576,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       }
       setText('');
       setMentionIds([]);
-    } catch { /* silent */ }
+    } catch { Alert.alert('Erreur', "Impossible d'envoyer le commentaire."); }
     finally { setSending(false); }
   };
 
@@ -819,6 +822,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                 placeholder={placeholder}
                 maxLength={500}
                 inputStyle={st.input}
+                onSubmit={canSend ? handleSubmit : undefined}
               />
               {canSend && (
                 <TouchableOpacity

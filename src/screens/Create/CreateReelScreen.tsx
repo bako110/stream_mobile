@@ -9,7 +9,7 @@
  */
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet, Image,
   ScrollView, Alert, Platform, StatusBar,
   Dimensions, KeyboardAvoidingView, ActivityIndicator,
 } from 'react-native';
@@ -57,21 +57,45 @@ const VideoPreview: React.FC<PreviewProps> = ({ videoUri, editResult, videoDurat
     p.muted = false;
   });
 
-  // Seeké au début, jamais autoplay
+  const startSec = editResult?.startSec ?? 0;
+  const endSec   = editResult?.endSec   ?? videoDuration;
+
+  // Figé sur la première frame du segment sélectionné
   useEffect(() => {
-    try { player.pause(); player.currentTime = 0; } catch {}
+    try {
+      player.pause();
+      player.currentTime = startSec;
+      setPreviewPlaying(false);
+    } catch {}
+  }, [player, startSec]);
+
+  // Stoppe le player dès qu'il dépasse endSec et rebobine au début du segment
+  const endSecRef   = useRef(endSec);
+  const startSecRef = useRef(startSec);
+  useEffect(() => { endSecRef.current = endSec; },    [endSec]);
+  useEffect(() => { startSecRef.current = startSec; }, [startSec]);
+
+  useEffect(() => {
+    const sub = player.addEventListener('onProgress', ({ currentTime: t }: { currentTime: number }) => {
+      if (t >= endSecRef.current - 0.1) {
+        try { player.pause(); player.currentTime = startSecRef.current; } catch {}
+        setPreviewPlaying(false);
+      }
+    });
+    return () => sub.remove();
   }, [player]);
 
   const togglePreviewPlay = useCallback(() => {
     if (previewPlaying) {
       player.pause();
+      try { player.currentTime = startSec; } catch {}
       setPreviewPlaying(false);
     } else {
-      try { player.currentTime = editResult ? editResult.startSec : 0; } catch {}
+      try { player.currentTime = startSec; } catch {}
       player.play();
       setPreviewPlaying(true);
     }
-  }, [previewPlaying, player, editResult]);
+  }, [previewPlaying, player, startSec]);
 
   // Chips résumé édition
   const editChips: { icon: string; label: string }[] = [];
@@ -241,7 +265,11 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   const [loadingMeta,       setLoadingMeta]       = useState(false);
   const [showEditor,        setShowEditor]        = useState(!!sourceReelUrl);
   const [editResult,        setEditResult]        = useState<ReelEditResult | null>(null);
-  const editResultRef = useRef<ReelEditResult | null>(null);
+  const [trimmedVideoUri,   setTrimmedVideoUri]   = useState<string | null>(null);
+  const [isTrimming,        setIsTrimming]        = useState(false);
+  const [isPhotoReel,       setIsPhotoReel]       = useState(false);
+  const editResultRef     = useRef<ReelEditResult | null>(null);
+  const trimmedVideoUriRef = useRef<string | null>(null);
 
   // Charge la durée de la vidéo source en arrière-plan
   useEffect(() => {
@@ -258,7 +286,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
   // ── Picker ─────────────────────────────────────────────────────────────────
   const handlePickVideo = useCallback(() => {
-    launchImageLibrary({ mediaType: 'video', selectionLimit: 1 }, async res => {
+    launchImageLibrary({ mediaType: 'mixed', selectionLimit: 1 }, async res => {
       if (res.didCancel) return;
       if (res.errorCode) {
         Alert.alert('Erreur', res.errorMessage ?? 'Impossible de sélectionner la vidéo.');
@@ -267,7 +295,22 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       const asset = res.assets?.[0];
       if (!asset?.uri) return;
 
+      const isImage = asset.type?.startsWith('image/') || (!asset.duration && !asset.uri.match(/\.(mp4|mov|avi|mkv|webm)$/i));
+
       setLoadingMeta(true);
+
+      if (isImage) {
+        setIsPhotoReel(true);
+        setVideoUri(asset.uri);
+        setVideoThumb(asset.uri);
+        setVideoDuration(5);
+        setEditResult(null);
+        setLoadingMeta(false);
+        // pas d'éditeur pour les photos — on reste sur l'écran compose
+        return;
+      }
+
+      setIsPhotoReel(false);
       let dur = asset.duration ?? 0;
       if (!dur || dur < 0.5) {
         try { const meta = await getVideoMetaData(asset.uri); dur = meta.duration ?? 0; } catch {}
@@ -275,7 +318,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       if (!dur) dur = 30;
 
       setVideoUri(asset.uri);
-      setVideoThumb(asset.uri); // on utilisera la première frame via l'URI vidéo directement
+      setVideoThumb(asset.uri);
       setVideoDuration(dur);
       setEditResult(null);
       setLoadingMeta(false);
@@ -292,17 +335,38 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
           setVideoDuration(0);
           setEditResult(null);
           editResultRef.current = null;
+          setTrimmedVideoUri(null);
+          trimmedVideoUriRef.current = null;
           setShowEditor(false);
         },
       },
     ]);
   }, []);
 
-  const handleEditorConfirm = useCallback((result: ReelEditResult) => {
+  const handleEditorConfirm = useCallback(async (result: ReelEditResult) => {
     editResultRef.current = result;
     setEditResult(result);
     setShowEditor(false);
-  }, []);
+
+    const hasTrim = result.startSec > 0.5 || result.endSec < videoDuration - 0.5;
+    if (hasTrim && videoUri) {
+      setIsTrimming(true);
+      try {
+        const { trimVideo } = await import('../../services/videoCompressService');
+        const cutUri = await trimVideo(videoUri, result.startSec, result.endSec);
+        trimmedVideoUriRef.current = cutUri;
+        setTrimmedVideoUri(cutUri);
+      } catch (e: any) {
+        console.error('[trimVideo] ERREUR:', e?.message ?? e);
+        Alert.alert('Erreur trim', e?.message ?? 'Impossible de découper la vidéo.');
+      } finally {
+        setIsTrimming(false);
+      }
+    } else {
+      trimmedVideoUriRef.current = null;
+      setTrimmedVideoUri(null);
+    }
+  }, [videoUri, videoDuration]);
 
   const handleEditorCancel = useCallback(() => {
     setShowEditor(false);
@@ -317,15 +381,17 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   const handlePublish = useCallback(() => {
     if (!videoUri) return;
 
-    // Lire depuis la ref pour éviter la closure stale sur editResult
     const freshEdit = editResultRef.current;
+    const freshTrimmedUri = trimmedVideoUriRef.current;
+    const hasTrim = !!(freshEdit && (freshEdit.startSec > 0.5 || freshEdit.endSec < videoDuration - 0.5));
+    const snapIsPhoto = isPhotoReel;
 
     publishRef.current = {
-      uri:        videoUri,
+      uri:        freshTrimmedUri ?? videoUri,
       cap:        caption.trim(),
       mentionIds: [...captionMentionIds],
       edit:       freshEdit,
-      dur:        videoDuration,
+      dur:        hasTrim && freshEdit ? freshEdit.endSec - freshEdit.startSec : videoDuration,
     };
 
     onBack();
@@ -333,13 +399,39 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
     const snap = publishRef.current;
     if (!snap) return;
 
+    // ── Photo reel : upload direct via image-to-reel, pas de backgroundUploadService ──
+    if (snapIsPhoto) {
+      const { uploadImageAsReel } = require('../../services/uploadService');
+      uploadImageAsReel(snap.uri, 5).then(async (result: any) => {
+        if (!result.hls_url) {
+          Alert.alert('Publication echouee', 'La conversion image→video a echoue. Reessaie.');
+          return;
+        }
+        try {
+          await reelService.create({
+            hls_url:       result.hls_url,
+            caption:       snap.cap || undefined,
+            thumbnail_url: result.thumbnail_url,
+            duration_sec:  5,
+            mention_ids:   snap.mentionIds.length ? snap.mentionIds : undefined,
+          });
+        } catch (err: any) {
+          Alert.alert('Publication echouee', err?.message ?? 'Erreur inconnue.');
+        }
+      }).catch((err: any) => {
+        Alert.alert('Upload echoue', err?.message ?? 'Erreur inconnue.');
+      });
+      return;
+    }
+
     backgroundUploadService.enqueueVideo({
       localUri: snap.uri,
       folder:   'reels',
       type:     'reel',
       label:    snap.cap || 'Nouveau Reel',
       onDone: async (result) => {
-        if (!result.hlsUrl) {
+        const playUrl = result.hlsUrl ?? result.videoUrl;
+        if (!playUrl) {
           Alert.alert(
             'Publication echouee',
             'La video a ete uploadee mais le lien de lecture est manquant. Reessaie dans quelques minutes.',
@@ -349,13 +441,11 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         const { edit, dur, cap, mentionIds } = snap;
         try {
           await reelService.create({
-            hls_url:       result.hlsUrl,
+            hls_url:       playUrl,
             caption:       cap || undefined,
             thumbnail_url: result.thumbnailUrl,
-            duration_sec:  result.durationSec ? Math.round(result.durationSec) : undefined,
+            duration_sec:  result.durationSec ? Math.round(result.durationSec) : Math.round(dur),
             mention_ids:   mentionIds.length ? mentionIds : undefined,
-            ...(edit && edit.startSec > 0.5        ? { trim_start:     Math.round(edit.startSec * 1000) } : {}),
-            ...(edit && edit.endSec   < dur - 0.5  ? { trim_end:       Math.round(edit.endSec   * 1000) } : {}),
             ...(edit && edit.speed !== 1           ? { playback_speed: edit.speed    } : {}),
             ...(edit && edit.filter !== 'original' ? { filter:         edit.filter   } : {}),
             ...(edit && edit.layers.length > 0   ? { text_layers:    JSON.stringify(edit.layers)    } : {}),
@@ -379,7 +469,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         );
       },
     });
-  }, [videoUri, caption, captionMentionIds, editResult, videoDuration, onBack, sourceReelId]);
+  }, [videoUri, caption, captionMentionIds, editResult, videoDuration, onBack, sourceReelId, isPhotoReel]);
 
   // ── ÉDITEUR — branch exclusive, aucun player dans ce composant quand rendu ─
   if (showEditor && videoUri) {
@@ -430,34 +520,72 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
           {/* ══ ZONE VIDÉO ══ */}
           <View style={s.videoSection}>
             {videoUri ? (
-              // Preview avec player pausé — seul player actif dans cette branche
+              isPhotoReel ? (
+                // Preview image fixe
+                <View style={s.videoPreview}>
+                  <Image source={{ uri: videoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  <View style={[s.pickerGrid, { opacity: 0 }]} pointerEvents="none" />
+                  <TouchableOpacity style={s.removeBtn} onPress={handleRemove} activeOpacity={0.8}>
+                    <Icon name="x" size={16} color="#fff" />
+                  </TouchableOpacity>
+                  <View style={[s.durationBadge, { backgroundColor: 'rgba(123,63,242,0.8)' }]} pointerEvents="none">
+                    <Icon name="image" size={10} color="#fff" />
+                    <Text style={s.durationTxt}>Photo · 5s</Text>
+                  </View>
+                </View>
+              ) : (
               <VideoPreview
-                videoUri={videoUri}
-                editResult={editResult}
-                videoDuration={videoDuration}
+                videoUri={trimmedVideoUri ?? videoUri}
+                editResult={trimmedVideoUri ? null : editResult}
+                videoDuration={
+                  trimmedVideoUri && editResult
+                    ? editResult.endSec - editResult.startSec
+                    : videoDuration
+                }
                 onEdit={() => setShowEditor(true)}
                 onRemove={handleRemove}
               />
+              )
             ) : (
-              <TouchableOpacity style={s.videoPicker} onPress={handlePickVideo} activeOpacity={0.8} disabled={loadingMeta}>
-                <LinearGradient colors={[colors.gradientStart + '22', colors.gradientEnd + '18']} style={StyleSheet.absoluteFill} />
+              <TouchableOpacity style={s.videoPicker} onPress={handlePickVideo} activeOpacity={0.9} disabled={loadingMeta}>
+                {/* Fond dégradé sombre */}
+                <LinearGradient
+                  colors={['#0D0A1A', '#1A0D2E', '#0D0A1A']}
+                  style={StyleSheet.absoluteFill}
+                />
+
+                {/* Grille décorative */}
+                <View style={s.pickerGrid} pointerEvents="none">
+                  {[0,1,2,3,4,5].map(i => (
+                    <View key={i} style={[s.pickerGridCell, { opacity: 0.06 + (i % 3) * 0.03 }]}>
+                      <Icon name={i % 2 === 0 ? 'video' : 'image'} size={22} color="#fff" />
+                    </View>
+                  ))}
+                </View>
+
                 {loadingMeta ? (
-                  <>
-                    <ActivityIndicator size="large" color={colors.primary} />
-                    <Text style={[s.pickerLabel, { color: colors.textSecondary }]}>Lecture des informations…</Text>
-                  </>
+                  <View style={s.pickerInner}>
+                    <ActivityIndicator size="large" color="#fff" />
+                    <Text style={[s.pickerLabel, { color: 'rgba(255,255,255,0.6)' }]}>Lecture des informations…</Text>
+                  </View>
                 ) : (
-                  <>
-                    <View style={[s.pickerIconWrap, { backgroundColor: colors.primary + '22' }]}>
-                      <Icon name="video" size={32} color={colors.primary} />
+                  <View style={s.pickerInner} pointerEvents="none">
+                    <LinearGradient
+                      colors={['#7B3FF2', '#C026D3']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={s.pickerIconWrap}
+                    >
+                      <Icon name="video" size={30} color="#fff" />
+                    </LinearGradient>
+
+                    <Text style={s.pickerLabel}>Ajouter une vidéo</Text>
+                    <Text style={s.pickerSub}>MP4 · max 90 s · 1080p recommandé</Text>
+
+                    <View style={s.pickerCta}>
+                      <Icon name="image" size={16} color="#fff" />
+                      <Text style={s.pickerCtaTxt}>Ouvrir la galerie</Text>
                     </View>
-                    <Text style={[s.pickerLabel, { color: colors.textPrimary }]}>Choisir une vidéo</Text>
-                    <Text style={[s.pickerSub, { color: colors.textTertiary }]}>MP4 · max 90 s · 1080p recommandé</Text>
-                    <View style={[s.pickerCta, { backgroundColor: colors.primary }]}>
-                      <Icon name="upload" size={15} color="#fff" />
-                      <Text style={s.pickerCtaTxt}>Depuis la galerie</Text>
-                    </View>
-                  </>
+                  </View>
                 )}
               </TouchableOpacity>
             )}
@@ -479,18 +607,6 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
                 <Text style={[s.charCount, { color: colors.textTertiary }]}>{caption.length}/300</Text>
               </View>
             </View>
-            <View style={[s.divider, { backgroundColor: colors.divider }]} />
-            <View style={s.fieldRow}>
-              <View style={s.fieldIcon}><Icon name="globe" size={15} color={colors.textSecondary} /></View>
-              <Text style={[s.fieldLabel, { color: colors.textPrimary }]}>Tout le monde</Text>
-              <Icon name="chevron-right" size={15} color={colors.textTertiary} />
-            </View>
-            <View style={[s.divider, { backgroundColor: colors.divider }]} />
-            <View style={s.fieldRow}>
-              <View style={s.fieldIcon}><Icon name="message-circle" size={15} color={colors.textSecondary} /></View>
-              <Text style={[s.fieldLabel, { color: colors.textPrimary }]}>Commentaires activés</Text>
-              <Icon name="chevron-right" size={15} color={colors.textTertiary} />
-            </View>
           </View>
 
           {/* ══ BOUTON PUBLIER ══ */}
@@ -510,6 +626,13 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {isTrimming && (
+        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+          <ActivityIndicator size="large" color="#7B3FF2" />
+          <Text style={{ color: '#fff', marginTop: 12, fontWeight: '600', fontSize: 15 }}>Découpage en cours…</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -547,11 +670,18 @@ const s = StyleSheet.create({
   durationBadge: { position: 'absolute', bottom: 14, left: 14, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12 },
   durationTxt: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-  videoPicker: { width: W, height: PREVIEW_H, alignItems: 'center', justifyContent: 'center', gap: 10, overflow: 'hidden', backgroundColor: '#08060F' },
-  pickerIconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  pickerLabel: { fontSize: 18, fontWeight: '800', letterSpacing: 0.2 },
-  pickerSub:   { fontSize: 12, marginTop: -4 },
-  pickerCta: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 26, marginTop: 8 },
+  videoPicker:    { width: W, height: PREVIEW_H, overflow: 'hidden', backgroundColor: '#08060F' },
+  pickerGrid:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', flexWrap: 'wrap' },
+  pickerGridCell: { width: W / 3, height: PREVIEW_H / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)' },
+  pickerInner:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 32 },
+  pickerIconWrap: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  pickerLabel:    { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: 0.2, textAlign: 'center' },
+  pickerSub:      { fontSize: 12, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: -4 },
+  pickerActions:  { flexDirection: 'row', gap: 12, marginTop: 16 },
+  pickerBtnPrimary: { borderRadius: 28, overflow: 'hidden' },
+  pickerBtnGrad:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 28, paddingVertical: 14 },
+  pickerBtnPrimaryTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  pickerCta:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 26, marginTop: 16, backgroundColor: 'rgba(123,63,242,0.85)', borderWidth: 1, borderColor: 'rgba(192,38,211,0.5)' },
   pickerCtaTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
 
   detailsCard: { marginHorizontal: 16, marginTop: 16, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },

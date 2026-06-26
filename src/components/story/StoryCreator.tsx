@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
   StyleSheet, Dimensions, StatusBar, Alert, Keyboard,
@@ -25,11 +25,13 @@ import { storyService } from '../../services/storyService';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import type { StoryMediaType, StoryAudienceType } from '../../types/story';
-import { compressVideo, trimVideo, cleanupTempVideos } from '../../services/videoCompressService';
+import { cleanupTempVideos, trimVideo } from '../../services/videoCompressService';
+import { cacheInBackground } from '../../services/videoCacheService';
 import ImageEditor from '@react-native-community/image-editor';
 import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { VideoTrimmer } from './VideoTrimmer';
+import notifee, { AndroidImportance, AndroidVisibility } from '@notifee/react-native';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -123,9 +125,25 @@ function pointsToPath(pts: {x:number;y:number}[]): string {
 
 // ── VideoPreview ──────────────────────────────────────────────────────────────
 
-const VideoPreview: React.FC<{ uri: string; playerRef: React.MutableRefObject<any> }> = ({ uri, playerRef }) => {
-  const player = useVideoPlayer({ uri }, p => { p.loop = true; p.muted = false; p.play(); });
+const VideoPreview: React.FC<{ uri: string; playerRef: React.MutableRefObject<any>; startSec?: number | null }> = ({ uri, playerRef, startSec }) => {
+  const start = startSec ?? 0;
+  const player = useVideoPlayer({ uri }, p => {
+    p.loop  = start <= 0;
+    p.muted = false;
+    if (start > 0) p.currentTime = start;
+    p.play();
+  });
   playerRef.current = player;
+
+  useEffect(() => {
+    if (start <= 0) return;
+    const sub = player.addEventListener('onEnd', () => {
+      player.currentTime = start;
+      player.play();
+    });
+    return () => sub.remove();
+  }, [player, start]);
+
   return <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />;
 };
 
@@ -258,6 +276,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [fontStyleKey, setFontStyleKey] = useState('classic');
   const [caption,      setCaption]      = useState('');
   const [showTrimmer,  setShowTrimmer]  = useState(false);
+  const [isTrimming,   setIsTrimming]   = useState(false);
   const [videoDuration,setVideoDuration]= useState(0);
   const [trimStart,    setTrimStart]    = useState<number | null>(null);
   const [trimEnd,      setTrimEnd]      = useState<number | null>(null);
@@ -632,19 +651,13 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     return (await uploadImageFromUri(finalUri, 'stories', `s_${Date.now()}.jpg`)).url;
   };
   const doUploadVideo = async (uri: string, _trimStart: number | null, _trimEnd: number | null) => {
-    let sourceUri = uri;
-    if (_trimStart !== null && _trimEnd !== null && _trimEnd > _trimStart) {
-      sourceUri = await trimVideo(uri, _trimStart, _trimEnd);
-      tempFiles.current.push(sourceUri);
-    }
-    const c = await compressVideo(sourceUri, { maxDurationSec:90, crf:23, onProgress:()=>{} });
-    tempFiles.current.push(c.uri);
-    const r = await uploadVideoFromUri(c.uri, 'stories', `s_${Date.now()}.mp4`, 'video/mp4');
-    let thumbnailUrl: string|undefined;
-    if (c.thumbnailUri) {
-      try { thumbnailUrl = (await uploadImageFromUri(c.thumbnailUri, 'stories', `st_${Date.now()}.jpg`)).url; } catch {}
-    }
-    return { url: r.hls_url??r.url, duration: c.durationSec, thumbnailUrl };
+    const r = await uploadVideoFromUri(uri, 'stories', `s_${Date.now()}.mp4`, 'video/mp4');
+    const thumbnailUrl = r.thumbnail_url ?? undefined;
+    const hasTrim = _trimStart !== null && _trimEnd !== null && _trimEnd > _trimStart;
+    const duration = hasTrim ? (_trimEnd! - _trimStart!) : (r.duration ?? 5);
+    // mp4_url retourné par le backend — MP4 brut stocké sur R2 pour 24h
+    const mp4Url = r.mp4_url ?? undefined;
+    return { url: r.hls_url ?? r.url, mp4Url, duration, thumbnailUrl };
   };
   const doUploadAudio = async (uri: string) => {
     const ext = uri.split('.').pop()?.toLowerCase()??'mp4';
@@ -670,6 +683,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       try {
         let media_url: string|undefined, media_type: StoryMediaType = 'image';
         let thumbnail_url: string|undefined, audio_url: string|undefined;
+        let mp4_url: string|undefined;
         let duration_sec = 5, background_color: string|undefined;
 
         if (_mode === 'text')  { media_type = 'text'; background_color = _bgColor; }
@@ -678,6 +692,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           const v = await doUploadVideo(_localUri!, _trimStart, _trimEnd);
           media_url = v.url; media_type = 'video';
           duration_sec = Math.min(Math.ceil(v.duration), 90); thumbnail_url = v.thumbnailUrl;
+          mp4_url = v.mp4Url;
+          // Démarre le cache du MP4 R2 en arrière-plan pour lecture offline future
+          if (mp4_url) cacheInBackground(mp4_url).catch(() => {});
         } else if (_mode === 'voice') {
           audio_url = _audioUri!.startsWith('http') ? _audioUri! : await doUploadAudio(_audioUri!);
           media_type = 'voice'; background_color = '#1A237E'; duration_sec = 15;
@@ -690,7 +707,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         }
 
         await storyService.create({
-          media_url, media_type, thumbnail_url,
+          media_url, media_type, thumbnail_url, mp4_url,
           caption: _caption.trim()||undefined,
           duration_sec, background_color, audio_url,
           font_style: _mode==='text' ? _fontStyleKey : undefined,
@@ -699,6 +716,15 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           audience_user_ids: _audienceType!=='everyone' ? _selectedUsers : [],
         });
         await cleanupTempVideos(_tempFiles);
+        try {
+          await notifee.createChannel({ id: 'uploads_v1', name: 'Publications', importance: AndroidImportance.DEFAULT, visibility: AndroidVisibility.PRIVATE });
+          await notifee.displayNotification({
+            id:    `story_done_${Date.now()}`,
+            title: 'Story publiée !',
+            body:  'Ta story est maintenant visible par tes abonnés.',
+            android: { channelId: 'uploads_v1', importance: AndroidImportance.DEFAULT, pressAction: { id: 'default', launchActivity: 'default' }, smallIcon: 'ic_notification' },
+          });
+        } catch {}
       } catch (e) {
         console.error('[publish] error:', e);
         Alert.alert('Erreur', String((e as any)?.message ?? e));
@@ -825,9 +851,30 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         <VideoTrimmer
           uri={localUri}
           duration={videoDuration}
-          onConfirm={(trimmedUri, startSec, endSec) => { setLocalUri(trimmedUri); setTrimStart(startSec); setTrimEnd(endSec); tempFiles.current.push(trimmedUri); setShowTrimmer(false); setStep('compose'); }}
+          onConfirm={async (originalUri, startSec, endSec) => {
+            setIsTrimming(true);
+            try {
+              const cutUri = await trimVideo(originalUri, startSec, endSec);
+              tempFiles.current.push(cutUri);
+              setLocalUri(cutUri);
+              setTrimStart(startSec);
+              setTrimEnd(endSec);
+              setShowTrimmer(false);
+              setStep('compose');
+            } catch {
+              Alert.alert('Erreur', 'Impossible de découper la vidéo.');
+            } finally {
+              setIsTrimming(false);
+            }
+          }}
           onCancel={() => { setShowTrimmer(false); setLocalUri(null); setStep('pick_media'); }}
         />
+      )}
+      {isTrimming && (
+        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+          <ActivityIndicator size="large" color="#7B3FF2" />
+          <Text style={{ color: '#fff', marginTop: 12, fontWeight: '600' }}>Découpage en cours…</Text>
+        </View>
       )}
 
       {/* ── STEP compose — écran unique édition + publication ────────────── */}
@@ -838,21 +885,21 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           {/* FOND / MEDIA */}
           {mode === 'text' && <View style={[StyleSheet.absoluteFill,{backgroundColor:bgColor}]} />}
 
-          {/* IMAGE / VIDEO — clippée par appliedCrop */}
+          {/* IMAGE / VIDEO — clippée par appliedCrop (crop uniquement pour les images) */}
           {(mode === 'image' || mode === 'video') && localUri && (() => {
             const ac = appliedCrop;
-            const isFull = ac.x === 0 && ac.y === 0 && ac.w === W && ac.h === H;
+            const isFull = mode === 'video' || (ac.x === 0 && ac.y === 0 && ac.w === W && ac.h === H);
             if (isFull) {
               return (
                 <View style={StyleSheet.absoluteFill}>
                   {mode === 'image'
                     ? <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                    : <VideoPreview uri={localUri} playerRef={playerRef} />
+                    : <VideoPreview uri={localUri} playerRef={playerRef} startSec={trimStart} />
                   }
                 </View>
               );
             }
-            // Zone rognée affichée a sa taille reelle, centree, fond noir
+            // Zone rognée affichée à sa taille réelle, centrée, fond noir (images uniquement)
             return (
               <View style={[StyleSheet.absoluteFill, {backgroundColor:'#000'}]}>
                 <View style={{
@@ -886,8 +933,8 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             </LinearGradient>
           )}
 
-          {/* OVERLAY CROP style WhatsApp */}
-          {(mode === 'image' || mode === 'video') && localUri && activeTool === 'crop' && (
+          {/* OVERLAY CROP style WhatsApp — images uniquement */}
+          {mode === 'image' && localUri && activeTool === 'crop' && (
             <View style={StyleSheet.absoluteFill} {...cropPan.panHandlers}>
               {/* Zones sombres autour du rectangle */}
               <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -1042,9 +1089,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
           {/* BARRE OUTILS DROITE — masquée en mode crop */}
           {activeTool !== 'crop' && <View style={[s.toolsRight,{top:Math.max(insets.top,16)+60}]}>
-            {/* Crop — image et video seulement */}
-            {(mode==='image'||mode==='video') && (
-              <TouchableOpacity onPress={()=>setActiveTool(t=>t==='crop'?'none':'crop')} style={[s.toolBtn,activeTool==='crop'&&s.toolBtnOn]}>
+            {/* Crop — image uniquement (le crop vidéo nécessiterait FFmpeg côté client) */}
+            {mode==='image' && (
+              <TouchableOpacity onPress={()=>setActiveTool((t: Tool) => t==='crop' ? 'none' : 'crop')} style={[s.toolBtn,activeTool==='crop'&&s.toolBtnOn]}>
                 <Icon name="crop" size={20} color={activeTool==='crop'?'#7B3FF2':'#fff'} />
               </TouchableOpacity>
             )}

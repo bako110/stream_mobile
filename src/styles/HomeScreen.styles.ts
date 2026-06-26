@@ -518,31 +518,119 @@ export const homeStyles = StyleSheet.create({
   },
   actionText: { fontSize: 13, fontWeight: '600' },
 
-  // ── Recherche résultats ───────────────────────────────────────────────────────
-  searchRow: {
+  // ── Search results ───────────────────────────────────────────────────────────
+  srTab: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    paddingHorizontal: 10,
+    paddingBottom:   10,
+    paddingTop:      6,
+    gap:             5,
+  },
+  srTabLabel: {
+    fontSize:   13,
+    fontWeight: '600',
+  },
+  srTabBadge: {
+    borderRadius:   10,
+    paddingHorizontal: 6,
+    paddingVertical:   2,
+    minWidth:       20,
+    alignItems:     'center',
+  },
+  srTabBadgeText: {
+    fontSize:   11,
+    fontWeight: '700',
+  },
+  srSection: {
+    paddingHorizontal: 16,
+    paddingTop:        16,
+  },
+  srSectionLabel: {
+    fontSize:      10,
+    fontWeight:    '700',
+    letterSpacing: 1.2,
+    marginBottom:  10,
+  },
+  srUserRow: {
     flexDirection:  'row',
     alignItems:     'center',
     paddingVertical: 10,
     gap:            12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  searchAvatar: {
-    width:          44,
-    height:         44,
-    borderRadius:   22,
+  srAvatar: {
+    width:          48,
+    height:         48,
+    borderRadius:   24,
     alignItems:     'center',
     justifyContent: 'center',
     overflow:       'hidden',
   },
+  srAvatarText: { color: '#fff', fontWeight: '700', fontSize: 18 },
+  srUserName: {
+    fontSize:   14,
+    fontWeight: '600',
+  },
+  srUserHandle: {
+    fontSize:  12,
+    marginTop: 2,
+  },
+  srFollowBtn: {
+    borderWidth:      1,
+    borderRadius:     16,
+    paddingHorizontal: 12,
+    paddingVertical:   5,
+  },
+  srFollowBtnText: {
+    fontSize:   12,
+    fontWeight: '600',
+  },
+  srCardRow: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    padding:        12,
+    borderRadius:   12,
+    gap:            12,
+    marginBottom:   8,
+  },
+  srCardThumb: {
+    width:          52,
+    height:         52,
+    borderRadius:   10,
+    alignItems:     'center',
+    justifyContent: 'center',
+    overflow:       'hidden',
+  },
+  srCardTitle: {
+    fontSize:   14,
+    fontWeight: '600',
+  },
+  srCardSub: {
+    fontSize:  12,
+    marginTop: 3,
+  },
+  srEmptyIcon: {
+    width:          72,
+    height:         72,
+    borderRadius:   36,
+    alignItems:     'center',
+    justifyContent: 'center',
+    marginBottom:   16,
+  },
+  srEmptyTitle: {
+    fontSize:   16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  srEmptySub: {
+    fontSize: 13,
+  },
+  // keep legacy names used elsewhere
+  searchRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  searchAvatar:   { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   searchAvatarText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  searchThumb: {
-    width:          50,
-    height:         38,
-    borderRadius:   8,
-    alignItems:     'center',
-    justifyContent: 'center',
-    overflow:       'hidden',
-  },
+  searchThumb:    { width: 50, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   searchRowTitle: { fontSize: 15, fontWeight: '600' },
   searchRowSub:   { fontSize: 12, marginTop: 1 },
 

@@ -18,6 +18,8 @@ import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { favoriteService } from '../services/favoriteService';
 import { cancelCallNotification } from '../services/fcmService';
+import { mutationQueueService, type PendingMutation } from '../services/mutationQueueService';
+import { socialService } from '../services/socialService';
 import {
   createWsEventHandler,
   type NewFollowerPayload,
@@ -350,6 +352,21 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
       }).catch(() => {});
       if (isMounted.current) refreshUnreadRef.current();
       favoriteService.syncFromServer().catch(() => {});
+      // Rejouer les mutations offline en attente
+      mutationQueueService.flush(async (m: PendingMutation) => {
+        switch (m.type) {
+          case 'like_reel':     await socialService.toggleReaction({ reaction_type: 'like', reel_id: m.payload.id }); break;
+          case 'unlike_reel':   await socialService.toggleReaction({ reaction_type: 'like', reel_id: m.payload.id }); break;
+          case 'like_post':     await socialService.toggleReaction({ reaction_type: 'like', post_id: m.payload.id }); break;
+          case 'unlike_post':   await socialService.toggleReaction({ reaction_type: 'like', post_id: m.payload.id }); break;
+          case 'like_event':    await socialService.toggleReaction({ reaction_type: 'like', event_id: m.payload.id }); break;
+          case 'unlike_event':  await socialService.toggleReaction({ reaction_type: 'like', event_id: m.payload.id }); break;
+          case 'like_concert':  await socialService.toggleReaction({ reaction_type: 'like', concert_id: m.payload.id }); break;
+          case 'unlike_concert':await socialService.toggleReaction({ reaction_type: 'like', concert_id: m.payload.id }); break;
+          case 'send_message':  await messageService.sendMessage(m.payload.partnerId, m.payload.content, m.payload.messageType); break;
+          default: break;
+        }
+      }).catch(() => {});
       if (pingTimer.current) clearInterval(pingTimer.current);
       pingTimer.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));

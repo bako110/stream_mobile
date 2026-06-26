@@ -156,8 +156,10 @@ async function request<T>(
         const newToken = await _refreshPromise;
         setAuthToken(newToken);
         return request<T>(endpoint, options, true);
-      } catch {
-        _onUnauthorized?.();
+      } catch (refreshErr) {
+        // Ne pas déconnecter si c'est une erreur réseau — le token est peut-être encore valide
+        const isNetworkErr = refreshErr instanceof ApiError && (refreshErr as ApiError).status === 0;
+        if (!isNetworkErr) _onUnauthorized?.();
         throw new ApiError(401, 'Session expirée', json);
       }
     }

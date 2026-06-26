@@ -9,7 +9,7 @@ import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
   ActivityIndicator, Keyboard, Image, Modal, Alert,
-  Dimensions, Linking, PermissionsAndroid, ImageBackground,
+  Dimensions, Linking, PermissionsAndroid,
 } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
@@ -25,12 +25,17 @@ import { Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
-import { uploadAudioFile, uploadMessageImage, uploadMessageVideo, uploadFileFromUri } from '../../services/uploadService';
+import { uploadAudioFile, uploadMessageImage, uploadFileFromUri } from '../../services/uploadService';
+import { backgroundUploadService } from '../../services/backgroundUploadService';
+import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { useWs } from '../../context/WebSocketContext';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { ConversationSummary } from '../../services/messageService';
 import { BackButton } from '../../components/common';
+import { useMediaDownload, fmtSize } from '../../hooks/useMediaDownload';
+import { useNetwork } from '../../context/NetworkContext';
+import { offlineCacheService } from '../../services/offlineCacheService';
 
 interface RouteParams {
   partnerId:   string;
@@ -57,6 +62,20 @@ function formatFileSize(bytes?: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return "Aujourd'hui";
+  const yest = new Date(today);
+  yest.setDate(yest.getDate() - 1);
+  if (d.toDateString() === yest.toDateString()) return 'Hier';
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: today.getFullYear() !== d.getFullYear() ? 'numeric' : undefined });
+}
+
+function sameDay(a: string, b: string): boolean {
+  return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
 function formatLastSeen(iso?: string | null): string {
@@ -88,8 +107,20 @@ export const ChatScreen: React.FC = () => {
   const route             = useRoute();
   const { partnerId, partnerName, lastSeen: initialLastSeen, isOnline: initialIsOnline } = route.params as RouteParams;
 
-  const [messages,  setMessages]  = useState<Message[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  const { get: getDl, download: startDl } = useMediaDownload();
+  const { visibleJobs } = useBackgroundUpload();
+  const msgVideoJobs = visibleJobs.filter(j => j.type === 'message');
+  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
+
+  // Init depuis cache immédiatement — évite l'écran vide en offline
+  const [messages,  setMessages]  = useState<Message[]>(() => {
+    const cached = offlineCacheService.getMessages(partnerId);
+    return (cached ?? []) as Message[];
+  });
+  const [loading,   setLoading]   = useState(() => {
+    const cached = offlineCacheService.getMessages(partnerId);
+    return !cached || cached.length === 0;
+  });
   const [sending,   setSending]   = useState(false);
   const [text,      setText]      = useState('');
   const [myId,      setMyId]      = useState<string | null>(null);
@@ -115,7 +146,6 @@ export const ChatScreen: React.FC = () => {
 
   // Attachment modal
   const [showAttach,  setShowAttach]  = useState(false);
-  const [uploading,   setUploading]   = useState(false);
   const [locating,    setLocating]    = useState(false);
 
   // Preview avant envoi image (style WhatsApp)
@@ -179,7 +209,9 @@ export const ChatScreen: React.FC = () => {
         ) {
           setMessages(prev => {
             if (prev.find(m => m.id === payload.id)) return prev;
-            return [payload as unknown as Message, ...prev];
+            const next = [payload as unknown as Message, ...prev];
+            offlineCacheService.saveMessages(partnerId, next);
+            return next;
           });
           // Auto-mark as read if the message is from the partner
           if (payload.sender_id === partnerId) {
@@ -269,6 +301,21 @@ export const ChatScreen: React.FC = () => {
   }, []);
 
   const loadMessages = useCallback(async (p = 1) => {
+    // Offline : servir le cache persistant sans toucher le réseau
+    if (!isOnline || !isInternetReachable) {
+      if (p === 1) {
+        const cached = offlineCacheService.getMessages(partnerId);
+        if (cached && cached.length > 0) {
+          setMessages(cached as Message[]);
+          const cachedReactions: Record<string, string> = {};
+          cached.forEach(m => { if (m.reaction) cachedReactions[m.id] = m.reaction; });
+          setReactions(cachedReactions);
+        }
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       const data = await messageService.getMessages(partnerId, p, 30);
       // Initialiser/mettre à jour les réactions depuis les messages chargés
@@ -280,9 +327,16 @@ export const ChatScreen: React.FC = () => {
         setMessages(data);
         setReactions(newReactions);
         setHasMore(data.length === 30);
+        // Sauvegarder en cache pour l'offline
+        offlineCacheService.saveMessages(partnerId, data);
         messageService.getPinnedMessages(partnerId).then(pins => setPinnedMessages(pins)).catch(() => {});
       } else {
-        setMessages(prev => [...prev, ...data]);
+        setMessages(prev => {
+          const merged = [...prev, ...data];
+          // Mettre à jour le cache avec tous les messages chargés
+          offlineCacheService.saveMessages(partnerId, merged);
+          return merged;
+        });
         setReactions(prev => ({ ...prev, ...newReactions }));
         setHasMore(data.length === 30);
       }
@@ -291,16 +345,32 @@ export const ChatScreen: React.FC = () => {
       if (e?.response?.status === 403 || e?.status === 403) {
         setIsBlocked(true);
       }
-      setMessages([]);
+      // Erreur réseau : garder le cache visible, ne pas vider
+      if (p === 1) {
+        const cached = offlineCacheService.getMessages(partnerId);
+        if (cached && cached.length > 0) {
+          setMessages(cached as Message[]);
+        }
+      }
     } finally {
       setLoading(false);
     }
-  }, [partnerId]);
+  }, [partnerId, isOnline, isInternetReachable]);
 
   useEffect(() => {
     loadMessages(1);
     messageService.markRead(partnerId).catch(() => {});
   }, []);
+
+  // Recharge les messages et marque comme lus quand la connexion se retablit
+  useEffect(() => {
+    const onReconnect = () => {
+      loadMessages(1);
+      messageService.markRead(partnerId).catch(() => {});
+    };
+    addReconnectListener(onReconnect);
+    return () => removeReconnectListener(onReconnect);
+  }, [addReconnectListener, removeReconnectListener, loadMessages, partnerId]);
 
   const loadMore = () => {
     if (!hasMore || loading) return;
@@ -494,6 +564,10 @@ export const ChatScreen: React.FC = () => {
     const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 as any });
     const asset = result.assets?.[0];
     if (!asset?.uri) return;
+    if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
+      Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+      return;
+    }
     openImagePreview(asset.uri, asset.fileName, asset.type);
   };
 
@@ -502,6 +576,10 @@ export const ChatScreen: React.FC = () => {
     const result = await launchCamera({ mediaType: 'photo', quality: 0.8 as any });
     const asset = result.assets?.[0];
     if (!asset?.uri) return;
+    if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
+      Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+      return;
+    }
     openImagePreview(asset.uri, asset.fileName, asset.type);
   };
 
@@ -533,18 +611,32 @@ export const ChatScreen: React.FC = () => {
       const result = await launchImageLibrary({ mediaType: 'video', selectionLimit: 1 });
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
-      setUploading(true);
-      const uploaded = await uploadMessageVideo(asset.uri, asset.fileName, asset.type);
-      const videoUrl = uploaded.hls_url ?? uploaded.url;
-      const msg = await messageService.sendMessage(
-        partnerId, '', 'video', videoUrl,
-        { duration: uploaded.duration, thumbnail_url: uploaded.thumbnail_url, width: uploaded.width, height: uploaded.height, hls_url: uploaded.hls_url },
-      );
-      setMessages(prev => [msg, ...prev]);
+      if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
+        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        return;
+      }
+
+      backgroundUploadService.enqueueMessageVideo({
+        localUri: asset.uri,
+        label:    asset.fileName ?? 'Vidéo',
+        onDone:   async (res) => {
+          const videoUrl = res.hlsUrl ?? res.videoUrl ?? '';
+          try {
+            const msg = await messageService.sendMessage(
+              partnerId, '', 'video', videoUrl,
+              { duration: res.durationSec, thumbnail_url: res.thumbnailUrl, width: res.videoWidth ?? undefined, height: res.videoHeight ?? undefined, hls_url: res.hlsUrl ?? undefined },
+            );
+            setMessages(prev => [msg, ...prev]);
+          } catch {
+            Alert.alert('Erreur', "Impossible d'envoyer le message vidéo.");
+          }
+        },
+        onError: () => {
+          Alert.alert('Erreur', "L'upload de la vidéo a échoué. Réessaie.");
+        },
+      });
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'envoyer la vidéo');
-    } finally {
-      setUploading(false);
+      Alert.alert('Erreur', 'Impossible de lire la vidéo sélectionnée.');
     }
   };
 
@@ -554,7 +646,10 @@ export const ChatScreen: React.FC = () => {
       const res = await pick({ type: [types.allFiles] });
       const file = res[0];
       if (!file?.uri) return;
-      // Affiche la prévisualisation — l'upload se fait à la confirmation
+      if (file.size != null && file.size > 30 * 1024 * 1024) {
+        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        return;
+      }
       setFilePreview({ uri: file.uri, name: file.name ?? `fichier_${Date.now()}`, size: file.size ?? undefined, mimeType: file.type ?? undefined });
       setFileCaption('');
       setFilePreviewOpen(true);
@@ -582,8 +677,9 @@ export const ChatScreen: React.FC = () => {
       setFilePreviewOpen(false);
       setFilePreview(null);
       setFileCaption('');
-    } catch {
-      Alert.alert('Erreur', "Impossible d'envoyer le fichier");
+    } catch (e: any) {
+      console.error('[ChatScreen] sendFile error:', e?.message ?? e);
+      Alert.alert('Erreur', e?.message ?? "Impossible d'envoyer le fichier");
     } finally {
       setFileUploading(false);
     }
@@ -911,44 +1007,122 @@ export const ChatScreen: React.FC = () => {
         );
       }
 
-      case 'image':
+      case 'image': {
+        const dl = getDl(item.id);
+        const readIcon = mine
+          ? (item.pending
+              ? <Icon name="clock" size={10} color="rgba(255,255,255,0.8)" />
+              : item.read
+                ? <Icon name="check-circle" size={10} color="rgba(255,255,255,0.9)" />
+                : <Icon name="check" size={10} color="rgba(255,255,255,0.8)" />)
+          : null;
         return (
-          <View>
-            {item.attachment_url && (
+          // marges négatives pour annuler le padding de bubbleInner
+          <View style={{ marginHorizontal: -14, marginVertical: -10 }}>
+            <TouchableOpacity
+              activeOpacity={0.92}
+              onPress={() => item.attachment_url && nav.navigate('ImageViewer', { url: item.attachment_url, isMine: mine })}
+            >
+              {/* Image visible directement depuis le réseau */}
               <Image
                 source={{ uri: item.attachment_url }}
                 style={styles.imageBubble}
                 resizeMode="cover"
               />
-            )}
-            {item.content ? <Text style={[styles.msgText, { color: textColor }]}>{item.content}</Text> : null}
-          </View>
-        );
-
-      case 'video': {
-        const videoPlayUrl = item.attachment_meta?.hls_url ?? item.attachment_url;
-        return (
-          <TouchableOpacity onPress={() => videoPlayUrl && Linking.openURL(videoPlayUrl)}>
-            {item.attachment_meta?.thumbnail_url ? (
-              <View>
-                <Image
-                  source={{ uri: item.attachment_meta.thumbnail_url }}
-                  style={styles.videoBubble}
-                  resizeMode="cover"
-                />
-                <View style={styles.videoPlayOverlay}>
-                  <Icon name="play-circle" size={44} color="rgba(255,255,255,0.9)" />
+              {/* Bouton download en overlay bas-droite — uniquement pour les messages reçus */}
+              {!mine && !dl.localUri && !dl.downloading && (
+                <TouchableOpacity
+                  style={styles.imgSaveBtn}
+                  onPress={() => item.attachment_url && startDl(item.id, item.attachment_url, false)}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="download" size={14} color="#fff" />
+                </TouchableOpacity>
+              )}
+              {/* Progression pendant la sauvegarde */}
+              {!mine && dl.downloading && (
+                <>
+                  <View style={styles.imgSaveBtn}>
+                    <Text style={styles.imgDlPct}>{dl.progress}%</Text>
+                  </View>
+                  <View style={styles.imgProgressBar}>
+                    <View style={[styles.imgProgressFill, { width: `${dl.progress}%` as any }]} />
+                  </View>
+                </>
+              )}
+              {/* Heure overlay bas-droit sans caption */}
+              {!item.content && (
+                <View style={styles.imgOverlayTime}>
+                  {item.edited_at && <Text style={styles.imgOverlayText}>modifié · </Text>}
+                  <Text style={styles.imgOverlayText}>{formatMsgTime(item.created_at)}</Text>
+                  {readIcon && <View style={{ marginLeft: 3 }}>{readIcon}</View>}
+                </View>
+              )}
+            </TouchableOpacity>
+            {item.content && (
+              <View style={{ paddingHorizontal: 14, paddingTop: 8, paddingBottom: 6 }}>
+                <Text style={[styles.msgText, { color: textColor }]}>{item.content}</Text>
+                <View style={styles.bubbleFooter}>
+                  {item.edited_at && <Text style={[styles.editedLabel, { color: subtextColor }]}>modifié</Text>}
+                  <Text style={[styles.msgTime, { color: subtextColor }]}>{formatMsgTime(item.created_at)}</Text>
+                  {readIcon && <View style={{ marginLeft: 2 }}>{readIcon}</View>}
                 </View>
               </View>
+            )}
+          </View>
+        );
+      }
+
+      case 'video': {
+        const dl = getDl(item.id);
+        const videoPlayUrl = item.attachment_meta?.hls_url ?? item.attachment_url;
+        const thumb = item.attachment_meta?.thumbnail_url;
+        const durLabel = item.attachment_meta?.duration != null
+          ? formatDuration((item.attachment_meta.duration ?? 0) * 1000) : null;
+        return (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => videoPlayUrl && nav.navigate('VideoPlayer', {
+              url: videoPlayUrl, title: 'Vidéo', thumbnailUrl: thumb,
+            })}
+          >
+            {/* Thumbnail visible directement */}
+            {thumb ? (
+              <Image source={{ uri: thumb }} style={styles.videoBubble} resizeMode="cover" />
             ) : (
-              <View style={[styles.videoBubble, { backgroundColor: mine ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center' }]}>
+              <View style={[styles.videoBubble, { backgroundColor: mine ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
                 <Icon name="video" size={36} color={mine ? '#fff' : colors.primary} />
               </View>
             )}
-            {item.attachment_meta?.duration != null && (
-              <Text style={[styles.videoDurationLabel, { color: subtextColor }]}>
-                {formatDuration((item.attachment_meta.duration ?? 0) * 1000)}
-              </Text>
+            {/* Bouton play central */}
+            <View style={styles.videoPlayOverlay}>
+              <Icon name="play-circle" size={44} color="rgba(255,255,255,0.9)" />
+            </View>
+            {/* Bouton download bas-droite — uniquement pour les messages reçus */}
+            {!mine && !dl.localUri && !dl.downloading && item.attachment_url && (
+              <TouchableOpacity
+                style={styles.imgSaveBtn}
+                onPress={(e) => { e.stopPropagation?.(); startDl(item.id, item.attachment_url!, true); }}
+                activeOpacity={0.8}
+              >
+                <Icon name="download" size={14} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {!mine && dl.downloading && (
+              <>
+                <View style={styles.imgSaveBtn}>
+                  <Text style={styles.imgDlPct}>{dl.progress}%</Text>
+                </View>
+                <View style={styles.imgProgressBar}>
+                  <View style={[styles.imgProgressFill, { width: `${dl.progress}%` as any }]} />
+                </View>
+              </>
+            )}
+            {/* Durée bas-gauche */}
+            {durLabel && (
+              <View style={[styles.imgOverlayTime, { left: 8, right: undefined }]}>
+                <Text style={styles.imgOverlayText}>{durLabel}</Text>
+              </View>
             )}
           </TouchableOpacity>
         );
@@ -1024,7 +1198,7 @@ export const ChatScreen: React.FC = () => {
         return <Text style={[styles.msgText, { color: textColor }]}>{item.content}</Text>;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colors, playingId, playAudio, playProgress, playDuration]);
+  }, [colors, playingId, playAudio, playProgress, playDuration, nav, getDl, startDl]);
 
   const renderChatItem = useCallback(({ item, index }: { item: Message; index: number }) => {
     const mine = !!myId && item.sender_id === myId;
@@ -1033,37 +1207,59 @@ export const ChatScreen: React.FC = () => {
       ? FadeInUp.delay(index * 20).springify()
       : undefined;
 
+    // Image sans caption : l'heure est en overlay dans la bulle, pas dans le footer extérieur
+    const isImageNoCaption = item.message_type === 'image' && !item.content;
+
+    // La FlatList est inverted : messages[index+1] est le message chronologiquement précédent.
+    // On affiche un séparateur de date quand on change de jour ou au premier message de la conversation.
+    const prevMsg = messages[index + 1];
+    const showDateSep = !prevMsg || !sameDay(item.created_at, prevMsg.created_at);
+    const DateSeparator = showDateSep ? (
+      <View style={styles.dateSepRow}>
+        <View style={[styles.dateSepLine, { backgroundColor: colors.divider }]} />
+        <View style={[styles.dateSepPill, { backgroundColor: colors.backgroundSecondary ?? colors.surface }]}>
+          <Text style={[styles.dateSepText, { color: colors.textTertiary }]}>{fmtDate(item.created_at)}</Text>
+        </View>
+        <View style={[styles.dateSepLine, { backgroundColor: colors.divider }]} />
+      </View>
+    ) : null;
+
     if (item.deleted) {
       return (
-        <Animated.View
-          entering={enteringAnim}
-          style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-        >
-          <View style={[styles.bubbleInner, { backgroundColor: colors.surface, opacity: 0.6 }]}>
-            <Text style={[styles.msgText, { color: colors.textTertiary, fontStyle: 'italic' }]}>
-              Message supprimé
-            </Text>
-            <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
-          </View>
-        </Animated.View>
+        <>
+          {DateSeparator}
+          <Animated.View
+            entering={enteringAnim}
+            style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+          >
+            <View style={[styles.bubbleInner, { backgroundColor: colors.surface, opacity: 0.6 }]}>
+              <Text style={[styles.msgText, { color: colors.textTertiary, fontStyle: 'italic' }]}>
+                Message supprimé
+              </Text>
+              <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
+            </View>
+          </Animated.View>
+        </>
       );
     }
 
     return (
-      <Animated.View
-        entering={enteringAnim}
-        style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-      >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onLongPress={() => onLongPressMessage(item)}
-          delayLongPress={400}
+      <>
+        {DateSeparator}
+        <Animated.View
+          entering={enteringAnim}
+          style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onLongPress={() => onLongPressMessage(item)}
+            delayLongPress={400}
         >
           {mine ? (
             <LinearGradient
               colors={[colors.gradientStart, colors.gradientEnd]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.bubbleInner}
+              style={[styles.bubbleInner, isImageNoCaption && { padding: 0 }]}
             >
               {item.forwarded_from_id && (
                 <View style={styles.forwardedLabel}>
@@ -1082,21 +1278,23 @@ export const ChatScreen: React.FC = () => {
                 </View>
               )}
               {renderBubbleContent(item, true)}
-              <View style={styles.bubbleFooter}>
-                {item.edited_at && <Text style={[styles.editedLabel, { color: 'rgba(255,255,255,0.55)' }]}>modifié</Text>}
-                <Text style={[styles.msgTime, { color: 'rgba(255,255,255,0.65)' }]}>{formatMsgTime(item.created_at)}</Text>
-                <View style={{ marginLeft: 4 }}>
-                  {item.pending
-                    ? <Icon name="clock" size={11} color="rgba(255,255,255,0.5)" />
-                    : item.read
-                      ? <Icon name="check-circle" size={11} color="rgba(255,255,255,0.9)" />
-                      : <Icon name="check" size={11} color="rgba(255,255,255,0.65)" />
-                  }
+              {!isImageNoCaption && (
+                <View style={styles.bubbleFooter}>
+                  {item.edited_at && <Text style={[styles.editedLabel, { color: 'rgba(255,255,255,0.55)' }]}>modifié</Text>}
+                  <Text style={[styles.msgTime, { color: 'rgba(255,255,255,0.65)' }]}>{formatMsgTime(item.created_at)}</Text>
+                  <View style={{ marginLeft: 4 }}>
+                    {item.pending
+                      ? <Icon name="clock" size={11} color="rgba(255,255,255,0.5)" />
+                      : item.read
+                        ? <Icon name="check-circle" size={11} color="rgba(255,255,255,0.9)" />
+                        : <Icon name="check" size={11} color="rgba(255,255,255,0.65)" />
+                    }
+                  </View>
                 </View>
-              </View>
+              )}
             </LinearGradient>
           ) : (
-            <View style={[styles.bubbleInner, { backgroundColor: colors.surface }]}>
+            <View style={[styles.bubbleInner, { backgroundColor: colors.surface }, isImageNoCaption && { padding: 0 }]}>
               {item.forwarded_from_id && (
                 <View style={styles.forwardedLabel}>
                   <Icon name="corner-up-right" size={11} color={colors.textTertiary} />
@@ -1114,21 +1312,24 @@ export const ChatScreen: React.FC = () => {
                 </View>
               )}
               {renderBubbleContent(item, false)}
-              <View style={styles.bubbleFooter}>
-                {item.edited_at && <Text style={[styles.editedLabel, { color: colors.textTertiary }]}>modifié</Text>}
-                <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
-              </View>
+              {!isImageNoCaption && (
+                <View style={styles.bubbleFooter}>
+                  {item.edited_at && <Text style={[styles.editedLabel, { color: colors.textTertiary }]}>modifié</Text>}
+                  <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
+                </View>
+              )}
             </View>
           )}
         </TouchableOpacity>
-        {reactions[item.id] && (
-          <View style={[styles.reactionBadge, mine ? styles.reactionMine : styles.reactionTheirs]}>
-            <Text style={styles.reactionEmoji}>{reactions[item.id]}</Text>
-          </View>
-        )}
-      </Animated.View>
+          {reactions[item.id] && (
+            <View style={[styles.reactionBadge, mine ? styles.reactionMine : styles.reactionTheirs]}>
+              <Text style={styles.reactionEmoji}>{reactions[item.id]}</Text>
+            </View>
+          )}
+        </Animated.View>
+      </>
     );
-  }, [myId, partnerName, colors, reactions, onLongPressMessage, renderBubbleContent]);
+  }, [myId, partnerName, colors, reactions, onLongPressMessage, renderBubbleContent, messages]);
 
   return (
     <KeyboardAvoidingView
@@ -1224,13 +1425,36 @@ export const ChatScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Upload indicator */}
-      {uploading && (
-        <View style={[styles.uploadBar, { backgroundColor: colors.primary + '15' }]}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={{ color: colors.primary, marginLeft: 8, fontSize: 13 }}>Envoi en cours…</Text>
+      {/* Bandeau upload vidéo TikTok-style */}
+      {msgVideoJobs.map(job => (
+        <View key={job.id} style={[styles.uploadBar, { backgroundColor: job.status === 'error' ? '#ff3b3015' : colors.primary + '18' }]}>
+          <View style={styles.uploadBarInner}>
+            <View style={styles.uploadBarLeft}>
+              {job.status === 'error' ? (
+                <Icon name="alert-circle" size={16} color="#ff3b30" />
+              ) : job.status === 'done' ? (
+                <Icon name="check-circle" size={16} color="#34c759" />
+              ) : (
+                <ActivityIndicator size="small" color={colors.primary} />
+              )}
+              <Text style={[styles.uploadBarText, { color: job.status === 'error' ? '#ff3b30' : job.status === 'done' ? '#34c759' : colors.primary }]}>
+                {job.status === 'done'       ? 'Vidéo envoyée !'
+                 : job.status === 'error'    ? (job.error ?? 'Échec de l\'envoi')
+                 : job.status === 'compressing' ? `Compression… ${job.progress}%`
+                 : `Envoi… ${job.progress}%`}
+              </Text>
+            </View>
+            {job.status !== 'done' && job.status !== 'error' && (
+              <Text style={[styles.uploadBarPct, { color: colors.primary }]}>{job.progress}%</Text>
+            )}
+          </View>
+          {job.status !== 'done' && job.status !== 'error' && (
+            <View style={styles.uploadProgressTrack}>
+              <View style={[styles.uploadProgressFill, { width: `${job.progress}%` as any, backgroundColor: colors.primary }]} />
+            </View>
+          )}
         </View>
-      )}
+      ))}
 
       {/* Messages */}
       {loading ? (
@@ -1783,10 +2007,38 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
 
   uploadBar: {
+    overflow: 'hidden',
+  },
+  uploadBarInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  uploadBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  uploadBarText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+  },
+  uploadBarPct: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  uploadProgressTrack: {
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    width: '100%',
+  },
+  uploadProgressFill: {
+    height: 3,
   },
 
   bubble:       { maxWidth: '78%', marginBottom: 2 },
@@ -1806,8 +2058,26 @@ const styles = StyleSheet.create({
   waveform:    { flexDirection: 'row', alignItems: 'center', height: 20, borderRadius: 4, gap: 1.5, paddingHorizontal: 4 },
   waveBar:     { width: 2.5, borderRadius: 2 },
 
-  // Image
-  imageBubble: { width: SCREEN_W * 0.55, height: SCREEN_W * 0.55, borderRadius: 14, marginBottom: 4 },
+  // Image / Vidéo — pleine largeur de la bulle
+  imageBubble:    { width: SCREEN_W * 0.62, height: SCREEN_W * 0.52 },
+  imgPlaceholder: { backgroundColor: 'rgba(0,0,0,0.18)', alignItems: 'center', justifyContent: 'center' },
+  imgSaveBtn: {
+    position: 'absolute', bottom: 6, right: 8,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.50)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  imgDlPct:  { color: '#fff', fontSize: 10, fontWeight: '700' },
+  imgDlSize: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '500' },
+  imgProgressBar:  { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
+  imgProgressFill: { height: 3, backgroundColor: '#fff' },
+  imgOverlayTime: {
+    position: 'absolute', bottom: 6, right: 8,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 2, gap: 3,
+  },
+  imgOverlayText: { color: '#fff', fontSize: 10, fontWeight: '500' },
 
   // Video
   videoBubble:       { width: SCREEN_W * 0.55, height: SCREEN_W * 0.4, borderRadius: 14, marginBottom: 4 },
@@ -2003,6 +2273,12 @@ const styles = StyleSheet.create({
   replyBannerBar:  { width: 3, height: 36, borderRadius: 2 },
   replyBannerName: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
   replyBannerText: { fontSize: 13 },
+
+  // Date separator
+  dateSepRow:  { flexDirection: 'row', alignItems: 'center', marginVertical: 10, marginHorizontal: 4 },
+  dateSepLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  dateSepPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginHorizontal: 8 },
+  dateSepText: { fontSize: 11, fontWeight: '500' },
 });
 
 const CP = StyleSheet.create({

@@ -27,6 +27,7 @@ export interface UploadedVideo {
   duration?:      number;
   thumbnail_url?: string;
   hls_url?:       string;
+  mp4_url?:       string;
   width?:         number;
   height?:        number;
   format?:        string;
@@ -52,6 +53,23 @@ async function normalizeUri(uri: string): Promise<string> {
   const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload_${Date.now()}.jpg`;
   const b64  = await ReactNativeBlobUtil.fetch('GET', uri).then(r => r.base64());
   await ReactNativeBlobUtil.fs.writeFile(dest, b64, 'base64');
+  return `file://${dest}`;
+}
+
+// Comme normalizeUri mais préserve l'extension d'origine (pour les fichiers non-image)
+async function normalizeFileUri(uri: string, fileName: string): Promise<string> {
+  if (!uri) throw new Error('URI fichier invalide');
+  if (Platform.OS !== 'android' || !uri.startsWith('content://')) return uri;
+  const ext  = fileName.includes('.') ? fileName.split('.').pop() : 'bin';
+  const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload_${Date.now()}.${ext}`;
+  try {
+    // cp gère nativement les content:// URIs Android sans passer par base64
+    await ReactNativeBlobUtil.fs.cp(uri, dest);
+  } catch {
+    // fallback base64 si cp échoue
+    const b64 = await ReactNativeBlobUtil.fetch('GET', uri).then((r: any) => r.base64());
+    await ReactNativeBlobUtil.fs.writeFile(dest, b64, 'base64');
+  }
   return `file://${dest}`;
 }
 
@@ -256,6 +274,7 @@ export async function uploadVideoFromUri(
               duration:      status.duration  ?? data.duration,
               thumbnail_url: status.thumbnail_url ?? undefined,
               hls_url:       status.hls_url   ?? undefined,
+              mp4_url:       status.mp4_url   ?? undefined,
               width:         compressed.width  ?? undefined,
               height:        compressed.height ?? undefined,
             };
@@ -276,21 +295,30 @@ export async function uploadVideoFromUri(
           }
         }
       }
-      throw new Error('Timeout : la video est en cours de traitement. Reessaie dans quelques minutes.');
+      // Poll expiré — la vidéo est uploadée mais le HLS n'est pas encore prêt.
+      // On retourne l'URL de base pour ne pas bloquer la publication.
+      return {
+        url:           data.url ?? '',
+        public_id:     data.public_id ?? '',
+        job_id:        jobId,
+        duration:      data.duration  ?? undefined,
+        thumbnail_url: data.thumbnail_url ?? undefined,
+        hls_url:       data.hls_url ?? data.url ?? undefined,
+        mp4_url:       data.mp4_url ?? undefined,
+        width:         compressed.width  ?? undefined,
+        height:        compressed.height ?? undefined,
+      };
     }
 
-    // Fallback : hls_url si disponible, sinon erreur (plus de MP4)
-    const fallbackHls = data.hls_url ?? undefined;
-    if (!fallbackHls) {
-      throw new Error('HLS non disponible après timeout — réessaie dans quelques minutes');
-    }
+    // Fallback sans jobId : hls_url si disponible
+    const fallbackHls = data.hls_url ?? data.url ?? undefined;
     return {
-      url:           fallbackHls,
+      url:           fallbackHls ?? '',
       public_id:     data.public_id ?? '',
-      job_id:        jobId,
       duration:      data.duration  ?? undefined,
       thumbnail_url: data.thumbnail_url ?? undefined,
       hls_url:       fallbackHls,
+      mp4_url:       data.mp4_url ?? undefined,
       width:         compressed.width  ?? undefined,
       height:        compressed.height ?? undefined,
     };
@@ -326,6 +354,74 @@ export async function uploadVideoFromUri(
     thumbnail_url: thumbnailPublicUrl,
     width:         compressed.width  ?? undefined,
     height:        compressed.height ?? undefined,
+  };
+}
+
+export async function uploadImageAsReel(
+  uri: string,
+  durationSec: number = 5,
+  onProgress?: (pct: number) => void,
+): Promise<UploadedVideo> {
+  const token    = getToken();
+  const filename = `reel_photo_${Date.now()}.jpg`;
+  const path     = uri.startsWith('file://') ? uri.slice(7) : uri;
+
+  onProgress?.(10);
+
+  const res = await ReactNativeBlobUtil.fetch(
+    'POST',
+    `${API_BASE_URL}/api/v1/upload/image-to-reel?duration=${durationSec}`,
+    {
+      Accept:         'application/json',
+      'Content-Type': 'multipart/form-data',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    [{ name: 'file', filename, type: 'image/jpeg', data: ReactNativeBlobUtil.wrap(path) as any }],
+  );
+
+  if (res.respInfo.status >= 300) {
+    let detail = `Upload error ${res.respInfo.status}`;
+    try { detail = (res.json() as any)?.detail ?? detail; } catch {}
+    throw new Error(detail);
+  }
+
+  onProgress?.(60);
+
+  const data   = res.json() as any;
+  const jobId: string | undefined = data.job_id;
+
+  if (jobId) {
+    const MAX_POLLS = 60;
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise<void>(r => setTimeout(() => r(), 4000));
+      onProgress?.(Math.min(95, 60 + Math.round(i * 35 / MAX_POLLS)));
+      try {
+        const { apiClient } = await import('../api/client');
+        const status = (await apiClient.get<any>(`/api/v1/upload/video/status/${jobId}`)).data;
+        if (status.status === 'done') {
+          onProgress?.(100);
+          return {
+            url:           status.url  ?? data.url,
+            public_id:     data.public_id,
+            job_id:        jobId,
+            duration:      durationSec,
+            thumbnail_url: status.thumbnail_url ?? undefined,
+            hls_url:       status.hls_url ?? undefined,
+          };
+        }
+        if (status.status === 'error') throw new Error(status.detail ?? 'Erreur conversion image');
+      } catch (e: any) {
+        if (!e?.message?.includes('404')) throw e;
+      }
+    }
+    throw new Error('Timeout conversion image→reel');
+  }
+
+  return {
+    url:       data.url,
+    public_id: data.public_id,
+    duration:  durationSec,
+    hls_url:   data.hls_url,
   };
 }
 
@@ -376,7 +472,7 @@ export async function uploadFileFromUri(
   mimeType = 'application/octet-stream',
   folder = 'messages',
 ): Promise<UploadedFile> {
-  const normalized = await normalizeUri(uri);
+  const normalized = await normalizeFileUri(uri, fileName);
   const { upload_url, public_url } = await getPresignedUrl(folder, fileName, mimeType);
   await putToR2(upload_url, normalized, mimeType);
   return { url: public_url, filename: fileName, mime_type: mimeType };

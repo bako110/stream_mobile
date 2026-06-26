@@ -38,6 +38,8 @@ import { communityService } from '../../services/communityService';
 import type { CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
+import { useNetwork } from '../../context/NetworkContext';
+import { offlineCacheService } from '../../services/offlineCacheService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import type { User } from '../../types/user';
 import type { SearchResults } from '../../types/search';
@@ -530,11 +532,21 @@ export const FeedScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated } = useWs();
   const { currentUser } = useUser();
+  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
   const userLocation = useUserLocation();
 
   const [filter,      setFilter]      = useState<FeedFilter>('all');
-  const [items,       setItems]       = useState<FeedItem[]>([]);
-  const [loading,     setLoading]     = useState(true);
+  // Init depuis cache immédiatement — filtrer les items sans données réelles (suggestions/ad/communities)
+  const [items,       setItems]       = useState<FeedItem[]>(() => {
+    const cached = offlineCacheService.getFeed();
+    if (!cached) return [];
+    return cached.filter(i => i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities') as FeedItem[];
+  });
+  const [loading,     setLoading]     = useState(() => {
+    const cached = offlineCacheService.getFeed();
+    const realCount = cached?.filter(i => i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities').length ?? 0;
+    return realCount === 0;
+  });
   const [currentAdData, setCurrentAdData] = useState<AdData | null>(null);
   const adInsertedRef = useRef<Set<string>>(new Set()); // évite double-injection
   const [refreshing,  setRefreshing]  = useState(false);
@@ -735,6 +747,33 @@ export const FeedScreen: React.FC = () => {
 
   const load = useCallback(async (f: FeedFilter, silent = false) => {
     if (!silent) setNetworkError(false);
+
+    // Offline : servir le cache persistant (même si TTL expiré)
+    if (!isOnline || !isInternetReachable) {
+      if (f === 'all') {
+        const cached = offlineCacheService.getFeed();
+        const realItems = cached?.filter(i =>
+          i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities'
+        ) ?? [];
+        if (realItems.length > 0) {
+          setItems(realItems as FeedItem[]);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+      }
+      // Pas de cache → garder ce qui est déjà affiché (ne jamais vider)
+      if (itemsRef.current.length > 0) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      setNetworkError(true);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
       if (f === 'all') {
         const [feedResult, reelsResult, postsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
@@ -864,6 +903,14 @@ export const FeedScreen: React.FC = () => {
         } else {
           setItems(result);
         }
+        // Persist pour mode offline — seulement les vrais contenus (pas suggestions/ad/communities)
+        offlineCacheService.saveFeed(result.filter(i =>
+          i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities'
+        ));
+        // Persist les reels pour ReelsScreen (même source de données)
+        const reelsForCache = (Array.isArray(reelsResult?.items) ? reelsResult.items : Array.isArray(reelsResult) ? reelsResult : [])
+          .filter((r: any) => r?.id && r?.hls_url);
+        if (reelsForCache.length > 0) offlineCacheService.saveReels(reelsForCache);
       } else if (f === 'following') {
         // Onglet Suivis — uniquement les posts des comptes suivis, triés par date
         const postsResult = await postService.getFeed(1, 50, true).catch(() => [] as Post[]);
@@ -894,21 +941,39 @@ export const FeedScreen: React.FC = () => {
       setNetworkError(false);
     } catch (err) {
       if (__DEV__) { console.warn('[FeedScreen] load error:', err); }
-      // En mode silent (retour sur l'ecran), on garde l'ancien contenu et on affiche juste la banniere
-      if (silent) {
-        setNetworkError(true);
-      } else {
-        // Chargement initial ou pull-to-refresh : on signale l'erreur mais on garde les items existants
-        setNetworkError(true);
+      // Erreur réseau → fallback cache filtré pour ne jamais laisser l'écran vide
+      if (f === 'all') {
+        const cached = offlineCacheService.getFeed();
+        const realItems = cached?.filter(i =>
+          i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities'
+        ) ?? [];
+        if (realItems.length > 0) {
+          setItems(prev => prev.length > 0 ? prev : realItems as FeedItem[]);
+        }
       }
+      setNetworkError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isOnline, isInternetReachable]);
 
   // Recharge quand le filtre change
-  useEffect(() => { setLoading(true); load(filter); }, [filter]);
+  // setLoading(true) uniquement si aucun item visible — évite le flash skeleton
+  const itemsRef = useRef<FeedItem[]>(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
+  useEffect(() => {
+    if (itemsRef.current.length === 0) setLoading(true);
+    load(filter);
+  }, [filter]);
+
+  // Sync au reconnect réseau
+  useEffect(() => {
+    const onReconnect = () => { load(filter, true); };
+    addReconnectListener(onReconnect);
+    return () => removeReconnectListener(onReconnect);
+  }, [filter, addReconnectListener, removeReconnectListener]);
 
   // Près de toi — chargé dès que la position est disponible
   useEffect(() => {
@@ -988,9 +1053,13 @@ export const FeedScreen: React.FC = () => {
         searchBarOpacity.value = 0;
       };
     }
-    // Retour : refresh silencieux si données > 60s
+    // Retour : refresh silencieux si données > 60s ET connexion disponible
     const age = Date.now() - lastLoadedAtRef.current;
-    if (age > 60_000) {
+    const hasItems = itemsRef.current.length > 0;
+    if (age > 60_000 && (isOnline && isInternetReachable)) {
+      load(filter, true);
+    } else if (!isOnline && !hasItems) {
+      // Offline sans cache → charger depuis cache persistant
       load(filter, true);
     }
     return () => {
@@ -1694,7 +1763,7 @@ export const FeedScreen: React.FC = () => {
             };
 
             return (
-              <>
+              <View style={{ flex: 1 }}>
                 {/* Suggestions historique au-dessus des résultats */}
                 {historySuggestions.length > 0 && (
                   <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
@@ -1715,10 +1784,11 @@ export const FeedScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* Chips filtre */}
+                {/* Chips filtre — sticky */}
+                <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
                 <ScrollView
                   horizontal showsHorizontalScrollIndicator={false}
-                  style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
+                  style={{ flexGrow: 0 }}
                   contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}
                 >
                   {CATS.filter(c => c.key === 'all' || totalCounts[c.key] > 0).map(cat => {
@@ -1747,6 +1817,7 @@ export const FeedScreen: React.FC = () => {
                     );
                   })}
                 </ScrollView>
+                </View>
 
                 <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
                   {/* Utilisateurs */}
@@ -1880,7 +1951,7 @@ export const FeedScreen: React.FC = () => {
                     </View>
                   )}
                 </ScrollView>
-              </>
+              </View>
             );
           })()}
         </Animated.View>
@@ -1905,7 +1976,11 @@ export const FeedScreen: React.FC = () => {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); load(filter); }}
+              onRefresh={() => {
+                if (!isOnline || !isInternetReachable) { setRefreshing(false); return; }
+                setRefreshing(true);
+                load(filter);
+              }}
               tintColor={colors.primary}
             />
           }
@@ -1927,6 +2002,16 @@ export const FeedScreen: React.FC = () => {
                 >
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Découvrir du contenu</Text>
                 </TouchableOpacity>
+              </View>
+            ) : (!isOnline || !isInternetReachable) ? (
+              <View style={s.empty}>
+                <Icon name="wifi-off" size={48} color={colors.textTertiary} />
+                <Text style={[s.emptyText, { color: colors.textPrimary, fontWeight: '700' }]}>
+                  Hors ligne
+                </Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 13, textAlign: 'center', paddingHorizontal: 32, marginTop: 4 }}>
+                  Aucun contenu en cache. Reconnecte-toi pour charger le feed.
+                </Text>
               </View>
             ) : (
               <View style={s.empty}>

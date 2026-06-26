@@ -1,7 +1,7 @@
 import { Video, createVideoThumbnail, getVideoMetaData } from 'react-native-compressor';
+import { trim as nativeTrim } from 'react-native-video-trim';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { Platform } from 'react-native';
-import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
 
 const CACHE = ReactNativeBlobUtil.fs.dirs.CacheDir;
 
@@ -111,9 +111,16 @@ export async function compressVideo(
   };
 }
 
+export interface TrimInfo {
+  uri: string;
+  startSec: number;
+  endSec: number;
+}
+
 /**
- * Coupe la video entre startSec et endSec avec FFmpeg (stream copy — instantane, sans reencoder).
- * Retourne l'URI du fichier tronque dans le cache.
+ * Coupe une vidéo localement avant l'upload.
+ * Utilise les APIs natives iOS/Android (AVFoundation / MediaMuxer) — pas de ré-encodage.
+ * Retourne l'URI du fichier coupé (fichier temporaire à nettoyer après upload).
  */
 export async function trimVideo(
   inputUri: string,
@@ -121,31 +128,25 @@ export async function trimVideo(
   endSec: number,
 ): Promise<string> {
   const { fileUri, isCopy } = await toFileUri(inputUri);
-  const trimDuration = Math.max(0.1, endSec - startSec);
-  const outPath      = `${CACHE}/trim_${Date.now()}.mp4`;
-  const outUri       = `file://${outPath}`;
+  const path = fileUri.startsWith('file://') ? fileUri.slice(7) : fileUri;
 
-  // Chemins sans file:// pour FFmpeg, espaces echappes
-  const inPath = fileUri.startsWith('file://') ? fileUri.slice(7) : fileUri;
-  const cmd = `-ss ${startSec.toFixed(3)} -i "${inPath}" -t ${trimDuration.toFixed(3)} -c copy -avoid_negative_ts make_zero -movflags +faststart "${outPath}"`;
+  const result = await nativeTrim(path, {
+    startTime: Math.round(startSec * 1000),
+    endTime:   Math.round(endSec   * 1000),
+    outputExt: 'mp4',
+  });
 
-  let session;
-  try {
-    session = await FFmpegKit.execute(cmd);
-  } finally {
-    if (isCopy) {
-      ReactNativeBlobUtil.fs.unlink(inPath).catch(() => {});
-    }
+  if (isCopy) {
+    ReactNativeBlobUtil.fs.unlink(path).catch(() => {});
   }
 
-  const returnCode = await session.getReturnCode();
-  if (!ReturnCode.isSuccess(returnCode)) {
-    ReactNativeBlobUtil.fs.unlink(outPath).catch(() => {});
-    const logs = await session.getAllLogsAsString();
-    throw new Error(`FFmpeg trim failed: ${logs?.slice(-400)}`);
+  if (!result.success || !result.outputPath) {
+    throw new Error('Trim échoué');
   }
 
-  return outUri;
+  return result.outputPath.startsWith('file://')
+    ? result.outputPath
+    : `file://${result.outputPath}`;
 }
 
 export async function splitVideo(

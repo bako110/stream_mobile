@@ -3,7 +3,7 @@ import type { Story, StoryGroup, StoryCreate, StoryUpdate, StoryViewerUser } fro
 import { uploadService } from './uploadService';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import {
-  getCachedFeed, setCachedFeed, applyLocalViewsToFeed,
+  getCachedFeed, getStaleFeed, setCachedFeed, applyLocalViewsToFeed,
   markStoryViewedLocally, invalidateFeedCache,
   saveViewedStory, purgeExpiredViewedStories,
   removeViewedStoryLocally,
@@ -41,8 +41,8 @@ export const storyService = {
       import('././videoCacheService').then(m => m.cleanup().catch(() => {})).catch(() => {});
       return applyLocalViewsToFeed(groups);
     } catch (e) {
-      // Reseau KO — retourner le cache expire plutot que vide
-      const stale = getCachedFeed();
+      // Réseau KO — retourner le cache persistant (même si TTL expiré)
+      const stale = getStaleFeed();
       return stale ? applyLocalViewsToFeed(stale) : [];
     }
   },

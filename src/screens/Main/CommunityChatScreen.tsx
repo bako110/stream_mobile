@@ -16,13 +16,20 @@ import { communityService } from '../../services/communityService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
+import { useNetwork } from '../../context/NetworkContext';
+import { offlineCacheService } from '../../services/offlineCacheService';
 import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Geolocation from '@react-native-community/geolocation';
-import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
+import { uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
+import { backgroundUploadService } from '../../services/backgroundUploadService';
+import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { BoostPrompt, BackButton } from '../../components/common';
+import { useMediaDownload } from '../../hooks/useMediaDownload';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const RNBlobUtil = require('react-native-blob-util').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -113,10 +120,16 @@ export const CommunityChatScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const route = useRoute();
   const { communityId, communityName } = route.params as RouteParams;
+  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
 
   const [activeTab,      setActiveTab]      = useState<ChatTab>('discussion');
-  const [messages,       setMessages]       = useState<CommunityMessage[]>([]);
-  const [loading,        setLoading]        = useState(true);
+  // Init depuis cache immédiatement
+  const [messages,       setMessages]       = useState<CommunityMessage[]>(
+    () => (offlineCacheService.getCommunityMessages(communityId) as unknown as CommunityMessage[]) ?? []
+  );
+  const [loading,        setLoading]        = useState(
+    () => (offlineCacheService.getCommunityMessages(communityId)?.length ?? 0) === 0
+  );
   const [loadingMore,    setLoadingMore]    = useState(false);
   const [sending,        setSending]        = useState(false);
   const [text,           setText]           = useState('');
@@ -147,9 +160,16 @@ export const CommunityChatScreen: React.FC = () => {
   const [typingUsers,    setTypingUsers]    = useState<TypingUser[]>([]);
   const [recordingUsers, setRecordingUsers] = useState<TypingUser[]>([]);
   const recordingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const { get: getDl, download: startDl } = useMediaDownload();
+  const { visibleJobs } = useBackgroundUpload();
+  const msgVideoJobs = visibleJobs.filter(j => j.type === 'message');
+
   const [imgViewerList,  setImgViewerList]  = useState<string[]>([]);
   const [imgViewerIdx,   setImgViewerIdx]   = useState(0);
   const [imgViewerOpen,  setImgViewerOpen]  = useState(false);
+  const [viewerIsMe,     setViewerIsMe]     = useState(false);
+  const [dlProgress,     setDlProgress]     = useState(0);
+  const [dlBusy,         setDlBusy]         = useState(false);
   const [pollModal,      setPollModal]      = useState(false);
   const [pollQ,          setPollQ]          = useState('');
   const [pollOpts,       setPollOpts]       = useState(['', '']);
@@ -321,13 +341,26 @@ export const CommunityChatScreen: React.FC = () => {
     const typeMap: Record<ChatTab, string | undefined> = {
       discussion: undefined, announcements: 'announcement', media: 'image', polls: 'poll',
     };
-    // Discussion exclut explicitement annonces et sondages
     const excludeMap: Record<ChatTab, string | undefined> = {
       discussion: 'announcement,poll', announcements: undefined, media: undefined, polls: undefined,
     };
+
+    // Offline : servir le cache pour la discussion page 1 seulement
+    if (!isOnline || !isInternetReachable) {
+      if (p === 1 && tab === 'discussion') {
+        const cached = offlineCacheService.getCommunityMessages(communityId);
+        if (cached && cached.length > 0) {
+          setMessages(cached as CommunityMessage[]);
+          setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+        }
+      }
+      setLoading(false);
+      setLoadingMore(false);
+      return;
+    }
+
     try {
       const msgs = await communityService.getMessages(communityId, p, 30, typeMap[tab], excludeMap[tab]);
-      // API renvoie du plus récent au plus ancien — on inverse pour afficher chronologiquement
       const sorted = [...msgs].reverse() as CommunityMessage[];
       if (prepend) {
         setMessages(prev => {
@@ -337,16 +370,19 @@ export const CommunityChatScreen: React.FC = () => {
       } else {
         setMessages(sorted);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+        // Persist pour mode offline (page 1, discussion uniquement)
+        if (p === 1 && tab === 'discussion') {
+          offlineCacheService.saveCommunityMessages(communityId, sorted as unknown as CommunityMessageData[]);
+        }
       }
       setHasMore(msgs.length === 30);
     } catch (e: any) {
-      // 403 = pas encore membre confirmé → rediriger
       if (e?.response?.status === 403) {
         nav.goBack();
       }
     }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [communityId, nav]);
+  }, [communityId, nav, isOnline, isInternetReachable]);
 
   const loadPinned = useCallback(async () => {
     try { setPinnedMsgs((await communityService.getPinnedMessages(communityId)) as CommunityMessage[]); } catch {}
@@ -385,11 +421,23 @@ export const CommunityChatScreen: React.FC = () => {
     loadPinned();
   }, [communityId]);
 
+  // Sync au reconnect réseau
+  useEffect(() => {
+    const onReconnect = () => { loadMessages(1, false, activeTab); };
+    addReconnectListener(onReconnect);
+    return () => removeReconnectListener(onReconnect);
+  }, [activeTab, addReconnectListener, removeReconnectListener]);
+
   useEffect(() => {
     activeTabRef.current = activeTab;
-    setLoading(true); setMessages([]); setPage(1);
+    setPage(1);
+    // Effacer les messages seulement si en ligne — offline on garde ce qui est affiché
+    if (isOnline && isInternetReachable) {
+      setLoading(true);
+      setMessages([]);
+    }
     loadMessages(1, false, activeTab);
-  }, [activeTab]);
+  }, [activeTab]); // isOnline/isInternetReachable intentionnellement exclus — géré par reconnect listener
 
   useEffect(() => () => {
     Object.values(typingTimers.current).forEach(clearTimeout);
@@ -462,6 +510,11 @@ export const CommunityChatScreen: React.FC = () => {
     setAttachOpen(false);
     launchImageLibrary({ mediaType: 'photo', selectionLimit: 4, quality: 0.8 }, (resp) => {
       if (resp.didCancel || !resp.assets?.length) return;
+      const tooBig = resp.assets.some(a => a.fileSize != null && a.fileSize > 30 * 1024 * 1024);
+      if (tooBig) {
+        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo par image.');
+        return;
+      }
       const assets = resp.assets
         .filter(a => !!a.uri)
         .map((a, i) => ({ uri: a.uri!, name: a.fileName ?? `photo_${Date.now()}_${i}.jpg` }));
@@ -479,6 +532,10 @@ export const CommunityChatScreen: React.FC = () => {
       if (resp.didCancel || !resp.assets?.length) return;
       const a = resp.assets[0];
       if (!a.uri) return;
+      if (a.fileSize != null && a.fileSize > 30 * 1024 * 1024) {
+        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        return;
+      }
       setMediaPreview([{ uri: a.uri, name: a.fileName ?? `photo_${Date.now()}.jpg` }]);
       setMediaPreviewIdx(0);
       setMediaCaption('');
@@ -492,19 +549,35 @@ export const CommunityChatScreen: React.FC = () => {
       const result = await launchImageLibrary({ mediaType: 'video', selectionLimit: 1 });
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
-      setSending(true);
-      const uploaded = await uploadMessageVideo(asset.uri, asset.fileName, asset.type);
-      const videoUrl = uploaded.hls_url ?? uploaded.url;
-      const reply_to_id = replyingTo?.id;
+      if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
+        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        return;
+      }
+
+      const capturedReplyId = replyingTo?.id;
       setReplyingTo(null);
-      const msg = await communityService.sendMessage(
-        communityId, '', 'video', [videoUrl], reply_to_id,
-        { duration: uploaded.duration, thumbnail_url: uploaded.thumbnail_url, hls_url: uploaded.hls_url },
-      );
-      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-    } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la vidéo.'); }
-    finally { setSending(false); }
+
+      backgroundUploadService.enqueueMessageVideo({
+        localUri: asset.uri,
+        label:    asset.fileName ?? 'Vidéo',
+        onDone:   async (res) => {
+          const videoUrl = res.hlsUrl ?? res.videoUrl ?? '';
+          try {
+            const msg = await communityService.sendMessage(
+              communityId, '', 'video', [videoUrl], capturedReplyId,
+              { duration: res.durationSec, thumbnail_url: res.thumbnailUrl, hls_url: res.hlsUrl },
+            );
+            setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
+            setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+          } catch {
+            Alert.alert('Erreur', "Impossible d'envoyer le message vidéo.");
+          }
+        },
+        onError: () => {
+          Alert.alert('Erreur', "L'upload de la vidéo a échoué. Réessaie.");
+        },
+      });
+    } catch { Alert.alert('Erreur', 'Impossible de lire la vidéo sélectionnée.'); }
   };
 
   // ── Enregistrement vocal en temps réel ───────────────────────────────────
@@ -608,6 +681,10 @@ export const CommunityChatScreen: React.FC = () => {
     setAttachOpen(false);
     try {
       const [result] = await pick({ type: [types.pdf, types.doc, types.docx, types.xls, types.xlsx, types.plainText, types.allFiles] });
+      if (result.size != null && result.size > 30 * 1024 * 1024) {
+        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        return;
+      }
       setFilePreview({ uri: result.uri, name: result.name ?? 'fichier', size: result.size ?? undefined, mimeType: result.type ?? undefined });
       setFileCaption('');
       setFilePreviewOpen(true);
@@ -811,8 +888,59 @@ export const CommunityChatScreen: React.FC = () => {
     ]);
   };
 
-  const openViewer = (list: string[], idx: number) => {
-    setImgViewerList(list); setImgViewerIdx(idx); setImgViewerOpen(true);
+  const openViewer = (list: string[], idx: number, fromMe = false) => {
+    setImgViewerList(list); setImgViewerIdx(idx); setImgViewerOpen(true); setViewerIsMe(fromMe);
+  };
+
+  const handleImgDownload = async () => {
+    if (dlBusy) return;
+    const url = imgViewerList[imgViewerIdx];
+    if (!url) return;
+
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        { title: 'Permission requise', message: 'Autoriser la sauvegarde dans vos téléchargements.', buttonPositive: 'Autoriser', buttonNegative: 'Refuser' },
+      );
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        Alert.alert('Permission refusée', 'Impossible de sauvegarder sans permission.');
+        return;
+      }
+    }
+
+    const ext = url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+    const mimeMap: Record<string, string> = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+      gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
+    };
+    const mime = mimeMap[ext] ?? 'image/jpeg';
+    const filename = `image_${Date.now()}.${ext}`;
+    const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
+
+    setDlBusy(true);
+    setDlProgress(0);
+    try {
+      await RNBlobUtil.config({
+        path: destPath,
+        addAndroidDownloads: {
+          useDownloadManager: true,
+          notification: true,
+          title: filename,
+          description: 'Téléchargement en cours…',
+          mime,
+        },
+      })
+        .fetch('GET', url)
+        .progress((received: number, total: number) => {
+          setDlProgress(Math.round((Number(received) / Number(total)) * 100));
+        });
+      Alert.alert('Téléchargement terminé', 'Image sauvegardée dans vos téléchargements.');
+    } catch {
+      Alert.alert('Erreur', 'Le téléchargement a échoué. Réessaie plus tard.');
+    } finally {
+      setDlBusy(false);
+      setDlProgress(0);
+    }
   };
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -854,29 +982,111 @@ export const CommunityChatScreen: React.FC = () => {
     );
   };
 
-  const MediaGrid = ({ urls, containerW }: { urls: string[]; containerW: number }) => {
+  const MediaGrid = ({ msgId, urls, containerW, caption, timeLabel, isMe, bubbleBg, myRadius, otherRadius }: {
+    msgId: string; urls: string[];
+    containerW: number; caption?: string | null; timeLabel: string;
+    isMe: boolean; bubbleBg: string; myRadius: object; otherRadius: object;
+  }) => {
+    const dl = getDl(msgId);
     const n = Math.min(urls.length, 4);
     const gap = 3;
+    const radius = isMe ? myRadius : otherRadius;
+
     if (n === 1) {
       return (
-        <TouchableOpacity onPress={() => openViewer(urls, 0)} activeOpacity={0.9}>
-          <Image source={{ uri: urls[0] }} style={{ width: containerW, height: containerW * 0.65, borderRadius: 10 }} resizeMode="cover" />
-        </TouchableOpacity>
-      );
-    }
-    const half = (containerW - gap) / 2;
-    return (
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
-        {urls.slice(0, 4).map((url, i) => (
-          <TouchableOpacity key={i} onPress={() => openViewer(urls, i)} activeOpacity={0.9} style={{ position: 'relative' }}>
-            <Image source={{ uri: url }} style={{ width: half, height: half * 0.75, borderRadius: 8 }} resizeMode="cover" />
-            {i === 3 && urls.length > 4 && (
-              <View style={[S.mediaMore, { borderRadius: 8 }]}>
-                <Text style={S.mediaMoreText}>+{urls.length - 4}</Text>
+        <View style={[S.imgBubble, { backgroundColor: bubbleBg }, radius]}>
+          <TouchableOpacity activeOpacity={0.9} onPress={() => openViewer(urls, 0, isMe)}>
+            {/* Image visible directement depuis le réseau */}
+            <Image source={{ uri: urls[0] }} style={{ width: containerW, height: containerW * 0.65 }} resizeMode="cover" />
+            {/* Bouton download bas-droite — uniquement pour les messages reçus */}
+            {!isMe && !dl.localUri && !dl.downloading && (
+              <TouchableOpacity
+                style={S.imgSaveBtn}
+                onPress={() => startDl(msgId, urls[0], false)}
+                activeOpacity={0.8}
+              >
+                <Icon name="download" size={13} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {!isMe && dl.downloading && (
+              <>
+                <View style={S.imgSaveBtn}>
+                  <Text style={S.imgDlPct}>{dl.progress}%</Text>
+                </View>
+                <View style={S.imgProgressBar}>
+                  <View style={[S.imgProgressFill, { width: `${dl.progress}%` as any }]} />
+                </View>
+              </>
+            )}
+            {/* Heure overlay bas-droit sans caption */}
+            {!caption && (
+              <View style={S.imgTimeBadge}>
+                <Text style={S.imgTimeText}>{timeLabel}</Text>
               </View>
             )}
           </TouchableOpacity>
-        ))}
+          {caption ? (
+            <View style={{ paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 }}>
+              <Text style={{ color: isMe ? '#fff' : colors.textPrimary, fontSize: 14, lineHeight: 19 }}>{caption}</Text>
+              <View style={[S.msgMeta, { marginTop: 3 }]}>
+                <Text style={[S.msgTime, { color: isMe ? 'rgba(255,255,255,0.65)' : colors.textTertiary }]}>{timeLabel}</Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      );
+    }
+
+    const half = (containerW - gap) / 2;
+
+    return (
+      <View style={[S.imgBubble, { backgroundColor: bubbleBg }, radius]}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
+          {urls.slice(0, 4).map((url, i) => {
+            const itemDl = getDl(`${msgId}_${i}`);
+            return (
+              <TouchableOpacity
+                key={i}
+                activeOpacity={0.9}
+                style={{ position: 'relative' }}
+                onPress={() => openViewer(urls, i, isMe)}
+              >
+                {/* Image visible directement */}
+                <Image source={{ uri: url }} style={{ width: half, height: half * 0.75 }} resizeMode="cover" />
+                {/* Bouton download par image — uniquement pour les messages reçus */}
+                {!isMe && !itemDl.localUri && !itemDl.downloading && (
+                  <TouchableOpacity
+                    style={[S.imgSaveBtn, { width: 24, height: 24, borderRadius: 12 }]}
+                    onPress={() => startDl(`${msgId}_${i}`, url, false)}
+                    activeOpacity={0.8}
+                  >
+                    <Icon name="download" size={11} color="#fff" />
+                  </TouchableOpacity>
+                )}
+                {!isMe && itemDl.downloading && (
+                  <View style={[S.imgSaveBtn, { width: 24, height: 24, borderRadius: 12 }]}>
+                    <Text style={[S.imgDlPct, { fontSize: 9 }]}>{itemDl.progress}%</Text>
+                  </View>
+                )}
+                {i === 3 && urls.length > 4 && (
+                  <View style={S.mediaMore}>
+                    <Text style={S.mediaMoreText}>+{urls.length - 4}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {caption ? (
+          <View style={{ paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 }}>
+            <Text style={{ color: isMe ? '#fff' : colors.textPrimary, fontSize: 14, lineHeight: 19 }}>{caption}</Text>
+            <View style={[S.msgMeta, { marginTop: 3 }]}>
+              <Text style={[S.msgTime, { color: isMe ? 'rgba(255,255,255,0.65)' : colors.textTertiary }]}>{timeLabel}</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={S.imgTimeBadge}><Text style={S.imgTimeText}>{timeLabel}</Text></View>
+        )}
       </View>
     );
   };
@@ -1193,28 +1403,52 @@ export const CommunityChatScreen: React.FC = () => {
     const otherRadius = { borderBottomLeftRadius: isLast ? 4 : 16 };
 
     const renderBubbleContent = () => {
-      // Vidéo
+      // Vidéo — style WhatsApp : placeholder + download à la demande
       if (msg.message_type === 'video') {
         const thumb = msg.metadata?.thumbnail_url;
         const dur = msg.metadata?.duration;
-        const videoPlayUrl = msg.metadata?.hls_url ?? msg.media_urls[0];
+        const rawUrl = msg.metadata?.hls_url ?? msg.media_urls[0];
+        const dl = getDl(msg.id);
         return (
           <TouchableOpacity
             style={[S.bubble, { backgroundColor: bubbleBg, padding: 0, overflow: 'hidden' }, isMe ? myRadius : otherRadius]}
-            onPress={() => videoPlayUrl && Linking.openURL(videoPlayUrl)}
+            onPress={() => rawUrl && nav.navigate('VideoPlayer', { url: rawUrl, title: 'Vidéo', thumbnailUrl: thumb })}
             activeOpacity={0.8}
           >
+            {/* Thumbnail visible directement */}
             {thumb
               ? <Image source={{ uri: thumb }} style={{ width: maxW, height: maxW * 0.6 }} resizeMode="cover" />
               : <View style={{ width: maxW, height: maxW * 0.6, backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="video" size={36} color={isMe ? '#fff' : colors.primary} />
                 </View>
             }
+            {/* Bouton play central */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.22)' }}>
               <Icon name="play-circle" size={44} color="rgba(255,255,255,0.9)" />
             </View>
+            {/* Bouton download bas-droite — uniquement pour les messages reçus */}
+            {!isMe && !dl.localUri && !dl.downloading && rawUrl && (
+              <TouchableOpacity
+                style={S.imgSaveBtn}
+                onPress={() => startDl(msg.id, rawUrl, true)}
+                activeOpacity={0.8}
+              >
+                <Icon name="download" size={13} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {!isMe && dl.downloading && (
+              <>
+                <View style={S.imgSaveBtn}>
+                  <Text style={S.imgDlPct}>{dl.progress}%</Text>
+                </View>
+                <View style={S.imgProgressBar}>
+                  <View style={[S.imgProgressFill, { width: `${dl.progress}%` as any }]} />
+                </View>
+              </>
+            )}
+            {/* Durée bas-gauche */}
             {dur != null && (
-              <View style={{ position: 'absolute', bottom: 8, right: 10 }}>
+              <View style={{ position: 'absolute', bottom: 8, left: 10 }}>
                 <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 }}>
                   {fmtDuration(dur)}
                 </Text>
@@ -1323,20 +1557,20 @@ export const CommunityChatScreen: React.FC = () => {
           </TouchableOpacity>
         );
       }
-      // Image
+      // Image — style WhatsApp : placeholder + download à la demande
       if (isMedia) {
         return (
-          <View style={{ gap: 4 }}>
-            <MediaGrid urls={msg.media_urls} containerW={maxW} />
-            {msg.content ? (
-              <View style={[S.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
-                <Text style={[S.msgText, { color: textColor }]}>{msg.content}</Text>
-              </View>
-            ) : null}
-            <Text style={[S.floatTime, { color: colors.textTertiary, textAlign: isMe ? 'right' : 'left' }]}>
-              {msg.is_pinned ? '📌 ' : ''}{fmtTime(msg.created_at)}
-            </Text>
-          </View>
+          <MediaGrid
+            msgId={msg.id}
+            urls={msg.media_urls}
+            containerW={maxW}
+            caption={msg.content || null}
+            timeLabel={(msg.is_pinned ? '📌 ' : '') + fmtTime(msg.created_at)}
+            isMe={isMe}
+            bubbleBg={bubbleBg}
+            myRadius={myRadius}
+            otherRadius={otherRadius}
+          />
         );
       }
       // Texte
@@ -1415,6 +1649,17 @@ export const CommunityChatScreen: React.FC = () => {
 
   // ── Empty state ────────────────────────────────────────────────────────────
   const EmptyState = () => {
+    if (!isOnline && messages.length === 0) {
+      return (
+        <View style={S.emptyState}>
+          <View style={[S.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
+            <Icon name="wifi-off" size={28} color={colors.textTertiary} />
+          </View>
+          <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>Hors ligne</Text>
+          <Text style={[S.emptySub, { color: colors.textTertiary }]}>Aucun message en cache. Reconnecte-toi pour charger la discussion.</Text>
+        </View>
+      );
+    }
     const cfg: Record<ChatTab, { icon: string; title: string; sub: string }> = {
       discussion:    { icon: 'message-circle', title: 'Aucun message', sub: 'Soyez le premier à écrire !' },
       announcements: { icon: 'bell',           title: 'Aucune annonce', sub: 'Les annonces des admins apparaîtront ici' },
@@ -1686,6 +1931,37 @@ export const CommunityChatScreen: React.FC = () => {
           </View>
         ) : activeTab === 'media' ? renderMediaTab() : (
           <>
+            {/* Bandeau upload vidéo TikTok-style */}
+            {msgVideoJobs.map(job => (
+              <View key={job.id} style={[S.uploadBar, { backgroundColor: job.status === 'error' ? '#ff3b3015' : colors.primary + '18' }]}>
+                <View style={S.uploadBarInner}>
+                  <View style={S.uploadBarLeft}>
+                    {job.status === 'error' ? (
+                      <Icon name="alert-circle" size={16} color="#ff3b30" />
+                    ) : job.status === 'done' ? (
+                      <Icon name="check-circle" size={16} color="#34c759" />
+                    ) : (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    )}
+                    <Text style={[S.uploadBarText, { color: job.status === 'error' ? '#ff3b30' : job.status === 'done' ? '#34c759' : colors.primary }]}>
+                      {job.status === 'done'          ? 'Vidéo envoyée !'
+                       : job.status === 'error'       ? (job.error ?? "Échec de l'envoi")
+                       : job.status === 'compressing' ? `Compression… ${job.progress}%`
+                       : `Envoi… ${job.progress}%`}
+                    </Text>
+                  </View>
+                  {job.status !== 'done' && job.status !== 'error' && (
+                    <Text style={[S.uploadBarPct, { color: colors.primary }]}>{job.progress}%</Text>
+                  )}
+                </View>
+                {job.status !== 'done' && job.status !== 'error' && (
+                  <View style={S.uploadProgressTrack}>
+                    <View style={[S.uploadProgressFill, { width: `${job.progress}%` as any, backgroundColor: colors.primary }]} />
+                  </View>
+                )}
+              </View>
+            ))}
+
             <FlatList
               key={`chat-${activeTab}`}
               ref={listRef}
@@ -2293,12 +2569,31 @@ export const CommunityChatScreen: React.FC = () => {
       <Modal visible={imgViewerOpen} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setImgViewerOpen(false)}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <StatusBar hidden />
+          {/* Fermer */}
           <TouchableOpacity style={S.viewerClose} onPress={() => setImgViewerOpen(false)}>
             <View style={S.viewerCloseInner}><Icon name="x" size={20} color="#fff" /></View>
           </TouchableOpacity>
+          {/* Compteur */}
           {imgViewerList.length > 1 && (
             <View style={S.viewerCounter}>
               <Text style={{ color: '#fff', fontWeight: '600' }}>{imgViewerIdx + 1} / {imgViewerList.length}</Text>
+            </View>
+          )}
+          {/* Bouton télécharger — uniquement pour les images reçues */}
+          {!viewerIsMe && (
+            <TouchableOpacity style={S.viewerDl} onPress={handleImgDownload} disabled={dlBusy}>
+              <View style={S.viewerCloseInner}>
+                {dlBusy
+                  ? <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{dlProgress}%</Text>
+                  : <Icon name="download" size={18} color="#fff" />
+                }
+              </View>
+            </TouchableOpacity>
+          )}
+          {/* Barre de progression */}
+          {!viewerIsMe && dlBusy && (
+            <View style={S.viewerProgressBg}>
+              <View style={[S.viewerProgressFill, { width: `${dlProgress}%` }]} />
             </View>
           )}
           <ScrollView
@@ -2363,7 +2658,6 @@ const S = StyleSheet.create({
   msgMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 5, gap: 3 },
   edited: { fontSize: 10, fontStyle: 'italic' },
   msgTime: { fontSize: 10 },
-  floatTime: { fontSize: 10, marginTop: 3 },
   pinnedRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
 
   // Reply
@@ -2377,6 +2671,18 @@ const S = StyleSheet.create({
   // Media
   mediaMore: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.52)', alignItems: 'center', justifyContent: 'center' },
   mediaMoreText: { color: '#fff', fontWeight: '800', fontSize: 22 },
+  imgBubble:    { overflow: 'hidden' },
+  imgTimeBadge: { position: 'absolute', bottom: 6, right: 8, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  imgTimeText:  { color: '#fff', fontSize: 10, fontWeight: '500' },
+  imgSaveBtn: {
+    position: 'absolute', bottom: 6, right: 8,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.50)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  imgDlPct:        { color: '#fff', fontSize: 10, fontWeight: '700' },
+  imgProgressBar:  { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
+  imgProgressFill: { height: 3, backgroundColor: '#fff' },
 
   // Announcement
   announceBubble: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8 },
@@ -2461,6 +2767,9 @@ const S = StyleSheet.create({
   viewerClose: { position: 'absolute', top: 52, right: 20, zIndex: 10 },
   viewerCloseInner: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   viewerCounter: { position: 'absolute', top: 56, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+  viewerDl: { position: 'absolute', top: 52, right: 68, zIndex: 10 },
+  viewerProgressBg: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.2)', zIndex: 10 },
+  viewerProgressFill: { height: 3, backgroundColor: '#fff' },
 
   // Messages système
   sysMsgRow:      { alignItems: 'center', marginVertical: 8, paddingHorizontal: 16 },
@@ -2528,6 +2837,15 @@ const S = StyleSheet.create({
   locationFooterOther: { backgroundColor: '#f5f5f5' },
   locationLabel:       { fontSize: 13, fontWeight: '700' },
   locationCoords:      { fontSize: 11, marginTop: 1 },
+
+  // Bandeau upload vidéo
+  uploadBar:           { overflow: 'hidden' },
+  uploadBarInner:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 9 },
+  uploadBarLeft:       { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  uploadBarText:       { fontSize: 13, fontWeight: '500', flex: 1 },
+  uploadBarPct:        { fontSize: 12, fontWeight: '700', marginLeft: 8 },
+  uploadProgressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', width: '100%' },
+  uploadProgressFill:  { height: 3 },
 });
 
 // Styles du modal preview média

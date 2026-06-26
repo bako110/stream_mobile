@@ -108,6 +108,7 @@ export const InlineVideoPlayer: React.FC<Props> = ({
           style={StyleSheet.absoluteFill}
           resizeMode="contain"
           controls={false}
+          surfaceType="texture"
         />
 
         {/* Overlay play/pause central */}
@@ -201,6 +202,7 @@ export const InlineVideoPlayer: React.FC<Props> = ({
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
         controls={false}
+        surfaceType="texture"
       />
 
       {/* Overlay tap central — play/pause ou navigation */}

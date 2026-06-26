@@ -17,7 +17,7 @@ import { storyService } from '../../services/storyService';
 import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
 import { GoFolyXLoader } from '../common';
-import { getLocalUri, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
+import { getLocalUri, getLocalUriAsync, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
 import { apiClient } from '../../api/client';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -80,14 +80,39 @@ const StoryImageView = React.memo(({ uri, bgColor }: { uri: string; bgColor?: st
   );
 });
 
-const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void; onBuffering?: (b: boolean) => void }> = React.memo(({ uri, paused, onReady, onBuffering }) => {
-  const [buffering,   setBuffering]   = useState(false);
-  const [ready,       setReady]       = useState(false);
-  const [usedFallback,setUsedFallback]= useState(false);
+const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => void; onBuffering?: (b: boolean) => void; thumbnail?: string | null }> = React.memo(({ uri, paused, onReady, onBuffering, thumbnail }) => {
+  const [buffering,    setBuffering]    = useState(false);
+  const [usedFallback, setUsedFallback] = useState(false);
+  const isHls = uri.includes('.m3u8');
 
-  // Utilise le cache disque si disponible, sinon l'URL réseau
-  const localUri  = getLocalUri(uri);
-  const playUri   = (!usedFallback && localUri) ? localUri : uri;
+  // Vérifie synchrone d'abord — si déjà en cache index, on démarre sans loader
+  const syncLocal = !isHls ? getLocalUri(uri) : null;
+  const [resolvedUri, setResolvedUri] = useState<string>(syncLocal ?? uri);
+  // Fichier local confirmé ou thumbnail dispo → pas de spinner de départ
+  const [ready, setReady] = useState(() => !!syncLocal);
+  // Thumbnail affiché tant que la vidéo n'est pas prête (évite le spinner brut)
+  const [showThumb, setShowThumb] = useState(() => !syncLocal && !!thumbnail);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (isHls) return; // HLS : pas de cache disque possible
+
+    getLocalUriAsync(uri).then(local => {
+      if (cancelled) return;
+      if (local) {
+        setResolvedUri(local);
+        setReady(true);
+        setShowThumb(false);
+        onReady();
+      } else {
+        setResolvedUri(uri);
+        cacheInBackground(uri).catch(() => {});
+      }
+    });
+    return () => { cancelled = true; };
+  }, [uri]);
+
+  const playUri = (!usedFallback && resolvedUri) ? resolvedUri : uri;
 
   const player = useVideoPlayer(
     { uri: playUri, bufferConfig: BUFFER_CFG },
@@ -100,43 +125,57 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
     },
   );
 
-  // Télécharge en background pendant la lecture pour la prochaine fois
-  useEffect(() => {
-    if (uri && !uri.includes('.m3u8')) {
-      cacheInBackground(uri).catch(() => {});
-    }
-  }, [uri]);
-
   useEffect(() => {
     if (paused) player.pause();
     else        player.play();
-  }, [paused]);
+  }, [paused, player]);
 
   useEffect(() => {
-    const bufSub = player.addEventListener('onBuffer', (isBuffering: boolean) => { setBuffering(isBuffering); onBuffering?.(isBuffering); });
-    const stsSub = player.addEventListener('onStatusChange', (status: VideoPlayerStatus) => {
-      if (status === 'readyToPlay' && !ready) { setReady(true); onReady(); }
+    if (!resolvedUri || resolvedUri === player.src?.uri) return;
+    player.replaceSourceAsync({ uri: resolvedUri, bufferConfig: BUFFER_CFG }).catch(() => {});
+  }, [resolvedUri]);
+
+  useEffect(() => {
+    const bufSub = player.addEventListener('onBuffer', (isBuffering: boolean) => {
+      setBuffering(isBuffering);
+      onBuffering?.(isBuffering);
     });
-    // Fallback réseau si le fichier local est corrompu/supprimé
+    const stsSub = player.addEventListener('onStatusChange', (status: VideoPlayerStatus) => {
+      if (status === 'readyToPlay' && !ready) {
+        setReady(true);
+        setShowThumb(false);
+        onReady();
+      }
+    });
     const errSub = player.addEventListener('onError', () => {
-      if (localUri && !usedFallback) {
-        invalidateCacheEntry(uri);  // supprime l'entrée zombie de l'index
-        setUsedFallback(true);       // déclenche re-render avec l'URL réseau
+      if (resolvedUri !== uri && !usedFallback) {
+        invalidateCacheEntry(uri);
+        setUsedFallback(true);
+        setResolvedUri(uri);
         setReady(false);
       }
     });
     return () => { bufSub.remove(); stsSub.remove(); errSub.remove(); };
-  }, [localUri, usedFallback]);
+  }, [resolvedUri, usedFallback]);
 
   return (
     <View style={s.media}>
       <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />
-      {(!ready || buffering) && (
+      {/* Thumbnail par-dessus pendant le buffering — disparait quand la vidéo est prête */}
+      {showThumb && thumbnail ? (
+        <Image
+          source={{ uri: thumbnail }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+      ) : null}
+      {/* Spinner uniquement si pas de thumbnail et pas encore prête */}
+      {(!ready || buffering) && !showThumb && (
         <GoFolyXLoader variant="reel" color="#ffffff" />
       )}
     </View>
   );
-}, (prev, next) => prev.uri === next.uri && prev.paused === next.paused);
+}, (prev, next) => prev.uri === next.uri && prev.paused === next.paused && prev.thumbnail === next.thumbnail);
 
 // ── Préchargeur silencieux — instancie un player et appelle preload() ─────────
 // Rendu invisible, libéré au unmount automatiquement par react-native-video
@@ -959,19 +998,19 @@ export const StoryViewer: React.FC<Props> = ({
         {/* ── Préchargeurs vidéo invisibles ─────────────────────────────────────
             Story suivante + 2 premiers groupes suivants + groupe précédent     */}
         {group.stories[storyIdx + 1]?.media_type === 'video' && group.stories[storyIdx + 1]?.media_url && (
-          <VideoPreloader key={`cur-next-${group.stories[storyIdx + 1].id}`} uri={group.stories[storyIdx + 1].media_url!} />
+          <VideoPreloader key={`cur-next-${group.stories[storyIdx + 1].id}`} uri={group.stories[storyIdx + 1].mp4_url ?? group.stories[storyIdx + 1].media_url!} />
         )}
         {[groupIdx + 1, groupIdx + 2].map(gi => {
           const g = groups[gi];
           const st = g?.stories[0];
           if (!st || st.media_type !== 'video' || !st.media_url) return null;
-          return <VideoPreloader key={`grp-${gi}-${st.id}`} uri={st.media_url!} />;
+          return <VideoPreloader key={`grp-${gi}-${st.id}`} uri={st.mp4_url ?? st.media_url!} />;
         })}
         {groupIdx > 0 && (() => {
           const prev = groups[groupIdx - 1];
           const lastSt = prev?.stories[prev.stories.length - 1];
           if (!lastSt || lastSt.media_type !== 'video' || !lastSt.media_url) return null;
-          return <VideoPreloader key={`prev-${lastSt.id}`} uri={lastSt.media_url!} />;
+          return <VideoPreloader key={`prev-${lastSt.id}`} uri={lastSt.mp4_url ?? lastSt.media_url!} />;
         })()}
 
         {/* ── Media ─────────────────────────────────────────────────────── */}
@@ -982,9 +1021,14 @@ export const StoryViewer: React.FC<Props> = ({
           <StoryImageView uri={story.media_url} bgColor={story.background_color ?? undefined} />
         )}
         {story.media_type === 'video' && story.media_url && (
-          <StoryVideoView key={story.id} uri={story.media_url} paused={paused}
+          <StoryVideoView
+            key={story.id}
+            uri={story.mp4_url ?? story.media_url}
+            paused={paused}
             onReady={() => setVideoReady(true)}
-            onBuffering={setVideoBuffering} />
+            onBuffering={setVideoBuffering}
+            thumbnail={story.thumbnail_url ?? null}
+          />
         )}
         {(story.media_type === 'image' || story.media_type === 'video') &&
           story.filter_overlay_color && (story.filter_overlay_opacity ?? 0) > 0 && (

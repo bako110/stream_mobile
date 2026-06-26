@@ -405,8 +405,10 @@ export const ReelEditorScreen: React.FC<Props> = ({
 
   const [startRatio, setStartRatio] = useState(initStartR);
   const [endRatio,   setEndRatio]   = useState(initEndR);
-  const startRef = useRef(initStartR);
-  const endRef   = useRef(initEndR);
+  const startRef   = useRef(initStartR);
+  const endRef     = useRef(initEndR);
+  const durationRef = useRef(Math.max(durationSec, 1));
+  useEffect(() => { durationRef.current = Math.max(durationSec, 1); }, [durationSec]);
 
   const [filter,   setFilter]   = useState<FilterKey>(init?.filter ?? 'original');
   const [adjust,   setAdjust]   = useState<VideoAdjust>(init?.adjust ?? { ...DEFAULT_ADJUST });
@@ -525,43 +527,66 @@ export const ReelEditorScreen: React.FC<Props> = ({
   }, [isPlaying, player, durationSec]);
 
   const pauseAndSeekStart = useCallback(() => {
-    player.pause(); setIsPlaying(false);
-    setTimeout(() => { try { player.currentTime = startRef.current * durationSec; } catch {}; }, 80);
-  }, [player, durationSec]);
+    try { player.currentTime = startRef.current * durationRef.current; } catch {}
+    setTimeout(() => {
+      try { player.play(); setIsPlaying(true); } catch {}
+    }, 120);
+  }, [player]);
 
   // ── Trim PanResponders ────────────────────────────────────────────────────
+  // On capture la valeur au moment du grant pour calculer depuis une base fixe,
+  // pas en accumulant les deltas frame par frame.
+  const leftGrantRatio  = useRef(0);
+  const rightGrantRatio = useRef(1);
+
   const leftPan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: () => { player.pause(); setIsPlaying(false); },
+      onStartShouldSetPanResponder:        () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder:         () => true,
+      onMoveShouldSetPanResponderCapture:  () => true,
+      onPanResponderGrant: () => {
+        leftGrantRatio.current = startRef.current;
+        player.pause();
+        setIsPlaying(false);
+      },
       onPanResponderMove: (_, g) => {
-        const r = Math.max(0, Math.min(
-          startRef.current + g.dx / TRIM_W,
-          endRef.current - 1 / Math.max(durationSec, 1),
-        ));
-        const minEnd = Math.min(r + MAX_TRIM / durationSec, 1);
+        const dur = durationRef.current;
+        const raw = leftGrantRatio.current + g.dx / TRIM_W;
+        const r   = Math.max(0, Math.min(raw, endRef.current - 1 / dur));
+        const minEnd = Math.min(r + MAX_TRIM / dur, 1);
         if (endRef.current > minEnd) { endRef.current = minEnd; setEndRatio(minEnd); }
-        startRef.current = r; setStartRatio(r);
+        startRef.current = r;
+        setStartRatio(r);
+        try { player.currentTime = r * dur; } catch {}
       },
       onPanResponderRelease: () => pauseAndSeekStart(),
+      onPanResponderTerminationRequest: () => false,
     }),
   ).current;
 
   const rightPan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: () => { player.pause(); setIsPlaying(false); },
-      onPanResponderMove: (_, g) => {
-        const maxR = Math.min(startRef.current + MAX_TRIM / durationSec, 1);
-        const r = Math.min(maxR, Math.max(
-          endRef.current + g.dx / TRIM_W,
-          startRef.current + 1 / Math.max(durationSec, 1),
-        ));
-        endRef.current = r; setEndRatio(r);
+      onStartShouldSetPanResponder:        () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder:         () => true,
+      onMoveShouldSetPanResponderCapture:  () => true,
+      onPanResponderGrant: () => {
+        rightGrantRatio.current = endRef.current;
+        player.pause();
+        setIsPlaying(false);
       },
-      onPanResponderRelease: () => { player.pause(); setIsPlaying(false); },
+      onPanResponderMove: (_, g) => {
+        const dur  = durationRef.current;
+        const raw  = rightGrantRatio.current + g.dx / TRIM_W;
+        const maxR = Math.min(startRef.current + MAX_TRIM / dur, 1);
+        const r    = Math.min(maxR, Math.max(raw, startRef.current + 1 / dur));
+        endRef.current = r;
+        setEndRatio(r);
+        try { player.currentTime = Math.max(0, r * dur - 0.1); } catch {}
+      },
+      onPanResponderRelease: () => pauseAndSeekStart(),
+      onPanResponderTerminationRequest: () => false,
     }),
   ).current;
 
@@ -1094,31 +1119,38 @@ export const ReelEditorScreen: React.FC<Props> = ({
             <View style={s.trimHeader}>
               <Text style={s.panelTitle}>Rogner</Text>
               <Text style={[s.trimDurTxt, !trimValid && { color: '#EF4444' }]}>
-                {fmt(startRatio * durationSec)} → {fmt(endRatio * durationSec)}
+                {fmt(startRatio * durationSec)} – {fmt(endRatio * durationSec)}
                 {'  '}<Text style={{ fontWeight: '800' }}>{fmt(trimSec)}</Text>
               </Text>
             </View>
-            {/* frameBarOuter n'a PAS overflow:hidden pour que les handles soient touchables */}
+
             <View style={s.frameBarOuter}>
-              {/* frameBarInner coupe visuellement les frames décoratives */}
               <View style={s.frameBar} pointerEvents="none">
                 {Array.from({ length: 28 }).map((_, i) => (
                   <View key={i} style={[s.frameCell, { opacity: 0.35 + (i % 3) * 0.15 }]} />
                 ))}
                 <View style={[s.dimL, { width: selLeft }]} />
                 <View style={[s.dimR, { left: selLeft + selWidth }]} />
-                <View style={[s.selBox, { left: selLeft, width: selWidth }, !trimValid && { borderColor: '#EF4444' }]} />
-                {isPlaying && <View style={[s.cursor, { left: Math.max(0, cursorX) }]} />}
+                <View style={[s.selBox, { left: selLeft, width: selWidth }, !trimValid && { borderColor: '#FFD60A' }]} />
+                <View style={[s.cursor, { left: Math.max(selLeft, Math.min(cursorX, selLeft + selWidth - 2)) }]} />
               </View>
-              {/* Handles en dehors du inner pour ne pas être coupés */}
               <View style={[s.handle, s.handleL, { left: selLeft }]} {...leftPan.panHandlers}>
                 <View style={s.handlePip} />
               </View>
-              <View style={[s.handle, s.handleR, { left: selLeft + selWidth - HANDLE_W }]} {...rightPan.panHandlers}>
+              <View style={[s.handle, s.handleR, { left: selLeft + selWidth - (HANDLE_W + 8) }]} {...rightPan.panHandlers}>
                 <View style={s.handlePip} />
               </View>
             </View>
-            <Text style={s.panelHint}>Glisse les poignées pour choisir ton segment (max 90s)</Text>
+
+            {/* Bouton play segment + hint */}
+            <View style={s.trimFooter}>
+              <TouchableOpacity onPress={togglePlay} style={s.trimPlayBtn} activeOpacity={0.8}>
+                <Icon name={isPlaying ? 'pause' : 'play'} size={16} color="#000" />
+              </TouchableOpacity>
+              <Text style={s.panelHint} numberOfLines={1}>
+                {isPlaying ? 'Lecture du segment…' : 'Appuie pour prévisualiser le segment'}
+              </Text>
+            </View>
           </View>
         )}
 
@@ -1469,17 +1501,19 @@ const s = StyleSheet.create({
   trimPanel:  { paddingHorizontal: 24, paddingTop: 16, gap: 10 },
   trimHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   trimDurTxt: { color: '#A78BFA', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  frameBarOuter: { height: 56, position: 'relative' },
-  frameBar:      { ...StyleSheet.absoluteFill, borderRadius: 10, overflow: 'hidden', flexDirection: 'row', backgroundColor: '#1A1830' },
-  frameCell:  { flex: 1, height: 56, backgroundColor: '#2A2848', borderRightWidth: 0.5, borderRightColor: '#0A0814' },
+  trimFooter: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 6 },
+  trimPlayBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#FFD60A', alignItems: 'center', justifyContent: 'center' },
+  frameBarOuter: { height: 64, position: 'relative', overflow: 'visible' },
+  frameBar:      { position: 'absolute', top: 8, left: 0, right: 0, bottom: 8, borderRadius: 10, overflow: 'hidden', flexDirection: 'row', backgroundColor: '#1A1830' },
+  frameCell:  { flex: 1, height: '100%', backgroundColor: '#2A2848', borderRightWidth: 0.5, borderRightColor: '#0A0814' },
   dimL:       { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 1 },
   dimR:       { position: 'absolute', top: 0, bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 1 },
   selBox:     { position: 'absolute', top: 0, bottom: 0, borderWidth: 2.5, borderColor: '#FFD60A', borderRadius: 6, zIndex: 2 },
   cursor:     { position: 'absolute', top: 0, bottom: 0, width: 2.5, backgroundColor: '#fff', zIndex: 5 },
-  handle:     { position: 'absolute', top: 0, bottom: 0, width: HANDLE_W, zIndex: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFD60A' },
-  handleL:    { borderTopLeftRadius: 6, borderBottomLeftRadius: 6 },
-  handleR:    { borderTopRightRadius: 6, borderBottomRightRadius: 6 },
-  handlePip:  { width: 3, height: 20, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.4)' },
+  handle:     { position: 'absolute', top: 0, bottom: 0, width: HANDLE_W + 8, zIndex: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFD60A' },
+  handleL:    { borderTopLeftRadius: 8, borderBottomLeftRadius: 8 },
+  handleR:    { borderTopRightRadius: 8, borderBottomRightRadius: 8 },
+  handlePip:  { width: 3, height: 24, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.4)' },
 
   // Filtres
   filterPanel:       { paddingTop: 12 },

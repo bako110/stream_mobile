@@ -17,6 +17,8 @@ import { communityService } from '../../services/communityService';
 import type { CommunityData, CreateCommunityPayload, JoinStatus } from '../../services/communityService';
 import { apiClient, Endpoints } from '../../api';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { useNetwork } from '../../context/NetworkContext';
+import { offlineCacheService } from '../../services/offlineCacheService';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -252,9 +254,17 @@ export const CommunitiesScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
+  const { isOnline, isInternetReachable } = useNetwork();
 
   const [tab,            setTab]            = useState<'discover' | 'mine'>('discover');
-  const [all,            setAll]            = useState<CommunityData[]>([]);
+  const [all,            setAll]            = useState<CommunityData[]>(() => {
+    // Init depuis cache pour eviter l'ecran vide offline
+    if (tab === 'mine') {
+      const cached = offlineCacheService.getCommunityList();
+      if (cached && cached.length > 0) return cached as unknown as CommunityData[];
+    }
+    return [];
+  });
   const [query,          setQuery]          = useState('');
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
@@ -353,15 +363,45 @@ export const CommunitiesScreen: React.FC = () => {
   };
 
   const load = useCallback(async (silent = false) => {
+    // Offline : servir le cache pour l'onglet "mine"
+    if (!isOnline || !isInternetReachable) {
+      if (tab === 'mine') {
+        const cached = offlineCacheService.getCommunityList();
+        if (cached && cached.length > 0) {
+          setAll(cached as unknown as CommunityData[]);
+        }
+      }
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     if (!silent) setLoading(true);
     try {
       const data = tab === 'mine'
         ? await communityService.mine()
         : await communityService.discover();
-      setAll(Array.isArray(data) ? data : []);
-    } catch {}
+      const list = Array.isArray(data) ? data : [];
+      setAll(list);
+      // Sauvegarder les communities rejointes pour l'offline
+      if (tab === 'mine' && list.length > 0) {
+        offlineCacheService.saveCommunityList(list.map(c => ({
+          id:            String(c.id),
+          name:          c.name,
+          description:   c.description ?? null,
+          avatar_url:    c.avatar_url ?? null,
+          members_count: c.members_count ?? 0,
+          is_private:    c.is_private ?? false,
+        })));
+      }
+    } catch {
+      // Erreur réseau → fallback cache sans vider la liste
+      if (tab === 'mine') {
+        const cached = offlineCacheService.getCommunityList();
+        if (cached && cached.length > 0) setAll(cached as unknown as CommunityData[]);
+      }
+    }
     finally { setLoading(false); setRefreshing(false); }
-  }, [tab]);
+  }, [tab, isOnline, isInternetReachable]);
 
   // Rechargement complet au changement de tab
   useEffect(() => { load(); }, [load]);

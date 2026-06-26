@@ -7,6 +7,7 @@ import { useNavigation, useNavigationState, CommonActions } from '@react-navigat
 import { navigate as navRefNavigate } from './navigationRef';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useWs } from '../context/WebSocketContext';
+import { startOfflinePrefetch } from '../services/offlinePrefetchService';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 import { FeedScreen as HomeScreen } from '../screens/Main/FeedScreen';
@@ -16,6 +17,7 @@ import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
 import { AppTabBar, NotificationToast, BoostPrompt } from '../components/common';
 import { UploadProgressBanner } from '../components/common/UploadProgressBanner';
+import { OfflineBanner }        from '../components/common/OfflineBanner';
 import { ActiveCallBar }        from '../components/call/ActiveCallBar';
 import { ActiveCallProvider }   from '../context/ActiveCallContext';
 
@@ -442,6 +444,12 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
     return () => task.cancel();
   }, []);
 
+  // Pre-charge toutes les conversations et communities en arriere-plan
+  // pour un acces offline immediat sans avoir besoin de les avoir ouvertes
+  useEffect(() => {
+    startOfflinePrefetch();
+  }, []);
+
   const SettingsWrapper = useCallback(
     () => <SettingsScreen onLogout={onLogout} />,
     [onLogout],
@@ -571,6 +579,7 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Support"     component={SupportScreen}     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="SupportChat" component={SupportChatScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack.Navigator>
+      <OfflineBanner />
       <UploadProgressBanner />
       <NotificationToast />
       <ActiveCallBar />

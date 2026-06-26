@@ -2,7 +2,8 @@
  * UserContext — état global de l'utilisateur connecté
  * Permet de propager les changements (avatar, nom, etc.) partout dans l'app.
  */
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { authService, invalidateUserCache } from '../services/authService';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
@@ -46,6 +47,18 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (me?.id) storage.setItem(STORAGE_KEYS.LAST_USER_ID, String(me.id));
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  // Rafraichit les données user quand l'app revient au premier plan
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (appStateRef.current.match(/inactive|background/) && next === 'active') {
+        refreshUser().catch(() => {});
+      }
+      appStateRef.current = next;
+    });
+    return () => sub.remove();
+  }, [refreshUser]);
 
   const value = useMemo(
     () => ({ currentUser, loading, refreshUser, setCurrentUser }),

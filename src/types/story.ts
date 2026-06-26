@@ -12,6 +12,7 @@ export interface Story {
   id: string;
   user_id: string;
   media_url: string | null;
+  mp4_url: string | null;
   media_type: StoryMediaType;
   thumbnail_url: string | null;
   caption: string | null;
@@ -43,6 +44,7 @@ export type StoryAudienceType = 'everyone' | 'selected' | 'except';
 
 export interface StoryCreate {
   media_url?: string;
+  mp4_url?: string;
   media_type: StoryMediaType;
   thumbnail_url?: string;
   caption?: string;

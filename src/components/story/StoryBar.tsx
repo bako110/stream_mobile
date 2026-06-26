@@ -8,9 +8,11 @@ import Icon from 'react-native-vector-icons/Feather';
 import { StoryViewer } from './StoryViewer';
 import { StoryCreator } from './StoryCreator';
 import { VerifiedBadge } from '../common';
-import { storyService } from '../../services/storyService';
+import { storyService, getViewedStories } from '../../services/storyService';
 import { storyUploadState } from '../../services/storyUploadState';
+import { cacheInBackground } from '../../services/videoCacheService';
 import { useWs } from '../../context/WebSocketContext';
+import type { Story } from '../../types/story';
 import type { StoryGroup } from '../../types/story';
 import type { User } from '../../types/user';
 
@@ -53,20 +55,42 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
 
   const load = useCallback(async (forceRefresh = false) => {
     try {
-      const data = await storyService.getFeed({ forceRefresh });
+      let data = await storyService.getFeed({ forceRefresh });
+
+      // Fallback ultime : reconstruire un feed depuis les stories vues localement
+      // (utilisé quand offline ET aucun feed en cache persistant)
+      if (data.length === 0) {
+        const viewed = getViewedStories();
+        if (viewed.length > 0) {
+          const byUser = new Map<string, Story[]>();
+          viewed.forEach(st => {
+            if (!st.author) return;
+            const uid = st.author.id ?? st.user_id;
+            if (!byUser.has(uid)) byUser.set(uid, []);
+            byUser.get(uid)!.push(st);
+          });
+          data = [...byUser.entries()].map(([, stories]) => ({
+            user: stories[0].author!,
+            stories,
+            has_unseen: false, // déjà vues
+          }));
+        }
+      }
+
       setGroups(data);
-      // Précharger thumbnails + 1ère story image des 10 premiers groupes
+      // Précharger thumbnails + images des 10 premiers groupes
       data.slice(0, 10).forEach(g => {
         g.stories.slice(0, 2).forEach(st => {
           if (st.thumbnail_url) Image.prefetch(st.thumbnail_url).catch(() => {});
           else if (st.media_url && st.media_type === 'image') Image.prefetch(st.media_url).catch(() => {});
         });
       });
-      // Précharger les URLs vidéo HLS des 3 premiers groupes (fetch léger — juste le manifest)
-      data.slice(0, 3).forEach(g => {
+      // Télécharger les vidéos des 5 premiers groupes en cache local (offline ready)
+      // HLS (.m3u8) ignoré par cacheInBackground — seuls les MP4 directs sont cachés
+      data.slice(0, 5).forEach(g => {
         g.stories.forEach(st => {
           if (st.media_type === 'video' && st.media_url) {
-            fetch(st.media_url, { method: 'HEAD' }).catch(() => {});
+            cacheInBackground(st.media_url).catch(() => {});
           }
         });
       });
@@ -106,8 +130,8 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
   const displayName = currentUser?.display_name ?? currentUser?.username ?? 'Vous';
   const initials    = displayName[0]?.toUpperCase() ?? '?';
 
-  // Derniere story publiee par le user courant
-  const myLastStory = myGroup?.stories[myGroup.stories.length - 1];
+  // Derniere story publiee (index 0 car backend trie DESC)
+  const myLastStory = myGroup?.stories[0];
   const myThumb = myLastStory?.thumbnail_url ?? myLastStory?.media_url ?? null;
   const myBg    = myLastStory?.background_color ?? null;
 
@@ -195,6 +219,9 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
             <Text style={s.cardLabelAbs} numberOfLines={1}>
               {myGroup ? 'Ma story' : 'Ajouter'}
             </Text>
+            {myGroup && myGroup.stories.length > 1 && (
+              <Text style={s.cardCount}>{myGroup.stories.length} stories</Text>
+            )}
           </TouchableOpacity>
           </LinearGradient>
 
@@ -203,9 +230,9 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
             const idx    = myGroup ? i + 1 : i;
             const user   = group.user;
             const name   = user.display_name ?? user.username;
-            // Toujours la dernière story publiée pour l'aperçu
-            const last   = group.stories[group.stories.length - 1];
-const thumb  = last?.thumbnail_url ?? last?.media_url ?? null;
+            // Index 0 = dernière story publiée (backend ORDER BY created_at DESC)
+            const last   = group.stories[0];
+            const thumb  = last?.thumbnail_url ?? last?.media_url ?? null;
             const bg      = last?.background_color ?? null;
             const caption = last?.caption ?? null;
             const isText  = last?.media_type === 'text';
@@ -270,12 +297,17 @@ const thumb  = last?.thumbnail_url ?? last?.media_url ?? null;
                   </View>
                 </View>
 
-                {/* Nom + badge verifie */}
+                {/* Nom + badge verifie + count */}
                 <View style={s.cardBottom}>
                   {user.is_verified && <VerifiedBadge size={10} />}
                   <Text style={[s.cardLabelInline, seen && { opacity: 0.7 }]} numberOfLines={1}>
                     {name.split(' ')[0]}
                   </Text>
+                  {group.stories.length > 1 && (
+                    <Text style={[s.cardCount, seen && { opacity: 0.7 }]}>
+                      {group.stories.length} stories
+                    </Text>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -480,5 +512,13 @@ const s = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  cardCount: {
+    fontSize:   9,
+    fontWeight: '600',
+    color:      'rgba(255,255,255,0.85)',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

@@ -326,15 +326,6 @@ const PostCardInner: React.FC<PostCardProps> = ({
               </View>
             )}
 
-            {/* Muet si vidéo */}
-            {(post.hls_url ?? post.video_url) && (
-              <View style={{ position: 'absolute', bottom: 48, right: 12,
-                width: 28, height: 28, borderRadius: 14,
-                backgroundColor: 'rgba(0,0,0,0.6)',
-                alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="volume-x" size={10} color="#fff" />
-              </View>
-            )}
 
             {/* Corps du post en overlay bas (si 1 image) */}
             {images.length === 1 && post.body ? (

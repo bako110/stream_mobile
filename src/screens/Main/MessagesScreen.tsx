@@ -17,6 +17,8 @@ import { SkeletonMessages, VerifiedBadge } from '../../components/common';
 import { BorderRadius, Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
 import { useWs } from '../../context/WebSocketContext';
+import { useNetwork } from '../../context/NetworkContext';
+import { offlineCacheService } from '../../services/offlineCacheService';
 import { callHistoryService } from '../../services/callHistoryService';
 import type { CallRecord } from '../../services/callHistoryService';
 import type { ConversationSummary } from '../../services/messageService';
@@ -66,6 +68,7 @@ function formatLastSeen(iso?: string | null): string {
 
 interface Props { onBack?: () => void; }
 
+
 export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const insets            = useSafeAreaInsets();
   const STATUS_H          = insets.top;
@@ -74,6 +77,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const nav               = useNavigation<any>();
   const route             = useRoute<any>();
   const { clearUnreadMessages, addListener, removeListener, missedCallCount, clearMissedCalls, sendMessage: sendWsMessage, isConnected } = useWs();
+  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
   const [activeTab,  setActiveTab]  = useState<'messages' | 'calls'>(
     route.params?.initialTab === 'calls' ? 'calls' : 'messages'
   );
@@ -84,25 +88,44 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const [convSelectedIds,   setConvSelectedIds]   = useState<Set<string>>(new Set());
   const [convSelectMode,    setConvSelectMode]    = useState(false);
 
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [loading,       setLoading]       = useState(true);
+  // Init depuis cache — pas de skeleton si cache dispo
+  const [conversations, setConversations] = useState<ConversationSummary[]>(
+    () => (offlineCacheService.getConversations() as any) ?? []
+  );
+  const [loading,       setLoading]       = useState(
+    () => (offlineCacheService.getConversations()?.length ?? 0) === 0
+  );
   const [refreshing,    setRefreshing]    = useState(false);
   const [search,        setSearch]        = useState('');
 
 
   const load = useCallback(async () => {
+    // Offline : servir le cache
+    if (!isOnline || !isInternetReachable) {
+      const cached = offlineCacheService.getConversations();
+      if (cached && cached.length > 0) {
+        setConversations(cached as any);
+      }
+      setLoading(false);
+      setRefreshing(false);
+      return cached ?? [];
+    }
     try {
       const data = await messageService.getConversations();
       setConversations(data);
+      offlineCacheService.saveConversations(data as any);
       return data;
     } catch {
-      setConversations([]);
+      // Fallback cache si erreur réseau — ne jamais effacer ce qui est déjà affiché
+      const cached = offlineCacheService.getConversations();
+      if (cached && cached.length > 0) setConversations(cached as any);
+      // Si pas de cache, garder les conversations actuellement affichées (setConversations pas appelé)
       return [];
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isOnline, isInternetReachable]);
 
   useEffect(() => { clearUnreadMessages(); }, []);
 
@@ -114,17 +137,31 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const loadAndSubscribe = useCallback((showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
     lastLoadAt.current = Date.now();
+
+    // Offline : servir le cache immédiatement
+    if (!isOnline || !isInternetReachable) {
+      const cached = offlineCacheService.getConversations();
+      if (cached && cached.length > 0) setConversations(cached as any);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     messageService.getConversations()
       .then(data => {
         setConversations(data);
+        offlineCacheService.saveConversations(data as any);
         if (!isConnectedRef.current) return;
         data.forEach(c => {
           if (c.partner_id) sendWsMessage({ type: 'subscribe_presence', user_id: c.partner_id });
         });
       })
-      .catch(() => {})
+      .catch(() => {
+        const cached = offlineCacheService.getConversations();
+        if (cached && cached.length > 0) setConversations(cached as any);
+      })
       .finally(() => { setLoading(false); setRefreshing(false); });
-  }, [sendWsMessage]);
+  }, [sendWsMessage, isOnline, isInternetReachable]);
 
   const isFirstLoad = useRef(true);
   useFocusEffect(useCallback(() => {
@@ -134,7 +171,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
       loadAndSubscribe(true);
     } else {
       // Re-focus : recharge seulement si > 30s depuis le dernier chargement
-      if (Date.now() - lastLoadAt.current > 30_000) {
+      if (Date.now() - lastLoadAt.current > 30_000 && (isOnline && isInternetReachable)) {
         loadAndSubscribe(false);
       } else {
         // Données fraîches — juste re-souscrire présence sans recharger
@@ -150,6 +187,13 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
     }
     return () => { setSearch(''); };
   }, [loadAndSubscribe, sendWsMessage]));
+
+  // Sync au reconnect réseau
+  useEffect(() => {
+    const onReconnect = () => { loadAndSubscribe(false); };
+    addReconnectListener(onReconnect);
+    return () => removeReconnectListener(onReconnect);
+  }, [loadAndSubscribe, addReconnectListener, removeReconnectListener]);
 
   // Reconnexion WS : re-souscrire présence sans recharger si données récentes
   useEffect(() => {
@@ -470,7 +514,11 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={() => { setRefreshing(true); loadAndSubscribe(false); }}
+                onRefresh={() => {
+                  if (!isOnline || !isInternetReachable) { setRefreshing(false); return; }
+                  setRefreshing(true);
+                  loadAndSubscribe(false);
+                }}
                 tintColor={colors.primary}
               />
             }
@@ -478,7 +526,11 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
               <View style={styles.center}>
                 <Icon name="message-circle" size={52} color={colors.textTertiary} />
                 <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
-                  {search ? 'Aucune conversation trouvée' : 'Démarrez votre première conversation'}
+                  {!isOnline || !isInternetReachable
+                    ? 'Aucune conversation en cache'
+                    : search
+                      ? 'Aucune conversation trouvée'
+                      : 'Démarrez votre première conversation'}
                 </Text>
               </View>
             }

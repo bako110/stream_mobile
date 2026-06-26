@@ -14,9 +14,15 @@ const FEED_TTL_MS       = 5 * 60 * 1000; // 5 min
 const MAX_VIEWED_STORED = 200;            // max stories completes en local
 
 // ── Feed cache ────────────────────────────────────────────────────────────────
+// getCachedFeed  → fraîcheur seulement (TTL 5 min). Retourne null si expiré → re-fetch en ligne.
+// getStaleFeed   → toujours disponible même si TTL expiré → fallback offline.
 
 export function getCachedFeed(): StoryGroup[] | null {
   return localCache.get<StoryGroup[]>(FEED_CACHE_KEY);
+}
+
+export function getStaleFeed(): StoryGroup[] | null {
+  return localCache.getPersistent<StoryGroup[]>(FEED_CACHE_KEY);
 }
 
 export function setCachedFeed(groups: StoryGroup[]): void {

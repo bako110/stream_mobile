@@ -35,16 +35,30 @@ export const storage = {
 };
 
 // ── Cache JSON avec TTL — utilisé pour les listes publiques ──────────────────
+// Deux couches :
+//   - localCache.get/set  : cache avec TTL (fraicheur). Expire → null (re-fetch en ligne)
+//   - localCache.getPersistent : cache sans TTL (offline). Toujours dispo tant que non effacé.
 
 interface CacheEntry<T> { data: T; expiresAt: number; }
 
 export const localCache = {
+  // Retourne null si expiré — utilisé pour décider si on re-fetch
   get<T>(key: string): T | null {
     try {
       const raw = mmkv.getString(`cache:${key}`);
       if (!raw) return null;
       const entry: CacheEntry<T> = JSON.parse(raw);
-      if (Date.now() > entry.expiresAt) { mmkv.remove(`cache:${key}`); return null; }
+      if (Date.now() > entry.expiresAt) return null; // expiré mais on ne supprime pas (voir getPersistent)
+      return entry.data;
+    } catch { return null; }
+  },
+
+  // Retourne les données même si TTL expiré — utilisé pour le mode offline
+  getPersistent<T>(key: string): T | null {
+    try {
+      const raw = mmkv.getString(`cache:${key}`);
+      if (!raw) return null;
+      const entry: CacheEntry<T> = JSON.parse(raw);
       return entry.data;
     } catch { return null; }
   },

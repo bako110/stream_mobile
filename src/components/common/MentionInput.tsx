@@ -30,6 +30,7 @@ interface Props {
   placeholder?: string;
   maxLength?: number;
   inputStyle?: any;
+  onSubmit?: () => void;
 }
 
 const DEBOUNCE_MS = 280;
@@ -41,6 +42,7 @@ export const MentionInput: React.FC<Props> = ({
   placeholder = 'Quoi de neuf ?',
   maxLength = 2000,
   inputStyle,
+  onSubmit,
 }) => {
   const inputRef = useRef<TextInput>(null);
   const [suggestions, setSuggestions] = useState<MentionUser[]>([]);
@@ -129,6 +131,9 @@ export const MentionInput: React.FC<Props> = ({
         maxLength={maxLength}
         value={value}
         onChangeText={handleChange}
+        returnKeyType={onSubmit ? 'send' : 'default'}
+        blurOnSubmit={false}
+        onSubmitEditing={onSubmit}
       />
 
       {showDropdown && (
@@ -185,7 +190,7 @@ export const MentionInput: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   container:    { flex: 1 },
-  input:        { fontSize: 18, lineHeight: 26, textAlignVertical: 'top', flex: 1, minHeight: 120 },
+  input:        { fontSize: 18, lineHeight: 26, textAlignVertical: 'top', flex: 1 },
   dropdown: {
     position:   'absolute',
     top:        0,

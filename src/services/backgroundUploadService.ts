@@ -9,13 +9,12 @@
  */
 import notifee, { AndroidImportance, AndroidVisibility } from '@notifee/react-native';
 import { Platform } from 'react-native';
-import { compressVideo } from './videoCompressService';
 import { uploadVideoFromUri, uploadImageFromUri } from './uploadService';
 import type { VideoFolder, UploadFolder } from './uploadService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type UploadJobType = 'reel' | 'post' | 'event' | 'concert';
+export type UploadJobType = 'reel' | 'post' | 'event' | 'concert' | 'message';
 
 export type UploadJobStatus =
   | 'queued'
@@ -94,12 +93,14 @@ class BackgroundUploadService {
   // ── Enqueue video ───────────────────────────────────────────────────────────
 
   enqueueVideo(opts: {
-    localUri:  string;
-    folder:    VideoFolder;
-    type:      UploadJobType;
-    label:     string;
-    onDone:    (result: UploadJobResult) => Promise<void>;
-    onError?:  (err: Error) => void;
+    localUri:   string;
+    folder:     VideoFolder;
+    type:       UploadJobType;
+    label:      string;
+    trimStart?: number;
+    trimEnd?:   number;
+    onDone:     (result: UploadJobResult) => Promise<void>;
+    onError?:   (err: Error) => void;
   }): string {
     const id = `job_${Date.now()}_${++this.counter}`;
     const job: UploadJob = {
@@ -115,6 +116,24 @@ class BackgroundUploadService {
 
     this._runVideo(id, opts).catch(() => {});
     return id;
+  }
+
+  // ── Enqueue message video (chat 1-to-1 ou community) ───────────────────────
+
+  enqueueMessageVideo(opts: {
+    localUri:  string;
+    label:     string;
+    onDone:    (result: UploadJobResult) => Promise<void>;
+    onError?:  (err: Error) => void;
+  }): string {
+    return this.enqueueVideo({
+      localUri: opts.localUri,
+      folder:   'messages',
+      type:     'message',
+      label:    opts.label,
+      onDone:   opts.onDone,
+      onError:  opts.onError,
+    });
   }
 
   // ── Enqueue images (post with mixed images) ─────────────────────────────────
@@ -152,6 +171,8 @@ class BackgroundUploadService {
     imageFolder: UploadFolder;
     type:        UploadJobType;
     label:       string;
+    trimStart?:  number;
+    trimEnd?:    number;
     onDone:      (result: UploadJobResult) => Promise<void>;
     onError?:    (err: Error) => void;
   }): string {
@@ -201,11 +222,9 @@ class BackgroundUploadService {
         videoHeight:  result.height ?? null,
       };
 
-      // Marque done immediatement — le banner se met a jour sans attendre postService.create
       this.update(id, { status: 'done', progress: 100, result: jobResult });
       await this._notifyDone(opts.label);
 
-      // Cree le post en arriere-plan, sans bloquer le banner
       opts.onDone(jobResult).catch(err => {
         console.warn('[backgroundUpload] onDone error:', err?.message ?? err);
       });

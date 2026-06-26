@@ -9,10 +9,13 @@ import { CGUScreen }                      from '../screens/Main/CGUScreen';
 import { PolitiqueConfidentialiteScreen } from '../screens/Main/PolitiqueConfidentialiteScreen';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { UserProvider }      from '../context/UserContext';
+import { NetworkProvider }   from '../context/NetworkContext';
 import { navigationRef }    from './navigationRef';
 import { storage }          from '../utils/storage';
 import { STORAGE_KEYS }     from '../utils/constants';
 import { authService }      from '../services';
+import { ApiError }         from '../api/client';
+import NetInfo              from '@react-native-community/netinfo';
 import { useTheme }         from '../hooks/useTheme';
 import { decodeId }         from '../utils/slugId';
 import { setupFCM } from '../services/fcmService';
@@ -117,7 +120,10 @@ export const RootNavigator: React.FC = () => {
     }
 
     const token = authService.loadStoredToken(
-      () => {
+      async () => {
+        // 401 recu pendant une coupure réseau → ignorer, le token est peut-être encore valide
+        const net = await NetInfo.fetch();
+        if (!net.isConnected || !net.isInternetReachable) return;
         authService._clearTokens();
         setAppState('auth');
       },
@@ -133,9 +139,7 @@ export const RootNavigator: React.FC = () => {
       return;
     }
 
-    // Verifier que la session est toujours valide (token ou refresh token ok)
-    try {
-      await authService.getMe(true);
+    const enterMain = () => {
       setAppState('main');
       setTimeout(() => {
         setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
@@ -143,19 +147,31 @@ export const RootNavigator: React.FC = () => {
         requestLocationPermission();
       }, 500);
       navigatePendingUrl();
-    } catch {
-      // getMe a echoue — tenter le refresh
+    };
+
+    // Verifier que la session est toujours valide (token ou refresh token ok)
+    try {
+      await authService.getMe(true);
+      enterMain();
+    } catch (err) {
+      // Erreur réseau (offline) → on laisse entrer avec le token stocké
+      const isNetworkError = err instanceof ApiError && err.status === 0;
+      if (isNetworkError) {
+        enterMain();
+        return;
+      }
+      // Vraie erreur HTTP (401, etc.) → tenter le refresh
       try {
         await authService.refresh();
-        setAppState('main');
-        setTimeout(() => {
-          setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
-          requestContactsPermission();
-          requestLocationPermission();
-        }, 500);
-        navigatePendingUrl();
-      } catch {
-        // Refresh aussi echoue — session completement expiree
+        enterMain();
+      } catch (refreshErr) {
+        // Refresh aussi échoue en réseau → laisser entrer quand même
+        const isRefreshNetworkError = refreshErr instanceof ApiError && (refreshErr as ApiError).status === 0;
+        if (isRefreshNetworkError) {
+          enterMain();
+          return;
+        }
+        // Session vraiment expirée → déconnexion
         authService._clearTokens();
         setAppState('auth');
       }
@@ -246,6 +262,7 @@ export const RootNavigator: React.FC = () => {
     <NavigationContainer ref={navigationRef} theme={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT} linking={linking}>
       {appState === 'main'
         ? (
+          <NetworkProvider>
           <UserProvider>
             <WebSocketProvider onAccountBlocked={(reason, contact) => {
               authService._clearTokens();
@@ -260,6 +277,7 @@ export const RootNavigator: React.FC = () => {
               <UpdateBanner />
             </WebSocketProvider>
           </UserProvider>
+          </NetworkProvider>
         )
         : <AuthNavigator onAuthSuccess={handleAuthSuccess} initialBlockedInfo={blockedInfo} />
       }
