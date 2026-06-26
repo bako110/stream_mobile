@@ -54,14 +54,15 @@ export const AvatarWithBadge: React.FC<Props> = ({
         </View>
       )}
 
-      {/* Badge online vert — bas gauche (ou bas droite si pas de verified) */}
-      {isOnline === true && (
+      {/* Badge online — toujours visible : vert si en ligne, brun si hors ligne */}
+      {isOnline !== undefined && isOnline !== null && (
         <View style={[s.online, {
           width: onlineBadgeSize, height: onlineBadgeSize,
           borderRadius: onlineBadgeSize / 2,
           bottom: 0,
           left: isVerified ? 0 : undefined,
           right: isVerified ? undefined : 0,
+          backgroundColor: isOnline ? '#22C55E' : '#92400E',
         }]} />
       )}
     </View>

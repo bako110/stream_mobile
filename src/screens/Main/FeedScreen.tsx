@@ -530,7 +530,7 @@ export const FeedScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
-  const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated } = useWs();
+  const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated, lastPresenceUpdate } = useWs();
   const { currentUser } = useUser();
   const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
   const userLocation = useUserLocation();
@@ -1036,6 +1036,20 @@ export const FeedScreen: React.FC = () => {
         : l
     ));
   }, [lastLiveViewersUpdated]);
+
+  // WS : mise à jour is_online en temps réel sur les cartes du feed
+  useEffect(() => {
+    if (!lastPresenceUpdate) return;
+    const { user_id, is_online } = lastPresenceUpdate;
+    setItems(prev => prev.map(item => {
+      const d = item.data as any;
+      if (!d) return item;
+      const authorKey = d.organizer ? 'organizer' : d.artist ? 'artist' : d.author ? 'author' : null;
+      if (!authorKey) return item;
+      if (String(d[authorKey]?.id) !== String(user_id)) return item;
+      return { ...item, data: { ...d, [authorKey]: { ...d[authorKey], is_online } } };
+    }));
+  }, [lastPresenceUpdate]);
 
   // Rafraîchissement temps réel : reload quand un autre utilisateur publie
   useEffect(() => {
