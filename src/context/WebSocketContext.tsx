@@ -511,6 +511,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           if (retryTimer.current) clearTimeout(retryTimer.current);
           retryCount.current = 0;
           connect();
+        } else if (wsRef.current.readyState === WebSocket.OPEN) {
+          // WS vivant en background — signaler qu'on est de nouveau actif
+          wsRef.current.send(JSON.stringify({ type: 'presence_update', is_online: true }));
         }
         // Appel entrant reçu via FCM pendant qu'on était en background
         const raw = storage.getItem('pending_incoming_call');
@@ -530,8 +533,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
             }
           } catch {}
         }
+      } else if (next === 'background') {
+        // WS reste vivant pour les appels — mais signaler qu'on est hors ligne
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'presence_update', is_online: false }));
+        }
       }
-      // Ne pas couper le ping en background — le WS doit rester vivant pour recevoir les appels
     };
     const sub = AppState.addEventListener('change', handleAppState);
     return () => {
