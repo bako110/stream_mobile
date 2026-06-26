@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "633145914883-leneqit4b3a42oml7qaj2ege5v2hiiti.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gofolyx.mobile",
+            "certificate_hash": "7cd47e8cb248ede3cd9756196ec3463871ba80bf"
+          }
+        },
+        {
           "client_id": "633145914883-2ka459achh16hhlak6h3pk58bpcsm4t2.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -23,6 +23,7 @@ export const Endpoints = {
     webQrScan:      `${V1}/auth/web-qr/scan`,
     phoneSendOtp:     `${V1}/auth/phone/send-otp`,
     phoneVerifyOtp:   `${V1}/auth/phone/verify-otp`,
+    phoneVerify:      `${V1}/auth/phone/verify`,
     phoneLink:        `${V1}/auth/phone/link`,
     resetPasswordMe:  `${V1}/auth/me/reset-password`,
   },

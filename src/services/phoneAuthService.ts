@@ -1,11 +1,11 @@
 /**
- * phoneAuthService — OTP SMS via backend GoFolyX (Firebase REST côté serveur).
- * Aucun SDK natif Firebase requis, pas de rebuild Android/iOS nécessaire.
+ * phoneAuthService — OTP SMS via Firebase Auth SDK natif.
  *
  * Flux :
- *   1. sendOtp(phoneE164)      → POST /auth/phone/send-otp   → sessionInfo
- *   2. verifyOtp(sessionInfo, code, opts?) → POST /auth/phone/verify-otp → JWT
+ *   1. sendOtp(phoneE164)         → Firebase envoie le SMS, retourne un ConfirmationResult
+ *   2. verifyOtp(code, opts?)     → Firebase vérifie le code → idToken → backend GoFolyX → JWT
  */
+import auth from '@react-native-firebase/auth';
 import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 import { authService } from './authService';
@@ -19,30 +19,34 @@ export interface PhoneVerifyResult {
 }
 
 class PhoneAuthService {
-  private _sessionInfo: string | null = null;
+  private _confirmation: ReturnType<typeof auth.prototype.signInWithPhoneNumber> | null = null;
 
-  /** Etape 1 : demande d'envoi du SMS via le backend (Firebase REST). */
+  /** Etape 1 : Firebase envoie le SMS via le SDK natif (pas de reCAPTCHA visible). */
   async sendOtp(phoneE164: string): Promise<void> {
-    const res = await apiClient.post<{ session_info: string }>(
-      Endpoints.auth.phoneSendOtp,
-      { phone: phoneE164 },
-    );
-    this._sessionInfo = res.data.session_info;
+    this._confirmation = await auth().signInWithPhoneNumber(phoneE164);
   }
 
-  /** Etape 2 : vérifie le code + connecte/crée le compte. */
+  /** Etape 2 : vérifie le code OTP + connecte/crée le compte GoFolyX. */
   async verifyOtp(code: string, opts?: {
     firstName?: string;
     lastName?: string;
     referralCode?: string;
   }): Promise<PhoneVerifyResult> {
-    if (!this._sessionInfo) throw new Error('Aucune session OTP en cours. Demandez d\'abord un code.');
+    if (!this._confirmation) {
+      throw new Error('Aucune session OTP en cours. Demandez d\'abord un code.');
+    }
+
+    const credential = await this._confirmation.confirm(code);
+    if (!credential?.user) {
+      throw new Error('Vérification Firebase échouée.');
+    }
+
+    const idToken = await credential.user.getIdToken();
 
     const res = await apiClient.post<PhoneVerifyResult>(
-      Endpoints.auth.phoneVerifyOtp,
+      Endpoints.auth.phoneVerify,
       {
-        session_info:  this._sessionInfo,
-        code:          code.trim(),
+        id_token:      idToken,
         first_name:    opts?.firstName,
         last_name:     opts?.lastName,
         referral_code: opts?.referralCode,
@@ -55,12 +59,12 @@ class PhoneAuthService {
       token_type:    res.data.token_type,
     });
 
-    this._sessionInfo = null;
+    this._confirmation = null;
     return res.data;
   }
 
   reset() {
-    this._sessionInfo = null;
+    this._confirmation = null;
   }
 }
 
