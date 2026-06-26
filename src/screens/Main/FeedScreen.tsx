@@ -683,16 +683,31 @@ export const FeedScreen: React.FC = () => {
 
 
   // ── Suggestions — pool de 30 (boosted en tête côté backend), tranches de 10 par bloc ──
-  const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
-  const [suggestLoading, setSuggestLoading] = useState(true);
+  const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>(
+    () => offlineCacheService.getSuggestions() ?? []
+  );
+  const [suggestLoading, setSuggestLoading] = useState(
+    () => (offlineCacheService.getSuggestions()?.length ?? 0) === 0
+  );
 
   const loadSuggestions = useCallback(async () => {
+    if (!isOnline || !isInternetReachable) {
+      const cached = offlineCacheService.getSuggestions();
+      if (cached) setSuggestPool(cached);
+      setSuggestLoading(false);
+      return;
+    }
     try {
       const data = await userService.getSuggestions(30);
-      setSuggestPool(Array.isArray(data) ? data : []);
-    } catch { setSuggestPool([]); }
+      const list = Array.isArray(data) ? data : [];
+      setSuggestPool(list);
+      if (list.length > 0) offlineCacheService.saveSuggestions(list);
+    } catch {
+      const cached = offlineCacheService.getSuggestions();
+      if (cached) setSuggestPool(cached);
+    }
     finally { setSuggestLoading(false); }
-  }, []);
+  }, [isOnline, isInternetReachable]);
 
   // Retourne la tranche du pool correspondant au numero de bloc (1-based)
   // Bloc 1 → [0..9], Bloc 2 → [10..19], Bloc 3 → [20..29], au-delà → tranche finale

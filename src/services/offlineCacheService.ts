@@ -42,6 +42,7 @@ const KEY = {
   EVENT:           (id: string) => `offline:event:${id}`,
   POST:            (id: string) => `offline:post:${id}`,
   USER_PROFILE:    (id: string) => `offline:user_profile:${id}`,
+  SUGGESTIONS:     'offline:suggestions',
 } as const;
 
 // Nombre max de notifications gardées en cache
@@ -257,6 +258,14 @@ export const offlineCacheService = {
   },
 
   // ── Pages Détail ─────────────────────────────────────────────────────────────
+
+  // Suggestions d'amis (TTL 2h — données fraîches mais ok offline)
+  saveSuggestions(users: any[]): void {
+    try { localCache.set(KEY.SUGGESTIONS, users, 2 * 60 * 60 * 1000); } catch {}
+  },
+  getSuggestions(): any[] | null {
+    return localCache.getPersistent<any[]>(KEY.SUGGESTIONS);
+  },
 
   saveConcert(id: string, data: Concert): void {
     try { localCache.set(KEY.CONCERT(id), data, TTL.DETAIL); } catch {}

@@ -256,17 +256,15 @@ export const CommunitiesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { isOnline, isInternetReachable } = useNetwork();
 
-  const [tab,            setTab]            = useState<'discover' | 'mine'>('discover');
-  const [all,            setAll]            = useState<CommunityData[]>(() => {
-    // Init depuis cache pour eviter l'ecran vide offline
-    if (tab === 'mine') {
-      const cached = offlineCacheService.getCommunityList();
-      if (cached && cached.length > 0) return cached as unknown as CommunityData[];
-    }
-    return [];
-  });
+  // Si des communautés sont en cache (= utilisateur déjà membre), démarrer sur 'mine' directement
+  const _cachedMine = offlineCacheService.getCommunityList();
+  const _hasCached  = !!(_cachedMine && _cachedMine.length > 0);
+  const [tab,            setTab]            = useState<'discover' | 'mine'>(_hasCached ? 'mine' : 'discover');
+  const [all,            setAll]            = useState<CommunityData[]>(() =>
+    _hasCached ? (_cachedMine as unknown as CommunityData[]) : []
+  );
   const [query,          setQuery]          = useState('');
-  const [loading,        setLoading]        = useState(true);
+  const [loading,        setLoading]        = useState(!_hasCached);
   const [refreshing,     setRefreshing]     = useState(false);
   const [createOpen,     setCreateOpen]     = useState(false);
   const [templateOpen,   setTemplateOpen]   = useState(false);
