@@ -31,6 +31,7 @@ const KEY = {
   CONV_MSGS:       (partnerId: string) => `offline:conv_msgs:${partnerId}`,
   COMMUNITY_MSGS:  (id: string) => `offline:community_msgs:${id}`,
   COMMUNITY_LIST:  'offline:community_list',
+  COMMUNITY_ROLE:  (id: string) => `offline:community_role:${id}`,
   MY_STORIES:      'offline:my_stories',
   NOTIFICATIONS:   'offline:notifications',
   NOTIF_BADGE:     'offline:notif_badge',
@@ -168,6 +169,14 @@ export const offlineCacheService = {
   },
   getCommunityList(): CachedCommunity[] | null {
     return localCache.getPersistent<CachedCommunity[]>(KEY.COMMUNITY_LIST);
+  },
+
+  // Role dans une communauté (persist 7j — le role change rarement)
+  saveCommunityRole(communityId: string, role: string): void {
+    try { localCache.set(KEY.COMMUNITY_ROLE(communityId), role, 7 * 24 * 60 * 60 * 1000); } catch {}
+  },
+  getCommunityRole(communityId: string): string | null {
+    return localCache.getPersistent<string>(KEY.COMMUNITY_ROLE(communityId));
   },
 
   // Community — messages d'un channel

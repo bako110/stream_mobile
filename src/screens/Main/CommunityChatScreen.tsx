@@ -394,31 +394,48 @@ export const CommunityChatScreen: React.FC = () => {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    communityService.getMyRole(communityId).then(role => {
-      if (!role) {
-        nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
-        return;
+    const online = isOnline && isInternetReachable;
+
+    // Récupérer le role — depuis le cache si offline, sinon API
+    if (!online) {
+      const cachedRole = offlineCacheService.getCommunityRole(communityId);
+      if (cachedRole) {
+        setMyRole(cachedRole);
+      } else {
+        // Jamais visité en ligne : on ne peut pas vérifier l'appartenance — laisser entrer en lecture seule
+        setMyRole('member');
       }
-      setMyRole(role);
-    }).catch(() => {
-      nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
-    });
-    communityService.getById(communityId).then(c => {
-      setCommunityVerified(c.is_verified);
-      setMembersOnlyChat(!!(c as any).members_only_chat);
-    }).catch(() => {});
-    // Charger la cotisation active
-    apiClient.get(`/api/v1/communities/${communityId}/cotisations?status=active`)
-      .then((r: any) => {
-        const list = r.data ?? [];
-        if (list.length > 0) setActiveCotisation(list[0]);
+    } else {
+      communityService.getMyRole(communityId).then(role => {
+        if (!role) {
+          nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+          return;
+        }
+        setMyRole(role);
+        offlineCacheService.saveCommunityRole(communityId, role);
+      }).catch(() => {
+        // Erreur réseau inattendue — lire le cache ou rester en lecture seule
+        const cached = offlineCacheService.getCommunityRole(communityId);
+        if (cached) { setMyRole(cached); }
+        else { nav.reset({ index: 0, routes: [{ name: 'Tabs' }] }); }
+      });
+
+      communityService.getById(communityId).then(c => {
+        setCommunityVerified(c.is_verified);
+        setMembersOnlyChat(!!(c as any).members_only_chat);
       }).catch(() => {});
-    // Charger le vote trésorier actif
-    apiClient.get(`/api/v1/communities/${communityId}/treasurer-elections/active`)
-      .then((r: any) => setActiveElection(r.data?.election ?? null))
-      .catch(() => {});
+      apiClient.get(`/api/v1/communities/${communityId}/cotisations?status=active`)
+        .then((r: any) => {
+          const list = r.data ?? [];
+          if (list.length > 0) setActiveCotisation(list[0]);
+        }).catch(() => {});
+      apiClient.get(`/api/v1/communities/${communityId}/treasurer-elections/active`)
+        .then((r: any) => setActiveElection(r.data?.election ?? null))
+        .catch(() => {});
+      loadPinned();
+    }
+
     loadMessages(1, false, 'discussion');
-    loadPinned();
   }, [communityId]);
 
   // Sync au reconnect réseau
