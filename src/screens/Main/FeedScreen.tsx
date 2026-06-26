@@ -1181,11 +1181,16 @@ export const FeedScreen: React.FC = () => {
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     if (!item) return null;
     if (item.kind === 'suggestions') {
-      // Extraire le numero de bloc depuis l'id "__suggestions__N"
       const blockNum = parseInt(item.id.split('__suggestions__')[1] ?? '1', 10) || 1;
+      // Exclure les utilisateurs déjà suivis ou soi-même
+      const myId = currentUser?.id ? String(currentUser.id) : null;
+      const filteredUsers = sliceForBlock(blockNum).filter(u =>
+        !followingSet.has(String(u.id)) && String(u.id) !== myId
+      );
+      if (!suggestLoading && filteredUsers.length === 0) return null;
       return (
         <PeopleSuggestions
-          users={sliceForBlock(blockNum)}
+          users={filteredUsers}
           loading={suggestLoading}
           onUserPress={id => nav.navigate('UserProfile', { userId: id })}
           onRefresh={loadSuggestions}
@@ -1193,7 +1198,12 @@ export const FeedScreen: React.FC = () => {
       );
     }
     if (item.kind === 'communities') {
-      const comms: CommunityData[] = Array.isArray(item.data) ? item.data : [];
+      const allComms: CommunityData[] = Array.isArray(item.data) ? item.data : [];
+      // Exclure les communautés dont l'utilisateur est déjà membre (cache MMKV)
+      const myCommIds = new Set(
+        (offlineCacheService.getCommunityList() ?? []).map(c => String(c.id))
+      );
+      const comms = allComms.filter(c => !myCommIds.has(String(c.id)) && c.join_status !== 'member');
       if (!comms.length) return null;
       const gradFor = (_name: string): [string, string] =>
         [colors.primary, colors.primaryLight];
