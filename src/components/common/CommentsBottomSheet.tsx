@@ -4,6 +4,7 @@ import {
   TouchableOpacity, KeyboardAvoidingView, Platform, Image,
   Animated, Pressable, Dimensions, Alert, TextInput,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../../hooks/useTheme';
@@ -487,7 +488,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     setPage(1);
     try {
       const data = await socialService.getComments({ ...targetParams, page: 1, limit: PAGE_LIMIT });
-      const mapped = data.map(c => ({ ...c, userReaction: null, replies: [], repliesLoaded: false, showReplies: false }));
+      const mapped = data.map(c => ({ ...c, userReaction: c.user_reaction ?? null, replies: [], repliesLoaded: false, showReplies: false }));
       setComments(mapped);
       setHasMore(data.length === PAGE_LIMIT);
       const count = data.length;
@@ -506,7 +507,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       setComments(prev => {
         const ids = new Set(prev.map(c => c.id));
         const fresh = data.filter(c => !ids.has(c.id)).map(c => ({
-          ...c, userReaction: null, replies: [], repliesLoaded: false, showReplies: false,
+          ...c, userReaction: c.user_reaction ?? null, replies: [], repliesLoaded: false, showReplies: false,
         }));
         return [...prev, ...fresh];
       });
@@ -534,7 +535,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
         const data = await socialService.getReplies(commentId);
         setComments(prev => prev.map(x =>
           x.id === commentId
-            ? { ...x, replies: data.map(r => ({ ...r, userReaction: null })), repliesLoaded: true, repliesLoading: false }
+            ? { ...x, replies: data.map(r => ({ ...r, userReaction: r.user_reaction ?? null })), repliesLoaded: true, repliesLoading: false }
             : x
         ));
       } catch {
@@ -680,6 +681,8 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     else { setReplyTo(null); setText(''); }
   };
 
+  const insets = useSafeAreaInsets();
+
   if (!visible) return null;
 
   return (
@@ -712,136 +715,137 @@ export const CommentsBottomSheet: React.FC<Props> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Liste */}
-          {commentsDisabled ? (
-            <View style={st.center}>
-              <MCIcon name="comment-off-outline" size={56} color={colors.textTertiary} />
-              <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Commentaires desactives</Text>
-              <Text style={[st.emptySubtitle, { color: colors.textTertiary }]}>
-                Les commentaires ont ete desactives sur ce contenu
-              </Text>
-            </View>
-          ) : loading ? (
-            <View style={st.center}>
-              <GoFolyXLoader variant="bar" color={colors.primary} />
-            </View>
-          ) : comments.length === 0 ? (
-            <View style={st.center}>
-              <MCIcon name="comment-text-outline" size={56} color={colors.textTertiary} />
-              <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Pas encore de commentaires</Text>
-              <Text style={[st.emptySubtitle, { color: colors.textTertiary }]}>
-                Soyez le premier a reagir
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={listRef}
-              data={comments}
-              keyExtractor={c => c.id}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={st.listContent}
-              renderItem={({ item }) => (
-                <CommentRow
-                  item={item}
-                  colors={colors}
-                  currentUserId={myId ?? ''}
-                  onReply={c => {
-                    setReplyTo(c);
-                    setEditingId(null);
-                    setTimeout(() => inputRef.current?.focus(), 100);
-                  }}
-                  onToggleReplies={toggleReplies}
-                  onLike={handleReaction}
-                  onEdit={startEdit}
-                  onDelete={handleDelete}
-                />
-              )}
-              ItemSeparatorComponent={() => (
-                <View style={[st.separator, { backgroundColor: colors.border }]} />
-              )}
-              ListFooterComponent={hasMore ? (
-                <TouchableOpacity
-                  style={[st.loadMoreBtn, { borderColor: colors.border }]}
-                  onPress={loadMore}
-                  activeOpacity={0.7}
-                  disabled={loadingMore}
-                >
-                  {loadingMore
-                    ? <GoFolyXLoader variant="bar" color={colors.primary} />
-                    : <Text style={[st.loadMoreText, { color: colors.primary }]}>Voir plus de commentaires</Text>
-                  }
-                </TouchableOpacity>
-              ) : null}
-            />
-          )}
-
-          {/* Banniere contexte */}
-          {(replyTo || isEditMode) && (
-            <View style={[st.contextBanner, {
-              backgroundColor: colors.primary + '12',
-              borderTopColor: colors.primary + '25',
-            }]}>
-              <View style={[st.contextAccent, { backgroundColor: colors.primary }]} />
-              <MCIcon
-                name={isEditMode ? 'pencil-outline' : 'reply-outline'}
-                size={20}
-                color={colors.primary}
+          {/* Liste — prend tout l'espace disponible */}
+          <View style={st.listArea}>
+            {commentsDisabled ? (
+              <View style={st.center}>
+                <MCIcon name="comment-off-outline" size={56} color={colors.textTertiary} />
+                <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Commentaires desactives</Text>
+                <Text style={[st.emptySubtitle, { color: colors.textTertiary }]}>
+                  Les commentaires ont ete desactives sur ce contenu
+                </Text>
+              </View>
+            ) : loading ? (
+              <View style={st.center}>
+                <GoFolyXLoader variant="bar" color={colors.primary} />
+              </View>
+            ) : comments.length === 0 ? (
+              <View style={st.center}>
+                <MCIcon name="comment-text-outline" size={56} color={colors.textTertiary} />
+                <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Pas encore de commentaires</Text>
+                <Text style={[st.emptySubtitle, { color: colors.textTertiary }]}>
+                  Soyez le premier a reagir
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                ref={listRef}
+                data={comments}
+                keyExtractor={c => c.id}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={st.listContent}
+                renderItem={({ item }) => (
+                  <CommentRow
+                    item={item}
+                    colors={colors}
+                    currentUserId={myId ?? ''}
+                    onReply={c => {
+                      setReplyTo(c);
+                      setEditingId(null);
+                      setTimeout(() => inputRef.current?.focus(), 100);
+                    }}
+                    onToggleReplies={toggleReplies}
+                    onLike={handleReaction}
+                    onEdit={startEdit}
+                    onDelete={handleDelete}
+                  />
+                )}
+                ItemSeparatorComponent={() => (
+                  <View style={[st.separator, { backgroundColor: colors.border }]} />
+                )}
+                ListFooterComponent={hasMore ? (
+                  <TouchableOpacity
+                    style={[st.loadMoreBtn, { borderColor: colors.border }]}
+                    onPress={loadMore}
+                    activeOpacity={0.7}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore
+                      ? <GoFolyXLoader variant="bar" color={colors.primary} />
+                      : <Text style={[st.loadMoreText, { color: colors.primary }]}>Voir plus de commentaires</Text>
+                    }
+                  </TouchableOpacity>
+                ) : null}
               />
-              <Text style={[st.contextText, { color: colors.primary }]} numberOfLines={1}>
-                {isEditMode
-                  ? 'Modification en cours…'
-                  : `Reponse a ${getDisplayName(replyTo!.author)}`}
-              </Text>
-              <TouchableOpacity onPress={cancelAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Icon name="x-circle" size={20} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Input — masqué si commentaires désactivés */}
-          {commentsDisabled ? (
-            <View style={[st.disabledBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-              <MCIcon name="comment-off-outline" size={18} color={colors.textTertiary} />
-              <Text style={[st.disabledText, { color: colors.textTertiary }]}>Commentaires desactives</Text>
-            </View>
-          ) : (
-          <View style={[st.inputRow, {
-            borderTopColor: colors.border,
-            backgroundColor: colors.background,
-          }]}>
-            <Avatar author={currentUser as any} size={28} color={colors.primary} />
-            <View style={[st.inputWrap, {
-              backgroundColor: colors.surfaceElevated ?? colors.surface,
-              borderColor: (replyTo || isEditMode) ? colors.primary : colors.border,
-            }]}>
-              <MentionInput
-                value={inputValue}
-                onChangeText={onChangeInput}
-                colors={colors}
-                placeholder={placeholder}
-                maxLength={500}
-                inputStyle={st.input}
-                onSubmit={canSend ? handleSubmit : undefined}
-              />
-              {canSend && (
-                <TouchableOpacity
-                  onPress={handleSubmit}
-                  disabled={sending || editSaving}
-                  style={[st.sendBtn, { backgroundColor: colors.primary }]}
-                  activeOpacity={0.8}
-                >
-                  {(sending || editSaving)
-                    ? <GoFolyXLoader variant="bar" color="#fff" />
-                    : isEditMode
-                      ? <Icon name="check" size={20} color="#fff" />
-                      : <MCIcon name="send" size={20} color="#fff" />
-                  }
-                </TouchableOpacity>
-              )}
-            </View>
+            )}
           </View>
-          )}
+
+          {/* Zone fixee en bas : banniere contexte + input */}
+          <View style={[st.bottomArea, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 6) }]}>
+            {/* Banniere contexte */}
+            {(replyTo || isEditMode) && (
+              <View style={[st.contextBanner, {
+                backgroundColor: colors.primary + '12',
+                borderTopColor: colors.primary + '25',
+              }]}>
+                <View style={[st.contextAccent, { backgroundColor: colors.primary }]} />
+                <MCIcon
+                  name={isEditMode ? 'pencil-outline' : 'reply-outline'}
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text style={[st.contextText, { color: colors.primary }]} numberOfLines={1}>
+                  {isEditMode
+                    ? 'Modification en cours…'
+                    : `Reponse a ${getDisplayName(replyTo!.author)}`}
+                </Text>
+                <TouchableOpacity onPress={cancelAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Icon name="x-circle" size={20} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Input — masqué si commentaires désactivés */}
+            {commentsDisabled ? (
+              <View style={[st.disabledBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+                <MCIcon name="comment-off-outline" size={18} color={colors.textTertiary} />
+                <Text style={[st.disabledText, { color: colors.textTertiary }]}>Commentaires desactives</Text>
+              </View>
+            ) : (
+              <View style={st.inputRow}>
+                <View style={[st.inputWrap, {
+                  backgroundColor: colors.surfaceElevated ?? colors.surface,
+                  borderColor: (replyTo || isEditMode) ? colors.primary : colors.border,
+                }]}>
+                  <MentionInput
+                    value={inputValue}
+                    onChangeText={onChangeInput}
+                    colors={colors}
+                    placeholder={placeholder}
+                    maxLength={500}
+                    inputStyle={st.input}
+                    onSubmit={canSend ? handleSubmit : undefined}
+                  />
+                  {canSend && (
+                    <TouchableOpacity
+                      onPress={handleSubmit}
+                      disabled={sending || editSaving}
+                      style={[st.sendBtn, { backgroundColor: colors.primary }]}
+                      activeOpacity={0.8}
+                    >
+                      {(sending || editSaving)
+                        ? <GoFolyXLoader variant="bar" color="#fff" />
+                        : isEditMode
+                          ? <Icon name="check" size={16} color="#fff" />
+                          : <MCIcon name="send" size={16} color="#fff" />
+                      }
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+          </View>
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -876,6 +880,9 @@ const st = StyleSheet.create({
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   emptyTitle:    { fontSize: 15, fontWeight: '700', marginTop: 4 },
   emptySubtitle: { fontSize: 13 },
+
+  listArea:    { flex: 1 },
+  bottomArea:  { borderTopWidth: StyleSheet.hairlineWidth },
 
   listContent: { paddingHorizontal: 14, paddingBottom: 8, paddingTop: 4 },
 
@@ -921,23 +928,22 @@ const st = StyleSheet.create({
 
   // Input
   inputRow: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
-    paddingHorizontal: 12, paddingVertical: 7,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 4,
   },
   inputWrap: {
-    flex: 1, flexDirection: 'row', alignItems: 'flex-end',
-    borderRadius: 18, borderWidth: 1,
-    paddingLeft: 12, paddingRight: 4, paddingVertical: 4,
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    borderRadius: 20, borderWidth: 1,
+    paddingLeft: 10, paddingRight: 3, paddingVertical: 2,
   },
   input: {
-    flex: 1, fontSize: 13, lineHeight: 18,
-    maxHeight: 72, paddingVertical: 2,
+    flex: 1, fontSize: 13, lineHeight: 17,
+    maxHeight: 56, paddingVertical: 1,
   },
   sendBtn: {
-    width: 34, height: 34, borderRadius: 17,
+    width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
-    marginLeft: 6,
+    marginLeft: 4,
   },
   loadMoreBtn: {
     alignItems: 'center', justifyContent: 'center',

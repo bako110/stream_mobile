@@ -68,6 +68,7 @@ export interface Comment {
   dislike_count?: number;
   reply_count?: number;
   parent_id: string | null;
+  user_reaction?: 'like' | 'dislike' | null;
   created_at: string;
   updated_at: string;
   author?: CommentAuthor | null;
