@@ -965,7 +965,7 @@ export const ChatScreen: React.FC = () => {
           : null;
         return (
           // marges négatives pour annuler le padding de bubbleInner
-          <View style={{ marginHorizontal: -14, marginVertical: -10 }}>
+          <View style={{ marginHorizontal: -14, marginVertical: -10, overflow: 'hidden', borderRadius: 18 }}>
             <TouchableOpacity
               activeOpacity={0.92}
               onPress={() => item.attachment_url && nav.navigate('ImageViewer', { url: item.attachment_url, isMine: mine })}
@@ -2042,7 +2042,7 @@ const styles = StyleSheet.create({
   bubble:       { maxWidth: '82%', marginBottom: 3 },
   bubbleMine:   { alignSelf: 'flex-end' },
   bubbleTheirs: { alignSelf: 'flex-start' },
-  bubbleInner:  { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 4, overflow: 'hidden' },
+  bubbleInner:  { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 4 },
   bubbleInnerMine:   { borderBottomRightRadius: 4 },
   bubbleInnerTheirs: { borderBottomLeftRadius: 4 },
   msgText:      { fontSize: 15, lineHeight: 22 },
