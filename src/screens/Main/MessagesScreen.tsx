@@ -1,6 +1,6 @@
 ﻿/**
  * MessagesScreen â€” Messagerie directe GoFolyX
- * ConnectÃ© Ã  l'API /api/v1/messages/conversations
+ * Connecté à l'API /api/v1/messages/conversations
  */
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
@@ -17,8 +17,6 @@ import { SkeletonMessages, VerifiedBadge } from '../../components/common';
 import { BorderRadius, Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
 import { useWs } from '../../context/WebSocketContext';
-import { useNetwork } from '../../context/NetworkContext';
-import { offlineCacheService } from '../../services/offlineCacheService';
 import { callHistoryService } from '../../services/callHistoryService';
 import type { CallRecord } from '../../services/callHistoryService';
 import type { ConversationSummary } from '../../services/messageService';
@@ -77,7 +75,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const nav               = useNavigation<any>();
   const route             = useRoute<any>();
   const { clearUnreadMessages, addListener, removeListener, missedCallCount, clearMissedCalls, sendMessage: sendWsMessage, isConnected } = useWs();
-  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
   const [activeTab,  setActiveTab]  = useState<'messages' | 'calls'>(
     route.params?.initialTab === 'calls' ? 'calls' : 'messages'
   );
@@ -88,44 +85,24 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const [convSelectedIds,   setConvSelectedIds]   = useState<Set<string>>(new Set());
   const [convSelectMode,    setConvSelectMode]    = useState(false);
 
-  // Init depuis cache — pas de skeleton si cache dispo
-  const [conversations, setConversations] = useState<ConversationSummary[]>(
-    () => (offlineCacheService.getConversations() as any) ?? []
-  );
-  const [loading,       setLoading]       = useState(
-    () => (offlineCacheService.getConversations()?.length ?? 0) === 0
-  );
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [loading,       setLoading]       = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
   const [search,        setSearch]        = useState('');
 
 
   const load = useCallback(async () => {
-    // Offline : servir le cache
-    if (!isOnline || !isInternetReachable) {
-      const cached = offlineCacheService.getConversations();
-      if (cached && cached.length > 0) {
-        setConversations(cached as any);
-      }
-      setLoading(false);
-      setRefreshing(false);
-      return cached ?? [];
-    }
     try {
       const data = await messageService.getConversations();
       setConversations(data);
-      offlineCacheService.saveConversations(data as any);
       return data;
     } catch {
-      // Fallback cache si erreur réseau — ne jamais effacer ce qui est déjà affiché
-      const cached = offlineCacheService.getConversations();
-      if (cached && cached.length > 0) setConversations(cached as any);
-      // Si pas de cache, garder les conversations actuellement affichées (setConversations pas appelé)
       return [];
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isOnline, isInternetReachable]);
+  }, []);
 
   useEffect(() => { clearUnreadMessages(); }, []);
 
@@ -138,30 +115,17 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
     if (showSkeleton) setLoading(true);
     lastLoadAt.current = Date.now();
 
-    // Offline : servir le cache immédiatement
-    if (!isOnline || !isInternetReachable) {
-      const cached = offlineCacheService.getConversations();
-      if (cached && cached.length > 0) setConversations(cached as any);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
     messageService.getConversations()
       .then(data => {
         setConversations(data);
-        offlineCacheService.saveConversations(data as any);
         if (!isConnectedRef.current) return;
         data.forEach(c => {
           if (c.partner_id) sendWsMessage({ type: 'subscribe_presence', user_id: c.partner_id });
         });
       })
-      .catch(() => {
-        const cached = offlineCacheService.getConversations();
-        if (cached && cached.length > 0) setConversations(cached as any);
-      })
+      .catch(() => {})
       .finally(() => { setLoading(false); setRefreshing(false); });
-  }, [sendWsMessage, isOnline, isInternetReachable]);
+  }, [sendWsMessage]);
 
   const isFirstLoad = useRef(true);
   useFocusEffect(useCallback(() => {
@@ -171,7 +135,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
       loadAndSubscribe(true);
     } else {
       // Re-focus : recharge seulement si > 30s depuis le dernier chargement
-      if (Date.now() - lastLoadAt.current > 30_000 && (isOnline && isInternetReachable)) {
+      if (Date.now() - lastLoadAt.current > 30_000) {
         loadAndSubscribe(false);
       } else {
         // Données fraîches — juste re-souscrire présence sans recharger
@@ -187,13 +151,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
     }
     return () => { setSearch(''); };
   }, [loadAndSubscribe, sendWsMessage]));
-
-  // Sync au reconnect réseau
-  useEffect(() => {
-    const onReconnect = () => { loadAndSubscribe(false); };
-    addReconnectListener(onReconnect);
-    return () => removeReconnectListener(onReconnect);
-  }, [loadAndSubscribe, addReconnectListener, removeReconnectListener]);
 
   // Reconnexion WS : re-souscrire présence sans recharger si données récentes
   useEffect(() => {
@@ -515,7 +472,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={() => {
-                  if (!isOnline || !isInternetReachable) { setRefreshing(false); return; }
                   setRefreshing(true);
                   loadAndSubscribe(false);
                 }}
@@ -526,11 +482,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
               <View style={styles.center}>
                 <Icon name="message-circle" size={52} color={colors.textTertiary} />
                 <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
-                  {!isOnline || !isInternetReachable
-                    ? 'Aucune conversation en cache'
-                    : search
-                      ? 'Aucune conversation trouvée'
-                      : 'Démarrez votre première conversation'}
+                  {search ? 'Aucune conversation trouvée' : 'Démarrez votre première conversation'}
                 </Text>
               </View>
             }
@@ -662,21 +614,21 @@ const ConversationRow: React.FC<{
   const name     = conv.partner?.full_name ?? conv.partner?.username ?? conv.partner_id;
   const accent   = accentFor(conv.partner_id);
   const isOnline = conv.partner?.is_online === true;
+  const avatarUri = conv.partner?.avatar_url;
 
   return (
     <TouchableOpacity
       style={[styles.row, {
-        borderBottomColor: colors.divider,
-        backgroundColor:   isSelected ? colors.primary + '15' : unread ? colors.primary + '08' : 'transparent',
+        backgroundColor: isSelected ? colors.primary + '15' : 'transparent',
       }]}
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350}
-      activeOpacity={0.75}
+      activeOpacity={0.7}
     >
       {/* Checkbox overlay en mode s\u00e9lection */}
       {selectMode && (
-        <View style={{ paddingRight: 8 }}>
+        <View style={{ paddingRight: 4 }}>
           <View style={[
             sst.checkbox,
             isSelected  && { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -687,32 +639,44 @@ const ConversationRow: React.FC<{
         </View>
       )}
 
+      {/* Avatar */}
       <TouchableOpacity
         style={[styles.avatarWrap, { opacity: selectMode && !isSelected ? 0.5 : 1 }]}
         onPress={selectMode ? onPress : onAvatarPress}
         activeOpacity={0.8}
       >
-        <View style={[styles.avatar, { backgroundColor: accent + '22' }]}>
-          <Text style={[styles.avatarText, { color: accent }]}>{getInitials(name)}</Text>
-        </View>
+        {avatarUri ? (
+          <Image source={{ uri: avatarUri }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: accent }]}>
+            <Text style={styles.avatarText}>{getInitials(name)}</Text>
+          </View>
+        )}
         {isOnline && !selectMode && <View style={styles.onlineDot} />}
       </TouchableOpacity>
 
-      <View style={[styles.rowContent, { opacity: selectMode && !isSelected ? 0.5 : 1 }]}>
+      {/* Content */}
+      <View style={[styles.rowContent, { opacity: selectMode && !isSelected ? 0.6 : 1 }]}>
+        {/* Ligne 1 : nom + heure */}
         <View style={styles.rowTop}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
-            <Text style={[styles.convName, { color: colors.textPrimary, fontWeight: unread ? '800' : '600' }]} numberOfLines={1}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, marginRight: 8 }}>
+            <Text
+              style={[styles.convName, { color: colors.textPrimary, fontWeight: unread ? '700' : '500' }]}
+              numberOfLines={1}
+            >
               {name}
             </Text>
-            {conv.partner?.is_verified && <VerifiedBadge size={14} />}
+            {conv.partner?.is_verified && <VerifiedBadge size={13} />}
           </View>
-          <Text style={[styles.convTime, { color: unread ? colors.primary : colors.textTertiary }]}>
+          <Text style={[styles.convTime, { color: unread ? colors.primary : colors.textTertiary, fontWeight: unread ? '600' : '400' }]}>
             {formatTime(conv.last_time)}
           </Text>
         </View>
+
+        {/* Ligne 2 : aper\u00e7u message + badge/statut */}
         <View style={styles.rowBottom}>
           <Text
-            style={[styles.convLast, { color: unread ? colors.textPrimary : colors.textTertiary, fontWeight: unread ? '600' : '400' }]}
+            style={[styles.convLast, { color: unread ? colors.textSecondary : colors.textTertiary, fontWeight: unread ? '500' : '400' }]}
             numberOfLines={1}
           >
             {conv.last_message ?? '\u2026'}
@@ -721,10 +685,10 @@ const ConversationRow: React.FC<{
             <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
               <Text style={styles.unreadText}>{conv.unread_count > 99 ? '99+' : conv.unread_count}</Text>
             </View>
-          ) : !selectMode ? (
-            <Text style={[styles.lastSeenText, { color: isOnline ? '#36D9A0' : colors.textDisabled }]}>
-              {isOnline ? 'En ligne' : formatLastSeen(conv.partner?.last_seen_at)}
-            </Text>
+          ) : !selectMode && isOnline ? (
+            <View style={styles.onlinePill}>
+              <View style={styles.onlinePillDot} />
+            </View>
           ) : null}
         </View>
       </View>
@@ -930,21 +894,23 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyText: { fontSize: 14, marginTop: 12, textAlign: 'center', paddingHorizontal: 32 },
 
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing[4], paddingVertical: 13, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing[4], paddingVertical: 11, gap: 13 },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 16, fontWeight: '800' },
-  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#36D9A0', borderWidth: 2, borderColor: '#fff' },
+  avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarText: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 13, height: 13, borderRadius: 6.5, backgroundColor: '#36D9A0', borderWidth: 2.5, borderColor: '#fff' },
 
-  rowContent: { flex: 1, gap: 3 },
+  rowContent: { flex: 1, gap: 4 },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  convName: { fontSize: 15, flex: 1, marginRight: 8 },
-  convTime: { fontSize: 12 },
-  rowBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  convLast: { fontSize: 13, flex: 1, marginRight: 8 },
+  convName: { fontSize: 15, flex: 1 },
+  convTime: { fontSize: 12, flexShrink: 0 },
+  rowBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  convLast: { fontSize: 13, flex: 1 },
   unreadBadge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  unreadText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   lastSeenText: { fontSize: 11, flexShrink: 0 },
+  onlinePill: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#36D9A0', flexShrink: 0 },
+  onlinePillDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#36D9A0' },
 
   fab: { position: 'absolute', bottom: 28, right: 20, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   fabInner: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
