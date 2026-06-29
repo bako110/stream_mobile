@@ -1301,10 +1301,18 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     if (!url) return;
     stopMusic();
     Sound.setCategory('Playback');
-    const snd = new Sound(url, '', err => {
-      if (err || !mountedRef.current) { snd.release(); return; }
+    // Pour une URL http/https : baseName doit être null (pas '') pour que react-native-sound
+    // utilise MediaPlayer.setDataSource(url) au lieu de chercher un fichier local
+    const isRemote = url.startsWith('http://') || url.startsWith('https://');
+    const snd = new Sound(url, isRemote ? (null as any) : '', err => {
+      if (err) {
+        console.warn('[ReelMusic] load error:', err, 'url:', url);
+        snd.release();
+        return;
+      }
+      if (!mountedRef.current) { snd.release(); return; }
       const startSec = reel.music_start_sec ?? 0;
-      snd.setCurrentTime(startSec);
+      if (startSec > 0) snd.setCurrentTime(startSec);
       musicSoundRef.current = snd;
       snd.play(success => {
         if (!success) console.warn('[ReelMusic] playback failed for', url);
