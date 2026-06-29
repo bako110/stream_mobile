@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ChatScreen — fenêtre de conversation entre deux utilisateurs
  * Supporte : texte, vocal, image, vidéo, fichiers, appels
  */
@@ -32,10 +32,7 @@ import { useWs } from '../../context/WebSocketContext';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { ConversationSummary } from '../../services/messageService';
-import { BackButton } from '../../components/common';
 import { useMediaDownload, fmtSize } from '../../hooks/useMediaDownload';
-import { useNetwork } from '../../context/NetworkContext';
-import { offlineCacheService } from '../../services/offlineCacheService';
 
 interface RouteParams {
   partnerId:   string;
@@ -105,22 +102,14 @@ export const ChatScreen: React.FC = () => {
   const { colors }        = theme;
   const nav               = useNavigation<any>();
   const route             = useRoute();
-  const { partnerId, partnerName, lastSeen: initialLastSeen, isOnline: initialIsOnline } = route.params as RouteParams;
+  const { partnerId, partnerName, avatarUrl: partnerAvatarUrl, lastSeen: initialLastSeen, isOnline: initialIsOnline } = route.params as RouteParams;
 
   const { get: getDl, download: startDl } = useMediaDownload();
   const { visibleJobs } = useBackgroundUpload();
   const msgVideoJobs = visibleJobs.filter(j => j.type === 'message');
-  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
 
-  // Init depuis cache immédiatement — évite l'écran vide en offline
-  const [messages,  setMessages]  = useState<Message[]>(() => {
-    const cached = offlineCacheService.getMessages(partnerId);
-    return (cached ?? []) as Message[];
-  });
-  const [loading,   setLoading]   = useState(() => {
-    const cached = offlineCacheService.getMessages(partnerId);
-    return !cached || cached.length === 0;
-  });
+  const [messages,  setMessages]  = useState<Message[]>([]);
+  const [loading,   setLoading]   = useState(true);
   const [sending,   setSending]   = useState(false);
   const [text,      setText]      = useState('');
   const [myId,      setMyId]      = useState<string | null>(null);
@@ -209,9 +198,7 @@ export const ChatScreen: React.FC = () => {
         ) {
           setMessages(prev => {
             if (prev.find(m => m.id === payload.id)) return prev;
-            const next = [payload as unknown as Message, ...prev];
-            offlineCacheService.saveMessages(partnerId, next);
-            return next;
+            return [payload as unknown as Message, ...prev];
           });
           // Auto-mark as read if the message is from the partner
           if (payload.sender_id === partnerId) {
@@ -301,24 +288,8 @@ export const ChatScreen: React.FC = () => {
   }, []);
 
   const loadMessages = useCallback(async (p = 1) => {
-    // Offline : servir le cache persistant sans toucher le réseau
-    if (!isOnline || !isInternetReachable) {
-      if (p === 1) {
-        const cached = offlineCacheService.getMessages(partnerId);
-        if (cached && cached.length > 0) {
-          setMessages(cached as Message[]);
-          const cachedReactions: Record<string, string> = {};
-          cached.forEach(m => { if (m.reaction) cachedReactions[m.id] = m.reaction; });
-          setReactions(cachedReactions);
-        }
-        setLoading(false);
-      }
-      return;
-    }
-
     try {
       const data = await messageService.getMessages(partnerId, p, 30);
-      // Initialiser/mettre à jour les réactions depuis les messages chargés
       const newReactions: Record<string, string> = {};
       data.forEach((m: any) => {
         if (m.reaction) newReactions[m.id] = m.reaction;
@@ -327,50 +298,26 @@ export const ChatScreen: React.FC = () => {
         setMessages(data);
         setReactions(newReactions);
         setHasMore(data.length === 30);
-        // Sauvegarder en cache pour l'offline
-        offlineCacheService.saveMessages(partnerId, data);
         messageService.getPinnedMessages(partnerId).then(pins => setPinnedMessages(pins)).catch(() => {});
       } else {
-        setMessages(prev => {
-          const merged = [...prev, ...data];
-          // Mettre à jour le cache avec tous les messages chargés
-          offlineCacheService.saveMessages(partnerId, merged);
-          return merged;
-        });
+        setMessages(prev => [...prev, ...data]);
         setReactions(prev => ({ ...prev, ...newReactions }));
         setHasMore(data.length === 30);
       }
     } catch (e: any) {
-      // 403 = bloqué par cet utilisateur (ou on l'a bloqué)
       if (e?.response?.status === 403 || e?.status === 403) {
         setIsBlocked(true);
-      }
-      // Erreur réseau : garder le cache visible, ne pas vider
-      if (p === 1) {
-        const cached = offlineCacheService.getMessages(partnerId);
-        if (cached && cached.length > 0) {
-          setMessages(cached as Message[]);
-        }
       }
     } finally {
       setLoading(false);
     }
-  }, [partnerId, isOnline, isInternetReachable]);
+  }, [partnerId]);
 
   useEffect(() => {
     loadMessages(1);
     messageService.markRead(partnerId).catch(() => {});
   }, []);
 
-  // Recharge les messages et marque comme lus quand la connexion se retablit
-  useEffect(() => {
-    const onReconnect = () => {
-      loadMessages(1);
-      messageService.markRead(partnerId).catch(() => {});
-    };
-    addReconnectListener(onReconnect);
-    return () => removeReconnectListener(onReconnect);
-  }, [addReconnectListener, removeReconnectListener, loadMessages, partnerId]);
 
   const loadMore = () => {
     if (!hasMore || loading) return;
@@ -1216,11 +1163,9 @@ export const ChatScreen: React.FC = () => {
     const showDateSep = !prevMsg || !sameDay(item.created_at, prevMsg.created_at);
     const DateSeparator = showDateSep ? (
       <View style={styles.dateSepRow}>
-        <View style={[styles.dateSepLine, { backgroundColor: colors.divider }]} />
         <View style={[styles.dateSepPill, { backgroundColor: colors.backgroundSecondary ?? colors.surface }]}>
-          <Text style={[styles.dateSepText, { color: colors.textTertiary }]}>{fmtDate(item.created_at)}</Text>
+          <Text style={[styles.dateSepText, { color: colors.textTertiary }]}>{fmtDate(item.created_at).toUpperCase()}</Text>
         </View>
-        <View style={[styles.dateSepLine, { backgroundColor: colors.divider }]} />
       </View>
     ) : null;
 
@@ -1259,7 +1204,7 @@ export const ChatScreen: React.FC = () => {
             <LinearGradient
               colors={[colors.gradientStart, colors.gradientEnd]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={[styles.bubbleInner, isImageNoCaption && { padding: 0 }]}
+              style={[styles.bubbleInner, styles.bubbleInnerMine, isImageNoCaption && { padding: 0 }]}
             >
               {item.forwarded_from_id && (
                 <View style={styles.forwardedLabel}>
@@ -1294,7 +1239,7 @@ export const ChatScreen: React.FC = () => {
               )}
             </LinearGradient>
           ) : (
-            <View style={[styles.bubbleInner, { backgroundColor: colors.surface }, isImageNoCaption && { padding: 0 }]}>
+            <View style={[styles.bubbleInner, styles.bubbleInnerTheirs, { backgroundColor: colors.surface }, isImageNoCaption && { padding: 0 }]}>
               {item.forwarded_from_id && (
                 <View style={styles.forwardedLabel}>
                   <Icon name="corner-up-right" size={11} color={colors.textTertiary} />
@@ -1366,16 +1311,33 @@ export const ChatScreen: React.FC = () => {
 
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, paddingTop: STATUS_H + 8, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
+        <TouchableOpacity onPress={() => nav.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
 
-        <View style={styles.headerInfo}>
+        {/* Avatar cliquable */}
+        <TouchableOpacity onPress={handleViewProfile} activeOpacity={0.8} style={styles.headerAvatarWrap}>
+          {partnerAvatarUrl ? (
+            <Image source={{ uri: partnerAvatarUrl }} style={styles.headerAvatar} />
+          ) : (
+            <View style={[styles.headerAvatar, { backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>
+                {partnerName?.[0]?.toUpperCase() ?? '?'}
+              </Text>
+            </View>
+          )}
+          {partnerOnline && <View style={styles.headerAvatarDot} />}
+        </TouchableOpacity>
+
+        {/* Nom + statut */}
+        <TouchableOpacity style={styles.headerInfo} onPress={handleViewProfile} activeOpacity={0.7}>
           <Text style={[styles.headerName, { color: colors.textPrimary }]} numberOfLines={1}>
             {partnerName}
           </Text>
           <Text style={[styles.headerSub, { color: partnerOnline ? '#36D9A0' : colors.textTertiary }]}>
-            {partnerOnline ? 'En ligne' : formatLastSeen(partnerLastSeen)}
+            {partnerOnline ? 'en ligne' : formatLastSeen(partnerLastSeen)}
           </Text>
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.callBtn} onPress={() => startCall('voice')}>
           <Icon name="phone" size={20} color={colors.textPrimary} />
@@ -1539,24 +1501,21 @@ export const ChatScreen: React.FC = () => {
       {/* Input bar */}
       {!isRecording && !isBlocked && (
         <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
-          {/* Row principale */}
           <View style={styles.inputRow}>
-            {!editingMsg && (
-              <TouchableOpacity style={styles.attachBtn} onPress={() => setShowAttach(true)}>
-                <LinearGradient
-                  colors={[colors.gradientStart + '33', colors.gradientEnd + '33']}
-                  style={styles.attachBtnInner}
-                >
-                  <Icon name="plus" size={20} color={colors.primary} />
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+            {/* Emoji */}
+            <TouchableOpacity
+              onPress={() => { setShowStickerPicker(false); setShowEmojiPicker(p => !p); }}
+              style={styles.inputSideBtn}
+            >
+              <Text style={{ fontSize: 22 }}>😊</Text>
+            </TouchableOpacity>
 
+            {/* Zone texte */}
             <View style={[styles.inputWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
               <TextInput
                 value={text}
                 onChangeText={handleTextChange}
-                placeholder="Écrire un message…"
+                placeholder="Tapez un message"
                 placeholderTextColor={colors.textDisabled}
                 style={[styles.input, { color: colors.textPrimary }]}
                 multiline
@@ -1564,15 +1523,10 @@ export const ChatScreen: React.FC = () => {
                 returnKeyType="default"
                 onFocus={() => { setShowEmojiPicker(false); setShowStickerPicker(false); }}
               />
-              <TouchableOpacity onPress={() => { setShowEmojiPicker(false); setShowStickerPicker(p => !p); }} style={styles.emojiBtn}>
-                <Text style={styles.emojiBtnText}>🎭</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { setShowStickerPicker(false); setShowEmojiPicker(p => !p); }} style={styles.emojiBtn}>
-                <Text style={styles.emojiBtnText}>😊</Text>
-              </TouchableOpacity>
             </View>
 
-            {text.trim().length > 0 ? (
+            {/* Trombone + Caméra (quand pas de texte) ou Envoyer/Valider (quand texte) */}
+            {text.trim().length > 0 || editingMsg ? (
               <TouchableOpacity
                 style={[styles.sendBtn, { opacity: sending ? 0.6 : 1 }]}
                 onPress={editingMsg ? confirmEdit : send}
@@ -1590,15 +1544,23 @@ export const ChatScreen: React.FC = () => {
                 </LinearGradient>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={styles.sendBtn} onPress={startRecording}>
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={styles.sendBtnInner}
-                >
-                  <Icon name="mic" size={19} color="#fff" />
-                </LinearGradient>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={styles.inputSideBtn} onPress={() => setShowAttach(true)}>
+                  <Icon name="paperclip" size={21} color={colors.textTertiary} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.inputSideBtn} onPress={takePhoto}>
+                  <Icon name="camera" size={21} color={colors.textTertiary} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.sendBtn} onPress={startRecording}>
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.sendBtnInner}
+                  >
+                    <Icon name="mic" size={19} color="#fff" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
@@ -2000,8 +1962,11 @@ const styles = StyleSheet.create({
   },
   callBtn:    { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   moreBtn:    { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerAvatarWrap: { position: 'relative' },
+  headerAvatar:     { width: 38, height: 38, borderRadius: 19, overflow: 'hidden' },
+  headerAvatarDot:  { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 5.5, backgroundColor: '#36D9A0', borderWidth: 2, borderColor: 'transparent' },
   headerInfo: { flex: 1 },
-  headerName: { fontSize: 17, fontWeight: '800' },
+  headerName: { fontSize: 16, fontWeight: '700' },
   headerSub:  { fontSize: 12, marginTop: 1 },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
@@ -2041,10 +2006,12 @@ const styles = StyleSheet.create({
     height: 3,
   },
 
-  bubble:       { maxWidth: '78%', marginBottom: 2 },
+  bubble:       { maxWidth: '82%', marginBottom: 3 },
   bubbleMine:   { alignSelf: 'flex-end' },
   bubbleTheirs: { alignSelf: 'flex-start' },
   bubbleInner:  { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 4, overflow: 'hidden' },
+  bubbleInnerMine:   { borderBottomRightRadius: 4 },
+  bubbleInnerTheirs: { borderBottomLeftRadius: 4 },
   msgText:      { fontSize: 15, lineHeight: 22 },
   msgTime:      { fontSize: 10, alignSelf: 'flex-end' },
   bubbleFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
@@ -2112,15 +2079,16 @@ const styles = StyleSheet.create({
 
   // Input bar
   inputBar: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical:   8,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems:    'flex-end',
-    gap: 8,
+    gap: 6,
   },
+  inputSideBtn: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
   attachBtn:      { justifyContent: 'flex-end', paddingBottom: 2 },
   attachBtnInner: {
     width: 40, height: 40, borderRadius: 20,
@@ -2141,8 +2109,8 @@ const styles = StyleSheet.create({
     paddingTop: 2,
     paddingBottom: 2,
   },
-  sendBtn:      { justifyContent: 'flex-end', paddingBottom: 2 },
-  sendBtnInner: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  sendBtn:      { justifyContent: 'flex-end' },
+  sendBtnInner: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
 
   // Attachment modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
@@ -2275,10 +2243,10 @@ const styles = StyleSheet.create({
   replyBannerText: { fontSize: 13 },
 
   // Date separator
-  dateSepRow:  { flexDirection: 'row', alignItems: 'center', marginVertical: 10, marginHorizontal: 4 },
+  dateSepRow:  { alignItems: 'center', marginVertical: 14 },
   dateSepLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  dateSepPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginHorizontal: 8 },
-  dateSepText: { fontSize: 11, fontWeight: '500' },
+  dateSepPill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
+  dateSepText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
 });
 
 const CP = StyleSheet.create({
