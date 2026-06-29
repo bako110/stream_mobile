@@ -2,30 +2,28 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView,
   Platform, TouchableOpacity, StatusBar, TextInput,
-  Dimensions, ScrollView, Image,
+  Dimensions, ScrollView, ActivityIndicator,
 } from 'react-native';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming, withSpring,
-  interpolate, Extrapolation, FadeInDown, FadeInUp, FadeOutUp,
-  SlideInRight, SlideOutLeft, SlideInLeft, SlideOutRight,
-  runOnJS,
+  FadeInDown, FadeInUp,
+  SlideInRight, SlideOutLeft,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../../hooks/useTheme';
-import { Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
+import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
-import { getLogo } from '../../assets';
 
-const { width } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
+const HERO_H = H * 0.26;
 
 interface Props {
   onRegisterSuccess: () => void;
   onGoLogin:         () => void;
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 type AuthMethod = 'email' | 'phone';
 
 interface StepData {
@@ -43,25 +41,31 @@ interface StepData {
 
 const STEPS = 3;
 
-// ── Composant barre de progression ───────────────────────────────────────────
+// ── Vague SVG ────────────────────────────────────────────────────────────────
+const WaveBottom: React.FC<{ color: string }> = ({ color }) => (
+  <Svg
+    width={W}
+    height={60}
+    viewBox={`0 0 ${W} 60`}
+    style={{ position: 'absolute', bottom: -1, left: 0 }}
+    preserveAspectRatio="none"
+  >
+    <Path
+      d={`M0,0 C${W * 0.25},55 ${W * 0.75},5 ${W},50 L${W},60 L0,60 Z`}
+      fill={color}
+    />
+  </Svg>
+);
+
+// ── Barre de progression ──────────────────────────────────────────────────────
 const StepBar: React.FC<{ current: number; total: number; colors: any }> = ({ current, total, colors }) => (
   <View style={sb.wrap}>
     {Array.from({ length: total }).map((_, i) => (
       <View key={i} style={[sb.track, { backgroundColor: colors.border }]}>
-        <Animated.View
-          style={[
-            sb.fill,
-            {
-              width: i < current ? '100%' : i === current - 1 ? '100%' : '0%',
-              backgroundColor: i < current ? colors.primary : colors.border,
-            },
-          ]}
-        />
         {i < current && (
           <LinearGradient
             colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
           />
         )}
@@ -71,21 +75,24 @@ const StepBar: React.FC<{ current: number; total: number; colors: any }> = ({ cu
 );
 
 const sb = StyleSheet.create({
-  wrap:  { flexDirection: 'row', gap: 6, marginBottom: 28 },
-  track: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' },
-  fill:  { height: '100%', borderRadius: 2 },
+  wrap:  { flexDirection: 'row', gap: 6, marginBottom: 24 },
+  track: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
 });
 
-// ── Step 1 : Identité ─────────────────────────────────────────────────────────
+// ── Indicateur force mdp ──────────────────────────────────────────────────────
+const pw = StyleSheet.create({
+  wrap:  { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 },
+  bars:  { flex: 1, flexDirection: 'row', gap: 4 },
+  bar:   { flex: 1, height: 4, borderRadius: 2 },
+  label: { fontSize: 12, fontWeight: '600', minWidth: 58, textAlign: 'right' },
+});
+
+// ── Step 1 ────────────────────────────────────────────────────────────────────
 const Step1: React.FC<{
-  data: StepData;
-  onChange: (k: keyof StepData, v: string) => void;
-  errors: Partial<StepData>;
-  onNext: () => void;
-  colors: any;
+  data: StepData; onChange: (k: keyof StepData, v: string) => void;
+  errors: Partial<StepData>; onNext: () => void; colors: any;
 }> = ({ data, onChange, errors, onNext, colors }) => {
   const lastRef = useRef<TextInput>(null);
-
   return (
     <Animated.View entering={SlideInRight.springify().damping(18)} exiting={SlideOutLeft.springify().damping(18)} style={s.stepWrap}>
       <Animated.Text entering={FadeInDown.delay(80).duration(400)} style={[s.stepTitle, { color: colors.textPrimary }]}>
@@ -123,38 +130,38 @@ const Step1: React.FC<{
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(320).springify()} style={{ marginTop: 24 }}>
-        <Button label="Continuer →" onPress={onNext} size="lg" />
+        <TouchableOpacity onPress={onNext} activeOpacity={0.85}>
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={s.submitBtn}
+          >
+            <Text style={s.submitBtnText}>Continuer</Text>
+            <Icon name="arrow-right" size={18} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
       </Animated.View>
     </Animated.View>
   );
 };
 
-// ── Step 2 : Compte ───────────────────────────────────────────────────────────
+// ── Step 2 ────────────────────────────────────────────────────────────────────
 const Step2: React.FC<{
-  data:            StepData;
-  onChange:        (k: keyof StepData, v: string) => void;
+  data: StepData; onChange: (k: keyof StepData, v: string) => void;
   onCountryChange: (c: Country) => void;
-  errors:          Partial<StepData>;
-  onNext:          () => void;
-  colors:          any;
+  errors: Partial<StepData>; onNext: () => void; colors: any;
 }> = ({ data, onChange, onCountryChange, errors, onNext, colors }) => {
   const userRef = useRef<TextInput>(null);
   const isEmail = data.authMethod === 'email';
 
   const toggle = (
     <TouchableOpacity
-      onPress={() => {
-        onChange('authMethod', isEmail ? 'phone' : 'email');
-        onChange('email', '');
-        onChange('phone', '');
-      }}
+      onPress={() => { onChange('authMethod', isEmail ? 'phone' : 'email'); onChange('email', ''); onChange('phone', ''); }}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       style={[s.togglePill, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}
     >
-      <Icon name={isEmail ? 'smartphone' : 'mail'} size={13} color={colors.primary} />
-      <Text style={[s.toggleText, { color: colors.primary }]}>
-        {isEmail ? 'Tel' : 'Email'}
-      </Text>
+      <Icon name={isEmail ? 'smartphone' : 'mail'} size={12} color={colors.primary} />
+      <Text style={[s.toggleText, { color: colors.primary }]}>{isEmail ? 'Tel' : 'Email'}</Text>
     </TouchableOpacity>
   );
 
@@ -164,7 +171,7 @@ const Step2: React.FC<{
         Vos informations de compte
       </Animated.Text>
       <Animated.Text entering={FadeInDown.delay(140).duration(400)} style={[s.stepSubtitle, { color: colors.textSecondary }]}>
-        Email ou numero de telephone
+        Email ou numéro de téléphone
       </Animated.Text>
 
       <Animated.View entering={FadeInDown.delay(200).springify()}>
@@ -192,13 +199,8 @@ const Step2: React.FC<{
             onSubmitEditing={() => userRef.current?.focus()}
           />
         )}
-        {isEmail && null}
-        {/* Pill toggle visible aussi en mode phone via le composant PhoneInput — on laisse le toggle email ici uniquement */}
         {!isEmail && (
-          <TouchableOpacity
-            onPress={() => { onChange('authMethod', 'email'); onChange('phone', ''); }}
-            style={[s.switchLink]}
-          >
+          <TouchableOpacity onPress={() => { onChange('authMethod', 'email'); onChange('phone', ''); }} style={s.switchLink}>
             <Icon name="mail" size={13} color={colors.primary} />
             <Text style={[s.switchLinkText, { color: colors.primary }]}>Utiliser un email à la place</Text>
           </TouchableOpacity>
@@ -219,23 +221,28 @@ const Step2: React.FC<{
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(320).springify()} style={{ marginTop: 24 }}>
-        <Button label="Continuer" onPress={onNext} size="lg" />
+        <TouchableOpacity onPress={onNext} activeOpacity={0.85}>
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={s.submitBtn}
+          >
+            <Text style={s.submitBtnText}>Continuer</Text>
+            <Icon name="arrow-right" size={18} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
       </Animated.View>
     </Animated.View>
   );
 };
 
-// ── Step 3 : Mot de passe ─────────────────────────────────────────────────────
+// ── Step 3 ────────────────────────────────────────────────────────────────────
 const Step3: React.FC<{
-  data: StepData;
-  onChange: (k: keyof StepData, v: string) => void;
-  errors: Partial<StepData>;
-  onSubmit: () => void;
-  loading: boolean;
-  colors: any;
+  data: StepData; onChange: (k: keyof StepData, v: string) => void;
+  errors: Partial<StepData>; onSubmit: () => void; loading: boolean; colors: any;
 }> = ({ data, onChange, errors, onSubmit, loading, colors }) => {
-  const confirmRef    = useRef<TextInput>(null);
-  const referralRef   = useRef<TextInput>(null);
+  const confirmRef  = useRef<TextInput>(null);
+  const referralRef = useRef<TextInput>(null);
 
   const strength = [
     data.password.length >= 8,
@@ -274,14 +281,11 @@ const Step3: React.FC<{
         />
       </Animated.View>
 
-      {/* Indicateur de force */}
       {data.password.length > 0 && (
         <Animated.View entering={FadeInDown.duration(250)} style={pw.wrap}>
           <View style={pw.bars}>
             {[1, 2, 3, 4].map(i => (
-              <View key={i} style={[pw.bar, {
-                backgroundColor: i <= strength ? lvl.color : colors.border,
-              }]} />
+              <View key={i} style={[pw.bar, { backgroundColor: i <= strength ? lvl.color : colors.border }]} />
             ))}
           </View>
           <Text style={[pw.label, { color: lvl.color }]}>{lvl.label}</Text>
@@ -316,7 +320,6 @@ const Step3: React.FC<{
         />
       </Animated.View>
 
-      {/* CGU */}
       <Animated.Text entering={FadeInDown.delay(320).duration(350)} style={[s.cgu, { color: colors.textTertiary }]}>
         En vous inscrivant, vous acceptez nos{' '}
         <Text style={{ color: colors.primary, fontWeight: '600' }}>CGU</Text>
@@ -325,22 +328,29 @@ const Step3: React.FC<{
       </Animated.Text>
 
       <Animated.View entering={FadeInDown.delay(380).springify()} style={{ marginTop: 20 }}>
-        <Button label="Créer mon compte" onPress={onSubmit} loading={loading} size="lg" />
+        <TouchableOpacity onPress={onSubmit} disabled={loading} activeOpacity={0.85}>
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={[s.submitBtn, { opacity: loading ? 0.7 : 1 }]}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <>
+                  <Text style={s.submitBtnText}>Créer mon compte</Text>
+                  <Icon name="check" size={18} color="#fff" />
+                </>
+            }
+          </LinearGradient>
+        </TouchableOpacity>
       </Animated.View>
     </Animated.View>
   );
 };
 
-const pw = StyleSheet.create({
-  wrap:  { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 },
-  bars:  { flex: 1, flexDirection: 'row', gap: 4 },
-  bar:   { flex: 1, height: 4, borderRadius: 2 },
-  label: { fontSize: 12, fontWeight: '600', minWidth: 58, textAlign: 'right' },
-});
-
 // ── Écran principal ───────────────────────────────────────────────────────────
 export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }) => {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { colors } = theme;
 
   const [step, setStep]       = useState(1);
@@ -369,7 +379,6 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
     else onGoLogin();
   };
 
-  // Validation par étape
   const validateStep1 = (): boolean => {
     const e: Partial<StepData> = {};
     if (!data.firstName.trim()) e.firstName = 'Prénom requis';
@@ -384,7 +393,7 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
       if (!data.email.trim() || !data.email.includes('@')) e.email = 'Email invalide';
     } else {
       const digits = data.phone.replace(/\D/g, '');
-      if (digits.length < 8) e.phone = 'Numero de telephone invalide';
+      if (digits.length < 8) e.phone = 'Numéro de téléphone invalide';
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -425,37 +434,39 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
     }
   }, [data, onRegisterSuccess]);
 
-  const stepTitles = ['Identité', 'Compte', 'Sécurité'];
+  const stepLabels = ['Identité', 'Compte', 'Sécurité'];
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Orbe décoratif */}
-      <View style={s.orb} pointerEvents="none">
-        <LinearGradient colors={[colors.accentGreen + '40', colors.primary + '28', 'transparent']} style={StyleSheet.absoluteFill} />
+      {/* ── HERO ── */}
+      <View style={[s.hero, { height: HERO_H }]}>
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd, colors.primary + 'CC']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[s.heroCircle1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
+        <View style={[s.heroCircle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
+
+        {/* Bouton retour */}
+        <TouchableOpacity onPress={goBack} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Icon name="arrow-left" size={22} color="#fff" />
+        </TouchableOpacity>
+
+        <Animated.View entering={FadeInDown.delay(80).springify()} style={s.heroContent}>
+          <Text style={s.heroTitle}>Inscription</Text>
+          <Text style={s.heroSub}>Étape {step} sur {STEPS} — {stepLabels[step - 1]}</Text>
+        </Animated.View>
+
+        <WaveBottom color={colors.background} />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          {/* Header */}
-          <Animated.View entering={FadeInDown.delay(40).springify()} style={s.header}>
-            <TouchableOpacity onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.backBtn}>
-              <Text style={[s.backIcon, { color: colors.primary }]}>←</Text>
-            </TouchableOpacity>
-            <View style={s.logoCircle}>
-              <Image source={getLogo(isDark)} style={s.logoImg} resizeMode="contain" />
-            </View>
-            <View style={{ width: 40 }} />
-          </Animated.View>
-
-          {/* Label étape */}
-          <Animated.Text entering={FadeInDown.delay(80).duration(350)} style={[s.stepLabel, { color: colors.textTertiary }]}>
-            Étape {step} sur {STEPS} — {stepTitles[step - 1]}
-          </Animated.Text>
-
-          {/* Barre progression */}
+          {/* Barre de progression */}
           <StepBar current={step} total={STEPS} colors={colors} />
 
           {/* Contenu de l'étape */}
@@ -478,7 +489,7 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
 
           {/* Lien connexion */}
           <Animated.View entering={FadeInUp.delay(440).duration(350)} style={s.loginRow}>
-            <Text style={[s.loginLabel, { color: colors.textSecondary }]}>Déjà un compte ?  </Text>
+            <Text style={[s.loginLabel, { color: colors.textSecondary }]}>Déjà un compte ?{'  '}</Text>
             <TouchableOpacity onPress={onGoLogin} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={[s.loginLink, { color: colors.primary }]}>Se connecter</Text>
             </TouchableOpacity>
@@ -491,35 +502,33 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
 };
 
 const s = StyleSheet.create({
-  root:        { flex: 1 },
-  scroll:      { flexGrow: 1, paddingHorizontal: 24, paddingTop: 52, paddingBottom: 40 },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  logoCircle:  {
-    width: 48, height: 48, borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#7B3FF2', shadowOpacity: 0.4,
-    shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  logoImg: { width: 48, height: 48 },
-  backIcon:    { fontSize: 24, fontWeight: '600' },
-  stepLabel:   { fontSize: 12, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
-  stepWrap:    {},
-  togglePill:  {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 4,
-    borderRadius: 20, borderWidth: 1,
-  },
-  toggleText:    { fontSize: 11, fontWeight: '700' },
-  switchLink:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  root:   { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
+
+  // Hero
+  hero:        { width: '100%', overflow: 'visible' },
+  heroCircle1: { position: 'absolute', width: 160, height: 160, borderRadius: 80, top: -30, right: -30 },
+  heroCircle2: { position: 'absolute', width: 100, height: 100, borderRadius: 50, bottom: 20, left: -20 },
+  backBtn:     { position: 'absolute', top: 52, left: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  heroContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 30, paddingTop: 52 },
+  heroTitle:   { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  heroSub:     { fontSize: 13, color: 'rgba(255,255,255,0.80)', marginTop: 6, fontWeight: '400' },
+
+  // Form
+  stepWrap:     {},
+  togglePill:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  toggleText:   { fontSize: 11, fontWeight: '700' },
+  switchLink:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
   switchLinkText:{ fontSize: 13, fontWeight: '600' },
-  stepTitle:   { fontSize: 26, fontWeight: '800', marginBottom: 6, lineHeight: 34 },
-  stepSubtitle:{ fontSize: 15, marginBottom: 24, lineHeight: 22 },
-  cgu:         { fontSize: 12, lineHeight: 18, marginTop: 14, textAlign: 'center' },
+  stepTitle:    { fontSize: 24, fontWeight: '800', marginBottom: 6, lineHeight: 32 },
+  stepSubtitle: { fontSize: 14, marginBottom: 22, lineHeight: 21 },
+  cgu:          { fontSize: 12, lineHeight: 18, marginTop: 14, textAlign: 'center' },
+
+  submitBtn:     { height: 52, borderRadius: 28, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
+  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+
   globalError: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 12, fontSize: 13, fontWeight: '500' },
   loginRow:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 28 },
   loginLabel:  { fontSize: 14 },
   loginLink:   { fontSize: 14, fontWeight: '700' },
-  orb:         { position: 'absolute', top: -90, left: -80, width: 280, height: 280, borderRadius: 140, overflow: 'hidden' },
 });

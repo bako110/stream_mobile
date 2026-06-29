@@ -2,16 +2,21 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView,
   Platform, TouchableOpacity, StatusBar, ScrollView, TextInput,
+  ActivityIndicator, Dimensions,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../../hooks/useTheme';
-import { AppLogo, BackButton, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
+import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+
+const { width: W, height: H } = Dimensions.get('window');
+const HERO_H = H * 0.26;
 
 type Method = 'email' | 'phone' | 'username';
 type Step   = 'input' | 'code' | 'newpass' | 'done';
@@ -24,8 +29,82 @@ const METHODS: { key: Method; label: string; icon: string }[] = [
   { key: 'username', label: 'Identifiant', icon: 'at-sign' },
 ];
 
+// ── Vague SVG identique à Login/Register ─────────────────────────────────────
+const WaveBottom: React.FC<{ color: string }> = ({ color }) => (
+  <Svg
+    width={W} height={60}
+    viewBox={`0 0 ${W} 60`}
+    style={{ position: 'absolute', bottom: -1, left: 0 }}
+    preserveAspectRatio="none"
+  >
+    <Path
+      d={`M0,0 C${W * 0.25},55 ${W * 0.75},5 ${W},50 L${W},60 L0,60 Z`}
+      fill={color}
+    />
+  </Svg>
+);
+
+// ── Hero réutilisable ─────────────────────────────────────────────────────────
+const Hero: React.FC<{
+  title: string; subtitle: string; icon: string;
+  colors: any; bgColor: string;
+  onBack: () => void;
+}> = ({ title, subtitle, icon, colors, bgColor, onBack }) => (
+  <View style={[hero.wrap, { height: HERO_H }]}>
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd, colors.primary + 'CC']}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      style={StyleSheet.absoluteFill}
+    />
+    <View style={[hero.circle1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
+    <View style={[hero.circle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
+
+    <TouchableOpacity onPress={onBack} style={hero.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+      <Icon name="arrow-left" size={22} color="#fff" />
+    </TouchableOpacity>
+
+    <Animated.View entering={FadeInDown.delay(80).springify()} style={hero.content}>
+      <View style={hero.iconCircle}>
+        <Icon name={icon} size={28} color="#fff" />
+      </View>
+      <Text style={hero.title}>{title}</Text>
+      <Text style={hero.subtitle}>{subtitle}</Text>
+    </Animated.View>
+
+    <WaveBottom color={bgColor} />
+  </View>
+);
+
+const hero = StyleSheet.create({
+  wrap:      { width: '100%', overflow: 'visible' },
+  circle1:   { position: 'absolute', width: 160, height: 160, borderRadius: 80, top: -30, right: -30 },
+  circle2:   { position: 'absolute', width: 100, height: 100, borderRadius: 50, bottom: 20, left: -20 },
+  backBtn:   { position: 'absolute', top: 52, left: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  content:   { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 28, paddingTop: 52, gap: 6 },
+  iconCircle:{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  title:     { fontSize: 24, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  subtitle:  { fontSize: 13, color: 'rgba(255,255,255,0.80)', fontWeight: '400', textAlign: 'center', paddingHorizontal: 24 },
+});
+
+// ── Bouton submit style hero ──────────────────────────────────────────────────
+const SubmitBtn: React.FC<{ label: string; onPress: () => void; loading?: boolean; colors: any }> = ({ label, onPress, loading, colors }) => (
+  <TouchableOpacity onPress={onPress} disabled={loading} activeOpacity={0.85}>
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd]}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+      style={[s.submitBtn, { opacity: loading ? 0.7 : 1 }]}
+    >
+      {loading
+        ? <ActivityIndicator color="#fff" />
+        : <Text style={s.submitBtnText}>{label}</Text>
+      }
+    </LinearGradient>
+  </TouchableOpacity>
+);
+
+// ── Écran principal ───────────────────────────────────────────────────────────
 export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { colors } = theme;
 
   const [step,        setStep]        = useState<Step>('input');
@@ -37,12 +116,18 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
   const [confirmPass, setConfirmPass] = useState('');
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState('');
-  const newPassRef    = useRef<TextInput>(null);
-  const confirmRef    = useRef<TextInput>(null);
+  const newPassRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   const switchMethod = (m: Method) => { setMethod(m); setValue(''); setError(''); };
 
-  /* ── Étape 1 : demande de reset ──────────────────────────────────────────── */
+  const goBackStep = () => {
+    if (step === 'code')    { setStep('input'); setCode(''); setError(''); }
+    else if (step === 'newpass') { setStep('code'); setError(''); }
+    else onGoBack();
+  };
+
+  /* ── Étape 1 ─────────────────────────────────────────────────────────────── */
   const handleRequestReset = useCallback(async () => {
     if (!value.trim()) { setError('Ce champ est obligatoire.'); return; }
     if (method === 'email' && !value.includes('@')) { setError('Adresse email invalide.'); return; }
@@ -62,38 +147,34 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
     } catch (e: any) {
       if (method === 'phone') {
         const msg: string = e?.message ?? e?.code ?? '';
-        console.error('[PhoneOTP] sendOtp error:', e?.code, e?.message);
         if (msg.includes('TOO_MANY_REQUESTS') || msg.includes('quota') || msg.includes('too-many-requests')) {
           setError('Trop de tentatives. Réessayez dans quelques minutes.');
         } else if (msg.includes('invalid-phone-number') || msg.includes('INVALID_PHONE_NUMBER')) {
-          setError('Numéro de téléphone invalide. Vérifiez le format.');
+          setError('Numéro de téléphone invalide.');
         } else if (msg.includes('operation-not-allowed')) {
           setError('Connexion par SMS non activée. Contactez le support.');
-        } else if (msg.includes('missing-client-identifier') || msg.includes('MISSING_CLIENT_IDENTIFIER')) {
-          setError('Configuration Firebase incomplète (SHA-1). Contactez le support.');
         } else {
           setError(`Erreur : ${msg || 'Impossible d\'envoyer le SMS.'}`);
         }
       } else {
-        setStep('code'); // anti-enumeration : toujours avancer
+        setStep('code'); // anti-enumeration
       }
     } finally { setLoading(false); }
   }, [value, method, country]);
 
-  /* ── Étape 2 : saisie du code ────────────────────────────────────────────── */
+  /* ── Étape 2 ─────────────────────────────────────────────────────────────── */
   const handleVerifyCode = useCallback(async () => {
     if (code.trim().length < 6) { setError('Le code doit faire au moins 6 caractères.'); return; }
-    setError('');
-    setLoading(true);
+    setError(''); setLoading(true);
     try {
       await apiClient.post(Endpoints.auth.verifyResetCode, { token: code.trim() });
       setStep('newpass');
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? e?.message ?? 'Code incorrect ou expiré.');
     } finally { setLoading(false); }
-  }, [code, method]);
+  }, [code]);
 
-  /* ── Étape 3 : nouveau mot de passe ─────────────────────────────────────── */
+  /* ── Étape 3 ─────────────────────────────────────────────────────────────── */
   const handleResetPassword = useCallback(async () => {
     if (newPass.length < 8) { setError('Minimum 8 caractères.'); return; }
     if (newPass !== confirmPass) { setError('Les mots de passe ne correspondent pas.'); return; }
@@ -104,42 +185,26 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
     } catch (e: any) {
       setError(e?.message ?? 'Code invalide ou expiré.');
     } finally { setLoading(false); }
-  }, [code, method, newPass, confirmPass]);
+  }, [code, newPass, confirmPass]);
 
-  /* ── UI ──────────────────────────────────────────────────────────────────── */
-
-  const renderHeader = () => (
-    <Animated.View entering={FadeInDown.delay(40).springify()} style={s.header}>
-      <BackButton onPress={step === 'input' ? onGoBack : () => { setStep(step === 'code' ? 'input' : step === 'newpass' ? 'code' : 'input'); setError(''); }} />
-      <AppLogo size="sm" style={{ flex: 0 }} />
-      <View style={{ width: 40 }} />
-    </Animated.View>
-  );
-
-  /* Étape saisie identifiant */
+  /* ── Rendu : Étape 1 ─────────────────────────────────────────────────────── */
   if (step === 'input') return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-      <Orb top colors={[colors.primary + '40', colors.gradientEnd + '25', 'transparent']} />
-
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <Hero
+        title="Mot de passe oublié ?"
+        subtitle="Choisissez comment récupérer votre compte"
+        icon="lock"
+        colors={colors}
+        bgColor={colors.background}
+        onBack={goBackStep}
+      />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {renderHeader()}
-
-          <Animated.View entering={FadeInDown.delay(80).springify()} style={[s.iconCircle, { overflow: 'hidden' }]}>
-            <LinearGradient colors={[colors.gradientStart + '30', colors.gradientEnd + '18']} style={StyleSheet.absoluteFill} />
-            <Icon name="lock" size={34} color={colors.primary} />
-          </Animated.View>
-
-          <Animated.Text entering={FadeInDown.delay(130).duration(400)} style={[s.title, { color: colors.textPrimary }]}>
-            Mot de passe oublié ?
-          </Animated.Text>
-          <Animated.Text entering={FadeInDown.delay(175).duration(400)} style={[s.subtitle, { color: colors.textSecondary }]}>
-            Choisissez comment récupérer votre compte
-          </Animated.Text>
 
           {/* Sélecteur méthode */}
-          <Animated.View entering={FadeInDown.delay(220).springify()} style={[s.methodBar, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+          <Animated.View entering={FadeInDown.delay(100).springify()}
+            style={[s.methodBar, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
             {METHODS.map(m => {
               const active = method === m.key;
               return (
@@ -157,7 +222,8 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
               <Input label="Adresse email" leftIcon="mail" value={value}
                 onChangeText={v => { setValue(v); setError(''); }} error={error}
                 keyboardType="email-address" autoCapitalize="none"
-                returnKeyType="done" onSubmitEditing={handleRequestReset} placeholder="exemple@mail.com" />
+                returnKeyType="done" onSubmitEditing={handleRequestReset}
+                placeholder="exemple@mail.com" />
             )}
             {method === 'phone' && (
               <>
@@ -170,60 +236,61 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
             {method === 'username' && (
               <Input label="Nom d'utilisateur" leftIcon="at-sign" value={value}
                 onChangeText={v => { setValue(v); setError(''); }} error={error}
-                autoCapitalize="none" returnKeyType="done" onSubmitEditing={handleRequestReset} placeholder="@identifiant" />
+                autoCapitalize="none" returnKeyType="done" onSubmitEditing={handleRequestReset}
+                placeholder="@identifiant" />
             )}
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(300).duration(350)} style={[s.infoBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+          {/* Info box */}
+          <Animated.View entering={FadeInDown.delay(200).duration(350)}
+            style={[s.infoBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
             <Icon name="info" size={13} color={colors.textTertiary} />
             <Text style={[s.infoText, { color: colors.textTertiary }]}>
               {method === 'email'    ? 'Un code de réinitialisation sera envoyé à votre adresse email.'
                : method === 'phone' ? 'Un SMS avec un code sera envoyé à ce numéro.'
-               :                     'Nous rechercherons le compte lié à cet identifiant et enverrons le code à l\'email associé.'}
+               :                     "Nous rechercherons le compte lié à cet identifiant et enverrons un code à l'email associé."}
             </Text>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(360).springify()} style={{ marginTop: 20 }}>
-            <Button label={method === 'phone' ? 'Envoyer le SMS' : 'Envoyer le code'}
-              onPress={handleRequestReset} loading={loading} size="lg" />
+          {/* Erreur non-phone */}
+          {!!error && method !== 'phone' && (
+            <Text style={[s.errorBubble, { color: colors.error, backgroundColor: colors.errorBg, marginTop: 8 }]}>{error}</Text>
+          )}
+
+          <Animated.View entering={FadeInDown.delay(260).springify()} style={{ marginTop: 20 }}>
+            <SubmitBtn
+              label={method === 'phone' ? 'Envoyer le SMS' : 'Envoyer le code'}
+              onPress={handleRequestReset} loading={loading} colors={colors}
+            />
           </Animated.View>
 
-          <Animated.View entering={FadeInUp.delay(400).duration(350)} style={s.backRow}>
+          <Animated.View entering={FadeInUp.delay(320).duration(350)} style={s.backRow}>
             <TouchableOpacity onPress={onGoBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={[s.backText, { color: colors.primary }]}>← Retour à la connexion</Text>
+              <Text style={[s.backText, { color: colors.primary }]}>Retour à la connexion</Text>
             </TouchableOpacity>
           </Animated.View>
+
         </ScrollView>
       </KeyboardAvoidingView>
-      <Orb bottom colors={['transparent', colors.accentOrange + '22', colors.gradientEnd + '25']} />
     </View>
   );
 
-  /* Étape saisie du code */
+  /* ── Rendu : Étape 2 (code) ─────────────────────────────────────────────── */
   if (step === 'code') return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-      <Orb top colors={[colors.primary + '35', colors.gradientEnd + '20', 'transparent']} />
-
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <Hero
+        title="Entrez le code"
+        subtitle={method === 'phone' ? `Code envoyé au ${country.dial} ${value}` : `Code envoyé à ${value || 'votre adresse'}`}
+        icon={method === 'phone' ? 'message-circle' : 'mail'}
+        colors={colors}
+        bgColor={colors.background}
+        onBack={goBackStep}
+      />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {renderHeader()}
 
-          <Animated.View entering={FadeInDown.delay(60).springify()} style={[s.iconCircle, { overflow: 'hidden' }]}>
-            <LinearGradient colors={[colors.primary + '28', colors.gradientEnd + '18']} style={StyleSheet.absoluteFill} />
-            <Icon name={method === 'phone' ? 'message-circle' : 'mail'} size={34} color={colors.primary} />
-          </Animated.View>
-
-          <Animated.Text entering={FadeInDown.delay(100).duration(400)} style={[s.title, { color: colors.textPrimary }]}>
-            Entrez le code
-          </Animated.Text>
-          <Animated.Text entering={FadeInDown.delay(150).duration(400)} style={[s.subtitle, { color: colors.textSecondary }]}>
-            {method === 'phone'
-              ? `Code envoyé au ${country.dial} ${value}`
-              : `Code envoyé à ${value || 'votre adresse'}`}
-          </Animated.Text>
-
-          <Animated.View entering={FadeInDown.delay(200).springify()}>
+          <Animated.View entering={FadeInDown.delay(100).springify()}>
             <Input label="Code de vérification" leftIcon="key" value={code}
               onChangeText={v => { setCode(v); setError(''); }} error={error}
               keyboardType="default" autoCapitalize="characters"
@@ -231,52 +298,46 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
               placeholder="Entrez le code reçu" />
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(260).springify()} style={{ marginTop: 24 }}>
-            <Button label="Continuer" onPress={handleVerifyCode} size="lg" />
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(310).duration(350)} style={[s.infoBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, marginTop: 16 }]}>
+          <Animated.View entering={FadeInDown.delay(160).duration(350)}
+            style={[s.infoBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, marginTop: 14 }]}>
             <Icon name="clock" size={13} color={colors.textTertiary} />
             <Text style={[s.infoText, { color: colors.textTertiary }]}>
               Le code est valide 15 minutes. Pensez à vérifier vos spams.
             </Text>
           </Animated.View>
 
-          <Animated.View entering={FadeInUp.delay(360).duration(350)} style={s.backRow}>
+          <Animated.View entering={FadeInDown.delay(220).springify()} style={{ marginTop: 20 }}>
+            <SubmitBtn label="Continuer" onPress={handleVerifyCode} loading={loading} colors={colors} />
+          </Animated.View>
+
+          <Animated.View entering={FadeInUp.delay(280).duration(350)} style={s.backRow}>
             <TouchableOpacity onPress={() => { setStep('input'); setCode(''); setError(''); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={[s.backText, { color: colors.primary }]}>Renvoyer le code</Text>
             </TouchableOpacity>
           </Animated.View>
+
         </ScrollView>
       </KeyboardAvoidingView>
-      <Orb bottom colors={['transparent', colors.accentOrange + '22', colors.gradientEnd + '25']} />
     </View>
   );
 
-  /* Étape nouveau mot de passe */
+  /* ── Rendu : Étape 3 (nouveau mdp) ──────────────────────────────────────── */
   if (step === 'newpass') return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-      <Orb top colors={[colors.primary + '35', colors.gradientEnd + '20', 'transparent']} />
-
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <Hero
+        title="Nouveau mot de passe"
+        subtitle="Choisissez un mot de passe fort (8 caractères minimum)"
+        icon="shield"
+        colors={colors}
+        bgColor={colors.background}
+        onBack={goBackStep}
+      />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {renderHeader()}
 
-          <Animated.View entering={FadeInDown.delay(60).springify()} style={[s.iconCircle, { overflow: 'hidden' }]}>
-            <LinearGradient colors={[colors.gradientStart + '30', colors.gradientEnd + '18']} style={StyleSheet.absoluteFill} />
-            <Icon name="shield" size={34} color={colors.primary} />
-          </Animated.View>
-
-          <Animated.Text entering={FadeInDown.delay(100).duration(400)} style={[s.title, { color: colors.textPrimary }]}>
-            Nouveau mot de passe
-          </Animated.Text>
-          <Animated.Text entering={FadeInDown.delay(150).duration(400)} style={[s.subtitle, { color: colors.textSecondary }]}>
-            Choisissez un mot de passe fort (8 caractères minimum)
-          </Animated.Text>
-
-          <Animated.View entering={FadeInDown.delay(200).springify()} style={{ gap: 14 }}>
+          <Animated.View entering={FadeInDown.delay(100).springify()} style={{ gap: 14 }}>
             <Input ref={newPassRef} label="Nouveau mot de passe" leftIcon="lock" isPassword
               value={newPass} onChangeText={v => { setNewPass(v); setError(''); }}
               returnKeyType="next" onSubmitEditing={() => confirmRef.current?.focus()} />
@@ -287,7 +348,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
 
           {/* Indicateur force */}
           {newPass.length > 0 && (
-            <Animated.View entering={FadeIn.duration(200)} style={[s.strengthBar, { marginTop: 8 }]}>
+            <Animated.View entering={FadeIn.duration(200)} style={[s.strengthBar, { marginTop: 10 }]}>
               {[...Array(4)].map((_, i) => {
                 const strength = newPass.length >= 12 ? 4 : newPass.length >= 10 ? 3 : newPass.length >= 8 ? 2 : 1;
                 const active = i < strength;
@@ -300,77 +361,54 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onGoBack }) => {
             </Animated.View>
           )}
 
-          <Animated.View entering={FadeInDown.delay(280).springify()} style={{ marginTop: 24 }}>
-            <Button label="Réinitialiser le mot de passe" onPress={handleResetPassword} loading={loading} size="lg" />
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={{ marginTop: 24 }}>
+            <SubmitBtn label="Réinitialiser le mot de passe" onPress={handleResetPassword} loading={loading} colors={colors} />
           </Animated.View>
+
         </ScrollView>
       </KeyboardAvoidingView>
-      <Orb bottom colors={['transparent', colors.accentOrange + '22', colors.gradientEnd + '25']} />
     </View>
   );
 
-  /* Étape succès */
+  /* ── Rendu : Succès ─────────────────────────────────────────────────────── */
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-      <Orb top colors={[colors.accentGreen + '30', colors.primary + '20', 'transparent']} />
-
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-        <Animated.View entering={FadeInDown.delay(60).springify()} style={[s.iconCircle, { overflow: 'hidden', width: 110, height: 110, borderRadius: 55 }]}>
-          <LinearGradient colors={[colors.accentGreen + '30', colors.primary + '18']} style={StyleSheet.absoluteFill} />
-          <Icon name="check-circle" size={48} color={colors.accentGreen} />
-        </Animated.View>
-
-        <Animated.Text entering={FadeInDown.delay(120).duration(400)} style={[s.title, { color: colors.textPrimary }]}>
-          Mot de passe modifié !
-        </Animated.Text>
-        <Animated.Text entering={FadeInDown.delay(170).duration(400)} style={[s.subtitle, { color: colors.textSecondary, marginBottom: 40 }]}>
-          Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter.
-        </Animated.Text>
-
-        <Animated.View entering={FadeInDown.delay(240).springify()} style={{ width: '100%' }}>
-          <Button label="Se connecter" onPress={onGoBack} size="lg" />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <Hero
+        title="Mot de passe modifié !"
+        subtitle="Votre compte est sécurisé. Vous pouvez maintenant vous connecter."
+        icon="check-circle"
+        colors={colors}
+        bgColor={colors.background}
+        onBack={onGoBack}
+      />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+        <Animated.View entering={FadeInDown.delay(100).springify()} style={{ width: '100%' }}>
+          <SubmitBtn label="Se connecter" onPress={onGoBack} colors={colors} />
         </Animated.View>
       </View>
-      <Orb bottom colors={['transparent', colors.accentOrange + '22', colors.gradientEnd + '25']} />
     </View>
   );
 };
 
-/* ── Composant orbe décoratif ──────────────────────────────────────────────── */
-const Orb: React.FC<{ top?: boolean; bottom?: boolean; colors: string[] }> = ({ top, bottom, colors: gradColors }) => (
-  <View style={[
-    top    ? orb.top    : orb.bottom,
-  ]} pointerEvents="none">
-    <LinearGradient colors={gradColors} style={StyleSheet.absoluteFill} />
-  </View>
-);
-
-const orb = StyleSheet.create({
-  top:    { position: 'absolute', top: -90, right: -70, width: 260, height: 260, borderRadius: 130, overflow: 'hidden' },
-  bottom: { position: 'absolute', bottom: -80, left: -60, width: 240, height: 240, borderRadius: 120, overflow: 'hidden' },
-});
-
 const s = StyleSheet.create({
-  root:       { flex: 1 },
-  scroll:     { flexGrow: 1, paddingHorizontal: 24, paddingTop: 52, paddingBottom: 40 },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-
-  iconCircle: { alignSelf: 'center', width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  title:      { fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-  subtitle:   { fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 24, color: '#888' },
+  root:   { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
 
   methodBar:  { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 4, marginBottom: 20, gap: 4 },
   methodTab:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 10 },
   methodLabel:{ fontSize: 12, fontWeight: '700' },
 
-  errorBubble:{ borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8, fontSize: 13 },
+  errorBubble: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, fontWeight: '500' },
 
-  infoBox:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 16, padding: 12, borderRadius: 12, borderWidth: 1 },
-  infoText:   { flex: 1, fontSize: 12, lineHeight: 18 },
+  infoBox:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
+  infoText: { flex: 1, fontSize: 12, lineHeight: 18 },
 
-  backRow:    { alignItems: 'center', marginTop: 24 },
-  backText:   { fontSize: 14, fontWeight: '600' },
+  backRow:  { alignItems: 'center', marginTop: 22 },
+  backText: { fontSize: 14, fontWeight: '600' },
+
+  submitBtn:     { height: 52, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
 
   strengthBar:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
   strengthSegment: { flex: 1, height: 4, borderRadius: 2 },

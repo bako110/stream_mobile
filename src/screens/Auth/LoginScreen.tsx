@@ -2,16 +2,17 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
   Platform, TouchableOpacity, StatusBar, TextInput, ActivityIndicator, Linking,
+  Dimensions,
 } from 'react-native';
 import Animated, {
   FadeInDown, FadeInUp,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import Svg, { Path, G } from 'react-native-svg';
+import Svg, { Path, Ellipse } from 'react-native-svg';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useTheme } from '../../hooks/useTheme';
-import { AppLogo, Button, Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
+import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
 import { QRScannerScreen } from './QRScannerScreen';
@@ -21,6 +22,9 @@ GoogleSignin.configure({
   webClientId: '633145914883-2ka459achh16hhlak6h3pk58bpcsm4t2.apps.googleusercontent.com',
   offlineAccess: false,
 });
+
+const { width: W, height: H } = Dimensions.get('window');
+const HERO_H = H * 0.30;
 
 const anim80  = FadeInDown.delay(80).springify();
 const anim160 = FadeInDown.delay(160).duration(500);
@@ -46,6 +50,22 @@ interface Props {
   onGoPrivacy?:        () => void;
   initialBlockedInfo?: { reason?: string; contact?: string; blockedAt?: string } | null;
 }
+
+// Vague SVG style screenshot — adaptée aux couleurs violet
+const WaveBottom: React.FC<{ color: string }> = ({ color }) => (
+  <Svg
+    width={W}
+    height={60}
+    viewBox={`0 0 ${W} 60`}
+    style={{ position: 'absolute', bottom: -1, left: 0 }}
+    preserveAspectRatio="none"
+  >
+    <Path
+      d={`M0,0 C${W * 0.25},55 ${W * 0.75},5 ${W},50 L${W},60 L0,60 Z`}
+      fill={color}
+    />
+  </Svg>
+);
 
 export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoCGU, onGoPrivacy, initialBlockedInfo }) => {
   const { theme, isDark } = useTheme();
@@ -79,7 +99,6 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
     setError('');
     try {
       await GoogleSignin.hasPlayServices();
-      // Force l'affichage du sélecteur de compte
       await GoogleSignin.signOut();
       const userInfo = await GoogleSignin.signIn();
       const tokens = await GoogleSignin.getTokens();
@@ -166,7 +185,6 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* Scanner QR plein écran */}
       {showScanner && (
         <QRScannerScreen
           onLoginSuccess={() => { setShowScanner(false); onLoginSuccess(); }}
@@ -174,20 +192,29 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
         />
       )}
 
-      <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
-      />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Orbe haut-droite */}
-      <View style={styles.orbTR} pointerEvents="none">
+      {/* ── HERO (vague violette) ── */}
+      <View style={[styles.hero, { height: HERO_H }]}>
         <LinearGradient
-          colors={[colors.primary + '50', colors.gradientEnd + '28', 'transparent']}
+          colors={[colors.gradientStart, colors.gradientEnd, colors.primary + 'CC']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
+        {/* Cercles décoratifs flottants */}
+        <View style={[styles.heroCircle1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
+        <View style={[styles.heroCircle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
+
+        <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.heroContent}>
+          <Text style={styles.heroTitle}>Se connecter</Text>
+          <Text style={styles.heroSub}>Bon retour sur GoFolyX</Text>
+        </Animated.View>
+
+        {/* Vague de transition vers le bas */}
+        <WaveBottom color={colors.background} />
       </View>
 
+      {/* ── FORMULAIRE ── */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -197,26 +224,21 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Animated.Text entering={anim220}
-            style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Connectez-vous à votre compte GoFolyX
-          </Animated.Text>
-
-          {/* QR Code — connexion rapide */}
+          {/* QR Code */}
           <Animated.View entering={anim280}>
             <TouchableOpacity
               onPress={() => setShowScanner(true)}
-              style={[styles.qrBtn, { borderColor: colors.primary + '50', backgroundColor: colors.primary + '0C' }]}
+              style={[styles.qrBtn, { borderColor: colors.primary + '40', backgroundColor: colors.primary + '0C' }]}
               activeOpacity={0.75}
             >
               <View style={[styles.qrIconWrap, { backgroundColor: colors.primary + '18' }]}>
-                <Icon name="maximize" size={18} color={colors.primary} />
+                <Icon name="maximize" size={16} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.qrBtnTitle, { color: colors.textPrimary }]}>Scanner un QR code</Text>
-                <Text style={[styles.qrBtnSub, { color: colors.textSecondary }]}>Connectez-vous depuis un autre appareil</Text>
+                <Text style={[styles.qrBtnSub, { color: colors.textSecondary }]}>Connexion depuis un autre appareil</Text>
               </View>
-              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              <Icon name="chevron-right" size={15} color={colors.textTertiary} />
             </TouchableOpacity>
           </Animated.View>
 
@@ -231,7 +253,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
           <Animated.View entering={anim400}>
             {isEmail ? (
               <Input
-                label="Adresse email ou nom d'utilisateur"
+                label="Email ou nom d'utilisateur"
                 leftIcon="mail"
                 value={identifier}
                 onChangeText={t => { setIdentifier(t); setError(''); }}
@@ -245,7 +267,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     style={[styles.togglePill, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}
                   >
-                    <Icon name="smartphone" size={13} color={colors.primary} />
+                    <Icon name="smartphone" size={12} color={colors.primary} />
                     <Text style={[styles.toggleText, { color: colors.primary }]}>Tel</Text>
                   </TouchableOpacity>
                 }
@@ -260,10 +282,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                   returnKeyType="next"
                   onSubmitEditing={() => passRef.current?.focus()}
                 />
-                <TouchableOpacity
-                  onPress={switchMethod}
-                  style={styles.switchLink}
-                >
+                <TouchableOpacity onPress={switchMethod} style={styles.switchLink}>
                   <Icon name="mail" size={13} color={colors.primary} />
                   <Text style={[styles.switchLinkText, { color: colors.primary }]}>Utiliser un email</Text>
                 </TouchableOpacity>
@@ -283,7 +302,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             />
           </Animated.View>
 
-          {/* Compte bloqué par un admin */}
+          {/* Compte bloqué */}
           {blockedInfo ? (
             <Animated.View entering={animErr}
               style={[styles.blockedBox, { backgroundColor: '#EF44441A', borderColor: '#EF444440' }]}>
@@ -299,7 +318,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                 Contactez le support pour en savoir plus.
               </Text>
               {blockedInfo.blockedAt ? (
-                <Text style={[{ fontSize: 11, color: colors.textTertiary, marginBottom: 8 }]}>
+                <Text style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 8 }}>
                   Bloqué le {blockedInfo.blockedAt}
                 </Text>
               ) : null}
@@ -308,12 +327,10 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                 style={[styles.blockedContactBtn, { backgroundColor: '#EF444420', borderColor: '#EF444460' }]}
               >
                 <Icon name="mail" size={13} color="#EF4444" />
-                <Text style={[styles.blockedContactText, { color: '#EF4444' }]}>
-                  Contacter le support
-                </Text>
+                <Text style={[styles.blockedContactText, { color: '#EF4444' }]}>Contacter le support</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setBlockedInfo(null)} style={{ marginTop: 8 }}>
-                <Text style={[{ fontSize: 12, color: colors.textTertiary }]}>Retour</Text>
+                <Text style={{ fontSize: 12, color: colors.textTertiary }}>Retour</Text>
               </TouchableOpacity>
             </Animated.View>
           ) : null}
@@ -333,15 +350,25 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Bouton connexion */}
+          {/* Bouton connexion — style screenshot : fond plein arrondi */}
           <Animated.View entering={anim500}>
-            <Button
-              label="Se connecter"
+            <TouchableOpacity
               onPress={handleLogin}
-              loading={loading}
-              size="lg"
+              disabled={loading}
+              activeOpacity={0.85}
               style={{ marginTop: 8 }}
-            />
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.submitBtn}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.submitBtnText}>Se connecter</Text>
+                }
+              </LinearGradient>
+            </TouchableOpacity>
           </Animated.View>
 
           {/* Lien inscription */}
@@ -354,7 +381,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             </TouchableOpacity>
           </Animated.View>
 
-          {/* CGU & Politique */}
+          {/* CGU */}
           {(onGoCGU || onGoPrivacy) && (
             <Animated.View entering={anim580} style={styles.cguRow}>
               <Text style={[styles.cguText, { color: colors.textTertiary }]}>En continuant, vous acceptez nos{' '}</Text>
@@ -374,7 +401,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             </Animated.View>
           )}
 
-          {/* Boutons sociaux */}
+          {/* Google */}
           <Animated.View entering={anim600} style={styles.socialRow}>
             <View style={styles.socialDividerRow}>
               <View style={[styles.socialDivider, { backgroundColor: colors.divider }]} />
@@ -402,79 +429,67 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                 )}
                 <Text style={[styles.socialBtnText, { color: colors.textPrimary }]}>Google</Text>
               </TouchableOpacity>
-
-              {/* <TouchableOpacity
-                style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.divider }]}
-                onPress={() => setShowPhoneOtp(true)}
-                disabled={!!socialLoading}
-                activeOpacity={0.75}
-              >
-                <Icon name="smartphone" size={18} color={colors.primary} />
-                <Text style={[styles.socialBtnText, { color: colors.textPrimary }]}>SMS</Text>
-              </TouchableOpacity> */}
             </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Orbe bas-gauche */}
-      <View style={styles.orbBL} pointerEvents="none">
-        <LinearGradient
-          colors={['transparent', colors.accentOrange + '28', colors.gradientEnd + '30']}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root:          { flex: 1 },
-  scroll:        { flexGrow: 1, paddingHorizontal: 24, paddingTop: 64, paddingBottom: 40 },
-  logoWrap:      { alignItems: 'center', marginBottom: 16 },
-  title:         { fontSize: 28, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
-  subtitle:      { fontSize: 15, textAlign: 'center', marginBottom: 24, lineHeight: 22, fontWeight: '400' },
-  sep:           { flexDirection: 'row', alignItems: 'center', marginVertical: 18 },
-  line:          { flex: 1, height: 1 },
-  orLabel:       { marginHorizontal: 14, fontSize: 13, fontWeight: '500' },
-  errorMsg:      { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 12, fontSize: 13, fontWeight: '500' },
-  forgotRow:     { alignItems: 'flex-end', marginTop: 12, marginBottom: 8 },
-  forgotText:    { fontSize: 13, fontWeight: '600' },
-  registerRow:   { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 28 },
-  registerLabel: { fontSize: 14 },
-  registerLink:  { fontSize: 14, fontWeight: '700' },
-  orbTR:       { position: 'absolute', top: -110, right: -90, width: 300, height: 300, borderRadius: 150, overflow: 'hidden' },
-  orbBL:       { position: 'absolute', bottom: -90, left: -70, width: 260, height: 260, borderRadius: 130, overflow: 'hidden' },
-  togglePill:    {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 4,
-    borderRadius: 20, borderWidth: 1,
-  },
-  toggleText:    { fontSize: 11, fontWeight: '700' },
-  switchLink:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  root:   { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 },
+
+  // Hero
+  hero:         { width: '100%', overflow: 'visible' },
+  heroCircle1:  { position: 'absolute', width: 180, height: 180, borderRadius: 90, top: -40, right: -40 },
+  heroCircle2:  { position: 'absolute', width: 120, height: 120, borderRadius: 60, bottom: 20, left: -30 },
+  heroContent:  { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 30 },
+  heroTitle:    { fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  heroSub:      { fontSize: 14, color: 'rgba(255,255,255,0.80)', marginTop: 6, fontWeight: '400' },
+
+  // Form
+  qrBtn:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 15, borderRadius: 16, borderWidth: 1.2 },
+  qrIconWrap:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  qrBtnTitle:   { fontSize: 13, fontWeight: '700' },
+  qrBtnSub:     { fontSize: 11, marginTop: 1 },
+  sep:          { flexDirection: 'row', alignItems: 'center', marginVertical: 18 },
+  line:         { flex: 1, height: 1 },
+  orLabel:      { marginHorizontal: 14, fontSize: 13, fontWeight: '500' },
+  togglePill:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  toggleText:   { fontSize: 11, fontWeight: '700' },
+  switchLink:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   switchLinkText:{ fontSize: 13, fontWeight: '600' },
-  qrBtn:         {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 14, paddingHorizontal: 16,
-    borderRadius: 16, borderWidth: 1.2,
-  },
-  qrIconWrap:    { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  qrBtnTitle:    { fontSize: 14, fontWeight: '700' },
-  qrBtnSub:      { fontSize: 12, marginTop: 1 },
-  socialRow:        { marginTop: 20, gap: 16 },
+
+  errorMsg:     { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 12, fontSize: 13, fontWeight: '500' },
+  forgotRow:    { alignItems: 'flex-end', marginTop: 12, marginBottom: 8 },
+  forgotText:   { fontSize: 13, fontWeight: '600' },
+
+  // Bouton submit style screenshot
+  submitBtn:    { height: 52, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  submitBtnText:{ color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+
+  registerRow:  { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24 },
+  registerLabel:{ fontSize: 14 },
+  registerLink: { fontSize: 14, fontWeight: '700' },
+
+  cguRow:       { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', marginTop: 14 },
+  cguText:      { fontSize: 12 },
+  cguLink:      { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
+
+  socialRow:        { marginTop: 20, gap: 14 },
   socialDividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   socialDivider:    { flex: 1, height: 1 },
   socialOrText:     { fontSize: 12, fontWeight: '500' },
   socialBtns:       { flexDirection: 'row', gap: 12 },
   socialBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 14, borderWidth: 1 },
   socialBtnText:    { fontSize: 14, fontWeight: '700' },
-  cguRow:           { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', marginTop: 16 },
-  cguText:          { fontSize: 12 },
-  cguLink:          { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
-  blockedBox:       { borderRadius: 16, borderWidth: 1, padding: 18, marginTop: 16, alignItems: 'center' },
-  blockedTitle:     { fontSize: 17, fontWeight: '800', marginBottom: 6 },
-  blockedReason:    { fontSize: 13, marginBottom: 6, textAlign: 'center' },
-  blockedSub:       { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 12 },
-  blockedContactBtn:{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
+
+  blockedBox:        { borderRadius: 16, borderWidth: 1, padding: 18, marginTop: 16, alignItems: 'center' },
+  blockedTitle:      { fontSize: 17, fontWeight: '800', marginBottom: 6 },
+  blockedReason:     { fontSize: 13, marginBottom: 6, textAlign: 'center' },
+  blockedSub:        { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 12 },
+  blockedContactBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
   blockedContactText:{ fontSize: 13, fontWeight: '700' },
 });
