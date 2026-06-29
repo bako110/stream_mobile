@@ -1281,14 +1281,36 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     : 'about:blank',
   [videoUri, isActive, isPreload]); // eslint-disable-line
 
+  const hasMusic = !!(reel.music_url);
   const player = useVideoPlayer(videoSource, p => {
-    p.loop = false; p.muted = muted; p.volume = muted ? 0 : 1.0;
+    // Si le reel a de la musique : vidéo en boucle silencieuse, le son vient de react-native-sound
+    p.loop   = hasMusic;
+    p.muted  = hasMusic ? true : muted;
+    p.volume = hasMusic ? 0    : (muted ? 0 : 1.0);
   });
 
+  // Sync loop/mute si hasMusic change (normalement stable après mount)
+  useEffect(() => {
+    try {
+      player.loop   = hasMusic;
+      player.muted  = hasMusic ? true : muted;
+      player.volume = hasMusic ? 0    : (muted ? 0 : 1.0);
+    } catch {}
+  }, [hasMusic, muted]); // eslint-disable-line
+
   // ── Musique associée au reel ────────────────────────────────────────────────
-  const musicSoundRef = useRef<Sound | null>(null);
+  const musicSoundRef    = useRef<Sound | null>(null);
+  const musicTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const musicProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Refs stables pour startMusic (isActiveRef/onEndRef déclarés plus bas mais les refs existent dès le mount)
+  const musicIsActiveRef = useRef(isActive);
+  const musicOnEndRef    = useRef(onEnd);
+  useEffect(() => { musicIsActiveRef.current = isActive; }, [isActive]);
+  useEffect(() => { musicOnEndRef.current    = onEnd;    }, [onEnd]);
 
   const stopMusic = useCallback(() => {
+    if (musicTimerRef.current)    { clearTimeout(musicTimerRef.current);      musicTimerRef.current    = null; }
+    if (musicProgressRef.current) { clearInterval(musicProgressRef.current);  musicProgressRef.current = null; }
     if (musicSoundRef.current) {
       musicSoundRef.current.stop();
       musicSoundRef.current.release();
@@ -1297,30 +1319,48 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   }, []);
 
   const startMusic = useCallback(() => {
-    const url = reel.music_url;
+    const url      = reel.music_url;
     if (!url) return;
+    const startSec = reel.music_start_sec ?? 0;
+    const endSec   = reel.music_end_sec   ?? 0;
+    const clipDur  = endSec > startSec ? endSec - startSec : 0;
+
     stopMusic();
     Sound.setCategory('Playback');
-    // Pour une URL http/https : baseName doit être null (pas '') pour que react-native-sound
-    // utilise MediaPlayer.setDataSource(url) au lieu de chercher un fichier local
     const isRemote = url.startsWith('http://') || url.startsWith('https://');
     const snd = new Sound(url, isRemote ? (null as any) : '', err => {
-      if (err) {
-        console.warn('[ReelMusic] load error:', err, 'url:', url);
-        snd.release();
-        return;
-      }
+      if (err) { console.warn('[ReelMusic] load error:', err); snd.release(); return; }
       if (!mountedRef.current) { snd.release(); return; }
-      const startSec = reel.music_start_sec ?? 0;
       if (startSec > 0) snd.setCurrentTime(startSec);
       musicSoundRef.current = snd;
+
+      // Progression basée sur la durée du clip musical
+      if (clipDur > 0) {
+        const started = Date.now();
+        progressValue.value = 0;
+        musicProgressRef.current = setInterval(() => {
+          const elapsed = (Date.now() - started) / 1000;
+          progressValue.value = Math.min(elapsed / clipDur, 1);
+        }, 100);
+
+        // Couper le son et passer au reel suivant à music_end_sec
+        musicTimerRef.current = setTimeout(() => {
+          stopMusic();
+          if (mountedRef.current && musicIsActiveRef.current) {
+            endedRef.current = true;
+            setEnded(true);
+            musicOnEndRef.current();
+          }
+        }, clipDur * 1000);
+      }
+
       snd.play(success => {
         if (!success) console.warn('[ReelMusic] playback failed for', url);
         musicSoundRef.current = null;
         snd.release();
       });
     });
-  }, [reel.music_url, reel.music_start_sec, stopMusic]);
+  }, [reel.music_url, reel.music_start_sec, reel.music_end_sec, stopMusic, progressValue]);
 
   // Démarrer/stopper la musique selon isActive et paused
   useEffect(() => {
