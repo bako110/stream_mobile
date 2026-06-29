@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
   ActivityIndicator, Alert, StatusBar, Dimensions, Platform,
@@ -16,8 +16,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
 import { socialService } from '../../services/socialService';
-import { offlineCacheService } from '../../services/offlineCacheService';
-import { useNetwork } from '../../context/NetworkContext';
 import { CommentsBottomSheet, ShareBottomSheet, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
 import { RichText } from '../../components/common/RichText';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
@@ -189,11 +187,9 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   const { theme: { colors } } = useTheme();
   const { currentUser }       = useUser();
   const insets                = useSafeAreaInsets();
-  const { isOnline, isInternetReachable } = useNetwork();
 
-  const cachedPost = !initialPost ? offlineCacheService.getPost(postId) : null;
-  const [post,          setPost]          = useState<Post | null>(initialPost ?? cachedPost ?? null);
-  const [loading,       setLoading]       = useState(!initialPost && !cachedPost);
+  const [post,          setPost]          = useState<Post | null>(initialPost ?? null);
+  const [loading,       setLoading]       = useState(!initialPost);
   const [liked,         setLiked]         = useState(initialPost?.user_reaction === 'like');
   const [likeCount,     setLikeCount]     = useState(initialPost?.like_count ?? 0);
   const [commentCount,  setCommentCount]  = useState(initialPost?.comment_count ?? 0);
@@ -231,25 +227,9 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   }, [postId]);
 
   const load = useCallback(async () => {
-    // Offline : servir le cache, pas d'alerte
-    if (!isOnline || !isInternetReachable) {
-      const cached = offlineCacheService.getPost(postId);
-      if (cached) {
-        setPost(cached);
-        setLiked(cached.user_reaction === 'like');
-        setLikeCount(cached.like_count ?? 0);
-        setCommentCount(cached.comment_count ?? 0);
-        if (cached.author?.id) {
-          authorIdRef.current = String(cached.author.id);
-        }
-      }
-      setLoading(false);
-      return;
-    }
     try {
       const res = await postService.getById(postId);
       setPost(res);
-      offlineCacheService.savePost(postId, res);
       setLiked(res.user_reaction === 'like');
       setLikeCount(res.like_count ?? 0);
       setCommentCount(res.comment_count ?? 0);
@@ -258,21 +238,12 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         loadAuthorPosts(String(res.author.id), 1, true);
       }
     } catch {
-      // Erreur réseau — fallback cache silencieux
-      const cached = offlineCacheService.getPost(postId);
-      if (cached) {
-        setPost(cached);
-        setLiked(cached.user_reaction === 'like');
-        setLikeCount(cached.like_count ?? 0);
-        setCommentCount(cached.comment_count ?? 0);
-      } else {
-        Alert.alert('Erreur', 'Impossible de charger le post.');
-        onBack();
-      }
+      Alert.alert('Erreur', 'Impossible de charger le post.');
+      onBack();
     } finally {
       setLoading(false);
     }
-  }, [postId, loadAuthorPosts, onBack, isOnline, isInternetReachable]);
+  }, [postId, loadAuthorPosts, onBack]);
 
   useEffect(() => {
     setAuthorPosts([]); setAuthorPage(1);
@@ -285,17 +256,8 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         loadAuthorPosts(String(initialPost.author.id), 1, true);
       }
     } else {
-      const cached = offlineCacheService.getPost(postId);
-      if (cached) {
-        setPost(cached);
-        setLoading(false);
-        if (cached.author?.id) {
-          authorIdRef.current = String(cached.author.id);
-        }
-      } else {
-        setPost(null);
-        setLoading(true);
-      }
+      setPost(null);
+      setLoading(true);
       load();
     }
   }, [postId]);
@@ -675,11 +637,11 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             {/* J'aime */}
             <TouchableOpacity activeOpacity={0.8} onPress={handleLike}
               style={[s.engageBtn, liked
-                ? { backgroundColor: '#E0389A18', borderColor: '#E0389A50' }
+                ? { backgroundColor: '#7B3FF218', borderColor: '#7B3FF250' }
                 : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
             >
               <Animated.View style={heartStyle}>
-                <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E0389A' : colors.textSecondary} />
+                <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textSecondary} />
               </Animated.View>
               <Text style={[s.engageBtnTxt, { color: liked ? '#E0389A' : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
                 {likeCount > 0 ? (likeCount >= 1_000_000 ? `${(likeCount/1_000_000).toFixed(1)}M` : likeCount >= 1_000 ? `${(likeCount/1_000).toFixed(1)}K` : String(likeCount)) : 'J\'aime'}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   FlatList, ActivityIndicator,
@@ -22,8 +22,6 @@ import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFoly
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, authService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
-import { offlineCacheService } from '../../services/offlineCacheService';
-import { useNetwork } from '../../context/NetworkContext';
 import type { Event } from '../../types/event';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -361,10 +359,9 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const { colors } = theme;
   const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
-  const { isOnline, isInternetReachable } = useNetwork();
 
-  const [event,        setEvent]        = useState<Event | null>(() => offlineCacheService.getEvent(eventId));
-  const [loading,      setLoading]      = useState(() => !offlineCacheService.getEvent(eventId));
+  const [event,        setEvent]        = useState<Event | null>(null);
+  const [loading,      setLoading]      = useState(true);
   const [isOwner,      setIsOwner]      = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [liked,        setLiked]        = useState(false);
@@ -388,16 +385,9 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const saveStyle  = useAnimatedStyle(() => ({ transform: [{ scale: saveScale.value }] }));
 
   const loadEvent = useCallback(async () => {
-    if (!isOnline || !isInternetReachable) {
-      const cached = offlineCacheService.getEvent(eventId);
-      if (cached) setEvent(cached);
-      setLoading(false);
-      return;
-    }
     try {
       const data = await eventService.getById(eventId);
       setEvent(data);
-      offlineCacheService.saveEvent(eventId, data);
       favoriteService.check('event', eventId).then(setSaved).catch(() => {});
       if (data.status === 'completed' && data.live_id) {
         try {
@@ -423,12 +413,9 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         const r = await eventService.getRemindStatus(eventId);
         setReminded(r.active);
       } catch { /**/ }
-    } catch {
-      const cached = offlineCacheService.getEvent(eventId);
-      if (cached) setEvent(cached);
-    }
+    } catch { /**/ }
     finally { setLoading(false); }
-  }, [eventId, isOnline, isInternetReachable]);
+  }, [eventId]);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => { loadEvent(); });
@@ -662,10 +649,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         <View style={[ds.socialBar, { borderTopColor: colors.divider, borderBottomColor: colors.divider }]}>
           <TouchableOpacity style={ds.socialBtn} onPress={handleLike} activeOpacity={0.7}>
             <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={21} color={liked ? '#E0389A' : colors.textTertiary} />
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={21} color={liked ? '#7B3FF2' : colors.textTertiary} />
             </Animated.View>
             {likeCount > 0 && (
-              <Text style={[ds.socialBtnText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
+              <Text style={[ds.socialBtnText, { color: liked ? '#7B3FF2' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
                 {likeCount.toLocaleString('fr')}
               </Text>
             )}

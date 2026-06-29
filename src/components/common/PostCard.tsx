@@ -463,13 +463,13 @@ const PostCardInner: React.FC<PostCardProps> = ({
         <TouchableOpacity style={pc.actionBtn} onPress={handleLike} activeOpacity={0.8}>
           <View style={[pc.actionPill,
             liked
-              ? { backgroundColor: '#E0389A18', borderColor: '#E0389A40' }
+              ? { backgroundColor: '#7B3FF218', borderColor: '#7B3FF240' }
               : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
           ]}>
             <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E0389A' : colors.textTertiary} />
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textTertiary} />
             </Animated.View>
-            <Text style={[pc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
+            <Text style={[pc.actionText, { color: liked ? '#7B3FF2' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
               {likeCount > 0 ? fmtN(likeCount) : 'J\'aime'}
             </Text>
           </View>
@@ -686,7 +686,7 @@ const pc = StyleSheet.create({
   countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
   countChip:        { flexDirection: 'row', alignItems: 'center', gap: 5 },
   countText:        { fontSize: 12, fontWeight: '500' },
-  likeCountIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' },
+  likeCountIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   commentCountIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   // Action bar
   actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 6, gap: 4 },
