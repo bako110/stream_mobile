@@ -928,22 +928,23 @@ const st = StyleSheet.create({
 
   // Input
   inputRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 10, paddingVertical: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 10,
   },
   inputWrap: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    borderRadius: 20, borderWidth: 1,
-    paddingLeft: 10, paddingRight: 3, paddingVertical: 2,
+    borderRadius: 24, borderWidth: 1.5,
+    paddingLeft: 14, paddingRight: 6, paddingVertical: 8,
+    minHeight: 44,
   },
   input: {
-    flex: 1, fontSize: 13, lineHeight: 17,
-    maxHeight: 56, paddingVertical: 1,
+    flex: 1, fontSize: 15, lineHeight: 20,
+    maxHeight: 100, paddingVertical: 0,
   },
   sendBtn: {
-    width: 28, height: 28, borderRadius: 14,
+    width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    marginLeft: 4,
+    marginLeft: 6,
   },
   loadMoreBtn: {
     alignItems: 'center', justifyContent: 'center',
