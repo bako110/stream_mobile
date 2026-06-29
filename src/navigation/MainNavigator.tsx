@@ -1,13 +1,12 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
 import { decodeId } from '../utils/slugId';
-import { Platform, PermissionsAndroid, BackHandler, ToastAndroid, InteractionManager } from 'react-native';
+import { Platform, BackHandler, ToastAndroid } from 'react-native';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation, useNavigationState, CommonActions } from '@react-navigation/native';
 import { navigate as navRefNavigate } from './navigationRef';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useWs } from '../context/WebSocketContext';
-import { startOfflinePrefetch } from '../services/offlinePrefetchService';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 import { FeedScreen as HomeScreen } from '../screens/Main/FeedScreen';
@@ -17,7 +16,6 @@ import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
 import { AppTabBar, NotificationToast, BoostPrompt } from '../components/common';
 import { UploadProgressBanner } from '../components/common/UploadProgressBanner';
-import { OfflineBanner }        from '../components/common/OfflineBanner';
 import { ActiveCallBar }        from '../components/call/ActiveCallBar';
 import { ActiveCallProvider }   from '../context/ActiveCallContext';
 
@@ -433,24 +431,7 @@ const IncomingCallHandler: React.FC = () => {
 // ── MainNavigator ─────────────────────────────────────────────────────────────
 
 export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const task = InteractionManager.runAfterInteractions(() => {
-      PermissionsAndroid.requestMultiple([
-        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-        PermissionsAndroid.PERMISSIONS.CAMERA,
-      ]).catch(() => {});
-    });
-    return () => task.cancel();
-  }, []);
-
-  // Pre-charge toutes les conversations et communities en arriere-plan
-  // pour un acces offline immediat sans avoir besoin de les avoir ouvertes
-  useEffect(() => {
-    startOfflinePrefetch();
-  }, []);
-
-  const SettingsWrapper = useCallback(
+const SettingsWrapper = useCallback(
     () => <SettingsScreen onLogout={onLogout} />,
     [onLogout],
   );
@@ -579,7 +560,6 @@ export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) 
         <Stack.Screen name="Support"     component={SupportScreen}     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="SupportChat" component={SupportChatScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack.Navigator>
-      <OfflineBanner />
       <UploadProgressBanner />
       <NotificationToast />
       <ActiveCallBar />

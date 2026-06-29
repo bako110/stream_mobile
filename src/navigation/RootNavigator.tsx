@@ -9,7 +9,6 @@ import { CGUScreen }                      from '../screens/Main/CGUScreen';
 import { PolitiqueConfidentialiteScreen } from '../screens/Main/PolitiqueConfidentialiteScreen';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { UserProvider }      from '../context/UserContext';
-import { NetworkProvider }   from '../context/NetworkContext';
 import { navigationRef }    from './navigationRef';
 import { storage }          from '../utils/storage';
 import { STORAGE_KEYS }     from '../utils/constants';
@@ -19,43 +18,8 @@ import NetInfo              from '@react-native-community/netinfo';
 import { useTheme }         from '../hooks/useTheme';
 import { decodeId }         from '../utils/slugId';
 import { setupFCM } from '../services/fcmService';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { UpdateBanner } from '../components/common/UpdateBanner';
 
-async function requestContactsPermission() {
-  try {
-    const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
-    const status = await check(perm);
-    if (status === RESULTS.DENIED) await request(perm);
-  } catch {}
-}
-
-async function requestLocationPermission() {
-  try {
-    if (Platform.OS === 'android') {
-      const { PermissionsAndroid } = require('react-native');
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Localisation',
-          message: 'GoFolyX utilise votre position pour vous afficher les événements près de chez vous.',
-          buttonPositive: 'Autoriser',
-          buttonNegative: 'Plus tard',
-        },
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    } else {
-      const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-      if (status === RESULTS.DENIED) {
-        const result = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-        return result === RESULTS.GRANTED;
-      }
-      return status === RESULTS.GRANTED;
-    }
-  } catch {
-    return false;
-  }
-}
 
 type AppState = 'splash' | 'onboarding' | 'auth' | 'main';
 
@@ -143,8 +107,6 @@ export const RootNavigator: React.FC = () => {
       setAppState('main');
       setTimeout(() => {
         setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
-        requestContactsPermission();
-        requestLocationPermission();
       }, 500);
       navigatePendingUrl();
     };
@@ -187,8 +149,6 @@ export const RootNavigator: React.FC = () => {
     setAppState('main');
     setTimeout(() => {
       setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
-      requestContactsPermission();
-      requestLocationPermission();
     }, 500);
     navigatePendingUrl();
   };
@@ -262,7 +222,6 @@ export const RootNavigator: React.FC = () => {
     <NavigationContainer ref={navigationRef} theme={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT} linking={linking}>
       {appState === 'main'
         ? (
-          <NetworkProvider>
           <UserProvider>
             <WebSocketProvider onAccountBlocked={(reason, contact) => {
               authService._clearTokens();
@@ -277,7 +236,6 @@ export const RootNavigator: React.FC = () => {
               <UpdateBanner />
             </WebSocketProvider>
           </UserProvider>
-          </NetworkProvider>
         )
         : <AuthNavigator onAuthSuccess={handleAuthSuccess} initialBlockedInfo={blockedInfo} />
       }
