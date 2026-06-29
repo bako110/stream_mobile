@@ -6,6 +6,7 @@ import { LoginScreen }          from '../screens/Auth/LoginScreen';
 import { RegisterScreen }       from '../screens/Auth/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/Auth/ForgotPasswordScreen';
 import { SocialLoginScreen }    from '../screens/Auth/SocialLoginScreen';
+import { QRScannerScreen }      from '../screens/Auth/QRScannerScreen';
 import { CGUScreen }                      from '../screens/Main/CGUScreen';
 import { PolitiqueConfidentialiteScreen } from '../screens/Main/PolitiqueConfidentialiteScreen';
 
@@ -14,6 +15,7 @@ export type AuthStackParamList = {
   Register:       undefined;
   ForgotPassword: undefined;
   SocialLogin:    undefined;
+  QRLogin:        undefined;
   CGU:                      undefined;
   PolitiqueConfidentialite: undefined;
 };
@@ -33,6 +35,7 @@ const LoginWrapper: React.FC<{ onAuthSuccess: () => void; initialBlockedInfo?: {
       onGoRegister={() => nav.navigate('Register')}
       onGoForgotPassword={() => nav.navigate('ForgotPassword')}
       onGoSocialLogin={() => nav.navigate('SocialLogin')}
+      onGoQRLogin={() => nav.navigate('QRLogin')}
       onGoCGU={() => nav.navigate('CGU')}
       onGoPrivacy={() => nav.navigate('PolitiqueConfidentialite')}
       initialBlockedInfo={initialBlockedInfo}
@@ -99,6 +102,14 @@ export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedIn
     </Stack.Screen>
     <Stack.Screen name="SocialLogin" options={{ animation: 'slide_from_bottom', presentation: 'modal' }}>
       {() => <SocialLoginWrapper onAuthSuccess={onAuthSuccess} onAccountBlocked={handleAccountBlocked} />}
+    </Stack.Screen>
+    <Stack.Screen name="QRLogin" options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}>
+      {({ navigation }) => (
+        <QRScannerScreen
+          onLoginSuccess={() => { navigation.goBack(); onAuthSuccess(); }}
+          onClose={() => navigation.goBack()}
+        />
+      )}
     </Stack.Screen>
     <Stack.Screen name="CGU" options={{ animation: 'slide_from_right' }}>
       {({ navigation }) => <CGUScreen onBack={() => navigation.goBack()} />}

@@ -9,13 +9,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import Svg, { Path, Ellipse } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useTheme } from '../../hooks/useTheme';
 import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
-import { QRScannerScreen } from './QRScannerScreen';
 import { PhoneOtpScreen } from './PhoneOtpScreen';
 
 GoogleSignin.configure({
@@ -46,6 +45,7 @@ interface Props {
   onGoRegister:        () => void;
   onGoForgotPassword?: () => void;
   onGoSocialLogin?:    () => void;
+  onGoQRLogin?:        () => void;
   onGoCGU?:            () => void;
   onGoPrivacy?:        () => void;
   initialBlockedInfo?: { reason?: string; contact?: string; blockedAt?: string } | null;
@@ -67,7 +67,7 @@ const WaveBottom: React.FC<{ color: string }> = ({ color }) => (
   </Svg>
 );
 
-export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoCGU, onGoPrivacy, initialBlockedInfo }) => {
+export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoQRLogin, onGoCGU, onGoPrivacy, initialBlockedInfo }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
@@ -81,7 +81,6 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
   const [blockedInfo,   setBlockedInfo]   = useState<{ reason?: string; contact?: string; blockedAt?: string } | null>(
     initialBlockedInfo ? { ...initialBlockedInfo, blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) } : null
   );
-  const [showScanner,   setShowScanner]   = useState(false);
 
   const isEmail = method === 'email';
 
@@ -185,13 +184,6 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {showScanner && (
-        <QRScannerScreen
-          onLoginSuccess={() => { setShowScanner(false); onLoginSuccess(); }}
-          onClose={() => setShowScanner(false)}
-        />
-      )}
-
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* ── HERO (vague violette) ── */}
@@ -227,7 +219,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
           {/* QR Code */}
           <Animated.View entering={anim280}>
             <TouchableOpacity
-              onPress={() => setShowScanner(true)}
+              onPress={() => onGoQRLogin?.()}
               style={[styles.qrBtn, { borderColor: colors.primary + '40', backgroundColor: colors.primary + '0C' }]}
               activeOpacity={0.75}
             >
