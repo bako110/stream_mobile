@@ -371,7 +371,7 @@ export const fS = StyleSheet.create({
 
   // Icône action (messages, notifs, bookmark, live) : s'étire sur toute la largeur restante
   actionIcon: {
-    height: 36,
+    paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',

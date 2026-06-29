@@ -1,4 +1,4 @@
-/**
+﻿/**
  * FeedScreen — fil social : événements + concerts
  * Features: like animé, commentaires, partage natif, sauvegarde locale
  */
@@ -38,8 +38,6 @@ import { communityService } from '../../services/communityService';
 import type { CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
-import { useNetwork } from '../../context/NetworkContext';
-import { offlineCacheService } from '../../services/offlineCacheService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import type { User } from '../../types/user';
 import type { SearchResults } from '../../types/search';
@@ -488,38 +486,51 @@ const FeedHeaderBadges: React.FC<{
 }> = React.memo(({ onMessages, onNotifs, onFavorites, onLive, colors }) => {
   const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
   const totalNotifs = unreadNotifications + unreadActivity;
+  const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 40, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, gap: 6 }}>
-      {/* Messages */}
-      <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onMessages} activeOpacity={0.8}>
-        <View style={{ position: 'relative' }}>
-          <Icon name="send" size={18} color={colors.textPrimary} />
-          {unreadMessages > 0 && (
-            <View style={badgeS.badge}>
-              <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-      {/* Notifications */}
-      <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onNotifs} activeOpacity={0.8}>
-        <View style={{ position: 'relative' }}>
-          <Icon name="bell" size={18} color={colors.textPrimary} />
-          {totalNotifs > 0 && (
-            <View style={badgeS.badge}>
-              <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-      {/* Favoris */}
-      <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: colors.backgroundSecondary }]} onPress={onFavorites} activeOpacity={0.8}>
-        <MCIcon name="bookmark-outline" size={19} color={colors.textPrimary} />
-      </TouchableOpacity>
-      {/* Live */}
-      <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: '#F0365A18' }]} onPress={onLive} activeOpacity={0.8}>
-        <Icon name="video" size={18} color="#F0365A" />
-      </TouchableOpacity>
+    <View style={{ paddingHorizontal: 12, paddingBottom: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden' }}>
+        {/* Partager */}
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onMessages} activeOpacity={0.8}>
+          <View style={{ position: 'relative' }}>
+            <Icon name="send" size={22} color={colors.textPrimary} />
+            {unreadMessages > 0 && (
+              <View style={[badgeS.badge, { borderColor: colors.backgroundSecondary }]}>
+                <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '500' }}>Partager</Text>
+        </TouchableOpacity>
+        {sep}
+        {/* Notifications */}
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onNotifs} activeOpacity={0.8}>
+          <View style={{ position: 'relative' }}>
+            <Icon name="bell" size={22} color={colors.textPrimary} />
+            {totalNotifs > 0 && (
+              <View style={[badgeS.badge, { borderColor: colors.backgroundSecondary, backgroundColor: colors.primary }]}>
+                <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '500' }}>Notifications</Text>
+        </TouchableOpacity>
+        {sep}
+        {/* Enregistrés */}
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onFavorites} activeOpacity={0.8}>
+          <MCIcon name="bookmark-outline" size={23} color={colors.textPrimary} />
+          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '500' }}>Enregistrés</Text>
+        </TouchableOpacity>
+        {sep}
+        {/* En direct */}
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: '#F0365A12' }]} onPress={onLive} activeOpacity={0.8}>
+          <View style={{ position: 'relative' }}>
+            <MCIcon name="video-outline" size={24} color="#F0365A" />
+            <View style={{ position: 'absolute', top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: colors.backgroundSecondary }} />
+          </View>
+          <Text style={{ fontSize: 11, color: '#F0365A', marginTop: 4, fontWeight: '600' }}>En direct</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 });
@@ -532,25 +543,14 @@ export const FeedScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated, lastPresenceUpdate } = useWs();
   const { currentUser } = useUser();
-  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
   const userLocation = useUserLocation();
 
   const [filter,      setFilter]      = useState<FeedFilter>('all');
-  // Init depuis cache immédiatement — filtrer les items sans données réelles (suggestions/ad/communities)
-  const [items,       setItems]       = useState<FeedItem[]>(() => {
-    const cached = offlineCacheService.getFeed();
-    if (!cached) return [];
-    return cached.filter(i => i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities') as FeedItem[];
-  });
-  const [loading,     setLoading]     = useState(() => {
-    const cached = offlineCacheService.getFeed();
-    const realCount = cached?.filter(i => i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities').length ?? 0;
-    return realCount === 0;
-  });
+  const [items,       setItems]       = useState<FeedItem[]>([]);
+  const [loading,     setLoading]     = useState(true);
   const [currentAdData, setCurrentAdData] = useState<AdData | null>(null);
   const adInsertedRef = useRef<Set<string>>(new Set()); // évite double-injection
   const [refreshing,  setRefreshing]  = useState(false);
-  const [networkError, setNetworkError] = useState(false);
   const lastLoadedAtRef = useRef<number>(0);
   const feedListRef     = useRef<FlatList>(null);
   const [menuOpen,      setMenuOpen]      = useState(false);
@@ -683,31 +683,17 @@ export const FeedScreen: React.FC = () => {
 
 
   // ── Suggestions — pool de 30 (boosted en tête côté backend), tranches de 10 par bloc ──
-  const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>(
-    () => offlineCacheService.getSuggestions() ?? []
-  );
-  const [suggestLoading, setSuggestLoading] = useState(
-    () => (offlineCacheService.getSuggestions()?.length ?? 0) === 0
-  );
+  const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(true);
 
   const loadSuggestions = useCallback(async () => {
-    if (!isOnline || !isInternetReachable) {
-      const cached = offlineCacheService.getSuggestions();
-      if (cached) setSuggestPool(cached);
-      setSuggestLoading(false);
-      return;
-    }
     try {
       const data = await userService.getSuggestions(30);
       const list = Array.isArray(data) ? data : [];
       setSuggestPool(list);
-      if (list.length > 0) offlineCacheService.saveSuggestions(list);
-    } catch {
-      const cached = offlineCacheService.getSuggestions();
-      if (cached) setSuggestPool(cached);
-    }
+    } catch { /* silencieux */ }
     finally { setSuggestLoading(false); }
-  }, [isOnline, isInternetReachable]);
+  }, []);
 
   // Retourne la tranche du pool correspondant au numero de bloc (1-based)
   // Bloc 1 → [0..9], Bloc 2 → [10..19], Bloc 3 → [20..29], au-delà → tranche finale
@@ -761,33 +747,6 @@ export const FeedScreen: React.FC = () => {
   }, [followingSet, currentUser]);
 
   const load = useCallback(async (f: FeedFilter, silent = false) => {
-    if (!silent) setNetworkError(false);
-
-    // Offline : servir le cache persistant (même si TTL expiré)
-    if (!isOnline || !isInternetReachable) {
-      if (f === 'all') {
-        const cached = offlineCacheService.getFeed();
-        const realItems = cached?.filter(i =>
-          i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities'
-        ) ?? [];
-        if (realItems.length > 0) {
-          setItems(realItems as FeedItem[]);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        }
-      }
-      // Pas de cache → garder ce qui est déjà affiché (ne jamais vider)
-      if (itemsRef.current.length > 0) {
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-      setNetworkError(true);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
 
     try {
       if (f === 'all') {
@@ -918,14 +877,6 @@ export const FeedScreen: React.FC = () => {
         } else {
           setItems(result);
         }
-        // Persist pour mode offline — seulement les vrais contenus (pas suggestions/ad/communities)
-        offlineCacheService.saveFeed(result.filter(i =>
-          i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities'
-        ));
-        // Persist les reels pour ReelsScreen (même source de données)
-        const reelsForCache = (Array.isArray(reelsResult?.items) ? reelsResult.items : Array.isArray(reelsResult) ? reelsResult : [])
-          .filter((r: any) => r?.id && r?.hls_url);
-        if (reelsForCache.length > 0) offlineCacheService.saveReels(reelsForCache);
       } else if (f === 'following') {
         // Onglet Suivis — uniquement les posts des comptes suivis, triés par date
         const postsResult = await postService.getFeed(1, 50, true).catch(() => [] as Post[]);
@@ -953,25 +904,13 @@ export const FeedScreen: React.FC = () => {
         setItems(results);
       }
       lastLoadedAtRef.current = Date.now();
-      setNetworkError(false);
     } catch (err) {
       if (__DEV__) { console.warn('[FeedScreen] load error:', err); }
-      // Erreur réseau → fallback cache filtré pour ne jamais laisser l'écran vide
-      if (f === 'all') {
-        const cached = offlineCacheService.getFeed();
-        const realItems = cached?.filter(i =>
-          i.kind !== 'suggestions' && i.kind !== 'ad' && i.kind !== 'communities'
-        ) ?? [];
-        if (realItems.length > 0) {
-          setItems(prev => prev.length > 0 ? prev : realItems as FeedItem[]);
-        }
-      }
-      setNetworkError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isOnline, isInternetReachable]);
+  }, []);
 
   // Recharge quand le filtre change
   // setLoading(true) uniquement si aucun item visible — évite le flash skeleton
@@ -982,13 +921,6 @@ export const FeedScreen: React.FC = () => {
     if (itemsRef.current.length === 0) setLoading(true);
     load(filter);
   }, [filter]);
-
-  // Sync au reconnect réseau
-  useEffect(() => {
-    const onReconnect = () => { load(filter, true); };
-    addReconnectListener(onReconnect);
-    return () => removeReconnectListener(onReconnect);
-  }, [filter, addReconnectListener, removeReconnectListener]);
 
   // Près de toi — chargé dès que la position est disponible
   useEffect(() => {
@@ -1082,13 +1014,9 @@ export const FeedScreen: React.FC = () => {
         searchBarOpacity.value = 0;
       };
     }
-    // Retour : refresh silencieux si données > 60s ET connexion disponible
+    // Retour : refresh silencieux si données > 60s
     const age = Date.now() - lastLoadedAtRef.current;
-    const hasItems = itemsRef.current.length > 0;
-    if (age > 60_000 && (isOnline && isInternetReachable)) {
-      load(filter, true);
-    } else if (!isOnline && !hasItems) {
-      // Offline sans cache → charger depuis cache persistant
+    if (age > 60_000) {
       load(filter, true);
     }
     return () => {
@@ -1213,10 +1141,7 @@ export const FeedScreen: React.FC = () => {
     }
     if (item.kind === 'communities') {
       const allComms: CommunityData[] = Array.isArray(item.data) ? item.data : [];
-      // Exclure les communautés dont l'utilisateur est déjà membre (cache MMKV)
-      const myCommIds = new Set(
-        (offlineCacheService.getCommunityList() ?? []).map(c => String(c.id))
-      );
+      const myCommIds = new Set<string>();
       const JOINED = new Set(['member', 'admin', 'moderator']);
       const comms = allComms.filter(c => !myCommIds.has(String(c.id)) && !JOINED.has(c.join_status as string));
       if (!comms.length) return null;
@@ -1402,50 +1327,29 @@ export const FeedScreen: React.FC = () => {
                   </View>
                 )}
                 {displayName ? (
-                  <Text style={[s.userName, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
-                    {displayName.split(' ')[0]}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                    <Text style={[s.userName, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+                      {displayName.split(' ')[0]}
+                    </Text>
+                    <Icon name="chevron-down" size={14} color={colors.textPrimary} />
+                  </View>
                 ) : null}
               </TouchableOpacity>
             )
           )}
 
-          {/* Centre : GoFolyX logo — position absolue, toujours centré */}
+          {/* Centre : GoFolyX — gradient violet, centré en absolu */}
           {!searchOpen && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
-                {/* "GoFoly" — blanc en dark, dark navy en light */}
-                <Text style={{ fontSize: 26, fontWeight: '900', letterSpacing: -0.5, color: colors.textPrimary }}>
-                  GoFoly
+              <LinearGradient
+                colors={['#A855F7', '#7B3FF2']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ borderRadius: 4 }}
+              >
+                <Text style={{ fontSize: 28, fontWeight: '900', letterSpacing: -0.5, color: '#fff', paddingHorizontal: 2 }}>
+                  GoFolyX
                 </Text>
-                {/* "x" gradient — deux barres diagonales colorées */}
-                <View style={{ width: 22, height: 30, marginLeft: 1, overflow: 'hidden' }}>
-                  {/* Barre \ : jaune → orange */}
-                  <LinearGradient
-                    colors={['#FFE600', '#FF6B00']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{
-                      position: 'absolute', width: 10, height: 34,
-                      top: -2, left: 0,
-                      transform: [{ rotate: '35deg' }, { translateX: 2 }],
-                      borderRadius: 3,
-                    }}
-                  />
-                  {/* Barre / : cyan → rose */}
-                  <LinearGradient
-                    colors={['#00D9FF', '#FF4FD8']}
-                    start={{ x: 0, y: 1 }}
-                    end={{ x: 1, y: 0 }}
-                    style={{
-                      position: 'absolute', width: 10, height: 34,
-                      top: -2, right: 0,
-                      transform: [{ rotate: '-35deg' }, { translateX: -2 }],
-                      borderRadius: 3,
-                    }}
-                  />
-                </View>
-              </View>
+              </LinearGradient>
             </View>
           )}
 
@@ -1488,17 +1392,17 @@ export const FeedScreen: React.FC = () => {
             </Animated.View>
           )}
 
-          {/* Droite : search + menu */}
+          {/* Droite : search + menu avec cercle bordure */}
           <View style={s.headerRight}>
             <TouchableOpacity
-              style={[s.iconBtn, { backgroundColor: searchOpen ? colors.primary + '22' : colors.backgroundSecondary }]}
+              style={[s.iconBtn, { backgroundColor: searchOpen ? colors.primary + '22' : colors.backgroundSecondary, borderWidth: 1.5, borderColor: colors.border }]}
               onPress={searchOpen ? closeSearch : openSearch}
             >
-              <Icon name={searchOpen ? 'x' : 'search'} size={20} color={searchOpen ? colors.primary : colors.textPrimary} />
+              <Icon name={searchOpen ? 'x' : 'search'} size={19} color={searchOpen ? colors.primary : colors.textPrimary} />
             </TouchableOpacity>
             {!searchOpen && (
-              <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={openMenu}>
-                <Icon name="menu" size={20} color={colors.textPrimary} />
+              <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary, borderWidth: 1.5, borderColor: colors.border }]} onPress={openMenu}>
+                <Icon name="menu" size={19} color={colors.textPrimary} />
               </TouchableOpacity>
             )}
           </View>
@@ -1522,19 +1426,19 @@ export const FeedScreen: React.FC = () => {
                       load(tab.key);
                     }}
                     activeOpacity={0.7}
-                    style={{ flex: 1, alignItems: 'center', paddingVertical: 11 }}
+                    style={{ flex: 1, alignItems: 'center', paddingVertical: 12 }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                       {tab.key === 'live' && (
                         <View style={{
-                          width: 6, height: 6, borderRadius: 3,
-                          backgroundColor: active ? '#F0365A' : '#F0365A88',
+                          width: 7, height: 7, borderRadius: 4,
+                          backgroundColor: '#F0365A',
                         }} />
                       )}
                       <Text style={{
-                        fontSize: 13,
-                        fontWeight: active ? '700' : '500',
-                        color: active ? colors.textPrimary : colors.textTertiary,
+                        fontSize: 15,
+                        fontWeight: active ? '800' : '500',
+                        color: active ? colors.primary : colors.textTertiary,
                         letterSpacing: 0.1,
                       }}>
                         {tab.label}
@@ -1568,26 +1472,6 @@ export const FeedScreen: React.FC = () => {
 
       </View>
 
-      {/* ── Banniere erreur réseau (silencieuse, disparait au prochain succès) */}
-      {networkError && !loading && !refreshing && (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => { setNetworkError(false); setLoading(items.length === 0); load(filter, items.length > 0); }}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: 8,
-            paddingHorizontal: 16, paddingVertical: 8,
-            backgroundColor: '#FF3B3011',
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: '#FF3B3030',
-          }}
-        >
-          <Icon name="wifi-off" size={14} color="#FF3B30" />
-          <Text style={{ flex: 1, fontSize: 12, color: '#FF3B30', fontWeight: '500' }}>
-            {items.length > 0 ? 'Contenu peut ne pas etre a jour — appuyer pour reessayer' : 'Impossible de charger le feed — appuyer pour reessayer'}
-          </Text>
-          <Icon name="refresh-cw" size={13} color="#FF3B30" />
-        </TouchableOpacity>
-      )}
 
       {searchOpen ? (
         /* ── Overlay recherche plein écran ──────────────────────────────── */
@@ -2017,7 +1901,6 @@ export const FeedScreen: React.FC = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
-                if (!isOnline || !isInternetReachable) { setRefreshing(false); return; }
                 setRefreshing(true);
                 load(filter);
               }}
@@ -2042,16 +1925,6 @@ export const FeedScreen: React.FC = () => {
                 >
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Découvrir du contenu</Text>
                 </TouchableOpacity>
-              </View>
-            ) : (!isOnline || !isInternetReachable) ? (
-              <View style={s.empty}>
-                <Icon name="wifi-off" size={48} color={colors.textTertiary} />
-                <Text style={[s.emptyText, { color: colors.textPrimary, fontWeight: '700' }]}>
-                  Hors ligne
-                </Text>
-                <Text style={{ color: colors.textTertiary, fontSize: 13, textAlign: 'center', paddingHorizontal: 32, marginTop: 4 }}>
-                  Aucun contenu en cache. Reconnecte-toi pour charger le feed.
-                </Text>
               </View>
             ) : (
               <View style={s.empty}>
