@@ -25,6 +25,7 @@ import { reelService } from '../../services';
 import { MentionInput } from '../../components/common/MentionInput';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { ReelEditorScreen, type ReelEditResult, type FilterKey, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from './ReelEditorScreen';
+import Sound from 'react-native-sound';
 
 const { width: W } = Dimensions.get('window');
 const PREVIEW_H = Math.round(W * 16 / 9);
@@ -271,6 +272,54 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   const editResultRef     = useRef<ReelEditResult | null>(null);
   const trimmedVideoUriRef = useRef<string | null>(null);
 
+  // ── Preview musique ────────────────────────────────────────────────────────
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const previewSoundRef = useRef<Sound | null>(null);
+
+  const stopPreviewSound = useCallback(() => {
+    if (previewSoundRef.current) {
+      previewSoundRef.current.stop();
+      previewSoundRef.current.release();
+      previewSoundRef.current = null;
+    }
+    setPreviewPlaying(false);
+  }, []);
+
+  const togglePreviewMusic = useCallback(() => {
+    if (previewPlaying) { stopPreviewSound(); return; }
+    const uri = editResultRef.current?.musicUri;
+    const startSec = editResultRef.current?.musicStartSec ?? 0;
+    if (!uri) { console.warn('[previewMusic] no uri in editResultRef'); return; }
+    Sound.setCategory('Playback');
+    // uri est déjà un chemin absolu (résolu par resolveAudioUri dans l'éditeur)
+    const cleanUri = uri.startsWith('file://') ? uri.slice(7) : uri;
+    console.log('[previewMusic] loading:', cleanUri, 'from:', startSec);
+    // '' = chemin absolu sur Android (react-native-sound détecte via File.exists())
+    const snd = new Sound(cleanUri, '', err => {
+      if (err) {
+        console.warn('[previewMusic] Sound error:', err, 'uri:', cleanUri);
+        snd.release();
+        return;
+      }
+      console.log('[previewMusic] loaded, duration:', snd.getDuration());
+      snd.setCurrentTime(startSec);
+      previewSoundRef.current = snd;
+      setPreviewPlaying(true);
+      snd.play(success => {
+        if (!success) console.warn('[previewMusic] playback failed');
+        setPreviewPlaying(false);
+        previewSoundRef.current = null;
+        snd.release();
+      });
+    });
+  }, [previewPlaying, stopPreviewSound]);
+
+  // Stoppe le son quand on repart vers l'éditeur ou qu'on démonte
+  useEffect(() => () => { stopPreviewSound(); }, [stopPreviewSound]);
+
+  // Stoppe si editResult change (nouveau son ou suppression)
+  useEffect(() => { stopPreviewSound(); }, [editResult, stopPreviewSound]);
+
   // Charge la durée de la vidéo source en arrière-plan
   useEffect(() => {
     if (!sourceReelUrl) return;
@@ -306,7 +355,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         setVideoDuration(5);
         setEditResult(null);
         setLoadingMeta(false);
-        // pas d'éditeur pour les photos — on reste sur l'écran compose
+        setShowEditor(true);
         return;
       }
 
@@ -401,25 +450,51 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
     // ── Photo reel : upload direct via image-to-reel, pas de backgroundUploadService ──
     if (snapIsPhoto) {
-      const { uploadImageAsReel } = require('../../services/uploadService');
+      const { uploadImageAsReel, uploadLocalAudio } = require('../../services/uploadService');
       uploadImageAsReel(snap.uri, 5).then(async (result: any) => {
         if (!result.hls_url) {
           Alert.alert('Publication echouee', 'La conversion image→video a echoue. Reessaie.');
           return;
         }
         try {
+          const { edit } = snap;
+
+          // Upload l'audio local vers R2 si présent
+          let musicPublicUrl: string | undefined;
+          if (edit?.musicUri) {
+            try {
+              musicPublicUrl = await uploadLocalAudio(
+                edit.musicUri,
+                edit.musicName || 'audio.mp3',
+              );
+            } catch (audioErr) {
+              console.warn('[publish] audio upload failed, skipping music:', audioErr);
+            }
+          }
+
           await reelService.create({
             hls_url:       result.hls_url,
             caption:       snap.cap || undefined,
             thumbnail_url: result.thumbnail_url,
             duration_sec:  5,
             mention_ids:   snap.mentionIds.length ? snap.mentionIds : undefined,
+            ...(edit && edit.filter !== 'original' ? { filter:         edit.filter   } : {}),
+            ...(edit && edit.layers.length > 0   ? { text_layers:    JSON.stringify(edit.layers)    } : {}),
+            ...(edit && edit.stickers.length > 0 ? { sticker_layers: JSON.stringify(edit.stickers) } : {}),
+            ...(edit && edit.drawings.length > 0 ? { draw_layers:    JSON.stringify(edit.drawings)  } : {}),
+            ...(edit && Object.values(edit.adjust).some(v => v !== 0) ? { video_adjust: JSON.stringify(edit.adjust) } : {}),
+            ...(musicPublicUrl ? {
+              music_url:       musicPublicUrl,
+              music_name:      edit?.musicName,
+              music_start_sec: edit?.musicStartSec,
+              music_end_sec:   edit?.musicEndSec,
+            } : {}),
           });
         } catch (err: any) {
           Alert.alert('Publication echouee', err?.message ?? 'Erreur inconnue.');
         }
       }).catch((err: any) => {
-        Alert.alert('Upload echoue', err?.message ?? 'Erreur inconnue.');
+        Alert.alert('Publication echouee', 'La conversion de l\'image a echoue. Reessaie dans quelques secondes.');
       });
       return;
     }
@@ -440,6 +515,20 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         }
         const { edit, dur, cap, mentionIds } = snap;
         try {
+          // Upload l'audio local vers R2 si présent
+          let musicPublicUrl: string | undefined;
+          if (edit?.musicUri) {
+            try {
+              const { uploadLocalAudio } = await import('../../services/uploadService');
+              musicPublicUrl = await uploadLocalAudio(
+                edit.musicUri,
+                edit.musicName || 'audio.mp3',
+              );
+            } catch (audioErr) {
+              console.warn('[publish] audio upload failed, skipping music:', audioErr);
+            }
+          }
+
           await reelService.create({
             hls_url:       playUrl,
             caption:       cap || undefined,
@@ -452,7 +541,12 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
             ...(edit && edit.stickers.length > 0 ? { sticker_layers: JSON.stringify(edit.stickers) } : {}),
             ...(edit && edit.drawings.length > 0 ? { draw_layers:    JSON.stringify(edit.drawings)  } : {}),
             ...(edit && Object.values(edit.adjust).some(v => v !== 0) ? { video_adjust: JSON.stringify(edit.adjust) } : {}),
-            ...(edit && edit.musicUri              ? { music_url:      edit.musicUri, music_name: edit.musicName } : {}),
+            ...(musicPublicUrl ? {
+              music_url:        musicPublicUrl,
+              music_name:       edit?.musicName,
+              music_start_sec:  edit?.musicStartSec,
+              music_end_sec:    edit?.musicEndSec,
+            } : {}),
             ...(sourceReelId ? { source_reel_id: sourceReelId, remix_type: 'remix' as const } : {}),
           });
         } catch (err: any) {
@@ -479,6 +573,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         durationSec={videoDuration}
         thumbnailUri={videoThumb ?? undefined}
         initialResult={editResult ?? undefined}
+        isPhoto={isPhotoReel}
         onConfirm={handleEditorConfirm}
         onCancel={handleEditorCancel}
       />
@@ -528,10 +623,22 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
                   <TouchableOpacity style={s.removeBtn} onPress={handleRemove} activeOpacity={0.8}>
                     <Icon name="x" size={16} color="#fff" />
                   </TouchableOpacity>
+                  <TouchableOpacity style={s.editBtn} onPress={() => setShowEditor(true)} activeOpacity={0.85}>
+                    <View style={s.editBtnInner}>
+                      <Icon name="sliders" size={13} color="#fff" />
+                      <Text style={s.editBtnTxt}>Modifier</Text>
+                    </View>
+                  </TouchableOpacity>
                   <View style={[s.durationBadge, { backgroundColor: 'rgba(123,63,242,0.8)' }]} pointerEvents="none">
                     <Icon name="image" size={10} color="#fff" />
                     <Text style={s.durationTxt}>Photo · 5s</Text>
                   </View>
+                  {previewPlaying && editResult?.musicName ? (
+                    <View style={s.nowPlayingBadge} pointerEvents="none">
+                      <Icon name="music" size={10} color="#fff" />
+                      <Text style={s.nowPlayingTxt} numberOfLines={1}>{editResult.musicName}</Text>
+                    </View>
+                  ) : null}
                 </View>
               ) : (
               <VideoPreview
@@ -609,6 +716,26 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
             </View>
           </View>
 
+          {/* ══ MUSIQUE SÉLECTIONNÉE ══ */}
+          {editResult?.musicUri ? (
+            <View style={[s.musicCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TouchableOpacity style={s.musicPlayBtn} onPress={togglePreviewMusic} activeOpacity={0.8}>
+                <Icon name={previewPlaying ? 'pause' : 'play'} size={14} color="#fff" />
+              </TouchableOpacity>
+              <View style={s.musicCardLeft}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.musicCardLabel, { color: colors.textSecondary }]}>Son ajouté</Text>
+                  <Text style={[s.musicCardName, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {editResult.musicName || 'Son sélectionné'}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity style={s.musicCardEdit} onPress={() => { stopPreviewSound(); setShowEditor(true); }} activeOpacity={0.8}>
+                <Icon name="edit-2" size={14} color="#7B3FF2" />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {/* ══ BOUTON PUBLIER ══ */}
           {videoUri && (
             <TouchableOpacity
@@ -669,6 +796,8 @@ const s = StyleSheet.create({
   editBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
   durationBadge: { position: 'absolute', bottom: 14, left: 14, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12 },
   durationTxt: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  nowPlayingBadge: { position: 'absolute', top: 14, left: 14, right: 60, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(123,63,242,0.88)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
+  nowPlayingTxt: { color: '#fff', fontSize: 11, fontWeight: '700', flex: 1 },
 
   videoPicker:    { width: W, height: PREVIEW_H, overflow: 'hidden', backgroundColor: '#08060F' },
   pickerGrid:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', flexWrap: 'wrap' },
@@ -690,6 +819,13 @@ const s = StyleSheet.create({
   fieldLabel: { flex: 1, fontSize: 14, fontWeight: '500' },
   divider:    { height: StyleSheet.hairlineWidth, marginLeft: 52 },
   charCount:  { fontSize: 11, textAlign: 'right', marginTop: 4, opacity: 0.6 },
+
+  musicCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, gap: 12 },
+  musicCardLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  musicPlayBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  musicCardLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 1 },
+  musicCardName: { fontSize: 13, fontWeight: '700' },
+  musicCardEdit: { padding: 6 },
 
   publishBtnFull: { marginHorizontal: 16, marginTop: 20, borderRadius: 26, overflow: 'hidden' },
   publishBtnFullInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },

@@ -33,6 +33,8 @@ export interface Post {
   updated_at: string;
   author?: PostAuthor | null;
   user_reaction?: 'like' | 'dislike' | null;
+  music_url?: string | null;
+  music_title?: string | null;
 }
 
 export interface PostCreate {

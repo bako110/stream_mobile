@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useEffect, useState, useCallback, useRef, memo, useMemo,
 } from 'react';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
@@ -25,8 +25,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { RichText } from '../../components/common/RichText';
 import { apiClient } from '../../api';
 import { reelService, socialService, authService } from '../../services';
-import { useNetwork } from '../../context/NetworkContext';
-import { offlineCacheService } from '../../services/offlineCacheService';
 import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
@@ -36,6 +34,7 @@ import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { type FilterKey, type ReelEditResult, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2, ReelEditorScreen } from '../Create/ReelEditorScreen';
+import Sound from 'react-native-sound';
 import { BackButton } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -79,7 +78,6 @@ export const ReelsScreen: React.FC = () => {
   const { colors }        = theme;
   const nav    = useNavigation<Nav>();
   const route  = useRoute();
-  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
   const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean };
   // paramsRef toujours à jour — lisible depuis useFocusEffect (closure figée sur [])
   const paramsRef = useRef(params);
@@ -107,12 +105,7 @@ export const ReelsScreen: React.FC = () => {
     params.initialReel?.hls_url ? [params.initialReel as Reel] : []
   ).current;
 
-  // Init depuis cache si pas de seedReel — affichage immédiat sans skeleton
-  const cachedReels = useRef(
-    seedReel.length === 0 && !params.initialReelId ? (offlineCacheService.getReels() ?? []) : []
-  ).current;
-
-  const [reels,         setReels]         = useState<Reel[]>(seedReel.length > 0 ? seedReel : cachedReels);
+  const [reels,         setReels]         = useState<Reel[]>(seedReel.length > 0 ? seedReel : []);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
   const [reelAd,        setReelAd]        = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string } | null>(null);
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
@@ -120,10 +113,12 @@ export const ReelsScreen: React.FC = () => {
   const [editCaption,   setEditCaption]   = useState('');
   const [editSaving,    setEditSaving]    = useState(false);
   const [fullEditReel,  setFullEditReel]  = useState<Reel | null>(null); // édition effets visuels
-  const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId && cachedReels.length === 0);
+  const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId);
   const [hasMore,       setHasMore]       = useState(true);
   const [tab,           setTab]           = useState<'feed' | 'mine'>('feed');
   const [myId,          setMyId]          = useState<string | null>(null);
+  const [myAvatar,      setMyAvatar]      = useState<string | null>(null);
+  const [myInitial,     setMyInitial]     = useState<string>('M');
   const [currentIndex,  setCurrentIndex]  = useState(0);
   const [listKey,       setListKey]       = useState('reels-0');
   const [screenFocused, setScreenFocused] = useState(true);
@@ -134,7 +129,7 @@ export const ReelsScreen: React.FC = () => {
   const [searching,     setSearching]     = useState(false);
 
   // Refs stables pour éviter les closures stales
-  const reelsRef        = useRef<Reel[]>(seedReel.length > 0 ? seedReel : cachedReels);
+  const reelsRef        = useRef<Reel[]>(seedReel.length > 0 ? seedReel : []);
   const hasMoreRef      = useRef(true);
   const pendingScrollIdx  = useRef<number | null>(null);
   const isScrollingRef    = useRef(false);
@@ -200,22 +195,6 @@ export const ReelsScreen: React.FC = () => {
     pageRef.current = 1;
     isLoadingMoreRef.current = false;
 
-    // Offline : servir le cache persistant (même si TTL expiré)
-    if (!isOnline || !isInternetReachable) {
-      if (mountedRef.current) {
-        const cached = offlineCacheService.getReels();
-        if (cached && cached.length > 0 && reelsRef.current.length === 0 && !silent) {
-          currentIdxRef.current = 0;
-          setCurrentIndex(0);
-          setReels(cached);
-          reelsRef.current = cached;
-          viewedReelsRef.current = new Set();
-        }
-        setLoading(false);
-      }
-      return;
-    }
-
     try {
       const data = await reelService.getFeed({ page: 1 });
       if (!mountedRef.current) return;
@@ -242,9 +221,6 @@ export const ReelsScreen: React.FC = () => {
           setReels(merged);
         }
       }
-      // Persist pour mode offline
-      offlineCacheService.saveReels(filtered);
-
       // Charger la pub reels en arriere-plan
       apiClient.get<{ id: string; title: string } | null>('/api/v1/ads/feed/next?placement=reels')
         .then(r => { if (r.data && mountedRef.current) setReelAd(r.data as any); })
@@ -254,25 +230,20 @@ export const ReelsScreen: React.FC = () => {
       authService.getMe().then(me => {
         if (!mountedRef.current) return;
         setMyId(String(me.id));
+        setMyAvatar(me.avatar_url ?? null);
+        const label = me.display_name || me.first_name || me.username || 'M';
+        setMyInitial(label[0].toUpperCase());
         userService.getUserReels(String(me.id))
           .then(mine => { if (mountedRef.current) setMyReels(Array.isArray(mine) ? mine : []); })
           .catch(() => {});
       }).catch(() => {});
 
     } catch {
-      // Erreur réseau en ligne → fallback cache plutôt que liste vide
-      if (mountedRef.current && !silent) {
-        const cached = offlineCacheService.getReels();
-        if (cached && cached.length > 0) {
-          setReels(cached);
-          reelsRef.current = cached;
-        }
-        // Si pas de cache, garder les reels actuellement affichés (ne pas mettre [])
-      }
+      // Erreur réseau — garder les reels actuellement affichés (ne pas mettre [])
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [isOnline, isInternetReachable]); // pas de dépendances sur params — targetId passé en argument
+  }, []); // pas de dépendances sur params — targetId passé en argument
 
   // ── Load more ─────────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -426,7 +397,7 @@ export const ReelsScreen: React.FC = () => {
         load(false);
       } else {
         const age = Date.now() - lastLoadedAtRef.current;
-        if (age > 90_000 && (isOnline && isInternetReachable)) load(true);
+        if (age > 90_000) load(true);
       }
     }
 
@@ -447,13 +418,6 @@ export const ReelsScreen: React.FC = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.reelPublished]);
-
-  // Sync au reconnect réseau
-  useEffect(() => {
-    const onReconnect = () => { if (mountedRef.current) load(true); };
-    addReconnectListener(onReconnect);
-    return () => removeReconnectListener(onReconnect);
-  }, [addReconnectListener, removeReconnectListener]);
 
   // ── Edit / Delete ─────────────────────────────────────────────────────────
   const handleDeleteReel = useCallback((reel: Reel) => {
@@ -613,13 +577,15 @@ export const ReelsScreen: React.FC = () => {
         insetBottom={insets.bottom}
         colors={colors}
         currentUserId={myId ?? undefined}
+        currentUserAvatar={myAvatar ?? undefined}
+        currentUserInitial={myInitial}
         onToggleMute={toggleMute}
         onAuthorPress={onAuthorPress}
         onEnd={goNextReel}
         activePlayerRef={activePlayerRef}
       />
     );
-  }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
+  }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -640,21 +606,17 @@ export const ReelsScreen: React.FC = () => {
         <BackButton onPress={() => nav.goBack()} />
         {/* Contenu vide centré */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <Icon name={!isOnline || !isInternetReachable ? 'wifi-off' : 'film'} size={48} color={colors.textDisabled} />
+          <Icon name="film" size={48} color={colors.textDisabled} />
           <Text style={{ color: colors.textTertiary, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 }}>
-            {!isOnline || !isInternetReachable
-              ? 'Hors ligne — aucun reel en cache'
-              : 'Aucun reel disponible'}
+            Aucun reel disponible
           </Text>
-          {(isOnline && isInternetReachable) && (
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8, borderRadius: 10 }}
-              onPress={() => nav.navigate('CreateReel')}
-            >
-              <Icon name="plus" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ajouter un reel</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8, borderRadius: 10 }}
+            onPress={() => nav.navigate('CreateReel')}
+          >
+            <Icon name="plus" size={18} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ajouter un reel</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -942,17 +904,6 @@ export const ReelsScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Bouton créer un reel — bas droite au-dessus de la barre de commentaire */}
-      {!searchOpen && (
-        <TouchableOpacity
-          onPress={() => nav.navigate('CreateReel')}
-          style={[s.createFab, { bottom: Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 0) + 76 + 16 }]}
-        >
-          <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.createFabInner}>
-            <Icon name="plus" size={22} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
 
       {/* Overlay recherche */}
       {searchOpen && (
@@ -1164,24 +1115,27 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
 // ─── VideoSlide ───────────────────────────────────────────────────────────────
 
 interface VideoSlideProps {
-  reel:           Reel;
-  isActive:       boolean;
-  isPreload:      boolean;
-  muted:          boolean;
-  screenW:        number;
-  screenH:        number;
-  insetBottom:    number;
-  colors:         any;
-  currentUserId?: string;
-  onToggleMute:   () => void;
-  onAuthorPress:  (userId: string) => void;
-  onEnd:          () => void;
-  activePlayerRef?: React.RefObject<{ pause: () => void } | null>;
+  reel:                 Reel;
+  isActive:             boolean;
+  isPreload:            boolean;
+  muted:                boolean;
+  screenW:              number;
+  screenH:              number;
+  insetBottom:          number;
+  colors:               any;
+  currentUserId?:       string;
+  currentUserAvatar?:   string;
+  currentUserInitial?:  string;
+  onToggleMute:         () => void;
+  onAuthorPress:        (userId: string) => void;
+  onEnd:                () => void;
+  activePlayerRef?:     React.RefObject<{ pause: () => void } | null>;
 }
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
   reel, isActive, isPreload, muted, screenW, screenH, insetBottom,
-  colors, currentUserId, onToggleMute, onAuthorPress, onEnd, activePlayerRef,
+  colors, currentUserId, currentUserAvatar, currentUserInitial = 'M',
+  onToggleMute, onAuthorPress, onEnd, activePlayerRef,
 }) => {
   const nav = useNavigation<Nav>();
 
@@ -1331,6 +1285,45 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     p.loop = false; p.muted = muted; p.volume = muted ? 0 : 1.0;
   });
 
+  // ── Musique associée au reel ────────────────────────────────────────────────
+  const musicSoundRef = useRef<Sound | null>(null);
+
+  const stopMusic = useCallback(() => {
+    if (musicSoundRef.current) {
+      musicSoundRef.current.stop();
+      musicSoundRef.current.release();
+      musicSoundRef.current = null;
+    }
+  }, []);
+
+  const startMusic = useCallback(() => {
+    const url = reel.music_url;
+    if (!url) return;
+    stopMusic();
+    Sound.setCategory('Playback');
+    const snd = new Sound(url, '', err => {
+      if (err || !mountedRef.current) { snd.release(); return; }
+      const startSec = reel.music_start_sec ?? 0;
+      snd.setCurrentTime(startSec);
+      musicSoundRef.current = snd;
+      snd.play(success => {
+        if (!success) console.warn('[ReelMusic] playback failed for', url);
+        musicSoundRef.current = null;
+        snd.release();
+      });
+    });
+  }, [reel.music_url, reel.music_start_sec, stopMusic]);
+
+  // Démarrer/stopper la musique selon isActive et paused
+  useEffect(() => {
+    if (isActive && !paused && reel.music_url) {
+      startMusic();
+    } else {
+      stopMusic();
+    }
+    return () => { stopMusic(); };
+  }, [isActive, paused, reel.music_url, startMusic, stopMusic]);
+
   const clearAllTimers = useCallback(() => {
     if (retryTimerRef.current)   { clearTimeout(retryTimerRef.current);   retryTimerRef.current   = null; }
     if (stallTimerRef.current)   { clearTimeout(stallTimerRef.current);   stallTimerRef.current   = null; }
@@ -1361,6 +1354,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       mountedRef.current = false;
       appSub.remove();
       clearAllTimers();
+      stopMusic();
       try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
     };
   }, []); // eslint-disable-line
@@ -1677,6 +1671,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const hPanFail   = Gesture.Pan().activeOffsetX([-10, 10]).failOffsetY([-10, 10]).minDistance(10);
 
   const safeBottom    = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
+  // 8 paddingV top + 8 paddingV bottom + 38 avatar height + 9 paddingV inner × 2 = 72 → 76 pour marge
   const COMMENT_BAR_H = 76;
 
   return (
@@ -1934,6 +1929,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           </View>
 
           {captionSt ? <RichText text={captionSt} textStyle={s.caption} primaryColor="#93C5FD" maxLines={3} /> : null}
+
+          {reel.music_name ? (
+            <View style={s.musicBand} pointerEvents="none">
+              <Icon name="music" size={11} color="#fff" />
+              <Text style={s.musicBandTxt} numberOfLines={1}>{reel.music_name}</Text>
+            </View>
+          ) : null}
+
           {reel.source_reel && (
             <View style={s.sourceBand}>
               <Icon name={reel.remix_type === 'remix' ? 'git-merge' : 'repeat'} size={11} color="rgba(255,255,255,0.7)" />
@@ -2238,11 +2241,23 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         )}
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : undefined} style={[s.commentBarWrap, { bottom: safeBottom }]} keyboardVerticalOffset={0}>
-          <View style={[s.commentBar, { backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.52)', borderColor: barFocused ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.18)' }]}>
-            <TextInput value={commentText} onChangeText={setCommentText} placeholder="Ajouter un commentaire..." placeholderTextColor="rgba(255,255,255,0.45)" onFocus={() => handleFocusBar(true)} onBlur={() => handleFocusBar(false)} style={s.commentBarInput} returnKeyType="send" onSubmitEditing={handleSendComment} maxLength={300} />
-            <TouchableOpacity onPress={handleSendComment} disabled={!commentText.trim() || sending} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={[s.commentBarSend, { backgroundColor: commentText.trim() ? colors.primary : 'rgba(255,255,255,0.15)' }]}>
-              {sending ? <ActivityIndicator size="small" color="#fff" /> : <MCIcon name="send" size={20} color={commentText.trim() ? '#fff' : 'rgba(255,255,255,0.5)'} />}
+          <View style={s.commentBarRow}>
+            {/* Avatar du user connecté */}
+            <TouchableOpacity activeOpacity={0.8} onPress={() => currentUserId && onAuthorPress(currentUserId)}>
+              {currentUserAvatar
+                ? <Image source={{ uri: currentUserAvatar }} style={s.commentBarAvatar} />
+                : <View style={[s.commentBarAvatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={s.commentBarAvatarTxt}>{currentUserInitial}</Text>
+                  </View>
+              }
             </TouchableOpacity>
+            {/* Champ commentaire */}
+            <View style={[s.commentBar, { flex: 1, backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.52)', borderColor: barFocused ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.18)' }]}>
+              <TextInput value={commentText} onChangeText={setCommentText} placeholder="Ajouter un commentaire..." placeholderTextColor="rgba(255,255,255,0.45)" onFocus={() => handleFocusBar(true)} onBlur={() => handleFocusBar(false)} style={s.commentBarInput} returnKeyType="send" onSubmitEditing={handleSendComment} maxLength={300} />
+              <TouchableOpacity onPress={handleSendComment} disabled={!commentText.trim() || sending} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={[s.commentBarSend, { backgroundColor: commentText.trim() ? colors.primary : 'rgba(255,255,255,0.15)' }]}>
+                {sending ? <ActivityIndicator size="small" color="#fff" /> : <MCIcon name="send" size={20} color={commentText.trim() ? '#fff' : 'rgba(255,255,255,0.5)'} />}
+              </TouchableOpacity>
+            </View>
           </View>
         </KeyboardAvoidingView>
 
@@ -2279,7 +2294,7 @@ const ActionBtn: React.FC<{
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '75%' },
+  bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '80%' },
 
   floatingHeader: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
@@ -2287,8 +2302,6 @@ const s = StyleSheet.create({
   myReelsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   myReelsBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   searchFab:      { position: 'absolute', right: 16, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
-  createFab:      { position: 'absolute', right: 16, width: 52, height: 52, borderRadius: 26, overflow: 'hidden', zIndex: 10 },
-  createFabInner: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
 
   playPauseCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   bufferOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)', zIndex: 6, gap: 10 },
@@ -2304,6 +2317,9 @@ const s = StyleSheet.create({
   avatar:       { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff', overflow: 'hidden' },
   avatarText:   { color: '#fff', fontWeight: '800', fontSize: 14 },
   avatarPlusBtn: { position: 'absolute', bottom: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
+
+  musicBand:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(123,63,242,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', maxWidth: '80%', marginTop: 4 },
+  musicBandTxt: { color: '#fff', fontSize: 11, fontWeight: '700', flex: 1 },
 
   sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', maxWidth: '100%' },
   sourceThumb: { width: 20, height: 20, borderRadius: 4, overflow: 'hidden' },
@@ -2325,13 +2341,16 @@ const s = StyleSheet.create({
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 
-  commentBarWrap:  { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 12, paddingVertical: 8 },
-  commentBar:      { flexDirection: 'row', alignItems: 'center', borderRadius: 26, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9, gap: 10 },
-  commentBarInput: { flex: 1, fontSize: 13, color: '#fff', padding: 0, maxHeight: 60 },
-  commentBarSend:  { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  commentBarWrap:      { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 12, paddingVertical: 8 },
+  commentBarRow:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  commentBarAvatar:    { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)', overflow: 'hidden', flexShrink: 0 },
+  commentBarAvatarTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  commentBar:          { flexDirection: 'row', alignItems: 'center', borderRadius: 26, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9, gap: 10 },
+  commentBarInput:     { flex: 1, fontSize: 13, color: '#fff', padding: 0, maxHeight: 60 },
+  commentBarSend:      { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   mineHeaderSub:     { fontSize: 12, fontWeight: '400', marginTop: 1 },
   mineCreateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   mineCreateBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
@@ -2375,7 +2394,7 @@ mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
 
   searchOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0a0a', zIndex: 50 },
   searchTopBar:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
-searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 22, height: 42, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 22, height: 42, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   searchInput:     { flex: 1, fontSize: 14, color: '#fff', paddingHorizontal: 10, paddingVertical: 0 },
   searchClearBtn:  { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', marginRight: 7 },
 

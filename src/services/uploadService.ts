@@ -10,7 +10,7 @@ import { apiClient } from '../api/client';
 
 export type UploadFolder = 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'content';
 export type VideoFolder  = 'reels' | 'stories' | 'messages' | 'events' | 'concerts' | 'content' | 'posts';
-export type AudioFolder  = 'messages' | 'stories';
+export type AudioFolder  = 'messages' | 'stories' | 'reels';
 
 export interface UploadedImage {
   url:       string;
@@ -457,6 +457,21 @@ export async function uploadAudioFile(
   const { upload_url, public_url } = await getPresignedUrl(folder, fileName, mimeType);
   await putToR2(upload_url, normalized, mimeType);
   return { url: public_url, public_id: public_url };
+}
+
+// Upload d'un fichier audio local (chemin absolu ou file://) vers R2
+export async function uploadLocalAudio(
+  localPath: string,
+  originalName: string,
+  folder: AudioFolder = 'reels',
+): Promise<string> {
+  const ext      = originalName.includes('.') ? originalName.split('.').pop()! : 'mp3';
+  const fileName = `audio_${Date.now()}.${ext}`;
+  const mimeType = ext === 'mp3' ? 'audio/mpeg' : ext === 'aac' ? 'audio/aac' : ext === 'm4a' ? 'audio/mp4' : 'audio/mpeg';
+  const cleanPath = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
+  const { upload_url, public_url } = await getPresignedUrl(folder, fileName, mimeType);
+  await putToR2(upload_url, cleanPath, mimeType);
+  return public_url;
 }
 
 export interface UploadedFile {

@@ -39,6 +39,10 @@ export interface Reel {
     thumbnail_url: string | null;
     author?: import('./user').User;
   } | null;
+  music_url?: string | null;
+  music_name?: string | null;
+  music_start_sec?: number | null;
+  music_end_sec?: number | null;
 }
 
 export interface CommentAuthor {

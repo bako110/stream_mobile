@@ -98,8 +98,10 @@ export const reelService = {
     sticker_layers?: string;
     draw_layers?:    string;
     video_adjust?:   string;
-    music_url?:      string;
-    music_name?:     string;
+    music_url?:       string;
+    music_name?:      string;
+    music_start_sec?: number;
+    music_end_sec?:   number;
     source_reel_id?: string;
     remix_type?:     'repost' | 'remix';
   }): Promise<Reel> {

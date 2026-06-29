@@ -4,9 +4,10 @@ import React, {
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, PanResponder, Animated as RNAnimated, Dimensions, Platform,
-  StatusBar, Alert, Keyboard, ActivityIndicator, Image,
+  StatusBar, Alert, Keyboard, ActivityIndicator, Image, PermissionsAndroid,
 } from 'react-native';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
+import RNBlobUtil from 'react-native-blob-util';
 import Sound from 'react-native-sound';
 import { SoundPicker } from '../../components/story/SoundPicker';
 import Animated, {
@@ -92,8 +93,10 @@ export interface ReelEditResult {
   layers:       TextLayer[];
   stickers:     StickerLayer[];
   drawings:     DrawPath[];
-  musicUri?:    string;
-  musicName?:   string;
+  musicUri?:      string;
+  musicName?:     string;
+  musicStartSec?: number;
+  musicEndSec?:   number;
 }
 
 interface Props {
@@ -101,6 +104,7 @@ interface Props {
   durationSec:    number;
   thumbnailUri?:  string;
   initialResult?: ReelEditResult;
+  isPhoto?:       boolean;
   onConfirm:      (r: ReelEditResult) => void;
   onCancel:       () => void;
 }
@@ -385,13 +389,12 @@ const sAdj = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const ReelEditorScreen: React.FC<Props> = ({
-  uri, durationSec, thumbnailUri, initialResult, onConfirm, onCancel,
+  uri, durationSec, thumbnailUri, initialResult, isPhoto = false, onConfirm, onCancel,
 }) => {
   const insets = useSafeAreaInsets();
 
   const player = useVideoPlayer({ uri }, p => {
-    p.loop  = false;
-    p.muted = false;
+    if (!isPhoto) { p.loop = false; p.muted = false; }
   });
 
   const [isPlaying,  setIsPlaying]  = useState(false);
@@ -424,43 +427,156 @@ export const ReelEditorScreen: React.FC<Props> = ({
   // Musique
   const [musicUri,        setMusicUri]        = useState<string | undefined>(init?.musicUri);
   const [musicName,       setMusicName]       = useState<string | undefined>(init?.musicName);
+  const [musicDuration,   setMusicDuration]   = useState(0);
+  const [musicStartSec,   setMusicStartSec]   = useState(init?.musicStartSec ?? 0);
+  const [musicEndSec,     setMusicEndSec]     = useState(init?.musicEndSec ?? 0);
+  const [musicPlaying,    setMusicPlaying]    = useState(false);
   const [musicPicking,    setMusicPicking]    = useState(false);
   const [showSoundPicker, setShowSoundPicker] = useState(false);
-  const soundRef = useRef<Sound | null>(null);
+  const soundRef   = useRef<Sound | null>(null);
+  const musicTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const musicPosRef   = useRef(0);
+
+  const MUSIC_TRIM_W = W - 48;
 
   const stopSound = useCallback(() => {
+    if (musicTimerRef.current) { clearInterval(musicTimerRef.current); musicTimerRef.current = null; }
     if (soundRef.current) {
       soundRef.current.stop(() => { soundRef.current?.release(); soundRef.current = null; });
     }
+    setMusicPlaying(false);
   }, []);
 
-  const playMusicPreview = useCallback((mUri: string) => {
+  const loadMusicMeta = useCallback((uri: string, defaultStart = 0, defaultEnd = 0) => {
+    const FALLBACK_DUR = 30;
+    const applyDur = (dur: number) => {
+      const d = dur > 0 ? dur : FALLBACK_DUR;
+      setMusicDuration(d);
+      const videoDur = endRef.current * durationRef.current - startRef.current * durationRef.current;
+      const clip = Math.min(videoDur > 0 ? videoDur : FALLBACK_DUR, d);
+      setMusicStartSec(defaultStart > 0 ? defaultStart : 0);
+      setMusicEndSec(defaultEnd > 0 ? defaultEnd : Math.min(clip, d));
+    };
+    const timer = setTimeout(() => applyDur(FALLBACK_DUR), 3000);
+    Sound.setCategory('Playback');
+    // file:// retiré pour Sound, content:// passé tel quel (Android MediaPlayer le gère)
+    const cleanUri = uri.startsWith('file://') ? uri.slice(7) : uri;
+    const snd = new Sound(cleanUri, '', err => {
+      clearTimeout(timer);
+      if (err) { snd.release(); applyDur(FALLBACK_DUR); return; }
+      const dur = snd.getDuration();
+      snd.release();
+      applyDur(dur);
+    });
+  }, []);
+
+  const playMusicSegment = useCallback((uri: string, fromSec: number) => {
     stopSound();
     Sound.setCategory('Playback');
-    const snd = new Sound(mUri, '', err => {
-      if (!err) { soundRef.current = snd; snd.play(); }
+    // Sur Android, Sound.MAIN_BUNDLE = '' — le path absolu doit commencer par /
+    // On s'assure de ne pas avoir le préfixe file://
+    const cleanUri = uri.startsWith('file://') ? uri.slice(7) : uri;
+    const snd = new Sound(cleanUri, '', err => {
+      if (err) {
+        console.warn('[playMusicSegment] Sound error:', err, 'uri:', cleanUri);
+        snd.release();
+        return;
+      }
+      snd.setCurrentTime(fromSec);
+      soundRef.current = snd;
+      musicPosRef.current = fromSec;
+      setMusicPlaying(true);
+      snd.play(success => {
+        if (!success) console.warn('[playMusicSegment] playback failed');
+        setMusicPlaying(false);
+      });
+      musicTimerRef.current = setInterval(() => {
+        snd.getCurrentTime(t => { musicPosRef.current = t; });
+      }, 200);
     });
   }, [stopSound]);
 
+  // Résout une URI audio vers un path absolu lisible par react-native-sound
+  const resolveAudioUri = useCallback(async (uri: string): Promise<string> => {
+    if (uri.startsWith('file://')) return uri.slice(7);
+    if (uri.startsWith('/')) return uri;
+    if (!uri.startsWith('content://')) return uri;
+    // content:// → lecture base64 via ContentResolver puis écriture dans le cache
+    const dest = `${RNBlobUtil.fs.dirs.CacheDir}/music_preview_${Date.now()}.mp3`;
+    const b64 = await RNBlobUtil.fs.readFile(uri, 'base64');
+    await RNBlobUtil.fs.writeFile(dest, b64, 'base64');
+    return dest;
+  }, []);
+
   const handlePickMusicLocal = useCallback(async () => {
     setMusicPicking(true);
-    try {
-      const [file] = await pick({ type: [types.audio], allowMultiSelection: false });
-      const name = file.name ?? file.uri.split('/').pop() ?? 'Son';
-      setMusicUri(file.uri);
-      setMusicName(name);
-      playMusicPreview(file.uri);
-    } catch (e) {
-      if (isErrorWithCode(e, errorCodes.OPERATION_CANCELED)) return;
-      Alert.alert('Erreur', "Impossible d'accéder à la bibliothèque audio.");
-    } finally {
-      setMusicPicking(false);
+
+    // Demande de permission audio sur Android
+    if (Platform.OS === 'android') {
+      const perm = Number(Platform.Version) >= 33
+        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_AUDIO
+        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+      const granted = await PermissionsAndroid.request(perm, {
+        title: 'Accès aux fichiers audio',
+        message: 'GoFolyX a besoin d\'accéder à vos fichiers audio.',
+        buttonPositive: 'Autoriser',
+        buttonNegative: 'Refuser',
+      });
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        setMusicPicking(false);
+        Alert.alert('Permission refusée', 'Autorisez l\'accès aux fichiers audio dans les paramètres.');
+        return;
+      }
     }
-  }, [playMusicPreview]);
+
+    let file: { uri: string; name?: string | null } | null = null;
+    try {
+      const results = await pick({ type: [types.audio] });
+      file = results[0] ?? null;
+    } catch (e) {
+      if (isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED) {
+        setMusicPicking(false);
+        return;
+      }
+      console.warn('[handlePickMusicLocal] pick error:', e);
+      setMusicPicking(false);
+      Alert.alert('Erreur', "Impossible d'ouvrir le sélecteur de fichiers.");
+      return;
+    }
+
+    if (!file) { setMusicPicking(false); return; }
+
+    const name = file.name ?? file.uri.split('/').pop() ?? 'Son';
+    stopSound();
+
+    let resolvedUri = file.uri;
+    try {
+      resolvedUri = await resolveAudioUri(file.uri);
+    } catch (e) {
+      console.warn('[handlePickMusicLocal] resolveAudioUri error:', e);
+      // On tente quand même avec l'URI d'origine
+    }
+
+    setMusicUri(resolvedUri);
+    setMusicName(name);
+    loadMusicMeta(resolvedUri);
+    setMusicPicking(false);
+  }, [stopSound, loadMusicMeta, resolveAudioUri]);
 
   const handleRemoveMusic = useCallback(() => {
-    stopSound(); setMusicUri(undefined); setMusicName(undefined);
+    stopSound();
+    setMusicUri(undefined);
+    setMusicName(undefined);
+    setMusicDuration(0);
+    setMusicStartSec(0);
+    setMusicEndSec(0);
   }, [stopSound]);
+
+  useEffect(() => {
+    if (init?.musicUri && init.musicUri === musicUri) {
+      loadMusicMeta(init.musicUri, init.musicStartSec, init.musicEndSec);
+    }
+  }, []);
 
   useEffect(() => () => { stopSound(); }, [stopSound]);
 
@@ -492,12 +608,15 @@ export const ReelEditorScreen: React.FC<Props> = ({
 
   // ── Animation panneau bas ─────────────────────────────────────────────────
   const panelH  = useSharedValue(0);
-  const PANEL_H = 260;
+  const PANEL_H_BASE = 260;
 
   useEffect(() => {
     const open = tool && tool !== 'text' && tool !== 'draw' && tool !== 'sticker';
-    panelH.value = withSpring(open ? PANEL_H : 0, { damping: 18, stiffness: 200 });
-  }, [tool]);
+    const h = open
+      ? (tool === 'music' && musicUri && musicDuration > 0 ? 380 : PANEL_H_BASE)
+      : 0;
+    panelH.value = withSpring(h, { damping: 18, stiffness: 200 });
+  }, [tool, musicUri, musicDuration]);
 
   const panelStyle = useAnimatedStyle(() => ({ height: panelH.value, overflow: 'hidden' }));
 
@@ -516,7 +635,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
     return () => { sub.remove(); subEnd.remove(); };
   }, [player, isPlaying, durationSec]);
 
-  useEffect(() => { try { player.rate = speed; } catch {} }, [speed, player]);
+  useEffect(() => { if (!isPhoto) { try { player.rate = speed; } catch {} } }, [isPhoto, speed, player]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) { player.pause(); setIsPlaying(false); }
@@ -800,19 +919,23 @@ export const ReelEditorScreen: React.FC<Props> = ({
   const trimValid = trimSec >= 1 && trimSec <= MAX_TRIM;
 
   const handleConfirm = useCallback(() => {
-    if (!trimValid) {
+    if (!isPhoto && !trimValid) {
       Alert.alert(
         'Segment invalide',
         trimSec < 1 ? 'Minimum 1 seconde.' : 'Maximum 90 secondes.',
       );
       return;
     }
-    player.pause(); stopSound();
+    if (!isPhoto) player.pause();
+    stopSound();
     onConfirm({
       uri, startSec: startRef.current * durationSec, endSec: endRef.current * durationSec,
-      speed, filter, adjust, layers, stickers, drawings, musicUri, musicName,
+      speed, filter, adjust, layers, stickers, drawings,
+      musicUri, musicName,
+      musicStartSec: musicUri ? musicStartSec : undefined,
+      musicEndSec:   musicUri ? musicEndSec   : undefined,
     });
-  }, [trimValid, trimSec, player, onConfirm, uri, durationSec, speed, filter, adjust, layers, stickers, drawings, musicUri, musicName, stopSound]);
+  }, [isPhoto, trimValid, trimSec, player, onConfirm, uri, durationSec, speed, filter, adjust, layers, stickers, drawings, musicUri, musicName, musicStartSec, musicEndSec, stopSound]);
 
   // ── Dérivés ────────────────────────────────────────────────────────────────
   const activeFilt      = useMemo(() => FILTERS.find(f => f.key === filter) ?? FILTERS[0], [filter]);
@@ -850,9 +973,12 @@ export const ReelEditorScreen: React.FC<Props> = ({
     <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
 
-      {/* ══ VIDÉO PLEIN ÉCRAN ══ */}
+      {/* ══ MEDIA PLEIN ÉCRAN ══ */}
       <View style={[StyleSheet.absoluteFill, s.videoContainer]}>
-        <VideoView player={player} style={s.videoView} resizeMode="cover" controls={false} />
+        {isPhoto
+          ? <Image source={{ uri }} style={s.videoView} resizeMode="cover" />
+          : <VideoView player={player} style={s.videoView} resizeMode="cover" controls={false} />
+        }
 
         {/* Overlay filtre principal */}
         {videoFiltOp > 0 && (
@@ -915,8 +1041,8 @@ export const ReelEditorScreen: React.FC<Props> = ({
           </View>
         )}
 
-        {/* Tap play/pause (seulement si pas en mode dessin ou overlay texte) */}
-        {!textOverlay && !drawActive && (
+        {/* Tap play/pause (seulement si pas en mode dessin ou overlay texte, et pas une photo) */}
+        {!isPhoto && !textOverlay && !drawActive && (
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={togglePlay} activeOpacity={1} />
         )}
 
@@ -952,9 +1078,9 @@ export const ReelEditorScreen: React.FC<Props> = ({
         })}
       </View>
 
-      {/* Bouton play/pause centré */}
-      {!isPlaying && !textOverlay && !drawActive && (
-        <View pointerEvents="none" style={[s.playHint, { top: insets.top + 110, bottom: (tool && !['text','draw','sticker'].includes(tool) ? PANEL_H : 0) + insets.bottom + 60 }]}>
+      {/* Bouton play/pause centré — masqué pour les photos */}
+      {!isPhoto && !isPlaying && !textOverlay && !drawActive && (
+        <View pointerEvents="none" style={[s.playHint, { top: insets.top + 110, bottom: (tool && !['text','draw','sticker'].includes(tool) ? PANEL_H_BASE : 0) + insets.bottom + 60 }]}>
           <View style={s.playCircle}>
             <Icon name="play" size={32} color="#fff" />
           </View>
@@ -963,7 +1089,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
 
       {/* ══ HEADER ══ */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={s.headerBtn} onPress={() => { player.pause(); onCancel(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity style={s.headerBtn} onPress={() => { if (!isPhoto) player.pause(); onCancel(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Icon name="x" size={20} color="#fff" />
         </TouchableOpacity>
 
@@ -971,7 +1097,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
           {filter !== 'original' && (
             <View style={s.badge}><Icon name="sliders" size={10} color="#fff" /><Text style={s.badgeTxt}>{FILTERS.find(f => f.key === filter)?.label}</Text></View>
           )}
-          {speed !== 1 && (
+          {!isPhoto && speed !== 1 && (
             <View style={[s.badge, { backgroundColor: 'rgba(234,179,8,0.85)' }]}><Icon name="zap" size={10} color="#fff" /><Text style={s.badgeTxt}>{speed}×</Text></View>
           )}
           {layers.length > 0 && (
@@ -991,7 +1117,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
           )}
         </View>
 
-        <TouchableOpacity style={[s.nextBtn, !trimValid && { opacity: 0.45 }]} onPress={handleConfirm} activeOpacity={0.85}>
+        <TouchableOpacity style={[s.nextBtn, (!isPhoto && !trimValid) && { opacity: 0.45 }]} onPress={handleConfirm} activeOpacity={0.85}>
           <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.nextBtnGrad}>
             <Text style={s.nextBtnTxt}>Suivant</Text>
             <Icon name="arrow-right" size={14} color="#fff" />
@@ -1002,7 +1128,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
       {/* ══ BARRE D'OUTILS ══ */}
       <View style={[s.toolbarWrap, { top: insets.top + 64 }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.toolbarRow}>
-          {TOOLS.map(t => {
+          {TOOLS.filter(t => !isPhoto || (t.key !== 'trim' && t.key !== 'speed')).map(t => {
             const active = tool === t.key || (t.key === 'draw' && drawActive);
             const hasMark = (
               (t.key === 'filter'  && filter !== 'original') ||
@@ -1026,15 +1152,17 @@ export const ReelEditorScreen: React.FC<Props> = ({
         </ScrollView>
       </View>
 
-      {/* ══ INFO DURÉE ══ */}
-      <View style={[s.trimInfo, { bottom: (tool && !['text','draw','sticker'].includes(tool) ? PANEL_H + 12 : 16) + insets.bottom }]} pointerEvents="none">
-        <View style={[s.trimInfoBadge, !trimValid && { borderColor: '#EF4444' }]}>
-          <Icon name="scissors" size={11} color={trimValid ? 'rgba(255,255,255,0.8)' : '#EF4444'} />
-          <Text style={[s.trimInfoTxt, !trimValid && { color: '#EF4444' }]}>
-            {fmt(trimSec)}{!trimValid && (trimSec < 1 ? ' · min 1s' : ' · max 90s')}
-          </Text>
+      {/* ══ INFO DURÉE — masqué pour les photos ══ */}
+      {!isPhoto && (
+        <View style={[s.trimInfo, { bottom: (tool && !['text','draw','sticker'].includes(tool) ? PANEL_H_BASE + 12 : 16) + insets.bottom }]} pointerEvents="none">
+          <View style={[s.trimInfoBadge, !trimValid && { borderColor: '#EF4444' }]}>
+            <Icon name="scissors" size={11} color={trimValid ? 'rgba(255,255,255,0.8)' : '#EF4444'} />
+            <Text style={[s.trimInfoTxt, !trimValid && { color: '#EF4444' }]}>
+              {fmt(trimSec)}{!trimValid && (trimSec < 1 ? ' · min 1s' : ' · max 90s')}
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* ══ PANNEAU STICKER (flottant) ══ */}
       {tool === 'sticker' && (
@@ -1230,30 +1358,112 @@ export const ReelEditorScreen: React.FC<Props> = ({
           <View style={s.musicPanel}>
             <Text style={s.panelTitle}>Musique</Text>
             {musicUri ? (
-              <View style={s.musicSelected}>
-                <LinearGradient colors={['#7B3FF2', '#C026D3']} style={s.musicIconWrap}>
-                  <Icon name="music" size={18} color="#fff" />
-                </LinearGradient>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.musicTitle} numberOfLines={1}>{musicName}</Text>
-                  <Text style={s.musicSub}>Son sélectionné</Text>
+              <>
+                {/* Carte son selectionne */}
+                <View style={s.musicSelected}>
+                  <LinearGradient colors={['#7B3FF2', '#C026D3']} style={s.musicIconWrap}>
+                    <Icon name="music" size={18} color="#fff" />
+                  </LinearGradient>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.musicTitle} numberOfLines={1}>{musicName}</Text>
+                    <Text style={s.musicSub}>
+                      {musicDuration > 0
+                        ? `${Math.floor(musicStartSec)}s – ${Math.floor(musicEndSec)}s · ${Math.ceil(musicEndSec - musicStartSec)}s sélectionnés`
+                        : 'Chargement...'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (musicPlaying) { stopSound(); }
+                      else { playMusicSegment(musicUri!, musicStartSec); }
+                    }}
+                    style={s.musicPlayBtn}
+                  >
+                    <Icon name={musicPlaying ? 'pause' : 'play'} size={16} color="#A78BFA" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleRemoveMusic} style={s.musicRemoveBtn}>
+                    <Icon name="x" size={16} color="rgba(255,255,255,0.5)" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => playMusicPreview(musicUri!)} style={s.musicPlayBtn}>
-                  <Icon name="play" size={16} color="#A78BFA" />
+
+                {/* Trimmer audio */}
+                {musicDuration > 0 && (() => {
+                  const startRatiM = musicStartSec / musicDuration;
+                  const endRatioM  = musicEndSec   / musicDuration;
+                  const selLeftM   = startRatiM * MUSIC_TRIM_W;
+                  const selWidthM  = (endRatioM - startRatiM) * MUSIC_TRIM_W;
+
+                  const startPanM = PanResponder.create({
+                    onStartShouldSetPanResponder: () => true,
+                    onPanResponderMove: (_, g) => {
+                      const r = Math.max(0, Math.min(1, (selLeftM + g.dx) / MUSIC_TRIM_W));
+                      const newStart = r * musicDuration;
+                      if (newStart < musicEndSec - 1) setMusicStartSec(newStart);
+                    },
+                  });
+
+                  const endPanM = PanResponder.create({
+                    onStartShouldSetPanResponder: () => true,
+                    onPanResponderMove: (_, g) => {
+                      const r = Math.max(0, Math.min(1, (selLeftM + selWidthM + g.dx) / MUSIC_TRIM_W));
+                      const newEnd = r * musicDuration;
+                      if (newEnd > musicStartSec + 1) setMusicEndSec(newEnd);
+                    },
+                  });
+
+                  return (
+                    <View style={s.musicTrimWrap}>
+                      <Text style={s.musicTrimLabel}>Choisir la partie</Text>
+                      <View style={s.musicTrimTrack}>
+                        {/* Zone non selectionnee gauche */}
+                        <View style={[s.musicTrimDim, { width: selLeftM }]} />
+                        {/* Zone selectionnee */}
+                        <View style={[s.musicTrimSel, { left: selLeftM, width: selWidthM }]} />
+                        {/* Zone non selectionnee droite */}
+                        <View style={[s.musicTrimDim, { position: 'absolute', left: selLeftM + selWidthM, right: 0 }]} />
+                        {/* Poignee debut */}
+                        <View {...startPanM.panHandlers} style={[s.musicHandle, s.musicHandleL, { left: selLeftM - HANDLE_W / 2 }]}>
+                          <View style={s.musicHandleBar} />
+                        </View>
+                        {/* Poignee fin */}
+                        <View {...endPanM.panHandlers} style={[s.musicHandle, s.musicHandleR, { left: selLeftM + selWidthM - HANDLE_W / 2 }]}>
+                          <View style={s.musicHandleBar} />
+                        </View>
+                      </View>
+                      {/* Labels temps */}
+                      <View style={s.musicTrimTimes}>
+                        <Text style={s.musicTrimTime}>0:00</Text>
+                        <Text style={s.musicTrimTime}>
+                          {Math.floor(musicDuration / 60)}:{String(Math.floor(musicDuration % 60)).padStart(2, '0')}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                <TouchableOpacity style={s.musicPickBtn} onPress={() => setShowSoundPicker(true)} activeOpacity={0.8}>
+                  <Icon name="globe" size={18} color="#A78BFA" />
+                  <Text style={s.musicPickTxt}>Changer (bibliothèque)</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleRemoveMusic} style={s.musicRemoveBtn}>
-                  <Icon name="x" size={16} color="rgba(255,255,255,0.5)" />
+              </>
+            ) : (
+              <>
+                <TouchableOpacity style={s.musicPickBtn} onPress={() => setShowSoundPicker(true)} activeOpacity={0.8}>
+                  <Icon name="globe" size={18} color="#A78BFA" />
+                  <Text style={s.musicPickTxt}>Sons populaires</Text>
                 </TouchableOpacity>
-              </View>
-            ) : null}
-            <TouchableOpacity style={s.musicPickBtn} onPress={() => setShowSoundPicker(true)} activeOpacity={0.8}>
-              <Icon name="globe" size={18} color="#A78BFA" />
-              <Text style={s.musicPickTxt}>{musicUri ? 'Changer (bibliothèque)' : 'Sons populaires'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.musicPickBtn, { marginTop: 8 }, musicPicking && { opacity: 0.6 }]} onPress={handlePickMusicLocal} disabled={musicPicking} activeOpacity={0.8}>
-              {musicPicking ? <ActivityIndicator size="small" color="#A78BFA" /> : <Icon name="folder" size={18} color="#A78BFA" />}
-              <Text style={s.musicPickTxt}>Mes fichiers</Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={[s.musicPickBtn, musicPicking && { opacity: 0.6 }]} onPress={handlePickMusicLocal} disabled={musicPicking} activeOpacity={0.8}>
+                  {musicPicking ? <ActivityIndicator size="small" color="#A78BFA" /> : <Icon name="folder" size={18} color="#A78BFA" />}
+                  <Text style={s.musicPickTxt}>Mes fichiers</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {musicUri && (
+              <TouchableOpacity style={[s.musicPickBtn, musicPicking && { opacity: 0.6 }]} onPress={handlePickMusicLocal} disabled={musicPicking} activeOpacity={0.8}>
+                {musicPicking ? <ActivityIndicator size="small" color="#A78BFA" /> : <Icon name="folder" size={18} color="#A78BFA" />}
+                <Text style={s.musicPickTxt}>Mes fichiers</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1418,9 +1628,10 @@ export const ReelEditorScreen: React.FC<Props> = ({
             onGoBack={() => setShowSoundPicker(false)}
             onSelectLocal={() => { setShowSoundPicker(false); handlePickMusicLocal(); }}
             onSelectOnline={(uri: string, title?: string) => {
+              stopSound();
               setMusicUri(uri);
               setMusicName(title ?? uri.split('/').pop() ?? 'Son');
-              playMusicPreview(uri);
+              loadMusicMeta(uri);
               setShowSoundPicker(false);
             }}
           />
@@ -1548,15 +1759,28 @@ const s = StyleSheet.create({
   speedSub:       { color: 'rgba(255,255,255,0.3)', fontSize: 9, marginTop: 2, fontWeight: '600' },
 
   // Musique
-  musicPanel:    { paddingHorizontal: 20, paddingTop: 14, gap: 12 },
+  musicPanel:    { paddingHorizontal: 20, paddingTop: 14, gap: 10 },
   musicIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   musicTitle:    { color: '#fff', fontWeight: '700', fontSize: 14 },
-  musicSub:      { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 },
+  musicSub:      { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 },
   musicSelected: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(167,139,250,0.12)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: 'rgba(167,139,250,0.3)' },
   musicPlayBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(167,139,250,0.2)', alignItems: 'center', justifyContent: 'center' },
   musicRemoveBtn:{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  musicPickBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(167,139,250,0.12)', borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(167,139,250,0.28)' },
+  musicPickBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(167,139,250,0.12)', borderRadius: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(167,139,250,0.28)' },
   musicPickTxt:  { color: '#A78BFA', fontWeight: '700', fontSize: 14 },
+
+  // Trimmer audio
+  musicTrimWrap:   { gap: 6 },
+  musicTrimLabel:  { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  musicTrimTrack:  { height: 36, borderRadius: 8, backgroundColor: 'rgba(167,139,250,0.15)', overflow: 'visible', position: 'relative' },
+  musicTrimDim:    { position: 'absolute', top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
+  musicTrimSel:    { position: 'absolute', top: 0, bottom: 0, backgroundColor: 'rgba(123,63,242,0.45)', borderWidth: 1.5, borderColor: '#A78BFA' },
+  musicHandle:     { position: 'absolute', top: 0, bottom: 0, width: HANDLE_W, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  musicHandleL:    { borderTopLeftRadius: 6, borderBottomLeftRadius: 6, backgroundColor: '#7B3FF2' },
+  musicHandleR:    { borderTopRightRadius: 6, borderBottomRightRadius: 6, backgroundColor: '#7B3FF2' },
+  musicHandleBar:  { width: 2.5, height: 16, borderRadius: 2, backgroundColor: '#fff' },
+  musicTrimTimes:  { flexDirection: 'row', justifyContent: 'space-between' },
+  musicTrimTime:   { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontVariant: ['tabular-nums'] },
 
   // Stickers
   stickerSetTabs:  { flexDirection: 'row', gap: 6 },
