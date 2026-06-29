@@ -12,6 +12,7 @@ import {
   Dimensions, Linking, PermissionsAndroid,
 } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
+import EmojiKeyboard from 'rn-emoji-keyboard';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -904,9 +905,8 @@ export const ChatScreen: React.FC = () => {
 
     switch (msgType) {
       case 'sticker':
-        return (
-          <Text style={styles.stickerText}>{item.content}</Text>
-        );
+        // géré directement dans renderChatItem pour éviter overflow
+        return <Text style={styles.stickerText}>{item.content}</Text>;
       case 'voice': {
         const duration = item.attachment_meta?.duration ?? 0;
         const isPlaying = playingId === item.id;
@@ -1183,6 +1183,34 @@ export const ChatScreen: React.FC = () => {
               </Text>
               <Text style={[styles.msgTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
             </View>
+          </Animated.View>
+        </>
+      );
+    }
+
+    // Sticker : bulle transparente sans padding ni overflow pour ne pas couper l'emoji
+    if (item.message_type === 'sticker') {
+      return (
+        <>
+          {DateSeparator}
+          <Animated.View
+            entering={enteringAnim}
+            style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+          >
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onLongPress={() => onLongPressMessage(item)}
+              delayLongPress={400}
+              style={styles.stickerBubble}
+            >
+              <Text style={styles.stickerText}>{item.content}</Text>
+              <Text style={[styles.stickerTime, { color: colors.textTertiary }]}>{formatMsgTime(item.created_at)}</Text>
+            </TouchableOpacity>
+            {reactions[item.id] && (
+              <View style={[styles.reactionBadge, mine ? styles.reactionMine : styles.reactionTheirs]}>
+                <Text style={styles.reactionEmoji}>{reactions[item.id]}</Text>
+              </View>
+            )}
           </Animated.View>
         </>
       );
@@ -1642,37 +1670,42 @@ export const ChatScreen: React.FC = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Sticker picker panel */}
-      {showStickerPicker && (
-        <View style={[styles.emojiPanel, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
-          {[
-            '❤️','🔥','😂','😍','🥰','😎','🤔','😢','😡','👍',
-            '🎉','💯','🙌','💪','🫶','🥳','😇','🤩','😏','😜',
-            '👏','🫠','🤯','🥹','😴','🤣','😅','🫡','💀','✨',
-            '🐶','🐱','🦊','🐻','🐼','🐨','🦁','🐯','🐸','🐙',
-            '🍕','🍔','🍦','🎂','🍩','🍭','🍿','☕','🧃','🥤',
-          ].map(emoji => (
-            <TouchableOpacity key={emoji} style={styles.emojiItem} onPress={() => sendSticker(emoji)}>
-              <Text style={{ fontSize: 36 }}>{emoji}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Emoji picker panel */}
-      {showEmojiPicker && (
-        <View style={[styles.emojiPanel, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
-          {[
-            '😀','😂','😍','🥰','😎','🤔','😢','😡','👍','👎',
-            '❤️','🔥','🎉','💯','✅','😮','🙏','😴','🤣','😅',
-            '💪','🫶','🥹','😏','🤩','😇','🤗','😬','🥳','😜',
-          ].map(emoji => (
-            <TouchableOpacity key={emoji} style={styles.emojiItem} onPress={() => { setText(p => p + emoji); }}>
-              <Text style={styles.emojiText}>{emoji}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+      {/* Emoji / Sticker picker — rn-emoji-keyboard (rendu image, universel) */}
+      <EmojiKeyboard
+        onEmojiSelected={e => {
+          if (showStickerPicker) {
+            sendSticker(e.emoji);
+            setShowStickerPicker(false);
+          } else {
+            setText(p => p + e.emoji);
+          }
+        }}
+        open={showEmojiPicker || showStickerPicker}
+        onClose={() => { setShowEmojiPicker(false); setShowStickerPicker(false); }}
+        theme={{
+          backdrop: 'transparent',
+          knob: colors.primary,
+          container: colors.surface,
+          header: colors.textTertiary,
+          skinTonesContainer: colors.backgroundSecondary,
+          category: {
+            icon: colors.textTertiary,
+            iconActive: colors.primary,
+            container: colors.surface,
+            containerActive: colors.primary + '20',
+          },
+          search: {
+            background: colors.backgroundSecondary,
+            placeholder: colors.textDisabled,
+            text: colors.textPrimary,
+            icon: colors.textTertiary,
+          },
+        }}
+        enableSearchBar
+        enableRecentlyUsed
+        enableCategoryChangeAnimation
+        categoryPosition="top"
+      />
 
       {/* ── Preview avant envoi fichier ── */}
       <Modal
@@ -2201,7 +2234,9 @@ const styles = StyleSheet.create({
   reactionMine:   { right: 8 },
   reactionTheirs: { left: 8 },
   reactionEmoji:  { fontSize: 14 },
-  stickerText:    { fontSize: 64, lineHeight: 72 },
+  stickerBubble:  { alignItems: 'flex-start', paddingHorizontal: 4, paddingVertical: 2 },
+  stickerText:    { fontSize: 72, lineHeight: 84 },
+  stickerTime:    { fontSize: 10, alignSelf: 'flex-end', marginTop: 2 },
 
   // Location card — style WhatsApp
   locationCard:        { borderRadius: 12, overflow: 'hidden', width: 240 },
