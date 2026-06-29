@@ -488,19 +488,19 @@ const FeedHeaderBadges: React.FC<{
   const totalNotifs = unreadNotifications + unreadActivity;
   const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 40, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
   return (
-    <View style={{ paddingHorizontal: 12, paddingBottom: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden' }}>
-        {/* Partager */}
+    <View style={{ paddingBottom: 10, paddingHorizontal: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden', width: '100%' }}>
+        {/* Messages & Appels */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onMessages} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
-            <Icon name="send" size={22} color={colors.textPrimary} />
+            <MCIcon name="forum" size={22} color={colors.textPrimary} />
             {unreadMessages > 0 && (
               <View style={[badgeS.badge, { borderColor: colors.backgroundSecondary }]}>
                 <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
               </View>
             )}
           </View>
-          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '500' }}>Partager</Text>
+          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '500' }}>Messages</Text>
         </TouchableOpacity>
         {sep}
         {/* Notifications */}
@@ -1338,18 +1338,12 @@ export const FeedScreen: React.FC = () => {
             )
           )}
 
-          {/* Centre : GoFolyX — gradient violet, centré en absolu */}
+          {/* Centre : GoFolyX — même style que "Reels" dans ReelsScreen */}
           {!searchOpen && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-              <LinearGradient
-                colors={['#A855F7', '#7B3FF2']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={{ borderRadius: 4 }}
-              >
-                <Text style={{ fontSize: 28, fontWeight: '900', letterSpacing: -0.5, color: '#fff', paddingHorizontal: 2 }}>
-                  GoFolyX
-                </Text>
-              </LinearGradient>
+              <Text style={{ fontSize: 26, fontWeight: '900', letterSpacing: 0.2, color: colors.textPrimary }}>
+                <Text style={{ color: colors.primary }}>G</Text>oFoly<Text style={{ color: colors.primary }}>X</Text>
+              </Text>
             </View>
           )}
 
