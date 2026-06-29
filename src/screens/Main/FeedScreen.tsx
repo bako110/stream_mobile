@@ -3462,13 +3462,13 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.8}>
           <View style={[fc.actionPill,
             liked
-              ? { backgroundColor: '#E0389A18', borderColor: '#E0389A40' }
+              ? { backgroundColor: '#7B3FF218', borderColor: '#7B3FF240' }
               : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
           ]}>
             <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E0389A' : colors.textTertiary} />
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textTertiary} />
             </Animated.View>
-            <Text style={[fc.actionText, { color: liked ? '#E0389A' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
+            <Text style={[fc.actionText, { color: liked ? '#7B3FF2' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
               {likeCount > 0 ? fmtN(likeCount) : 'J\'aime'}
             </Text>
           </View>
@@ -3572,7 +3572,7 @@ const fc = StyleSheet.create({
   countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   countChip:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
   countText:    { fontSize: 12, fontWeight: '500' },
-  likeIcon:     { width: 20, height: 20, borderRadius: 10, backgroundColor: '#E0389A', alignItems: 'center', justifyContent: 'center' },
+  likeIcon:     { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   commentIcon:  { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   shareIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#6B7280', alignItems: 'center', justifyContent: 'center' },
   // Actions
