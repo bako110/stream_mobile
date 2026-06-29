@@ -1980,7 +1980,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
           {reel.music_name ? (
             <View style={s.musicBand} pointerEvents="none">
-              <Icon name="music" size={11} color="#fff" />
+              <MCIcon name="music-note" size={13} color="#fff" />
               <Text style={s.musicBandTxt} numberOfLines={1}>{reel.music_name}</Text>
             </View>
           ) : null}
@@ -2007,7 +2007,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
           <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
-            <Icon name={muted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
+            <Icon name={muted ? 'volume-x' : 'volume-2'} size={17} color="#fff" />
           </TouchableOpacity>
           <ActionBtn icon="heart-outline" iconActive="heart" useMCIcon label={formatCount(likes)} color={liked ? '#E0389A' : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder="#E0389A" activeGlow="#E0389A" />
           {!commentsDisabledSt && <ActionBtn icon="message-circle" label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
@@ -2018,7 +2018,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           {!isOwnReel && (
             <TouchableOpacity style={s.actionBtn} onPress={() => setShowRemix(true)} activeOpacity={0.8}>
               <View style={s.actionCircle}>
-                <Icon name="more-horizontal" size={22} color="#fff" />
+                <Icon name="more-horizontal" size={17} color="#fff" />
               </View>
               <Text style={s.actionLabel}>Plus</Text>
             </TouchableOpacity>
@@ -2026,10 +2026,16 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           {isOwnReel && (
             <TouchableOpacity style={s.actionBtn} onPress={() => setShowOwnerMenu(true)} activeOpacity={0.8}>
               <View style={s.actionCircle}>
-                <Icon name="more-vertical" size={22} color="#fff" />
+                <Icon name="more-vertical" size={17} color="#fff" />
               </View>
             </TouchableOpacity>
           )}
+          {/* Bouton disque musique — en bas de la colonne, comme TikTok */}
+          {reel.music_name ? (
+            <View style={s.musicDisc} pointerEvents="none">
+              <MCIcon name="music-note" size={20} color="#000" />
+            </View>
+          ) : null}
         </View>
 
         <ReportModal visible={reportVisible} contentType="reel" contentId={reel.id} onClose={() => setReportVisible(false)} />
@@ -2289,8 +2295,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         )}
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : undefined} style={[s.commentBarWrap, { bottom: safeBottom }]} keyboardVerticalOffset={0}>
-          <View style={s.commentBarRow}>
-            {/* Avatar du user connecté */}
+          {/* Tout dans une seule barre : avatar + input + send */}
+          <View style={[s.commentBar, { backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(255,255,255,0.12)', borderColor: barFocused ? 'rgba(255,255,255,0.3)' : 'transparent' }]}>
             <TouchableOpacity activeOpacity={0.8} onPress={() => currentUserId && onAuthorPress(currentUserId)}>
               {currentUserAvatar
                 ? <Image source={{ uri: currentUserAvatar }} style={s.commentBarAvatar} />
@@ -2299,13 +2305,24 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   </View>
               }
             </TouchableOpacity>
-            {/* Champ commentaire */}
-            <View style={[s.commentBar, { flex: 1, backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.52)', borderColor: barFocused ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.18)' }]}>
-              <TextInput value={commentText} onChangeText={setCommentText} placeholder="Ajouter un commentaire..." placeholderTextColor="rgba(255,255,255,0.45)" onFocus={() => handleFocusBar(true)} onBlur={() => handleFocusBar(false)} style={s.commentBarInput} returnKeyType="send" onSubmitEditing={handleSendComment} maxLength={300} />
-              <TouchableOpacity onPress={handleSendComment} disabled={!commentText.trim() || sending} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={[s.commentBarSend, { backgroundColor: commentText.trim() ? colors.primary : 'rgba(255,255,255,0.15)' }]}>
-                {sending ? <ActivityIndicator size="small" color="#fff" /> : <MCIcon name="send" size={20} color={commentText.trim() ? '#fff' : 'rgba(255,255,255,0.5)'} />}
-              </TouchableOpacity>
-            </View>
+            <TextInput
+              value={commentText}
+              onChangeText={setCommentText}
+              placeholder="Ajouter un commentaire..."
+              placeholderTextColor="rgba(255,255,255,0.5)"
+              onFocus={() => handleFocusBar(true)}
+              onBlur={() => handleFocusBar(false)}
+              style={s.commentBarInput}
+              returnKeyType="send"
+              onSubmitEditing={handleSendComment}
+              maxLength={300}
+            />
+            <TouchableOpacity onPress={handleSendComment} disabled={!commentText.trim() || sending} activeOpacity={0.8} style={s.commentBarSend}>
+              {sending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Icon name="arrow-up" size={16} color="#fff" />
+              }
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
 
@@ -2331,7 +2348,7 @@ const ActionBtn: React.FC<{
         active && activeBorder     ? { borderColor: activeBorder, borderWidth: 1.5 } : {},
         active && activeGlow       ? { shadowColor: activeGlow, shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6 } : {},
       ]}>
-        {useMCIcon ? <MCIcon name={iconName} size={22} color={color} /> : <Icon name={iconName} size={20} color={color} />}
+        {useMCIcon ? <MCIcon name={iconName} size={19} color={color} /> : <Icon name={iconName} size={17} color={color} />}
       </View>
       {!!label && <Text style={[s.actionLabel, { color }]}>{label}</Text>}
     </TouchableOpacity>
@@ -2366,8 +2383,10 @@ const s = StyleSheet.create({
   avatarText:   { color: '#fff', fontWeight: '800', fontSize: 14 },
   avatarPlusBtn: { position: 'absolute', bottom: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
 
-  musicBand:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(123,63,242,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', maxWidth: '80%', marginTop: 4 },
-  musicBandTxt: { color: '#fff', fontSize: 11, fontWeight: '700', flex: 1 },
+  musicBand:    { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#7B3FF2', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '80%', marginTop: 4 },
+  musicBandTxt: { color: '#fff', fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  musicBandDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.6)' },
+  musicDisc:    { width: 46, height: 46, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
 
   sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', maxWidth: '100%' },
   sourceThumb: { width: 20, height: 20, borderRadius: 4, overflow: 'hidden' },
@@ -2381,21 +2400,21 @@ const s = StyleSheet.create({
   refKind:    { color: 'rgba(255,255,255,0.55)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   refLabel:   { color: '#fff', fontSize: 12, fontWeight: '700' },
 
-  actions:      { position: 'absolute', right: 12, alignItems: 'center', gap: 16, zIndex: 3 },
-  actionBtn:    { alignItems: 'center', gap: 4 },
-  actionCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
-  actionLabel:  { fontSize: 11, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  muteBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  actions:      { position: 'absolute', right: 10, alignItems: 'center', gap: 10, zIndex: 3 },
+  actionBtn:    { alignItems: 'center', gap: 3 },
+  actionCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
+  actionLabel:  { fontSize: 10, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  muteBtn:      { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 
   commentBarWrap:      { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 12, paddingVertical: 8 },
-  commentBarRow:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  commentBarAvatar:    { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)', overflow: 'hidden', flexShrink: 0 },
-  commentBarAvatarTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  commentBar:          { flexDirection: 'row', alignItems: 'center', borderRadius: 26, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9, gap: 10 },
+  commentBarRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  commentBarAvatar:    { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', overflow: 'hidden', flexShrink: 0 },
+  commentBarAvatarTxt: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  commentBar:          { flexDirection: 'row', alignItems: 'center', borderRadius: 28, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, gap: 8 },
   commentBarInput:     { flex: 1, fontSize: 13, color: '#fff', padding: 0, maxHeight: 60 },
-  commentBarSend:      { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  commentBarSend:      { width: 32, height: 32, borderRadius: 16, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
