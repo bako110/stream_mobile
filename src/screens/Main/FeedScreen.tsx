@@ -488,8 +488,8 @@ const FeedHeaderBadges: React.FC<{
   const totalNotifs = unreadNotifications + unreadActivity;
   const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 40, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
   return (
-    <View style={{ paddingBottom: 10, paddingHorizontal: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.backgroundSecondary, borderRadius: 16, overflow: 'hidden', width: '100%' }}>
+    <View style={{ paddingBottom: 10, marginHorizontal: -16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.backgroundSecondary, borderRadius: 12, overflow: 'hidden' }}>
         {/* Messages & Appels */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onMessages} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
