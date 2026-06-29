@@ -610,7 +610,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                   activeOpacity={0.7}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <View style={[s.engageCountDot, { backgroundColor: '#E0389A' }]}>
+                  <View style={[s.engageCountDot, { backgroundColor: colors.primary }]}>
                     <MCIcon name="heart" size={10} color="#fff" />
                   </View>
                   <Text style={[s.engageCountTxt, { color: colors.textTertiary }]}>
@@ -643,7 +643,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               <Animated.View style={heartStyle}>
                 <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textSecondary} />
               </Animated.View>
-              <Text style={[s.engageBtnTxt, { color: liked ? '#E0389A' : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
+              <Text style={[s.engageBtnTxt, { color: liked ? colors.primary : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
                 {likeCount > 0 ? (likeCount >= 1_000_000 ? `${(likeCount/1_000_000).toFixed(1)}M` : likeCount >= 1_000 ? `${(likeCount/1_000).toFixed(1)}K` : String(likeCount)) : 'J\'aime'}
               </Text>
             </TouchableOpacity>
