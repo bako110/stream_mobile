@@ -2308,11 +2308,6 @@ const MiniReelPlayer: React.FC<{
 
       <LinearGradient colors={['transparent', 'transparent', 'rgba(0,0,0,0.8)']} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} />
 
-      {/* Badge REEL */}
-      <View style={rrS.reelBadge}>
-        <Icon name="play" size={8} color="#fff" />
-        <Text style={[rrS.reelBadgeTxt, { fontSize: 9 }]}>REEL</Text>
-      </View>
 
       {/* Bouton son */}
       {videoUri && isActive && (
@@ -2508,11 +2503,6 @@ const HeroReelPlayer: React.FC<{
         style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
       />
 
-      {/* Badge REEL haut gauche */}
-      <View style={rrS.reelBadge}>
-        <Icon name="play" size={9} color="#fff" />
-        <Text style={[rrS.reelBadgeTxt, { fontSize: 10 }]}>REEL</Text>
-      </View>
 
       {/* Bouton son haut droite */}
       {videoUri && (
@@ -2637,11 +2627,6 @@ const ReelRowCard: React.FC<{
           style={[StyleSheet.absoluteFill, { borderRadius: large ? 18 : 14 }]}
         />
 
-        {/* Badge REEL coin haut gauche */}
-        <View style={rrS.reelBadge}>
-          <Icon name="play" size={large ? 9 : 8} color="#fff" />
-          <Text style={[rrS.reelBadgeTxt, { fontSize: large ? 10 : 9 }]}>REEL</Text>
-        </View>
 
         {/* Durée coin haut droit */}
         {reel.duration_sec ? (
@@ -2883,11 +2868,6 @@ const ReelFeedCard: React.FC<{
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Badge REEL */}
-        <View style={rs.reelBadge}>
-          <Icon name="film" size={11} color="#fff" />
-          <Text style={rs.reelBadgeText}>REEL</Text>
-        </View>
 
         {/* Auteur en haut */}
         <View style={rs.authorOverlay}>
