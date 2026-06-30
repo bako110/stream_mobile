@@ -473,11 +473,14 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   };
 
   // ── MainPost (header du FlatList) ─────────────────────────────────────────
+  const fmtN = (n: number) => n >= 1_000_000 ? `${(n/1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n/1_000).toFixed(1)}K` : String(n);
+
   const MainPost = (
     <Animated.View entering={FadeInDown.duration(350).springify()}>
-      <View style={[s.postBody, { backgroundColor: colors.surface }]}>
+      {/* Carte post */}
+      <View style={[s.postCard, { backgroundColor: colors.surface }]}>
 
-        {/* Auteur */}
+        {/* ── En-tête auteur ── */}
         <View style={s.authorRow}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -487,8 +490,8 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             {author?.avatar_url ? (
               <Image source={{ uri: author.avatar_url }} style={s.avatar} />
             ) : (
-              <View style={[s.avatarFallback, { backgroundColor: colors.primary + '22' }]}>
-                <Text style={[s.avatarInitials, { color: colors.primary }]}>{initials}</Text>
+              <View style={[s.avatarFallback, { backgroundColor: colors.primary }]}>
+                <Text style={s.avatarInitials}>{initials}</Text>
               </View>
             )}
             <View style={{ flex: 1 }}>
@@ -507,13 +510,12 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               </View>
             </View>
           </TouchableOpacity>
-          {/* Bouton menu ··· */}
+          {/* Bouton ··· */}
           <TouchableOpacity
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={[s.moreBtn, { backgroundColor: colors.backgroundSecondary }]}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             onPress={() => setMenuOpen(v => !v)}
           >
-            <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
+            <Icon name="more-horizontal" size={20} color={colors.textTertiary} />
           </TouchableOpacity>
         </View>
 
@@ -551,39 +553,44 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
         {/* Feeling pill */}
         {post.feeling ? (
-          <View style={s.feelingRow}>
-            <View style={[s.feelingPill, { backgroundColor: colors.accentOrange + '18', borderColor: colors.accentOrange + '30' }]}>
-              <Text style={s.feelingEmoji}>😊</Text>
-              <Text style={[s.feelingTxt, { color: colors.accentOrange }]}>
-                se sent <Text style={{ fontWeight: '800' }}>{post.feeling}</Text>
+          <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+            <View style={[s.feelingPill, { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.1)' }]}>
+              <Text style={{ fontSize: 15 }}>😊</Text>
+              <Text style={{ fontSize: 13, fontStyle: 'italic', color: colors.textSecondary }}>
+                se sent{' '}
               </Text>
+              <Text style={{ fontSize: 13 }}>💪</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#F97316' }}>{post.feeling}</Text>
             </View>
           </View>
         ) : null}
 
         {/* Texte du post */}
         {post.body ? (
-          <RichText
-            text={post.body}
-            maxLines={4}
-            primaryColor={colors.primary}
-            textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
-          />
+          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+            <RichText
+              text={post.body}
+              primaryColor={colors.primary}
+              textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
+            />
+          </View>
         ) : null}
 
         {/* Apercu lien */}
         {post.link_url ? (
-          <LinkPreviewCard url={post.link_url} />
+          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+            <LinkPreviewCard url={post.link_url} />
+          </View>
         ) : null}
 
         {/* Vidéo inline */}
         {(post.hls_url ?? post.video_url) && allUrls.length === 0 && (
-          <View style={[s.imagesWrap, !post.body && { marginTop: 0 }]}>
+          <View style={{ marginHorizontal: 16, marginBottom: 12, borderRadius: 14, overflow: 'hidden' }}>
             <InlineVideoPlayer
               uri={(post.hls_url ?? post.video_url)!}
               thumbnailUri={post.thumbnail_url}
               aspectRatio={16 / 9}
-              borderRadius={12}
+              borderRadius={14}
               showControls
               muted={false}
             />
@@ -592,106 +599,112 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
         {/* Images */}
         {allUrls.length > 0 && (
-          <View style={[s.imagesWrap, !post.body && { marginTop: 0 }]}>
+          <View style={{ marginHorizontal: 16, marginBottom: 12, borderRadius: 14, overflow: 'hidden' }}>
             <ImageGrid urls={allUrls} onPress={i => navigation?.navigate('ImageGallery', { urls: allUrls, initialIndex: i })} />
           </View>
         )}
 
-        {/* ── Barre engagement ── */}
-        <View style={[s.engageWrap, { borderTopColor: colors.divider }]}>
-
-          {/* Ligne compteurs */}
-          {(likeCount > 0 || commentCount > 0) && (
-            <View style={s.engageCountRow}>
-              {likeCount > 0 && (
-                <TouchableOpacity
-                  style={s.engageCountItem}
-                  onPress={() => setLikersOpen(true)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <View style={[s.engageCountDot, { backgroundColor: colors.primary }]}>
-                    <MCIcon name="heart" size={10} color="#fff" />
-                  </View>
-                  <Text style={[s.engageCountTxt, { color: colors.textTertiary }]}>
-                    {likeCount >= 1_000_000 ? `${(likeCount/1_000_000).toFixed(1)}M` : likeCount >= 1_000 ? `${(likeCount/1_000).toFixed(1)}K` : likeCount}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {!post?.comments_disabled && commentCount > 0 && (
-                <TouchableOpacity style={s.engageCountItem} onPress={() => setCommentsOpen(true)}>
-                  <View style={[s.engageCountDot, { backgroundColor: colors.primary }]}>
-                    <MCIcon name="comment-outline" size={10} color="#fff" />
-                  </View>
-                  <Text style={[s.engageCountTxt, { color: colors.textTertiary }]}>
-                    {commentCount} commentaire{commentCount > 1 ? 's' : ''}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {/* Boutons capsules */}
-          <View style={[s.engageBtnRow, { borderTopColor: colors.divider }]}>
-
-            {/* J'aime */}
-            <TouchableOpacity activeOpacity={0.8} onPress={handleLike}
-              style={[s.engageBtn, liked
-                ? { backgroundColor: '#7B3FF218', borderColor: '#7B3FF250' }
-                : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
-            >
-              <Animated.View style={heartStyle}>
-                <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textSecondary} />
-              </Animated.View>
-              <Text style={[s.engageBtnTxt, { color: liked ? colors.primary : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
-                {likeCount > 0 ? (likeCount >= 1_000_000 ? `${(likeCount/1_000_000).toFixed(1)}M` : likeCount >= 1_000 ? `${(likeCount/1_000).toFixed(1)}K` : String(likeCount)) : 'J\'aime'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Commenter */}
-            {!post?.comments_disabled && (
-              <TouchableOpacity activeOpacity={0.8} onPress={() => setCommentsOpen(true)}
-                style={[s.engageBtn, commentCount > 0
-                  ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '40' }
-                  : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+        {/* ── Ligne compteurs cliquables ── */}
+        {(likeCount > 0 || commentCount > 0) && (
+          <View style={[s.countersRow, { borderTopColor: colors.divider }]}>
+            {likeCount > 0 && (
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                onPress={() => setLikersOpen(true)}
+                activeOpacity={0.7}
               >
-                <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
-                <Text style={[s.engageBtnTxt, { color: commentCount > 0 ? colors.primary : colors.textSecondary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-                  {commentCount > 0 ? (commentCount >= 1_000_000 ? `${(commentCount/1_000_000).toFixed(1)}M` : commentCount >= 1_000 ? `${(commentCount/1_000).toFixed(1)}K` : String(commentCount)) : 'Comm…'}
+                <View style={[s.countDot, { backgroundColor: colors.primary }]}>
+                  <MCIcon name="heart" size={10} color="#fff" />
+                </View>
+                <Text style={[s.countTxt, { color: colors.textTertiary }]}>{fmtN(likeCount)}</Text>
+              </TouchableOpacity>
+            )}
+            {likeCount > 0 && commentCount > 0 && (
+              <View style={{ width: StyleSheet.hairlineWidth, height: 14, backgroundColor: colors.divider }} />
+            )}
+            {!post?.comments_disabled && commentCount > 0 && (
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                onPress={() => setCommentsOpen(true)}
+                activeOpacity={0.7}
+              >
+                <View style={[s.countDot, { backgroundColor: colors.primary }]}>
+                  <MCIcon name="comment-outline" size={10} color="#fff" />
+                </View>
+                <Text style={[s.countTxt, { color: colors.textTertiary }]}>
+                  {commentCount} commentaire{commentCount > 1 ? 's' : ''}
                 </Text>
               </TouchableOpacity>
             )}
-
-            {/* Partager */}
-            <TouchableOpacity activeOpacity={0.8} onPress={handleShare}
-              style={[s.engageBtn, shareCount > 0
-                ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '40' }
-                : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
-            >
-              <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textSecondary} />
-              <Text style={[s.engageBtnTxt, { color: shareCount > 0 ? colors.primary : colors.textSecondary, fontWeight: shareCount > 0 ? '700' : '500' }]}>
-                {shareCount > 0 ? (shareCount >= 1_000_000 ? `${(shareCount/1_000_000).toFixed(1)}M` : shareCount >= 1_000 ? `${(shareCount/1_000).toFixed(1)}K` : String(shareCount)) : 'Partager'}
-              </Text>
-            </TouchableOpacity>
-
           </View>
+        )}
+
+        {/* ── Barre 3 boutons ── */}
+        <View style={[s.actionBar, { borderTopColor: colors.divider }]}>
+
+          {/* J'aime */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleLike}
+            style={s.actionBtn}
+          >
+            <Animated.View style={heartStyle}>
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={19} color={liked ? colors.primary : colors.textSecondary} />
+            </Animated.View>
+            <Text style={[s.actionBtnTxt, { color: liked ? colors.primary : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
+              {likeCount > 0 ? `J'aime\n${fmtN(likeCount)}` : "J'aime"}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={[s.actionSep, { backgroundColor: colors.divider }]} />
+
+          {/* Commenter */}
+          {!post?.comments_disabled && (
+            <>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setCommentsOpen(true)}
+                style={[s.actionBtn, commentCount > 0 && { backgroundColor: colors.primary + '14' }]}
+              >
+                <MCIcon name="comment-outline" size={19} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
+                <Text style={[s.actionBtnTxt, { color: commentCount > 0 ? colors.primary : colors.textSecondary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
+                  {commentCount > 0 ? `Commenter\n${fmtN(commentCount)}` : 'Commenter'}
+                </Text>
+              </TouchableOpacity>
+              <View style={[s.actionSep, { backgroundColor: colors.divider }]} />
+            </>
+          )}
+
+          {/* Partager */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleShare}
+            style={s.actionBtn}
+          >
+            <MCIcon name="share-outline" size={19} color={colors.textSecondary} />
+            <Text style={[s.actionBtnTxt, { color: colors.textSecondary }]}>Partager</Text>
+          </TouchableOpacity>
+
         </View>
       </View>
     </Animated.View>
   );
 
-  // ── Header section "Publications" ──────────────────────────────────────────
+  // ── Header section "Autres publications" ───────────────────────────────────
   const SectionHeader = (
     <View>
       {MainPost}
       {(authorPosts.length > 0 || authorLoading) && (
         <View style={[s.secHeader, { borderBottomColor: colors.divider }]}>
-          <Text style={[s.secTitle, { color: colors.textPrimary }]}>Publications</Text>
-          {authorPosts.length > 0 && (
-            <View style={[s.secCountPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-              <Text style={[s.secCountTxt, { color: colors.textTertiary }]}>{authorPosts.length}</Text>
-            </View>
-          )}
+          <Text style={[s.secTitle, { color: colors.textPrimary }]}>Autres publications</Text>
+          <TouchableOpacity
+            onPress={() => author?.id && onAuthorPress?.(String(author.id))}
+            activeOpacity={0.7}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+          >
+            <Text style={[s.secSeeAll, { color: colors.primary }]}>Voir tout</Text>
+            <Icon name="arrow-right" size={14} color={colors.primary} />
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -717,19 +730,19 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   );
 
   return (
-    <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
+    <View style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Top bar */}
-      <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.topBar, { backgroundColor: colors.background, borderBottomColor: 'transparent' }]}>
         <BackButton onPress={onBack} />
         <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
         <TouchableOpacity
           onPress={handleShare}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={[s.topBtn, { backgroundColor: colors.backgroundSecondary }]}
+          style={s.topBtn}
         >
-          <MCIcon name="share-outline" size={19} color={colors.textTertiary} />
+          <MCIcon name="share-outline" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -739,7 +752,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         showsVerticalScrollIndicator={false}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32, paddingTop: 8 }}
         ListHeaderComponent={SectionHeader}
         renderItem={renderPair}
         ListFooterComponent={
@@ -800,120 +813,104 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  // Top bar
+  // Top bar — transparent, icone partage violet à droite
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderBottomWidth: 0,
   },
-  topBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
+  topBtn: { padding: 4 },
+  topTitle: { fontSize: 17, fontWeight: '700' },
+
+  // Carte post — fond légèrement contrasté, coins arrondis, margin H
+  postCard: {
+    marginHorizontal: 12,
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginBottom: 10,
   },
-  topTitle: { fontSize: 16, fontWeight: '700' },
 
-  // Post principal
-  postBody: { marginBottom: 8 },
-
+  // En-tête auteur
   authorRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 14, gap: 12,
+    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 12,
   },
   avatar:         { width: 46, height: 46, borderRadius: 23 },
   avatarFallback: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { fontSize: 17, fontWeight: '800' },
-  verifiedDot:    { width: 15, height: 15, borderRadius: 8, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  verifiedDot:    { width: 16, height: 16, borderRadius: 8, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' },
   authorName:     { fontSize: 15, fontWeight: '700' },
   date:           { fontSize: 12 },
-  moreBtn:        { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
 
-  feelingRow:  { paddingHorizontal: 16, paddingBottom: 12 },
+  // Feeling pill
   feelingPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 20, borderWidth: StyleSheet.hairlineWidth,
-  },
-  feelingEmoji: { fontSize: 15 },
-  feelingTxt:   { fontSize: 13, fontStyle: 'italic' },
-
-  bodyTxt: {
-    paddingHorizontal: 16, paddingTop: 4, paddingBottom: 14,
-    fontSize: 16, lineHeight: 26, letterSpacing: 0.1,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 24, borderWidth: StyleSheet.hairlineWidth,
   },
 
-  imagesWrap: { marginTop: 4, overflow: 'hidden' },
+  // Corps texte
+  bodyTxt: { fontSize: 15, lineHeight: 24, letterSpacing: 0.1 },
 
-  counters: {
-    flexDirection: 'row', alignItems: 'center',
+  // Ligne compteurs
+  countersRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 16, paddingVertical: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 6,
   },
-  counterItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  counterIcon: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  counterTxt:  { fontSize: 12, fontWeight: '500' },
+  countDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  countTxt: { fontSize: 13, fontWeight: '500' },
 
-  reactBar:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 2, borderTopWidth: StyleSheet.hairlineWidth },
-  reactDivider: { width: StyleSheet.hairlineWidth, height: 22, marginHorizontal: 2 },
-
-  // Section publications
-  secHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  // Barre 3 boutons plats
+  actionBar: {
+    flexDirection: 'row', alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  secTitle:    { fontSize: 15, fontWeight: '800' },
-  secCountPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
-  secCountTxt: { fontSize: 12, fontWeight: '600' },
-
-  // Grille portrait
-  pRow: {
-    flexDirection: 'row', gap: 8,
-    paddingHorizontal: 12, paddingTop: 8,
+  actionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 7, paddingVertical: 13,
   },
-  pCard: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    // Ombre légère iOS
-    shadowColor: '#000',
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-  },
-  pThumbWrap: { width: '100%', overflow: 'hidden', position: 'relative' },
-  pNoThumb:   { alignItems: 'center', justifyContent: 'center' },
-  pStats:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pStatsLight:{ flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pStat:      { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  pStatTxt:   { color: '#fff', fontSize: 11, fontWeight: '600' },
-  pImgBadge:  { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6 },
-  pVideoBadge:{ position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  pBody:      { paddingHorizontal: 10, paddingVertical: 8 },
-  pBodyTxt:   { fontSize: 12, fontWeight: '400', lineHeight: 17 },
+  actionBtnTxt: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  actionSep:    { width: StyleSheet.hairlineWidth, height: 32 },
 
   // Menu contextuel ···
   ctxMenu: {
-    position: 'absolute', top: 58, right: 14, zIndex: 20,
-    borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
-    minWidth: 160, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 }, elevation: 8,
+    position: 'absolute', top: 62, right: 16, zIndex: 20,
+    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
+    minWidth: 170, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
-  ctxItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
+  ctxItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
   ctxTxt:  { fontSize: 14, fontWeight: '500' },
   ctxSep:  { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
 
-  // Barre engagement
-  engageWrap:       { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, borderTopWidth: StyleSheet.hairlineWidth },
-  engageCountRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
-  engageCountItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  engageCountDot:   { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  engageCountTxt:   { fontSize: 13, fontWeight: '500' },
-  engageBtnRow:     { flexDirection: 'row', gap: 8, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
-  engageBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
-  engageBtnTxt:     { fontSize: 13, fontWeight: '700' },
+  // Section "Autres publications"
+  secHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  secTitle:  { fontSize: 16, fontWeight: '800' },
+  secSeeAll: { fontSize: 14, fontWeight: '700' },
+
+  // Grille portrait
+  pRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 8 },
+  pCard: {
+    borderRadius: 14, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }, elevation: 3,
+  },
+  pThumbWrap:  { width: '100%', overflow: 'hidden', position: 'relative' },
+  pNoThumb:    { alignItems: 'center', justifyContent: 'center' },
+  pStats:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pStatsLight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pStat:       { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  pStatTxt:    { color: '#fff', fontSize: 11, fontWeight: '600' },
+  pImgBadge:   { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6 },
+  pVideoBadge: { position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  pBody:       { paddingHorizontal: 10, paddingVertical: 8 },
+  pBodyTxt:    { fontSize: 12, fontWeight: '400', lineHeight: 17 },
 
   // Footer
   footerLoader: { paddingVertical: 28, alignItems: 'center' },
@@ -921,15 +918,10 @@ const s = StyleSheet.create({
   footerLine:   { flex: 1, height: StyleSheet.hairlineWidth },
   footerTxt:    { fontSize: 12, fontWeight: '500' },
 
-  // Fullscreen image
-  fsRoot: { flex: 1, backgroundColor: '#000' },
-  fsClose: { position: 'absolute', right: 18 },
-  fsCloseGlass: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
-  },
-  fsDots: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', gap: 5 },
-  fsDot:  { height: 6, borderRadius: 3 },
+  // Fullscreen image (inchangé)
+  fsRoot:       { flex: 1, backgroundColor: '#000' },
+  fsClose:      { position: 'absolute', right: 18 },
+  fsCloseGlass: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+  fsDots:       { position: 'absolute', alignSelf: 'center', flexDirection: 'row', gap: 5 },
+  fsDot:        { height: 6, borderRadius: 3 },
 });

@@ -474,6 +474,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
           await reelService.create({
             hls_url:       result.hls_url,
+            mp4_url:       result.mp4_url,
             caption:       snap.cap || undefined,
             thumbnail_url: result.thumbnail_url,
             duration_sec:  5,
@@ -531,6 +532,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
           await reelService.create({
             hls_url:       playUrl,
+            mp4_url:       result.mp4Url ?? undefined,
             caption:       cap || undefined,
             thumbnail_url: result.thumbnailUrl,
             duration_sec:  result.durationSec ? Math.round(result.durationSec) : Math.round(dur),

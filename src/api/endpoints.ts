@@ -154,12 +154,14 @@ export const Endpoints = {
 
   // ── Reels (prefix: /api/v1/reels) ─────────────────────────────────────────
   reels: {
-    feed:      `${V1}/reels`,
-    byId:      (id: string) => `${V1}/reels/${id}`,
-    view:      (id: string) => `${V1}/reels/${id}/view`,
-    byUser:    (userId: string) => `${V1}/reels/user/${userId}`,
-    update:    (id: string) => `${V1}/reels/${id}`,
-    delete:    (id: string) => `${V1}/reels/${id}`,
+    feed:           `${V1}/reels`,
+    byId:           (id: string) => `${V1}/reels/${id}`,
+    view:           (id: string) => `${V1}/reels/${id}/view`,
+    byUser:         (userId: string) => `${V1}/reels/user/${userId}`,
+    update:         (id: string) => `${V1}/reels/${id}`,
+    delete:         (id: string) => `${V1}/reels/${id}`,
+    download:       (id: string) => `${V1}/reels/${id}/download`,
+    downloadStatus: (id: string, jobId: string) => `${V1}/reels/${id}/download/status/${jobId}`,
   },
 
   // ── Social (prefix: /api/v1/social) ───────────────────────────────────────

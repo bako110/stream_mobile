@@ -856,7 +856,7 @@ const Header: React.FC<HeaderProps> = ({
           <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary }]} onPress={onMessages}>
             <Icon name="message-circle" size={20} color={colors.textPrimary} />
             {unreadMessages > 0 && (
-              <View style={[s.badge, { backgroundColor: colors.accentOrange }]}>
+              <View style={[s.badge, { backgroundColor: colors.primary }]}>
                 <Text style={s.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
               </View>
             )}

@@ -26,6 +26,7 @@ export type UploadJobStatus =
 export interface UploadJobResult {
   videoUrl?:      string;
   hlsUrl?:        string;
+  mp4Url?:        string;
   thumbnailUrl?:  string;
   durationSec?:   number;
   videoWidth?:    number | null;
@@ -216,6 +217,7 @@ class BackgroundUploadService {
       const jobResult: UploadJobResult = {
         videoUrl:     result.url,
         hlsUrl:       result.hls_url,
+        mp4Url:       result.mp4_url,
         thumbnailUrl: result.thumbnail_url,
         durationSec:  result.duration,
         videoWidth:   result.width  ?? null,
@@ -302,6 +304,7 @@ class BackgroundUploadService {
       const jobResult: UploadJobResult = {
         videoUrl:     videoResult.url,
         hlsUrl:       videoResult.hls_url,
+        mp4Url:       videoResult.mp4_url,
         thumbnailUrl: videoResult.thumbnail_url,
         durationSec:  videoResult.duration,
         videoWidth:   videoResult.width  ?? null,

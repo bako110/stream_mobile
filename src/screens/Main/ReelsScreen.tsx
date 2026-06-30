@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
 import { RichText } from '../../components/common/RichText';
-import { apiClient } from '../../api';
+import { apiClient, Endpoints } from '../../api';
 import { reelService, socialService, authService } from '../../services';
 import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
@@ -36,6 +36,7 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { type FilterKey, type ReelEditResult, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2, ReelEditorScreen } from '../Create/ReelEditorScreen';
 import Sound from 'react-native-sound';
 import { BackButton } from '../../components/common';
+import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -1182,6 +1183,79 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [savingCaption,      setSavingCaption]       = useState(false);
   const [captionSt,          setCaptionSt]           = useState(reel.caption ?? '');
 
+  const [renderPending, setRenderPending] = useState(false);
+
+  const handleDownload = useCallback(async () => {
+    setShowRemix(false);
+    setShowOwnerMenu(false);
+
+    if (renderPending) {
+      Alert.alert('Patiente', 'Le rendu est en cours, encore quelques instants...');
+      return;
+    }
+
+    setRenderPending(true);
+
+    const saveToGallery = async (url: string, withEffects: boolean) => {
+      await CameraRoll.saveAsset(url, { type: 'video' });
+      Alert.alert(
+        'Sauvegarde',
+        withEffects
+          ? 'Le reel a ete sauvegarde dans ta galerie avec tes effets.'
+          : 'Le reel a ete sauvegarde dans ta galerie.',
+      );
+    };
+
+    const pollJob = async (jobId: string): Promise<void> => {
+      const MAX = 24; // 24 x 5s = 2 min max
+      for (let i = 0; i < MAX; i++) {
+        await new Promise<void>(res => setTimeout(res, 5000));
+        try {
+          const pollRes = await apiClient.get<{ status: string; mp4_url?: string; detail?: string }>(
+            Endpoints.reels.downloadStatus(reel.id, jobId),
+          );
+          const d = pollRes.data ?? (pollRes as any);
+          if (d.status === 'done' && d.mp4_url) {
+            await saveToGallery(d.mp4_url, true);
+            return;
+          }
+          if (d.status === 'error') {
+            Alert.alert('Erreur rendu', d.detail ?? 'Le rendu a echoue. Reessaie.');
+            return;
+          }
+          // status === 'processing' → continuer
+        } catch {
+          // erreur reseau passagere → continuer a poller
+        }
+      }
+      Alert.alert('Timeout', 'Le rendu prend trop de temps. Reessaie dans quelques instants.');
+    };
+
+    let polling = false;
+    try {
+      const res = await apiClient.get<{ status: string; mp4_url?: string; job_id?: string }>(
+        Endpoints.reels.download(reel.id),
+      );
+      const data = res.data ?? (res as any);
+
+      if (data.status === 'ready' && data.mp4_url) {
+        await saveToGallery(data.mp4_url, false);
+      } else if (data.status === 'processing' && data.job_id) {
+        polling = true;
+        Alert.alert('Rendu en cours', 'Tes effets sont appliques cote serveur. La galerie sera mise a jour automatiquement.');
+        pollJob(data.job_id).finally(() => setRenderPending(false));
+      } else {
+        Alert.alert('Erreur', 'Reponse inattendue du serveur.');
+      }
+    } catch {
+      Alert.alert('Erreur', 'Impossible de lancer le telechargement. Verifie ta connexion.');
+    }
+
+    if (!polling) {
+      setRenderPending(false);
+    }
+  }, [reel.id, renderPending]);
+
   const likeInFlight  = useRef(false);
   const pausedRef     = useRef(false);
   const endedRef      = useRef(false);
@@ -2063,6 +2137,16 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Stats du reel</Text>
                 </TouchableOpacity>
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+                <TouchableOpacity style={s.menuItem} onPress={handleDownload} disabled={renderPending}>
+                  {renderPending
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Icon name="download" size={20} color={colors.textPrimary} />
+                  }
+                  <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
+                    {renderPending ? 'Rendu en cours...' : 'Telecharger'}
+                  </Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
                 <TouchableOpacity style={s.menuItem} onPress={handleDeleteReel}>
                   <Icon name="trash-2" size={20} color="#ef4444" />
                   <Text style={[s.menuItemText, { color: '#ef4444' }]}>Supprimer</Text>
@@ -2236,6 +2320,32 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                     <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
                   </>
                 )}
+
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+
+                {/* ── Télécharger ── */}
+                <TouchableOpacity
+                  style={s.menuItem}
+                  onPress={handleDownload}
+                  disabled={renderPending}
+                >
+                  <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                    {renderPending
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <Icon name="download" size={20} color={colors.textPrimary} />
+                    }
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
+                      {renderPending ? 'Rendu en cours...' : 'Telecharger'}
+                    </Text>
+                    <Text style={[s.sheetItemSub, { color: colors.textSecondary }]}>
+                      {renderPending ? 'Les effets sont appliques cote serveur' : 'Enregistrer ce reel avec tous tes effets'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
 
                 {/* ── Signaler ── */}
                 <TouchableOpacity

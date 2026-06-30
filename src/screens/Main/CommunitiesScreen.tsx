@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, Modal,
   StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput,
   ScrollView, KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -17,8 +18,6 @@ import { communityService } from '../../services/communityService';
 import type { CommunityData, CreateCommunityPayload, JoinStatus } from '../../services/communityService';
 import { apiClient, Endpoints } from '../../api';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import { useNetwork } from '../../context/NetworkContext';
-import { offlineCacheService } from '../../services/offlineCacheService';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -254,18 +253,13 @@ export const CommunitiesScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const { isOnline, isInternetReachable } = useNetwork();
 
-  // Si des communautés sont en cache (= utilisateur déjà membre), démarrer sur 'mine' directement
-  const _cachedMine = offlineCacheService.getCommunityList();
-  const _hasCached  = !!(_cachedMine && _cachedMine.length > 0);
-  const [tab,            setTab]            = useState<'discover' | 'mine'>(_hasCached ? 'mine' : 'discover');
-  const [all,            setAll]            = useState<CommunityData[]>(() =>
-    _hasCached ? (_cachedMine as unknown as CommunityData[]) : []
-  );
+  const [tab,            setTab]            = useState<'discover' | 'mine'>('discover');
+  const [all,            setAll]            = useState<CommunityData[]>([]);
   const [query,          setQuery]          = useState('');
-  const [loading,        setLoading]        = useState(!_hasCached);
+  const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
+  const [isOffline,      setIsOffline]      = useState(false);
   const [createOpen,     setCreateOpen]     = useState(false);
   const [templateOpen,   setTemplateOpen]   = useState(false);
   const [joinOpen,       setJoinOpen]       = useState(false);
@@ -361,14 +355,11 @@ export const CommunitiesScreen: React.FC = () => {
   };
 
   const load = useCallback(async (silent = false) => {
-    // Offline : servir le cache pour l'onglet "mine"
-    if (!isOnline || !isInternetReachable) {
-      if (tab === 'mine') {
-        const cached = offlineCacheService.getCommunityList();
-        if (cached && cached.length > 0) {
-          setAll(cached as unknown as CommunityData[]);
-        }
-      }
+    const net = await NetInfo.fetch();
+    const online = !!(net.isConnected && net.isInternetReachable !== false);
+    setIsOffline(!online);
+    if (!online) {
+      setAll([]);
       setLoading(false);
       setRefreshing(false);
       return;
@@ -378,28 +369,10 @@ export const CommunitiesScreen: React.FC = () => {
       const data = tab === 'mine'
         ? await communityService.mine()
         : await communityService.discover();
-      const list = Array.isArray(data) ? data : [];
-      setAll(list);
-      // Sauvegarder les communities rejointes pour l'offline
-      if (tab === 'mine' && list.length > 0) {
-        offlineCacheService.saveCommunityList(list.map(c => ({
-          id:            String(c.id),
-          name:          c.name,
-          description:   c.description ?? null,
-          avatar_url:    c.avatar_url ?? null,
-          members_count: c.members_count ?? 0,
-          is_private:    c.is_private ?? false,
-        })));
-      }
-    } catch {
-      // Erreur réseau → fallback cache sans vider la liste
-      if (tab === 'mine') {
-        const cached = offlineCacheService.getCommunityList();
-        if (cached && cached.length > 0) setAll(cached as unknown as CommunityData[]);
-      }
-    }
+      setAll(Array.isArray(data) ? data : []);
+    } catch { /**/ }
     finally { setLoading(false); setRefreshing(false); }
-  }, [tab, isOnline, isInternetReachable]);
+  }, [tab]);
 
   // Rechargement complet au changement de tab
   useEffect(() => { load(); }, [load]);
@@ -407,12 +380,19 @@ export const CommunitiesScreen: React.FC = () => {
   // Refresh silencieux au retour sur l'écran (pas de skeleton)
   useEffect(() => { if (isFocused) load(true); }, [isFocused]);
 
+  // On the discover tab, exclude communities the user already joined so they only
+  // appear under "Mes communautés". On the mine tab keep all items as-is since
+  // the /mine endpoint already returns only the user's own communities.
+  const filtered = tab === 'discover'
+    ? all.filter(c => c.join_status !== 'member')
+    : all;
+
   const communities = query.trim()
-    ? all.filter(c =>
+    ? filtered.filter(c =>
         c.name.toLowerCase().includes(query.toLowerCase()) ||
         c.description?.toLowerCase().includes(query.toLowerCase()),
       )
-    : all;
+    : filtered;
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleJoin = (item: CommunityData) => {
@@ -442,10 +422,6 @@ export const CommunitiesScreen: React.FC = () => {
         );
       } else if (res.joined) {
         Alert.alert('Bienvenue !', `Tu as rejoint "${item.name}".`);
-      } else if (res.error === 'already_member') {
-        Alert.alert('Déjà membre', `Tu es déjà membre de "${item.name}".`);
-      } else if (res.error === 'already_pending') {
-        Alert.alert('Demande en cours', `Ta demande pour "${item.name}" est déjà en cours d'examen.`);
       }
       load();
     } catch (e: any) {
@@ -1194,6 +1170,16 @@ export const CommunitiesScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* ── Bannière hors-ligne ── */}
+      {isOffline && (
+        <View style={[S.offlineBanner, { backgroundColor: colors.surface }]}>
+          <Icon name="wifi-off" size={14} color="#F97316" />
+          <Text style={[S.offlineTxt, { color: colors.textSecondary }]}>
+            Pas de connexion — les communautés ne sont pas disponibles hors ligne.
+          </Text>
+        </View>
+      )}
+
       {/* ── Corps ── */}
       {renderList()}
 
@@ -1357,6 +1343,16 @@ export const CommunitiesScreen: React.FC = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
   root: { flex: 1 },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F9731630',
+  },
+  offlineTxt: { fontSize: 13, flex: 1 },
   emptyContainer: {
     flexGrow: 1,
     alignItems: 'center',

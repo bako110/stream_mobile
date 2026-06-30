@@ -85,7 +85,7 @@ const badgeS = StyleSheet.create({
   badge: {
     position: 'absolute', top: -6, right: -8,
     minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#7B3FF2',
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 1.5,
@@ -108,6 +108,38 @@ interface AdData {
   format: string;
 }
 
+const AdVideoCreative: React.FC<{ uri: string; thumbnailUri?: string }> = ({ uri }) => {
+  const [muted, setMuted] = useState(true);
+  const player = useVideoPlayer({ uri }, p => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+  const toggleMute = useCallback(() => {
+    setMuted(m => {
+      player.muted = !m;
+      return !m;
+    });
+  }, [player]);
+  return (
+    <View style={{ position: 'relative' }}>
+      <VideoView
+        player={player}
+        style={adSt.image}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      <TouchableOpacity
+        onPress={toggleMute}
+        style={adSt.muteBtn}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (id: string, url: string) => void }> = React.memo(
   ({ ad, colors, onImpression, onPress }) => {
     const firedRef = useRef<string | null>(null);
@@ -118,8 +150,9 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
       }
     }, [ad?.id, onImpression]);
 
-    const hasImage = !!(ad.creative_url || ad.thumbnail_url);
-    const imageUri = ad.creative_url || ad.thumbnail_url;
+    const creativeUri = ad.creative_url || ad.thumbnail_url;
+    const isVideo = !!(creativeUri && (creativeUri.includes('.m3u8') || creativeUri.includes('.mp4')));
+    const hasCreative = !!creativeUri;
 
     return (
       <View style={[adSt.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
@@ -150,13 +183,13 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
           </Text>
         ) : null}
 
-        {/* ── Image créative ── */}
-        {hasImage ? (
-          <Image
-            source={{ uri: imageUri! }}
-            style={adSt.image}
-            resizeMode="cover"
-          />
+        {/* ── Créatif : vidéo ou image ── */}
+        {hasCreative ? (
+          isVideo ? (
+            <AdVideoCreative uri={creativeUri!} thumbnailUri={ad.thumbnail_url} />
+          ) : (
+            <Image source={{ uri: creativeUri! }} style={adSt.image} resizeMode="cover" />
+          )
         ) : (
           <View style={[adSt.imagePlaceholder, { backgroundColor: colors.primary + '14' }]}>
             <Icon name="image" size={32} color={colors.primary + '60'} />
@@ -201,6 +234,7 @@ const adSt = StyleSheet.create({
   moreBtn:        { padding: 4 },
   description:    { fontSize: 14, lineHeight: 20, paddingHorizontal: 14, paddingBottom: 10 },
   image:          { width: '100%', height: 220 },
+  muteBtn:        { position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   imagePlaceholder:{ width: '100%', height: 180, alignItems: 'center', justifyContent: 'center' },
   footer:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   ctaDomain:      { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 1 },

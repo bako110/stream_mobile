@@ -28,6 +28,9 @@ export interface Reel {
   author?: import('./user').User;
   user_reaction?: 'like' | 'dislike' | null;
   remix_type?: 'repost' | 'remix' | null;
+  trim_start_ms?: number | null;
+  trim_end_ms?: number | null;
+  playback_speed?: number | null;
   filter_name?: string | null;
   text_layers?: string | null;
   sticker_layers?: string | null;
@@ -43,6 +46,7 @@ export interface Reel {
   music_name?: string | null;
   music_start_sec?: number | null;
   music_end_sec?: number | null;
+  mp4_url?: string | null;
 }
 
 export interface CommentAuthor {

@@ -42,6 +42,14 @@ export function useMediaDownload() {
   const download = useCallback(async (id: string, url: string, isVideo: boolean) => {
     if (!url || states[id]?.downloading || states[id]?.localUri) return;
 
+    if (url.includes('.m3u8')) {
+      Alert.alert(
+        'Téléchargement indisponible',
+        'La version téléchargeable (MP4) de ce reel n\'est pas encore disponible. Réessaie dans quelques instants.',
+      );
+      return;
+    }
+
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
