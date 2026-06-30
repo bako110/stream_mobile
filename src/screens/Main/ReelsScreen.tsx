@@ -37,6 +37,7 @@ import { type FilterKey, type ReelEditResult, FILTERS, FILTER_VIDEO_OPACITY, FIL
 import Sound from 'react-native-sound';
 import { BackButton } from '../../components/common';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
+import RNBlobUtil from 'react-native-blob-util';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -1197,7 +1198,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     setRenderPending(true);
 
     const saveToGallery = async (url: string, withEffects: boolean) => {
-      await CameraRoll.saveAsset(url, { type: 'video' });
+      // Télécharger en local d'abord, CameraRoll n'accepte pas les URLs distantes
+      const destPath = `${RNBlobUtil.fs.dirs.CacheDir}/reel_${reel.id}_${Date.now()}.mp4`;
+      await RNBlobUtil.config({ fileCache: true, path: destPath })
+        .fetch('GET', url);
+      await CameraRoll.saveAsset(`file://${destPath}`, { type: 'video' });
+      // Nettoyage du cache après sauvegarde
+      RNBlobUtil.fs.unlink(destPath).catch(() => {});
       Alert.alert(
         'Sauvegarde',
         withEffects
