@@ -10,6 +10,7 @@ import { pick, types, isErrorWithCode, errorCodes } from '@react-native-document
 import RNBlobUtil from 'react-native-blob-util';
 import Sound from 'react-native-sound';
 import { SoundPicker } from '../../components/story/SoundPicker';
+import { soundService } from '../../services/soundService';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
   withRepeat, withSequence, Easing,
@@ -561,6 +562,8 @@ export const ReelEditorScreen: React.FC<Props> = ({
     setMusicName(name);
     loadMusicMeta(resolvedUri);
     setMusicPicking(false);
+    // Ajoute au catalogue partagé — retrouvable ensuite via Recherche/Populaires
+    soundService.uploadFromUri(resolvedUri, name);
   }, [stopSound, loadMusicMeta, resolveAudioUri]);
 
   const handleRemoveMusic = useCallback(() => {

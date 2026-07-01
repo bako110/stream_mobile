@@ -26,3 +26,5 @@ export { liveService } from './liveService';
 export type { LiveStream, LiveToken, LiveStatus } from './liveService';
 export { favoriteService } from './favoriteService';
 export type { FavoriteType, FavoriteOut, SavePayload } from './favoriteService';
+export { soundService } from './soundService';
+export type { SoundOut } from './soundService';

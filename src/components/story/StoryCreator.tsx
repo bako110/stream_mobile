@@ -29,6 +29,7 @@ import { cleanupTempVideos, trimVideo } from '../../services/videoCompressServic
 import { cacheInBackground } from '../../services/videoCacheService';
 import ImageEditor from '@react-native-community/image-editor';
 import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../services/uploadService';
+import { soundService } from '../../services/soundService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { VideoTrimmer } from './VideoTrimmer';
 import notifee, { AndroidImportance, AndroidVisibility } from '@notifee/react-native';
@@ -662,7 +663,10 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const doUploadAudio = async (uri: string) => {
     const ext = uri.split('.').pop()?.toLowerCase()??'mp4';
     const mime: Record<string,string> = { mp3:'audio/mpeg', m4a:'audio/x-m4a', aac:'audio/aac', wav:'audio/wav', ogg:'audio/ogg', mp4:'audio/mp4' };
-    return (await uploadAudioFile(uri, `s_${Date.now()}.${ext}`, mime[ext]??'audio/mp4', 'stories')).url;
+    const fileName = `s_${Date.now()}.${ext}`;
+    // Ajoute au catalogue partagé (recherche/populaires) — non-bloquant, en parallèle
+    soundService.uploadFromUri(uri, fileName);
+    return (await uploadAudioFile(uri, fileName, mime[ext]??'audio/mp4', 'stories')).url;
   };
 
   // ── Publish ───────────────────────────────────────────────────────────────
