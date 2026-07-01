@@ -16,7 +16,7 @@ import type { StoryGroup, StoryViewerUser } from '../../types/story';
 import { storyService } from '../../services/storyService';
 import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
-import { GoFolyXLoader } from '../common';
+import { GoFolyXLoader, HeartRain, RecentLikersAvatars } from '../common';
 import { getLocalUri, getLocalUriAsync, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
 import { apiClient } from '../../api/client';
 
@@ -1227,6 +1227,10 @@ export const StoryViewer: React.FC<Props> = ({
         )}
 
         <View style={s.bottomBar}>
+          {/* Pluie de cœurs + avatars des derniers likers — story très aimée (≥1000 likes) */}
+          <HeartRain active={!paused} likeCount={likeCount} contentId={story.id} />
+          <RecentLikersAvatars active={!paused} likeCount={likeCount} contentId={story.id} kind="story" />
+
           {isOwn ? (
             <TouchableOpacity style={s.viewsBtn} onPress={() => openViewers('views')} activeOpacity={0.8}>
               <Icon name="eye" size={14} color="#fff" />

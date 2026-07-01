@@ -29,6 +29,7 @@ import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
   CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader, ShareBottomSheet, FriendsWhoLiked,
+  HeartRain, RecentLikersAvatars,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -2085,6 +2086,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             <FriendsWhoLiked entityType="reel" entityId={reel.id} totalLikes={likes} lightText />
           )}
         </View>
+
+        {/* Pluie de cœurs + avatars des derniers likers — reel très aimé (≥1000 likes) */}
+        <HeartRain active={isActive} likeCount={likes} contentId={reel.id} />
+        <RecentLikersAvatars active={isActive} likeCount={likes} contentId={reel.id} kind="reel" />
 
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
           <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
