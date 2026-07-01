@@ -96,6 +96,7 @@ export const ReelsScreen: React.FC = () => {
   const activePlayerRef   = useRef<{ pause: () => void } | null>(null);
   const mountedRef        = useRef(true);
   const searchTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchReqRef      = useRef('');
   const searchInputRef    = useRef<TextInput>(null);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
   const lastLoadedAtRef   = useRef<number>(0);
@@ -272,16 +273,21 @@ export const ReelsScreen: React.FC = () => {
 
   // ── Search ────────────────────────────────────────────────────────────────
   const runSearch = useCallback(async (q: string) => {
-    if (!q.trim()) { setSearchResults([]); return; }
+    const term = q.trim();
+    searchReqRef.current = term;
+    if (!term) { setSearchResults([]); return; }
     if (!mountedRef.current) return;
     setSearching(true);
     try {
-      const data = await reelService.search(q.trim(), 1, 20);
-      if (mountedRef.current) setSearchResults(data.items.filter((r: Reel) => !!r.hls_url));
+      const data = await reelService.search(term, 1, 20);
+      // Ignore une réponse en retard (frappe rapide) qui ne correspond plus au terme actuel
+      if (mountedRef.current && searchReqRef.current === term) {
+        setSearchResults(data.items.filter((r: Reel) => !!r.hls_url));
+      }
     } catch {
-      if (mountedRef.current) setSearchResults([]);
+      if (mountedRef.current && searchReqRef.current === term) setSearchResults([]);
     } finally {
-      if (mountedRef.current) setSearching(false);
+      if (mountedRef.current && searchReqRef.current === term) setSearching(false);
     }
   }, []);
 

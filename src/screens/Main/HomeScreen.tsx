@@ -150,6 +150,7 @@ export const HomeScreen: React.FC = () => {
   const [searchEvents,  setSearchEvents]  = useState<any[]>([]);
   const [searchConcerts,setSearchConcerts]= useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const searchReqRef = useRef('');
   const [currentUser,   setCurrentUser]   = useState<User | null>(null);
   const [liveConcerts,  setLiveConcerts]  = useState<Concert[]>([]);
   const [spontLives,    setSpontLives]    = useState<LiveStream[]>([]);
@@ -444,20 +445,27 @@ export const HomeScreen: React.FC = () => {
   // ── Recherche ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!search.trim()) {
+    const term = search.trim();
+    searchReqRef.current = term;
+    if (!term) {
       setSearchUsers([]); setSearchEvents([]); setSearchConcerts([]);
       return;
     }
     const timer = setTimeout(async () => {
       setSearchLoading(true);
       try {
-        const res = await searchService.searchAll({ q: search.trim(), limit: 10 });
-        setSearchUsers(Array.isArray(res.users) ? res.users : []);
-        setSearchEvents(Array.isArray(res.events) ? res.events : []);
-        setSearchConcerts(Array.isArray(res.concerts) ? res.concerts : []);
+        const res = await searchService.searchAll({ q: term, limit: 10 });
+        // Ignore une réponse en retard (frappe rapide) qui ne correspond plus au terme actuel
+        if (searchReqRef.current === term) {
+          setSearchUsers(Array.isArray(res.users) ? res.users : []);
+          setSearchEvents(Array.isArray(res.events) ? res.events : []);
+          setSearchConcerts(Array.isArray(res.concerts) ? res.concerts : []);
+        }
       } catch {
-        setSearchUsers([]); setSearchEvents([]); setSearchConcerts([]);
-      } finally { setSearchLoading(false); }
+        if (searchReqRef.current === term) { setSearchUsers([]); setSearchEvents([]); setSearchConcerts([]); }
+      } finally {
+        if (searchReqRef.current === term) setSearchLoading(false);
+      }
     }, 400);
     return () => clearTimeout(timer);
   }, [search]);

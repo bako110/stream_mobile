@@ -630,6 +630,7 @@ export const FeedScreen: React.FC = () => {
 
   const searchInputRef = useRef<any>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchReqRef   = useRef('');
 
   const refreshHistory = useCallback(() => {
     setSearchHistory(searchHistoryService.getAll());
@@ -701,14 +702,17 @@ export const FeedScreen: React.FC = () => {
   // Recherche auto avec debounce 300ms
   const liveSearch = useCallback((query: string) => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (!query.trim()) { setSearchResults(null); setSearching(false); return; }
+    const term = query.trim();
+    searchReqRef.current = term;
+    if (!term) { setSearchResults(null); setSearching(false); return; }
     searchTimerRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await searchService.searchAll({ q: query.trim() });
-        setSearchResults(results);
+        const results = await searchService.searchAll({ q: term });
+        // Ignore une réponse en retard (frappe rapide) qui ne correspond plus au terme actuel
+        if (searchReqRef.current === term) setSearchResults(results);
       } catch { /* silencieux */ }
-      finally { setSearching(false); }
+      finally { if (searchReqRef.current === term) setSearching(false); }
     }, 300);
   }, []);
 
@@ -1436,14 +1440,17 @@ export const FeedScreen: React.FC = () => {
                 value={searchQuery}
                 onChangeText={(text) => { setSearchQuery(text); liveSearch(text); }}
                 onSubmitEditing={async () => {
-                  if (!searchQuery.trim()) return;
+                  const term = searchQuery.trim();
+                  if (!term) return;
+                  if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                  searchReqRef.current = term;
                   commitSearch(searchQuery);
                   setSearching(true);
                   try {
-                    const results = await searchService.searchAll({ q: searchQuery.trim() });
-                    setSearchResults(results);
+                    const results = await searchService.searchAll({ q: term });
+                    if (searchReqRef.current === term) setSearchResults(results);
                   } catch { /* silencieux */ }
-                  finally { setSearching(false); }
+                  finally { if (searchReqRef.current === term) setSearching(false); }
                 }}
               />
               {searching && <ActivityIndicator size="small" color={colors.primary} />}
