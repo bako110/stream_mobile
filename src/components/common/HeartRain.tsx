@@ -9,7 +9,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── Pluie de cœurs — se déclenche une fois à l'arrivée sur un contenu très aimé ──
 export const HEART_RAIN_THRESHOLD = 1;
-const HEART_RAIN_COUNT  = 54;
+const HEART_RAIN_COUNT  = 100;
 const HEART_RAIN_COLORS = ['#7B3FF2', '#E0389A', '#F0365A', '#A855F7'];
 
 // Évite de rejouer l'effet si l'utilisateur revient sur le même contenu dans la session
