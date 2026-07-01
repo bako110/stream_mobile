@@ -1,5 +1,6 @@
 import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
+import { authService } from './authService';
 
 export interface SoundOut {
   id: string;
@@ -30,9 +31,17 @@ export const soundService = {
         : ext === 'aac' ? 'audio/aac'
         : 'audio/mp4';
 
+      // Artiste par défaut = utilisateur courant (sinon reste "Inconnu" côté affichage)
+      let artistName: string | undefined;
+      try {
+        const me = await authService.getMe();
+        artistName = me?.display_name ?? me?.username ?? undefined;
+      } catch {}
+
       const form = new FormData();
       form.append('file', { uri, name, type: mime } as any);
       if (title) form.append('title', title);
+      if (artistName) form.append('artist_name', artistName);
 
       const res = await apiClient.upload<SoundOut>(Endpoints.sounds.upload, form);
       return res.data;
