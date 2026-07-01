@@ -29,7 +29,7 @@ import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
   CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader, ShareBottomSheet, FriendsWhoLiked,
-  HeartRain, RecentLikersAvatars,
+  HeartRain, LikeNamesFeed,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -2087,9 +2087,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           )}
         </View>
 
-        {/* Pluie de cœurs + avatars des derniers likers — reel très aimé (≥1000 likes) */}
+        {/* Pluie de cœurs + défilement des noms qui aiment — reel très aimé */}
         <HeartRain active={isActive} likeCount={likes} contentId={reel.id} />
-        <RecentLikersAvatars active={isActive} likeCount={likes} contentId={reel.id} kind="reel" />
+        <LikeNamesFeed active={isActive} likeCount={likes} contentId={reel.id} kind="reel" />
 
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
           <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>

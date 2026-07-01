@@ -8,8 +8,8 @@ import { Endpoints } from '../../api/endpoints';
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── Pluie de cœurs — se déclenche une fois à l'arrivée sur un contenu très aimé ──
-export const HEART_RAIN_THRESHOLD = 1000;
-const HEART_RAIN_COUNT  = 24;
+export const HEART_RAIN_THRESHOLD = 1;
+const HEART_RAIN_COUNT  = 54;
 const HEART_RAIN_COLORS = ['#7B3FF2', '#E0389A', '#F0365A', '#A855F7'];
 
 // Évite de rejouer l'effet si l'utilisateur revient sur le même contenu dans la session
@@ -129,4 +129,86 @@ const s = StyleSheet.create({
   avatar: { width: '100%', height: '100%' },
   avatarFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B3FF2' },
   avatarInitial: { color: '#fff', fontSize: 10, fontWeight: '800' },
+});
+
+// ── Défilement des noms qui aiment — bas-gauche, monte et s'efface (style TikTok) ──
+const _likeNamesCache = new Map<string, RecentLiker[]>();
+const NAME_FEED_INTERVAL = 1400; // ms entre deux apparitions
+const NAME_FEED_LIFETIME = 2600; // ms de vie d'une bulle (montée + fondu)
+
+function RisingName({ liker }: { liker: RecentLiker }) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: NAME_FEED_LIFETIME, easing: Easing.out(Easing.quad) });
+  }, []); // eslint-disable-line
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: progress.value * -130 }],
+    opacity: progress.value < 0.12 ? progress.value / 0.12 : progress.value > 0.75 ? (1 - progress.value) / 0.25 : 1,
+  }));
+
+  return (
+    <Animated.View style={[nameS.bubble, style]}>
+      <Icon name="heart" size={11} color="#E0389A" />
+      <Text style={nameS.label} numberOfLines={1}>{liker.display_name ?? liker.username ?? 'Quelqu\'un'}</Text>
+    </Animated.View>
+  );
+}
+
+export function LikeNamesFeed({ active, likeCount, contentId, kind }: {
+  active: boolean; likeCount: number; contentId: string; kind: 'reel' | 'story';
+}) {
+  const [names, setNames] = useState<RecentLiker[]>(() => _likeNamesCache.get(contentId) ?? []);
+  const [queue, setQueue] = useState<{ key: number; liker: RecentLiker }[]>([]);
+  const fetchedRef = useRef(false);
+  const cursorRef = useRef(0);
+  const seqRef = useRef(0);
+
+  useEffect(() => {
+    if (!active || likeCount < HEART_RAIN_THRESHOLD || fetchedRef.current) return;
+    fetchedRef.current = true;
+    const url = kind === 'reel'
+      ? `${Endpoints.social.reactionUsers}?reel_id=${contentId}&limit=10`
+      : `${Endpoints.stories.likers(contentId)}?limit=10`;
+    apiClient.get<RecentLiker[]>(url)
+      .then(r => {
+        const data = Array.isArray(r.data) ? r.data : [];
+        _likeNamesCache.set(contentId, data);
+        setNames(data);
+      })
+      .catch(() => {});
+  }, [active, likeCount, contentId, kind]);
+
+  useEffect(() => {
+    if (!active || names.length === 0) return;
+    const timer = setInterval(() => {
+      const liker = names[cursorRef.current % names.length];
+      cursorRef.current += 1;
+      const key = seqRef.current++;
+      setQueue(q => [...q, { key, liker }]);
+      setTimeout(() => setQueue(q => q.filter(item => item.key !== key)), NAME_FEED_LIFETIME);
+    }, NAME_FEED_INTERVAL);
+    return () => clearInterval(timer);
+  }, [active, names]);
+
+  if (queue.length === 0) return null;
+
+  return (
+    <View style={nameS.container} pointerEvents="none">
+      {queue.map(({ key, liker }) => <RisingName key={key} liker={liker} />)}
+    </View>
+  );
+}
+
+const nameS = StyleSheet.create({
+  container: { position: 'absolute', bottom: 130, left: 12, height: 140, width: 200, zIndex: 5 },
+  bubble: {
+    position: 'absolute', bottom: 0, left: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 14,
+  },
+  label: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 150 },
 });
