@@ -1,7 +1,7 @@
-﻿/**
- * LiveAccessGate â€” Verrou d'accÃ¨s pour les lives monÃ©tisÃ©s.
- * AffichÃ© quand le live est monÃ©tisÃ© et que l'utilisateur n'a pas encore payÃ©.
- * - Montre un aperÃ§u floutÃ© du live (juste un fond sombre avec avatar host)
+/**
+ * LiveAccessGate — Verrou d'acces pour les lives monetises.
+ * Affiche quand le live est monetise et que l'utilisateur n'a pas encore paye.
+ * - Montre un apercu floute du live (juste un fond sombre avec avatar host)
  * - Affiche les conditions (coins ou cadeau requis)
  * - Bouton d'action pour payer/envoyer le cadeau
  */
@@ -46,12 +46,12 @@ export const LiveAccessGate: React.FC<Props> = ({
   const isGift  = live.monetization_type === 'gift';
   const isCoins = live.monetization_type === 'coins';
 
-  const hostName   = live.user?.display_name ?? live.user?.username ?? 'CrÃ©ateur';
+  const hostName   = live.user?.display_name ?? live.user?.username ?? 'Createur';
   const hostAvatar = live.user?.avatar_url ?? null;
 
   const requiredGiftId    = live.monetization_gift_id;
   const requiredGiftName  = live.monetization_gift_name ?? '';
-  const requiredGiftEmoji = live.monetization_gift_emoji ?? 'ðŸŽ';
+  const requiredGiftEmoji = live.monetization_gift_emoji ?? '🎁';
   const requiredCoins     = live.monetization_coins ?? 0;
 
   const [myBalance, setMyBalance] = useState<number | null>(null);
@@ -62,8 +62,6 @@ export const LiveAccessGate: React.FC<Props> = ({
       .catch(() => setMyBalance(null));
   }, []);
 
-  // CoÃ»t effectif selon le type (pour le cadeau on ne connait pas encore le coins_cost ici,
-  // mais le backend retourne 402 avec le montant exact â€” on utilise requiredCoins comme proxy)
   const effectiveCost = isCoins ? requiredCoins : 0;
   const hasEnough = myBalance !== null && (isCoins ? myBalance >= effectiveCost : true);
 
@@ -117,7 +115,7 @@ export const LiveAccessGate: React.FC<Props> = ({
       }
     } catch (e: any) {
       const status = e?.status ?? e?.response?.status;
-      const msg = e?.message ?? e?.response?.data?.detail ?? 'Erreur lors de l\'envoi du cadeau.';
+      const msg = e?.message ?? e?.response?.data?.detail ?? "Erreur lors de l'envoi du cadeau.";
       if (status === 402) {
         showInsufficientFunds(msg);
       } else {
@@ -131,7 +129,7 @@ export const LiveAccessGate: React.FC<Props> = ({
     <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      {/* Fond floutÃ© simulÃ© â€” avatar host centrÃ© */}
+      {/* Fond floute simule — avatar host centre */}
       <View style={s.bgPreview}>
         {hostAvatar ? (
           <Image source={{ uri: hostAvatar }} style={s.bgAvatar} blurRadius={18} />
@@ -163,9 +161,9 @@ export const LiveAccessGate: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* Carte d'accÃ¨s */}
+      {/* Carte d'acces */}
       <View style={[s.gateCard, { backgroundColor: colors.surface }]}>
-        {/* IcÃ´ne verrou */}
+        {/* Icone verrou */}
         <View style={s.lockIconWrap}>
           <LinearGradient colors={['#F59E0B', '#F97316']} style={s.lockIconGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <MCIcon name="lock" size={26} color="#fff" />
@@ -180,13 +178,13 @@ export const LiveAccessGate: React.FC<Props> = ({
             : `Envoie le cadeau requis pour regarder.`}
         </Text>
 
-        {/* Condition affichÃ©e */}
+        {/* Condition affichee */}
         <View style={[s.conditionBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
           {isCoins ? (
             <View style={s.conditionRow}>
-              <Text style={s.conditionEmoji}>ðŸª™</Text>
+              <Text style={s.conditionEmoji}>🪙</Text>
               <View style={{ flex: 1 }}>
-                <Text style={[s.conditionLabel, { color: colors.textPrimary }]}>Prix d'accÃ¨s</Text>
+                <Text style={[s.conditionLabel, { color: colors.textPrimary }]}>Prix d'acces</Text>
                 <Text style={[s.conditionValue, { color: '#F59E0B' }]}>{requiredCoins} coins</Text>
               </View>
             </View>
@@ -236,7 +234,7 @@ export const LiveAccessGate: React.FC<Props> = ({
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
-                <Text style={s.actionBtnEmoji}>{isCoins ? 'ðŸª™' : requiredGiftEmoji}</Text>
+                <Text style={s.actionBtnEmoji}>{isCoins ? '🪙' : requiredGiftEmoji}</Text>
                 <Text style={s.actionBtnText}>
                   {isCoins ? `Payer ${requiredCoins} coins` : `Envoyer ${requiredGiftName}`}
                 </Text>
@@ -256,13 +254,11 @@ export const LiveAccessGate: React.FC<Props> = ({
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
 
-  // â”€â”€ Fond preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   bgPreview:  { ...StyleSheet.absoluteFill },
   bgAvatar:   { width: '100%', height: '100%', resizeMode: 'cover' },
   bgFallback: { flex: 1, backgroundColor: '#1a1a2e' },
   bgOverlay:  { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.72)' },
 
-  // â”€â”€ Bouton retour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   backBtn: { position: 'absolute', top: 52, left: 16, zIndex: 10 },
   backBtnInner: {
     width: 38, height: 38, borderRadius: 19,
@@ -270,7 +266,6 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // â”€â”€ Host row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   hostRow: {
     position: 'absolute', top: 52, left: 70, right: 16, zIndex: 10,
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -283,7 +278,6 @@ const s = StyleSheet.create({
   liveDot:           { width: 5, height: 5, borderRadius: 3, backgroundColor: '#fff' },
   livePillText:      { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
 
-  // â”€â”€ Carte d'accÃ¨s â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   gateCard: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,

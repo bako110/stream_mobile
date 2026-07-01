@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, RefreshControl, Image, Alert,
@@ -16,8 +16,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { SkeletonFeed, BackButton } from '../../components/common';
 import { notificationService, NotifItem } from '../../services/notificationService';
 import { useWs } from '../../context/WebSocketContext';
-import { offlineCacheService, CachedNotification } from '../../services/offlineCacheService';
-import { useNetwork } from '../../context/NetworkContext';
 
 // ── Config visuelle ────────────────────────────────────────────────────────────
 
@@ -67,76 +65,30 @@ function timeAgo(iso: string): string {
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
-// Convertit un CachedNotification (stocké par FCM) en NotifItem (format screen)
-function cachedToNotifItem(n: CachedNotification): NotifItem {
-  return {
-    id:                n.id,
-    notification_type: n.notification_type,
-    title:             n.title,
-    body:              n.body,
-    ref_id:            n.ref_id,
-    ref_type:          n.ref_type,
-    is_read:           n.is_read,
-    created_at:        n.created_at,
-    actor:             n.actor ?? null,
-  };
-}
-
 export const NotificationsScreen: React.FC = () => {
   const { theme }  = useTheme();
   const { colors, fontSize } = theme;
   const nav = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { addListener, removeListener, clearUnreadNotifications } = useWs();
-  const { isOnline, isInternetReachable } = useNetwork();
 
-  // Init immédiate depuis le cache offline — aucun spinner si données connues
-  const [items,       setItems]       = useState<NotifItem[]>(() => {
-    const cached = offlineCacheService.getNotifications();
-    return cached ? cached.map(cachedToNotifItem) : [];
-  });
-  const [loading,     setLoading]     = useState(() => (offlineCacheService.getNotifications()?.length ?? 0) === 0);
+  const [items,       setItems]       = useState<any[]>([]);
+  const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [page,        setPage]        = useState(1);
   const [hasMore,     setHasMore]     = useState(true);
   const [filter,      setFilter]      = useState<'all' | 'unread'>('all');
   const [selectMode,  setSelectMode]  = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  // Nombre de notifs reçues offline (banniere de reconnexion)
-  const [offlineCount, setOfflineCount] = useState(0);
   const loadingMore = useRef(false);
-  const wasOffline  = useRef(!isOnline || !isInternetReachable);
 
   const load = useCallback(async (p = 1, refresh = false) => {
-    // Mode offline : servir le cache directement sans spinner
-    if (!isOnline || !isInternetReachable) {
-      const cached = offlineCacheService.getNotifications();
-      if (cached) setItems(cached.map(cachedToNotifItem));
-      setLoading(false);
-      if (refresh) setRefreshing(false);
-      return;
-    }
     try {
       const data = await notificationService.getList(p, 30, filter === 'unread');
       if (refresh || p === 1) {
         setItems(data);
         setPage(1);
         clearUnreadNotifications();
-        // Synchroniser le cache avec les données fraîches du serveur
-        const asCached: CachedNotification[] = data.map(d => ({
-          id:                d.id,
-          notification_type: d.notification_type,
-          title:             d.title,
-          body:              d.body,
-          ref_id:            d.ref_id,
-          ref_type:          d.ref_type,
-          is_read:           d.is_read,
-          created_at:        d.created_at,
-          actor:             d.actor ?? null,
-        }));
-        offlineCacheService.saveNotifications(asCached);
-        offlineCacheService.clearBadge();
-        setOfflineCount(0);
       } else {
         setItems(prev => {
           const ids = new Set(prev.map(x => x.id));
@@ -146,26 +98,12 @@ export const NotificationsScreen: React.FC = () => {
       }
       setHasMore(data.length >= 30);
     } catch {
-      // Erreur réseau — garder le cache visible
-      const cached = offlineCacheService.getNotifications();
-      if (cached) setItems(cached.map(cachedToNotifItem));
     } finally {
       setLoading(false);
       setRefreshing(false);
       loadingMore.current = false;
     }
-  }, [filter, clearUnreadNotifications, isOnline, isInternetReachable]);
-
-  // Quand on revient online après une coupure : afficher la bannière + recharger
-  useEffect(() => {
-    const online = isOnline && isInternetReachable;
-    if (online && wasOffline.current) {
-      const cnt = offlineCacheService.getOfflineUnreadCount();
-      if (cnt > 0) setOfflineCount(cnt);
-      load(1, true);
-    }
-    wasOffline.current = !online;
-  }, [isOnline, isInternetReachable]);
+  }, [filter, clearUnreadNotifications]);
 
   useEffect(() => { setLoading(true); load(1); }, [filter]);
 
@@ -304,21 +242,6 @@ export const NotificationsScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Banniere reconnexion — notifs manquees pendant deconnexion */}
-      {offlineCount > 0 && (
-        <TouchableOpacity
-          style={[s.offlineBanner, { backgroundColor: colors.primary }]}
-          onPress={() => { setOfflineCount(0); offlineCacheService.markAllNotificationsRead(); }}
-          activeOpacity={0.85}
-        >
-          <Icon name="wifi" size={14} color="#fff" />
-          <Text style={s.offlineBannerText}>
-            {offlineCount} notification{offlineCount > 1 ? 's' : ''} reçue{offlineCount > 1 ? 's' : ''} hors connexion
-          </Text>
-          <Icon name="x" size={14} color="rgba(255,255,255,0.7)" />
-        </TouchableOpacity>
-      )}
-
       {/* Header */}
       <LinearGradient colors={[colors.surface, colors.background]} style={[s.header, { paddingTop: insets.top + 12 }]}>
         {/* Ligne 1 : retour + titre + badge */}
@@ -595,14 +518,6 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  offlineBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 10,
-  },
-  offlineBannerText: {
-    flex: 1, color: '#fff', fontSize: 13, fontWeight: '600',
-  },
-
   header: {
     flexDirection: 'column',
     paddingHorizontal: 16, paddingBottom: 12,

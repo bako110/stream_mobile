@@ -20,7 +20,7 @@ export const postService = {
     return res.data;
   },
 
-  async update(id: string, data: { body?: string; feeling?: string }): Promise<Post> {
+  async update(id: string, data: { body?: string; feeling?: string; music_url?: string | null; music_title?: string | null }): Promise<Post> {
     const res = await apiClient.put<Post>(Endpoints.posts.update(id), data);
     return res.data;
   },

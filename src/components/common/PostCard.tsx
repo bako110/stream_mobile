@@ -29,6 +29,7 @@ import { ReportModal } from './ReportModal';
 import { LikersBottomSheet } from './LikersBottomSheet';
 import { FriendsWhoLiked } from './FriendsWhoLiked';
 import { LinkPreviewCard } from './LinkPreviewCard';
+import { CachedImage } from './CachedImage';
 
 const { width: SW } = Dimensions.get('window');
 const GAP    = 2;
@@ -63,8 +64,8 @@ const ImgTile: React.FC<{
           style={StyleSheet.absoluteFill}
         />
       )}
-      <Image
-        source={{ uri }}
+      <CachedImage
+        uri={uri}
         style={[{ width: '100%', height: '100%' }, !loaded && { opacity: 0 }]}
         resizeMode="cover"
         onLoad={() => setLoaded(true)}
@@ -297,7 +298,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
                 isActive={isActive}
               />
             ) : images.length === 1 ? (
-              <Image source={{ uri: images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
             ) : (
               <ImageGrid
                 urls={images}
@@ -344,7 +345,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
         <TouchableOpacity style={pc.headerLeft} activeOpacity={0.75} onPress={onAuthorPress}>
           <View style={pc.avatarWrap}>
             {author?.avatar_url ? (
-              <Image source={{ uri: author.avatar_url }} style={pc.avatar} />
+              <CachedImage uri={author.avatar_url} style={pc.avatar} />
             ) : (
               <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={pc.avatar}>
                 <Text style={[pc.avatarText, { fontSize: 15 }]}>{initials}</Text>

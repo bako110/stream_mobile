@@ -1,4 +1,4 @@
-/**
+﻿/**
  * UserProfileScreen — profil public complet style Facebook
  * - Banner + avatar + infos complètes
  * - Stats (abonnés/abonnements)
@@ -20,8 +20,6 @@ import { BackButton, SkeletonUserProfile, VerifiedBadge } from '../../components
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { postService } from '../../services/postService';
-import { offlineCacheService } from '../../services/offlineCacheService';
-import { useNetwork } from '../../context/NetworkContext';
 import { useWs } from '../../context/WebSocketContext';
 import type { UserPublicProfile, UserPublic } from '../../types/user';
 import type { Event } from '../../types/event';
@@ -49,12 +47,11 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors } = theme;
   const { userId } = route.params;
   const { currentUser } = useUser();
-  const { isOnline, isInternetReachable } = useNetwork();
   const { lastPresenceUpdate } = useWs();
 
-  const [profile, setProfile]   = useState<UserPublicProfile | null>(() => offlineCacheService.getUserProfile(userId));
+  const [profile, setProfile]   = useState<UserPublicProfile | null>(null);
   const [profileIsOnline, setProfileIsOnline] = useState<boolean | null>(null);
-  const [loading, setLoading]   = useState(() => !offlineCacheService.getUserProfile(userId));
+  const [loading, setLoading]   = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
   const [showList, setShowList] = useState<'followers' | 'following' | null>(null);
   const [listUsers, setListUsers] = useState<UserPublic[]>([]);
@@ -75,16 +72,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const [friends, setFriends] = useState<UserPublic[]>([]);
 
   const load = useCallback(async () => {
-    // Offline : servir le cache directement
-    if (!isOnline || !isInternetReachable) {
-      const cached = offlineCacheService.getUserProfile(userId);
-      if (cached) setProfile(cached);
-      setLoading(false);
-      return;
-    }
     try {
-      const meId = currentUser ? String(currentUser.id) : null;
-
       const [p, me, followersRes, followingRes] = await Promise.allSettled([
         userService.getPublicProfile(userId),
         authService.getMe(),
@@ -93,7 +81,6 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       ]);
       if (p.status === 'fulfilled') {
         setProfile(p.value);
-        offlineCacheService.saveUserProfile(userId, p.value);
       } else if (me.status === 'fulfilled') {
         const m = me.value;
         const followersCount = followersRes.status === 'fulfilled' ? followersRes.value.length : 0;
@@ -139,13 +126,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       if (posts.status === 'fulfilled')  setUserPosts(posts.value);
       setFriends(followingList.slice(0, 10));
       setContentLoading(false);
-    } catch (e) {
-      // Erreur réseau — fallback cache silencieux
-      const cached = offlineCacheService.getUserProfile(userId);
-      if (cached) setProfile(cached);
-    }
+    } catch { /**/ }
     finally { setLoading(false); }
-  }, [userId, isOnline, isInternetReachable]);
+  }, [userId]);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => { load(); });

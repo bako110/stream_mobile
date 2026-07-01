@@ -7,10 +7,11 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { StoryViewer } from './StoryViewer';
 import { StoryCreator } from './StoryCreator';
-import { VerifiedBadge } from '../common';
+import { VerifiedBadge, CachedImage } from '../common';
 import { storyService, getViewedStories } from '../../services/storyService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { cacheInBackground } from '../../services/videoCacheService';
+import { networkService } from '../../services/networkService';
 import { useWs } from '../../context/WebSocketContext';
 import type { Story } from '../../types/story';
 import type { StoryGroup } from '../../types/story';
@@ -78,22 +79,27 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
       }
 
       setGroups(data);
-      // Précharger thumbnails + images des 10 premiers groupes
-      data.slice(0, 10).forEach(g => {
+      // Précharger thumbnails + images des premiers groupes — réduit hors wifi
+      const onWifi = networkService.isWifi();
+      const prefetchGroups = onWifi ? 10 : 3;
+      data.slice(0, prefetchGroups).forEach(g => {
         g.stories.slice(0, 2).forEach(st => {
           if (st.thumbnail_url) Image.prefetch(st.thumbnail_url).catch(() => {});
           else if (st.media_url && st.media_type === 'image') Image.prefetch(st.media_url).catch(() => {});
         });
       });
-      // Télécharger les vidéos des 5 premiers groupes en cache local (offline ready)
+      // Télécharger les vidéos des premiers groupes en cache local (offline ready)
       // HLS (.m3u8) ignoré par cacheInBackground — seuls les MP4 directs sont cachés
-      data.slice(0, 5).forEach(g => {
-        g.stories.forEach(st => {
-          if (st.media_type === 'video' && st.media_url) {
-            cacheInBackground(st.media_url).catch(() => {});
-          }
+      // Désactivé hors wifi : ce sont des vidéos complètes, coûteux en 4G
+      if (onWifi) {
+        data.slice(0, 5).forEach(g => {
+          g.stories.forEach(st => {
+            if (st.media_type === 'video' && st.media_url) {
+              cacheInBackground(st.media_url).catch(() => {});
+            }
+          });
         });
-      });
+      }
     } catch (e) {
       __DEV__ && console.error('[StoryBar] getFeed error:', e);
     } finally { setLoading(false); }
@@ -158,7 +164,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           >
             {/* Fond : thumbnail si story existante, sinon couleur secondaire */}
             {myThumb ? (
-              <Image source={{ uri: myThumb }} style={[s.cardBg, { width: CARD_W, height: CARD_H }]} resizeMode="cover" />
+              <CachedImage uri={myThumb} style={[s.cardBg, { width: CARD_W, height: CARD_H }]} resizeMode="cover" />
             ) : myBg ? (
               <View style={[s.cardBg, { backgroundColor: myBg }]} />
             ) : (
@@ -186,7 +192,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                 <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.cardAvatarRing}>
                   <View style={s.cardAvatarInner}>
                     {currentUser?.avatar_url
-                      ? <Image source={{ uri: currentUser.avatar_url }} style={s.cardAvatar} />
+                      ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
                       : <View style={[s.cardAvatarFallback, { backgroundColor: '#7B3FF2' }]}>
                           <Text style={s.cardAvatarInitial}>{initials}</Text>
                         </View>
@@ -197,7 +203,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                 // Pas de story → avatar simple sans ring
                 <View style={s.cardAvatarInner}>
                   {currentUser?.avatar_url
-                    ? <Image source={{ uri: currentUser.avatar_url }} style={s.cardAvatar} />
+                    ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
                     : <View style={[s.cardAvatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#e0e0e0' }]}>
                         <Text style={[s.cardAvatarInitial, { color: colors.primary ?? '#7B3FF2' }]}>{initials}</Text>
                       </View>
@@ -250,8 +256,8 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
               >
                 {/* Fond card */}
                 {thumb ? (
-                  <Image
-                    source={{ uri: thumb }}
+                  <CachedImage
+                    uri={thumb}
                     style={[s.cardBg, { width: CARD_W, height: CARD_H }, seen && { opacity: 0.65 }]}
                     resizeMode="cover"
                   />
@@ -289,7 +295,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                 <View style={s.cardAvatarWrap}>
                   <View style={s.cardMiniAvatarInner}>
                     {user.avatar_url
-                      ? <Image source={{ uri: user.avatar_url }} style={[s.cardAvatar, seen && { opacity: 0.7 }]} />
+                      ? <CachedImage uri={user.avatar_url} style={[s.cardAvatar, seen && { opacity: 0.7 }]} />
                       : <View style={[s.cardAvatarFallback, { backgroundColor: seen ? '#aaa' : '#302B63' }]}>
                           <Text style={s.cardAvatarInitial}>{name[0]?.toUpperCase()}</Text>
                         </View>

@@ -18,9 +18,6 @@ import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { favoriteService } from '../services/favoriteService';
 import { cancelCallNotification } from '../services/fcmService';
-import { offlineCacheService } from '../services/offlineCacheService';
-import { mutationQueueService, type PendingMutation } from '../services/mutationQueueService';
-import { socialService } from '../services/socialService';
 import {
   createWsEventHandler,
   type NewFollowerPayload,
@@ -176,7 +173,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   const [isConnected,         setIsConnected]         = useState(false);
   const [unreadMessages,      setUnreadMessages]      = useState(0);
   const [unreadActivity,      setUnreadActivity]      = useState(0);
-  const [unreadNotifications, setUnreadNotifications] = useState(() => offlineCacheService.getBadge());
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [missedCallCount,     setMissedCallCount]     = useState(0);
   const [pendingIncomingCall, setPendingIncomingCall] = useState<IncomingCallPayload | null>(null);
 
@@ -208,8 +205,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     onCommentOnContent:   (d) => { if (isMounted.current) { setLastCommentOnContent(d); setUnreadActivity(n => n + 1); } },
     onReactionOnContent:  (d) => { if (isMounted.current) { setLastReactionOnContent(d); setUnreadActivity(n => n + 1); } },
     onNewFollower:        (d) => { if (isMounted.current) { setLastNewFollower(d); setUnreadActivity(n => n + 1); } },
-    onCoinTransferReceived: (d) => { if (isMounted.current) { setLastCoinTransfer(d); setUnreadNotifications(n => { const next = n + 1; offlineCacheService.saveBadge(next); return next; }); } },
-    onGiftReceived:       (d) => { if (isMounted.current) { setLastGiftReceived(d); setUnreadNotifications(n => { const next = n + 1; offlineCacheService.saveBadge(next); return next; }); } },
+    onCoinTransferReceived: (d) => { if (isMounted.current) { setLastCoinTransfer(d); setUnreadNotifications(n => n + 1); } },
+    onGiftReceived:       (d) => { if (isMounted.current) { setLastGiftReceived(d); setUnreadNotifications(n => n + 1); } },
     onPresence:           (d) => { if (isMounted.current) setLastPresenceUpdate(d); },
     onConcertLive:        (d) => { if (isMounted.current) setLastConcertLive(d); },
     onConcertEnded:       ()  => { /* le feed se recharge via onFeedUpdated */ },
@@ -217,7 +214,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     onLiveEnded:          (id) => { if (isMounted.current) setLastLiveEnded(id); },
     onLiveViewersUpdated: (d) => { if (isMounted.current) setLastLiveViewersUpdated(d); },
     onActivity:           ()  => { if (isMounted.current) setUnreadActivity(n => n + 1); },
-    onNotification:       ()  => { if (isMounted.current) setUnreadNotifications(n => { const next = n + 1; offlineCacheService.saveBadge(next); return next; }); },
+    onNotification:       ()  => { if (isMounted.current) setUnreadNotifications(n => n + 1); },
   }));
 
   // CallScreen appelle drainCallBuffer au montage pour récupérer les events reçus avant lui
@@ -353,21 +350,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
       }).catch(() => {});
       if (isMounted.current) refreshUnreadRef.current();
       favoriteService.syncFromServer().catch(() => {});
-      // Rejouer les mutations offline en attente
-      mutationQueueService.flush(async (m: PendingMutation) => {
-        switch (m.type) {
-          case 'like_reel':     await socialService.toggleReaction({ reaction_type: 'like', reel_id: m.payload.id }); break;
-          case 'unlike_reel':   await socialService.toggleReaction({ reaction_type: 'like', reel_id: m.payload.id }); break;
-          case 'like_post':     await socialService.toggleReaction({ reaction_type: 'like', post_id: m.payload.id }); break;
-          case 'unlike_post':   await socialService.toggleReaction({ reaction_type: 'like', post_id: m.payload.id }); break;
-          case 'like_event':    await socialService.toggleReaction({ reaction_type: 'like', event_id: m.payload.id }); break;
-          case 'unlike_event':  await socialService.toggleReaction({ reaction_type: 'like', event_id: m.payload.id }); break;
-          case 'like_concert':  await socialService.toggleReaction({ reaction_type: 'like', concert_id: m.payload.id }); break;
-          case 'unlike_concert':await socialService.toggleReaction({ reaction_type: 'like', concert_id: m.payload.id }); break;
-          case 'send_message':  await messageService.sendMessage(m.payload.partnerId, m.payload.content, m.payload.messageType); break;
-          default: break;
-        }
-      }).catch(() => {});
       if (pingTimer.current) clearInterval(pingTimer.current);
       pingTimer.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
@@ -553,10 +535,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
 
   const clearUnreadMessages      = useCallback(() => setUnreadMessages(0), []);
   const clearUnreadActivity      = useCallback(() => setUnreadActivity(0), []);
-  const clearUnreadNotifications = useCallback(() => {
-    setUnreadNotifications(0);
-    offlineCacheService.clearBadge();
-  }, []);
+  const clearUnreadNotifications = useCallback(() => setUnreadNotifications(0), []);
   const clearMissedCalls         = useCallback(() => setMissedCallCount(0), []);
 
   const sendMessage = useCallback((payload: object, _retryMs = 0) => {

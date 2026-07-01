@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   StatusBar, Platform, ActivityIndicator, TextInput, FlatList,
@@ -7,6 +7,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Sound from 'react-native-sound';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import type { AppColors } from '../../theme/colors';
@@ -59,6 +60,32 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
   const [tracks, setTracks] = useState<OnlineTrack[]>([]);
   const [loading, setLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const soundRef = useRef<Sound | null>(null);
+
+  const stopPreview = useCallback(() => {
+    if (soundRef.current) {
+      soundRef.current.stop(() => { soundRef.current?.release(); soundRef.current = null; });
+    }
+    setPlayingId(null);
+    setLoadingId(null);
+  }, []);
+
+  const togglePreview = useCallback((track: OnlineTrack) => {
+    if (playingId === track.id) { stopPreview(); return; }
+    stopPreview();
+    setLoadingId(track.id);
+    Sound.setCategory('Playback');
+    const snd = new Sound(track.url, '', err => {
+      setLoadingId(null);
+      if (err) return;
+      soundRef.current = snd;
+      setPlayingId(track.id);
+      snd.play(success => { if (!success || playingId === track.id) setPlayingId(null); });
+    });
+  }, [playingId, stopPreview]);
+
+  useEffect(() => () => { stopPreview(); }, [stopPreview]);
 
   const loadPopular = useCallback(async () => {
     setLoading(true);
@@ -96,6 +123,7 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
   }, [search, tab]);
 
   const handleSelect = (track: OnlineTrack) => {
+    stopPreview();
     onSelectOnline(track.url, track.title);
     apiClient.post(Endpoints.sounds.use(track.id)).catch(() => {});
   };
@@ -160,6 +188,7 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
               const mins = Math.floor(item.duration / 60);
               const secs = Math.floor(item.duration % 60);
               const isPlaying = playingId === item.id;
+              const isLoading = loadingId === item.id;
               return (
                 <TouchableOpacity
                   style={[sp.trackRow, { borderBottomColor: colors.divider ?? colors.border }]}
@@ -167,7 +196,7 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
                   activeOpacity={0.7}
                 >
                   <View style={[sp.trackThumb, { backgroundColor: colors.backgroundSecondary ?? '#1a1a2e' }]}>
-                    <MaterialIcon name="music-note" size={18} color={colors.primary} />
+                    <MaterialIcon name={isPlaying ? 'music-note-eighth' : 'music-note'} size={18} color={colors.primary} />
                   </View>
                   <View style={sp.trackInfo}>
                     <Text style={[sp.trackTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
@@ -179,10 +208,14 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
                     <Text style={[sp.trackDur, { color: colors.textTertiary }]}>{mins}:{String(secs).padStart(2, '0')}</Text>
                   )}
                   <TouchableOpacity
-                    style={[sp.trackPlayBtn, { backgroundColor: colors.backgroundSecondary ?? 'rgba(255,255,255,0.1)' }]}
-                    onPress={() => setPlayingId(prev => prev === item.id ? null : item.id)}
+                    style={[sp.trackPlayBtn, { backgroundColor: isPlaying ? colors.primary + '33' : (colors.backgroundSecondary ?? 'rgba(255,255,255,0.1)') }]}
+                    onPress={() => togglePreview(item)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Icon name={isPlaying ? 'pause' : 'play'} size={14} color={colors.primary} />
+                    {isLoading
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <Icon name={isPlaying ? 'pause' : 'play'} size={14} color={colors.primary} />
+                    }
                   </TouchableOpacity>
                 </TouchableOpacity>
               );

@@ -23,7 +23,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage } from '../../components/common';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
@@ -38,6 +38,7 @@ import { communityService } from '../../services/communityService';
 import type { CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
+import { networkService } from '../../services/networkService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import type { User } from '../../types/user';
 import type { SearchResults } from '../../types/search';
@@ -108,19 +109,43 @@ interface AdData {
   format: string;
 }
 
-const AdVideoCreative: React.FC<{ uri: string; thumbnailUri?: string }> = ({ uri }) => {
+const AdVideoCreative: React.FC<{ uri: string; thumbnailUri?: string; isVisible: boolean }> = ({ uri, thumbnailUri, isVisible }) => {
   const [muted, setMuted] = useState(true);
-  const player = useVideoPlayer({ uri }, p => {
+  const everVisibleRef = useRef(false);
+  if (isVisible) everVisibleRef.current = true;
+
+  // Ne charge le flux vidéo qu'une fois la pub devenue visible au moins une fois —
+  // évite de streamer une vidéo qui n'a jamais été vue.
+  const videoSource = useMemo(
+    () => (everVisibleRef.current ? { uri } : 'about:blank'),
+    [uri, everVisibleRef.current],
+  );
+
+  const player = useVideoPlayer(videoSource, p => {
     p.loop = true;
     p.muted = true;
-    p.play();
   });
+
+  // Joue/pause selon la visibilité réelle à l'écran — coupe le stream hors champ
+  useEffect(() => {
+    if (isVisible) player.play();
+    else player.pause();
+  }, [isVisible, player]);
+
   const toggleMute = useCallback(() => {
     setMuted(m => {
       player.muted = !m;
       return !m;
     });
   }, [player]);
+
+  if (!everVisibleRef.current) {
+    // Avant la première apparition à l'écran : thumbnail statique seulement
+    return thumbnailUri ? (
+      <CachedImage uri={thumbnailUri} style={adSt.image} resizeMode="cover" />
+    ) : null;
+  }
+
   return (
     <View style={{ position: 'relative' }}>
       <VideoView
@@ -140,8 +165,8 @@ const AdVideoCreative: React.FC<{ uri: string; thumbnailUri?: string }> = ({ uri
   );
 };
 
-const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: string) => void; onPress: (id: string, url: string) => void }> = React.memo(
-  ({ ad, colors, onImpression, onPress }) => {
+const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onImpression: (id: string) => void; onPress: (id: string, url: string) => void }> = React.memo(
+  ({ ad, colors, isVisible, onImpression, onPress }) => {
     const firedRef = useRef<string | null>(null);
     useEffect(() => {
       if (ad?.id && firedRef.current !== ad.id) {
@@ -186,9 +211,9 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; onImpression: (id: strin
         {/* ── Créatif : vidéo ou image ── */}
         {hasCreative ? (
           isVideo ? (
-            <AdVideoCreative uri={creativeUri!} thumbnailUri={ad.thumbnail_url} />
+            <AdVideoCreative uri={creativeUri!} thumbnailUri={ad.thumbnail_url} isVisible={isVisible} />
           ) : (
-            <Image source={{ uri: creativeUri! }} style={adSt.image} resizeMode="cover" />
+            <CachedImage uri={creativeUri!} style={adSt.image} resizeMode="cover" />
           )
         ) : (
           <View style={[adSt.imagePlaceholder, { backgroundColor: colors.primary + '14' }]}>
@@ -267,7 +292,7 @@ const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
     <TouchableOpacity style={{ width: 130, borderRadius: 14, overflow: 'hidden', backgroundColor: surfaceColor }} activeOpacity={0.85} onPress={onPress}>
       <View style={{ width: 130, height: 170, position: 'relative' }}>
         {c.thumbnail_url
-          ? <Image source={{ uri: c.thumbnail_url }} style={{ width: 130, height: 170 }} />
+          ? <CachedImage uri={c.thumbnail_url} style={{ width: 130, height: 170 }} />
           : <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ width: 130, height: 170, alignItems: 'center', justifyContent: 'center' }}><Icon name="radio" size={28} color="#fff" /></LinearGradient>
         }
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
@@ -283,7 +308,7 @@ const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
           <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{c.title}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
             {artist?.avatar_url
-              ? <Image source={{ uri: artist.avatar_url }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+              ? <CachedImage uri={artist.avatar_url} style={{ width: 14, height: 14, borderRadius: 7 }} />
               : <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{initial}</Text></View>
             }
             <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }} numberOfLines={1}>{artistName}</Text>
@@ -393,7 +418,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                 >
                   <View style={{ width: 110, height: 150, position: 'relative' }}>
                     {live.thumbnail_url ? (
-                      <Image source={{ uri: live.thumbnail_url }} style={{ width: 110, height: 150 }} resizeMode="cover" />
+                      <CachedImage uri={live.thumbnail_url} style={{ width: 110, height: 150 }} resizeMode="cover" />
                     ) : (
                       <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={{ width: 110, height: 150, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 40, fontWeight: '900' }}>{liveInitial}</Text>
@@ -423,7 +448,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
 
                     {/* Avatar centré */}
                     {live.user?.avatar_url
-                      ? <Image source={{ uri: live.user.avatar_url }} style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }} />
+                      ? <CachedImage uri={live.user.avatar_url} style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }} />
                       : <View style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' }}>
                           <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{liveInitial}</Text>
                         </View>
@@ -463,7 +488,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                 <View key={ev.id} style={[nbS.card, { width: NCARD_W, backgroundColor: colors.surface, borderColor: colors.divider }]}>
                   <TouchableOpacity activeOpacity={0.9} onPress={() => onNavEvent(ev.id)}>
                     {ev.thumbnail_url ? (
-                      <Image source={{ uri: ev.thumbnail_url }} style={{ width: NCARD_W, height: NCOVER_H }} resizeMode="cover" />
+                      <CachedImage uri={ev.thumbnail_url} style={{ width: NCARD_W, height: NCOVER_H }} resizeMode="cover" />
                     ) : (
                       <LinearGradient colors={[typeColor + 'DD', typeColor + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: NCARD_W, height: NCOVER_H, alignItems: 'center', justifyContent: 'center' }}>
                         <Icon name={typeIcon} size={28} color="rgba(255,255,255,0.7)" />
@@ -629,6 +654,7 @@ export const FeedScreen: React.FC = () => {
     minimumViewTime: 200,              // évite les faux positifs au scroll rapide
   }).current;
   const [activeReelRowId, setActiveReelRowId] = useState<string | null>(null);
+  const [adVisible, setAdVisible] = useState(false);
 
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     setActiveReelId(null);
@@ -648,6 +674,9 @@ export const FeedScreen: React.FC = () => {
       v.item?.kind === 'post' && ((v.item?.data as Post)?.hls_url ?? (v.item?.data as Post)?.video_url),
     );
     setActivePostId(postItem ? postItem.item.id : null);
+
+    // Pub vidéo : ne joue que quand réellement visible à l'écran (coupe le stream sinon)
+    setAdVisible(viewableItems.some(v => v.item?.kind === 'ad'));
   }).current;
 
   // Tab underline animation
@@ -784,10 +813,15 @@ export const FeedScreen: React.FC = () => {
 
     try {
       if (f === 'all') {
+        // Charge moins en 4G/5G (hors wifi) pour limiter la conso data au premier écran
+        const onWifi = networkService.isWifi();
+        const feedLimit  = onWifi ? 30 : 15;
+        const reelsLimit = onWifi ? 20 : 10;
+        const postsLimit = onWifi ? 20 : 10;
         const [feedResult, reelsResult, postsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
-          searchService.getFeed(1, 50).catch(() => ({ items: [] })),
-          reelService.getFeed().catch(() => ({ items: [], has_more: false, page: 1 })),
-          postService.getFeed(1, 30).catch(() => [] as Post[]),
+          searchService.getFeed(1, feedLimit).catch(() => ({ items: [] })),
+          reelService.getFeed({ limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: 1 })),
+          postService.getFeed(1, postsLimit).catch(() => [] as Post[]),
           communityService.list(1, 8).catch(() => []),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
@@ -1213,7 +1247,7 @@ export const FeedScreen: React.FC = () => {
                 >
                   {/* Cover — bannière ou gradient */}
                   {comm.banner_url
-                    ? <Image source={{ uri: comm.banner_url }} style={[cs.cover, { height: COVER_H }]} resizeMode="cover" />
+                    ? <CachedImage uri={comm.banner_url} style={[cs.cover, { height: COVER_H }]} resizeMode="cover" />
                     : <LinearGradient colors={grad} style={[cs.cover, { height: COVER_H }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
                   }
                   {/* Badges privé / vérifié */}
@@ -1224,7 +1258,7 @@ export const FeedScreen: React.FC = () => {
                   {/* Avatar chevauchant — même style que PeopleSuggestions */}
                   <View style={[cs.avatarWrap, { width: AVT_SZ + 4, height: AVT_SZ + 4, borderRadius: (AVT_SZ + 4) / 2, borderColor: colors.background, marginTop: -(AVT_SZ / 2) }]}>
                     {comm.avatar_url
-                      ? <Image source={{ uri: comm.avatar_url }} style={{ width: AVT_SZ, height: AVT_SZ, borderRadius: AVT_SZ / 2 }} />
+                      ? <CachedImage uri={comm.avatar_url} style={{ width: AVT_SZ, height: AVT_SZ, borderRadius: AVT_SZ / 2 }} />
                       : <LinearGradient colors={grad} style={{ width: AVT_SZ, height: AVT_SZ, borderRadius: AVT_SZ / 2, alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ color: '#fff', fontWeight: '800', fontSize: AVT_SZ * 0.38 }}>{initial}</Text>
                         </LinearGradient>
@@ -1261,6 +1295,7 @@ export const FeedScreen: React.FC = () => {
         <AdCard
           ad={currentAdData}
           colors={colors}
+          isVisible={adVisible}
           onImpression={handleAdImpression}
           onPress={handleAdPress}
         />
@@ -1354,7 +1389,7 @@ export const FeedScreen: React.FC = () => {
                 onPress={() => currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id })}
               >
                 {currentUser.avatar_url ? (
-                  <Image source={{ uri: currentUser.avatar_url }} style={s.avatar} />
+                  <CachedImage uri={currentUser.avatar_url} style={s.avatar} />
                 ) : (
                   <View style={[s.avatarFallback, { backgroundColor: colors.primary + '22' }]}>
                     <Text style={[s.avatarText, { color: colors.primary }]}>{initials}</Text>
@@ -1516,7 +1551,7 @@ export const FeedScreen: React.FC = () => {
 
             const SrThumb = ({ uri, icon, accent, round }: { uri?: string | null; icon: string; accent: string; round?: boolean }) =>
               uri ? (
-                <Image source={{ uri }} style={{ width: 52, height: 52, borderRadius: round ? 26 : 12 }} />
+                <CachedImage uri={uri} style={{ width: 52, height: 52, borderRadius: round ? 26 : 12 }} />
               ) : (
                 <View style={{ width: 52, height: 52, borderRadius: round ? 26 : 12, backgroundColor: accent + '20', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name={icon} size={20} color={accent} />
@@ -1779,7 +1814,7 @@ export const FeedScreen: React.FC = () => {
                       {searchResults!.users!.map((u: any, i: number) => (
                         <SrRow key={u.id} onPress={() => { closeSearch(); (nav as any).navigate('UserProfile', { userId: u.id }); }} last={i === searchResults!.users!.length - 1}>
                           {u.avatar_url ? (
-                            <Image source={{ uri: u.avatar_url }} style={{ width: 52, height: 52, borderRadius: 26 }} />
+                            <CachedImage uri={u.avatar_url} style={{ width: 52, height: 52, borderRadius: 26 }} />
                           ) : (
                             <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#7B3FF2' + '20', alignItems: 'center', justifyContent: 'center' }}>
                               <Text style={{ fontSize: 20, fontWeight: '800', color: '#7B3FF2' }}>{((u.display_name ?? u.username ?? '?')[0] ?? '?').toUpperCase()}</Text>
@@ -2054,7 +2089,7 @@ export const FeedScreen: React.FC = () => {
                 onPress={() => { setMenuOpen(false); nav.navigate('EditProfile' as any); }}
               >
                 {currentUser.avatar_url ? (
-                  <Image source={{ uri: currentUser.avatar_url }} style={mnu.profileAvatar} />
+                  <CachedImage uri={currentUser.avatar_url} style={mnu.profileAvatar} />
                 ) : (
                   <View style={[mnu.profileAvatar, { backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }]}>
                     <Text style={{ fontSize: 22, fontWeight: '800', color: colors.primary }}>
@@ -2270,7 +2305,7 @@ const MiniReelPlayer: React.FC<{
           surfaceType="texture"
         />
       ) : reel.thumbnail_url ? (
-        <Image source={{ uri: reel.thumbnail_url }} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} resizeMode="cover" />
+        <CachedImage uri={reel.thumbnail_url} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} resizeMode="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: 14 }]}>
           <Icon name="film" size={28} color="rgba(255,255,255,0.18)" />
@@ -2324,7 +2359,7 @@ const MiniReelPlayer: React.FC<{
       <View style={rrS.thumbBottom}>
         <View style={rrS.thumbAuthor}>
           {author?.avatar_url ? (
-            <Image source={{ uri: author.avatar_url }} style={rrS.thumbAvatar} />
+            <CachedImage uri={author.avatar_url} style={rrS.thumbAvatar} />
           ) : (
             <View style={[rrS.thumbAvatar, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
               <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{initials}</Text>
@@ -2490,7 +2525,7 @@ const HeroReelPlayer: React.FC<{
           surfaceType="texture"
         />
       ) : reel.thumbnail_url ? (
-        <Image source={{ uri: reel.thumbnail_url }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="cover" />
+        <CachedImage uri={reel.thumbnail_url} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: 18 }]}>
           <Icon name="film" size={48} color="rgba(255,255,255,0.18)" />
@@ -2526,7 +2561,7 @@ const HeroReelPlayer: React.FC<{
       <View style={rrS.thumbBottom}>
         <View style={rrS.thumbAuthor}>
           {author?.avatar_url ? (
-            <Image source={{ uri: author.avatar_url }} style={[rrS.thumbAvatar, rrS.thumbAvatarLarge]} />
+            <CachedImage uri={author.avatar_url} style={[rrS.thumbAvatar, rrS.thumbAvatarLarge]} />
           ) : (
             <View style={[rrS.thumbAvatar, rrS.thumbAvatarLarge, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{initials}</Text>
@@ -2599,7 +2634,7 @@ const ReelRowCard: React.FC<{
         style={[rrS.thumb, { width: w, height: h }]}
       >
         {reel.thumbnail_url ? (
-          <Image source={{ uri: reel.thumbnail_url }} style={[StyleSheet.absoluteFill, { borderRadius: br }]} resizeMode="cover" />
+          <CachedImage uri={reel.thumbnail_url} style={[StyleSheet.absoluteFill, { borderRadius: br }]} resizeMode="cover" />
         ) : (
           <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: br }]}>
             <Icon name="film" size={large ? 48 : 28} color="rgba(255,255,255,0.18)" />
@@ -2646,7 +2681,7 @@ const ReelRowCard: React.FC<{
         <View style={rrS.thumbBottom}>
           <View style={rrS.thumbAuthor}>
             {author?.avatar_url ? (
-              <Image source={{ uri: author.avatar_url }} style={[rrS.thumbAvatar, large && rrS.thumbAvatarLarge]} />
+              <CachedImage uri={author.avatar_url} style={[rrS.thumbAvatar, large && rrS.thumbAvatarLarge]} />
             ) : (
               <View style={[rrS.thumbAvatar, large && rrS.thumbAvatarLarge, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
                 <Text style={{ color: '#fff', fontSize: large ? 12 : 9, fontWeight: '800' }}>{initials}</Text>
@@ -2872,7 +2907,7 @@ const ReelFeedCard: React.FC<{
         {/* Auteur en haut */}
         <View style={rs.authorOverlay}>
           {author?.avatar_url ? (
-            <Image source={{ uri: author.avatar_url }} style={rs.avatarSm} />
+            <CachedImage uri={author.avatar_url} style={rs.avatarSm} />
           ) : (
             <View style={[rs.avatarSm, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{initials}</Text>
@@ -3338,7 +3373,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           {videoUrl ? (
             <CardVideo uri={videoUrl} playing={isActive} />
           ) : thumbUrl ? (
-            <Image source={{ uri: thumbUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <CachedImage uri={thumbUrl} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
             <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

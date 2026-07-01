@@ -119,9 +119,10 @@ export const reelService = {
    * Enregistre une vue. Appelé uniquement si watch_ratio >= 0.1 (10% visionné).
    * Fire-and-forget côté UI — ne jamais await si ce n'est pas critique.
    */
-  async recordView(id: string, watchRatio = 1.0): Promise<void> {
+  async recordView(id: string, watchRatio = 1.0, watchSeconds?: number): Promise<void> {
     await apiClient.post(Endpoints.reels.view(id), {
       watch_ratio: Math.max(0, Math.min(1, watchRatio)),
+      ...(watchSeconds != null ? { watch_seconds: Math.round(watchSeconds) } : {}),
     });
   },
 

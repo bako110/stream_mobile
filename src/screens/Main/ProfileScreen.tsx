@@ -134,11 +134,6 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
     month: 'long', year: 'numeric',
   }) : '';
 
-  // Styles locaux pour les boutons icône+label
-  const _btnCol: object  = { alignItems: 'center', gap: 4 };
-  const _btnIcon: object = { width: 42, height: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' };
-  const _btnLabel: object = { fontSize: 10, fontWeight: '600' };
-
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <QRCodeScreen visible={showQR} onClose={() => setShowQR(false)} />
@@ -154,10 +149,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-          {/* ── Bannière + Avatar ───────────────────────────────────────── */}
-          <View style={{ backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
+          {/* ── HEADER : Bannière + Avatar + Identité + Stats + Actions ── */}
+          <View style={{ backgroundColor: colors.surface }}>
+
             {/* Bannière */}
-            <View style={{ height: 140, width: '100%' }}>
+            <View style={{ height: 150, width: '100%' }}>
               {user?.banner_url ? (
                 <Image source={{ uri: user.banner_url, cache: 'reload' }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
               ) : (
@@ -167,143 +163,123 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   style={{ width: '100%', height: '100%' }}
                 />
               )}
-              {/* Nom sur la banniere */}
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.55)']}
-                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, justifyContent: 'flex-end', paddingHorizontal: 14, paddingBottom: 8 }}
-              >
-                <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.2 }} numberOfLines={1}>
-                  {displayName}
-                </Text>
-              </LinearGradient>
-
-              {/* Bouton modifier la bannière */}
+              {/* Bouton "Modifier la bannière" en haut à droite */}
               <TouchableOpacity
                 onPress={onEditProfile}
-                style={{ position: 'absolute', bottom: 8, right: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14 }}
+                style={{ position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.50)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
                 activeOpacity={0.8}
               >
                 <Icon name="camera" size={13} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Modifier</Text>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Modifier la bannière</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Avatar chevauchant */}
-            <View style={{ paddingHorizontal: 16, marginTop: -40, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 12 }}>
-              <View style={[s.avatarCircle, { borderColor: colors.surface, borderWidth: 4 }]}>
-                {user?.avatar_url ? (
-                  <Image source={{ uri: user.avatar_url, cache: 'reload' }} style={{ width: '100%', height: '100%', borderRadius: 999 }} />
-                ) : (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    style={[s.avatarGrad, { borderRadius: 999 }]}
-                  >
-                    <Text style={[s.avatarInitials, { color: colors.textOnBrand }]}>{initials}</Text>
-                  </LinearGradient>
-                )}
-              </View>
+            {/* Zone avatar + bouton "Modifier le profil" */}
+            <View style={{ paddingHorizontal: 16, marginTop: -44, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 12 }}>
+              {/* Avatar avec icone crayon */}
+              <TouchableOpacity onPress={onEditProfile} activeOpacity={0.85} style={{ position: 'relative' }}>
+                <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: colors.surface, overflow: 'hidden' }}>
+                  {user?.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url, cache: 'reload' }} style={{ width: '100%', height: '100%', borderRadius: 44 }} />
+                  ) : (
+                    <LinearGradient
+                      colors={[colors.gradientStart, colors.gradientEnd]}
+                      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ fontSize: 32, fontWeight: '900', color: colors.textOnBrand }}>{initials}</Text>
+                    </LinearGradient>
+                  )}
+                </View>
+                {/* Icone crayon sur l'avatar */}
+                <View style={{ position: 'absolute', bottom: 2, right: 2, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface }}>
+                  <Icon name="edit-2" size={10} color="#fff" />
+                </View>
+              </TouchableOpacity>
+
+              {/* Bouton "Modifier le profil" */}
               <TouchableOpacity
                 onPress={onEditProfile}
-                style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.divider, backgroundColor: colors.surface }}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>Modifier le profil</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* ── Identité ───────────────────────────────────────── */}
-          <View
-            style={[s.avatarSection, { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, paddingTop: 4 }]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-              <Text style={[s.profileName, { color: colors.textPrimary }]}>{displayName}</Text>
-              {user?.is_verified && <VerifiedBadge size={20} />}
-            </View>
-            {user?.username && (
-              <Text style={[s.profileHandle, { color: colors.primary }]}>@{user.username}</Text>
-            )}
-            {user?.bio ? (
-              <Text style={[s.profileBio, { color: colors.textSecondary }]} numberOfLines={3}>
-                {user.bio}
-              </Text>
-            ) : null}
-
-            <View style={[s.roleBadge, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}>
-              <Icon name={roleIcon} size={12} color={colors.primary} />
-              <Text style={[s.roleText, { color: colors.primary }]}>{roleLabel}</Text>
-            </View>
-
-            {/* Bouton test GoFolyX ID */}
-            {!user?.gofolyx_id && (
-              <TouchableOpacity
-                style={{ marginTop: 10, backgroundColor: '#FF6B00', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20, alignSelf: 'center' }}
-                onPress={async () => {
-                  try {
-                    console.log('[TEST] Appel generate-gofolyx-id...', Endpoints.users.generateGoFolyXId);
-                    const r = await apiClient.post<User>(Endpoints.users.generateGoFolyXId);
-                    console.log('[TEST] Réponse:', JSON.stringify(r.data?.gofolyx_id));
-                    setCurrentUser(r.data);
-                  } catch (e: any) {
-                    console.log('[TEST] Erreur:', e?.message, e?.response?.status, JSON.stringify(e?.response?.data));
-                  }
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Générer GoFolyX ID</Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Boutons d'action */}
-            <View style={s.actionRow}>
-              {/* Modifier le profil */}
-              <TouchableOpacity
-                style={[s.editBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                onPress={onEditProfile}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 22, backgroundColor: colors.primary }}
+                activeOpacity={0.8}
               >
                 <Icon name="edit-2" size={13} color="#fff" />
-                <Text style={[s.editBtnText, { color: '#fff' }]}>Modifier</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Modifier le profil</Text>
               </TouchableOpacity>
+            </View>
 
-              {/* Wallet */}
-              <TouchableOpacity
-                style={[_btnCol]}
-                onPress={() => nav.navigate('Wallet')}
-                activeOpacity={0.75}
-              >
-                <View style={[_btnIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                  <Icon name="credit-card" size={16} color={colors.textSecondary} />
+            {/* Identité : nom + badge verified + username + badge role */}
+            <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: colors.textPrimary }} numberOfLines={1}>{displayName}</Text>
+                {user?.is_verified && <VerifiedBadge size={18} />}
+              </View>
+              {user?.username && (
+                <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textSecondary }}>@{user.username}</Text>
+              )}
+              {user?.bio ? (
+                <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: 4 }} numberOfLines={3}>{user.bio}</Text>
+              ) : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, backgroundColor: colors.primary + '18', borderWidth: 1, borderColor: colors.primary + '40' }}>
+                <Icon name={roleIcon} size={12} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>{roleLabel}</Text>
+              </View>
+            </View>
+
+            {/* Stats Abonnés / Abonnements — deux cards côte à côte */}
+            {user && (
+              <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 16 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, backgroundColor: colors.backgroundSecondary, gap: 3 }}
+                  onPress={() => nav.navigate('Following', { userId: user.id, tab: 'followers' })}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="users" size={18} color={colors.textSecondary} style={{ marginBottom: 2 }} />
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.textPrimary }}>{followersCount}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '500', color: colors.textTertiary }}>Abonnés</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, backgroundColor: colors.backgroundSecondary, gap: 3 }}
+                  onPress={() => nav.navigate('Following', { userId: user.id, tab: 'following' })}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="user-plus" size={18} color={colors.textSecondary} style={{ marginBottom: 2 }} />
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.textPrimary }}>{followingCount}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '500', color: colors.textTertiary }}>Abonnements</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Ligne de 4 boutons icônes : Wallet, Story, QR Code, Plus */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 20, gap: 12 }}>
+              <TouchableOpacity onPress={() => nav.navigate('Wallet')} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="credit-card" size={20} color={colors.textSecondary} />
                 </View>
-                <Text style={[_btnLabel, { color: colors.textTertiary }]}>Wallet</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>Wallet</Text>
               </TouchableOpacity>
-
-              {/* Story */}
-              <TouchableOpacity
-                style={[_btnCol]}
-                onPress={() => nav.navigate('MyStories')}
-                activeOpacity={0.75}
-              >
-                <View style={[_btnIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                  <Icon name="camera" size={16} color={colors.textSecondary} />
+              <TouchableOpacity onPress={() => nav.navigate('MyStories')} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="camera" size={20} color={colors.textSecondary} />
                 </View>
-                <Text style={[_btnLabel, { color: colors.textTertiary }]}>Story</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>Story</Text>
               </TouchableOpacity>
-
-              {/* QR Code */}
-              <TouchableOpacity
-                style={[_btnCol]}
-                onPress={() => setShowQR(true)}
-                activeOpacity={0.75}
-              >
-                <View style={[_btnIcon, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '40' }]}>
-                  <Icon name="grid" size={16} color={colors.primary} />
+              <TouchableOpacity onPress={() => setShowQR(true)} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="grid" size={20} color={colors.textSecondary} />
                 </View>
-                <Text style={[_btnLabel, { color: colors.primary }]}>QR Code</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>QR Code</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => nav.navigate('Settings')} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="more-horizontal" size={20} color={colors.textSecondary} />
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>Plus</Text>
               </TouchableOpacity>
             </View>
 
             {/* Boutons artiste — créer événement / concert */}
             {isCreator && (
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, paddingHorizontal: 4 }}>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: -8, marginBottom: 16, paddingHorizontal: 16 }}>
                 <TouchableOpacity
                   style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: '#E0389A' + '60', backgroundColor: '#E0389A' + '10' }}
                   onPress={onCreateEvent}
@@ -322,27 +298,12 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 </TouchableOpacity>
               </View>
             )}
+
           </View>
 
-          {/* ── Stats (Followers / Following / Publications) ───────────── */}
-          {user && (
+          {/* ── Stats (ancien bloc — conservé pour isCreator Publications) ── */}
+          {user && isCreator && (
             <View style={s.statsRow}>
-              <TouchableOpacity
-                style={[s.statCard, { backgroundColor: colors.surfaceElevated }]}
-                onPress={() => nav.navigate('Following', { userId: user.id, tab: 'followers' })}
-                activeOpacity={0.7}
-              >
-                <Text style={[s.statValue, { color: colors.textPrimary }]}>{followersCount}</Text>
-                <Text style={[s.statLabel, { color: colors.textTertiary }]}>Abonnés</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.statCard, { backgroundColor: colors.surfaceElevated }]}
-                onPress={() => nav.navigate('Following', { userId: user.id, tab: 'following' })}
-                activeOpacity={0.7}
-              >
-                <Text style={[s.statValue, { color: colors.textPrimary }]}>{followingCount}</Text>
-                <Text style={[s.statLabel, { color: colors.textTertiary }]}>Abonnements</Text>
-              </TouchableOpacity>
               {isCreator && (
                 <View style={[s.statCard, { backgroundColor: colors.surfaceElevated }]}>
                   <Text style={[s.statValue, { color: colors.textPrimary }]}>{postsCount}</Text>

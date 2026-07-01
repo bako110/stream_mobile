@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Image, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { CachedImage } from './CachedImage';
 
 interface Props {
   avatarUrl?: string | null;
@@ -32,7 +33,7 @@ export const AvatarWithBadge: React.FC<Props> = ({
       {/* Avatar */}
       <View style={{ position: 'absolute', top: 0, left: 0, width: size, height: size }}>
         {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={{ width: size, height: size, borderRadius }} />
+          <CachedImage uri={avatarUrl} style={{ width: size, height: size, borderRadius }} />
         ) : (
           <LinearGradient
             colors={[accentColor, accentColor + 'AA']}

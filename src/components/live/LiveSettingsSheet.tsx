@@ -1,8 +1,8 @@
-﻿/**
- * LiveSettingsSheet â€” ParamÃ¨tres du live, visible uniquement par le host.
- * Deux sections de monÃ©tisation distinctes :
- *  - AccÃ¨s au live  (is_monetized / monetization_*)  â†’ PATCH /monetization
- *  - MontÃ©e scÃ¨ne   (stage_monetized / stage_*)       â†’ PATCH /stage-monetization
+/**
+ * LiveSettingsSheet — Parametres du live, visible uniquement par le host.
+ * Deux sections de monetisation distinctes :
+ *  - Acces au live  (is_monetized / monetization_*)  → PATCH /monetization
+ *  - Montee scene   (stage_monetized / stage_*)       → PATCH /stage-monetization
  */
 import React, { useState } from 'react';
 import {
@@ -47,7 +47,7 @@ interface Props {
   onMonetizationUpdated: (updated: Partial<LiveStream>) => void;
 }
 
-// â”€â”€ Formulaire monÃ©tisation rÃ©utilisable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Formulaire monetisation reutilisable ──────────────────────────────────────
 
 const MonetForm: React.FC<{
   title: string;
@@ -122,21 +122,21 @@ const MonetForm: React.FC<{
             style={[s.typeCard, type === 'coins' && s.typeCardActive, { borderColor: type === 'coins' ? accentColor : colors.border }]}
             onPress={() => setType('coins')} activeOpacity={0.8}
           >
-            <Text style={s.typeEmoji}>ðŸª™</Text>
+            <Text style={s.typeEmoji}>🪙</Text>
             <Text style={[s.typeLabel, { color: colors.textPrimary }]}>Prix coins</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.typeCard, type === 'gift' && s.typeCardActive, { borderColor: type === 'gift' ? '#E85DAD' : colors.border }]}
             onPress={() => setType('gift')} activeOpacity={0.8}
           >
-            <Text style={s.typeEmoji}>ðŸŽ</Text>
+            <Text style={s.typeEmoji}>🎁</Text>
             <Text style={[s.typeLabel, { color: colors.textPrimary }]}>Cadeau requis</Text>
           </TouchableOpacity>
         </View>
 
         {type === 'coins' && (
           <View style={s.coinsInputWrap}>
-            <Text style={s.coinsInputEmoji}>ðŸª™</Text>
+            <Text style={s.coinsInputEmoji}>🪙</Text>
             <TextInput
               value={coins}
               onChangeText={v => setCoins(v.replace(/[^0-9]/g, ''))}
@@ -221,7 +221,7 @@ const MonetForm: React.FC<{
   );
 };
 
-// â”€â”€ Sheet principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Sheet principal ────────────────────────────────────────────────────────────
 
 export const LiveSettingsSheet: React.FC<Props> = ({
   visible, onClose, live, liveId,
@@ -232,7 +232,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   const { theme } = useTheme();
   const { colors } = theme;
 
-  // â”€â”€ MonÃ©tisation accÃ¨s au live â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Monetisation acces au live ─────────────────────────────────────────────
   const saveAccessMonet = async (type: 'coins' | 'gift', coins: number | null, gift: GiftType | null) => {
     const payload: any = {
       is_monetized: true,
@@ -252,7 +252,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   };
 
   const removeAccessMonet = () => {
-    Alert.alert('Retirer la monÃ©tisation', 'Les prochains viewers pourront rejoindre gratuitement.', [
+    Alert.alert('Retirer la monetisation', 'Les prochains viewers pourront rejoindre gratuitement.', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Confirmer', style: 'destructive',
@@ -266,7 +266,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
     ]);
   };
 
-  // â”€â”€ MonÃ©tisation montÃ©e sur scÃ¨ne â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Monetisation montee sur scene ─────────────────────────────────────────
   const saveStageMonet = async (type: 'coins' | 'gift', coins: number | null, gift: GiftType | null) => {
     const payload: any = {
       stage_monetized: true,
@@ -286,7 +286,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   };
 
   const removeStageMonet = () => {
-    Alert.alert('Retirer la condition scÃ¨ne', 'Les viewers pourront lever la main gratuitement.', [
+    Alert.alert('Retirer la condition scene', 'Les viewers pourront lever la main gratuitement.', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Confirmer', style: 'destructive',
@@ -301,7 +301,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   };
 
   const confirmStop = () => {
-    Alert.alert('Terminer le live', 'Es-tu sÃ»r de vouloir terminer ce live ?', [
+    Alert.alert('Terminer le live', 'Es-tu sur de vouloir terminer ce live ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Terminer', style: 'destructive', onPress: onStopLive },
     ]);
@@ -320,7 +320,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
       >
         <View style={s.handle} />
         <View style={s.sheetHeader}>
-          <Text style={[s.sheetTitle, { color: colors.textPrimary }]}>ParamÃ¨tres du live</Text>
+          <Text style={[s.sheetTitle, { color: colors.textPrimary }]}>Parametres du live</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Icon name="x" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -328,7 +328,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
 
-          {/* â”€â”€ CamÃ©ra & Micro â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Camera & Micro ─────────────────────────────────────────────── */}
           <Text style={[s.sectionLabel, { color: colors.textSecondary }]}>Diffusion</Text>
           <View style={s.row}>
             <TouchableOpacity
@@ -338,7 +338,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
               <View style={[s.toggleIcon, { backgroundColor: camOn ? 'rgba(74,222,128,0.15)' : 'rgba(240,54,90,0.12)' }]}>
                 <Icon name={camOn ? 'video' : 'video-off'} size={22} color={camOn ? '#4ade80' : '#F0365A'} />
               </View>
-              <Text style={[s.toggleLabel, { color: colors.textPrimary }]}>{camOn ? 'CamÃ©ra ON' : 'CamÃ©ra OFF'}</Text>
+              <Text style={[s.toggleLabel, { color: colors.textPrimary }]}>{camOn ? 'Camera ON' : 'Camera OFF'}</Text>
               <View style={[s.dot, { backgroundColor: camOn ? '#4ade80' : '#F0365A' }]} />
             </TouchableOpacity>
 
@@ -354,9 +354,9 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             </TouchableOpacity>
           </View>
 
-          {/* â”€â”€ Demandes de scÃ¨ne â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Demandes de scene ──────────────────────────────────────────── */}
           <Text style={[s.sectionLabel, { color: colors.textSecondary }]}>
-            Demandes de scÃ¨ne
+            Demandes de scene
             {handRequests.length > 0 && <Text style={{ color: '#F0365A' }}> ({handRequests.length})</Text>}
           </Text>
 
@@ -368,7 +368,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             handRequests.map(req => (
               <View key={req.identity} style={[s.handCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
                 <View style={s.handLeft}>
-                  <Text style={{ fontSize: 24 }}>âœ‹</Text>
+                  <Text style={{ fontSize: 24 }}>✋</Text>
                   <Text style={[s.handName, { color: colors.textPrimary }]} numberOfLines={1}>{req.name}</Text>
                 </View>
                 <View style={s.handActions}>
@@ -386,19 +386,19 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             ))
           )}
 
-          {/* â”€â”€ MonÃ©tisation accÃ¨s au live â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Monetisation acces au live ─────────────────────────────────── */}
           <View style={s.monetSectionHeader}>
             <View style={[s.monetSectionIcon, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
               <Icon name="log-in" size={16} color="#F59E0B" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.sectionLabelInline, { color: colors.textPrimary }]}>AccÃ¨s au live</Text>
+              <Text style={[s.sectionLabelInline, { color: colors.textPrimary }]}>Acces au live</Text>
               <Text style={[s.sectionSub, { color: colors.textSecondary }]}>Condition pour rejoindre le live</Text>
             </View>
           </View>
 
           <MonetForm
-            title="MonÃ©tiser l'accÃ¨s au live"
+            title="Monetiser l'acces au live"
             accentColor="#F59E0B"
             isActive={live?.is_monetized ?? false}
             currentType={live?.monetization_type}
@@ -410,19 +410,19 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             onRemove={removeAccessMonet}
           />
 
-          {/* â”€â”€ MonÃ©tisation montÃ©e sur scÃ¨ne â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Monetisation montee sur scene ──────────────────────────────── */}
           <View style={s.monetSectionHeader}>
             <View style={[s.monetSectionIcon, { backgroundColor: 'rgba(155,101,245,0.12)' }]}>
               <Icon name="mic" size={16} color="#9B65F5" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.sectionLabelInline, { color: colors.textPrimary }]}>MontÃ©e sur scÃ¨ne</Text>
+              <Text style={[s.sectionLabelInline, { color: colors.textPrimary }]}>Montee sur scene</Text>
               <Text style={[s.sectionSub, { color: colors.textSecondary }]}>Condition pour lever la main</Text>
             </View>
           </View>
 
           <MonetForm
-            title="MonÃ©tiser la montÃ©e sur scÃ¨ne"
+            title="Monetiser la montee sur scene"
             accentColor="#9B65F5"
             isActive={live?.stage_monetized ?? false}
             currentType={live?.stage_type}
@@ -434,7 +434,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             onRemove={removeStageMonet}
           />
 
-          {/* â”€â”€ Terminer le live â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Terminer le live ───────────────────────────────────────────── */}
           <Text style={[s.sectionLabel, { color: colors.textSecondary }]}>Actions</Text>
           <TouchableOpacity style={[s.stopBtn, { borderColor: '#F0365A' }]} onPress={confirmStop} activeOpacity={0.8}>
             <Icon name="radio" size={18} color="#F0365A" />

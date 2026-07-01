@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
@@ -16,8 +16,6 @@ import { communityService } from '../../services/communityService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useCommunityWebSocket } from '../../hooks/useCommunityWebSocket';
-import { useNetwork } from '../../context/NetworkContext';
-import { offlineCacheService } from '../../services/offlineCacheService';
 import type { CommunityWsPayload } from '../../hooks/useCommunityWebSocket';
 import type { CommunityMessageData } from '../../services/communityService';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
@@ -120,16 +118,10 @@ export const CommunityChatScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const route = useRoute();
   const { communityId, communityName } = route.params as RouteParams;
-  const { isOnline, isInternetReachable, addReconnectListener, removeReconnectListener } = useNetwork();
 
   const [activeTab,      setActiveTab]      = useState<ChatTab>('discussion');
-  // Init depuis cache immédiatement
-  const [messages,       setMessages]       = useState<CommunityMessage[]>(
-    () => (offlineCacheService.getCommunityMessages(communityId) as unknown as CommunityMessage[]) ?? []
-  );
-  const [loading,        setLoading]        = useState(
-    () => (offlineCacheService.getCommunityMessages(communityId)?.length ?? 0) === 0
-  );
+  const [messages,       setMessages]       = useState<CommunityMessage[]>([]);
+  const [loading,        setLoading]        = useState(true);
   const [loadingMore,    setLoadingMore]    = useState(false);
   const [sending,        setSending]        = useState(false);
   const [text,           setText]           = useState('');
@@ -345,20 +337,6 @@ export const CommunityChatScreen: React.FC = () => {
       discussion: 'announcement,poll', announcements: undefined, media: undefined, polls: undefined,
     };
 
-    // Offline : servir le cache pour la discussion page 1 seulement
-    if (!isOnline || !isInternetReachable) {
-      if (p === 1 && tab === 'discussion') {
-        const cached = offlineCacheService.getCommunityMessages(communityId);
-        if (cached && cached.length > 0) {
-          setMessages(cached as CommunityMessage[]);
-          setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
-        }
-      }
-      setLoading(false);
-      setLoadingMore(false);
-      return;
-    }
-
     try {
       const msgs = await communityService.getMessages(communityId, p, 30, typeMap[tab], excludeMap[tab]);
       const sorted = [...msgs].reverse() as CommunityMessage[];
@@ -370,10 +348,6 @@ export const CommunityChatScreen: React.FC = () => {
       } else {
         setMessages(sorted);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
-        // Persist pour mode offline (page 1, discussion uniquement)
-        if (p === 1 && tab === 'discussion') {
-          offlineCacheService.saveCommunityMessages(communityId, sorted as unknown as CommunityMessageData[]);
-        }
       }
       setHasMore(msgs.length === 30);
     } catch (e: any) {
@@ -382,7 +356,7 @@ export const CommunityChatScreen: React.FC = () => {
       }
     }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [communityId, nav, isOnline, isInternetReachable]);
+  }, [communityId, nav]);
 
   const loadPinned = useCallback(async () => {
     try { setPinnedMsgs((await communityService.getPinnedMessages(communityId)) as CommunityMessage[]); } catch {}
@@ -394,67 +368,40 @@ export const CommunityChatScreen: React.FC = () => {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    const online = isOnline && isInternetReachable;
-
-    // Récupérer le role — depuis le cache si offline, sinon API
-    if (!online) {
-      const cachedRole = offlineCacheService.getCommunityRole(communityId);
-      if (cachedRole) {
-        setMyRole(cachedRole);
-      } else {
-        // Jamais visité en ligne : on ne peut pas vérifier l'appartenance — laisser entrer en lecture seule
-        setMyRole('member');
+    communityService.getMyRole(communityId).then(role => {
+      if (!role) {
+        nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+        return;
       }
-    } else {
-      communityService.getMyRole(communityId).then(role => {
-        if (!role) {
-          nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
-          return;
-        }
-        setMyRole(role);
-        offlineCacheService.saveCommunityRole(communityId, role);
-      }).catch(() => {
-        // Erreur réseau inattendue — lire le cache ou rester en lecture seule
-        const cached = offlineCacheService.getCommunityRole(communityId);
-        if (cached) { setMyRole(cached); }
-        else { nav.reset({ index: 0, routes: [{ name: 'Tabs' }] }); }
-      });
+      setMyRole(role);
+    }).catch(() => {
+      nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+    });
 
-      communityService.getById(communityId).then(c => {
-        setCommunityVerified(c.is_verified);
-        setMembersOnlyChat(!!(c as any).members_only_chat);
+    communityService.getById(communityId).then(c => {
+      setCommunityVerified(c.is_verified);
+      setMembersOnlyChat(!!(c as any).members_only_chat);
+    }).catch(() => {});
+    apiClient.get(`/api/v1/communities/${communityId}/cotisations?status=active`)
+      .then((r: any) => {
+        const list = r.data ?? [];
+        if (list.length > 0) setActiveCotisation(list[0]);
       }).catch(() => {});
-      apiClient.get(`/api/v1/communities/${communityId}/cotisations?status=active`)
-        .then((r: any) => {
-          const list = r.data ?? [];
-          if (list.length > 0) setActiveCotisation(list[0]);
-        }).catch(() => {});
-      apiClient.get(`/api/v1/communities/${communityId}/treasurer-elections/active`)
-        .then((r: any) => setActiveElection(r.data?.election ?? null))
-        .catch(() => {});
-      loadPinned();
-    }
+    apiClient.get(`/api/v1/communities/${communityId}/treasurer-elections/active`)
+      .then((r: any) => setActiveElection(r.data?.election ?? null))
+      .catch(() => {});
+    loadPinned();
 
     loadMessages(1, false, 'discussion');
   }, [communityId]);
 
-  // Sync au reconnect réseau
-  useEffect(() => {
-    const onReconnect = () => { loadMessages(1, false, activeTab); };
-    addReconnectListener(onReconnect);
-    return () => removeReconnectListener(onReconnect);
-  }, [activeTab, addReconnectListener, removeReconnectListener]);
-
   useEffect(() => {
     activeTabRef.current = activeTab;
     setPage(1);
-    // Effacer les messages seulement si en ligne — offline on garde ce qui est affiché
-    if (isOnline && isInternetReachable) {
-      setLoading(true);
-      setMessages([]);
-    }
+    setLoading(true);
+    setMessages([]);
     loadMessages(1, false, activeTab);
-  }, [activeTab]); // isOnline/isInternetReachable intentionnellement exclus — géré par reconnect listener
+  }, [activeTab]);
 
   useEffect(() => () => {
     Object.values(typingTimers.current).forEach(clearTimeout);
@@ -1666,17 +1613,6 @@ export const CommunityChatScreen: React.FC = () => {
 
   // ── Empty state ────────────────────────────────────────────────────────────
   const EmptyState = () => {
-    if (!isOnline && messages.length === 0) {
-      return (
-        <View style={S.emptyState}>
-          <View style={[S.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
-            <Icon name="wifi-off" size={28} color={colors.textTertiary} />
-          </View>
-          <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>Hors ligne</Text>
-          <Text style={[S.emptySub, { color: colors.textTertiary }]}>Aucun message en cache. Reconnecte-toi pour charger la discussion.</Text>
-        </View>
-      );
-    }
     const cfg: Record<ChatTab, { icon: string; title: string; sub: string }> = {
       discussion:    { icon: 'message-circle', title: 'Aucun message', sub: 'Soyez le premier à écrire !' },
       announcements: { icon: 'bell',           title: 'Aucune annonce', sub: 'Les annonces des admins apparaîtront ici' },

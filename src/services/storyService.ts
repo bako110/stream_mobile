@@ -39,6 +39,8 @@ export const storyService = {
       purgeExpiredViewedStories();
       // Nettoyage silencieux du cache vidéo (7j max, 200Mo max)
       import('././videoCacheService').then(m => m.cleanup().catch(() => {})).catch(() => {});
+      // Nettoyage silencieux du cache images (7j max, 120Mo max)
+      import('././imageCacheService').then(m => m.cleanupImageCache().catch(() => {})).catch(() => {});
       return applyLocalViewsToFeed(groups);
     } catch (e) {
       // Réseau KO — retourner le cache persistant (même si TTL expiré)

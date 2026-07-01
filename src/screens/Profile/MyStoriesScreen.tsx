@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+﻿import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Image,
   StyleSheet, Alert, RefreshControl, Platform,
@@ -15,8 +15,6 @@ import { StoryCreator } from '../../components/story/StoryCreator';
 import { storyService } from '../../services/storyService';
 import { authService } from '../../services/authService';
 import { cacheInBackground } from '../../services/videoCacheService';
-import { offlineCacheService } from '../../services/offlineCacheService';
-import { useNetwork } from '../../context/NetworkContext';
 import { BackButton } from '../../components/common';
 import type { Story, StoryGroup } from '../../types/story';
 
@@ -161,11 +159,9 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
   const { colors } = theme;
   const nav = useNavigation<any>();
 
-  const { isOnline, isInternetReachable } = useNetwork();
 
-  // Init depuis cache — zéro spinner si stories déjà connues
-  const [stories,     setStories]     = useState<Story[]>(() => offlineCacheService.getMyStories() ?? []);
-  const [loading,     setLoading]     = useState(() => (offlineCacheService.getMyStories()?.length ?? 0) === 0);
+  const [stories,     setStories]     = useState<Story[]>([]);
+  const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [viewerOpen,  setViewerOpen]  = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -184,28 +180,15 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   const load = useCallback(async (refresh = false) => {
-    // Offline : servir le cache sans spinner
-    if (!isOnline || !isInternetReachable) {
-      const cached = offlineCacheService.getMyStories();
-      if (cached && cached.length > 0) setStories(cached);
-      setLoading(false);
-      if (refresh) setRefreshing(false);
-      return;
-    }
     try {
       const data = await storyService.getMyStories();
       setStories(data);
-      offlineCacheService.saveMyStories(data);
       _cacheVideos(data);
-    } catch {
-      // Erreur réseau — garder le cache visible
-      const cached = offlineCacheService.getMyStories();
-      if (cached && cached.length > 0) setStories(cached);
-    } finally {
+    } catch { /**/ } finally {
       setLoading(false);
       if (refresh) setRefreshing(false);
     }
-  }, [isOnline, isInternetReachable, _cacheVideos]);
+  }, [_cacheVideos]);
 
   useEffect(() => {
     load();
@@ -229,11 +212,7 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
           onPress: async () => {
             try {
               await storyService.delete(story.id);
-              setStories(prev => {
-                const next = prev.filter(s => s.id !== story.id);
-                offlineCacheService.saveMyStories(next);
-                return next;
-              });
+              setStories(prev => prev.filter(s => s.id !== story.id));
             } catch {
               Alert.alert('Erreur', 'Impossible de supprimer ce statut.');
             }

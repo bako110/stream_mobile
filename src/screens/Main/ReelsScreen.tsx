@@ -172,7 +172,7 @@ export const ReelsScreen: React.FC = () => {
     const watchRatio = Math.min(elapsed / 30, 1.0);
     if (watchRatio >= 0.1) {
       viewedReelsRef.current.add(cur.id);
-      reelService.recordView(cur.id, parseFloat(watchRatio.toFixed(2))).catch(() => {});
+      reelService.recordView(cur.id, parseFloat(watchRatio.toFixed(2)), elapsed).catch(() => {});
     }
   }, []);
 
@@ -572,7 +572,7 @@ export const ReelsScreen: React.FC = () => {
       <VideoSlide
         reel={item}
         isActive={index === currentIndex && screenFocused}
-        isPreload={Math.abs(index - currentIndex) <= 3 && index !== currentIndex}
+        isPreload={Math.abs(index - currentIndex) <= 1 && index !== currentIndex}
         muted={muted}
         screenW={SCREEN_W}
         screenH={SCREEN_H}

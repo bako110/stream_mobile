@@ -52,3 +52,4 @@ export { LikersBottomSheet }     from './LikersBottomSheet';
 export { FriendsWhoLiked }       from './FriendsWhoLiked';
 export { BoostPrompt } from './BoostPrompt';
 export { GoFolyXLoader } from './GoFolyXLoader';
+export { CachedImage } from './CachedImage';

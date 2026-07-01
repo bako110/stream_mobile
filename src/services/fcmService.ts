@@ -30,8 +30,6 @@ import { Endpoints } from '../api/endpoints';
 import { navigate } from '../navigation/navigationRef';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
-import { offlineCacheService } from './offlineCacheService';
-import type { CachedNotification } from './offlineCacheService';
 
 // ── Channel IDs — incrémenter le suffixe pour forcer recréation si besoin ─────
 const CHANNEL_CALLS    = 'incoming_calls_v6';
@@ -244,7 +242,6 @@ export async function handleBackgroundFCM(
       },
       data: data as Record<string, string>,
     });
-    _storeOfflineNotif({ type, title: callerName, body: `Appel ${callLabel} manqué`, data });
     return;
   }
 
@@ -263,7 +260,6 @@ export async function handleBackgroundFCM(
       },
       data: data as Record<string, string>,
     });
-    _storeOfflineNotif({ type, title: msgTitle, body: msgBody, data });
     return;
   }
 
@@ -285,7 +281,6 @@ export async function handleBackgroundFCM(
       },
       data: data as Record<string, string>,
     });
-    _storeOfflineNotif({ type, title: subTitle, body, data });
     return;
   }
 
@@ -307,7 +302,6 @@ export async function handleBackgroundFCM(
       },
       data: data as Record<string, string>,
     });
-    _storeOfflineNotif({ type, title: evTitle, body, data });
     return;
   }
 
@@ -324,40 +318,8 @@ export async function handleBackgroundFCM(
     },
     data: data as Record<string, string>,
   });
-  _storeOfflineNotif({ type, title, body, data });
 }
 
-// Stocke une notif FCM reçue offline dans le cache local + incrémente le badge
-function _storeOfflineNotif({ type, title, body, data }: {
-  type: string; title: string; body: string; data: Record<string, any>;
-}): void {
-  try {
-    const id = (data.notification_id as string) || (data.ref_id as string) || `fcm_${Date.now()}`;
-    const notif: CachedNotification = {
-      id,
-      notification_type: (data.notification_type as string) || type,
-      title,
-      body,
-      ref_id:   (data.ref_id   as string) || null,
-      ref_type: (data.ref_type as string) || null,
-      is_read:  false,
-      created_at: new Date().toISOString(),
-      actor: data.actor_id ? {
-        id:           data.actor_id   as string,
-        username:     (data.actor_username     as string) || '',
-        display_name: (data.actor_display_name as string) || '',
-        avatar_url:   (data.actor_avatar       as string) || null,
-      } : null,
-      fcm_type:         type,
-      fcm_data:         data as Record<string, string>,
-      received_offline: true,
-    };
-    offlineCacheService.prependNotification(notif);
-    // Incrémenter le badge persistant
-    const current = offlineCacheService.getBadge();
-    offlineCacheService.saveBadge(current + 1);
-  } catch {}
-}
 
 // ── Handle notification tap (foreground + background open) ───────────────────
 function _handleNotificationOpen(data?: Record<string, string>): void {
