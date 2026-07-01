@@ -495,13 +495,19 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                   onLongPress={() => { setConvSelectMode(true); toggleConvSelect(item.partner_id); }}
                   onPress={convSelectMode
                     ? () => toggleConvSelect(item.partner_id)
-                    : () => nav.navigate('Chat' as any, {
-                        partnerId:   item.partner_id,
-                        partnerName: item.partner?.full_name ?? item.partner?.username ?? item.partner_id,
-                        avatarUrl:   item.partner?.avatar_url,
-                        isOnline:    item.partner?.is_online,
-                        lastSeen:    item.partner?.last_seen_at,
-                      })}
+                    : () => {
+                        // Marque lu localement tout de suite — évite d'attendre le rechargement (>30s) au retour
+                        setConversations(prev => prev.map(c =>
+                          c.partner_id === item.partner_id ? { ...c, unread_count: 0 } : c,
+                        ));
+                        nav.navigate('Chat' as any, {
+                          partnerId:   item.partner_id,
+                          partnerName: item.partner?.full_name ?? item.partner?.username ?? item.partner_id,
+                          avatarUrl:   item.partner?.avatar_url,
+                          isOnline:    item.partner?.is_online,
+                          lastSeen:    item.partner?.last_seen_at,
+                        });
+                      }}
                   onAvatarPress={convSelectMode
                     ? () => toggleConvSelect(item.partner_id)
                     : () => nav.navigate('UserProfile' as any, { userId: item.partner_id })}
