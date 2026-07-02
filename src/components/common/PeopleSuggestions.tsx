@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/userService';
+import { useWs } from '../../context/WebSocketContext';
 import { VerifiedBadge } from './VerifiedBadge';
 import type { UserPublic } from '../../types';
 
@@ -28,6 +29,7 @@ type ItemState = Record<string, 'idle' | 'loading' | 'followed' | 'dismissed'>;
 export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress, onRefresh }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const { liveUserIds } = useWs();
   const [itemState, setItemState] = useState<ItemState>({});
 
   const handleFollow = async (userId: string) => {
@@ -113,7 +115,7 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
 
                   {/* Avatar chevauchant */}
                   <View style={{ alignSelf: 'center', marginTop: -(AVATAR_SZ / 2) }}>
-                    {item.is_live ? (
+                    {(item.is_live || liveUserIds.has(item.id)) ? (
                       <LinearGradient
                         colors={['#F0365A', '#E0389A', '#7B3FF2']}
                         style={[st.liveRing, { padding: 2.5 }]}
