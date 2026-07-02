@@ -81,10 +81,15 @@ export const ReelsScreen: React.FC = () => {
   const { colors }        = theme;
   const nav    = useNavigation<Nav>();
   const route  = useRoute();
-  const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean };
+  const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean; userId?: string; initialReels?: Reel[] };
   // paramsRef toujours à jour — lisible depuis useFocusEffect (closure figée sur [])
   const paramsRef = useRef(params);
   paramsRef.current = params;
+
+  // Mode "reels d'un utilisateur" — figé au montage (une navigation vers un autre
+  // profil démonte cet écran, donc pas besoin de réagir à un changement en cours de vie).
+  const userModeRef = useRef<string | undefined>(params.userId);
+  const userMode = userModeRef.current;
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const listRef           = useRef<FlatList>(null);
@@ -106,7 +111,17 @@ export const ReelsScreen: React.FC = () => {
   const pendingTargetRef    = useRef<{ id: string; reel?: Reel } | null>(null);
   // ── State ─────────────────────────────────────────────────────────────────
   const seedReel = useRef(
-    params.initialReel?.hls_url ? [params.initialReel as Reel] : []
+    userMode && params.initialReels && params.initialReels.length > 0
+      ? (() => {
+          const list = params.initialReels!.filter(r => !!r.hls_url);
+          const targetId = params.initialReelId;
+          if (targetId) {
+            const idx = list.findIndex(r => r.id === targetId);
+            if (idx > 0) { const [cur] = list.splice(idx, 1); list.unshift(cur); }
+          }
+          return list;
+        })()
+      : params.initialReel?.hls_url ? [params.initialReel as Reel] : []
   ).current;
 
   const [reels,         setReels]         = useState<Reel[]>(seedReel.length > 0 ? seedReel : []);
@@ -198,6 +213,37 @@ export const ReelsScreen: React.FC = () => {
     if (!silent && reelsRef.current.length === 0) setLoading(true);
     pageRef.current = 1;
     isLoadingMoreRef.current = false;
+
+    // Mode profil : GET /users/{id}/reels — liste complète d'un coup, pas de pagination,
+    // pas de pub, pas de "mes reels" (tout ça n'a pas de sens hors du feed global).
+    if (userMode) {
+      try {
+        const data = await userService.getUserReels(userMode) as Reel[];
+        if (!mountedRef.current) return;
+        const filtered = (Array.isArray(data) ? data : []).filter((r: Reel) => !!r.hls_url);
+        setHasMore(false);
+        lastLoadedAtRef.current = Date.now();
+        if (!silent) {
+          currentIdxRef.current = 0;
+          setCurrentIndex(0);
+          setReels(filtered);
+          viewedReelsRef.current = new Set();
+        } else {
+          const existingIds = new Set(reelsRef.current.map(r => r.id));
+          const toAdd = filtered.filter(r => !existingIds.has(r.id));
+          if (toAdd.length > 0) {
+            const merged = [...reelsRef.current, ...toAdd];
+            reelsRef.current = merged;
+            setReels(merged);
+          }
+        }
+      } catch {
+        // garder les reels actuellement affichés
+      } finally {
+        if (mountedRef.current) setLoading(false);
+      }
+      return;
+    }
 
     try {
       const data = await reelService.getFeed({ page: 1 });
@@ -552,7 +598,7 @@ export const ReelsScreen: React.FC = () => {
   // Feed reels avec pub injectee toutes les 5 reels
   const AD_INTERVAL = 5;
   const feedWithAds = useMemo(() => {
-    if (!reelAd) return reels;
+    if (userMode || !reelAd) return reels;
     const result: (Reel | { _isAd: true; id: string; ad: typeof reelAd })[] = [];
     reels.forEach((r, i) => {
       result.push(r);
@@ -898,19 +944,23 @@ export const ReelsScreen: React.FC = () => {
       {/* Header flottant */}
       <View style={[s.floatingHeader, { top: insets.top + 6 }]} pointerEvents="box-none">
         <BackButton onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)} transparent color="#fff" />
-        <Text style={s.reelHeaderTitle}>Reels</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="box-none">
-          <TouchableOpacity onPress={openSearch} style={s.iconBtn}>
-            <Icon name="search" size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setTab('mine')}
-            style={[s.myReelsBtn, { backgroundColor: colors.primary + '30', borderColor: colors.primary + '60' }]}
-          >
-            <Icon name="user" size={14} color="#fff" />
-            <Text style={s.myReelsBtnText}>Mes reels</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={s.reelHeaderTitle}>
+          {userMode ? getAuthorLabel(reels[0]?.author) : 'Reels'}
+        </Text>
+        {!userMode && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="box-none">
+            <TouchableOpacity onPress={openSearch} style={s.iconBtn}>
+              <Icon name="search" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setTab('mine')}
+              style={[s.myReelsBtn, { backgroundColor: colors.primary + '30', borderColor: colors.primary + '60' }]}
+            >
+              <Icon name="user" size={14} color="#fff" />
+              <Text style={s.myReelsBtnText}>Mes reels</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
 

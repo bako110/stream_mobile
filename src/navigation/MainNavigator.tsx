@@ -46,7 +46,6 @@ import { NearbyEventsScreen }    from '../screens/Main/NearbyEventsScreen';
 import { ConcertsScreen }        from '../screens/Main/ConcertsScreen';
 import { BlockedUsersScreen }    from '../screens/Main/BlockedUsersScreen';
 import { WatchHistoryScreen }    from '../screens/Main/WatchHistoryScreen';
-import { UserReelsScreen }       from '../screens/Main/UserReelsScreen';
 import { CreateEventScreen }     from '../screens/Create/CreateEventScreen';
 import { CreateConcertScreen }   from '../screens/Create/CreateConcertScreen';
 import { CreateReelScreen }      from '../screens/Create/CreateReelScreen';
@@ -488,7 +487,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="StoryViewers"   component={StoryViewersScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="LiveStream"     component={LiveStreamWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="LiveViewer"     component={LiveViewerWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="UserReels"      component={UserReelsScreen}       options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="UserReels"      component={ReelsScreen}           options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="ReelPlayer"    component={ReelPlayerScreen}      options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreatePost"     component={CreatePostWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="PostDetail"     component={PostDetailWrapper}     options={{ animation: 'slide_from_right' }} />
