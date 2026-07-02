@@ -113,21 +113,47 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
 
                   {/* Avatar chevauchant */}
                   <View style={{ alignSelf: 'center', marginTop: -(AVATAR_SZ / 2) }}>
-                    <TouchableOpacity
-                      style={[st.avatarWrap, { borderColor: colors.background }]}
-                      onPress={() => onUserPress(item.id)}
-                      activeOpacity={0.9}
-                    >
-                      {item.avatar_url ? (
-                        <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
-                      ) : (
-                        <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={st.avatarImg}>
-                          <Text style={st.initial}>{initials}</Text>
-                        </LinearGradient>
-                      )}
-                    </TouchableOpacity>
-                    {item.is_online != null && (
-                      <View style={[st.onlineDot, { borderColor: colors.background, backgroundColor: item.is_online ? '#22C55E' : '#92400E' }]} />
+                    {item.is_live ? (
+                      <LinearGradient
+                        colors={['#F0365A', '#E0389A', '#7B3FF2']}
+                        style={[st.liveRing, { padding: 2.5 }]}
+                      >
+                        <TouchableOpacity
+                          style={[st.avatarWrap, { borderColor: colors.background, borderWidth: 0 }]}
+                          onPress={() => onUserPress(item.id)}
+                          activeOpacity={0.9}
+                        >
+                          {item.avatar_url ? (
+                            <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
+                          ) : (
+                            <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={st.avatarImg}>
+                              <Text style={st.initial}>{initials}</Text>
+                            </LinearGradient>
+                          )}
+                        </TouchableOpacity>
+                        <View style={st.liveBadge}>
+                          <Text style={st.liveBadgeText}>LIVE</Text>
+                        </View>
+                      </LinearGradient>
+                    ) : (
+                      <>
+                        <TouchableOpacity
+                          style={[st.avatarWrap, { borderColor: colors.background }]}
+                          onPress={() => onUserPress(item.id)}
+                          activeOpacity={0.9}
+                        >
+                          {item.avatar_url ? (
+                            <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
+                          ) : (
+                            <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={st.avatarImg}>
+                              <Text style={st.initial}>{initials}</Text>
+                            </LinearGradient>
+                          )}
+                        </TouchableOpacity>
+                        {item.is_online != null && (
+                          <View style={[st.onlineDot, { borderColor: colors.background, backgroundColor: item.is_online ? '#22C55E' : '#92400E' }]} />
+                        )}
+                      </>
                     )}
                   </View>
 
@@ -196,6 +222,9 @@ const st = StyleSheet.create({
   avatarImg:  { width: AVATAR_SZ, height: AVATAR_SZ, borderRadius: AVATAR_SZ / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   initial:    { color: '#fff', fontWeight: '800', fontSize: AVATAR_SZ * 0.38 },
   onlineDot:  { position: 'absolute', bottom: 2, right: 2, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22C55E', borderWidth: 2 },
+  liveRing:   { width: AVATAR_SZ + 4 + 6, height: AVATAR_SZ + 4 + 6, borderRadius: (AVATAR_SZ + 4 + 6) / 2, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+  liveBadge:  { position: 'absolute', alignSelf: 'center', bottom: -3, backgroundColor: '#F0365A', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1.5 },
+  liveBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800', letterSpacing: 0.3 },
 
   cardBody:   { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, paddingTop: AVATAR_SZ / 2 + 8, gap: 4 },
   name:       { fontSize: 14, fontWeight: '700', textAlign: 'center' },

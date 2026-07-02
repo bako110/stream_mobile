@@ -98,6 +98,7 @@ export interface UserPublic {
   location?: string | null;
   website?: string | null;
   is_online?: boolean | null;
+  is_live?: boolean | null;
 }
 
 export interface UserPublicProfile extends UserPublic {

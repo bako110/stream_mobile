@@ -17,6 +17,7 @@ import { authService } from '../services/authService';
 import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { favoriteService } from '../services/favoriteService';
+import { liveService } from '../services/liveService';
 import { cancelCallNotification } from '../services/fcmService';
 import {
   createWsEventHandler,
@@ -105,6 +106,7 @@ interface WebSocketContextValue {
   lastConcertLive:          ConcertLivePayload | null;
   lastLiveStarted:          LiveStartedPayload | null;
   lastLiveEnded:            string | null;
+  liveUserIds:              Set<string>;
   lastLiveViewersUpdated:   LiveViewersUpdatedPayload | null;
 }
 
@@ -142,6 +144,7 @@ const Ctx = createContext<WebSocketContextValue>({
   lastConcertLive:          null,
   lastLiveStarted:          null,
   lastLiveEnded:            null,
+  liveUserIds:              new Set(),
   lastLiveViewersUpdated:   null,
 });
 
@@ -192,6 +195,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   const [lastLiveStarted,         setLastLiveStarted]         = useState<LiveStartedPayload | null>(null);
   const [lastLiveEnded,           setLastLiveEnded]           = useState<string | null>(null);
   const [lastLiveViewersUpdated,  setLastLiveViewersUpdated]  = useState<LiveViewersUpdatedPayload | null>(null);
+  // IDs des utilisateurs actuellement en live — alimente l'anneau "Live" sur les avatars
+  // partout dans l'app, mis à jour en temps réel sans recharger l'écran.
+  const [liveUserIds,             setLiveUserIds]             = useState<Set<string>>(new Set());
 
   const addListener    = useCallback((fn: WsListener) => { listeners.current.add(fn); }, []);
   const removeListener = useCallback((fn: WsListener) => { listeners.current.delete(fn); }, []);
@@ -210,8 +216,17 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     onPresence:           (d) => { if (isMounted.current) setLastPresenceUpdate(d); },
     onConcertLive:        (d) => { if (isMounted.current) setLastConcertLive(d); },
     onConcertEnded:       ()  => { /* le feed se recharge via onFeedUpdated */ },
-    onLiveStarted:        (d) => { if (isMounted.current) setLastLiveStarted(d); },
-    onLiveEnded:          (id) => { if (isMounted.current) setLastLiveEnded(id); },
+    onLiveStarted:        (d) => {
+      if (!isMounted.current) return;
+      setLastLiveStarted(d);
+      const uid = d.live?.user_id;
+      if (uid) setLiveUserIds(prev => { const next = new Set(prev); next.add(uid); return next; });
+    },
+    onLiveEnded:          (id, uid) => {
+      if (!isMounted.current) return;
+      setLastLiveEnded(id);
+      if (uid) setLiveUserIds(prev => { const next = new Set(prev); next.delete(uid); return next; });
+    },
     onLiveViewersUpdated: (d) => { if (isMounted.current) setLastLiveViewersUpdated(d); },
     onActivity:           ()  => { if (isMounted.current) setUnreadActivity(n => n + 1); },
     onNotification:       ()  => { if (isMounted.current) setUnreadNotifications(n => n + 1); },
@@ -312,6 +327,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
       .catch(() => {});
     notificationService.getUnreadCount()
       .then(count => { if (isMounted.current) setUnreadNotifications(count); })
+      .catch(() => {});
+    // Lives déjà actifs à la connexion — sinon liveUserIds resterait vide jusqu'au
+    // prochain live_started reçu en direct pendant la session.
+    liveService.getLives()
+      .then(lives => { if (isMounted.current) setLiveUserIds(new Set(lives.map(l => l.user_id))); })
       .catch(() => {});
   }, []);
 
@@ -592,6 +612,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     lastConcertLive,
     lastLiveStarted,
     lastLiveEnded,
+    liveUserIds,
     lastLiveViewersUpdated,
   }), [
     sendMessage, isConnected, addListener, removeListener,
@@ -601,7 +622,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     pendingIncomingCall, clearPendingIncomingCall,
     lastNewFollower, lastCoinTransfer, lastGiftReceived, lastStoryAdded,
     lastStoryView, lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate,
-    lastConcertLive, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated,
+    lastConcertLive, lastLiveStarted, lastLiveEnded, liveUserIds, lastLiveViewersUpdated,
   ]);
 
   // ── Contexte compteurs (change souvent) — isolé pour éviter re-renders ──

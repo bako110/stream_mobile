@@ -53,7 +53,7 @@ export interface WsEventCallbacks {
 
   // Lives spontanés
   onLiveStarted?: (d: LiveStartedPayload) => void;
-  onLiveEnded?: (live_id: string) => void;
+  onLiveEnded?: (live_id: string, user_id?: string) => void;
   onLiveViewersUpdated?: (d: LiveViewersUpdatedPayload) => void;
 
   // Stories
@@ -226,7 +226,7 @@ export function createWsEventHandler(callbacks: WsEventCallbacks) {
         break;
 
       case 'live_ended':
-        callbacks.onLiveEnded?.((payload as any).live_id);
+        callbacks.onLiveEnded?.((payload as any).live_id, (payload as any).user_id);
         break;
 
       case 'live_viewers_updated':

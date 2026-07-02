@@ -13,7 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonMessages, VerifiedBadge } from '../../components/common';
+import { SkeletonMessages, VerifiedBadge, AvatarWithBadge } from '../../components/common';
 import { BorderRadius, Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
 import { useWs } from '../../context/WebSocketContext';
@@ -74,7 +74,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const { colors }        = theme;
   const nav               = useNavigation<any>();
   const route             = useRoute<any>();
-  const { clearUnreadMessages, addListener, removeListener, missedCallCount, clearMissedCalls, sendMessage: sendWsMessage, isConnected } = useWs();
+  const { clearUnreadMessages, addListener, removeListener, missedCallCount, clearMissedCalls, sendMessage: sendWsMessage, isConnected, liveUserIds } = useWs();
   const [activeTab,  setActiveTab]  = useState<'messages' | 'calls'>(
     route.params?.initialTab === 'calls' ? 'calls' : 'messages'
   );
@@ -490,6 +490,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
               <ConversationRow
                   conv={item}
                   colors={colors}
+                  isLive={item.partner?.is_live || liveUserIds.has(item.partner_id)}
                   selectMode={convSelectMode}
                   isSelected={convSelectedIds.has(item.partner_id)}
                   onLongPress={() => { setConvSelectMode(true); toggleConvSelect(item.partner_id); }}
@@ -615,7 +616,8 @@ const ConversationRow: React.FC<{
   onAvatarPress: () => void;
   selectMode:    boolean;
   isSelected:    boolean;
-}> = ({ conv, colors, onPress, onLongPress, onAvatarPress, selectMode, isSelected }) => {
+  isLive?:       boolean;
+}> = ({ conv, colors, onPress, onLongPress, onAvatarPress, selectMode, isSelected, isLive }) => {
   const unread   = (conv.unread_count ?? 0) > 0;
   const name     = conv.partner?.full_name ?? conv.partner?.username ?? conv.partner_id;
   const accent   = accentFor(conv.partner_id);
@@ -651,14 +653,14 @@ const ConversationRow: React.FC<{
         onPress={selectMode ? onPress : onAvatarPress}
         activeOpacity={0.8}
       >
-        {avatarUri ? (
-          <Image source={{ uri: avatarUri }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: accent }]}>
-            <Text style={styles.avatarText}>{getInitials(name)}</Text>
-          </View>
-        )}
-        {isOnline && !selectMode && <View style={styles.onlineDot} />}
+        <AvatarWithBadge
+          avatarUrl={avatarUri}
+          initials={getInitials(name)}
+          size={56}
+          accentColor={accent}
+          isOnline={selectMode ? undefined : isOnline}
+          isLive={selectMode ? undefined : isLive}
+        />
       </TouchableOpacity>
 
       {/* Content */}

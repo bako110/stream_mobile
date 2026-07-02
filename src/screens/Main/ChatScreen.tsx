@@ -30,6 +30,7 @@ import { uploadAudioFile, uploadMessageImage, uploadFileFromUri } from '../../se
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { useWs } from '../../context/WebSocketContext';
+import { AvatarWithBadge } from '../../components/common';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { ConversationSummary } from '../../services/messageService';
@@ -182,7 +183,8 @@ export const ChatScreen: React.FC = () => {
   const myIdRef = useRef<string | null>(null);
 
   // WebSocket (global context)
-  const { sendMessage: sendWsMessage, isConnected, addListener, removeListener, setActiveChat } = useWs();
+  const { sendMessage: sendWsMessage, isConnected, addListener, removeListener, setActiveChat, liveUserIds } = useWs();
+  const partnerLive = liveUserIds.has(partnerId);
 
   // Mark this chat as active so unread counter skips messages from this partner
   useEffect(() => {
@@ -1345,16 +1347,14 @@ export const ChatScreen: React.FC = () => {
 
         {/* Avatar cliquable */}
         <TouchableOpacity onPress={handleViewProfile} activeOpacity={0.8} style={styles.headerAvatarWrap}>
-          {partnerAvatarUrl ? (
-            <Image source={{ uri: partnerAvatarUrl }} style={styles.headerAvatar} />
-          ) : (
-            <View style={[styles.headerAvatar, { backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>
-                {partnerName?.[0]?.toUpperCase() ?? '?'}
-              </Text>
-            </View>
-          )}
-          {partnerOnline && <View style={styles.headerAvatarDot} />}
+          <AvatarWithBadge
+            avatarUrl={partnerAvatarUrl}
+            initials={partnerName?.[0]?.toUpperCase() ?? '?'}
+            size={38}
+            accentColor={colors.primary}
+            isOnline={partnerLive ? undefined : partnerOnline}
+            isLive={partnerLive}
+          />
         </TouchableOpacity>
 
         {/* Nom + statut */}

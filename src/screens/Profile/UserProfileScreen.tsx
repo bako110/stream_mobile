@@ -47,7 +47,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors } = theme;
   const { userId } = route.params;
   const { currentUser } = useUser();
-  const { lastPresenceUpdate } = useWs();
+  const { lastPresenceUpdate, liveUserIds } = useWs();
 
   const [profile, setProfile]   = useState<UserPublicProfile | null>(null);
   const [profileIsOnline, setProfileIsOnline] = useState<boolean | null>(null);
@@ -169,6 +169,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [currentUser?.avatar_url, currentUser?.banner_url, currentUser?.display_name]);
 
   const isMe = myId !== null && String(myId) === String(userId);
+  const profileIsLive = !!(profile?.is_live || liveUserIds.has(userId));
 
   const handleFollow = async () => {
     if (!profile) return;
@@ -309,17 +310,34 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             activeOpacity={profile.avatar_url ? 0.85 : 1}
             onPress={() => profile.avatar_url && openViewer(profile.avatar_url, 'Photo de profil')}
           >
-            <View style={[styles.avatarRing, { borderColor: colors.background }]}>
-              {profile.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.avatarInitial}>{initials}</Text>
+            {profileIsLive ? (
+              <LinearGradient colors={['#F0365A', '#E0389A', '#7B3FF2']} style={styles.avatarRingLive}>
+                <View style={[styles.avatarRing, { borderWidth: 0, width: 80, height: 80, borderRadius: 40 }]}>
+                  {profile.avatar_url ? (
+                    <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+                  ) : (
+                    <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.avatarInitial}>{initials}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
+                <View style={styles.liveBadgeProfile}>
+                  <Text style={styles.liveBadgeProfileText}>LIVE</Text>
+                </View>
+              </LinearGradient>
+            ) : (
+              <View style={[styles.avatarRing, { borderColor: colors.background }]}>
+                {profile.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.avatarInitial}>{initials}</Text>
+                  </View>
+                )}
+              </View>
+            )}
           </TouchableOpacity>
-          {profileIsOnline != null && (
+          {!profileIsLive && profileIsOnline != null && (
             <View style={[styles.onlineBadge, { borderColor: colors.background, backgroundColor: profileIsOnline ? '#22C55E' : '#92400E' }]} />
           )}
           {profile.is_verified && (
@@ -941,6 +959,9 @@ const styles = StyleSheet.create({
   avatarInitial: { color: '#fff', fontSize: 28, fontWeight: '800' },
   verifiedBadge: { position: 'absolute', bottom: 2, right: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   onlineBadge:   { position: 'absolute', bottom: 4, left: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#22C55E', borderWidth: 3 },
+  avatarRingLive: { width: 92, height: 92, borderRadius: 46, padding: 3, alignItems: 'center', justifyContent: 'center' },
+  liveBadgeProfile: { position: 'absolute', alignSelf: 'center', bottom: -4, backgroundColor: '#F0365A', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  liveBadgeProfileText: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
 
   infoSection: {
     alignItems: 'center', marginHorizontal: 16, marginTop: 10,

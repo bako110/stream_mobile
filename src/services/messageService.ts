@@ -31,6 +31,7 @@ export interface ConversationSummary {
     full_name?:   string;
     avatar_url?:  string;
     is_online?:   boolean;
+    is_live?:     boolean;
     is_verified?: boolean;
     last_seen_at?: string;
   };
