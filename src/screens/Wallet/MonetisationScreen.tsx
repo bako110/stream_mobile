@@ -30,11 +30,11 @@ const SECTIONS: { title: string; accent: string; rows: RowItem[] }[] = [
     ],
   },
   {
-    title: 'Coins & Achats',
+    title: 'GoGold & Achats',
     accent: '#FF8C00',
     rows: [
-      { icon: 'shopping-bag', color: '#FF8C00', label: 'Acheter des coins',   sub: 'Packs de coins via Stripe',            screen: 'BuyCoins' },
-      { icon: 'send',         color: '#9B65F5', label: 'Transférer des coins',sub: 'Envoyer des coins à un utilisateur',   screen: 'Transfer' },
+      { icon: 'shopping-bag', color: '#FF8C00', label: 'Acheter des GoGold',   sub: 'Packs de GoGold via Stripe',            screen: 'BuyGoGold' },
+      { icon: 'send',         color: '#9B65F5', label: 'Transférer des GoGold',sub: 'Envoyer des GoGold à un utilisateur',   screen: 'Transfer' },
     ],
   },
   {

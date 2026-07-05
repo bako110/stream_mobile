@@ -82,7 +82,7 @@ interface GiftTick {
   emoji:      string;
   senderName: string;
   giftName:   string;
-  coins:      number;
+  GoGold:      number;
 }
 
 // ── Avatar fallback ───────────────────────────────────────────────────────────
@@ -108,17 +108,17 @@ const StageAccessSheet: React.FC<{
   const [balanceLoading, setBalanceLoading] = useState(true);
   const [loading,        setLoading]        = useState(false);
 
-  const isCoins           = live.stage_type === 'coins';
+  const isGoGold           = live.stage_type === 'gogold';
   const isGift            = live.stage_type === 'gift';
-  const requiredCoins     = live.stage_coins ?? 0;
+  const requiredGoGold     = live.stage_gogold ?? 0;
   const requiredGiftName  = live.stage_gift_name ?? 'Cadeau';
   const requiredGiftEmoji = live.stage_gift_emoji ?? '🎁';
   const hostId            = live.user_id ?? '';
   const hostName          = live.user?.display_name ?? live.user?.username ?? 'le host';
 
-  // coût effectif : pour coins → stage_coins, pour gift → coins_cost du gift_type
+  // coût effectif : pour GoGold → stage_gogold, pour gift → gogold_cost du gift_type
   const [giftCost, setGiftCost] = useState<number | null>(null);
-  const effectiveCost = isCoins ? requiredCoins : (giftCost ?? 0);
+  const effectiveCost = isGoGold ? requiredGoGold : (giftCost ?? 0);
 
   const insufficientFunds = !balanceLoading && myBalance < effectiveCost;
 
@@ -126,7 +126,7 @@ const StageAccessSheet: React.FC<{
     const fetchAll = async () => {
       try {
         const balRes = await apiClient.get(Endpoints.wallet.balance);
-        setMyBalance(Number((balRes as any).data?.coins_balance ?? (balRes as any).data?.balance ?? 0));
+        setMyBalance(Number((balRes as any).data?.gogold_balance ?? (balRes as any).data?.balance ?? 0));
       } catch { setMyBalance(0); }
 
       if (isGift && live.stage_gift_id) {
@@ -134,14 +134,14 @@ const StageAccessSheet: React.FC<{
           const giftsRes = await apiClient.get(Endpoints.wallet.giftTypes);
           const list: any[] = (giftsRes as any).data?.gifts ?? (giftsRes as any).data ?? [];
           const found = list.find((g: any) => g.id === live.stage_gift_id);
-          if (found) setGiftCost(Number(found.coins_cost ?? 0));
+          if (found) setGiftCost(Number(found.gogold_cost ?? 0));
         } catch {}
       }
 
       setBalanceLoading(false);
     };
     fetchAll();
-  }, [isCoins, isGift, live.stage_gift_id]);
+  }, [isGoGold, isGift, live.stage_gift_id]);
 
   const handlePay = async () => {
     if (isGift) {
@@ -194,11 +194,11 @@ const StageAccessSheet: React.FC<{
 
         {/* Condition requise */}
         <View style={sas.conditionBox}>
-          <Text style={sas.conditionEmoji}>{isCoins ? '🪙' : requiredGiftEmoji}</Text>
+          <Text style={sas.conditionEmoji}>{isGoGold ? '🪙' : requiredGiftEmoji}</Text>
           <View style={{ flex: 1 }}>
             <Text style={sas.conditionLabel}>Condition requise</Text>
             <Text style={sas.conditionValue}>
-              {isCoins ? `${requiredCoins} coins` : requiredGiftName}
+              {isGoGold ? `${requiredGoGold} GoGold` : requiredGiftName}
             </Text>
           </View>
         </View>
@@ -213,7 +213,7 @@ const StageAccessSheet: React.FC<{
             ? <ActivityIndicator size="small" color="#3FEDB6" />
             : <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={[sas.balanceValue, insufficientFunds && { color: '#F0365A' }]}>
-                  {myBalance} coins
+                  {myBalance} GoGold
                 </Text>
                 {insufficientFunds && effectiveCost > 0 && (
                   <Text style={sas.balanceShort}> · manque {effectiveCost - myBalance}</Text>
@@ -223,9 +223,9 @@ const StageAccessSheet: React.FC<{
         </View>
 
         {/* Note escrow */}
-        {isCoins && requiredCoins > 0 && (
+        {isGoGold && requiredGoGold > 0 && (
           <Text style={sas.refundNote}>
-            Les coins sont réservés jusqu'à l'acceptation du host. Remboursés automatiquement si le live se termine.
+            Les GoGold sont réservés jusqu'à l'acceptation du host. Remboursés automatiquement si le live se termine.
           </Text>
         )}
 
@@ -249,18 +249,18 @@ const StageAccessSheet: React.FC<{
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={isCoins ? ['#F59E0B', '#F97316'] : ['#F0365A', '#9B65F5']}
+              colors={isGoGold ? ['#F59E0B', '#F97316'] : ['#F0365A', '#9B65F5']}
               style={sas.payBtnGrad}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             >
               {loading || balanceLoading
                 ? <ActivityIndicator color="#fff" size="small" />
                 : <>
-                    <Text style={{ fontSize: 18 }}>{isCoins ? '🪙' : requiredGiftEmoji}</Text>
+                    <Text style={{ fontSize: 18 }}>{isGoGold ? '🪙' : requiredGiftEmoji}</Text>
                     <Text style={sas.payBtnText}>
-                      {isCoins
-                        ? `Payer ${requiredCoins} coins · Lever la main`
-                        : `Envoyer ${requiredGiftName}${giftCost ? ` (${giftCost} coins)` : ''} · Lever la main`}
+                      {isGoGold
+                        ? `Payer ${requiredGoGold} GoGold · Lever la main`
+                        : `Envoyer ${requiredGiftName}${giftCost ? ` (${giftCost} GoGold)` : ''} · Lever la main`}
                     </Text>
                   </>
               }
@@ -747,7 +747,7 @@ const RoomContent: React.FC<{
                 <Text style={gt.emoji}>{t.emoji}</Text>
                 <View style={gt.info}>
                   <Text style={gt.sender} numberOfLines={1}>{t.senderName}</Text>
-                  <Text style={gt.detail}>{t.giftName} · {t.coins} coins</Text>
+                  <Text style={gt.detail}>{t.giftName} · {t.GoGold} GoGold</Text>
                 </View>
               </LinearGradient>
             </Animated.View>
@@ -930,7 +930,7 @@ const RoomContent: React.FC<{
           <View style={gp.header}>
             <LinearGradient colors={['#9B65F5', '#F0365A']} style={gp.titleGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Text style={gp.title}>Cadeaux reçus</Text>
-              <Text style={gp.totalBadge}>{giftHistory.reduce((s, t) => s + t.coins, 0)} coins</Text>
+              <Text style={gp.totalBadge}>{giftHistory.reduce((s, t) => s + t.GoGold, 0)} GoGold</Text>
             </LinearGradient>
             <TouchableOpacity onPress={() => setShowGifts(false)} style={gp.closeBtn}>
               <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
@@ -944,7 +944,7 @@ const RoomContent: React.FC<{
                   <Text style={gp.rowSender} numberOfLines={1}>{t.senderName}</Text>
                   <Text style={gp.rowGift}>{t.giftName}</Text>
                 </View>
-                <Text style={gp.rowCoins}>+{t.coins}</Text>
+                <Text style={gp.rowGoGold}>+{t.GoGold}</Text>
               </View>
             ))}
           </View>
@@ -1246,11 +1246,11 @@ export const SimpleLiveViewerScreen: React.FC = () => {
             senderName,
             emoji:      gf.gift_type?.emoji ?? '🎁',
             giftName:   gf.gift_type?.name  ?? 'Cadeau',
-            coins:      gf.coins_spent ?? 0,
+            GoGold:      gf.gogold_spent ?? 0,
           };
           setGiftNotifs(prev => [...prev, {
             id: tick.id, senderName,
-            emoji: tick.emoji, giftName: tick.giftName, coins: tick.coins,
+            emoji: tick.emoji, giftName: tick.giftName, GoGold: tick.GoGold,
           }]);
           setGiftTicker(prev => [...prev.slice(-2), tick]);
           setGiftHistory(prev => [tick, ...prev.slice(0, 49)]);
@@ -1801,7 +1801,7 @@ const gp = StyleSheet.create({
   rowInfo:   { flex: 1 },
   rowSender: { color: '#fff', fontSize: 12, fontWeight: '700' },
   rowGift:   { color: 'rgba(255,255,255,0.45)', fontSize: 10, marginTop: 1 },
-  rowCoins:  { color: '#3FEDB6', fontSize: 13, fontWeight: '900' },
+  rowGoGold:  { color: '#3FEDB6', fontSize: 13, fontWeight: '900' },
 });
 
 // ── Styles menu scène ─────────────────────────────────────────────────────────

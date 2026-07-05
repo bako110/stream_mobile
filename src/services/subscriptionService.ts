@@ -3,7 +3,7 @@ import type { Subscription, Payment, Ticket, PlanType } from '../types';
 
 export interface WalletCheck {
   plan: PlanType;
-  coins_required: number;
+  gogold_required: number;
   balance: number;
   sufficient: boolean;
   missing: number;

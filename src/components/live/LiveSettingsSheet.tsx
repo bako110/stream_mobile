@@ -28,7 +28,7 @@ interface GiftType {
   id: string;
   name: string;
   emoji: string;
-  coins_cost: number;
+  gogold_cost: number;
 }
 
 interface Props {
@@ -54,22 +54,22 @@ const MonetForm: React.FC<{
   accentColor: string;
   isActive: boolean;
   currentType?: string | null;
-  currentCoins?: number | null;
+  currentGoGold?: number | null;
   currentGiftId?: string | null;
   currentGiftName?: string | null;
   currentGiftEmoji?: string | null;
-  onSave: (type: 'coins' | 'gift', coins: number | null, gift: GiftType | null) => Promise<void>;
+  onSave: (type: 'gogold' | 'gift', GoGold: number | null, gift: GiftType | null) => Promise<void>;
   onRemove: () => void;
 }> = ({
   title, accentColor, isActive,
-  currentType, currentCoins, currentGiftId, currentGiftName, currentGiftEmoji,
+  currentType, currentGoGold, currentGiftId, currentGiftName, currentGiftEmoji,
   onSave, onRemove,
 }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const [showForm,     setShowForm]     = useState(false);
-  const [type,         setType]         = useState<'coins' | 'gift' | null>((currentType as any) ?? null);
-  const [coins,        setCoins]        = useState(currentCoins ? String(currentCoins) : '');
+  const [type,         setType]         = useState<'gogold' | 'gift' | null>((currentType as any) ?? null);
+  const [GoGold,        setGoGold]        = useState(currentGoGold ? String(currentGoGold) : '');
   const [gift,         setGift]         = useState<GiftType | null>(null);
   const [gifts,        setGifts]        = useState<GiftType[]>([]);
   const [giftsLoading, setGiftsLoading] = useState(false);
@@ -94,14 +94,14 @@ const MonetForm: React.FC<{
 
   const save = async () => {
     if (!type) return;
-    if (type === 'coins') {
-      const v = parseInt(coins, 10);
+    if (type === 'gogold') {
+      const v = parseInt(GoGold, 10);
       if (!v || v < 1) { Alert.alert('Erreur', 'Entre un montant valide.'); return; }
     }
     if (type === 'gift' && !gift) { Alert.alert('Erreur', 'Choisis un cadeau requis.'); return; }
     setSaving(true);
     try {
-      await onSave(type, type === 'coins' ? parseInt(coins, 10) : null, type === 'gift' ? gift : null);
+      await onSave(type, type === 'gogold' ? parseInt(GoGold, 10) : null, type === 'gift' ? gift : null);
       setShowForm(false);
     } catch (e: any) {
       Alert.alert('Erreur', e?.response?.data?.detail ?? e?.message ?? 'Impossible de sauvegarder.');
@@ -119,11 +119,11 @@ const MonetForm: React.FC<{
 
         <View style={s.typeRow}>
           <TouchableOpacity
-            style={[s.typeCard, type === 'coins' && s.typeCardActive, { borderColor: type === 'coins' ? accentColor : colors.border }]}
-            onPress={() => setType('coins')} activeOpacity={0.8}
+            style={[s.typeCard, type === 'gogold' && s.typeCardActive, { borderColor: type === 'gogold' ? accentColor : colors.border }]}
+            onPress={() => setType('gogold')} activeOpacity={0.8}
           >
             <Text style={s.typeEmoji}>🪙</Text>
-            <Text style={[s.typeLabel, { color: colors.textPrimary }]}>Prix coins</Text>
+            <Text style={[s.typeLabel, { color: colors.textPrimary }]}>Prix GoGold</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.typeCard, type === 'gift' && s.typeCardActive, { borderColor: type === 'gift' ? '#E85DAD' : colors.border }]}
@@ -134,16 +134,16 @@ const MonetForm: React.FC<{
           </TouchableOpacity>
         </View>
 
-        {type === 'coins' && (
-          <View style={s.coinsInputWrap}>
-            <Text style={s.coinsInputEmoji}>🪙</Text>
+        {type === 'gogold' && (
+          <View style={s.goGoldInputWrap}>
+            <Text style={s.goGoldInputEmoji}>🪙</Text>
             <TextInput
-              value={coins}
-              onChangeText={v => setCoins(v.replace(/[^0-9]/g, ''))}
-              placeholder="Montant en coins"
+              value={GoGold}
+              onChangeText={v => setGoGold(v.replace(/[^0-9]/g, ''))}
+              placeholder="Montant en GoGold"
               placeholderTextColor={colors.textTertiary}
               keyboardType="numeric"
-              style={[s.coinsInput, { color: colors.textPrimary, borderColor: colors.border }]}
+              style={[s.goGoldInput, { color: colors.textPrimary, borderColor: colors.border }]}
             />
           </View>
         )}
@@ -161,7 +161,7 @@ const MonetForm: React.FC<{
                   >
                     <Text style={s.giftEmoji}>{item.emoji}</Text>
                     <Text style={[s.giftName, { color: colors.textSecondary }]} numberOfLines={1}>{item.name}</Text>
-                    <Text style={s.giftCost}>{item.coins_cost}</Text>
+                    <Text style={s.giftCost}>{item.gogold_cost}</Text>
                   </TouchableOpacity>
                 )}
                 contentContainerStyle={{ gap: 6 }}
@@ -193,8 +193,8 @@ const MonetForm: React.FC<{
           <View style={s.monetActive}>
             <MCIcon name="lock" size={18} color={accentColor} />
             <Text style={[s.monetActiveText, { color: colors.textPrimary }]}>
-              {currentType === 'coins'
-                ? `${currentCoins} coins requis`
+              {currentType === 'gogold'
+                ? `${currentGoGold} GoGold requis`
                 : `Cadeau requis : ${currentGiftEmoji ?? ''} ${currentGiftName ?? ''}`}
             </Text>
           </View>
@@ -233,18 +233,18 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   const { colors } = theme;
 
   // ── Monetisation acces au live ─────────────────────────────────────────────
-  const saveAccessMonet = async (type: 'coins' | 'gift', coins: number | null, gift: GiftType | null) => {
+  const saveAccessMonet = async (type: 'gogold' | 'gift', GoGold: number | null, gift: GiftType | null) => {
     const payload: any = {
       is_monetized: true,
       monetization_type: type,
-      monetization_coins: type === 'coins' ? coins : null,
+      monetization_gogold: type === 'gogold' ? GoGold : null,
       monetization_gift_id: type === 'gift' ? gift!.id : null,
     };
     await apiClient.patch(Endpoints.lives.monetization(liveId), payload);
     onMonetizationUpdated({
       is_monetized: true,
       monetization_type: type,
-      monetization_coins: type === 'coins' ? coins ?? undefined : undefined,
+      monetization_gogold: type === 'gogold' ? GoGold ?? undefined : undefined,
       monetization_gift_id: type === 'gift' ? gift!.id : undefined,
       monetization_gift_name: type === 'gift' ? gift!.name : undefined,
       monetization_gift_emoji: type === 'gift' ? gift!.emoji : undefined,
@@ -259,7 +259,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
         onPress: async () => {
           try {
             await apiClient.patch(Endpoints.lives.monetization(liveId), { is_monetized: false });
-            onMonetizationUpdated({ is_monetized: false, monetization_type: null, monetization_coins: undefined });
+            onMonetizationUpdated({ is_monetized: false, monetization_type: null, monetization_gogold: undefined });
           } catch {}
         },
       },
@@ -267,18 +267,18 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   };
 
   // ── Monetisation montee sur scene ─────────────────────────────────────────
-  const saveStageMonet = async (type: 'coins' | 'gift', coins: number | null, gift: GiftType | null) => {
+  const saveStageMonet = async (type: 'gogold' | 'gift', GoGold: number | null, gift: GiftType | null) => {
     const payload: any = {
       stage_monetized: true,
       stage_type: type,
-      stage_coins: type === 'coins' ? coins : null,
+      stage_gogold: type === 'gogold' ? GoGold : null,
       stage_gift_id: type === 'gift' ? gift!.id : null,
     };
     await apiClient.patch(Endpoints.lives.stageMonetization(liveId), payload);
     onMonetizationUpdated({
       stage_monetized: true,
       stage_type: type,
-      stage_coins: type === 'coins' ? coins ?? undefined : undefined,
+      stage_gogold: type === 'gogold' ? GoGold ?? undefined : undefined,
       stage_gift_id: type === 'gift' ? gift!.id : undefined,
       stage_gift_name: type === 'gift' ? gift!.name : undefined,
       stage_gift_emoji: type === 'gift' ? gift!.emoji : undefined,
@@ -293,7 +293,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
         onPress: async () => {
           try {
             await apiClient.patch(Endpoints.lives.stageMonetization(liveId), { stage_monetized: false });
-            onMonetizationUpdated({ stage_monetized: false, stage_type: null, stage_coins: undefined });
+            onMonetizationUpdated({ stage_monetized: false, stage_type: null, stage_gogold: undefined });
           } catch {}
         },
       },
@@ -402,7 +402,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             accentColor="#F59E0B"
             isActive={live?.is_monetized ?? false}
             currentType={live?.monetization_type}
-            currentCoins={live?.monetization_coins}
+            currentGoGold={live?.monetization_gogold}
             currentGiftId={live?.monetization_gift_id}
             currentGiftName={live?.monetization_gift_name}
             currentGiftEmoji={live?.monetization_gift_emoji}
@@ -426,7 +426,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             accentColor="#9B65F5"
             isActive={live?.stage_monetized ?? false}
             currentType={live?.stage_type}
-            currentCoins={live?.stage_coins}
+            currentGoGold={live?.stage_gogold}
             currentGiftId={live?.stage_gift_id}
             currentGiftName={live?.stage_gift_name}
             currentGiftEmoji={live?.stage_gift_emoji}
@@ -499,9 +499,9 @@ const s = StyleSheet.create({
   typeCardActive:   { backgroundColor: 'rgba(245,158,11,0.08)' },
   typeEmoji:        { fontSize: 28 },
   typeLabel:        { fontSize: 13, fontWeight: '600' },
-  coinsInputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
-  coinsInputEmoji:  { fontSize: 24 },
-  coinsInput:       { flex: 1, height: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, fontSize: 16, fontWeight: '700' },
+  goGoldInputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
+  goGoldInputEmoji:  { fontSize: 24 },
+  goGoldInput:       { flex: 1, height: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, fontSize: 16, fontWeight: '700' },
   giftItem:         { flex: 1, alignItems: 'center', padding: 8, borderRadius: 12, borderWidth: 1.5, borderColor: 'transparent' },
   giftItemActive:   { borderColor: '#E85DAD', backgroundColor: 'rgba(232,93,173,0.1)' },
   giftEmoji:        { fontSize: 26 },

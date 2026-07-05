@@ -23,7 +23,7 @@ interface Contribution {
   username?: string;
   display_name?: string;
   avatar_url?: string;
-  coins_paid: number;
+  gogold_paid: number;
   status: 'pending' | 'paid' | 'exempt';
   note?: string;
   paid_at?: string;
@@ -35,8 +35,8 @@ interface Cotisation {
   title: string;
   description?: string;
   amount_per_member: number;
-  target_amount_coins: number;
-  collected_coins: number;
+  target_amount_gogold: number;
+  collected_gogold: number;
   member_count_paid: number;
   member_count_total: number;
   progress_pct: number;
@@ -213,11 +213,11 @@ export const CommunityFundDetailScreen: React.FC = () => {
                   <View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                       <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 22 }}>
-                        {cotisation.collected_coins.toLocaleString('fr-FR')}
-                        <Text style={{ fontSize: 13, fontWeight: '400', color: colors.textTertiary }}> coins</Text>
+                        {cotisation.collected_gogold.toLocaleString('fr-FR')}
+                        <Text style={{ fontSize: 13, fontWeight: '400', color: colors.textTertiary }}> GoGold</Text>
                       </Text>
                       <Text style={{ color: colors.textTertiary, fontSize: 13, alignSelf: 'flex-end' }}>
-                        sur {cotisation.target_amount_coins.toLocaleString('fr-FR')}
+                        sur {cotisation.target_amount_gogold.toLocaleString('fr-FR')}
                       </Text>
                     </View>
                     <View style={[st.progressTrack, { backgroundColor: colors.backgroundSecondary }]}>
@@ -235,7 +235,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
                   {/* Stats 4 blocs */}
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     {[
-                      { val: cotisation.amount_per_member,       lbl: 'Par membre',  color: '#7B3FF2', suffix: ' coins' },
+                      { val: cotisation.amount_per_member,       lbl: 'Par membre',  color: '#7B3FF2', suffix: ' GoGold' },
                       { val: cotisation.member_count_paid,       lbl: 'Payé',        color: '#10B981', suffix: `/${cotisation.member_count_total}` },
                       { val: pendingCount,                       lbl: 'En attente',  color: '#F59E0B', suffix: '' },
                       { val: exemptCount,                        lbl: 'Exemptés',    color: '#3B82F6', suffix: '' },
@@ -277,7 +277,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
             )}
 
             {/* Bouton retrait — demande formelle via trésorier */}
-            {isAdmin && cotisation.status === 'closed' && cotisation.collected_coins > 0 && (
+            {isAdmin && cotisation.status === 'closed' && cotisation.collected_gogold > 0 && (
               <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
                 <TouchableOpacity
                   onPress={() => nav.navigate('CommunityTreasurer', {
@@ -375,7 +375,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 {item.status === 'paid' ? (
                   <Text style={{ color: '#10B981', fontWeight: '800', fontSize: 14 }}>
-                    +{item.coins_paid} coins
+                    +{item.gogold_paid} GoGold
                   </Text>
                 ) : item.status === 'pending' ? (
                   <Text style={{ color: '#F59E0B', fontWeight: '600', fontSize: 12 }}>

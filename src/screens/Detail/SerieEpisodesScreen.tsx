@@ -236,12 +236,12 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
   const [hasAccess, setHasAccess]         = useState(!item.is_premium);
   const [accessLoading, setAccessLoading] = useState(item.is_premium);
   const [showPaywall, setShowPaywall]     = useState(false);
-  const [walletCoins, setWalletCoins]     = useState(0);
+  const [walletGoGold, setWalletGoGold]     = useState(0);
   const [purchasing, setPurchasing]       = useState(false);
   const [playingEpId, setPlayingEpId]     = useState<string | null>(null);
 
-  const coinsRequired = Math.round((item.price ?? 0) * 100); // 1 € = 100 coins
-  const canAfford     = walletCoins >= coinsRequired;
+  const goGoldRequired = Math.round((item.price ?? 0) * 100); // 1 € = 100 GoGold
+  const canAfford     = walletGoGold >= goGoldRequired;
   const banner        = item.banner_url || item.thumbnail_url;
   const synopsis      = (item as any).synopsis || (item as any).short_synopsis;
 
@@ -257,11 +257,11 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!item.is_premium) return;
     Promise.all([
       apiClient.get<{ has_access: boolean }>(Endpoints.content.serieAccess(item.id)),
-      apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance),
+      apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance),
     ])
       .then(([accessRes, walletRes]) => {
         setHasAccess(accessRes.data?.has_access ?? false);
-        setWalletCoins(walletRes.data?.coins_balance ?? 0);
+        setWalletGoGold(walletRes.data?.gogold_balance ?? 0);
       })
       .catch(() => {})
       .finally(() => setAccessLoading(false));
@@ -274,7 +274,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
         Endpoints.content.seriePurchase(item.id), {},
       );
       setHasAccess(true);
-      setWalletCoins(res.data?.new_balance ?? 0);
+      setWalletGoGold(res.data?.new_balance ?? 0);
       setShowPaywall(false);
       Alert.alert('Accès obtenu', `Vous pouvez maintenant regarder "${item.title}".`);
     } catch (err: any) {
@@ -425,7 +425,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={pw2.bannerIcon}><Icon name="lock" size={14} color="#fff" /></View>
               <View style={{ flex: 1 }}>
                 <Text style={pw2.bannerTitle}>Déverrouiller toute la série</Text>
-                <Text style={pw2.bannerSub}>{coinsRequired} coins · {item.price} €</Text>
+                <Text style={pw2.bannerSub}>{goGoldRequired} GoGold · {item.price} €</Text>
               </View>
               <Icon name="chevron-right" size={18} color="rgba(255,255,255,0.8)" />
             </LinearGradient>
@@ -564,7 +564,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={[pw.cardLabel, { color: colors.textSecondary }]}>Prix</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[pw.cardValue, { color: colors.textPrimary }]}>{coinsRequired} coins</Text>
+                  <Text style={[pw.cardValue, { color: colors.textPrimary }]}>{goGoldRequired} GoGold</Text>
                   <Text style={[pw.cardSub, { color: colors.textTertiary }]}>{item.price} €</Text>
                 </View>
               </View>
@@ -578,11 +578,11 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={[pw.cardValue, { color: canAfford ? '#10b981' : '#ef4444', fontWeight: '800' }]}>
-                    {walletCoins} coins
+                    {walletGoGold} GoGold
                   </Text>
                   {!canAfford && (
                     <Text style={[pw.cardSub, { color: '#ef4444' }]}>
-                      manque {coinsRequired - walletCoins}
+                      manque {goGoldRequired - walletGoGold}
                     </Text>
                   )}
                 </View>
@@ -614,7 +614,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
                 <LinearGradient colors={[ORANGE, '#FF4500']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={pw.btn}>
                   {purchasing
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <><Icon name="unlock" size={17} color="#fff" /><Text style={pw.btnTxt}>Acheter — {coinsRequired} coins</Text></>
+                    : <><Icon name="unlock" size={17} color="#fff" /><Text style={pw.btnTxt}>Acheter — {goGoldRequired} GoGold</Text></>
                   }
                 </LinearGradient>
               </TouchableOpacity>
@@ -626,7 +626,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
               >
                 <LinearGradient colors={[PURPLE, '#5B2DB0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={pw.btn}>
                   <Icon name="plus-circle" size={17} color="#fff" />
-                  <Text style={pw.btnTxt}>Recharger — manque {coinsRequired - walletCoins} coins</Text>
+                  <Text style={pw.btnTxt}>Recharger — manque {goGoldRequired - walletGoGold} GoGold</Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}

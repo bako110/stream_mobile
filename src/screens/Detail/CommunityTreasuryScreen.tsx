@@ -16,7 +16,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 
 interface WalletInfo {
-  coins_balance:   number;
+  gogold_balance:   number;
   total_received:  number;
   total_withdrawn: number;
   eur_balance:     number;
@@ -27,7 +27,7 @@ interface TxItem {
   id:           string;
   tx_type:      string;
   label:        string;
-  coins_amount: number;
+  gogold_amount: number;
   balance_after:number;
   description:  string;
   actor_name?:  string;
@@ -128,8 +128,8 @@ export const CommunityTreasuryScreen: React.FC = () => {
 
                 <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginBottom: 4 }}>Solde disponible</Text>
                 <Text style={{ color: '#fff', fontSize: 36, fontWeight: '900', letterSpacing: -1 }}>
-                  {(wallet?.coins_balance ?? 0).toLocaleString('fr-FR')}
-                  <Text style={{ fontSize: 16, fontWeight: '400' }}> coins</Text>
+                  {(wallet?.gogold_balance ?? 0).toLocaleString('fr-FR')}
+                  <Text style={{ fontSize: 16, fontWeight: '400' }}> GoGold</Text>
                 </Text>
                 <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 2 }}>
                   ≈ {wallet?.eur_balance?.toFixed(2) ?? '0.00'} €
@@ -138,8 +138,8 @@ export const CommunityTreasuryScreen: React.FC = () => {
                 {/* Stats bas */}
                 <View style={{ flexDirection: 'row', marginTop: 18, gap: 8 }}>
                   {[
-                    { lbl: 'Total collecté', val: `${(wallet?.total_received ?? 0).toLocaleString('fr-FR')} coins`, sub: `${wallet?.eur_received?.toFixed(2) ?? '0.00'} €` },
-                    { lbl: 'Total retiré',   val: `${(wallet?.total_withdrawn ?? 0).toLocaleString('fr-FR')} coins`, sub: `${((wallet?.total_withdrawn ?? 0) / 100).toFixed(2)} €` },
+                    { lbl: 'Total collecté', val: `${(wallet?.total_received ?? 0).toLocaleString('fr-FR')} GoGold`, sub: `${wallet?.eur_received?.toFixed(2) ?? '0.00'} €` },
+                    { lbl: 'Total retiré',   val: `${(wallet?.total_withdrawn ?? 0).toLocaleString('fr-FR')} GoGold`, sub: `${((wallet?.total_withdrawn ?? 0) / 100).toFixed(2)} €` },
                   ].map(s => (
                     <View key={s.lbl} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.12)',
                       borderRadius: 14, padding: 12 }}>
@@ -163,7 +163,7 @@ export const CommunityTreasuryScreen: React.FC = () => {
           }
           renderItem={({ item }) => {
             const cfg = TX_ICONS[item.tx_type] ?? { icon: 'activity', color: '#7B3FF2' };
-            const isCredit = item.coins_amount > 0;
+            const isCredit = item.gogold_amount > 0;
             return (
               <View style={[st.txRow, { borderBottomColor: colors.divider }]}>
                 {/* Icône */}
@@ -194,7 +194,7 @@ export const CommunityTreasuryScreen: React.FC = () => {
                 {/* Montant */}
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
                   <Text style={{ color: isCredit ? '#10B981' : '#EF4444', fontWeight: '800', fontSize: 15 }}>
-                    {isCredit ? '+' : ''}{item.coins_amount.toLocaleString('fr-FR')}
+                    {isCredit ? '+' : ''}{item.gogold_amount.toLocaleString('fr-FR')}
                   </Text>
                   <Text style={{ color: colors.textTertiary, fontSize: 10 }}>
                     Solde : {item.balance_after.toLocaleString('fr-FR')}

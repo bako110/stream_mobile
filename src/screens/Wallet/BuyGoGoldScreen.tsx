@@ -8,7 +8,7 @@ import { useTheme } from '../../hooks/useTheme';
 
 const CONTACT_EMAIL = 'contact@gofolyx.com';
 
-const BuyCoinsScreen: React.FC = () => {
+const BuyGoGoldScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<any>();
@@ -35,7 +35,7 @@ const BuyCoinsScreen: React.FC = () => {
           Fonctionnalité en maintenance
         </Text>
         <Text style={[s.subtitle, { color: colors.textSecondary }]}>
-          Le dépôt de coins sera disponible très prochainement.{'\n'}
+          Le dépôt de GoGold sera disponible très prochainement.{'\n'}
           En attendant, utilisez la version web sur{' '}
           <Text style={{ color: '#9B65F5', fontWeight: '700' }}>gofolyx.com</Text>
         </Text>
@@ -131,4 +131,4 @@ const s = StyleSheet.create({
   },
 });
 
-export default BuyCoinsScreen;
+export default BuyGoGoldScreen;

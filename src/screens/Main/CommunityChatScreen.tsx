@@ -140,7 +140,7 @@ export const CommunityChatScreen: React.FC = () => {
   const [membersOnlyChat,     setMembersOnlyChat]     = useState(false);
   const [activeCotisation,    setActiveCotisation]    = useState<{
     id: string; title: string; amount_per_member: number;
-    progress_pct: number; collected_coins: number; target_amount_coins: number;
+    progress_pct: number; collected_gogold: number; target_amount_gogold: number;
     my_status?: string;
   } | null>(null);
   const [activeElection, setActiveElection] = useState<{
@@ -1749,7 +1749,7 @@ export const CommunityChatScreen: React.FC = () => {
                   ? `Vous avez payé · ${activeCotisation.progress_pct}% collecté`
                   : activeCotisation.my_status === 'exempt'
                   ? 'Vous êtes exempté de cette cotisation'
-                  : `${activeCotisation.amount_per_member} coins requis · ${activeCotisation.progress_pct}% collecté`}
+                  : `${activeCotisation.amount_per_member} GoGold requis · ${activeCotisation.progress_pct}% collecté`}
               </Text>
             </View>
             {/* Badge statut */}

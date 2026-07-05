@@ -17,6 +17,7 @@ const _heartRainPlayed = new Set<string>();
 
 interface Drop { id: number; left: number; delay: number; duration: number; size: number; color: string }
 
+
 function FallingHeart({ drop }: { drop: Drop }) {
   const progress = useSharedValue(0);
 

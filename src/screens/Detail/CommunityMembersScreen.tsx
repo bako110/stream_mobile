@@ -89,9 +89,9 @@ const AnimBar: React.FC<{ progress: number; color: string }> = ({ progress, colo
 // ── Carte podium ─────────────────────────────────────────────────────────────
 const PodiumCard: React.FC<{
   member: CommunityMemberData; rank: 1 | 2 | 3;
-  onPress: () => void; maxCoins: number;
-}> = ({ member, rank, onPress, maxCoins }) => {
-  const coins = (member as any).coins ?? 0;
+  onPress: () => void; maxGoGold: number;
+}> = ({ member, rank, onPress, maxGoGold }) => {
+  const GoGold = (member as any).GoGold ?? 0;
   const mc = MEDAL_COLOR[rank];
   const gradients: Record<number, string[]> = {
     1: ['#4A2080', '#7B3FF2'], 2: ['#1C1830', '#2A2248'], 3: ['#1A1530', '#251D42'],
@@ -111,16 +111,16 @@ const PodiumCard: React.FC<{
         <Text style={{ color: '#fff', fontSize: rank === 1 ? 13 : 12, fontWeight: '700', textAlign: 'center' }} numberOfLines={1}>
           {member.display_name || member.username}
         </Text>
-        {coins > 0 && (
+        {GoGold > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3,
             backgroundColor: '#F59E0B22', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
             <Text style={{ fontSize: 11 }}>⚡</Text>
             <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '800' }}>
-              {coins >= 1000 ? `${(coins / 1000).toFixed(1)}k` : coins}
+              {GoGold >= 1000 ? `${(GoGold / 1000).toFixed(1)}k` : GoGold}
             </Text>
           </View>
         )}
-        {coins > 0 && <AnimBar progress={maxCoins > 0 ? coins / maxCoins : 0} color={mc} />}
+        {GoGold > 0 && <AnimBar progress={maxGoGold > 0 ? GoGold / maxGoGold : 0} color={mc} />}
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -129,7 +129,7 @@ const PodiumCard: React.FC<{
 // ── Carte membre ──────────────────────────────────────────────────────────────
 const MemberCard: React.FC<{ member: CommunityMemberData; rank?: number; onPress: () => void; colors: any }> = ({ member, rank, onPress, colors }) => {
   const roleColor = ROLE_COLOR[member.role] ?? '#3B82F6';
-  const coins = (member as any).coins ?? 0;
+  const GoGold = (member as any).GoGold ?? 0;
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}
       style={[st.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -159,10 +159,10 @@ const MemberCard: React.FC<{ member: CommunityMemberData; rank?: number; onPress
           </Text>
         )}
       </View>
-      {coins > 0 && (
+      {GoGold > 0 && (
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
-          <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '800' }}>⚡ {coins >= 1000 ? `${(coins / 1000).toFixed(1)}k` : coins}</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 10 }}>coins</Text>
+          <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '800' }}>⚡ {GoGold >= 1000 ? `${(GoGold / 1000).toFixed(1)}k` : GoGold}</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: 10 }}>GoGold</Text>
         </View>
       )}
       <Icon name="chevron-right" size={15} color={colors.textTertiary} style={{ marginLeft: 4 }} />
@@ -229,11 +229,11 @@ export default function CommunityMembersScreen({ route }: Props) {
     member: members.filter(m => m.role === 'member').length,
   };
 
-  // Podium — top 3 par coins si disponible
-  const sorted = [...members].sort((a, b) => ((b as any).coins ?? 0) - ((a as any).coins ?? 0));
+  // Podium — top 3 par GoGold si disponible
+  const sorted = [...members].sort((a, b) => ((b as any).GoGold ?? 0) - ((a as any).GoGold ?? 0));
   const top3 = sorted.slice(0, 3);
-  const maxCoins = (top3[0] as any)?.coins ?? 0;
-  const showPodium = roleFilter === 'all' && search.trim() === '' && top3.length === 3 && maxCoins > 0;
+  const maxGoGold = (top3[0] as any)?.GoGold ?? 0;
+  const showPodium = roleFilter === 'all' && search.trim() === '' && top3.length === 3 && maxGoGold > 0;
 
   if (blockedForPublic || blockedForMembers) {
     return (
@@ -358,9 +358,9 @@ export default function CommunityMembersScreen({ route }: Props) {
                 TOP MEMBRES
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-                <PodiumCard member={top3[1]} rank={2} onPress={() => onPress(top3[1])} maxCoins={maxCoins} />
-                <PodiumCard member={top3[0]} rank={1} onPress={() => onPress(top3[0])} maxCoins={maxCoins} />
-                <PodiumCard member={top3[2]} rank={3} onPress={() => onPress(top3[2])} maxCoins={maxCoins} />
+                <PodiumCard member={top3[1]} rank={2} onPress={() => onPress(top3[1])} maxGoGold={maxGoGold} />
+                <PodiumCard member={top3[0]} rank={1} onPress={() => onPress(top3[0])} maxGoGold={maxGoGold} />
+                <PodiumCard member={top3[2]} rank={3} onPress={() => onPress(top3[2])} maxGoGold={maxGoGold} />
               </View>
               <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '700',
                 letterSpacing: 0.9, textTransform: 'uppercase', paddingHorizontal: 4,

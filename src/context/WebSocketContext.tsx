@@ -22,7 +22,7 @@ import { cancelCallNotification } from '../services/fcmService';
 import {
   createWsEventHandler,
   type NewFollowerPayload,
-  type CoinTransferPayload,
+  type GoGoldTransferPayload,
   type GiftReceivedPayload,
   type StoryAddedPayload,
   type StoryViewPayload,
@@ -96,7 +96,7 @@ interface WebSocketContextValue {
   clearPendingIncomingCall: () => void;
   // Events temps-réel enrichis
   lastNewFollower:          NewFollowerPayload | null;
-  lastCoinTransfer:         CoinTransferPayload | null;
+  lastGoGoldTransfer:         GoGoldTransferPayload | null;
   lastGiftReceived:         GiftReceivedPayload | null;
   lastStoryAdded:           StoryAddedPayload | null;
   lastStoryView:            StoryViewPayload | null;
@@ -134,7 +134,7 @@ const Ctx = createContext<WebSocketContextValue>({
   pendingIncomingCall:      null,
   clearPendingIncomingCall: () => {},
   lastNewFollower:          null,
-  lastCoinTransfer:         null,
+  lastGoGoldTransfer:         null,
   lastGiftReceived:         null,
   lastStoryAdded:           null,
   lastStoryView:            null,
@@ -184,7 +184,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
 
   // États des événements enrichis
   const [lastNewFollower,       setLastNewFollower]       = useState<NewFollowerPayload | null>(null);
-  const [lastCoinTransfer,      setLastCoinTransfer]      = useState<CoinTransferPayload | null>(null);
+  const [lastGoGoldTransfer,      setLastGoGoldTransfer]      = useState<GoGoldTransferPayload | null>(null);
   const [lastGiftReceived,      setLastGiftReceived]      = useState<GiftReceivedPayload | null>(null);
   const [lastStoryAdded,        setLastStoryAdded]        = useState<StoryAddedPayload | null>(null);
   const [lastStoryView,         setLastStoryView]         = useState<StoryViewPayload | null>(null);
@@ -211,7 +211,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     onCommentOnContent:   (d) => { if (isMounted.current) { setLastCommentOnContent(d); setUnreadActivity(n => n + 1); } },
     onReactionOnContent:  (d) => { if (isMounted.current) { setLastReactionOnContent(d); setUnreadActivity(n => n + 1); } },
     onNewFollower:        (d) => { if (isMounted.current) { setLastNewFollower(d); setUnreadActivity(n => n + 1); } },
-    onCoinTransferReceived: (d) => { if (isMounted.current) { setLastCoinTransfer(d); setUnreadNotifications(n => n + 1); } },
+    onGoGoldTransferReceived: (d) => { if (isMounted.current) { setLastGoGoldTransfer(d); setUnreadNotifications(n => n + 1); } },
     onGiftReceived:       (d) => { if (isMounted.current) { setLastGiftReceived(d); setUnreadNotifications(n => n + 1); } },
     onPresence:           (d) => { if (isMounted.current) setLastPresenceUpdate(d); },
     onConcertLive:        (d) => { if (isMounted.current) setLastConcertLive(d); },
@@ -602,7 +602,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     clearPendingIncomingCall,
     pendingIncomingCall,
     lastNewFollower,
-    lastCoinTransfer,
+    lastGoGoldTransfer,
     lastGiftReceived,
     lastStoryAdded,
     lastStoryView,
@@ -620,7 +620,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     notifyCallConnected, notifyCallEnded, markCallAccepted, markCallEnded,
     isOutgoingCall, drainCallBuffer,
     pendingIncomingCall, clearPendingIncomingCall,
-    lastNewFollower, lastCoinTransfer, lastGiftReceived, lastStoryAdded,
+    lastNewFollower, lastGoGoldTransfer, lastGiftReceived, lastStoryAdded,
     lastStoryView, lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate,
     lastConcertLive, lastLiveStarted, lastLiveEnded, liveUserIds, lastLiveViewersUpdated,
   ]);

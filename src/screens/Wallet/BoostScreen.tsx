@@ -22,7 +22,7 @@ interface BoostSuggestion {
   target: string;
   tier_id: string;
   tier_label: string;
-  coins: number;
+  GoGold: number;
   duration_days: number;
   target_quantity: number;
   quantity_label: string;
@@ -44,7 +44,7 @@ interface BoostTier {
   quantity_num: number;
   duration: string;
   duration_days: number;
-  coins: number;
+  GoGold: number;
   popular?: boolean;
 }
 
@@ -74,7 +74,7 @@ interface BoostRecord {
   tier_label: string;
   quantity_label: string;
   duration_days: number;
-  coins_spent: number;
+  gogold_spent: number;
   status: 'active' | 'completed' | 'cancelled' | 'paused';
   progress: number;
   delivered_quantity: number;
@@ -101,10 +101,10 @@ const BOOST_CATEGORIES: BoostCategory[] = [
     icon: 'users',
     gradient: ['#7B3FF2', '#E0389A'],
     tiers: [
-      { id: 'f1', label: 'Starter', quantity: '+50 abonnes',    quantity_num: 50,   duration: '3 jours',  duration_days: 3,  coins: 200 },
-      { id: 'f2', label: 'Growth',  quantity: '+150 abonnes',   quantity_num: 150,  duration: '7 jours',  duration_days: 7,  coins: 500, popular: true },
-      { id: 'f3', label: 'Viral',   quantity: '+500 abonnes',   quantity_num: 500,  duration: '14 jours', duration_days: 14, coins: 1500 },
-      { id: 'f4', label: 'Mega',    quantity: '+2 000 abonnes', quantity_num: 2000, duration: '30 jours', duration_days: 30, coins: 5000 },
+      { id: 'f1', label: 'Starter', quantity: '+50 abonnes',    quantity_num: 50,   duration: '3 jours',  duration_days: 3,  GoGold: 200 },
+      { id: 'f2', label: 'Growth',  quantity: '+150 abonnes',   quantity_num: 150,  duration: '7 jours',  duration_days: 7,  GoGold: 500, popular: true },
+      { id: 'f3', label: 'Viral',   quantity: '+500 abonnes',   quantity_num: 500,  duration: '14 jours', duration_days: 14, GoGold: 1500 },
+      { id: 'f4', label: 'Mega',    quantity: '+2 000 abonnes', quantity_num: 2000, duration: '30 jours', duration_days: 30, GoGold: 5000 },
     ],
   },
   {
@@ -115,10 +115,10 @@ const BOOST_CATEGORIES: BoostCategory[] = [
     icon: 'eye',
     gradient: ['#FF8C00', '#FF4500'],
     tiers: [
-      { id: 'p1', label: 'Starter', quantity: '500 vues',    quantity_num: 500,   duration: '2 jours',  duration_days: 2,  coins: 150 },
-      { id: 'p2', label: 'Growth',  quantity: '2 000 vues',  quantity_num: 2000,  duration: '5 jours',  duration_days: 5,  coins: 400, popular: true },
-      { id: 'p3', label: 'Viral',   quantity: '10 000 vues', quantity_num: 10000, duration: '10 jours', duration_days: 10, coins: 1200 },
-      { id: 'p4', label: 'Mega',    quantity: '50 000 vues', quantity_num: 50000, duration: '21 jours', duration_days: 21, coins: 4000 },
+      { id: 'p1', label: 'Starter', quantity: '500 vues',    quantity_num: 500,   duration: '2 jours',  duration_days: 2,  GoGold: 150 },
+      { id: 'p2', label: 'Growth',  quantity: '2 000 vues',  quantity_num: 2000,  duration: '5 jours',  duration_days: 5,  GoGold: 400, popular: true },
+      { id: 'p3', label: 'Viral',   quantity: '10 000 vues', quantity_num: 10000, duration: '10 jours', duration_days: 10, GoGold: 1200 },
+      { id: 'p4', label: 'Mega',    quantity: '50 000 vues', quantity_num: 50000, duration: '21 jours', duration_days: 21, GoGold: 4000 },
     ],
   },
   {
@@ -129,10 +129,10 @@ const BOOST_CATEGORIES: BoostCategory[] = [
     icon: 'trending-up',
     gradient: ['#10B981', '#06B6D4'],
     tiers: [
-      { id: 'c1', label: 'Starter', quantity: '1 000 impressions',   quantity_num: 1000,   duration: '3 jours',  duration_days: 3,  coins: 250 },
-      { id: 'c2', label: 'Growth',  quantity: '5 000 impressions',   quantity_num: 5000,   duration: '7 jours',  duration_days: 7,  coins: 700, popular: true },
-      { id: 'c3', label: 'Viral',   quantity: '20 000 impressions',  quantity_num: 20000,  duration: '14 jours', duration_days: 14, coins: 2000 },
-      { id: 'c4', label: 'Mega',    quantity: '100 000 impressions', quantity_num: 100000, duration: '30 jours', duration_days: 30, coins: 7000 },
+      { id: 'c1', label: 'Starter', quantity: '1 000 impressions',   quantity_num: 1000,   duration: '3 jours',  duration_days: 3,  GoGold: 250 },
+      { id: 'c2', label: 'Growth',  quantity: '5 000 impressions',   quantity_num: 5000,   duration: '7 jours',  duration_days: 7,  GoGold: 700, popular: true },
+      { id: 'c3', label: 'Viral',   quantity: '20 000 impressions',  quantity_num: 20000,  duration: '14 jours', duration_days: 14, GoGold: 2000 },
+      { id: 'c4', label: 'Mega',    quantity: '100 000 impressions', quantity_num: 100000, duration: '30 jours', duration_days: 30, GoGold: 7000 },
     ],
   },
   {
@@ -145,10 +145,10 @@ const BOOST_CATEGORIES: BoostCategory[] = [
     contentType: 'reel',
     targetLabel: 'Choisir un Reel',
     tiers: [
-      { id: 'r1', label: 'Starter', quantity: '1 000 vues',    quantity_num: 1000,   duration: '2 jours',  duration_days: 2,  coins: 200 },
-      { id: 'r2', label: 'Growth',  quantity: '5 000 vues',    quantity_num: 5000,   duration: '5 jours',  duration_days: 5,  coins: 600, popular: true },
-      { id: 'r3', label: 'Viral',   quantity: '25 000 vues',   quantity_num: 25000,  duration: '10 jours', duration_days: 10, coins: 2000 },
-      { id: 'r4', label: 'Mega',    quantity: '100 000 vues',  quantity_num: 100000, duration: '20 jours', duration_days: 20, coins: 6000 },
+      { id: 'r1', label: 'Starter', quantity: '1 000 vues',    quantity_num: 1000,   duration: '2 jours',  duration_days: 2,  GoGold: 200 },
+      { id: 'r2', label: 'Growth',  quantity: '5 000 vues',    quantity_num: 5000,   duration: '5 jours',  duration_days: 5,  GoGold: 600, popular: true },
+      { id: 'r3', label: 'Viral',   quantity: '25 000 vues',   quantity_num: 25000,  duration: '10 jours', duration_days: 10, GoGold: 2000 },
+      { id: 'r4', label: 'Mega',    quantity: '100 000 vues',  quantity_num: 100000, duration: '20 jours', duration_days: 20, GoGold: 6000 },
     ],
   },
   {
@@ -161,10 +161,10 @@ const BOOST_CATEGORIES: BoostCategory[] = [
     contentType: 'post',
     targetLabel: 'Choisir un post',
     tiers: [
-      { id: 'po1', label: 'Starter', quantity: '2 000 impressions',   quantity_num: 2000,   duration: '2 jours',  duration_days: 2,  coins: 200 },
-      { id: 'po2', label: 'Growth',  quantity: '8 000 impressions',   quantity_num: 8000,   duration: '5 jours',  duration_days: 5,  coins: 550, popular: true },
-      { id: 'po3', label: 'Viral',   quantity: '30 000 impressions',  quantity_num: 30000,  duration: '10 jours', duration_days: 10, coins: 1600 },
-      { id: 'po4', label: 'Mega',    quantity: '120 000 impressions', quantity_num: 120000, duration: '21 jours', duration_days: 21, coins: 5500 },
+      { id: 'po1', label: 'Starter', quantity: '2 000 impressions',   quantity_num: 2000,   duration: '2 jours',  duration_days: 2,  GoGold: 200 },
+      { id: 'po2', label: 'Growth',  quantity: '8 000 impressions',   quantity_num: 8000,   duration: '5 jours',  duration_days: 5,  GoGold: 550, popular: true },
+      { id: 'po3', label: 'Viral',   quantity: '30 000 impressions',  quantity_num: 30000,  duration: '10 jours', duration_days: 10, GoGold: 1600 },
+      { id: 'po4', label: 'Mega',    quantity: '120 000 impressions', quantity_num: 120000, duration: '21 jours', duration_days: 21, GoGold: 5500 },
     ],
   },
   {
@@ -177,10 +177,10 @@ const BOOST_CATEGORIES: BoostCategory[] = [
     contentType: 'event',
     targetLabel: 'Choisir un evenement',
     tiers: [
-      { id: 'ev1', label: 'Starter', quantity: '500 personnes',    quantity_num: 500,   duration: '2 jours',  duration_days: 2,  coins: 300 },
-      { id: 'ev2', label: 'Growth',  quantity: '2 000 personnes',  quantity_num: 2000,  duration: '5 jours',  duration_days: 5,  coins: 800, popular: true },
-      { id: 'ev3', label: 'Viral',   quantity: '8 000 personnes',  quantity_num: 8000,  duration: '10 jours', duration_days: 10, coins: 2200 },
-      { id: 'ev4', label: 'Mega',    quantity: '30 000 personnes', quantity_num: 30000, duration: '20 jours', duration_days: 20, coins: 7000 },
+      { id: 'ev1', label: 'Starter', quantity: '500 personnes',    quantity_num: 500,   duration: '2 jours',  duration_days: 2,  GoGold: 300 },
+      { id: 'ev2', label: 'Growth',  quantity: '2 000 personnes',  quantity_num: 2000,  duration: '5 jours',  duration_days: 5,  GoGold: 800, popular: true },
+      { id: 'ev3', label: 'Viral',   quantity: '8 000 personnes',  quantity_num: 8000,  duration: '10 jours', duration_days: 10, GoGold: 2200 },
+      { id: 'ev4', label: 'Mega',    quantity: '30 000 personnes', quantity_num: 30000, duration: '20 jours', duration_days: 20, GoGold: 7000 },
     ],
   },
   {
@@ -193,10 +193,10 @@ const BOOST_CATEGORIES: BoostCategory[] = [
     contentType: 'concert',
     targetLabel: 'Choisir un concert',
     tiers: [
-      { id: 'co1', label: 'Starter', quantity: '300 personnes',    quantity_num: 300,   duration: '1 jour',   duration_days: 1,  coins: 400 },
-      { id: 'co2', label: 'Growth',  quantity: '1 500 personnes',  quantity_num: 1500,  duration: '3 jours',  duration_days: 3,  coins: 1000, popular: true },
-      { id: 'co3', label: 'Viral',   quantity: '5 000 personnes',  quantity_num: 5000,  duration: '7 jours',  duration_days: 7,  coins: 2800 },
-      { id: 'co4', label: 'Mega',    quantity: '20 000 personnes', quantity_num: 20000, duration: '14 jours', duration_days: 14, coins: 8000 },
+      { id: 'co1', label: 'Starter', quantity: '300 personnes',    quantity_num: 300,   duration: '1 jour',   duration_days: 1,  GoGold: 400 },
+      { id: 'co2', label: 'Growth',  quantity: '1 500 personnes',  quantity_num: 1500,  duration: '3 jours',  duration_days: 3,  GoGold: 1000, popular: true },
+      { id: 'co3', label: 'Viral',   quantity: '5 000 personnes',  quantity_num: 5000,  duration: '7 jours',  duration_days: 7,  GoGold: 2800 },
+      { id: 'co4', label: 'Mega',    quantity: '20 000 personnes', quantity_num: 20000, duration: '14 jours', duration_days: 14, GoGold: 8000 },
     ],
   },
   {
@@ -209,10 +209,10 @@ const BOOST_CATEGORIES: BoostCategory[] = [
     contentType: 'live',
     targetLabel: 'Choisir un concert live',
     tiers: [
-      { id: 'lv1', label: 'Starter', quantity: '100 viewers',   quantity_num: 100,  duration: '1 jour',  duration_days: 1, coins: 300 },
-      { id: 'lv2', label: 'Growth',  quantity: '500 viewers',   quantity_num: 500,  duration: '2 jours', duration_days: 2, coins: 800, popular: true },
-      { id: 'lv3', label: 'Viral',   quantity: '2 000 viewers', quantity_num: 2000, duration: '3 jours', duration_days: 3, coins: 2000 },
-      { id: 'lv4', label: 'Mega',    quantity: '8 000 viewers', quantity_num: 8000, duration: '7 jours', duration_days: 7, coins: 6000 },
+      { id: 'lv1', label: 'Starter', quantity: '100 viewers',   quantity_num: 100,  duration: '1 jour',  duration_days: 1, GoGold: 300 },
+      { id: 'lv2', label: 'Growth',  quantity: '500 viewers',   quantity_num: 500,  duration: '2 jours', duration_days: 2, GoGold: 800, popular: true },
+      { id: 'lv3', label: 'Viral',   quantity: '2 000 viewers', quantity_num: 2000, duration: '3 jours', duration_days: 3, GoGold: 2000 },
+      { id: 'lv4', label: 'Mega',    quantity: '8 000 viewers', quantity_num: 8000, duration: '7 jours', duration_days: 7, GoGold: 6000 },
     ],
   },
 ];
@@ -242,7 +242,7 @@ const CUSTOM_REACH_CONFIG: Record<string, { min: number; max: number; step: numb
   live_viewers:  { min: 10,  max: 10000,  step: 10,  presets: [100, 500, 2000, 8000] },
 };
 
-function computeCustomCoins(catId: string, reach: number, days: number): number {
+function computeCustomGoGold(catId: string, reach: number, days: number): number {
   const rate = CUSTOM_RATES[catId] ?? 0.02;
   return Math.max(50, Math.round(rate * reach * days));
 }
@@ -391,11 +391,11 @@ const ActiveBoostCard: React.FC<{
   async function handleStop() {
     setStopping(true);
     try {
-      const res = await apiClient.delete<{ message: string; refund_coins: number; new_balance: number }>(
+      const res = await apiClient.delete<{ message: string; refund_gogold: number; new_balance: number }>(
         Endpoints.wallet.boostCancel(boost.id)
       );
       setShowStop(false);
-      onCancelled(boost.id, res.data.refund_coins, res.data.new_balance);
+      onCancelled(boost.id, res.data.refund_gogold, res.data.new_balance);
     } catch (e: any) {
       Alert.alert('Erreur', e?.response?.data?.detail ?? "Echec de l'annulation.");
     } finally { setStopping(false); }
@@ -460,7 +460,7 @@ const ActiveBoostCard: React.FC<{
             {[
               { icon: 'trending-up', label: 'Multiplicateur', val: mult > 1 ? `×${mult.toFixed(1)}` : '×1.0', color: g1 },
               { icon: 'eye',         label: 'Impressions',    val: fmtNum(boost.impression_count ?? 0), color: '#3B82F6' },
-              { icon: 'zap',         label: 'Coins',          val: fmtNum(boost.coins_spent), color: '#F59E0B' },
+              { icon: 'zap',         label: 'GoGold',          val: fmtNum(boost.gogold_spent), color: '#F59E0B' },
               { icon: 'clock',       label: boost.status === 'active' ? 'Expire' : 'Durée',
                 val: boost.status === 'active'
                   ? new Date(boost.expires_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
@@ -486,7 +486,7 @@ const ActiveBoostCard: React.FC<{
                 <Icon name="square" size={13} color="#EF4444" />
                 <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13 }}>Arrêter le boost</Text>
                 <Text style={{ color: '#EF444480', fontSize: 11 }}>
-                  (+{Math.round(boost.coins_spent * 0.9).toLocaleString('fr-FR')} coins remboursés)
+                  (+{Math.round(boost.gogold_spent * 0.9).toLocaleString('fr-FR')} GoGold remboursés)
                 </Text>
               </TouchableOpacity>
             ) : (
@@ -507,12 +507,12 @@ const ActiveBoostCard: React.FC<{
             <View style={[ms.handle, { backgroundColor: colors.border }]} />
             <Text style={[ms.title, { color: colors.textPrimary }]}>Arrêter le boost ?</Text>
             <Text style={[ms.sub, { color: colors.textSecondary }]}>
-              Annulation dans les 30 premières minutes. 90% des coins vous sont remboursés.
+              Annulation dans les 30 premières minutes. 90% des GoGold vous sont remboursés.
             </Text>
             <View style={[ms.refundBox, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
               <Icon name="gift" size={18} color="#22C55E" />
               <Text style={[ms.refundText, { color: '#22C55E' }]}>
-                +{Math.round(boost.coins_spent * 0.9).toLocaleString('fr-FR')} coins remboursés
+                +{Math.round(boost.gogold_spent * 0.9).toLocaleString('fr-FR')} GoGold remboursés
               </Text>
             </View>
             <TouchableOpacity onPress={handleStop} disabled={stopping} activeOpacity={0.85}
@@ -691,7 +691,7 @@ const SuggestionCard: React.FC<{
   const cat = BOOST_CATEGORIES.find(c => c.id === suggestion.target);
   const [g1, g2] = cat?.gradient ?? ['#7B3FF2', '#E0389A'];
   const icon = IMPACT_ICONS[suggestion.impact_label] ?? cat?.icon ?? 'zap';
-  const canAfford = suggestion.affordable && balance >= suggestion.coins;
+  const canAfford = suggestion.affordable && balance >= suggestion.GoGold;
 
   return (
     <View style={[sc.card, { backgroundColor: colors.surface, borderColor: g1 + '30' }]}>
@@ -748,7 +748,7 @@ const SuggestionCard: React.FC<{
           <LinearGradient colors={canAfford ? [g1, g2] : ['#888', '#666']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sc.boostBtn}>
             <Icon name="zap" size={12} color="#fff" />
             <Text style={sc.boostBtnText}>
-              {canAfford ? `${suggestion.coins.toLocaleString('fr-FR')} coins` : 'Solde insuffisant'}
+              {canAfford ? `${suggestion.GoGold.toLocaleString('fr-FR')} GoGold` : 'Solde insuffisant'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -790,11 +790,11 @@ export default function BoostScreen() {
   const [g1, g2] = cat.gradient;
   const reachCfg = CUSTOM_REACH_CONFIG[cat.id] ?? { min: 100, max: 100000, step: 100, presets: [500, 1000, 5000, 10000] };
   const customUnit = CUSTOM_UNITS[cat.id] ?? 'impressions';
-  const customCoins = computeCustomCoins(cat.id, customReach, customDays);
+  const customGoGold = computeCustomGoGold(cat.id, customReach, customDays);
 
   useEffect(() => {
-    apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance)
-      .then(r => setBalance(r.data?.coins_balance ?? 0))
+    apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance)
+      .then(r => setBalance(r.data?.gogold_balance ?? 0))
       .catch(() => {});
     apiClient.get<BoostRecord[]>(Endpoints.wallet.boostsActive)
       .then(r => setActiveBoosts(Array.isArray(r.data) ? r.data : []))
@@ -823,12 +823,12 @@ export default function BoostScreen() {
     try {
       const [boostsRes, balanceRes] = await Promise.allSettled([
         apiClient.get<BoostRecord[]>(Endpoints.wallet.boostsActive),
-        apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance),
+        apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance),
       ]);
       if (boostsRes.status === 'fulfilled')
         setActiveBoosts(Array.isArray(boostsRes.value.data) ? boostsRes.value.data : []);
       if (balanceRes.status === 'fulfilled')
-        setBalance(balanceRes.value.data?.coins_balance ?? 0);
+        setBalance(balanceRes.value.data?.gogold_balance ?? 0);
     } catch {}
     finally { if (!silent) setRefreshingActive(false); }
   }, []);
@@ -847,10 +847,10 @@ export default function BoostScreen() {
   }, [tab, refreshActiveBoosts]);
 
   function handleBoostFromSuggestion(s: BoostSuggestion) {
-    if (!s.affordable || balance < s.coins) {
-      Alert.alert('Solde insuffisant', `Il te manque ${(s.coins - balance).toLocaleString('fr-FR')} coins.`, [
+    if (!s.affordable || balance < s.GoGold) {
+      Alert.alert('Solde insuffisant', `Il te manque ${(s.GoGold - balance).toLocaleString('fr-FR')} GoGold.`, [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Acheter des coins', onPress: () => navigation.navigate('BuyCoins') },
+        { text: 'Acheter des GoGold', onPress: () => navigation.navigate('BuyGoGold') },
       ]);
       return;
     }
@@ -884,10 +884,10 @@ export default function BoostScreen() {
       Alert.alert('Contenu requis', `Selectionnez d'abord un ${cat.contentType} a booster.`);
       return;
     }
-    if (balance < tier.coins) {
-      Alert.alert('Solde insuffisant', `Il te manque ${(tier.coins - balance).toLocaleString('fr-FR')} coins.`, [
+    if (balance < tier.GoGold) {
+      Alert.alert('Solde insuffisant', `Il te manque ${(tier.GoGold - balance).toLocaleString('fr-FR')} GoGold.`, [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Acheter des coins', onPress: () => navigation.navigate('BuyCoins') },
+        { text: 'Acheter des GoGold', onPress: () => navigation.navigate('BuyGoGold') },
       ]);
       return;
     }
@@ -900,15 +900,15 @@ export default function BoostScreen() {
       Alert.alert('Contenu requis', `Selectionnez d'abord un ${cat.contentType}.`);
       return;
     }
-    if (balance < customCoins) {
-      Alert.alert('Solde insuffisant', `Il te manque ${(customCoins - balance).toLocaleString('fr-FR')} coins.`);
+    if (balance < customGoGold) {
+      Alert.alert('Solde insuffisant', `Il te manque ${(customGoGold - balance).toLocaleString('fr-FR')} GoGold.`);
       return;
     }
     setSelectedTier({
       id: 'custom', label: 'Custom',
       quantity: `${fmtNum(customReach)} ${customUnit}`, quantity_num: customReach,
       duration: `${customDays} jour${customDays > 1 ? 's' : ''}`, duration_days: customDays,
-      coins: customCoins,
+      GoGold: customGoGold,
     });
     setShowModal(true);
   }
@@ -920,7 +920,7 @@ export default function BoostScreen() {
       const payload: Record<string, any> = {
         boost_option_id: cat.id,
         tier_id: selectedTier.id,
-        coins_amount: selectedTier.coins,
+        gogold_amount: selectedTier.GoGold,
       };
       if (selectedTier.id === 'custom') {
         payload.custom_reach    = customReach;
@@ -934,7 +934,7 @@ export default function BoostScreen() {
       const res = await apiClient.post<{ boost: BoostRecord; new_balance: number }>(
         Endpoints.wallet.boostsPurchase, payload
       );
-      setBalance(res.data?.new_balance ?? (balance - selectedTier.coins));
+      setBalance(res.data?.new_balance ?? (balance - selectedTier.GoGold));
       if (res.data?.boost) setActiveBoosts(prev => [res.data.boost, ...prev]);
       setShowModal(false);
       setSelectedTier(null);
@@ -965,7 +965,7 @@ export default function BoostScreen() {
           <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Booster</Text>
           <Text style={[s.headerSub, { color: colors.textTertiary }]}>Abonnes · Reels · Posts · Events · Live</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('BuyCoins')} style={[s.balancePill, { backgroundColor: colors.backgroundSecondary }]}>
+        <TouchableOpacity onPress={() => navigation.navigate('BuyGoGold')} style={[s.balancePill, { backgroundColor: colors.backgroundSecondary }]}>
           <Icon name="zap" size={12} color="#FFD700" />
           <Text style={s.balanceText}>{balance.toLocaleString('fr-FR')}</Text>
         </TouchableOpacity>
@@ -1119,7 +1119,7 @@ export default function BoostScreen() {
           {!customMode ? (
             <View style={s.tiersGrid}>
               {cat.tiers.map(tier => {
-                const afford = balance >= tier.coins;
+                const afford = balance >= tier.GoGold;
                 const locked = !!cat.contentType && !targetContent?.id;
                 const isSel  = selectedTier?.id === tier.id;
                 return (
@@ -1136,7 +1136,7 @@ export default function BoostScreen() {
                         <Text style={[s.tierLabel, { color: 'rgba(255,255,255,0.8)' }]}>{tier.label}</Text>
                         <Text style={[s.tierQty, { color: '#fff' }]}>{tier.quantity}</Text>
                         <Text style={[s.tierDur, { color: 'rgba(255,255,255,0.7)' }]}>{tier.duration}</Text>
-                        <Text style={[s.tierCoins, { color: '#fff' }]}>{tier.coins.toLocaleString('fr-FR')} coins</Text>
+                        <Text style={[s.tierGoGold, { color: '#fff' }]}>{tier.GoGold.toLocaleString('fr-FR')} GoGold</Text>
                       </LinearGradient>
                     ) : (
                       <View style={[s.tierCard, { backgroundColor: colors.surface, borderColor: tier.popular ? g1 : colors.border }]}>
@@ -1144,7 +1144,7 @@ export default function BoostScreen() {
                         <Text style={[s.tierLabel, { color: colors.textSecondary }]}>{tier.label}</Text>
                         <Text style={[s.tierQty, { color: colors.textPrimary }]}>{tier.quantity}</Text>
                         <Text style={[s.tierDur, { color: colors.textTertiary }]}>{tier.duration}</Text>
-                        <Text style={[s.tierCoins, { color: g1 }]}>{tier.coins.toLocaleString('fr-FR')} coins</Text>
+                        <Text style={[s.tierGoGold, { color: g1 }]}>{tier.GoGold.toLocaleString('fr-FR')} GoGold</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -1196,26 +1196,26 @@ export default function BoostScreen() {
                     {fmtNum(customReach)} {customUnit} · {customDays}j
                   </Text>
                   <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
-                    Solde apres : {Math.max(0, balance - customCoins).toLocaleString('fr-FR')} coins
+                    Solde apres : {Math.max(0, balance - customGoGold).toLocaleString('fr-FR')} GoGold
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 22, fontWeight: '900', color: g1 }}>{customCoins.toLocaleString('fr-FR')}</Text>
-                  <Text style={{ fontSize: 10, color: colors.textTertiary }}>coins</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: g1 }}>{customGoGold.toLocaleString('fr-FR')}</Text>
+                  <Text style={{ fontSize: 10, color: colors.textTertiary }}>GoGold</Text>
                 </View>
               </View>
 
               <TouchableOpacity
                 onPress={handleSelectCustom}
-                disabled={balance < customCoins}
+                disabled={balance < customGoGold}
                 activeOpacity={0.85}
-                style={{ borderRadius: 16, overflow: 'hidden', opacity: balance < customCoins ? 0.4 : 1 }}
+                style={{ borderRadius: 16, overflow: 'hidden', opacity: balance < customGoGold ? 0.4 : 1 }}
               >
                 <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.buyInner}>
                   <Icon name="zap" size={15} color="#fff" />
                   <Text style={s.buyText}>
-                    {balance >= customCoins
-                      ? `Booster pour ${customCoins.toLocaleString('fr-FR')} coins`
+                    {balance >= customGoGold
+                      ? `Booster pour ${customGoGold.toLocaleString('fr-FR')} GoGold`
                       : 'Solde insuffisant'}
                   </Text>
                 </LinearGradient>
@@ -1227,7 +1227,7 @@ export default function BoostScreen() {
           <View style={[s.infoBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Icon name="info" size={13} color={colors.textTertiary} />
             <Text style={[s.infoText, { color: colors.textTertiary }]}>
-              Coins debites immediatement. Remboursement 90% si annule dans les 30 premieres minutes (10% de frais retenus). Annulation impossible ensuite.
+              GoGold debites immediatement. Remboursement 90% si annule dans les 30 premieres minutes (10% de frais retenus). Annulation impossible ensuite.
             </Text>
           </View>
         </ScrollView>
@@ -1326,9 +1326,9 @@ export default function BoostScreen() {
 
                 <View style={[s.modalSummary, { backgroundColor: colors.background }]}>
                   {[
-                    { label: 'Cout',          value: `${selectedTier.coins.toLocaleString('fr-FR')} coins`, color: g1 },
-                    { label: 'Solde actuel',  value: `${balance.toLocaleString('fr-FR')} coins` },
-                    { label: 'Solde restant', value: `${(balance - selectedTier.coins).toLocaleString('fr-FR')} coins` },
+                    { label: 'Cout',          value: `${selectedTier.GoGold.toLocaleString('fr-FR')} GoGold`, color: g1 },
+                    { label: 'Solde actuel',  value: `${balance.toLocaleString('fr-FR')} GoGold` },
+                    { label: 'Solde restant', value: `${(balance - selectedTier.GoGold).toLocaleString('fr-FR')} GoGold` },
                     { label: 'Remboursement', value: '90% si annule dans les 30 min', color: '#22C55E' },
                   ].map(row => (
                     <View key={row.label} style={s.modalRow}>
@@ -1477,7 +1477,7 @@ const s = StyleSheet.create({
   tierLabel:   { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   tierQty:     { fontSize: 15, fontWeight: '800', textAlign: 'center' },
   tierDur:     { fontSize: 11, marginTop: 2 },
-  tierCoins:   { fontSize: 14, fontWeight: '800', marginTop: 6 },
+  tierGoGold:   { fontSize: 14, fontWeight: '800', marginTop: 6 },
 
   customPanel:   { borderRadius: 18, borderWidth: 1, padding: 16, gap: 14 },
   customLabelRow:{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },

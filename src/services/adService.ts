@@ -29,9 +29,9 @@ export interface Ad {
   starts_at:        string | null;
   ends_at:          string | null;
   created_at:       string;
-  coins_debited?:   number;
-  coins_spent?:     number;
-  coins_remaining?: number;
+  gogold_debited?:   number;
+  gogold_spent?:     number;
+  gogold_remaining?: number;
 }
 
 export interface AdCreate {

@@ -41,7 +41,7 @@ interface CreatorStats {
   stories_count: number; stories_views: number; stories_likes: number;
   lives_count: number; lives_total_viewers: number; lives_best_viewers: number;
   followers: number; following: number;
-  total_coins_earned: number; gifts_coins_earned: number; community_coins_earned: number;
+  total_gogold_earned: number; gifts_gogold_earned: number; community_gogold_earned: number;
   top_reels: TopReel[];
   top_posts: TopPost[];
   top_stories: TopStory[];
@@ -522,10 +522,10 @@ export function CreatorStatsScreen() {
     { label: 'Viewers total',  value: stats.lives_total_viewers,  color: '#3B82F6' },
     { label: 'Pic max',        value: stats.lives_best_viewers,   color: '#F59E0B' },
   ];
-  const coinsBars = [
-    { label: 'Cadeaux',   value: stats.gifts_coins_earned,     color: '#E0389A' },
-    { label: 'Communaute',value: stats.community_coins_earned, color: '#7B3FF2' },
-    { label: 'Autres',    value: Math.max(0, stats.total_coins_earned - stats.gifts_coins_earned - stats.community_coins_earned), color: '#FFD700' },
+  const goGoldBars = [
+    { label: 'Cadeaux',   value: stats.gifts_gogold_earned,     color: '#E0389A' },
+    { label: 'Communaute',value: stats.community_gogold_earned, color: '#7B3FF2' },
+    { label: 'Autres',    value: Math.max(0, stats.total_gogold_earned - stats.gifts_gogold_earned - stats.community_gogold_earned), color: '#FFD700' },
   ];
 
   return (
@@ -557,8 +557,8 @@ export function CreatorStatsScreen() {
             </View>
             <View style={[styles.heroDivider, { backgroundColor: colors.divider }]} />
             <View style={styles.heroItem}>
-              <Text style={[styles.heroValue, { color: '#FFD700' }]}>{fmt(stats.total_coins_earned)}</Text>
-              <Text style={[styles.heroLabel, { color: colors.textTertiary }]}>Coins gagnes</Text>
+              <Text style={[styles.heroValue, { color: '#FFD700' }]}>{fmt(stats.total_gogold_earned)}</Text>
+              <Text style={[styles.heroLabel, { color: colors.textTertiary }]}>GoGold gagnes</Text>
             </View>
           </View>
         </LinearGradient>
@@ -587,12 +587,12 @@ export function CreatorStatsScreen() {
           <BarChart bars={liveBars} colors={colors} />
         </View>
 
-        {/* Coins chart */}
-        <SectionHeader title="Coins & Remuneration" accent="#FFD700" />
+        {/* GoGold chart */}
+        <SectionHeader title="GoGold & Remuneration" accent="#FFD700" />
         <View style={[styles.chartCard, { backgroundColor: colors.backgroundSecondary, flexDirection: 'row', alignItems: 'center' }]}>
-          <DonutChart segments={coinsBars} colors={colors} size={130} />
+          <DonutChart segments={goGoldBars} colors={colors} size={130} />
           <View style={{ flex: 1, paddingLeft: 16 }}>
-            {coinsBars.map((b, i) => (
+            {goGoldBars.map((b, i) => (
               <View key={i} style={styles.coinRow}>
                 <View style={[styles.exactDot, { backgroundColor: b.color }]} />
                 <Text style={[styles.exactLabel, { color: colors.textSecondary, flex: 1 }]}>{b.label}</Text>
@@ -602,7 +602,7 @@ export function CreatorStatsScreen() {
             <View style={[styles.coinRow, { borderTopWidth: 1, borderTopColor: colors.divider, marginTop: 4, paddingTop: 6 }]}>
               <View style={[styles.exactDot, { backgroundColor: '#FFD700' }]} />
               <Text style={[styles.exactLabel, { color: colors.textSecondary, flex: 1 }]}>Total</Text>
-              <Text style={[styles.exactValue, { color: '#FFD700' }]}>{fmt(stats.total_coins_earned)}</Text>
+              <Text style={[styles.exactValue, { color: '#FFD700' }]}>{fmt(stats.total_gogold_earned)}</Text>
             </View>
           </View>
         </View>

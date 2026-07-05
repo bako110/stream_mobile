@@ -1,6 +1,6 @@
 /**
  * WalletScreen — Portefeuille principal
- * - Balance coins animée
+ * - Balance GoGold animée
  * - Actions rapides: Acheter, Envoyer cadeau, Retirer
  * - Stats: gagné / dépensé / en attente
  * - Liste des 10 dernières transactions
@@ -34,9 +34,9 @@ import { BackButton } from '../../components/common';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface WalletBalance {
-  coins_balance: number;
-  coins_earned: number;
-  coins_spent: number;
+  gogold_balance: number;
+  gogold_earned: number;
+  gogold_spent: number;
   total_earned: number;
   total_spent: number;
   pending_withdrawal: number;
@@ -46,7 +46,7 @@ interface Transaction {
   id:               string;
   public_id?:       string;
   transaction_type: string;
-  coins_amount:     number;
+  gogold_amount:     number;
   eur_amount?:      number;
   description:      string;
   created_at:       string;
@@ -57,8 +57,8 @@ interface Transaction {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-// Taux retrait : 100 coins = 0.35 € (aligné avec COINS_TO_EUR_RATE backend)
-const coinsToEur = (coins: number) => ((coins / 100) * 0.35).toFixed(2);
+// Taux retrait : 100 GoGold = 0.35 € (aligné avec COINS_TO_EUR_RATE backend)
+const goGoldToEur = (GoGold: number) => ((GoGold / 100) * 0.35).toFixed(2);
 
 const formatDate = (iso: string) => {
   const d = new Date(iso);
@@ -86,7 +86,7 @@ const txIcon = (type: Transaction['transaction_type']) => {
 
 const txLabel = (type: Transaction['transaction_type']): string => {
   switch (type) {
-    case 'credit_purchase':      return 'Achat de coins';
+    case 'credit_purchase':      return 'Achat de GoGold';
     case 'gift_sent':            return 'Cadeau envoyé';
     case 'gift_received':        return 'Cadeau reçu';
     case 'withdrawal':           return 'Retrait';
@@ -154,11 +154,11 @@ const TxList: React.FC<{
   txHasMore: boolean;
   txLoadingMore: boolean;
   onLoadMore: () => void;
-  onBuyCoins: () => void;
+  onBuyGoGold: () => void;
   balance: WalletBalance | null;
   colors: any;
   renderTx: (tx: Transaction) => React.ReactNode;
-}> = ({ transactions, txFilter, txHasMore, txLoadingMore, onLoadMore, onBuyCoins, balance, colors, renderTx }) => {
+}> = ({ transactions, txFilter, txHasMore, txLoadingMore, onLoadMore, onBuyGoGold, balance, colors, renderTx }) => {
   const filtered = transactions.filter(tx => txFilter === 'all' || tx.transaction_type === txFilter);
 
   if (filtered.length === 0) {
@@ -169,15 +169,15 @@ const TxList: React.FC<{
           {txFilter === 'all' ? 'Aucune transaction pour l\'instant' : 'Aucune transaction dans cette catégorie'}
         </Text>
         <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 18 }}>
-          {txFilter === 'all' ? 'Achete des coins, envoie un cadeau ou rejoins une communaute — tout apparaitra ici.' : 'Essayez un autre filtre.'}
+          {txFilter === 'all' ? 'Achete des GoGold, envoie un cadeau ou rejoins une communaute — tout apparaitra ici.' : 'Essayez un autre filtre.'}
         </Text>
         {txFilter === 'all' && (
           <>
             <View style={{ width: '100%', marginTop: 8, gap: 8 }}>
               {[
-                { label: 'Solde actuel',        value: `${(balance?.coins_balance ?? 0).toLocaleString('fr-FR')} coins`, color: '#7B3FF2' },
-                { label: 'Equivalent EUR',       value: `${(((balance?.coins_balance ?? 0) / 100) * 0.35).toFixed(2)} EUR`, color: colors.textPrimary },
-                { label: 'Taux de conversion',   value: '100 coins = 0,35 EUR', color: colors.textPrimary },
+                { label: 'Solde actuel',        value: `${(balance?.gogold_balance ?? 0).toLocaleString('fr-FR')} GoGold`, color: '#7B3FF2' },
+                { label: 'Equivalent EUR',       value: `${(((balance?.gogold_balance ?? 0) / 100) * 0.35).toFixed(2)} EUR`, color: colors.textPrimary },
+                { label: 'Taux de conversion',   value: '100 GoGold = 0,35 EUR', color: colors.textPrimary },
               ].map(row => (
                 <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
                   <Text style={{ fontSize: 13, color: colors.textSecondary }}>{row.label}</Text>
@@ -186,11 +186,11 @@ const TxList: React.FC<{
               ))}
             </View>
             <TouchableOpacity
-              onPress={onBuyCoins}
+              onPress={onBuyGoGold}
               style={{ marginTop: 8, backgroundColor: '#7B3FF2', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 20 }}
               activeOpacity={0.85}
             >
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Acheter des coins</Text>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Acheter des GoGold</Text>
             </TouchableOpacity>
           </>
         )}
@@ -251,19 +251,19 @@ const WalletScreen: React.FC = () => {
   ];
 
   // Animated coin count-up
-  const animatedCoins = useRef(new Animated.Value(0)).current;
-  const [displayCoins, setDisplayCoins] = useState(0);
+  const animatedGoGold = useRef(new Animated.Value(0)).current;
+  const [displayGoGold, setDisplayGoGold] = useState(0);
 
   const runCountUp = useCallback((target: number) => {
-    animatedCoins.setValue(0);
-    Animated.timing(animatedCoins, {
+    animatedGoGold.setValue(0);
+    Animated.timing(animatedGoGold, {
       toValue: target,
       duration: 1200,
       useNativeDriver: false,
     }).start();
-    const id = animatedCoins.addListener(({ value }) => setDisplayCoins(Math.floor(value)));
-    return () => animatedCoins.removeListener(id);
-  }, [animatedCoins]);
+    const id = animatedGoGold.addListener(({ value }) => setDisplayGoGold(Math.floor(value)));
+    return () => animatedGoGold.removeListener(id);
+  }, [animatedGoGold]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -278,7 +278,7 @@ const WalletScreen: React.FC = () => {
       setTransactions(txList);
       setTxOffset(TX_LIMIT);
       setTxHasMore(txList.length === TX_LIMIT);
-      runCountUp(balRes.data?.coins_balance ?? 0);
+      runCountUp(balRes.data?.gogold_balance ?? 0);
       setIsMonetized(monetRes.data?.status === 'approved');
     } catch (e: any) {
       setError(e?.message ?? 'Erreur de chargement');
@@ -312,7 +312,7 @@ const WalletScreen: React.FC = () => {
 
   // Rafraîchissement automatique sur tout événement wallet
   useWsEvents({
-    onCoinTransferReceived: () => fetchData(),
+    onGoGoldTransferReceived: () => fetchData(),
     onGiftReceived:         () => fetchData(),
     onWalletUpdated:        () => fetchData(),
   });
@@ -322,19 +322,19 @@ const WalletScreen: React.FC = () => {
   // ── Ouvre la facture détaillée d'une transaction ────────────────────────
   const openReceipt = (tx: Transaction) => {
     const label     = txLabel(tx.transaction_type as any);
-    const isCredit  = tx.coins_amount > 0;
-    const absAmt    = Math.abs(tx.coins_amount);
+    const isCredit  = tx.gogold_amount > 0;
+    const absAmt    = Math.abs(tx.gogold_amount);
     const eurVal    = tx.eur_amount != null
       ? Math.abs(tx.eur_amount).toFixed(2)
       : ((absAmt / 100) * 0.5).toFixed(2);
     const statusStr = tx.status === 'completed' ? 'Confirmée' : tx.status === 'pending' ? 'En attente' : 'Échouée';
 
     let details = `${tx.description || label}\n\n`;
-    details += `Montant : ${isCredit ? '+' : '-'}${absAmt.toLocaleString('fr-FR')} coins`;
+    details += `Montant : ${isCredit ? '+' : '-'}${absAmt.toLocaleString('fr-FR')} GoGold`;
     if (parseFloat(eurVal) > 0) details += ` (${isCredit ? '+' : '-'}${eurVal} €)`;
     details += `\nStatut : ${statusStr}`;
     details += `\nDate : ${formatDate(tx.created_at)}`;
-    if (tx.balance_after != null) details += `\nSolde après : ${tx.balance_after.toLocaleString('fr-FR')} coins`;
+    if (tx.balance_after != null) details += `\nSolde après : ${tx.balance_after.toLocaleString('fr-FR')} GoGold`;
     if (tx.public_id) details += `\n\nRéf. : ${tx.public_id}`;
     if (tx.reference_type) details += `\nType réf. : ${tx.reference_type}`;
 
@@ -344,8 +344,8 @@ const WalletScreen: React.FC = () => {
   // ── Render transaction item ──────────────────────────────────────────────
   const renderTx = (tx: Transaction) => {
     const icon     = txIcon(tx.transaction_type);
-    const isCredit = tx.coins_amount > 0;
-    const absAmt   = Math.abs(tx.coins_amount);
+    const isCredit = tx.gogold_amount > 0;
+    const absAmt   = Math.abs(tx.gogold_amount);
     const sign     = isCredit ? '+' : '-';
     const amtColor = isCredit ? colors.success : colors.error;
 
@@ -364,7 +364,7 @@ const WalletScreen: React.FC = () => {
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[s.txAmount, { color: amtColor }]}>
-            {sign}{absAmt.toLocaleString('fr-FR')} <Text style={s.txAmountSub}>coins</Text>
+            {sign}{absAmt.toLocaleString('fr-FR')} <Text style={s.txAmountSub}>GoGold</Text>
           </Text>
           {tx.status === 'pending' && (
             <Text style={[s.txStatus, { color: colors.warning }]}>En attente</Text>
@@ -429,18 +429,18 @@ const WalletScreen: React.FC = () => {
           style={s.balanceCard}
         >
           <Text style={s.balanceLabel}>Solde total</Text>
-          <Text style={s.balanceAmount}>{displayCoins.toLocaleString('fr-FR')}</Text>
-          <Text style={s.balanceSub}>coins</Text>
+          <Text style={s.balanceAmount}>{displayGoGold.toLocaleString('fr-FR')}</Text>
+          <Text style={s.balanceSub}>GoGold</Text>
           <View style={s.eurRow}>
             <MaterialCommunityIcons name="currency-eur" size={14} color="rgba(255,255,255,0.75)" />
-            <Text style={s.eurText}>{coinsToEur(balance?.coins_balance ?? 0)} EUR</Text>
+            <Text style={s.eurText}>{goGoldToEur(balance?.gogold_balance ?? 0)} EUR</Text>
           </View>
         </LinearGradient>
 
         {/* Quick actions */}
         <View style={s.actionsRow}>
           {[
-            { icon: 'shopping-cart', label: 'Acheter',    color: '#3B82F6', screen: 'BuyCoins',          show: true },
+            { icon: 'shopping-cart', label: 'Acheter',    color: '#3B82F6', screen: 'BuyGoGold',          show: true },
             { icon: 'send',          label: 'Transférer', color: '#7B3FF2', screen: 'Transfer',           show: true },
             { icon: 'bar-chart-2',   label: 'Créateur',   color: '#E85DAD', screen: 'CreatorDashboard',   show: isMonetized },
             { icon: 'arrow-up-right',label: 'Retirer',    color: '#3FEDB6', screen: 'Withdraw',           show: true },
@@ -466,8 +466,8 @@ const WalletScreen: React.FC = () => {
         {/* Stats */}
         <View style={s.statsRow}>
           {[
-            { label: 'Gagné',   value: balance?.coins_earned ?? 0,   color: colors.success },
-            { label: 'Dépensé', value: balance?.coins_spent ?? 0,    color: colors.error },
+            { label: 'Gagné',   value: balance?.gogold_earned ?? 0,   color: colors.success },
+            { label: 'Dépensé', value: balance?.gogold_spent ?? 0,    color: colors.error },
             { label: 'Attente', value: balance?.pending_withdrawal ?? 0, color: colors.warning },
           ].map(stat => (
             <View key={stat.label} style={s.statCard}>
@@ -511,7 +511,7 @@ const WalletScreen: React.FC = () => {
             txHasMore={txHasMore}
             txLoadingMore={txLoadingMore}
             onLoadMore={loadMoreTx}
-            onBuyCoins={() => navigation.navigate('BuyCoins')}
+            onBuyGoGold={() => navigation.navigate('BuyGoGold')}
             balance={balance}
             colors={colors}
             renderTx={renderTx}

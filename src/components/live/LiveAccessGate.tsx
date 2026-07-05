@@ -2,7 +2,7 @@
  * LiveAccessGate — Verrou d'acces pour les lives monetises.
  * Affiche quand le live est monetise et que l'utilisateur n'a pas encore paye.
  * - Montre un apercu floute du live (juste un fond sombre avec avatar host)
- * - Affiche les conditions (coins ou cadeau requis)
+ * - Affiche les conditions (GoGold ou cadeau requis)
  * - Bouton d'action pour payer/envoyer le cadeau
  */
 import React, { useState, useEffect } from 'react';
@@ -24,7 +24,7 @@ interface GiftType {
   id: string;
   name: string;
   emoji: string;
-  coins_cost: number;
+  gogold_cost: number;
 }
 
 interface Props {
@@ -44,7 +44,7 @@ export const LiveAccessGate: React.FC<Props> = ({
   const navigation = useNavigation<any>();
 
   const isGift  = live.monetization_type === 'gift';
-  const isCoins = live.monetization_type === 'coins';
+  const isGoGold = live.monetization_type === 'gogold';
 
   const hostName   = live.user?.display_name ?? live.user?.username ?? 'Createur';
   const hostAvatar = live.user?.avatar_url ?? null;
@@ -52,18 +52,18 @@ export const LiveAccessGate: React.FC<Props> = ({
   const requiredGiftId    = live.monetization_gift_id;
   const requiredGiftName  = live.monetization_gift_name ?? '';
   const requiredGiftEmoji = live.monetization_gift_emoji ?? '🎁';
-  const requiredCoins     = live.monetization_coins ?? 0;
+  const requiredGoGold     = live.monetization_gogold ?? 0;
 
   const [myBalance, setMyBalance] = useState<number | null>(null);
 
   useEffect(() => {
     apiClient.get(Endpoints.wallet.balance)
-      .then(r => setMyBalance(r.data?.coins_balance ?? r.data?.balance ?? 0))
+      .then(r => setMyBalance(r.data?.gogold_balance ?? r.data?.balance ?? 0))
       .catch(() => setMyBalance(null));
   }, []);
 
-  const effectiveCost = isCoins ? requiredCoins : 0;
-  const hasEnough = myBalance !== null && (isCoins ? myBalance >= effectiveCost : true);
+  const effectiveCost = isGoGold ? requiredGoGold : 0;
+  const hasEnough = myBalance !== null && (isGoGold ? myBalance >= effectiveCost : true);
 
   const showInsufficientFunds = (msg: string) => {
     Alert.alert(
@@ -82,10 +82,10 @@ export const LiveAccessGate: React.FC<Props> = ({
     );
   };
 
-  const handlePayCoins = async () => {
+  const handlePayGoGold = async () => {
     setChecking(true);
     try {
-      const r = await liveService.payCoinsForAccess(liveId);
+      const r = await liveService.payGoGoldForAccess(liveId);
       if (r.access_granted) {
         onAccessGranted();
       } else {
@@ -173,19 +173,19 @@ export const LiveAccessGate: React.FC<Props> = ({
         <Text style={[s.gateTitle, { color: colors.textPrimary }]}>Live payant</Text>
         <Text style={[s.gateSub, { color: colors.textSecondary }]}>
           {hostName} a rendu ce live accessible sur condition.{'\n'}
-          {isCoins
-            ? `Envoie ${requiredCoins} coins pour regarder.`
+          {isGoGold
+            ? `Envoie ${requiredGoGold} GoGold pour regarder.`
             : `Envoie le cadeau requis pour regarder.`}
         </Text>
 
         {/* Condition affichee */}
         <View style={[s.conditionBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-          {isCoins ? (
+          {isGoGold ? (
             <View style={s.conditionRow}>
               <Text style={s.conditionEmoji}>🪙</Text>
               <View style={{ flex: 1 }}>
                 <Text style={[s.conditionLabel, { color: colors.textPrimary }]}>Prix d'acces</Text>
-                <Text style={[s.conditionValue, { color: '#F59E0B' }]}>{requiredCoins} coins</Text>
+                <Text style={[s.conditionValue, { color: '#F59E0B' }]}>{requiredGoGold} GoGold</Text>
               </View>
             </View>
           ) : (
@@ -203,16 +203,16 @@ export const LiveAccessGate: React.FC<Props> = ({
         {myBalance !== null && (
           <View style={[
             s.balanceRow,
-            { borderColor: isCoins && !hasEnough ? '#F0365A' : colors.border,
-              backgroundColor: isCoins && !hasEnough ? 'rgba(240,54,90,0.08)' : colors.backgroundSecondary },
+            { borderColor: isGoGold && !hasEnough ? '#F0365A' : colors.border,
+              backgroundColor: isGoGold && !hasEnough ? 'rgba(240,54,90,0.08)' : colors.backgroundSecondary },
           ]}>
             <Text style={[s.balanceLabel, { color: colors.textSecondary }]}>Ton solde</Text>
-            <Text style={[s.balanceValue, { color: isCoins && !hasEnough ? '#F0365A' : '#3FEDB6' }]}>
-              {myBalance} coins
+            <Text style={[s.balanceValue, { color: isGoGold && !hasEnough ? '#F0365A' : '#3FEDB6' }]}>
+              {myBalance} GoGold
             </Text>
-            {isCoins && !hasEnough && (
+            {isGoGold && !hasEnough && (
               <Text style={s.balanceShort}>
-                {`  (manque ${effectiveCost - myBalance} coins)`}
+                {`  (manque ${effectiveCost - myBalance} GoGold)`}
               </Text>
             )}
           </View>
@@ -221,12 +221,12 @@ export const LiveAccessGate: React.FC<Props> = ({
         {/* Bouton d'action */}
         <TouchableOpacity
           style={[s.actionBtn, checking && { opacity: 0.5 }]}
-          onPress={isCoins ? handlePayCoins : handleSendGift}
+          onPress={isGoGold ? handlePayGoGold : handleSendGift}
           disabled={checking}
           activeOpacity={0.85}
         >
           <LinearGradient
-            colors={isCoins ? ['#F59E0B', '#F97316'] : ['#E85DAD', '#9B65F5']}
+            colors={isGoGold ? ['#F59E0B', '#F97316'] : ['#E85DAD', '#9B65F5']}
             style={s.actionBtnGrad}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           >
@@ -234,9 +234,9 @@ export const LiveAccessGate: React.FC<Props> = ({
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
-                <Text style={s.actionBtnEmoji}>{isCoins ? '🪙' : requiredGiftEmoji}</Text>
+                <Text style={s.actionBtnEmoji}>{isGoGold ? '🪙' : requiredGiftEmoji}</Text>
                 <Text style={s.actionBtnText}>
-                  {isCoins ? `Payer ${requiredCoins} coins` : `Envoyer ${requiredGiftName}`}
+                  {isGoGold ? `Payer ${requiredGoGold} GoGold` : `Envoyer ${requiredGiftName}`}
                 </Text>
               </>
             )}

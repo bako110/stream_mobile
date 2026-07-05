@@ -246,7 +246,7 @@ export default function SubscriptionPlansScreen() {
         <View style={[s.footer, { backgroundColor: colors.backgroundSecondary }]}>
           <Icon name="info" size={14} color={colors.textTertiary} />
           <Text style={[s.footerText, { color: colors.textTertiary }]}>
-            Paiement sécurisé via coins GoFolyX ou carte bancaire. Annulation sans frais à tout moment.
+            Paiement sécurisé via GoGold GoFolyX ou carte bancaire. Annulation sans frais à tout moment.
           </Text>
         </View>
 

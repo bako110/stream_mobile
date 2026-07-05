@@ -68,7 +68,7 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-function formatCoins(n: number): string {
+function formatGoGold(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k` : String(n);
 }
 
@@ -150,7 +150,7 @@ function PodiumCard({ entry, rank, onPress }: PodiumCardProps) {
 
         <View style={[styles.podiumCoinsPill, { backgroundColor: '#F59E0B18' }]}>
           <Text style={styles.podiumCoinsIcon}>⚡</Text>
-          <Text style={[styles.podiumCoinsText, { color: '#F59E0B' }]}>{formatCoins(entry.coins)}</Text>
+          <Text style={[styles.podiumCoinsText, { color: '#F59E0B' }]}>{formatGoGold(entry.GoGold)}</Text>
         </View>
 
         {entry.streak > 0 && (
@@ -208,14 +208,14 @@ function RankItem({ entry, onPress }: RankItemProps) {
             </View>
           )}
         </View>
-        <Text style={[styles.rankWeeklyCoins, { color: colors.textTertiary }]}>
-          +{entry.weekly_coins} ⚡ cette sem.
+        <Text style={[styles.rankWeeklyGoGold, { color: colors.textTertiary }]}>
+          +{entry.weekly_gogold} ⚡ cette sem.
         </Text>
       </View>
 
       <View style={styles.rankCoinsWrap}>
         <Text style={styles.rankCoinsIcon}>⚡</Text>
-        <Text style={[styles.rankCoinsValue, { color: '#F59E0B' }]}>{formatCoins(entry.coins)}</Text>
+        <Text style={[styles.rankCoinsValue, { color: '#F59E0B' }]}>{formatGoGold(entry.GoGold)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -294,11 +294,11 @@ export function CommunityLeaderboardScreen({ route }: Props) {
     },
     {
       icon: '⚡',
-      title: '500 coins cette semaine',
-      desc: 'Gagner 500 coins en une semaine',
-      unlocked: myStats.weekly_coins >= 500,
-      progress: Math.min(1, myStats.weekly_coins / 500),
-      hint: myStats.weekly_coins >= 500 ? 'Débloqué !' : `${myStats.weekly_coins} / 500 coins`,
+      title: '500 GoGold cette semaine',
+      desc: 'Gagner 500 GoGold en une semaine',
+      unlocked: myStats.weekly_gogold >= 500,
+      progress: Math.min(1, myStats.weekly_gogold / 500),
+      hint: myStats.weekly_gogold >= 500 ? 'Débloqué !' : `${myStats.weekly_gogold} / 500 GoGold`,
     },
     {
       icon: '🔥',
@@ -311,8 +311,8 @@ export function CommunityLeaderboardScreen({ route }: Props) {
   ] : [];
 
   const progressToNext = myStats
-    ? myStats.coins_to_next > 0
-      ? Math.min(1, 1 - myStats.coins_to_next / (myStats.coins_to_next + myStats.weekly_coins))
+    ? myStats.gogold_to_next > 0
+      ? Math.min(1, 1 - myStats.gogold_to_next / (myStats.gogold_to_next + myStats.weekly_gogold))
       : 1
     : 0;
 
@@ -339,8 +339,8 @@ export function CommunityLeaderboardScreen({ route }: Props) {
             <View style={styles.myCardStats}>
               <View style={styles.myCardStatRow}>
                 <Text style={styles.myCardCoinsIcon}>⚡</Text>
-                <Text style={styles.myCardStatValue}>{myStats.coins.toLocaleString('fr-FR')}</Text>
-                <Text style={styles.myCardStatUnit}> coins</Text>
+                <Text style={styles.myCardStatValue}>{myStats.GoGold.toLocaleString('fr-FR')}</Text>
+                <Text style={styles.myCardStatUnit}> GoGold</Text>
               </View>
               <View style={styles.myCardStatRow}>
                 <Text style={styles.myCardStreakEmoji}>🔥</Text>
@@ -349,7 +349,7 @@ export function CommunityLeaderboardScreen({ route }: Props) {
               </View>
               <View style={styles.myCardStatRow}>
                 <Icon name="trending-up" size={12} color="#A3E635" />
-                <Text style={[styles.myCardStatValue, { marginLeft: 4 }]}>+{myStats.weekly_coins}</Text>
+                <Text style={[styles.myCardStatValue, { marginLeft: 4 }]}>+{myStats.weekly_gogold}</Text>
                 <Text style={styles.myCardStatUnit}> ⚡ cette sem.</Text>
               </View>
             </View>
@@ -358,7 +358,7 @@ export function CommunityLeaderboardScreen({ route }: Props) {
           <View style={styles.myCardProgress}>
             <View style={styles.myCardProgressHeader}>
               <Text style={styles.myCardProgressLabel}>
-                {myStats.coins_to_next} ⚡ pour rejoindre le rang {myStats.rank - 1}
+                {myStats.gogold_to_next} ⚡ pour rejoindre le rang {myStats.rank - 1}
               </Text>
               <Text style={styles.myCardProgressPct}>{Math.round(progressToNext * 100)}%</Text>
             </View>
@@ -419,7 +419,7 @@ export function CommunityLeaderboardScreen({ route }: Props) {
         </>
       )}
 
-      <Text style={[styles.sectionTitle, { color: colors.textTertiary, marginTop: 24 }]}>COMMENT GAGNER DES COINS ?</Text>
+      <Text style={[styles.sectionTitle, { color: colors.textTertiary, marginTop: 24 }]}>COMMENT GAGNER DES GOGOLD ?</Text>
       <View style={[styles.howtoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {COINS_HOWTO.map((item, i) => (
           <View key={item.label}>
@@ -587,7 +587,7 @@ const styles = StyleSheet.create({
   rankStreakRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   rankStreakEmoji: { fontSize: 11 },
   rankStreakText: { fontSize: 11, fontWeight: '700' },
-  rankWeeklyCoins: { fontSize: 10, fontWeight: '500', marginTop: 1 },
+  rankWeeklyGoGold: { fontSize: 10, fontWeight: '500', marginTop: 1 },
   rankCoinsWrap: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   rankCoinsIcon: { fontSize: 15 },
   rankCoinsValue: { fontSize: 17, fontWeight: '800' },

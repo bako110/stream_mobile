@@ -23,15 +23,15 @@ interface Cotisation {
   title: string;
   description?: string;
   amount_per_member: number;
-  target_amount_coins: number;
-  collected_coins: number;
+  target_amount_gogold: number;
+  collected_gogold: number;
   member_count_paid: number;
   member_count_total: number;
   progress_pct: number;
   status: 'active' | 'closed' | 'cancelled';
   deadline?: string;
   created_at: string;
-  my_contribution?: { status: string; coins_paid: number; paid_at?: string } | null;
+  my_contribution?: { status: string; gogold_paid: number; paid_at?: string } | null;
 }
 
 // ── Card cotisation ───────────────────────────────────────────────────────────
@@ -111,8 +111,8 @@ const CotisationCard: React.FC<{
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
             <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
               <Text style={{ fontWeight: '800', color: '#7B3FF2' }}>
-                {item.collected_coins.toLocaleString('fr-FR')}
-              </Text> coins collectés
+                {item.collected_gogold.toLocaleString('fr-FR')}
+              </Text> GoGold collectés
             </Text>
             <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
               {item.progress_pct}% · {item.member_count_paid}/{item.member_count_total} membres
@@ -123,8 +123,8 @@ const CotisationCard: React.FC<{
         {/* Stats row */}
         <View style={[st.statsRow, { borderTopColor: colors.divider }]}>
           {[
-            { icon: 'zap',   val: `${item.amount_per_member} coins`, lbl: 'Par membre' },
-            { icon: 'target',val: `${item.target_amount_coins.toLocaleString('fr-FR')}`, lbl: 'Objectif' },
+            { icon: 'zap',   val: `${item.amount_per_member} GoGold`, lbl: 'Par membre' },
+            { icon: 'target',val: `${item.target_amount_gogold.toLocaleString('fr-FR')}`, lbl: 'Objectif' },
             { icon: 'users', val: `${item.member_count_paid}/${item.member_count_total}`, lbl: 'Cotisé' },
           ].map(s => (
             <View key={s.lbl} style={{ flex: 1, alignItems: 'center' }}>
@@ -146,7 +146,7 @@ const CotisationCard: React.FC<{
             >
               <Icon name="zap" size={15} color="#fff" />
               <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>
-                Payer {item.amount_per_member} coins
+                Payer {item.amount_per_member} GoGold
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -226,12 +226,12 @@ export const CommunityFundScreen: React.FC = () => {
 
   const handlePay = async (c: Cotisation) => {
     Alert.alert(
-      `Payer ${c.amount_per_member} coins`,
-      `Confirmer votre participation à "${c.title}" ?\n${c.amount_per_member} coins seront débités de votre wallet.`,
+      `Payer ${c.amount_per_member} GoGold`,
+      `Confirmer votre participation à "${c.title}" ?\n${c.amount_per_member} GoGold seront débités de votre wallet.`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
-          text: `Payer ${c.amount_per_member} coins`,
+          text: `Payer ${c.amount_per_member} GoGold`,
           onPress: async () => {
             setPaying(c.id);
             try {
@@ -243,10 +243,10 @@ export const CommunityFundScreen: React.FC = () => {
               if (status === 402) {
                 Alert.alert(
                   'Solde insuffisant',
-                  `Il vous faut ${c.amount_per_member} coins pour participer à cette cotisation.\n\nRechargez votre wallet pour continuer.`,
+                  `Il vous faut ${c.amount_per_member} GoGold pour participer à cette cotisation.\n\nRechargez votre wallet pour continuer.`,
                   [
                     { text: 'Plus tard', style: 'cancel' },
-                    { text: 'Recharger mes coins', onPress: () => nav.navigate('BuyCoins') },
+                    { text: 'Recharger mes GoGold', onPress: () => nav.navigate('BuyGoGold') },
                   ],
                 );
               } else {
@@ -259,7 +259,7 @@ export const CommunityFundScreen: React.FC = () => {
     );
   };
 
-  const totalCollected = cotisations.reduce((s, c) => s + c.collected_coins, 0);
+  const totalCollected = cotisations.reduce((s, c) => s + c.collected_gogold, 0);
   const activeCount    = cotisations.filter(c => c.status === 'active').length;
 
   return (
@@ -304,7 +304,7 @@ export const CommunityFundScreen: React.FC = () => {
               </Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {[
-                  { val: `${totalCollected.toLocaleString('fr-FR')}`, lbl: 'Coins collectés', color: '#7B3FF2' },
+                  { val: `${totalCollected.toLocaleString('fr-FR')}`, lbl: 'GoGold collectés', color: '#7B3FF2' },
                   { val: `${cotisations.length}`, lbl: 'Cotisations', color: '#E0389A' },
                   { val: `${activeCount}`, lbl: 'En cours', color: '#10B981' },
                 ].map(s => (
@@ -407,7 +407,7 @@ export const CommunityFundScreen: React.FC = () => {
               ))}
 
               <View>
-                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>MONTANT PAR MEMBRE (coins) *</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>MONTANT PAR MEMBRE (GoGold) *</Text>
                 <View style={[st.input, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider,
                   flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 }]}>
                   <Icon name="zap" size={15} color="#F59E0B" style={{ marginRight: 8 }} />
@@ -419,7 +419,7 @@ export const CommunityFundScreen: React.FC = () => {
                     placeholderTextColor={colors.textTertiary}
                     keyboardType="number-pad"
                   />
-                  <Text style={{ color: colors.textTertiary, fontSize: 12 }}>coins</Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: 12 }}>GoGold</Text>
                 </View>
                 {formAmount ? (
                   <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>
@@ -473,7 +473,7 @@ export const CommunityFundScreen: React.FC = () => {
                   style={{ borderRadius: 14, borderWidth: 1, borderColor: '#7B3FF230', padding: 14, gap: 6 }}>
                   <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 13 }}>Aperçu</Text>
                   <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-                    Chaque membre paiera <Text style={{ fontWeight: '800', color: colors.textPrimary }}>{formAmount} coins</Text>
+                    Chaque membre paiera <Text style={{ fontWeight: '800', color: colors.textPrimary }}>{formAmount} GoGold</Text>
                     {' '}({(parseInt(formAmount || '0') / 100).toFixed(2)} €)
                   </Text>
                   <Text style={{ color: colors.textTertiary, fontSize: 12 }}>

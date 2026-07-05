@@ -1,7 +1,7 @@
 import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 
-export type MonetizationType = 'coins' | 'gift';
+export type MonetizationType = 'gogold' | 'gift';
 
 export interface LiveStream {
   id: string;
@@ -20,14 +20,14 @@ export interface LiveStream {
   // Monétisation accès au live (rejoindre)
   is_monetized?: boolean;
   monetization_type?: MonetizationType | null;
-  monetization_coins?: number | null;
+  monetization_gogold?: number | null;
   monetization_gift_id?: string | null;
   monetization_gift_name?: string | null;
   monetization_gift_emoji?: string | null;
   // Monétisation montée sur scène (hand-raise)
   stage_monetized?: boolean;
   stage_type?: MonetizationType | null;
-  stage_coins?: number | null;
+  stage_gogold?: number | null;
   stage_gift_id?: string | null;
   stage_gift_name?: string | null;
   stage_gift_emoji?: string | null;
@@ -67,7 +67,7 @@ async function startLive(payload: {
   is_private?: boolean;
   is_monetized?: boolean;
   monetization_type?: MonetizationType;
-  monetization_coins?: number;
+  monetization_gogold?: number;
   monetization_gift_id?: string;
 }): Promise<{ live: LiveStream; token: string; livekit_url: string }> {
   const r = await apiClient.post<{ live: LiveStream; token: string; livekit_url: string }>(Endpoints.lives.start, payload);
@@ -79,8 +79,8 @@ async function sendGiftForAccess(liveId: string, giftId: string): Promise<{ acce
   return r.data;
 }
 
-async function payCoinsForAccess(liveId: string): Promise<{ access_granted: boolean }> {
-  const r = await apiClient.post<{ access_granted: boolean }>(`/api/v1/lives/${liveId}/access/coins`);
+async function payGoGoldForAccess(liveId: string): Promise<{ access_granted: boolean }> {
+  const r = await apiClient.post<{ access_granted: boolean }>(`/api/v1/lives/${liveId}/access/gogold`);
   return r.data;
 }
 
@@ -131,8 +131,8 @@ async function globalBan(liveId: string, identity: string): Promise<void> {
   await apiClient.post(Endpoints.lives.globalBan(liveId, identity));
 }
 
-async function getLiveCost(): Promise<{ cost_coins: number; balance: number; sufficient: boolean }> {
-  const r = await apiClient.get<{ cost_coins: number; balance: number; sufficient: boolean }>(Endpoints.lives.cost);
+async function getLiveCost(): Promise<{ cost_gogold: number; balance: number; sufficient: boolean }> {
+  const r = await apiClient.get<{ cost_gogold: number; balance: number; sufficient: boolean }>(Endpoints.lives.cost);
   return r.data;
 }
 
@@ -140,5 +140,5 @@ export const liveService = {
   getLives, getById, startLive, stopLive, getToken, getStatus, stopAllMine,
   blockUserFromLives, unblockUserFromLives,
   invite, demote, ban, globalBan, getLiveCost,
-  sendGiftForAccess, payCoinsForAccess, checkAccess,
+  sendGiftForAccess, payGoGoldForAccess, checkAccess,
 };

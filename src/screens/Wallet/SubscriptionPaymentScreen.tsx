@@ -22,7 +22,7 @@ const PLAN_GRADIENTS: Record<PlanType, string[]> = {
   family:  ['#F59E0B', '#FF8C00'],
 };
 
-type PayMethod = 'coins' | 'stripe';
+type PayMethod = 'gogold' | 'stripe';
 
 export default function SubscriptionPaymentScreen() {
   const nav               = useNavigation<any>();
@@ -35,14 +35,14 @@ export default function SubscriptionPaymentScreen() {
   const cfg                    = PLAN_CONFIG[plan];
   const gradient               = PLAN_GRADIENTS[plan];
 
-  const [method,     setMethod]     = useState<PayMethod>(walletCheck?.sufficient ? 'coins' : 'stripe');
+  const [method,     setMethod]     = useState<PayMethod>(walletCheck?.sufficient ? 'gogold' : 'stripe');
   const [processing, setProcessing] = useState(false);
   const [success,    setSuccess]    = useState(false);
 
   async function handleConfirm() {
     setProcessing(true);
     try {
-      if (method === 'coins') {
+      if (method === 'gogold') {
         await subscriptionService.subscribeViaWallet(plan);
       } else {
         await subscriptionService.subscribe(plan);
@@ -105,29 +105,29 @@ export default function SubscriptionPaymentScreen() {
         {/* Payment method */}
         <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>MODE DE PAIEMENT</Text>
 
-        {/* Coins method */}
+        {/* GoGold method */}
         <TouchableOpacity
-          onPress={() => setMethod('coins')}
-          style={[s.methodCard, { backgroundColor: colors.surface, borderColor: method === 'coins' ? colors.primary : colors.divider }]}
+          onPress={() => setMethod('gogold')}
+          style={[s.methodCard, { backgroundColor: colors.surface, borderColor: method === 'gogold' ? colors.primary : colors.divider }]}
           activeOpacity={0.8}
         >
           <View style={[s.methodIcon, { backgroundColor: '#FFD700' + '22' }]}>
             <Icon name="dollar-sign" size={20} color="#FFD700" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.methodLabel, { color: colors.textPrimary }]}>Payer avec Coins</Text>
+            <Text style={[s.methodLabel, { color: colors.textPrimary }]}>Payer avec GoGold</Text>
             {walletCheck ? (
               <Text style={[s.methodSub, { color: walletCheck.sufficient ? '#10B981' : '#EF4444' }]}>
                 {walletCheck.sufficient
-                  ? `${walletCheck.coins_required} coins · Solde suffisant (${walletCheck.balance} coins)`
-                  : `Il manque ${walletCheck.missing} coins`}
+                  ? `${walletCheck.gogold_required} GoGold · Solde suffisant (${walletCheck.balance} GoGold)`
+                  : `Il manque ${walletCheck.missing} GoGold`}
               </Text>
             ) : (
               <Text style={[s.methodSub, { color: colors.textTertiary }]}>Déduire de votre portefeuille</Text>
             )}
           </View>
-          <View style={[s.radio, method === 'coins' && { borderColor: colors.primary }]}>
-            {method === 'coins' && <View style={[s.radioDot, { backgroundColor: colors.primary }]} />}
+          <View style={[s.radio, method === 'gogold' && { borderColor: colors.primary }]}>
+            {method === 'gogold' && <View style={[s.radioDot, { backgroundColor: colors.primary }]} />}
           </View>
         </TouchableOpacity>
 
@@ -149,15 +149,15 @@ export default function SubscriptionPaymentScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Coins missing — lien recharge */}
-        {method === 'coins' && walletCheck && !walletCheck.sufficient && (
+        {/* GoGold missing — lien recharge */}
+        {method === 'gogold' && walletCheck && !walletCheck.sufficient && (
           <TouchableOpacity
-            onPress={() => nav.navigate('BuyCoins', { missingCoins: walletCheck.missing, returnTo: 'SubscriptionPayment' })}
+            onPress={() => nav.navigate('BuyGoGold', { missingGoGold: walletCheck.missing, returnTo: 'SubscriptionPayment' })}
             style={[s.rechargeBtn, { backgroundColor: '#FFD700' + '18', borderColor: '#FFD700' + '55' }]}
           >
             <Icon name="plus-circle" size={16} color="#FFD700" />
             <Text style={[s.rechargeBtnText, { color: '#FFD700' }]}>
-              Acheter {walletCheck.missing} coins manquants
+              Acheter {walletCheck.missing} GoGold manquants
             </Text>
           </TouchableOpacity>
         )}
@@ -183,12 +183,12 @@ export default function SubscriptionPaymentScreen() {
         {/* Confirm button */}
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={processing || (method === 'coins' && walletCheck && !walletCheck.sufficient)}
+          disabled={processing || (method === 'gogold' && walletCheck && !walletCheck.sufficient)}
           style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden' }}
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={(method === 'coins' && walletCheck && !walletCheck.sufficient)
+            colors={(method === 'gogold' && walletCheck && !walletCheck.sufficient)
               ? ['#4B5563', '#374151']
               : gradient}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}

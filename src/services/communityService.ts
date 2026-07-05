@@ -11,7 +11,7 @@ export interface CommunityData {
   is_private: boolean;
   requires_approval: boolean;
   members_only_chat: boolean;
-  entry_price_coins: number;
+  entry_price_gogold: number;
   is_verified: boolean;
   verified_at: string | null;
   members_count: number;
@@ -36,7 +36,7 @@ export interface JoinRequest {
   username: string | null;
   display_name: string | null;
   avatar_url: string | null;
-  coins_paid: number;
+  gogold_paid: number;
   created_at: string | null;
 }
 
@@ -56,7 +56,7 @@ export interface CreateCommunityPayload {
   is_private?: boolean;
   requires_approval?: boolean;
   members_only_chat?: boolean;
-  entry_price_coins?: number;
+  entry_price_gogold?: number;
   avatar_url?: string;
   banner_url?: string;
   members_list_hidden_public?: boolean;
@@ -138,7 +138,7 @@ export interface CommunityMemberProfile {
   role: 'admin' | 'moderator' | 'member';
   joined_at: string | null;
   bio: string | null;
-  coins_total: number;
+  gogold_total: number;
   badges: string[];
   posts_count: number;
   reactions_given: number;
@@ -153,17 +153,17 @@ export interface LeaderboardEntry {
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
-  coins: number;
-  weekly_coins: number;
+  GoGold: number;
+  weekly_gogold: number;
   streak: number;
   is_me: boolean;
 }
 
 export interface LeaderboardMyStats {
   rank: number;
-  coins: number;
-  weekly_coins: number;
-  coins_to_next: number;
+  GoGold: number;
+  weekly_gogold: number;
+  gogold_to_next: number;
   streak: number;
 }
 
@@ -192,7 +192,7 @@ export interface CommunityStats {
     name: string;
     username: string;
     avatar_url: string | null;
-    coins: number;
+    GoGold: number;
     posts: number;
   }[];
   activity: { day: string; msgs: number }[];
@@ -239,9 +239,9 @@ export interface MemberCreatorStats {
   stories_likes: number;
   followers: number;
   following: number;
-  total_coins_earned: number;
-  gifts_coins_earned: number;
-  community_coins_earned: number;
+  total_gogold_earned: number;
+  gifts_gogold_earned: number;
+  community_gogold_earned: number;
 }
 
 // ── Canaux (sous-groupes) ─────────────────────────────────────────────────────

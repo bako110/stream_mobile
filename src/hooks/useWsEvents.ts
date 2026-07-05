@@ -15,7 +15,7 @@ import { useEffect, useRef } from 'react';
 import { useWs } from '../context/WebSocketContext';
 import type {
   NewFollowerPayload,
-  CoinTransferPayload,
+  GoGoldTransferPayload,
   GiftReceivedPayload,
   WalletUpdatedPayload,
   StoryAddedPayload,
@@ -28,7 +28,7 @@ import type {
 export interface WsEventOptions {
   onFeedUpdated?:           (kind: 'post' | 'reel' | 'event' | 'concert') => void;
   onNewFollower?:           (d: NewFollowerPayload) => void;
-  onCoinTransferReceived?:  (d: CoinTransferPayload) => void;
+  onGoGoldTransferReceived?:  (d: GoGoldTransferPayload) => void;
   onGiftReceived?:          (d: GiftReceivedPayload) => void;
   onWalletUpdated?:         (d: WalletUpdatedPayload) => void;
   onStoryAdded?:            (d: StoryAddedPayload) => void;
@@ -41,7 +41,7 @@ export interface WsEventOptions {
 export function useWsEvents(options: WsEventOptions) {
   const {
     addListener, removeListener,
-    lastNewFollower, lastCoinTransfer, lastGiftReceived,
+    lastNewFollower, lastGoGoldTransfer, lastGiftReceived,
     lastStoryAdded, lastCommentOnContent, lastReactionOnContent,
     lastPresenceUpdate, lastConcertLive,
   } = useWs();
@@ -69,8 +69,8 @@ export function useWsEvents(options: WsEventOptions) {
   }, [lastNewFollower]);
 
   useEffect(() => {
-    if (lastCoinTransfer) optsRef.current.onCoinTransferReceived?.(lastCoinTransfer);
-  }, [lastCoinTransfer]);
+    if (lastGoGoldTransfer) optsRef.current.onGoGoldTransferReceived?.(lastGoGoldTransfer);
+  }, [lastGoGoldTransfer]);
 
   useEffect(() => {
     if (lastGiftReceived) optsRef.current.onGiftReceived?.(lastGiftReceived);

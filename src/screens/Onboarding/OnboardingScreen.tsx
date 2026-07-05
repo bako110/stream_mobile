@@ -209,7 +209,7 @@ const s = StyleSheet.create({
   logoCircle: {
     width: 88, height: 88,
     borderRadius: 44,         // parfaitement rond
-    overflow: 'hidden',       // coupe les coins du fond foncé de l'image
+    overflow: 'hidden',       // coupe les GoGold du fond foncé de l'image
     shadowColor: '#7B3FF2',
     shadowOpacity: 0.4,
     shadowRadius: 20,

@@ -15,10 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { adService, type Ad } from '../../services/adService';
 
-// 1 € = 100 coins
+// 1 € = 100 GoGold
 const EUR_TO_COINS = 100;
 const eur2coins = (eur: number) => Math.round(eur * EUR_TO_COINS);
-const coins2eur = (coins: number) => (coins / EUR_TO_COINS).toFixed(2);
+const coins2eur = (GoGold: number) => (GoGold / EUR_TO_COINS).toFixed(2);
 
 // ── Section "Comment ça marche" ────────────────────────────────────────────────
 const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
@@ -33,7 +33,7 @@ const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
         <Text style={{ color: '#fff', fontSize: 16, fontWeight: '900' }}>Comment ça marche ?</Text>
       </View>
       {[
-        { icon: 'zap',        text: 'Tu paies en coins — 100 coins = 1 €' },
+        { icon: 'zap',        text: 'Tu paies en GoGold — 100 GoGold = 1 €' },
         { icon: 'eye',        text: 'Ta pub apparaît dans le feed de milliers d\'utilisateurs' },
         { icon: 'bar-chart-2',text: 'Tu suis impressions, clics et CTR en temps réel' },
         { icon: 'pause',      text: 'Tu peux mettre en pause ou arrêter à tout moment' },
@@ -54,10 +54,10 @@ const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
         <Text style={{ color: '#7B3FF2', fontSize: 12, fontWeight: '800' }}>Tarifs — Coût pour 1 000 impressions (CPM)</Text>
       </View>
       {[
-        { cpm: 1,  coins: 100,  label: 'Économique', reach: '~1 000',  color: '#10B981' },
-        { cpm: 2,  coins: 200,  label: 'Standard',   reach: '~500',    color: '#3B82F6' },
-        { cpm: 5,  coins: 500,  label: 'Premium',    reach: '~200',    color: '#F59E0B' },
-        { cpm: 10, coins: 1000, label: 'Top',        reach: '~100',    color: '#E0389A' },
+        { cpm: 1,  GoGold: 100,  label: 'Économique', reach: '~1 000',  color: '#10B981' },
+        { cpm: 2,  GoGold: 200,  label: 'Standard',   reach: '~500',    color: '#3B82F6' },
+        { cpm: 5,  GoGold: 500,  label: 'Premium',    reach: '~200',    color: '#F59E0B' },
+        { cpm: 10, GoGold: 1000, label: 'Top',        reach: '~100',    color: '#E0389A' },
       ].map((row, i, arr) => (
         <View key={row.cpm} style={{
           flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11,
@@ -68,7 +68,7 @@ const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
           <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 13, width: 70 }}>{row.label}</Text>
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-              {row.cpm}€ · <Text style={{ color: row.color, fontWeight: '700' }}>{row.coins} coins</Text> / 1 000 imp.
+              {row.cpm}€ · <Text style={{ color: row.color, fontWeight: '700' }}>{row.GoGold} GoGold</Text> / 1 000 imp.
             </Text>
           </View>
           <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{row.reach} imp/€</Text>
@@ -87,10 +87,10 @@ const AdCard: React.FC<{
 }> = ({ item, colors, onEdit, onToggle, onDelete }) => {
   const statusColor = adService.statusColor(item.status);
   const pct         = item.budget_eur > 0 ? item.spent_eur / item.budget_eur : 0;
-  const coinsTotal  = (item as any).coins_debited  ?? eur2coins(item.budget_eur);
-  const coinsSpent  = (item as any).coins_spent    ?? eur2coins(item.spent_eur);
-  const coinsLeft   = (item as any).coins_remaining ?? Math.max(0, coinsTotal - coinsSpent);
-  const cpmCoins    = eur2coins(item.cpm_eur ?? 2);
+  const goGoldTotal  = (item as any).gogold_debited  ?? eur2coins(item.budget_eur);
+  const goGoldSpent  = (item as any).gogold_spent    ?? eur2coins(item.spent_eur);
+  const goGoldLeft   = (item as any).gogold_remaining ?? Math.max(0, goGoldTotal - goGoldSpent);
+  const cpmGoGold    = eur2coins(item.cpm_eur ?? 2);
 
   const PLACEMENT_LABELS: Record<string, string> = {
     feed: 'Feed principal', reels: 'Reels', stories: 'Stories', search: 'Recherche',
@@ -130,15 +130,15 @@ const AdCard: React.FC<{
         </View>
       </View>
 
-      {/* Budget en coins + euros */}
+      {/* Budget en GoGold + euros */}
       <View style={[s.coinBox, { backgroundColor: '#7B3FF210', borderColor: '#7B3FF225' }]}>
         <View style={{ flex: 1 }}>
           <Text style={{ color: '#7B3FF2', fontSize: 11, fontWeight: '700', marginBottom: 2 }}>BUDGET</Text>
           <Text style={{ color: '#7B3FF2', fontSize: 18, fontWeight: '900' }}>
-            {coinsLeft.toLocaleString('fr-FR')} <Text style={{ fontSize: 12 }}>coins restants</Text>
+            {goGoldLeft.toLocaleString('fr-FR')} <Text style={{ fontSize: 12 }}>GoGold restants</Text>
           </Text>
           <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 1 }}>
-            {coinsSpent.toLocaleString('fr-FR')} dépensés · {coinsTotal.toLocaleString('fr-FR')} total
+            {goGoldSpent.toLocaleString('fr-FR')} dépensés · {goGoldTotal.toLocaleString('fr-FR')} total
           </Text>
           <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
             = {item.spent_eur.toFixed(2)}€ / {item.budget_eur.toFixed(2)}€
@@ -148,16 +148,16 @@ const AdCard: React.FC<{
           <View style={{ backgroundColor: '#7B3FF222', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, alignItems: 'center' }}>
             <Text style={{ color: '#7B3FF2', fontSize: 9, fontWeight: '700', letterSpacing: 0.3 }}>CPM</Text>
             <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>
-              1 000 imp = {cpmCoins} coins
+              1 000 imp = {cpmGoGold} GoGold
             </Text>
             <Text style={{ color: colors.textTertiary, fontSize: 9 }}>= {(item.cpm_eur ?? 2).toFixed(2)}€</Text>
           </View>
         </View>
       </View>
-      {/* coins_debited — affiché si disponible */}
-      {item.coins_debited != null && (
+      {/* gogold_debited — affiché si disponible */}
+      {item.gogold_debited != null && (
         <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: -4 }}>
-          Débité à la création : {item.coins_debited.toLocaleString('fr-FR')} coins
+          Débité à la création : {item.gogold_debited.toLocaleString('fr-FR')} GoGold
         </Text>
       )}
 
@@ -180,7 +180,7 @@ const AdCard: React.FC<{
           { icon: 'eye',        val: item.impressions.toLocaleString('fr-FR'), lbl: 'Impressions', color: '#3B82F6' },
           { icon: 'mouse-pointer', val: item.clicks.toLocaleString('fr-FR'),  lbl: 'Clics',       color: '#10B981' },
           { icon: 'percent',    val: `${item.ctr_pct}%`,                      lbl: 'CTR',         color: '#F59E0B' },
-          { icon: 'zap',        val: coinsLeft.toLocaleString('fr-FR'),        lbl: 'Coins rest.', color: '#E0389A' },
+          { icon: 'zap',        val: goGoldLeft.toLocaleString('fr-FR'),        lbl: 'GoGold rest.', color: '#E0389A' },
         ].map(st => (
           <View key={st.lbl} style={s.stat}>
             <Icon name={st.icon} size={13} color={st.color} style={{ marginBottom: 3 }} />
@@ -218,9 +218,9 @@ export const AdsScreen: React.FC = () => {
   const globalCtr        = totalImpressions > 0 ? (totalClicks / totalImpressions * 100).toFixed(2) : '0.00';
   const activeCount      = ads.filter(a => a.status === 'active').length;
 
-  // Budget total en coins : somme des coins_debited si disponibles, sinon eur2coins(budget_eur)
-  const totalBudgetCoins = ads.reduce((s, a) =>
-    s + (a.coins_debited != null ? a.coins_debited : eur2coins(a.budget_eur)), 0);
+  // Budget total en GoGold : somme des gogold_debited si disponibles, sinon eur2coins(budget_eur)
+  const totalBudgetGoGold = ads.reduce((s, a) =>
+    s + (a.gogold_debited != null ? a.gogold_debited : eur2coins(a.budget_eur)), 0);
 
   // Impressions restantes estimées sur les campagnes actives/en pause
   const estimatedRemainingImpressions = ads
@@ -287,7 +287,7 @@ export const AdsScreen: React.FC = () => {
       {/* Ligne 1 : Budget total + Dépensé + Impressions + CTR */}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {[
-          { lbl: 'Budget total',  val: `${totalBudgetCoins.toLocaleString('fr-FR')} c`,      sub: `${totalBudget.toFixed(0)}€`,  color: '#7B3FF2' },
+          { lbl: 'Budget total',  val: `${totalBudgetGoGold.toLocaleString('fr-FR')} c`,      sub: `${totalBudget.toFixed(0)}€`,  color: '#7B3FF2' },
           { lbl: 'Dépensé',       val: `${eur2coins(totalSpent).toLocaleString('fr-FR')} c`, sub: `${totalSpent.toFixed(0)}€`,   color: '#E0389A' },
           { lbl: 'Impressions',   val: totalImpressions.toLocaleString('fr-FR'),              sub: 'vues réelles',                color: '#3B82F6' },
           { lbl: 'CTR moyen',     val: `${globalCtr}%`,                                       sub: 'taux clic',                   color: '#F59E0B' },
@@ -327,7 +327,7 @@ export const AdsScreen: React.FC = () => {
         <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }}>
           <Text style={[s.title, { color: colors.textPrimary }]}>Mes publicités</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 1 }}>100 coins = 1 € de budget pub</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 1 }}>100 GoGold = 1 € de budget pub</Text>
         </View>
         <TouchableOpacity
           onPress={() => nav.navigate('CreateAd', { ad: null })}
@@ -388,7 +388,7 @@ export const AdsScreen: React.FC = () => {
               </LinearGradient>
               <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Lance ta première campagne</Text>
               <Text style={[s.emptyDesc, { color: colors.textSecondary }]}>
-                Touche des milliers d'utilisateurs dès 100 coins (1€).{'\n'}
+                Touche des milliers d'utilisateurs dès 100 GoGold (1€).{'\n'}
                 Tu contrôles ton budget, tu pauses quand tu veux.
               </Text>
               <TouchableOpacity

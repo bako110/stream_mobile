@@ -70,17 +70,17 @@ Points clés :
 GoFolyX ne vend jamais vos données personnelles à des tiers.`,
   },
   {
-    key: 'monetisation', icon: 'zap', title: '5. Coins, monétisation et paiements',
-    body: `GoFolyX propose un système de Coins (monnaie virtuelle interne) permettant d'accéder à des fonctionnalités premium, d'envoyer des cadeaux virtuels à des créateurs ou d'acheter des contenus exclusifs.
+    key: 'monetisation', icon: 'zap', title: '5. GoGold, monétisation et paiements',
+    body: `GoFolyX propose un système de GoGold (monnaie virtuelle interne) permettant d'accéder à des fonctionnalités premium, d'envoyer des cadeaux virtuels à des créateurs ou d'acheter des contenus exclusifs.
 
 Conditions d'achat et d'utilisation :
-• Les Coins s'achètent via les stores officiels (Apple App Store, Google Play) ou sur gofolyx.app
-• Les Coins achetés sont définitifs et non remboursables, sauf obligation légale contraire
-• Les Coins n'ont aucune valeur monétaire réelle en dehors du programme de monétisation GoFolyX
+• Les GoGold s'achètent via les stores officiels (Apple App Store, Google Play) ou sur gofolyx.app
+• Les GoGold achetés sont définitifs et non remboursables, sauf obligation légale contraire
+• Les GoGold n'ont aucune valeur monétaire réelle en dehors du programme de monétisation GoFolyX
 • Ils ne peuvent pas être échangés contre de l'argent réel, sauf dans le cadre du Programme Créateur GoFolyX sous réserve d'éligibilité
 
 Programme Créateur :
-• Les créateurs éligibles peuvent convertir leurs Coins reçus en revenus réels
+• Les créateurs éligibles peuvent convertir leurs GoGold reçus en revenus réels
 • GoFolyX retient une commission définie dans les conditions du Programme Créateur
 • Les revenus sont soumis aux obligations fiscales applicables dans votre pays
 
@@ -104,7 +104,7 @@ Automatisation non autorisée :
 • Manipuler artificiellement les métriques d'engagement (vues, likes, followers)
 • Spammer des utilisateurs via les messages privés ou les commentaires
 
-Tout manquement grave peut entraîner la suspension temporaire ou la suppression définitive du compte, sans préavis ni remboursement des Coins éventuels.`,
+Tout manquement grave peut entraîner la suspension temporaire ou la suppression définitive du compte, sans préavis ni remboursement des GoGold éventuels.`,
   },
   {
     key: 'ip', icon: 'tv', title: '7. Propriété intellectuelle',
@@ -132,7 +132,7 @@ Paramètres > Compte > Zone dangereuse > Supprimer mon compte
 Effets de la suppression :
 • Vos données personnelles sont effacées sous 30 jours (délai légal de rétention)
 • Vos contenus publiés sont supprimés des flux, mais peuvent être conservés temporairement dans nos sauvegardes
-• Les Coins non utilisés sont définitivement perdus sans remboursement
+• Les GoGold non utilisés sont définitivement perdus sans remboursement
 • Les abonnements actifs ne sont pas automatiquement annulés — gérez-les depuis votre store
 
 GoFolyX se réserve le droit de suspendre ou supprimer tout compte :

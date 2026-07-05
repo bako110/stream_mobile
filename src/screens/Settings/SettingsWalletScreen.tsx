@@ -15,8 +15,8 @@ export const SettingsWalletScreen: React.FC = () => {
       <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
         <Card>
           <Row icon="dollar-sign"  label="Mon Wallet"           color="#FFD700" value="Solde et historique transactions"  onPress={() => nav.navigate('Wallet')} />
-          <Row icon="shopping-bag" label="Acheter des coins"    color="#FF8C00" value="Packs disponibles"                 onPress={() => nav.navigate('BuyCoins')} />
-          <Row icon="send"         label="Transférer des coins" color="#9B65F5" value="Envoyer à un utilisateur"          onPress={() => nav.navigate('Transfer')} last />
+          <Row icon="shopping-bag" label="Acheter des GoGold"    color="#FF8C00" value="Packs disponibles"                 onPress={() => nav.navigate('BuyGoGold')} />
+          <Row icon="send"         label="Transférer des GoGold" color="#9B65F5" value="Envoyer à un utilisateur"          onPress={() => nav.navigate('Transfer')} last />
         </Card>
       </ScrollView>
     </View>

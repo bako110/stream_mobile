@@ -68,7 +68,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [myId,           setMyId]           = useState<string | null>(null);
   const [myName,         setMyName]         = useState<string>('');
   const [myRole,         setMyRole]         = useState<string | null>(null);
-  const [myCoins,        setMyCoins]        = useState<number | null>(null);
+  const [myGoGold,        setMyGoGold]        = useState<number | null>(null);
   const [actionLoading,  setActionLoading]  = useState(false);
   const [blockedMembers, setBlockedMembers] = useState<BlockedMemberData[]>([]);
   const [isGlobalAdmin,  setIsGlobalAdmin]  = useState(false);
@@ -186,10 +186,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       } else {
         setMembers([]);
       }
-      if ((c.entry_price_coins ?? 0) > 0 && js !== 'member') {
-        apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance)
-          .then(r => setMyCoins(r.data?.coins_balance ?? 0))
-          .catch(() => setMyCoins(null));
+      if ((c.entry_price_gogold ?? 0) > 0 && js !== 'member') {
+        apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance)
+          .then(r => setMyGoGold(r.data?.gogold_balance ?? 0))
+          .catch(() => setMyGoGold(null));
       }
       if (role === 'admin' || role === 'moderator') {
         communityService.getBlockedMembers(communityId).then(setBlockedMembers).catch(() => {});
@@ -225,7 +225,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     setEditPrivate(community.is_private);
     setEditApproval(!!community.requires_approval);
     setEditMembersOnly(!!community.members_only_chat);
-    setEditEntryPrice(String(community.entry_price_coins ?? 0));
+    setEditEntryPrice(String(community.entry_price_gogold ?? 0));
     setEditMembersHiddenPublic(!!community.members_list_hidden_public);
     setEditMembersHiddenAll(!!community.members_list_hidden_members);
     setEditInviteOnlyAdmin(!!community.invite_only_admin);
@@ -288,7 +288,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         is_private:                  editPrivate,
         requires_approval:           editApproval,
         members_only_chat:           editMembersOnly,
-        entry_price_coins:           price,
+        entry_price_gogold:           price,
         members_list_hidden_public:  editMembersHiddenPublic,
         members_list_hidden_members: editMembersHiddenAll,
         invite_only_admin:           editInviteOnlyAdmin,
@@ -444,18 +444,18 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const handleJoin = async () => {
     if (!community) return;
     if (joiningRef.current || actionLoading || joinStatus !== 'none') return;
-    const price         = community.entry_price_coins ?? 0;
+    const price         = community.entry_price_gogold ?? 0;
     const needsApproval = community.is_private || community.requires_approval;
-    const priceLabel    = (n: number) => `${n} coin${n > 1 ? 's' : ''}`;
+    const priceLabel    = (n: number) => `${n} GoGold`;
 
-    if (price > 0 && myCoins !== null && myCoins < price) {
-      const manque = price - myCoins;
+    if (price > 0 && myGoGold !== null && myGoGold < price) {
+      const manque = price - myGoGold;
       Alert.alert(
         'Solde insuffisant',
-        `Vous avez ${myCoins} coin${myCoins > 1 ? 's' : ''} mais il en faut ${price}.\nIl vous manque ${priceLabel(manque)}.`,
+        `Vous avez ${myGoGold} GoGold mais il en faut ${price}.\nIl vous manque ${priceLabel(manque)}.`,
         [
           { text: 'Annuler', style: 'cancel' },
-          { text: 'Recharger', onPress: () => nav.navigate('BuyCoins') },
+          { text: 'Recharger', onPress: () => nav.navigate('BuyGoGold') },
         ],
       );
       return;
@@ -469,9 +469,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         const res = await communityService.join(communityId);
         if (res.pending) {
           setJoinStatus('pending');
-          if (myCoins !== null) setMyCoins(prev => (prev ?? 0) - price);
+          if (myGoGold !== null) setMyGoGold(prev => (prev ?? 0) - price);
           const debitLine = price > 0
-            ? `\n\n${price} coin${price > 1 ? 's' : ''} ont été déduits de votre solde et enregistrés dans votre historique.`
+            ? `\n\n${price} GoGold ont été déduits de votre solde et enregistrés dans votre historique.`
             : '';
           Alert.alert(
             price > 0 ? 'Paiement effectué — Demande envoyée' : 'Demande envoyée',
@@ -482,22 +482,22 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           load();
         } else if (res.joined) {
           setJoinStatus('member');
-          if (price > 0 && myCoins !== null) setMyCoins(prev => (prev ?? 0) - price);
+          if (price > 0 && myGoGold !== null) setMyGoGold(prev => (prev ?? 0) - price);
           load();
           nav.replace('CommunityChat', { communityId, communityName: community.name });
         }
       } catch (e: any) {
         const detail = (e?.response?.data?.detail ?? '').toLowerCase();
-        if (detail.includes('insufficient') || detail.includes('coins')) {
-          const walletRes = await apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance).catch(() => null);
-          const realBalance = walletRes?.data?.coins_balance ?? 0;
-          setMyCoins(realBalance);
+        if (detail.includes('insufficient') || detail.includes('gogold')) {
+          const walletRes = await apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance).catch(() => null);
+          const realBalance = walletRes?.data?.gogold_balance ?? 0;
+          setMyGoGold(realBalance);
           Alert.alert(
             'Solde insuffisant',
-            `Votre solde est de ${realBalance} coin${realBalance !== 1 ? 's' : ''}. Il vous manque ${priceLabel(price - realBalance)}.`,
+            `Votre solde est de ${realBalance} GoGold. Il vous manque ${priceLabel(price - realBalance)}.`,
             [
               { text: 'Annuler', style: 'cancel' },
-              { text: 'Recharger', onPress: () => nav.navigate('BuyCoins') },
+              { text: 'Recharger', onPress: () => nav.navigate('BuyGoGold') },
             ],
           );
         } else if (detail.includes('blocked')) {
@@ -512,18 +512,18 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     };
 
     if (price > 0) {
-      const soldeApres = myCoins !== null ? myCoins - price : null;
-      const soldeInfo  = myCoins !== null
-        ? `\nVotre solde : ${myCoins} coin${myCoins !== 1 ? 's' : ''} → ${soldeApres} coin${(soldeApres ?? 0) !== 1 ? 's' : ''} après déduction.`
+      const soldeApres = myGoGold !== null ? myGoGold - price : null;
+      const soldeInfo  = myGoGold !== null
+        ? `\nVotre solde : ${myGoGold} GoGold → ${soldeApres} GoGold après déduction.`
         : '';
       const approvalNote = needsApproval
-        ? '\n\nCes coins seront remboursés automatiquement en cas de refus de votre demande.'
+        ? '\n\nCes GoGold seront remboursés automatiquement en cas de refus de votre demande.'
         : '';
       const debitNote = needsApproval
-        ? `${price} coin${price > 1 ? 's' : ''} seront immédiatement déduits de votre solde et consignés dans votre historique de transactions.`
-        : `${price} coin${price > 1 ? 's' : ''} seront déduits de votre solde.`;
+        ? `${price} GoGold seront immédiatement déduits de votre solde et consignés dans votre historique de transactions.`
+        : `${price} GoGold seront déduits de votre solde.`;
       Alert.alert(
-        `Adhésion payante — ${price} coins`,
+        `Adhésion payante — ${price} GoGold`,
         `${debitNote}${soldeInfo}${approvalNote}`,
         [
           { text: 'Annuler', style: 'cancel', onPress: () => { joiningRef.current = false; } },
@@ -576,34 +576,34 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   }
 
   function handleUpgradeTier(tier: 'pro' | 'elite') {
-    const prices: Record<string, { eur: number; coins: number }> = {
-      pro:   { eur: 9.99,  coins: Math.ceil(9.99  * 100) }, // 1 € = 100 coins
-      elite: { eur: 24.99, coins: Math.ceil(24.99 * 100) },
+    const prices: Record<string, { eur: number; GoGold: number }> = {
+      pro:   { eur: 9.99,  GoGold: Math.ceil(9.99  * 100) }, // 1 € = 100 GoGold
+      elite: { eur: 24.99, GoGold: Math.ceil(24.99 * 100) },
     };
     const p = prices[tier];
     const tierLabel = tier === 'pro' ? 'Pro' : 'Elite';
 
-    if (myCoins !== null && myCoins < p.coins) {
+    if (myGoGold !== null && myGoGold < p.GoGold) {
       Alert.alert(
         'Solde insuffisant',
-        `Le tier ${tierLabel} coûte ${p.coins.toLocaleString('fr-FR')} coins (${p.eur}€/mois).\nTon solde : ${myCoins.toLocaleString('fr-FR')} coins.`,
+        `Le tier ${tierLabel} coûte ${p.GoGold.toLocaleString('fr-FR')} GoGold (${p.eur}€/mois).\nTon solde : ${myGoGold.toLocaleString('fr-FR')} GoGold.`,
       );
       return;
     }
 
     Alert.alert(
       `Passer en ${tierLabel}`,
-      `${p.coins.toLocaleString('fr-FR')} coins (${p.eur}€) seront débités de ton wallet pour 30 jours.\n\nAvantages ${tierLabel} : ${tier === 'pro' ? 'channels illimités, analytics, badge Pro' : 'tout Pro + priorité feed, support dédié'}.`,
+      `${p.GoGold.toLocaleString('fr-FR')} GoGold (${p.eur}€) seront débités de ton wallet pour 30 jours.\n\nAvantages ${tierLabel} : ${tier === 'pro' ? 'channels illimités, analytics, badge Pro' : 'tout Pro + priorité feed, support dédié'}.`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: `Activer ${tierLabel}`, onPress: async () => {
             setTierLoading(true);
             try {
-              const res = await apiClient.post<{ tier: string; coins_debited: number; tier_expires_at: string }>(
+              const res = await apiClient.post<{ tier: string; gogold_debited: number; tier_expires_at: string }>(
                 Endpoints.communities.upgradeTier(communityId), { tier }
               );
-              setMyCoins(prev => prev !== null ? prev - res.data.coins_debited : null);
+              setMyGoGold(prev => prev !== null ? prev - res.data.gogold_debited : null);
               setCommunity(prev => prev ? { ...prev, tier: res.data.tier as any, tier_expires_at: res.data.tier_expires_at } as any : prev);
               Alert.alert('Activé !', `Ta communauté est maintenant en ${tierLabel} jusqu'au ${new Date(res.data.tier_expires_at).toLocaleDateString('fr-FR')}.`);
             } catch (e: any) {
@@ -620,10 +620,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   function handleRequestVerification() {
     setVrReason('');
     // Charger le solde si pas encore fait
-    if (myCoins === null) {
-      apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance)
-        .then(r => setMyCoins(r.data?.coins_balance ?? 0))
-        .catch(() => setMyCoins(0));
+    if (myGoGold === null) {
+      apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance)
+        .then(r => setMyGoGold(r.data?.gogold_balance ?? 0))
+        .catch(() => setMyGoGold(0));
     }
     setVrModalOpen(true);
   }
@@ -632,10 +632,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     setVrLoading(true);
     try {
       await communityService.requestVerification(communityId, vrReason.trim() || undefined);
-      setMyCoins(prev => prev !== null ? prev - 500 : null);
+      setMyGoGold(prev => prev !== null ? prev - 500 : null);
       setVrStatus('pending');
       setVrModalOpen(false);
-      Alert.alert('Demande envoyée', '500 coins ont été débités. Les administrateurs vont examiner votre demande.');
+      Alert.alert('Demande envoyée', '500 GoGold ont été débités. Les administrateurs vont examiner votre demande.');
     } catch (e: any) {
       const status = e?.response?.status;
       const detail = e?.response?.data?.detail ?? e?.message ?? 'Impossible d\'envoyer la demande.';
@@ -643,10 +643,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         setVrModalOpen(false);
         Alert.alert(
           'Solde insuffisant',
-          `Il faut 500 coins pour demander la vérification.\n\n${detail}`,
+          `Il faut 500 GoGold pour demander la vérification.\n\n${detail}`,
           [
             { text: 'Annuler', style: 'cancel' },
-            { text: 'Acheter des coins', onPress: () => nav.navigate('Wallet') },
+            { text: 'Acheter des GoGold', onPress: () => nav.navigate('Wallet') },
           ],
         );
       } else {
@@ -818,13 +818,13 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               {community.is_private ? 'Privée' : 'Publique'}
             </Text>
           </View>
-          {(community.entry_price_coins ?? 0) > 0 && (
+          {(community.entry_price_gogold ?? 0) > 0 && (
             <>
               <View style={[s.infoSummarySep, { backgroundColor: colors.divider }]} />
               <View style={s.infoSummaryRow}>
                 <Icon name="zap" size={14} color="#F59E0B" />
                 <Text style={[s.infoSummaryTxt, { color: colors.warning }]}>
-                  {community.entry_price_coins} coins requis
+                  {community.entry_price_gogold} GoGold requis
                 </Text>
               </View>
             </>
@@ -1122,7 +1122,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             <Icon name="zap" size={18} color="#F59E0B" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Prix d'entrée (coins)</Text>
+            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Prix d'entrée (GoGold)</Text>
             <Text style={[s.secDesc, { color: colors.textTertiary }]}>
               0 = gratuit — les membres paient ce montant pour rejoindre
             </Text>
@@ -1734,9 +1734,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                           <Text style={[s.actionTxt, { color: '#fff' }]}>
                             {(community.is_private || community.requires_approval) ? 'Demander à rejoindre' : 'Rejoindre'}
                           </Text>
-                          {(community.entry_price_coins ?? 0) > 0 && (
+                          {(community.entry_price_gogold ?? 0) > 0 && (
                             <View style={s.coinPill}>
-                              <Text style={s.coinPillTxt}>{community.entry_price_coins}</Text>
+                              <Text style={s.coinPillTxt}>{community.entry_price_gogold}</Text>
                               <Icon name="zap" size={10} color="#F59E0B" />
                             </View>
                           )}
@@ -1748,10 +1748,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               </View>
 
               {/* ── Barre wallet si accès payant ── */}
-              {joinStatus === 'none' && (community.entry_price_coins ?? 0) > 0 && (() => {
-                const price     = community.entry_price_coins!;
-                const isLow     = myCoins !== null && myCoins < price;
-                const hasEnough = myCoins !== null && myCoins >= price;
+              {joinStatus === 'none' && (community.entry_price_gogold ?? 0) > 0 && (() => {
+                const price     = community.entry_price_gogold!;
+                const isLow     = myGoGold !== null && myGoGold < price;
+                const hasEnough = myGoGold !== null && myGoGold >= price;
                 return (
                   <View style={[s.walletBar, {
                     borderColor: isLow ? '#EF444440' : '#F59E0B40',
@@ -1763,18 +1763,18 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                         <Text style={[s.walletTitle, { color: isLow ? colors.error : colors.warning }]}>
                           {price} coin{price > 1 ? 's' : ''} requis pour accéder
                         </Text>
-                        {myCoins !== null && (
+                        {myGoGold !== null && (
                           <Text style={[s.walletSub, { color: isLow ? colors.error : colors.textTertiary }]}>
                             {isLow
-                              ? `Solde insuffisant — vous avez ${myCoins} coin${myCoins !== 1 ? 's' : ''} (manque ${price - myCoins})`
-                              : `Votre solde : ${myCoins} coin${myCoins !== 1 ? 's' : ''}`}
+                              ? `Solde insuffisant — vous avez ${myGoGold} GoGold (manque ${price - myGoGold})`
+                              : `Votre solde : ${myGoGold} GoGold`}
                           </Text>
                         )}
                       </View>
                     </View>
                     {isLow && (
                       <TouchableOpacity
-                        onPress={() => nav.navigate('BuyCoins')}
+                        onPress={() => nav.navigate('BuyGoGold')}
                         style={s.rechargeBtn}
                       >
                         <Text style={s.rechargeTxt}>Recharger</Text>
@@ -1866,8 +1866,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                              : vrStatus === 'rejected' ? colors.error : colors.info,
                       }]}>
                         {vrStatus === 'pending'  ? 'Demande en cours d\'examen…'
-                        : vrStatus === 'rejected' ? 'Refusée (coins remboursés) — Renvoyer'
-                        : 'Demander la vérification — 500 coins'}
+                        : vrStatus === 'rejected' ? 'Refusée (GoGold remboursés) — Renvoyer'
+                        : 'Demander la vérification — 500 GoGold'}
                       </Text>
                     </>
                   )}
@@ -2139,9 +2139,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               {/* Boite frais */}
               {(() => {
                 const fee = 500;
-                const hasCoins = myCoins !== null;
-                const canAfford = myCoins !== null && myCoins >= fee;
-                const afterBalance = myCoins !== null ? myCoins - fee : null;
+                const hasGoGold = myGoGold !== null;
+                const canAfford = myGoGold !== null && myGoGold >= fee;
+                const afterBalance = myGoGold !== null ? myGoGold - fee : null;
                 return (
                   <View style={[s.vrFeeBox, { borderColor: canAfford ? '#1D9BF040' : '#EF444440', backgroundColor: canAfford ? '#1D9BF008' : '#EF444408' }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -2150,19 +2150,19 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       </Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <Icon name="zap" size={13} color="#F59E0B" />
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.warning }}>500 coins</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.warning }}>500 GoGold</Text>
                       </View>
                     </View>
-                    {hasCoins && (
+                    {hasGoGold && (
                       <View style={{ gap: 3 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                           <Text style={{ fontSize: 11, color: colors.textTertiary }}>Votre solde</Text>
-                          <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>{myCoins} coins</Text>
+                          <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>{myGoGold} GoGold</Text>
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                           <Text style={{ fontSize: 11, color: colors.textTertiary }}>Solde après</Text>
                           <Text style={{ fontSize: 11, fontWeight: '700', color: canAfford ? colors.success : colors.error }}>
-                            {afterBalance} coins
+                            {afterBalance} GoGold
                           </Text>
                         </View>
                       </View>
@@ -2174,14 +2174,14 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 );
               })()}
 
-              {myCoins !== null && myCoins < 500 ? (
+              {myGoGold !== null && myGoGold < 500 ? (
                 <TouchableOpacity
                   style={[s.actionBtn, { backgroundColor: colors.error, marginTop: 10 }]}
                   onPress={() => { setVrModalOpen(false); nav.navigate('Wallet'); }}
                   activeOpacity={0.8}
                 >
                   <Icon name="zap" size={16} color="#fff" />
-                  <Text style={[s.actionTxt, { color: '#fff' }]}>Acheter des coins</Text>
+                  <Text style={[s.actionTxt, { color: '#fff' }]}>Acheter des GoGold</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity

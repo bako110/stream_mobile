@@ -14,7 +14,7 @@ interface GiftType {
   id: string;
   name: string;
   emoji: string;
-  coins_cost: number;
+  gogold_cost: number;
 }
 
 interface Props {
@@ -37,17 +37,17 @@ export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverN
   useEffect(() => {
     Promise.all([
       apiClient.get<GiftType[]>('/api/v1/wallet/gifts'),
-      apiClient.get<{ coins_balance: number }>('/api/v1/wallet/me'),
+      apiClient.get<{ gogold_balance: number }>('/api/v1/wallet/me'),
     ]).then(([g, w]) => {
       setGifts(g.data ?? []);
-      setBalance(w.data?.coins_balance ?? 0);
+      setBalance(w.data?.gogold_balance ?? 0);
     }).finally(() => setLoading(false));
   }, []);
 
   const handleSend = async () => {
     if (!selected) return;
-    if (balance < selected.coins_cost) {
-      Alert.alert('Coins insuffisants', 'Rechargez votre wallet pour envoyer ce cadeau.');
+    if (balance < selected.gogold_cost) {
+      Alert.alert('GoGold insuffisants', 'Rechargez votre wallet pour envoyer ce cadeau.');
       return;
     }
     setSending(true);
@@ -57,7 +57,7 @@ export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverN
         receiver_id:  receiverId,
         reel_id:      reelId,
       });
-      setBalance(b => b - selected.coins_cost);
+      setBalance(b => b - selected.gogold_cost);
       // Animation emoji
       flyOpacity.setValue(1);
       Animated.parallel([
@@ -109,7 +109,7 @@ export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverN
                     )}
                     <Text style={s.giftEmoji}>{g.emoji}</Text>
                     <Text style={[s.giftName,  { color: colors.textPrimary }]}>{g.name}</Text>
-                    <Text style={[s.giftCost,  { color: '#FFD700' }]}>{g.coins_cost} 🪙</Text>
+                    <Text style={[s.giftCost,  { color: '#FFD700' }]}>{g.gogold_cost} 🪙</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -128,7 +128,7 @@ export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverN
                 : <>
                     <Icon name="gift" size={16} color="#fff" />
                     <Text style={s.sendBtnText}>
-                      Envoyer {selected ? `${selected.emoji} (${selected.coins_cost} 🪙)` : ''}
+                      Envoyer {selected ? `${selected.emoji} (${selected.gogold_cost} 🪙)` : ''}
                     </Text>
                   </>
               }

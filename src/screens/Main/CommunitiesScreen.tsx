@@ -123,7 +123,7 @@ const CommunityCard = React.memo(function CommunityCard({
 }) {
   const joinStatus: JoinStatus = isMine ? 'member' : (item.join_status ?? 'none');
   const isPrivateOrApproval = item.is_private || item.requires_approval;
-  const price = item.entry_price_coins ?? 0;
+  const price = item.entry_price_gogold ?? 0;
 
   const subline = (() => {
     if (item.description) return item.description;
@@ -131,7 +131,7 @@ const CommunityCard = React.memo(function CommunityCard({
     if (item.is_private) parts.push('Privee');
     else parts.push('Publique');
     if (isPrivateOrApproval) parts.push('sur invitation');
-    if (price > 0) parts.push(`${price} coins`);
+    if (price > 0) parts.push(`${price} GoGold`);
     return parts.join(' · ');
   })();
 
@@ -153,7 +153,7 @@ const CommunityCard = React.memo(function CommunityCard({
     return (
       <TouchableOpacity onPress={onJoin} activeOpacity={0.8} style={CS.pillJoin}>
         <Text style={CS.pillJoinTxt}>
-          {isPrivateOrApproval ? 'Demander' : price > 0 ? `${price} coins` : 'Rejoindre'}
+          {isPrivateOrApproval ? 'Demander' : price > 0 ? `${price} GoGold` : 'Rejoindre'}
         </Text>
       </TouchableOpacity>
     );
@@ -277,7 +277,7 @@ export const CommunitiesScreen: React.FC = () => {
   const [createMembersHiddenPublic, setCreateMembersHiddenPublic] = useState(true);
   const [createMembersHiddenAll,    setCreateMembersHiddenAll]    = useState(true);
   const [createInviteOnlyAdmin,     setCreateInviteOnlyAdmin]     = useState(true);
-  const [createPriceCoins,          setCreatePriceCoins]          = useState('');
+  const [createPriceGoGold,          setCreatePriceGoGold]          = useState('');
   const [createAvatarUri,  setCreateAvatarUri]  = useState<string | null>(null);
   const [createBannerUri,  setCreateBannerUri]  = useState<string | null>(null);
   const [creating,         setCreating]         = useState(false);
@@ -292,7 +292,7 @@ export const CommunitiesScreen: React.FC = () => {
     setCreateMembersHiddenPublic(true);
     setCreateMembersHiddenAll(true);
     setCreateInviteOnlyAdmin(true);
-    setCreatePriceCoins('');
+    setCreatePriceGoGold('');
     setCreateAvatarUri(null);
     setCreateBannerUri(null);
     setSelectedTemplate(null);
@@ -344,8 +344,8 @@ export const CommunitiesScreen: React.FC = () => {
       const status: number = e?.response?.status ?? 0;
       if (status === 404) {
         Alert.alert('Code invalide', 'Ce code d\'invitation n\'existe pas ou a expiré.');
-      } else if (status === 402 || detail.toLowerCase().includes('coins')) {
-        Alert.alert('Coins insuffisants', 'Tu n\'as pas assez de coins pour rejoindre cette communauté.');
+      } else if (status === 402 || detail.toLowerCase().includes('gogold')) {
+        Alert.alert('GoGold insuffisants', 'Tu n\'as pas assez de GoGold pour rejoindre cette communauté.');
       } else if (status === 403) {
         Alert.alert('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
       } else {
@@ -396,12 +396,12 @@ export const CommunitiesScreen: React.FC = () => {
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleJoin = (item: CommunityData) => {
-    const price = item.entry_price_coins ?? 0;
+    const price = item.entry_price_gogold ?? 0;
     const needsApproval = item.is_private || item.requires_approval;
     if (price > 0) {
-      const label = `${price} coin${price > 1 ? 's' : ''}`;
+      const label = `${price} GoGold`;
       const note = needsApproval
-        ? '\n\nVotre demande sera examinée par l\'admin. Les coins sont remboursés en cas de refus.'
+        ? '\n\nVotre demande sera examinée par l\'admin. Les GoGold sont remboursés en cas de refus.'
         : '';
       Alert.alert('Accès payant', `Rejoindre "${item.name}" coûte ${label}.${note}`, [
         { text: 'Annuler', style: 'cancel' },
@@ -427,8 +427,8 @@ export const CommunitiesScreen: React.FC = () => {
     } catch (e: any) {
       const detail: string = e?.response?.data?.detail ?? '';
       const status: number = e?.response?.status ?? 0;
-      if (status === 402 || detail.toLowerCase().includes('coins')) {
-        Alert.alert('Coins insuffisants', `Il te faut ${item.entry_price_coins ?? '?'} coins pour rejoindre cette communauté.`);
+      if (status === 402 || detail.toLowerCase().includes('gogold')) {
+        Alert.alert('GoGold insuffisants', `Il te faut ${item.entry_price_gogold ?? '?'} GoGold pour rejoindre cette communauté.`);
       } else if (status === 403) {
         Alert.alert('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
       } else if (status === 404) {
@@ -507,7 +507,7 @@ export const CommunitiesScreen: React.FC = () => {
         members_list_hidden_public:  createMembersHiddenPublic,
         members_list_hidden_members: createMembersHiddenAll,
         invite_only_admin:           createInviteOnlyAdmin,
-        entry_price_coins:           parseInt(createPriceCoins, 10) || 0,
+        entry_price_gogold:           parseInt(createPriceGoGold, 10) || 0,
         avatar_url:                  avatarUrl ?? undefined,
         banner_url:                  bannerUrl ?? undefined,
         template:                    selectedTemplate?.id,
@@ -979,24 +979,24 @@ export const CommunitiesScreen: React.FC = () => {
       </Text>
       <View style={[S.optRow, {
         backgroundColor: colors.surface,
-        borderColor: (parseInt(createPriceCoins, 10) || 0) > 0 ? '#F59E0B80' : colors.border,
+        borderColor: (parseInt(createPriceGoGold, 10) || 0) > 0 ? '#F59E0B80' : colors.border,
         alignItems: 'center',
       }]}>
         <View style={[S.optIcon, { backgroundColor: '#F59E0B20' }]}>
           <Icon name="zap" size={18} color="#F59E0B" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[S.optLabel, { color: colors.textPrimary }]}>Coins requis</Text>
+          <Text style={[S.optLabel, { color: colors.textPrimary }]}>GoGold requis</Text>
           <Text style={[S.optSub, { color: colors.textTertiary }]}>0 = accès gratuit</Text>
         </View>
         <TextInput
-          style={[S.coinsInput, {
+          style={[S.goGoldInput, {
             color: colors.textPrimary,
-            borderColor: (parseInt(createPriceCoins, 10) || 0) > 0 ? colors.warning : colors.border,
+            borderColor: (parseInt(createPriceGoGold, 10) || 0) > 0 ? colors.warning : colors.border,
             backgroundColor: colors.backgroundSecondary,
           }]}
-          value={createPriceCoins}
-          onChangeText={v => setCreatePriceCoins(v.replace(/[^0-9]/g, ''))}
+          value={createPriceGoGold}
+          onChangeText={v => setCreatePriceGoGold(v.replace(/[^0-9]/g, ''))}
           keyboardType="number-pad"
           maxLength={6}
           placeholder="0"
@@ -1634,7 +1634,7 @@ const S = StyleSheet.create({
   optSub: { fontSize: 11, marginTop: 2, lineHeight: 15 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
-  coinsInput: {
+  goGoldInput: {
     width: 64,
     textAlign: 'center',
     fontSize: 16,

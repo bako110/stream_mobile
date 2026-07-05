@@ -85,7 +85,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [hasAccess, setHasAccess]         = useState(!item.is_premium);
   const [accessLoading, setAccessLoading] = useState(item.is_premium);
   const [showPaywall, setShowPaywall]     = useState(false);
-  const [walletCoins, setWalletCoins]     = useState<number | null>(null);
+  const [walletGoGold, setWalletGoGold]     = useState<number | null>(null);
   const [purchasing, setPurchasing]       = useState(false);
   const [launching, setLaunching]         = useState(false);
   const [isSaved, setIsSaved]             = useState(false);
@@ -95,7 +95,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const isSerie  = item.type === 'serie';
   const banner   = item.banner_url || item.thumbnail_url;
   const synopsis = item.synopsis || item.short_synopsis;
-  const coinsRequired = item.is_premium && item.price ? Math.round(item.price * 100) : 0; // 1 € = 100 coins
+  const goGoldRequired = item.is_premium && item.price ? Math.round(item.price * 100) : 0; // 1 € = 100 GoGold
 
   // Vérifier l'accès + solde wallet si contenu premium
   useEffect(() => {
@@ -107,10 +107,10 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           : Endpoints.content.filmAccess(item.id);
         const [accessRes, walletRes] = await Promise.all([
           apiClient.get<{ has_access: boolean }>(endpoint),
-          apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance),
+          apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance),
         ]);
         setHasAccess(accessRes.data.has_access);
-        setWalletCoins(walletRes.data.coins_balance);
+        setWalletGoGold(walletRes.data.gogold_balance);
       } catch {
         setHasAccess(false);
       } finally {
@@ -126,9 +126,9 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       const endpoint = isSerie
         ? Endpoints.content.seriePurchase(item.id)
         : Endpoints.content.filmPurchase(item.id);
-      const res = await apiClient.post<{ coins_paid: number; new_balance: number }>(endpoint);
+      const res = await apiClient.post<{ gogold_paid: number; new_balance: number }>(endpoint);
       setHasAccess(true);
-      setWalletCoins(res.data.new_balance);
+      setWalletGoGold(res.data.new_balance);
       setShowPaywall(false);
       Alert.alert('Acces accordé', `Vous pouvez maintenant regarder "${item.title}".`);
     } catch (e: any) {
@@ -136,10 +136,10 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       if (detail.includes('insuffisant')) {
         Alert.alert(
           'Solde insuffisant',
-          `Il vous manque des coins. Rechargez votre wallet pour continuer.`,
+          `Il vous manque des GoGold. Rechargez votre wallet pour continuer.`,
           [
             { text: 'Annuler', style: 'cancel' },
-            { text: 'Recharger', onPress: () => { setShowPaywall(false); navigation.navigate('BuyCoins' as any, {}); } },
+            { text: 'Recharger', onPress: () => { setShowPaywall(false); navigation.navigate('BuyGoGold' as any, {}); } },
           ],
         );
       } else {
@@ -375,7 +375,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   {accessLoading || launching
                     ? 'Chargement…'
                     : item.is_premium && !hasAccess
-                    ? `Acheter — ${coinsRequired} coins (${item.price} €)`
+                    ? `Acheter — ${goGoldRequired} GoGold (${item.price} €)`
                     : isSerie
                     ? 'Voir les épisodes'
                     : videosLoading
@@ -522,7 +522,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={{ flex: 1 }}>
                 <Text style={[pw.priceLabel, { color: colors.textTertiary }]}>Prix d'accès</Text>
                 <Text style={[pw.priceValue, { color: colors.textPrimary }]}>
-                  {coinsRequired} coins
+                  {goGoldRequired} GoGold
                   <Text style={[pw.priceEur, { color: colors.textSecondary }]}> ({item.price} €)</Text>
                 </Text>
               </View>
@@ -533,11 +533,11 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={[pw.balanceRow, { borderColor: colors.border }]}>
               <Icon name="credit-card" size={15} color={colors.textTertiary} />
               <Text style={[pw.balanceTxt, { color: colors.textSecondary }]}>
-                Votre solde : <Text style={{ color: walletCoins !== null && walletCoins >= coinsRequired ? '#10B981' : '#EF4444', fontWeight: '700' }}>
-                  {walletCoins ?? '…'} coins
+                Votre solde : <Text style={{ color: walletGoGold !== null && walletGoGold >= goGoldRequired ? '#10B981' : '#EF4444', fontWeight: '700' }}>
+                  {walletGoGold ?? '…'} GoGold
                 </Text>
               </Text>
-              {walletCoins !== null && walletCoins < coinsRequired && (
+              {walletGoGold !== null && walletGoGold < goGoldRequired && (
                 <Text style={pw.balanceShort}> — insuffisant</Text>
               )}
             </View>
@@ -553,10 +553,10 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
 
             {/* Boutons */}
-            {walletCoins !== null && walletCoins < coinsRequired ? (
+            {walletGoGold !== null && walletGoGold < goGoldRequired ? (
               <TouchableOpacity
                 style={pw.btnRecharge}
-                onPress={() => { setShowPaywall(false); navigation.navigate('BuyCoins' as any, {}); }}
+                onPress={() => { setShowPaywall(false); navigation.navigate('BuyGoGold' as any, {}); }}
               >
                 <Icon name="plus-circle" size={18} color="#fff" />
                 <Text style={pw.btnTxt}>Recharger mon wallet</Text>
@@ -569,7 +569,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               >
                 {purchasing
                   ? <ActivityIndicator color="#fff" />
-                  : <><Icon name="zap" size={18} color="#fff" /><Text style={pw.btnTxt}>Confirmer l'achat — {coinsRequired} coins</Text></>
+                  : <><Icon name="zap" size={18} color="#fff" /><Text style={pw.btnTxt}>Confirmer l'achat — {goGoldRequired} GoGold</Text></>
                 }
               </TouchableOpacity>
             )}

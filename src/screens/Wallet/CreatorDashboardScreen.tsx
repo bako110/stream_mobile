@@ -1,8 +1,8 @@
 /**
  * CreatorDashboardScreen — Tableau de bord monétisation créateur
  * - Toggle monétisation (PATCH /wallet/creator/profile)
- * - Stats: vues, cadeaux, coins, revenus ce mois
- * - Top Reels avec coins gagnés
+ * - Stats: vues, cadeaux, GoGold, revenus ce mois
+ * - Top Reels avec GoGold gagnés
  * - Prix abonnement
  * - Section retrait
  * - Cadeaux reçus récents
@@ -42,8 +42,8 @@ interface CreatorProfile {
 interface CreatorStats {
   total_views: number;
   total_gifts_received: number;
-  total_coins_earned: number;
-  monthly_earnings_coins: number;
+  total_gogold_earned: number;
+  monthly_earnings_gogold: number;
   monthly_earnings_eur: number;
   current_balance: number;
   available_balance: number;
@@ -55,7 +55,7 @@ interface TopReel {
   caption?: string;
   views_count: number;
   gifts_count: number;
-  coins_earned: number;
+  gogold_earned: number;
 }
 
 interface GiftReceived {
@@ -64,13 +64,13 @@ interface GiftReceived {
   sender_avatar?: string;
   gift_emoji: string;
   gift_name: string;
-  coins: number;
+  GoGold: number;
   created_at: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-// Taux retrait : 100 coins = 0.35 €
-const coinsToEur = (coins: number | string) => ((parseFloat(String(coins ?? 0)) / 100) * 0.35).toFixed(2);
+// Taux retrait : 100 GoGold = 0.35 €
+const goGoldToEur = (GoGold: number | string) => ((parseFloat(String(GoGold ?? 0)) / 100) * 0.35).toFixed(2);
 const fmtNum = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : `${n}`;
 
@@ -283,9 +283,9 @@ const CreatorDashboardScreen: React.FC = () => {
                 color="#E85DAD" colors={colors}
               />
               <StatCard
-                icon="bitcoin" iconLib="mci" label="Coins gagnés"
-                value={fmtNum(stats.total_coins_earned)}
-                sub={`≈ ${coinsToEur(stats.total_coins_earned)} €`}
+                icon="bitcoin" iconLib="mci" label="GoGold gagnés"
+                value={fmtNum(stats.total_gogold_earned)}
+                sub={`≈ ${goGoldToEur(stats.total_gogold_earned)} €`}
                 color="#FFD700" colors={colors}
               />
               <StatCard
@@ -331,8 +331,8 @@ const CreatorDashboardScreen: React.FC = () => {
                   </View>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                  <Text style={s.reelCoins}>{reel.coins_earned}</Text>
-                  <Text style={s.reelCoinsLabel}>coins</Text>
+                  <Text style={s.reelGoGold}>{reel.gogold_earned}</Text>
+                  <Text style={s.reelCoinsLabel}>GoGold</Text>
                 </View>
               </View>
             ))}
@@ -374,12 +374,12 @@ const CreatorDashboardScreen: React.FC = () => {
         <Text style={s.sectionTitle}>Revenus disponibles</Text>
         <View style={s.withdrawCard}>
           <View style={s.withdrawBalance}>
-            <Text style={s.withdrawCoins}>
+            <Text style={s.withdrawGoGold}>
               {(stats?.available_balance ?? 0).toLocaleString('fr-FR')}
             </Text>
-            <Text style={s.withdrawCoinsLabel}>coins disponibles</Text>
+            <Text style={s.withdrawCoinsLabel}>GoGold disponibles</Text>
             <Text style={s.withdrawEur}>
-              ≈ {coinsToEur(stats?.available_balance ?? 0)} EUR
+              ≈ {goGoldToEur(stats?.available_balance ?? 0)} EUR
             </Text>
           </View>
           <TouchableOpacity
@@ -405,7 +405,7 @@ const CreatorDashboardScreen: React.FC = () => {
           </TouchableOpacity>
           {(stats?.available_balance ?? 0) < 1000 && (
             <Text style={s.withdrawMin}>
-              Minimum 500 coins ({coinsToEur(500)} €) requis
+              Minimum 500 GoGold ({goGoldToEur(500)} €) requis
             </Text>
           )}
         </View>
@@ -459,7 +459,7 @@ const CreatorDashboardScreen: React.FC = () => {
                   <Text style={s.giftSender}>{g.sender_name}</Text>
                   <Text style={s.giftName}>{g.gift_name} • {formatDate(g.created_at)}</Text>
                 </View>
-                <Text style={s.giftCoins}>+{g.coins}</Text>
+                <Text style={s.giftGoGold}>+{g.GoGold}</Text>
               </View>
             ))}
           </View>
@@ -577,7 +577,7 @@ const styles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
   },
-  reelCoins: {
+  reelGoGold: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.primary,
@@ -640,7 +640,7 @@ const styles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
-  withdrawCoins: {
+  withdrawGoGold: {
     fontSize: 36,
     fontWeight: '800',
     color: colors.textPrimary,
@@ -725,7 +725,7 @@ const styles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
   },
-  giftCoins: {
+  giftGoGold: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.success,

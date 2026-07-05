@@ -54,7 +54,7 @@ const MENU_OPTIONS = [
   { label: 'Artiste & Vérification',      value: 'artiste'    },
   { label: 'Social & Communautés',        value: 'social'     },
   { label: 'Notifications & Paramètres',  value: 'parametres' },
-  { label: 'Parrainage & Coins',          value: 'parrainage' },
+  { label: 'Parrainage & GoGold',          value: 'parrainage' },
   { label: 'Parler à un agent',           value: 'agent'      },
 ];
 
@@ -69,14 +69,14 @@ const BOT: Record<string, BotNode> = {
     text: 'Paiement & Wallet\n\nQuel est votre problème ?',
     options: [
       { label: 'Mon dépôt a échoué',          value: 'depot_echoue'    },
-      { label: "Je n'ai pas reçu mes coins",   value: 'coins_manquants' },
+      { label: "Je n'ai pas reçu mes GoGold",   value: 'coins_manquants' },
       { label: 'Problème de retrait',          value: 'retrait'         },
       { label: 'Autre',                        value: 'agent'           },
       { label: 'Retour menu',                  value: 'menu'            },
     ],
   },
   depot_echoue: {
-    text: "Dépôt échoué\n\nCauses fréquentes :\n• Solde insuffisant\n• Limite journalière dépassée\n• Connexion instable\n\nQue faire ?\n1. Vérifiez votre solde\n2. Essayez un autre moyen de paiement\n3. Réessayez après 5 minutes\n\nSi le montant a été débité sans créditer vos coins, contactez un agent avec votre numéro de transaction.",
+    text: "Dépôt échoué\n\nCauses fréquentes :\n• Solde insuffisant\n• Limite journalière dépassée\n• Connexion instable\n\nQue faire ?\n1. Vérifiez votre solde\n2. Essayez un autre moyen de paiement\n3. Réessayez après 5 minutes\n\nSi le montant a été débité sans créditer vos GoGold, contactez un agent avec votre numéro de transaction.",
     options: [
       { label: "C'est résolu",       value: 'resolu' },
       { label: 'Besoin d\'aide',     value: 'agent'  },
@@ -84,15 +84,15 @@ const BOT: Record<string, BotNode> = {
     ],
   },
   coins_manquants: {
-    text: "Coins non reçus\n\nAprès un achat réussi, les coins sont crédités immédiatement.\n\n1. Rafraîchissez votre wallet\n2. Déconnectez-vous puis reconnectez-vous\n3. Vérifiez l'historique Wallet → Transactions\n\nSi le problème persiste, un agent peut vous aider.",
+    text: "GoGold non reçus\n\nAprès un achat réussi, les GoGold sont crédités immédiatement.\n\n1. Rafraîchissez votre wallet\n2. Déconnectez-vous puis reconnectez-vous\n3. Vérifiez l'historique Wallet → Transactions\n\nSi le problème persiste, un agent peut vous aider.",
     options: [
-      { label: 'Coins bien reçus',  value: 'resolu'   },
+      { label: 'GoGold bien reçus',  value: 'resolu'   },
       { label: 'Besoin d\'un agent', value: 'agent'   },
       { label: 'Retour',            value: 'paiement' },
     ],
   },
   retrait: {
-    text: "Retrait de gains\n\nConditions :\n• Minimum : 1 000 coins\n• Délai : 24–72h ouvrables\n• Compte vérifié requis\n• Moyen de paiement configuré dans Paramètres → Monétisation\n\nBesoin d'aide ?",
+    text: "Retrait de gains\n\nConditions :\n• Minimum : 1 000 GoGold\n• Délai : 24–72h ouvrables\n• Compte vérifié requis\n• Moyen de paiement configuré dans Paramètres → Monétisation\n\nBesoin d'aide ?",
     options: [
       { label: 'Mon retrait est bloqué', value: 'agent' },
       { label: 'Compris',                value: 'resolu' },
@@ -161,10 +161,10 @@ const BOT: Record<string, BotNode> = {
     ],
   },
   parrainage: {
-    text: 'Parrainage & Coins\n\nQuel est votre problème ?',
+    text: 'Parrainage & GoGold\n\nQuel est votre problème ?',
     options: [
       { label: 'Code de parrainage invalide',   value: 'agent' },
-      { label: 'Coins de parrainage non reçus', value: 'agent' },
+      { label: 'GoGold de parrainage non reçus', value: 'agent' },
       { label: 'Retour menu',                   value: 'menu'  },
     ],
   },

@@ -43,7 +43,7 @@ export const SettingsVerificationScreen: React.FC = () => {
   const [bio,         setBio]         = useState('');
   const [links,       setLinks]       = useState('');
   const [loading,     setLoading]     = useState(false);
-  const [myCoins,     setMyCoins]     = useState<number | null>(null);
+  const [myGoGold,     setMyGoGold]     = useState<number | null>(null);
 
   const canGoStep2 = !!accountType;
   const canGoStep3 = fullName.trim().length >= 2 && bio.trim().length >= 20;
@@ -52,10 +52,10 @@ export const SettingsVerificationScreen: React.FC = () => {
     try {
       const [verifRes, walletRes] = await Promise.all([
         apiClient.get<{ status: VerifStatus; is_verified: boolean }>(Endpoints.users.verificationStatus),
-        apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance),
+        apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance),
       ]);
       setStatus(verifRes.data.status);
-      setMyCoins(walletRes.data?.coins_balance ?? 0);
+      setMyGoGold(walletRes.data?.gogold_balance ?? 0);
       if (verifRes.data.is_verified || verifRes.data.status === 'approved') await refreshUser();
     } catch {}
     finally { setFetching(false); }
@@ -68,13 +68,13 @@ export const SettingsVerificationScreen: React.FC = () => {
   }, []);
 
   const handleSubmit = async () => {
-    if (myCoins !== null && myCoins < VERIFICATION_FEE) {
+    if (myGoGold !== null && myGoGold < VERIFICATION_FEE) {
       Alert.alert(
         'Solde insuffisant',
-        `Il te faut ${VERIFICATION_FEE} coins pour soumettre une demande.\nTon solde actuel : ${myCoins} coins.\nIl te manque ${VERIFICATION_FEE - myCoins} coins.`,
+        `Il te faut ${VERIFICATION_FEE} GoGold pour soumettre une demande.\nTon solde actuel : ${myGoGold} GoGold.\nIl te manque ${VERIFICATION_FEE - myGoGold} GoGold.`,
         [
           { text: 'Annuler', style: 'cancel' },
-          { text: 'Acheter des coins', onPress: () => nav.navigate('BuyCoins') },
+          { text: 'Acheter des GoGold', onPress: () => nav.navigate('BuyGoGold') },
         ],
       );
       return;
@@ -83,21 +83,21 @@ export const SettingsVerificationScreen: React.FC = () => {
     try {
       const note = [`Type: ${accountType}`, `Nom: ${fullName.trim()}`, `Bio: ${bio.trim()}`, links.trim() ? `Liens: ${links.trim()}` : ''].filter(Boolean).join('\n');
       await apiClient.post(Endpoints.users.verifyRequest, { note });
-      setMyCoins(prev => prev !== null ? prev - VERIFICATION_FEE : null);
+      setMyGoGold(prev => prev !== null ? prev - VERIFICATION_FEE : null);
       setStatus('pending');
       setStep(0);
     } catch (e: any) {
       const detail = e?.response?.data?.detail ?? '';
       if (e?.response?.status === 402 || detail.toLowerCase().includes('insuffisant')) {
-        const walletRes = await apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance).catch(() => null);
-        const realBalance = walletRes?.data?.coins_balance ?? 0;
-        setMyCoins(realBalance);
+        const walletRes = await apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance).catch(() => null);
+        const realBalance = walletRes?.data?.gogold_balance ?? 0;
+        setMyGoGold(realBalance);
         Alert.alert(
           'Solde insuffisant',
-          `Ton solde est de ${realBalance} coins. Il te manque ${VERIFICATION_FEE - realBalance} coins.`,
+          `Ton solde est de ${realBalance} GoGold. Il te manque ${VERIFICATION_FEE - realBalance} GoGold.`,
           [
             { text: 'Annuler', style: 'cancel' },
-            { text: 'Acheter des coins', onPress: () => nav.navigate('BuyCoins') },
+            { text: 'Acheter des GoGold', onPress: () => nav.navigate('BuyGoGold') },
           ],
         );
       } else {
@@ -112,7 +112,7 @@ export const SettingsVerificationScreen: React.FC = () => {
       none:     { icon: 'shield',       color: colors.textTertiary, title: 'Non vérifié',        sub: '' },
       pending:  { icon: 'clock',        color: '#F59E0B',           title: 'En cours d\'examen', sub: 'Notre équipe examine votre dossier. Cela peut prendre quelques jours.' },
       approved: { icon: 'check-circle', color: BLUE,                title: 'Compte vérifié ✓',   sub: 'Votre compte est certifié GoFolyX.' },
-      rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',    sub: (user?.verification_note ? user.verification_note + '\n\n' : '') + `Tes ${VERIFICATION_FEE} coins ont été remboursés dans ton wallet. Tu peux soumettre une nouvelle demande.` },
+      rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',    sub: (user?.verification_note ? user.verification_note + '\n\n' : '') + `Tes ${VERIFICATION_FEE} GoGold ont été remboursés dans ton wallet. Tu peux soumettre une nouvelle demande.` },
     };
     const cfg = CFG[status];
     return (
@@ -239,8 +239,8 @@ export const SettingsVerificationScreen: React.FC = () => {
   // ── Step 3 ─────────────────────────────────────────────────────────────────
   const renderStep3 = () => {
     const typeInfo = ACCOUNT_TYPES.find(t => t.key === accountType)!;
-    const canAfford = myCoins === null || myCoins >= VERIFICATION_FEE;
-    const soldeApres = myCoins !== null ? myCoins - VERIFICATION_FEE : null;
+    const canAfford = myGoGold === null || myGoGold >= VERIFICATION_FEE;
+    const soldeApres = myGoGold !== null ? myGoGold - VERIFICATION_FEE : null;
     return (
       <View style={{ gap: 14 }}>
         <Text style={[vs.stepTitle, { color: colors.textPrimary }]}>Vérifiez votre demande</Text>
@@ -265,29 +265,29 @@ export const SettingsVerificationScreen: React.FC = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <Icon name="zap" size={16} color={canAfford ? BLUE : '#EF4444'} />
             <Text style={{ fontSize: 14, fontWeight: '800', color: canAfford ? BLUE : '#EF4444' }}>
-              Frais de dossier : {VERIFICATION_FEE} coins
+              Frais de dossier : {VERIFICATION_FEE} GoGold
             </Text>
           </View>
-          {myCoins !== null && (
+          {myGoGold !== null && (
             <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
-              Ton solde : {myCoins.toLocaleString('fr-FR')} coins
-              {canAfford && soldeApres !== null ? `  →  ${soldeApres.toLocaleString('fr-FR')} coins après` : ''}
+              Ton solde : {myGoGold.toLocaleString('fr-FR')} GoGold
+              {canAfford && soldeApres !== null ? `  →  ${soldeApres.toLocaleString('fr-FR')} GoGold après` : ''}
             </Text>
           )}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
             <Icon name="rotate-ccw" size={12} color="#22C55E" style={{ marginTop: 2 }} />
             <Text style={{ fontSize: 12, color: '#22C55E', flex: 1, lineHeight: 17 }}>
-              Ces coins sont remboursés automatiquement dans ton wallet si ta demande est refusée.
+              Ces GoGold sont remboursés automatiquement dans ton wallet si ta demande est refusée.
             </Text>
           </View>
           {!canAfford && (
             <TouchableOpacity
-              onPress={() => nav.navigate('BuyCoins')}
+              onPress={() => nav.navigate('BuyGoGold')}
               style={{ marginTop: 10, backgroundColor: '#EF4444', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}
               activeOpacity={0.85}
             >
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
-                Acheter des coins — il te manque {VERIFICATION_FEE - (myCoins ?? 0)} coins
+                Acheter des GoGold — il te manque {VERIFICATION_FEE - (myGoGold ?? 0)} GoGold
               </Text>
             </TouchableOpacity>
           )}
@@ -304,7 +304,7 @@ export const SettingsVerificationScreen: React.FC = () => {
           >
             {loading
               ? <ActivityIndicator color="#fff" size="small" />
-              : <><Icon name="send" size={15} color="#fff" /><Text style={vs.primaryBtnText}>Envoyer — {VERIFICATION_FEE} coins</Text></>
+              : <><Icon name="send" size={15} color="#fff" /><Text style={vs.primaryBtnText}>Envoyer — {VERIFICATION_FEE} GoGold</Text></>
             }
           </TouchableOpacity>
         </View>

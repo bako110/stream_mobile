@@ -90,7 +90,7 @@ import { GoLiveScreen }            from '../screens/Live/GoLiveScreen';
 import { SimpleLiveStreamScreen }  from '../screens/Live/SimpleLiveStreamScreen';
 import { SimpleLiveViewerScreen }  from '../screens/Live/SimpleLiveViewerScreen';
 import WalletScreen                from '../screens/Wallet/WalletScreen';
-import BuyCoinsScreen              from '../screens/Wallet/BuyCoinsScreen';
+import BuyGoGoldScreen              from '../screens/Wallet/BuyGoGoldScreen';
 import CreatorDashboardScreen      from '../screens/Wallet/CreatorDashboardScreen';
 import { MonetisationScreen }       from '../screens/Wallet/MonetisationScreen';
 import { CreatorStatsScreen }       from '../screens/Wallet/CreatorStatsScreen';
@@ -208,7 +208,7 @@ export type MainStackParamList = {
   ImageViewer:     { url: string; label?: string };
   CreatePost:      undefined;
   Wallet:          undefined;
-  BuyCoins:        { reason?: string; missingCoins?: number; returnTo?: keyof MainStackParamList } | undefined;
+  BuyGoGold:        { reason?: string; missingGoGold?: number; returnTo?: keyof MainStackParamList } | undefined;
   CreatorDashboard: undefined;
   CreatorStats:     undefined;
   Monetisation:     undefined;
@@ -506,7 +506,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="Wallet"         component={WalletScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Ads"            component={AdsScreen}             options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CreateAd"       component={CreateAdScreen}        options={{ animation: 'slide_from_right', headerShown: false }} />
-        <Stack.Screen name="BuyCoins"       component={BuyCoinsScreen}        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="BuyGoGold"       component={BuyGoGoldScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreatorDashboard" component={CreatorDashboardScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CreatorStats"     component={CreatorStatsScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Monetisation"    component={MonetisationScreen}     options={{ animation: 'slide_from_right' }} />

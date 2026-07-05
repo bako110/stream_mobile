@@ -313,11 +313,11 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
     if (needsLive) {
       try {
         const cost = await apiClient.get('/api/v1/lives/cost') as any;
-        const { cost_coins, balance, sufficient } = cost;
+        const { cost_gogold, balance, sufficient } = cost;
         if (!sufficient) {
           Alert.alert(
             'Solde insuffisant',
-            `Il faut ${cost_coins} coins pour programmer un live.\nTon solde : ${balance} coins.\n\nRecharge ton wallet pour continuer.`,
+            `Il faut ${cost_gogold} GoGold pour programmer un live.\nTon solde : ${balance} GoGold.\n\nRecharge ton wallet pour continuer.`,
             [
               { text: 'Annuler', style: 'cancel' },
               { text: 'Recharger', onPress: () => onBack?.() },
@@ -328,7 +328,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
         await new Promise<void>((resolve, reject) =>
           Alert.alert(
             'Programmer un live',
-            `${cost_coins} coins seront débités de ton wallet (solde : ${balance} coins) pour programmer ce live.\n\nConfirmer ?`,
+            `${cost_gogold} GoGold seront débités de ton wallet (solde : ${balance} GoGold) pour programmer ce live.\n\nConfirmer ?`,
             [
               { text: 'Annuler', style: 'cancel', onPress: () => reject() },
               { text: 'Confirmer', onPress: () => resolve() },

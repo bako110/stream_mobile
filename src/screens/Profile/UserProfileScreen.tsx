@@ -743,7 +743,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                                 <View style={styles.pubMetaItem}>
                                   <Icon name="tag" size={10} color={accent} />
                                   <Text style={[styles.pubMetaText, { color: accent, fontWeight: '700' }]}>
-                                    {item.ticket_price === 0 ? 'Gratuit' : `${item.ticket_price} coins`}
+                                    {item.ticket_price === 0 ? 'Gratuit' : `${item.ticket_price} GoGold`}
                                   </Text>
                                 </View>
                               ) : null}

@@ -371,9 +371,9 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
                 </View>
 
                 <View style={styles.contribRight}>
-                  <View style={styles.coinsRow}>
+                  <View style={styles.goGoldRow}>
                     <Text style={styles.lightningIcon}>⚡</Text>
-                    <Text style={[styles.coinsValue, { color: COIN_COLOR }]}>{fmtNum(user.coins)}</Text>
+                    <Text style={[styles.goGoldValue, { color: COIN_COLOR }]}>{fmtNum(user.GoGold)}</Text>
                   </View>
                   <View style={styles.postsRow}>
                     <Icon name="edit-3" size={10} color={colors.textTertiary} />
@@ -575,9 +575,9 @@ const styles = StyleSheet.create({
   contribName: { fontSize: 14, fontWeight: '600' },
   contribUsername: { fontSize: 12, marginTop: 1 },
   contribRight: { alignItems: 'flex-end', gap: 3 },
-  coinsRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  goGoldRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   lightningIcon: { fontSize: 12 },
-  coinsValue: { fontSize: 13, fontWeight: '800', letterSpacing: -0.3 },
+  goGoldValue: { fontSize: 13, fontWeight: '800', letterSpacing: -0.3 },
   postsRow: { flexDirection: 'row', alignItems: 'center' },
   postsValue: { fontSize: 11 },
   divider: { height: 1, marginHorizontal: 2, opacity: 0.6 },

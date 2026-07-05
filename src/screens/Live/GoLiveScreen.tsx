@@ -22,7 +22,7 @@ interface GiftType {
   id: string;
   name: string;
   emoji: string;
-  coins_cost: number;
+  gogold_cost: number;
 }
 
 export const GoLiveScreen: React.FC = () => {
@@ -42,7 +42,7 @@ export const GoLiveScreen: React.FC = () => {
   // Monétisation
   const [showMonetModal,  setShowMonetModal]  = useState(false);
   const [monetType,       setMonetType]       = useState<MonetizationType | null>(null);
-  const [monetCoins,      setMonetCoins]      = useState('');
+  const [monetGoGold,      setMonetGoGold]      = useState('');
   const [monetGift,       setMonetGift]       = useState<GiftType | null>(null);
   const [gifts,           setGifts]           = useState<GiftType[]>([]);
   const [giftsLoading,    setGiftsLoading]    = useState(false);
@@ -77,9 +77,9 @@ export const GoLiveScreen: React.FC = () => {
   };
 
   const confirmMonetisation = () => {
-    if (monetType === 'coins') {
-      const v = parseInt(monetCoins, 10);
-      if (!v || v < 1) { Alert.alert('Erreur', 'Saisis un montant en coins valide.'); return; }
+    if (monetType === 'gogold') {
+      const v = parseInt(monetGoGold, 10);
+      if (!v || v < 1) { Alert.alert('Erreur', 'Saisis un montant en GoGold valide.'); return; }
     }
     if (monetType === 'gift' && !monetGift) {
       Alert.alert('Erreur', 'Sélectionne un cadeau.'); return;
@@ -89,7 +89,7 @@ export const GoLiveScreen: React.FC = () => {
 
   const cancelMonetisation = () => {
     setMonetType(null);
-    setMonetCoins('');
+    setMonetGoGold('');
     setMonetGift(null);
     setShowMonetModal(false);
   };
@@ -98,7 +98,7 @@ export const GoLiveScreen: React.FC = () => {
 
   const monetLabel = () => {
     if (!isMonetized) return null;
-    if (monetType === 'coins') return `${monetCoins} coins`;
+    if (monetType === 'gogold') return `${monetGoGold} GoGold`;
     if (monetType === 'gift' && monetGift) return `${monetGift.emoji} ${monetGift.name}`;
     return null;
   };
@@ -114,7 +114,7 @@ export const GoLiveScreen: React.FC = () => {
         is_private: isPrivate,
         is_monetized: isMonetized,
         monetization_type:     isMonetized ? monetType! : undefined,
-        monetization_coins:    monetType === 'coins' ? parseInt(monetCoins, 10) : undefined,
+        monetization_gogold:    monetType === 'gogold' ? parseInt(monetGoGold, 10) : undefined,
         monetization_gift_id:  monetType === 'gift'  ? monetGift?.id : undefined,
       };
       const result = await liveService.startLive(payload);
@@ -269,8 +269,8 @@ export const GoLiveScreen: React.FC = () => {
             <View style={st.monetBadge}>
               <MCIcon name="currency-usd" size={13} color="#F59E0B" />
               <Text style={st.monetBadgeText}>
-                {monetType === 'coins'
-                  ? `Live payant · ${monetCoins} coins pour rejoindre`
+                {monetType === 'gogold'
+                  ? `Live payant · ${monetGoGold} GoGold pour rejoindre`
                   : `Live payant · cadeau requis : ${monetGift?.emoji} ${monetGift?.name}`}
               </Text>
             </View>
@@ -331,16 +331,16 @@ export const GoLiveScreen: React.FC = () => {
 
             {/* Choix du type */}
             <View style={st.typeRow}>
-              {/* Coins */}
+              {/* GoGold */}
               <TouchableOpacity
-                style={[st.typeBtn, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }, monetType === 'coins' && { borderColor: '#F59E0B', backgroundColor: '#F59E0B18' }]}
-                onPress={() => setMonetType('coins')}
+                style={[st.typeBtn, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }, monetType === 'gogold' && { borderColor: '#F59E0B', backgroundColor: '#F59E0B18' }]}
+                onPress={() => setMonetType('gogold')}
                 activeOpacity={0.8}
               >
                 <Text style={st.typeEmoji}>🪙</Text>
-                <Text style={[st.typeLabel, { color: monetType === 'coins' ? '#F59E0B' : colors.textPrimary }]}>Prix en coins</Text>
+                <Text style={[st.typeLabel, { color: monetType === 'gogold' ? '#F59E0B' : colors.textPrimary }]}>Prix en GoGold</Text>
                 <Text style={[st.typeSub, { color: colors.textTertiary }]}>Montant fixe à payer</Text>
-                {monetType === 'coins' && <MCIcon name="check-circle" size={18} color="#F59E0B" style={st.typeCheck} />}
+                {monetType === 'gogold' && <MCIcon name="check-circle" size={18} color="#F59E0B" style={st.typeCheck} />}
               </TouchableOpacity>
 
               {/* Cadeau */}
@@ -356,20 +356,20 @@ export const GoLiveScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Saisie coins */}
-            {monetType === 'coins' && (
-              <View style={[st.coinsInputWrap, { backgroundColor: colors.backgroundSecondary, borderColor: '#F59E0B' }]}>
-                <Text style={st.coinsInputEmoji}>🪙</Text>
+            {/* Saisie GoGold */}
+            {monetType === 'gogold' && (
+              <View style={[st.goGoldInputWrap, { backgroundColor: colors.backgroundSecondary, borderColor: '#F59E0B' }]}>
+                <Text style={st.goGoldInputEmoji}>🪙</Text>
                 <TextInput
-                  value={monetCoins}
-                  onChangeText={v => setMonetCoins(v.replace(/[^0-9]/g, ''))}
+                  value={monetGoGold}
+                  onChangeText={v => setMonetGoGold(v.replace(/[^0-9]/g, ''))}
                   placeholder="Ex: 50"
                   placeholderTextColor={colors.textTertiary}
                   keyboardType="number-pad"
-                  style={[st.coinsInput, { color: colors.textPrimary }]}
+                  style={[st.goGoldInput, { color: colors.textPrimary }]}
                   maxLength={6}
                 />
-                <Text style={[st.coinsInputSuffix, { color: colors.textTertiary }]}>coins</Text>
+                <Text style={[st.goGoldInputSuffix, { color: colors.textTertiary }]}>GoGold</Text>
               </View>
             )}
 
@@ -395,7 +395,7 @@ export const GoLiveScreen: React.FC = () => {
                         >
                           <Text style={st.giftEmoji}>{item.emoji}</Text>
                           <Text style={[st.giftName, { color: colors.textSecondary }]} numberOfLines={1}>{item.name}</Text>
-                          <Text style={st.giftCost}>{item.coins_cost}🪙</Text>
+                          <Text style={st.giftCost}>{item.gogold_cost}🪙</Text>
                           {selected && <View style={st.giftSelectedDot} />}
                         </TouchableOpacity>
                       );
@@ -525,14 +525,14 @@ const st = StyleSheet.create({
   typeSub:   { fontSize: 11 },
   typeCheck: { position: 'absolute', top: 8, right: 8 },
 
-  coinsInputWrap: {
+  goGoldInputWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     borderRadius: 14, borderWidth: 1.5,
     paddingHorizontal: 16, height: 52, marginBottom: 16,
   },
-  coinsInputEmoji:  { fontSize: 22 },
-  coinsInput:       { flex: 1, fontSize: 22, fontWeight: '700' },
-  coinsInputSuffix: { fontSize: 14 },
+  goGoldInputEmoji:  { fontSize: 22 },
+  goGoldInput:       { flex: 1, fontSize: 22, fontWeight: '700' },
+  goGoldInputSuffix: { fontSize: 14 },
 
   giftSection:      { marginBottom: 16 },
   giftSectionTitle: { fontSize: 12, fontWeight: '600', marginBottom: 10 },

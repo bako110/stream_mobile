@@ -42,7 +42,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
 
 const PAID_PLANS: PlanType[] = ['basic', 'premium', 'family'];
 
-// 1 EUR = 100 coins (aligné sur le backend)
+// 1 EUR = 100 GoGold (aligné sur le backend)
 const PLAN_COINS: Record<string, number> = {
   basic:   Math.round(5.99  * 100),  // 599
   premium: Math.round(9.99  * 100),  // 999
@@ -188,7 +188,7 @@ const ConfirmModal: React.FC<{
               <Text style={[s.walletLabel, { color: colors.textSecondary }]}>Votre solde</Text>
             </View>
             <Text style={[s.walletBalance, { color: check.sufficient ? colors.textPrimary : '#EF4444' }]}>
-              {check.balance.toLocaleString()} coins
+              {check.balance.toLocaleString()} GoGold
             </Text>
           </View>
 
@@ -198,7 +198,7 @@ const ConfirmModal: React.FC<{
               <Text style={[s.walletLabel, { color: colors.textSecondary }]}>Coût abonnement</Text>
             </View>
             <Text style={[s.walletCost, { color: grad[0] }]}>
-              -{check.coins_required.toLocaleString()} coins
+              -{check.gogold_required.toLocaleString()} GoGold
             </Text>
           </View>
 
@@ -210,7 +210,7 @@ const ConfirmModal: React.FC<{
                   <Text style={[s.walletLabel, { color: colors.textSecondary }]}>Solde après</Text>
                 </View>
                 <Text style={[s.walletBalance, { color: '#10B981' }]}>
-                  {(check.balance - check.coins_required).toLocaleString()} coins
+                  {(check.balance - check.gogold_required).toLocaleString()} GoGold
                 </Text>
               </View>
 
@@ -230,7 +230,7 @@ const ConfirmModal: React.FC<{
               <View style={[s.insufficientBox, { backgroundColor: '#EF444415', borderColor: '#EF444430' }]}>
                 <Icon name="alert-circle" size={15} color="#EF4444" />
                 <Text style={s.insufficientText}>
-                  Il vous manque {check.missing.toLocaleString()} coins pour souscrire à ce plan.
+                  Il vous manque {check.missing.toLocaleString()} GoGold pour souscrire à ce plan.
                 </Text>
               </View>
               <TouchableOpacity style={[s.confirmBtn, { backgroundColor: colors.primary }]} onPress={onRecharge} disabled={confirming}>
@@ -262,7 +262,7 @@ const PlanPicker: React.FC<{
       <Icon name="zap" size={32} color={colors.primary} />
       <Text style={[s.noSubTitle, { color: colors.textPrimary }]}>Choisissez votre plan</Text>
       <Text style={[s.noSubSub, { color: colors.textSecondary }]}>
-        Accédez à tout le contenu GoFolyX sans limite. Paiement en coins.
+        Accédez à tout le contenu GoFolyX sans limite. Paiement en GoGold.
       </Text>
 
       {PAID_PLANS.map((p, idx) => {
@@ -280,8 +280,8 @@ const PlanPicker: React.FC<{
                   <Text style={[s.planCardName, { color: grad[0] }]}>{PLAN_LABELS[p]}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={[s.planCardPrice, { color: grad[0] }]}>{PLAN_PRICES[p]}</Text>
-                    <Text style={[s.planCardCoins, { color: grad[0] + 'AA' }]}>
-                      ({PLAN_COINS[p]} coins)
+                    <Text style={[s.planCardGoGold, { color: grad[0] + 'AA' }]}>
+                      ({PLAN_COINS[p]} GoGold)
                     </Text>
                   </View>
                 </View>
@@ -381,7 +381,7 @@ export const SubscriptionsScreen: React.FC = () => {
       await load(true);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
-      if (detail?.code === 'insufficient_coins') {
+      if (detail?.code === 'insufficient_gogold') {
         // Ne devrait pas arriver (on a vérifié avant), mais on gère
         setWalletCheck(prev => prev ? { ...prev, sufficient: false, missing: detail.missing } : prev);
       } else {
@@ -398,9 +398,9 @@ export const SubscriptionsScreen: React.FC = () => {
     const missing = walletCheck?.missing ?? 0;
     setModalPlan(null);
     setWalletCheck(null);
-    navigation.navigate('BuyCoins', {
-      reason: `Il vous manque ${missing.toLocaleString()} coins pour souscrire`,
-      missingCoins: missing,
+    navigation.navigate('BuyGoGold', {
+      reason: `Il vous manque ${missing.toLocaleString()} GoGold pour souscrire`,
+      missingGoGold: missing,
       returnTo: 'Subscriptions',
     });
   }, [walletCheck, navigation]);
@@ -550,7 +550,7 @@ const s = StyleSheet.create({
   confirmBtnText:     { color: '#fff', fontWeight: '700', fontSize: 15 },
   cancelLink:         { alignItems: 'center', paddingVertical: 14 },
   cancelLinkText:     { fontSize: 14 },
-  planCardCoins:      { fontSize: 11 },
+  planCardGoGold:      { fontSize: 11 },
 
   // Historique
   sectionTitle:     { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },

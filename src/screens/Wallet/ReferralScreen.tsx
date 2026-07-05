@@ -15,8 +15,8 @@ import { Endpoints } from '../../api/endpoints';
 interface ReferralStats {
   referral_code:        string | null;
   total_referred:       number;
-  total_coins_earned:   number;
-  monthly_coins_earned: number;
+  total_gogold_earned:   number;
+  monthly_gogold_earned: number;
   monthly_cap:          number;
 }
 
@@ -27,7 +27,7 @@ interface ReferredUser {
   avatar_url:      string | null;
   gofolyx_id:        string | null;
   joined_at:       string;
-  coins_generated: number;
+  gogold_generated: number;
 }
 
 export const ReferralScreen: React.FC = () => {
@@ -71,13 +71,13 @@ export const ReferralScreen: React.FC = () => {
     if (!stats?.referral_code) return;
     await Share.share({
       message:
-        `Rejoins-moi sur GoFolyX ! Utilise mon code de parrainage \`${stats.referral_code}\` lors de ton inscription et gagne 20 coins bonus. Tu peux t'inscrire sur GoFolyX maintenant.`,
+        `Rejoins-moi sur GoFolyX ! Utilise mon code de parrainage \`${stats.referral_code}\` lors de ton inscription et gagne 20 GoGold bonus. Tu peux t'inscrire sur GoFolyX maintenant.`,
       title: 'Invite un ami sur GoFolyX',
     });
   }, [stats]);
 
   const monthlyPct = stats
-    ? Math.min(100, Math.round((stats.monthly_coins_earned / stats.monthly_cap) * 100))
+    ? Math.min(100, Math.round((stats.monthly_gogold_earned / stats.monthly_cap) * 100))
     : 0;
 
   return (
@@ -109,14 +109,14 @@ export const ReferralScreen: React.FC = () => {
           >
             <Text style={[s.heroTitle, { color: colors.textPrimary }]}>Invitez vos amis</Text>
             <Text style={[s.heroSub, { color: colors.textSecondary }]}>
-              Gagnez des coins pour chaque ami qui rejoint GoFolyX et chaque achat qu'il effectue.
+              Gagnez des GoGold pour chaque ami qui rejoint GoFolyX et chaque achat qu'il effectue.
             </Text>
 
             {/* Récompenses */}
             <View style={s.rewardsRow}>
               <View style={[s.rewardPill, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}>
                 <Icon name="user-plus" size={14} color={colors.primary} />
-                <Text style={[s.rewardText, { color: colors.primary }]}>+30 coins / inscription</Text>
+                <Text style={[s.rewardText, { color: colors.primary }]}>+30 GoGold / inscription</Text>
               </View>
               <View style={[s.rewardPill, { backgroundColor: colors.accentGreen + '18', borderColor: colors.accentGreen + '40' }]}>
                 <Icon name="shopping-cart" size={14} color={colors.accentGreen} />
@@ -161,8 +161,8 @@ export const ReferralScreen: React.FC = () => {
             </View>
             <View style={[s.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Icon name="award" size={20} color={colors.accentGreen} />
-              <Text style={[s.statValue, { color: colors.textPrimary }]}>{stats?.total_coins_earned ?? 0}</Text>
-              <Text style={[s.statLabel, { color: colors.textSecondary }]}>Coins gagnés</Text>
+              <Text style={[s.statValue, { color: colors.textPrimary }]}>{stats?.total_gogold_earned ?? 0}</Text>
+              <Text style={[s.statLabel, { color: colors.textSecondary }]}>GoGold gagnés</Text>
             </View>
           </View>
 
@@ -171,14 +171,14 @@ export const ReferralScreen: React.FC = () => {
             <View style={s.capHeader}>
               <Text style={[s.cardLabel, { color: colors.textSecondary }]}>Ce mois-ci</Text>
               <Text style={[s.capValue, { color: colors.textPrimary }]}>
-                {stats?.monthly_coins_earned ?? 0} / {stats?.monthly_cap ?? 500} coins
+                {stats?.monthly_gogold_earned ?? 0} / {stats?.monthly_cap ?? 500} GoGold
               </Text>
             </View>
             <View style={[s.capTrack, { backgroundColor: colors.border }]}>
               <View style={[s.capFill, { width: `${monthlyPct}%`, backgroundColor: colors.primary }]} />
             </View>
             <Text style={[s.capNote, { color: colors.textTertiary }]}>
-              Plafond : {stats?.monthly_cap ?? 500} coins/mois de commissions affiliation
+              Plafond : {stats?.monthly_cap ?? 500} GoGold/mois de commissions affiliation
             </Text>
           </View>
 
@@ -188,7 +188,7 @@ export const ReferralScreen: React.FC = () => {
             {[
               { icon: 'share-2', text: 'Partagez votre code avec vos amis' },
               { icon: 'user-check', text: "L'ami entre votre code lors de son inscription" },
-              { icon: 'gift', text: 'Il recoit 20 coins, vous recevez 30 coins' },
+              { icon: 'gift', text: 'Il recoit 20 GoGold, vous recevez 30 GoGold' },
               { icon: 'percent', text: 'Vous gagnez 5% sur chacun de ses achats (max 500/mois)' },
             ].map((item, i) => (
               <View key={i} style={s.howRow}>
@@ -227,10 +227,10 @@ export const ReferralScreen: React.FC = () => {
                       ) : null}
                       <Text style={[s.userDate, { color: colors.textTertiary }]}>Inscrit le {date}</Text>
                     </View>
-                    {u.coins_generated > 0 && (
-                      <View style={[s.userCoins, { backgroundColor: '#FFD70018' }]}>
-                        <Text style={s.userCoinsText}>+{u.coins_generated}</Text>
-                        <Text style={s.userCoinsLabel}> coins</Text>
+                    {u.gogold_generated > 0 && (
+                      <View style={[s.userGoGold, { backgroundColor: '#FFD70018' }]}>
+                        <Text style={s.userCoinsText}>+{u.gogold_generated}</Text>
+                        <Text style={s.userCoinsLabel}> GoGold</Text>
                       </View>
                     )}
                   </View>
@@ -293,7 +293,7 @@ const s = StyleSheet.create({
   userInitial:  { fontSize: 16, fontWeight: '800' },
   userName:     { fontSize: 14, fontWeight: '600' },
   userDate:     { fontSize: 11, marginTop: 2 },
-  userCoins:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  userGoGold:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
   userCoinsText:  { color: '#FFD700', fontSize: 13, fontWeight: '800' },
   userCoinsLabel: { color: '#FFD700', fontSize: 11, fontWeight: '500' },
 });

@@ -184,8 +184,8 @@ export function CommunityMemberCreatorStatsScreen({ route }: Props) {
               </View>
               <View style={styles.heroSep} />
               <View style={styles.heroStat}>
-                <Text style={styles.heroStatValue}>{fmt(stats.total_coins_earned)}</Text>
-                <Text style={styles.heroStatLabel}>Coins gagnés</Text>
+                <Text style={styles.heroStatValue}>{fmt(stats.total_gogold_earned)}</Text>
+                <Text style={styles.heroStatLabel}>GoGold gagnés</Text>
               </View>
             </View>
           </LinearGradient>
@@ -228,35 +228,35 @@ export function CommunityMemberCreatorStatsScreen({ route }: Props) {
             </View>
           </SectionCard>
 
-          {/* Coins & Rémunération */}
-          <SectionCard title="Coins & Rémunération" icon="zap" gradient={['#F59E0B', '#D97706']} colors={colors}>
+          {/* GoGold & Rémunération */}
+          <SectionCard title="GoGold & Rémunération" icon="zap" gradient={['#F59E0B', '#D97706']} colors={colors}>
             <View style={styles.statsGrid}>
-              <StatCell icon="zap"      label="Total gagné"     value={stats.total_coins_earned}     color="#F59E0B" colors={colors} index={0} />
-              <StatCell icon="gift"     label="Cadeaux reçus"   value={stats.gifts_coins_earned}     color="#EC4899" colors={colors} index={1} />
-              <StatCell icon="users"    label="Communauté"      value={stats.community_coins_earned} color="#7B3FF2" colors={colors} index={2} />
+              <StatCell icon="zap"      label="Total gagné"     value={stats.total_gogold_earned}     color="#F59E0B" colors={colors} index={0} />
+              <StatCell icon="gift"     label="Cadeaux reçus"   value={stats.gifts_gogold_earned}     color="#EC4899" colors={colors} index={1} />
+              <StatCell icon="users"    label="Communauté"      value={stats.community_gogold_earned} color="#7B3FF2" colors={colors} index={2} />
             </View>
 
             {/* Barre de contribution */}
-            {stats.total_coins_earned > 0 && (
+            {stats.total_gogold_earned > 0 && (
               <View style={[styles.remuRow, { borderTopColor: colors.border }]}>
                 <Text style={[styles.remuTitle, { color: colors.textSecondary }]}>Répartition des gains</Text>
                 <View style={styles.remuBar}>
-                  {stats.gifts_coins_earned > 0 && (
+                  {stats.gifts_gogold_earned > 0 && (
                     <View style={[styles.remuSegment, {
                       backgroundColor: '#EC4899',
-                      flex: stats.gifts_coins_earned / stats.total_coins_earned,
+                      flex: stats.gifts_gogold_earned / stats.total_gogold_earned,
                     }]} />
                   )}
-                  {stats.community_coins_earned > 0 && (
+                  {stats.community_gogold_earned > 0 && (
                     <View style={[styles.remuSegment, {
                       backgroundColor: '#7B3FF2',
-                      flex: stats.community_coins_earned / stats.total_coins_earned,
+                      flex: stats.community_gogold_earned / stats.total_gogold_earned,
                     }]} />
                   )}
-                  {(stats.total_coins_earned - stats.gifts_coins_earned - stats.community_coins_earned) > 0 && (
+                  {(stats.total_gogold_earned - stats.gifts_gogold_earned - stats.community_gogold_earned) > 0 && (
                     <View style={[styles.remuSegment, {
                       backgroundColor: '#F59E0B',
-                      flex: (stats.total_coins_earned - stats.gifts_coins_earned - stats.community_coins_earned) / stats.total_coins_earned,
+                      flex: (stats.total_gogold_earned - stats.gifts_gogold_earned - stats.community_gogold_earned) / stats.total_gogold_earned,
                     }]} />
                   )}
                 </View>

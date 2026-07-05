@@ -130,10 +130,10 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
               </Text>
             )}
           </View>
-          {item.coins_paid > 0 && (
+          {item.gogold_paid > 0 && (
             <View style={[s.coinPill, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B40' }]}>
               <Icon name="zap" size={11} color="#F59E0B" />
-              <Text style={[s.coinText, { color: '#F59E0B' }]}>{item.coins_paid}</Text>
+              <Text style={[s.coinText, { color: '#F59E0B' }]}>{item.gogold_paid}</Text>
             </View>
           )}
         </View>
@@ -280,8 +280,8 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
               <Text style={[s.modalNote, { color: colors.textTertiary }]}>
                 L'utilisateur sera notifié du refus
                 {rejectReason.trim() ? ' avec votre raison.' : ' sans raison spécifiée.'}
-                {(rejectTarget?.coins_paid ?? 0) > 0 && (
-                  ' Les coins seront remboursés automatiquement.'
+                {(rejectTarget?.gogold_paid ?? 0) > 0 && (
+                  ' Les GoGold seront remboursés automatiquement.'
                 )}
               </Text>
 

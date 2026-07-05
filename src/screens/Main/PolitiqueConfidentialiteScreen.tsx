@@ -57,7 +57,7 @@ Données de localisation :
 • Géolocalisation précise uniquement si vous l'autorisez explicitement
 
 Données financières :
-• Historique des transactions Coins (montants, dates, types)
+• Historique des transactions GoGold (montants, dates, types)
 • Les données bancaires/carte sont gérées exclusivement par nos prestataires de paiement certifiés PCI-DSS (Stripe, Apple Pay, Google Pay)`,
   },
   {
@@ -67,7 +67,7 @@ Données financières :
 Fourniture du service (nécessaire au contrat) :
 • Créer, gérer et sécuriser votre compte utilisateur
 • Afficher vos contenus et ceux des personnes que vous suivez
-• Traiter les transactions Coins et gérer votre portefeuille virtuel
+• Traiter les transactions GoGold et gérer votre portefeuille virtuel
 • Envoyer les notifications liées à votre activité
 
 Amélioration du service (intérêt légitime) :

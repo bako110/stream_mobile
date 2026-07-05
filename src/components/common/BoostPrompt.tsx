@@ -101,7 +101,7 @@ export const BoostPrompt: React.FC<Props> = ({ visible, contentType, onBoost, on
           Booste {label} pour plus de portée
         </Text>
         <Text style={[s.boostSub, { color: colors.textSecondary }]}>
-          Dépense quelques coins pour être vu par beaucoup plus de monde.
+          Dépense quelques GoGold pour être vu par beaucoup plus de monde.
         </Text>
 
         {/* Avantages */}

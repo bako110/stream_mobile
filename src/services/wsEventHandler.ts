@@ -67,7 +67,7 @@ export interface WsEventCallbacks {
   onNewFollower?: (data: NewFollowerPayload) => void;
 
   // Wallet
-  onCoinTransferReceived?: (data: CoinTransferPayload) => void;
+  onGoGoldTransferReceived?: (data: GoGoldTransferPayload) => void;
   onGiftReceived?: (data: GiftReceivedPayload) => void;
   onWalletUpdated?: (data: WalletUpdatedPayload) => void;
 
@@ -122,8 +122,8 @@ export interface NewFollowerPayload {
   from_avatar?: string;
 }
 
-export interface CoinTransferPayload {
-  coins_amount: number;
+export interface GoGoldTransferPayload {
+  gogold_amount: number;
   note?: string;
   from_user_id: string;
   from_username: string;
@@ -132,7 +132,7 @@ export interface CoinTransferPayload {
 }
 
 export interface GiftReceivedPayload {
-  coins_amount: number;
+  gogold_amount: number;
   gift_name: string;
   gift_emoji: string;
   reel_id?: string;
@@ -144,7 +144,7 @@ export interface GiftReceivedPayload {
 
 export interface WalletUpdatedPayload {
   notification_type: string;
-  coins?: number;
+  GoGold?: number;
   ref_id?: string;
   ref_type?: string;
 }
@@ -194,8 +194,8 @@ export function createWsEventHandler(callbacks: WsEventCallbacks) {
         callbacks.onNewFollower?.(payload as unknown as NewFollowerPayload);
         break;
 
-      case 'coin_transfer_received':
-        callbacks.onCoinTransferReceived?.(payload as unknown as CoinTransferPayload);
+      case 'gogold_transfer_received':
+        callbacks.onGoGoldTransferReceived?.(payload as unknown as GoGoldTransferPayload);
         callbacks.onWalletUpdated?.(payload as unknown as WalletUpdatedPayload);
         callbacks.onNotification?.();
         break;

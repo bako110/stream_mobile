@@ -46,8 +46,8 @@ export default function TransferScreen() {
   const [balance,    setBalance]    = useState<number | null>(null);
 
   React.useEffect(() => {
-    apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance)
-      .then(r => setBalance(r.data?.coins_balance ?? 0))
+    apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance)
+      .then(r => setBalance(r.data?.gogold_balance ?? 0))
       .catch(() => {});
   }, []);
 
@@ -65,13 +65,13 @@ export default function TransferScreen() {
 
   const handleSend = async () => {
     if (!selected) return Alert.alert('Destinataire manquant', 'Sélectionne un utilisateur.');
-    const coins = parseInt(amount, 10);
-    if (!coins || coins < 1) return Alert.alert('Montant invalide', 'Entre un nombre de coins valide.');
-    if (balance !== null && coins > balance) return Alert.alert('Solde insuffisant', `Tu as ${balance} coins disponibles.`);
+    const GoGold = parseInt(amount, 10);
+    if (!GoGold || GoGold < 1) return Alert.alert('Montant invalide', 'Entre un nombre de GoGold valide.');
+    if (balance !== null && GoGold > balance) return Alert.alert('Solde insuffisant', `Tu as ${balance} GoGold disponibles.`);
 
     Alert.alert(
       'Confirmer le transfert',
-      `Envoyer ${coins} coins à ${selected.display_name || selected.username} ?${note ? `\nNote : ${note}` : ''}`,
+      `Envoyer ${GoGold} GoGold à ${selected.display_name || selected.username} ?${note ? `\nNote : ${note}` : ''}`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -80,10 +80,10 @@ export default function TransferScreen() {
             try {
               const res = await apiClient.post<{ new_balance: number; message: string }>(
                 Endpoints.wallet.transfer,
-                { receiver_id: selected.id, coins_amount: coins, note: note || null },
+                { receiver_id: selected.id, gogold_amount: GoGold, note: note || null },
               );
               setBalance(res.data?.new_balance ?? null);
-              Alert.alert('Transfert réussi ✓', res.data?.message ?? `${coins} coins envoyés.`, [
+              Alert.alert('Transfert réussi ✓', res.data?.message ?? `${GoGold} GoGold envoyés.`, [
                 { text: 'OK', onPress: () => navigation.goBack() },
               ]);
             } catch (e: any) {
@@ -95,8 +95,8 @@ export default function TransferScreen() {
     );
   };
 
-  const coins = parseInt(amount, 10) || 0;
-  const eur   = ((coins / 100) * 0.35).toFixed(2); // 100 coins = 0.35 €
+  const GoGold = parseInt(amount, 10) || 0;
+  const eur   = ((GoGold / 100) * 0.35).toFixed(2); // 100 GoGold = 0.35 €
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
@@ -105,7 +105,7 @@ export default function TransferScreen() {
       {/* Header */}
       <View style={s.header}>
         <BackButton onPress={() => navigation.goBack()} />
-        <Text style={[s.title, { color: colors.textPrimary }]}>Transférer des coins</Text>
+        <Text style={[s.title, { color: colors.textPrimary }]}>Transférer des GoGold</Text>
         {balance !== null && (
           <View style={[s.balancePill, { backgroundColor: colors.surface }]}>
             <Text style={s.balanceText}>{balance} 🪙</Text>
@@ -211,9 +211,9 @@ export default function TransferScreen() {
 
         {/* Bouton envoyer */}
         <TouchableOpacity
-          style={[s.sendBtn, (!selected || !coins || sending) && { opacity: 0.4 }]}
+          style={[s.sendBtn, (!selected || !GoGold || sending) && { opacity: 0.4 }]}
           onPress={handleSend}
-          disabled={!selected || !coins || sending}
+          disabled={!selected || !GoGold || sending}
           activeOpacity={0.85}
         >
           <LinearGradient
@@ -226,7 +226,7 @@ export default function TransferScreen() {
               : <>
                   <Icon name="send" size={16} color="#fff" />
                   <Text style={s.sendText}>
-                    {coins > 0 ? `Envoyer ${coins} 🪙` : 'Envoyer'}
+                    {GoGold > 0 ? `Envoyer ${GoGold} 🪙` : 'Envoyer'}
                   </Text>
                 </>
             }

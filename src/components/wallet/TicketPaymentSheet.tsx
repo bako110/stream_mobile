@@ -45,11 +45,11 @@ interface Props {
 // ── Constantes ──────────────────────────────────────────────────────────────
 
 const FEES_RATE    = 0.10;
-const EUR_TO_COINS = 100; // 1 € = 100 coins à l'achat
+const EUR_TO_COINS = 100; // 1 € = 100 GoGold à l'achat
 
-const coinsToEur = (c: number) => (c / 100) * 0.35; // taux retrait : 100 coins = 0.35 €
-const eurToCoins = (e: number) => Math.ceil(e * EUR_TO_COINS);
-const fmtCoins   = (c: number) => c.toLocaleString('fr-FR');
+const goGoldToEur = (c: number) => (c / 100) * 0.35; // taux retrait : 100 GoGold = 0.35 €
+const eurToGoGold = (e: number) => Math.ceil(e * EUR_TO_COINS);
+const fmtGoGold   = (c: number) => c.toLocaleString('fr-FR');
 const fmtEur     = (e: number) => e.toFixed(2).replace('.', ',') + ' €';
 
 const TIER_ICONS: Record<string, string> = {
@@ -100,8 +100,8 @@ export const TicketPaymentSheet: React.FC<Props> = ({
   const fetchBalance = async () => {
     setLoadingBal(true);
     try {
-      const res = await apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance);
-      setBalance(res.data?.coins_balance ?? 0);
+      const res = await apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance);
+      setBalance(res.data?.gogold_balance ?? 0);
     } catch {
       setBalance(0);
     } finally {
@@ -114,11 +114,11 @@ export const TicketPaymentSheet: React.FC<Props> = ({
   const priceEur   = activeTier?.price ?? 0;
   const feesEur    = Math.round(priceEur * FEES_RATE * 100) / 100;
   const totalEur   = priceEur + feesEur;
-  const priceCoins = eurToCoins(totalEur);
-  const hasEnough  = balance !== null && balance >= priceCoins;
-  const coinsAfter = balance !== null ? balance - priceCoins : null;
-  const missing    = balance !== null ? Math.max(0, priceCoins - balance) : 0;
-  const missingEur = coinsToEur(missing);
+  const priceGoGold = eurToGoGold(totalEur);
+  const hasEnough  = balance !== null && balance >= priceGoGold;
+  const goGoldAfter = balance !== null ? balance - priceGoGold : null;
+  const missing    = balance !== null ? Math.max(0, priceGoGold - balance) : 0;
+  const missingEur = goGoldToEur(missing);
 
   // ── Téléchargement PDF billet ───────────────────────────────────────────
   const downloadTicketPdf = async () => {
@@ -164,7 +164,7 @@ export const TicketPaymentSheet: React.FC<Props> = ({
 
   const goRecharge = () => {
     onClose();
-    navigation.navigate('BuyCoins', { neededCoins: missing, neededEur: missingEur });
+    navigation.navigate('BuyGoGold', { neededGoGold: missing, neededEur: missingEur });
   };
 
   // ── Rendu ────────────────────────────────────────────────────────────────
@@ -257,10 +257,10 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                       <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 4 }} />
                     ) : (
                       <Text style={[sh.balValue, { color: colors.textPrimary }]}>
-                        {fmtCoins(balance ?? 0)}{' '}
-                        <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textTertiary }}>coins</Text>
+                        {fmtGoGold(balance ?? 0)}{' '}
+                        <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textTertiary }}>GoGold</Text>
                         {'  '}
-                        <Text style={{ fontSize: 13, color: colors.textTertiary }}>≈ {fmtEur(coinsToEur(balance ?? 0))}</Text>
+                        <Text style={{ fontSize: 13, color: colors.textTertiary }}>≈ {fmtEur(goGoldToEur(balance ?? 0))}</Text>
                       </Text>
                     )}
                   </View>
@@ -296,14 +296,14 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                     <Text style={[sh.totalVal, { color: activeTier.color }]}>{fmtEur(totalEur)}</Text>
                   </View>
                   <View style={[sh.priceRow, { marginTop: 2 }]}>
-                    <Text style={[sh.priceLabel, { color: colors.textTertiary }]}>Équivalent coins</Text>
-                    <Text style={[sh.priceVal, { color: colors.primary, fontWeight: '700' }]}>{fmtCoins(priceCoins)} coins</Text>
+                    <Text style={[sh.priceLabel, { color: colors.textTertiary }]}>Équivalent GoGold</Text>
+                    <Text style={[sh.priceVal, { color: colors.primary, fontWeight: '700' }]}>{fmtGoGold(priceGoGold)} GoGold</Text>
                   </View>
-                  {!loadingBal && coinsAfter !== null && (
+                  {!loadingBal && goGoldAfter !== null && (
                     <View style={[sh.priceRow, { paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, marginTop: 4 }]}>
                       <Text style={[sh.priceLabel, { color: colors.textSecondary }]}>Solde après</Text>
                       <Text style={[sh.priceVal, { color: hasEnough ? '#10B981' : '#EF4444', fontWeight: '700' }]}>
-                        {hasEnough ? `${fmtCoins(coinsAfter)} coins` : 'Insuffisant'}
+                        {hasEnough ? `${fmtGoGold(goGoldAfter)} GoGold` : 'Insuffisant'}
                       </Text>
                     </View>
                   )}
@@ -314,9 +314,9 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                   <View style={[sh.insuffBanner, { backgroundColor: '#EF444415', borderColor: '#EF4444' }]}>
                     <Icon name="alert-circle" size={18} color="#EF4444" />
                     <View style={{ flex: 1 }}>
-                      <Text style={sh.insuffTitle}>Pas assez de coins</Text>
+                      <Text style={sh.insuffTitle}>Pas assez de GoGold</Text>
                       <Text style={sh.insuffSub}>
-                        Il te manque {fmtCoins(missing)} coins (≈ {fmtEur(missingEur)}). Recharge en 30 secondes !
+                        Il te manque {fmtGoGold(missing)} GoGold (≈ {fmtEur(missingEur)}). Recharge en 30 secondes !
                       </Text>
                     </View>
                   </View>
@@ -357,7 +357,7 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                         <Text style={sh.btnTxt}>
                           {!isPaid
                             ? 'Je réserve ma place !'
-                            : `Payer — ${fmtCoins(priceCoins)} coins`}
+                            : `Payer — ${fmtGoGold(priceGoGold)} GoGold`}
                         </Text>
                       </>
                     )}

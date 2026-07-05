@@ -230,8 +230,8 @@ export function CommunityMemberProfileScreen({ route }: Props) {
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
               <Icon name="zap" size={16} color="#F59E0B" />
-              <Text style={[styles.statValue, { color: colors.textPrimary }]}>{(member.coins_total ?? 0).toLocaleString()}</Text>
-              <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Coins</Text>
+              <Text style={[styles.statValue, { color: colors.textPrimary }]}>{(member.gogold_total ?? 0).toLocaleString()}</Text>
+              <Text style={[styles.statLabel, { color: colors.textTertiary }]}>GoGold</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>

@@ -44,14 +44,14 @@ export const JoinCommunityScreen: React.FC = () => {
       return;
     }
 
-    const price: number = community.entry_price_coins ?? 0;
+    const price: number = community.entry_price_gogold ?? 0;
     if (price > 0) {
       Alert.alert(
         'Adhésion payante',
-        `Cette communauté coûte ${price} coins pour rejoindre. Continuer ?`,
+        `Cette communauté coûte ${price} GoGold pour rejoindre. Continuer ?`,
         [
           { text: 'Annuler', style: 'cancel' },
-          { text: `Payer ${price} coins`, onPress: () => _doJoin(code) },
+          { text: `Payer ${price} GoGold`, onPress: () => _doJoin(code) },
         ],
       );
       return;
@@ -72,8 +72,8 @@ export const JoinCommunityScreen: React.FC = () => {
           "L'admin doit approuver ta demande. Tu seras notifie des que tu auras acces.",
           [{ text: 'OK', onPress: () => nav.goBack() }],
         );
-      } else if (res.data?.error === 'insufficient_coins') {
-        Alert.alert('Coins insuffisants', `Il te faut ${community.entry_price_coins} coins pour rejoindre cette communaute.`);
+      } else if (res.data?.error === 'insufficient_gogold') {
+        Alert.alert('GoGold insuffisants', `Il te faut ${community.entry_price_gogold} GoGold pour rejoindre cette communaute.`);
       }
     } catch (e: any) {
       const detail = e?.response?.data?.detail ?? 'Impossible de rejoindre.';
@@ -117,12 +117,12 @@ export const JoinCommunityScreen: React.FC = () => {
 
   const alreadyMember   = community.join_status === 'member';
   const pendingApproval = community.join_status === 'pending';
-  const price: number   = community.entry_price_coins ?? 0;
+  const price: number   = community.entry_price_gogold ?? 0;
   const needsApproval   = community.requires_approval || community.is_private;
 
   const joinLabel = () => {
     if (needsApproval) return 'Demander a rejoindre';
-    if (price > 0) return `Rejoindre · ${price} coins`;
+    if (price > 0) return `Rejoindre · ${price} GoGold`;
     return 'Rejoindre';
   };
 
@@ -199,7 +199,7 @@ export const JoinCommunityScreen: React.FC = () => {
           <View style={[st.badge, { backgroundColor: '#F59E0B10', borderColor: '#F59E0B30' }]}>
             <Icon name="zap" size={14} color="#F59E0B" />
             <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '600' }}>
-              Adhésion : <Text style={{ fontWeight: '900' }}>{price} coins</Text>
+              Adhésion : <Text style={{ fontWeight: '900' }}>{price} GoGold</Text>
             </Text>
           </View>
         )}

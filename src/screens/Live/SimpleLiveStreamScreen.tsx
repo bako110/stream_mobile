@@ -93,7 +93,7 @@ interface GiftTick {
   emoji:      string;
   senderName: string;
   giftName:   string;
-  coins:      number;
+  GoGold:      number;
 }
 
 // ── Avatar fallback ───────────────────────────────────────────────────────────
@@ -610,11 +610,11 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
             senderName: sn,
             emoji:      gf.gift_type?.emoji ?? '🎁',
             giftName:   gf.gift_type?.name  ?? 'Cadeau',
-            coins:      gf.coins_spent ?? 0,
+            GoGold:      gf.gogold_spent ?? 0,
           };
           setGiftNotifs(prev => [...prev, {
             id: tick.id, senderName: sn,
-            emoji: tick.emoji, giftName: tick.giftName, coins: tick.coins,
+            emoji: tick.emoji, giftName: tick.giftName, GoGold: tick.GoGold,
           }]);
           setGiftTicker(prev => [...prev.slice(-2), tick]);
           setGiftHistory(prev => [tick, ...prev.slice(0, 49)]);
@@ -939,7 +939,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
                   <Text style={st.giftTickerSender}>{t.senderName}</Text>
                   {' · '}{t.giftName}
                 </Text>
-                <Text style={st.giftTickerCoins}>{t.coins} 🪙</Text>
+                <Text style={st.giftTickerGoGold}>{t.GoGold} 🪙</Text>
               </LinearGradient>
             </Animated.View>
           ))}
@@ -1212,7 +1212,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
           <View style={os.header}>
             <Text style={os.title}>Cadeaux ({giftHistory.length})</Text>
             <Text style={[os.title, { color: '#FFD700', fontSize: 12 }]}>
-              {giftHistory.reduce((s, t) => s + t.coins, 0)} 🪙 total
+              {giftHistory.reduce((s, t) => s + t.GoGold, 0)} 🪙 total
             </Text>
             <TouchableOpacity onPress={() => setShowGifts(false)} style={os.closeBtn}>
               <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
@@ -1226,7 +1226,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
                   <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{t.senderName}</Text>
                   <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>{t.giftName}</Text>
                 </View>
-                <Text style={{ color: '#FFD700', fontSize: 13, fontWeight: '800' }}>{t.coins} 🪙</Text>
+                <Text style={{ color: '#FFD700', fontSize: 13, fontWeight: '800' }}>{t.GoGold} 🪙</Text>
               </View>
             ))}
           </ScrollView>
@@ -1543,7 +1543,7 @@ const st = StyleSheet.create({
   giftTickerEmoji:  { fontSize: 16 },
   giftTickerText:   { flex: 1, color: '#fff', fontSize: 12 },
   giftTickerSender: { fontWeight: '800' },
-  giftTickerCoins:  { color: '#fff', fontSize: 11, fontWeight: '700' },
+  giftTickerGoGold:  { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   // ── Colonne droite ────────────────────────────────────────────────────────────
   sideCol: {

@@ -63,7 +63,7 @@ export const CreateAdScreen: React.FC = () => {
   const [budgetEur,    setBudgetEur]    = useState(existingAd ? String(existingAd.budget_eur) : '10');
   const [cpmEur,       setCpmEur]       = useState(existingAd ? existingAd.cpm_eur : 2.0);
   const [saving,       setSaving]       = useState(false);
-  const [walletCoins,  setWalletCoins]  = useState<number | null>(null);
+  const [walletGoGold,  setWalletGoGold]  = useState<number | null>(null);
   const [localMedia,     setLocalMedia]     = useState<string | null>(null);
   const [mediaType,      setMediaType]      = useState<'image' | 'video' | null>(null);
   const [uploading,      setUploading]      = useState(false);
@@ -73,8 +73,8 @@ export const CreateAdScreen: React.FC = () => {
 
   // Charger le solde wallet
   useEffect(() => {
-    apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance)
-      .then(r => setWalletCoins(r.data?.coins_balance ?? null))
+    apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance)
+      .then(r => setWalletGoGold(r.data?.gogold_balance ?? null))
       .catch(() => {});
   }, []);
 
@@ -200,11 +200,11 @@ export const CreateAdScreen: React.FC = () => {
     }
 
     // Vérifier solde avant création
-    const coinsRequired = Math.ceil(budget * 100); // 1 € = 100 coins
-    if (!isEdit && walletCoins !== null && walletCoins < coinsRequired) {
+    const goGoldRequired = Math.ceil(budget * 100); // 1 € = 100 GoGold
+    if (!isEdit && walletGoGold !== null && walletGoGold < goGoldRequired) {
       Alert.alert(
         'Solde insuffisant',
-        `Tu as ${walletCoins.toLocaleString('fr-FR')} coins mais ${coinsRequired.toLocaleString('fr-FR')} sont requis pour ce budget (${budget.toFixed(2)}€).\n\nRecharge ton wallet ou réduis le budget.`,
+        `Tu as ${walletGoGold.toLocaleString('fr-FR')} GoGold mais ${goGoldRequired.toLocaleString('fr-FR')} sont requis pour ce budget (${budget.toFixed(2)}€).\n\nRecharge ton wallet ou réduis le budget.`,
       );
       return;
     }
@@ -228,11 +228,11 @@ export const CreateAdScreen: React.FC = () => {
         Alert.alert('Modifié', 'Ta campagne a été mise à jour.');
       } else {
         const result = await adService.create(payload);
-        const coinsDebited = (result as any).coins_debited ?? Math.ceil(budget * 100);
-        setWalletCoins(prev => prev !== null ? prev - coinsDebited : null);
+        const goGoldDebited = (result as any).gogold_debited ?? Math.ceil(budget * 100);
+        setWalletGoGold(prev => prev !== null ? prev - goGoldDebited : null);
         Alert.alert(
           'Campagne créée ! 🎯',
-          `${coinsDebited.toLocaleString('fr-FR')} coins débités. Ta pub est active dans le feed.`,
+          `${goGoldDebited.toLocaleString('fr-FR')} GoGold débités. Ta pub est active dans le feed.`,
         );
       }
       nav.goBack();
@@ -278,18 +278,18 @@ export const CreateAdScreen: React.FC = () => {
               ~{estimatedImpressions.toLocaleString('fr-FR')} impressions estimées
             </Text>
             <Text style={{ color: '#7B3FF2', fontSize: 12, opacity: 0.8 }}>
-              Coût : {(budget * 100).toLocaleString('fr-FR')} coins ({budget.toFixed(2)}€)
+              Coût : {(budget * 100).toLocaleString('fr-FR')} GoGold ({budget.toFixed(2)}€)
             </Text>
             <Text style={{ color: '#7B3FF2', fontSize: 11, opacity: 0.7, marginTop: 1 }}>
-              Coût : {(cpmEur / 1000 * 100).toFixed(3)} coins/impression
+              Coût : {(cpmEur / 1000 * 100).toFixed(3)} GoGold/impression
             </Text>
-            {walletCoins !== null && (
+            {walletGoGold !== null && (
               <Text style={{
-                color: walletCoins < budget * 100 ? '#EF4444' : '#10B981',
+                color: walletGoGold < budget * 100 ? '#EF4444' : '#10B981',
                 fontSize: 12, fontWeight: '700', marginTop: 2,
               }}>
-                Solde : {walletCoins.toLocaleString('fr-FR')} coins
-                {walletCoins < budget * 100 ? ' — insuffisant' : ' ✓'}
+                Solde : {walletGoGold.toLocaleString('fr-FR')} GoGold
+                {walletGoGold < budget * 100 ? ' — insuffisant' : ' ✓'}
               </Text>
             )}
           </View>

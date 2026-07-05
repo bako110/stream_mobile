@@ -25,7 +25,7 @@ interface Treasurer {
 }
 
 interface WithdrawalRequest {
-  id: string; coins_amount: number; eur_amount: number;
+  id: string; gogold_amount: number; eur_amount: number;
   description?: string; status: string;
   requested_by?: string;
   admin_approved: boolean; treasurer_approved: boolean;
@@ -101,8 +101,8 @@ export const CommunityTreasurerScreen: React.FC = () => {
       const elec = eRes.data?.election ?? null;
       setElection(elec);
       // Solde communautaire
-      apiClient.get<{ coins_balance: number }>(`${BASE}/wallet`)
-        .then(r => { if (mountedRef.current) setCommunityBalance(r.data?.coins_balance ?? null); })
+      apiClient.get<{ gogold_balance: number }>(`${BASE}/wallet`)
+        .then(r => { if (mountedRef.current) setCommunityBalance(r.data?.gogold_balance ?? null); })
         .catch(() => {});
       // Charger les membres si vote en cours et pas encore de résultats
       if (elec && elec.results.length === 0) {
@@ -215,21 +215,21 @@ export const CommunityTreasurerScreen: React.FC = () => {
     if (communityBalance !== null && amount > communityBalance) {
       Alert.alert(
         'Solde insuffisant',
-        `Le solde communautaire est de ${communityBalance.toLocaleString('fr-FR')} coins.\nVous ne pouvez pas retirer plus.`,
+        `Le solde communautaire est de ${communityBalance.toLocaleString('fr-FR')} GoGold.\nVous ne pouvez pas retirer plus.`,
       );
       return;
     }
     setFormSaving(true);
     try {
       const res = await apiClient.post<any>(`${BASE}/withdrawal-requests`, {
-        coins_amount: amount,
+        gogold_amount: amount,
         description:  formDesc.trim() || undefined,
       });
       setCreateOpen(false);
       setFormAmount(''); setFormDesc('');
       load();
       if (res.data?.executed_immediately) {
-        Alert.alert('Retrait exécuté', `${amount} coins ont été transférés vers votre wallet.\n(Aucun trésorier — approbation automatique)`);
+        Alert.alert('Retrait exécuté', `${amount} GoGold ont été transférés vers votre wallet.\n(Aucun trésorier — approbation automatique)`);
       } else {
         Alert.alert('Demande créée', 'Le trésorier doit maintenant approuver le retrait.');
       }
@@ -240,7 +240,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
   const handleApprove = (req: WithdrawalRequest) => {
     Alert.alert(
       'Approuver le retrait',
-      `Approuver le retrait de ${req.coins_amount.toLocaleString('fr-FR')} coins (${req.eur_amount.toFixed(2)} €) ?\n\n${req.description ?? ''}`,
+      `Approuver le retrait de ${req.gogold_amount.toLocaleString('fr-FR')} GoGold (${req.eur_amount.toFixed(2)} €) ?\n\n${req.description ?? ''}`,
       [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Approuver', onPress: async () => {
@@ -258,7 +258,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
   const handleReject = (req: WithdrawalRequest) => {
     Alert.alert(
       'Rejeter le retrait',
-      `Rejeter la demande de ${req.coins_amount.toLocaleString('fr-FR')} coins ?`,
+      `Rejeter la demande de ${req.gogold_amount.toLocaleString('fr-FR')} GoGold ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Rejeter', style: 'destructive', onPress: async () => {
@@ -565,7 +565,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '900' }}>
-                      {req.coins_amount.toLocaleString('fr-FR')} <Text style={{ fontSize: 13, fontWeight: '400' }}>coins</Text>
+                      {req.gogold_amount.toLocaleString('fr-FR')} <Text style={{ fontSize: 13, fontWeight: '400' }}>GoGold</Text>
                     </Text>
                     <Text style={{ color: colors.textTertiary, fontSize: 12 }}>≈ {req.eur_amount.toFixed(2)} €</Text>
                   </View>
@@ -737,7 +737,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                   <Icon name="briefcase" size={14} color="#10B981" />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '800' }}>
-                      Solde communautaire : {communityBalance.toLocaleString('fr-FR')} coins
+                      Solde communautaire : {communityBalance.toLocaleString('fr-FR')} GoGold
                     </Text>
                     <Text style={{ color: '#10B981', fontSize: 11, opacity: 0.8 }}>
                       ≈ {(communityBalance / 100).toFixed(2)} € disponibles
@@ -757,7 +757,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
               )}
 
               <View>
-                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>MONTANT (coins) *</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>MONTANT (GoGold) *</Text>
                 <View style={[st.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                   <Icon name="zap" size={16} color="#10B981" />
                   <TextInput

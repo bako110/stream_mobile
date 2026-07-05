@@ -3,7 +3,7 @@
  * - Bottom sheet avec grille de cadeaux
  * - Animation "fusée" montante à l'envoi
  * - Notifications en overlay quand quelqu'un envoie un cadeau (WS gift_received)
- * - Solde coins affiché + lien recharge
+ * - Solde GoGold affiché + lien recharge
  */
 import React, { useEffect, useRef, useState, useCallback, useImperativeHandle } from 'react';
 import {
@@ -56,7 +56,7 @@ interface GiftType {
   id: string;
   name: string;
   emoji: string;
-  coins_cost: number;
+  gogold_cost: number;
   animation_url?: string | null;
 }
 
@@ -65,7 +65,7 @@ export interface GiftNotif {
   senderName: string;
   emoji: string;
   giftName: string;
-  coins: number;
+  GoGold: number;
 }
 
 // ── Animation montante pour chaque cadeau envoyé ──────────────────────────────
@@ -128,7 +128,7 @@ const GiftToast: React.FC<{ notif: GiftNotif; onDone: () => void }> = ({ notif, 
         <View style={{ flex: 1 }}>
           <Text style={g.giftToastSender} numberOfLines={1}>{notif.senderName}</Text>
           <Text style={g.giftToastName} numberOfLines={1}>
-            a envoyé {notif.giftName} · {notif.coins} 🪙
+            a envoyé {notif.giftName} · {notif.GoGold} 🪙
           </Text>
         </View>
       </LinearGradient>
@@ -158,10 +158,10 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
   useEffect(() => {
     Promise.all([
       apiClient.get<GiftType[]>(Endpoints.wallet.giftTypes),
-      apiClient.get<{ coins_balance: number }>(Endpoints.wallet.balance),
+      apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance),
     ]).then(([gRes, wRes]) => {
       setGifts(gRes.data ?? []);
-      setBalance(wRes.data?.coins_balance ?? 0);
+      setBalance(wRes.data?.gogold_balance ?? 0);
     }).catch(() => {}).finally(() => setLoading(false));
 
     Animated.spring(slideY, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }).start();
@@ -173,13 +173,13 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
 
   const handleSend = useCallback(async () => {
     if (!selected) return;
-    if (balance < selected.coins_cost) {
+    if (balance < selected.gogold_cost) {
       Alert.alert(
-        'Coins insuffisants',
-        `Il te faut ${selected.coins_cost} 🪙 mais tu en as ${balance}.\nRecharge ton wallet ?`,
+        'GoGold insuffisants',
+        `Il te faut ${selected.gogold_cost} 🪙 mais tu en as ${balance}.\nRecharge ton wallet ?`,
         [
           { text: 'Annuler', style: 'cancel' },
-          { text: 'Recharger', onPress: () => { handleClose(); nav.navigate('BuyCoins'); } },
+          { text: 'Recharger', onPress: () => { handleClose(); nav.navigate('BuyGoGold'); } },
         ],
       );
       return;
@@ -191,7 +191,7 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
         receiver_id:  receiverId,
         live_id:      liveId,
       });
-      setBalance(b => b - selected.coins_cost);
+      setBalance(b => b - selected.gogold_cost);
       onGiftSent(selected.emoji);
       handleClose();
     } catch (e: any) {
@@ -201,7 +201,7 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
     }
   }, [selected, balance, receiverId, liveId, onGiftSent, handleClose, nav]);
 
-  const canAfford = selected ? balance >= selected.coins_cost : false;
+  const canAfford = selected ? balance >= selected.gogold_cost : false;
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={handleClose}>
@@ -220,7 +220,7 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
             </View>
             <TouchableOpacity
               style={g.balancePill}
-              onPress={() => { handleClose(); nav.navigate('BuyCoins'); }}
+              onPress={() => { handleClose(); nav.navigate('BuyGoGold'); }}
             >
               <Icon name="zap" size={12} color="#FFD700" />
               <Text style={g.balanceText}>{balance} 🪙</Text>
@@ -240,7 +240,7 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
               >
                 {gifts.map(gift => {
                   const isSelected = selected?.id === gift.id;
-                  const affordable = balance >= gift.coins_cost;
+                  const affordable = balance >= gift.gogold_cost;
                   return (
                     <TouchableOpacity
                       key={gift.id}
@@ -259,7 +259,7 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
                       <Text style={[g.giftName, isSelected && { color: '#000' }]}>{gift.name}</Text>
                       <View style={[g.giftCostRow, isSelected && g.giftCostRowSelected]}>
                         <Text style={[g.giftCost, isSelected && { color: '#000' }]}>
-                          {gift.coins_cost} 🪙
+                          {gift.gogold_cost} 🪙
                         </Text>
                       </View>
                       {!affordable && <View style={g.giftLockOverlay}><Icon name="lock" size={14} color="#fff" /></View>}
@@ -273,7 +273,7 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
                 {selected && !canAfford && (
                   <TouchableOpacity
                     style={g.rechargeBtn}
-                    onPress={() => { handleClose(); nav.navigate('BuyCoins'); }}
+                    onPress={() => { handleClose(); nav.navigate('BuyGoGold'); }}
                   >
                     <Icon name="zap" size={14} color="#FFD700" />
                     <Text style={g.rechargeBtnText}>Recharger</Text>
@@ -296,7 +296,7 @@ const GiftSheet: React.FC<SheetProps> = ({ liveId, receiverId, receiverName, onC
                         <Text style={g.sendBtnEmoji}>{selected?.emoji ?? '🎁'}</Text>
                         <Text style={g.sendBtnText}>
                           {selected
-                            ? `Envoyer · ${selected.coins_cost} 🪙`
+                            ? `Envoyer · ${selected.gogold_cost} 🪙`
                             : 'Choisir un cadeau'}
                         </Text>
                       </>

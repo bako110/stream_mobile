@@ -339,9 +339,9 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
   } else if (type === 'message') {
     navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
   } else if (type === 'subscription_expired') {
-    const missingCoins = parseInt(data.missing_coins ?? '0', 10);
+    const missingGoGold = parseInt(data.missing_gogold ?? '0', 10);
     const missingEur   = parseFloat(data.missing_eur ?? '0');
-    navigate('BuyCoins', { neededCoins: missingCoins, neededEur: missingEur });
+    navigate('BuyGoGold', { neededGoGold: missingGoGold, neededEur: missingEur });
   } else if (type === 'event_reminder') {
     const refType = data.ref_type ?? '';
     const refId   = data.ref_id   ?? '';

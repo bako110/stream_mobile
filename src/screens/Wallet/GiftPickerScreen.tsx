@@ -31,7 +31,7 @@ interface GiftType {
   id: string;
   name: string;
   emoji: string;
-  cost_coins: number;
+  cost_gogold: number;
   animation?: string;
 }
 
@@ -102,7 +102,7 @@ const GiftCard: React.FC<{
       </Text>
       <View style={s.costRow}>
         <MaterialCommunityIcons name="bitcoin" size={10} color={canAfford ? '#FFD700' : colors.textTertiary} />
-        <Text style={[s.cost, !canAfford && { color: colors.textTertiary }]}>{gift.cost_coins}</Text>
+        <Text style={[s.cost, !canAfford && { color: colors.textTertiary }]}>{gift.cost_gogold}</Text>
       </View>
     </View>
   );
@@ -199,10 +199,10 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
   useEffect(() => {
     Promise.allSettled([
       apiClient.get<GiftType[]>(Endpoints.wallet.giftTypes),
-      apiClient.get<{ coins: number }>(Endpoints.wallet.balance),
+      apiClient.get<{ GoGold: number }>(Endpoints.wallet.balance),
     ]).then(([giftsRes, balRes]) => {
       if (giftsRes.status === 'fulfilled') setGifts(giftsRes.value.data ?? []);
-      if (balRes.status === 'fulfilled') setBalance(balRes.value.data.coins);
+      if (balRes.status === 'fulfilled') setBalance(balRes.value.data.GoGold);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -215,7 +215,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
         receiver_id: receiverId,
         gift_type_id: selected.id,
       });
-      setBalance(prev => prev - selected.cost_coins);
+      setBalance(prev => prev - selected.cost_gogold);
       setFlying(selected.emoji);
     } catch (e: any) {
       const { Alert } = require('react-native');
@@ -224,7 +224,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
     }
   };
 
-  const canAfford = (gift: GiftType) => balance >= gift.cost_coins;
+  const canAfford = (gift: GiftType) => balance >= gift.cost_gogold;
   const s = styles(colors);
 
   // Rows: split gifts into 2 rows
@@ -267,11 +267,11 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
       <View style={s.balanceRow}>
         <View style={s.balancePill}>
           <MaterialCommunityIcons name="bitcoin" size={16} color="#FFD700" />
-          <Text style={s.balanceText}>{balance.toLocaleString('fr-FR')} coins</Text>
+          <Text style={s.balanceText}>{balance.toLocaleString('fr-FR')} GoGold</Text>
         </View>
         <TouchableOpacity
           style={s.rechargeBtn}
-          onPress={() => navigation.navigate('BuyCoins')}
+          onPress={() => navigation.navigate('BuyGoGold')}
         >
           <Icon name="plus-circle" size={14} color={colors.primary} />
           <Text style={s.rechargeText}>Recharger</Text>
@@ -318,14 +318,14 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
         </ScrollView>
       )}
 
-      {/* Insufficient coins warning */}
+      {/* Insufficient GoGold warning */}
       {selected && !canAfford(selected) && (
         <View style={s.warningRow}>
           <Icon name="alert-circle" size={14} color={colors.warning} />
           <Text style={s.warningText}>
-            Coins insuffisants. Il vous faut {selected.cost_coins - balance} coins de plus.
+            GoGold insuffisants. Il vous faut {selected.cost_gogold - balance} GoGold de plus.
           </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('BuyCoins')}>
+          <TouchableOpacity onPress={() => navigation.navigate('BuyGoGold')}>
             <Text style={s.warningLink}>Recharger →</Text>
           </TouchableOpacity>
         </View>
@@ -335,7 +335,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
       {selected && (
         <View style={s.selectedInfo}>
           <Text style={s.selectedInfoText}>
-            {selected.emoji} {selected.name} — {selected.cost_coins} coins
+            {selected.emoji} {selected.name} — {selected.cost_gogold} GoGold
           </Text>
         </View>
       )}
@@ -364,7 +364,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
                 <>
                   <Icon name="send" size={18} color={selected && canAfford(selected) ? '#FFF' : colors.textTertiary} />
                   <Text style={[s.sendText, { color: selected && canAfford(selected) ? '#FFF' : colors.textTertiary }]}>
-                    Envoyer{selected ? ` • ${selected.cost_coins} coins` : ''}
+                    Envoyer{selected ? ` • ${selected.cost_gogold} GoGold` : ''}
                   </Text>
                 </>
               )
