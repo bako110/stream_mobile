@@ -40,6 +40,7 @@ interface Props {
   micOn: boolean;
   onToggleCam: () => void;
   onToggleMic: () => void;
+  onFlipCam?: () => void;
   handRequests: HandRequest[];
   onInvite: (identity: string) => void;
   onDismissHand: (identity: string) => void;
@@ -225,7 +226,7 @@ const MonetForm: React.FC<{
 
 export const LiveSettingsSheet: React.FC<Props> = ({
   visible, onClose, live, liveId,
-  camOn, micOn, onToggleCam, onToggleMic,
+  camOn, micOn, onToggleCam, onToggleMic, onFlipCam,
   handRequests, onInvite, onDismissHand,
   onStopLive, onMonetizationUpdated,
 }) => {
@@ -354,6 +355,18 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             </TouchableOpacity>
           </View>
 
+          {onFlipCam && (
+            <TouchableOpacity
+              style={[s.toggleCard, s.flipCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: camOn ? 1 : 0.4 }]}
+              onPress={camOn ? onFlipCam : undefined} activeOpacity={0.8}
+            >
+              <View style={[s.toggleIcon, { backgroundColor: 'rgba(155,101,245,0.12)' }]}>
+                <Icon name="refresh-cw" size={20} color="#9B65F5" />
+              </View>
+              <Text style={[s.toggleLabel, { color: colors.textPrimary }]}>Retourner la caméra</Text>
+            </TouchableOpacity>
+          )}
+
           {/* ── Demandes de scene ──────────────────────────────────────────── */}
           <Text style={[s.sectionLabel, { color: colors.textSecondary }]}>
             Demandes de scene
@@ -465,6 +478,7 @@ const s = StyleSheet.create({
   sectionSub:         { fontSize: 11, marginTop: 1 },
 
   row:          { flexDirection: 'row', gap: 12 },
+  flipCard:     { flexDirection: 'row', justifyContent: 'center', marginTop: 10, gap: 10, paddingVertical: 12 },
   toggleCard:   { flex: 1, borderRadius: 16, borderWidth: 1.5, padding: 14, alignItems: 'center', gap: 8 },
   toggleIcon:   { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   toggleLabel:  { fontSize: 12, fontWeight: '700', textAlign: 'center' },

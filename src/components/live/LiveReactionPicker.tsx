@@ -9,6 +9,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,14 +23,150 @@ const { width: SW, height: SH } = Dimensions.get('window');
 
 // Sur Android, les fichiers res/raw se chargent sans extension, bundle = null
 const REACTION_SOUNDS: Record<string, string> = {
+  // Classiques
   '❤️': 'reaction_heart',
+  '💙': 'reaction_blue_heart',
+  '💚': 'reaction_green_heart',
+  '💜': 'reaction_purple_heart',
+  '🩷': 'reaction_pink_heart',
+
+  // Rire
   '😂': 'reaction_laugh',
+  '🤣': 'reaction_rofl',
+  '😆': 'reaction_funny',
+
+  // Surprise
   '😮': 'reaction_wow',
+  '🤯': 'reaction_mind_blown',
+  '😲': 'reaction_surprised',
+
+  // Tristesse
   '😢': 'reaction_sad',
+  '😭': 'reaction_cry',
+
+  // Colère
   '😡': 'reaction_angry',
-  '🔥': 'reaction_fire',
+  '🤬': 'reaction_rage',
+
+  // Amour
+  '😍': 'reaction_love',
+  '🥰': 'reaction_love_face',
+  '😘': 'reaction_kiss',
+  '💋': 'reaction_lips',
+
+  // Applaudissements
   '👏': 'reaction_clap',
+  '🙌': 'reaction_celebrate',
+
+  // Feu
+  '🔥': 'reaction_fire',
+  '💥': 'reaction_boom',
+  '⚡': 'reaction_lightning',
+
+  // Fête
   '🎉': 'reaction_party',
+  '🎊': 'reaction_confetti',
+
+  // Like
+  '👍': 'reaction_like',
+  '👎': 'reaction_dislike',
+
+  // Force
+  '💪': 'reaction_strength',
+  '🦾': 'reaction_power',
+
+  // Argent
+  '💰': 'reaction_money',
+  '💸': 'reaction_cash',
+
+  // Étoiles
+  '⭐': 'reaction_star',
+  '🌟': 'reaction_glow',
+  '✨': 'reaction_sparkles',
+
+  // Succès
+  '🏆': 'reaction_trophy',
+  '🥇': 'reaction_gold',
+
+  // Cadeaux
+  '🎁': 'reaction_gift',
+
+  // Musique
+  '🎵': 'reaction_music',
+  '🎶': 'reaction_music_notes',
+
+  // Couronne
+  '👑': 'reaction_king',
+
+  // Fusée
+  '🚀': 'reaction_rocket',
+
+  // 100%
+  '💯': 'reaction_hundred',
+
+  // Check
+  '✅': 'reaction_check',
+
+  // OK
+  '👌': 'reaction_ok',
+
+  // Salut
+  '👋': 'reaction_wave',
+
+  // Prières
+  '🙏': 'reaction_pray',
+
+  // Regard
+  '👀': 'reaction_eyes',
+
+  // Cerveau
+  '🧠': 'reaction_brain',
+
+  // Idée
+  '💡': 'reaction_idea',
+
+  // Émotion
+  '🥺': 'reaction_pleading',
+
+  // Cool
+  '😎': 'reaction_cool',
+
+  // Clin d'œil
+  '😉': 'reaction_wink',
+
+  // Sourire
+  '😊': 'reaction_smile',
+  '😁': 'reaction_grin',
+
+  // Cœur en feu
+  '❤️‍🔥': 'reaction_heart_fire',
+
+  // Arc-en-ciel
+  '🌈': 'reaction_rainbow',
+
+  // Trèfle
+  '🍀': 'reaction_lucky',
+
+  // Soleil
+  '☀️': 'reaction_sun',
+
+  // Lune
+  '🌙': 'reaction_moon',
+
+  // Cafés
+  '☕': 'reaction_coffee',
+
+  // Poulet 😄
+  '🍗': 'reaction_chicken',
+
+  // Pizza
+  '🍕': 'reaction_pizza',
+
+  // Burger
+  '🍔': 'reaction_burger',
+
+  // Glace
+  '🍦': 'reaction_icecream',
 };
 
 export const REACTIONS = Object.keys(REACTION_SOUNDS).map(emoji => ({ emoji }));
@@ -151,10 +288,11 @@ export interface LiveReactionPickerRef {
 
 interface Props {
   onReact: (emoji: string) => void;
+  compact?: boolean;
 }
 
 export const LiveReactionPicker = forwardRef<LiveReactionPickerRef, Props>(
-  ({ onReact }, ref) => {
+  ({ onReact, compact }, ref) => {
     const [open, setOpen] = useState(false);
     const openAnim = useRef(new Animated.Value(0)).current;
 
@@ -176,32 +314,39 @@ export const LiveReactionPicker = forwardRef<LiveReactionPickerRef, Props>(
       <View style={st.container}>
         {open && (
           <Animated.View
-            style={[
-              st.picker,
-              {
-                opacity: openAnim,
-                transform: [
-                  { scale: openAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
-                  { translateY: openAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-                ],
-              },
-            ]}
+            pointerEvents="box-none"
+            style={{
+              opacity: openAnim,
+              transform: [
+                { scale: openAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
+                { translateY: openAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+              ],
+            }}
           >
-            {REACTIONS.map(r => (
-              <TouchableOpacity
-                key={r.emoji}
-                style={st.reactionBtn}
-                onPress={() => handleSelect(r.emoji)}
-                activeOpacity={0.7}
+            <View style={[st.picker, compact && st.pickerCompact]}>
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={st.pickerGrid}
+                style={st.pickerScroll}
               >
-                <Text style={st.reactionEmoji}>{r.emoji}</Text>
-              </TouchableOpacity>
-            ))}
+                {REACTIONS.map(r => (
+                  <TouchableOpacity
+                    key={r.emoji}
+                    style={[st.reactionBtn, compact && st.reactionBtnCompact]}
+                    onPress={() => handleSelect(r.emoji)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[st.reactionEmoji, compact && st.reactionEmojiCompact]}>{r.emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           </Animated.View>
         )}
 
-        <TouchableOpacity style={st.triggerBtn} onPress={togglePicker} activeOpacity={0.75}>
-          <Text style={st.triggerEmoji}>{open ? '✕' : '😊'}</Text>
+        <TouchableOpacity style={[st.triggerBtn, compact && st.triggerBtnCompact]} onPress={togglePicker} activeOpacity={0.75}>
+          <Text style={[st.triggerEmoji, compact && st.triggerEmojiCompact]}>{open ? '✕' : '😊'}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -222,23 +367,29 @@ const st = StyleSheet.create({
     position: 'absolute',
     bottom: 58,
     right: 0,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: 6,
-    width: 104,
-    backgroundColor: 'rgba(18,18,18,0.92)',
-    borderRadius: 22,
+    width: 320,
+    backgroundColor: 'rgba(18,18,18,0.95)',
+    borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     zIndex: 100,
   },
+  pickerScroll: {
+    maxHeight: 220,
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  pickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   reactionBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -255,4 +406,18 @@ const st = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.25)',
   },
   triggerEmoji: { fontSize: 22 },
+
+  // ── Variante compacte : trigger intégré dans le champ de saisie ────────────
+  pickerCompact: {
+    bottom: 46,
+    right: -4,
+    width: 260,
+  },
+  reactionBtnCompact: { width: 34, height: 34, borderRadius: 17 },
+  reactionEmojiCompact: { fontSize: 19 },
+  triggerBtnCompact: {
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'transparent', borderWidth: 0,
+  },
+  triggerEmojiCompact: { fontSize: 13 },
 });

@@ -24,9 +24,10 @@ export interface LiveLikeButtonRef {
 interface Props {
   total: number;
   onLike: () => void;
+  compact?: boolean;
 }
 
-export const LiveLikeButton = forwardRef<LiveLikeButtonRef, Props>(({ total, onLike }, ref) => {
+export const LiveLikeButton = forwardRef<LiveLikeButtonRef, Props>(({ total, onLike, compact }, ref) => {
   const [hearts, setHearts] = useState<FloatingHeart[]>([]);
   const counterAnim = useRef(new Animated.Value(1)).current;
   const nextId = useRef(0);
@@ -68,6 +69,41 @@ export const LiveLikeButton = forwardRef<LiveLikeButtonRef, Props>(({ total, onL
   }, [spawnHeart, counterAnim]);
 
   useImperativeHandle(ref, () => ({ trigger, triggerRemote }), [trigger, triggerRemote]);
+
+  if (compact) {
+    return (
+      <View style={st.rootCompact} pointerEvents="box-none">
+        {hearts.map(h => (
+          <Animated.Text
+            key={h.id}
+            style={[
+              st.floatHeart,
+              {
+                fontSize: h.size * 0.7,
+                color: COLORS[h.id % COLORS.length],
+                transform: [
+                  { translateX: h.x },
+                  { translateY: h.y },
+                  { scale: h.scale },
+                ],
+                opacity: h.opacity,
+              },
+            ]}
+          >
+            {HEARTS[h.id % HEARTS.length]}
+          </Animated.Text>
+        ))}
+
+        <Animated.Text style={[st.countCompact, { transform: [{ scale: counterAnim }] }]}>
+          {formatCount(total)}
+        </Animated.Text>
+
+        <TouchableOpacity onPress={trigger} activeOpacity={0.7} style={st.btnCompact}>
+          <Text style={st.heartIconCompact}>❤️</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={st.root} pointerEvents="box-none">
@@ -136,4 +172,18 @@ const st = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)',
   },
   heartIcon: { fontSize: 22 },
+
+  // ── Variante compacte : nombre à gauche, icône à droite, sur une seule ligne ──
+  rootCompact: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  countCompact: {
+    color: '#fff', fontSize: 11, fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  btnCompact: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  heartIconCompact: { fontSize: 14 },
 });

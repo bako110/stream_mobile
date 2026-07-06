@@ -50,9 +50,12 @@ import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
-import { useWs } from '../../context/WebSocketContext';
 import { BoostPrompt } from '../../components/common';
 import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
+import { StageTileRow } from '../../components/live/StageTileRow';
+import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
+import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
+import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 import type { LiveStream } from '../../services/liveService';
 
 // ── LiveKit quality config ─────────────────────────────────────────────────────
@@ -104,6 +107,15 @@ const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, si
   </View>
 );
 
+const PulsingLiveDot: React.FC = () => {
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    opacity.value = withRepeat(withTiming(0.3, { duration: 650 }), -1, true);
+  }, []);
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return <Animated.View style={[st.liveIndicator, animStyle]} />;
+};
+
 // ── Anneau pulsant "parle en ce moment" ──────────────────────────────────────
 
 const SpeakingRing: React.FC<{ color?: string; size: number; borderWidth?: number }> = ({
@@ -139,63 +151,6 @@ const SpeakingRing: React.FC<{ color?: string; size: number; borderWidth?: numbe
     />
   );
 };
-
-// ── Toast "X parle" affiché en overlay bas-gauche ────────────────────────────
-
-const ActiveSpeakerToast: React.FC<{
-  name: string;
-  avatarUrl?: string | null;
-  isLocal: boolean;
-}> = ({ name, avatarUrl, isLocal }) => {
-  const barW = useSharedValue(0.4);
-
-  useEffect(() => {
-    barW.value = withRepeat(withSequence(
-      withTiming(1,   { duration: 220, easing: Easing.out(Easing.ease) }),
-      withTiming(0.3, { duration: 220, easing: Easing.in(Easing.ease) }),
-      withTiming(0.8, { duration: 180 }),
-      withTiming(0.2, { duration: 180 }),
-    ), -1, false);
-  }, []);
-
-  const bar1 = useAnimatedStyle(() => ({ height: 4 + barW.value * 12 }));
-  const bar2 = useAnimatedStyle(() => ({ height: 4 + ((1 - barW.value) * 0.8) * 12 }));
-  const bar3 = useAnimatedStyle(() => ({ height: 4 + barW.value * 0.6 * 12 }));
-
-  return (
-    <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(280)} style={spk.toast}>
-      {avatarUrl
-        ? <Image source={{ uri: avatarUrl }} style={spk.avatar} />
-        : <View style={[spk.avatar, { backgroundColor: isLocal ? '#F0365A' : '#9B65F5', alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>{(name || '?')[0].toUpperCase()}</Text>
-          </View>
-      }
-      <Text style={spk.name} numberOfLines={1}>{isLocal ? 'Toi' : name}</Text>
-      {/* Barres audio animées */}
-      <View style={spk.bars}>
-        <Animated.View style={[spk.bar, bar1, { backgroundColor: '#3FEDB6' }]} />
-        <Animated.View style={[spk.bar, bar2, { backgroundColor: '#9B65F5' }]} />
-        <Animated.View style={[spk.bar, bar3, { backgroundColor: '#3FEDB6' }]} />
-      </View>
-    </Animated.View>
-  );
-};
-
-const spk = StyleSheet.create({
-  toast: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(5,0,16,0.82)',
-    borderRadius: 22, paddingHorizontal: 12, paddingVertical: 7,
-    borderWidth: 1.5, borderColor: '#3FEDB6',
-    alignSelf: 'flex-start', maxWidth: 200,
-    shadowColor: '#3FEDB6', shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 2 },
-    elevation: 8,
-  },
-  avatar: { width: 28, height: 28, borderRadius: 14 },
-  name:   { color: '#fff', fontSize: 12, fontWeight: '700', flex: 1 },
-  bars:   { flexDirection: 'row', alignItems: 'center', gap: 3, height: 20, overflow: 'hidden' },
-  bar:    { width: 3, borderRadius: 2, minHeight: 4 },
-});
 
 // ── Zone vidéo host ───────────────────────────────────────────────────────────
 
@@ -305,63 +260,45 @@ const HostVideoView: React.FC<{
         </TouchableOpacity>
       )}
 
-      {/* Vignettes viewers (sur scène) */}
-      {thumbnailTracks.length > 0 && (
-        <View style={mv.thumbsCol}>
-          {thumbnailTracks.map(t => {
-            const camOn     = !t.publication?.isMuted;
-            const tName     = t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity);
-            const isLocal   = t.participant.isLocal;
-            const isOnStage = !isLocal && onStage.has(t.participant.identity);
-            const talking   = isLocal ? localSpeaking : isSpeaking(t.participant.identity);
-            return (
-              <TouchableOpacity
-                key={t.participant.identity}
-                style={[mv.thumb, isOnStage && mv.thumbOnStage, talking && mv.thumbSpeaking]}
-                onPress={() => setSpotlightId(t.participant.identity)}
-                onLongPress={() => {
-                  if (isLocal) return;
-                  const id = t.participant.identity;
-                  Alert.alert(tName, 'Que veux-tu faire ?', [
-                    { text: 'Annuler', style: 'cancel' },
-                    ...(isOnStage ? [{
-                      text: 'Faire descendre',
-                      onPress: () => onDemote(id, tName),
-                    }] : []),
-                    { text: 'Bannir...', style: 'destructive' as const, onPress: () => onBan(id, tName) },
-                  ]);
-                }}
-                activeOpacity={0.8}
-                delayLongPress={400}
-              >
-                {camOn
-                  ? <VideoTrack trackRef={t} style={StyleSheet.absoluteFill} objectFit="cover" />
-                  : <View style={[StyleSheet.absoluteFill, mv.thumbNoCam]}><Av name={tName} size={40} /></View>
-                }
-                {/* Anneau pulsant vert si parle */}
-                {talking && <SpeakingRing color="#3FEDB6" size={mv.thumb.width as number} borderWidth={2.5} />}
-                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={mv.thumbGrad}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                    {talking && <View style={mv.thumbSpeakDot} />}
-                    <Text style={mv.thumbLabel} numberOfLines={1}>{tName}</Text>
-                  </View>
-                </LinearGradient>
-                {isOnStage && (
-                  <View style={[mv.thumbStageDot, talking && { backgroundColor: '#3FEDB6' }]}>
-                    <Icon name="mic" size={9} color="#fff" />
-                  </View>
-                )}
-                {!isLocal && (
-                  <TouchableOpacity style={mv.thumbGiftBtn} onPress={() => onGift(t.participant.identity, tName)}
-                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
-                    <Text style={{ fontSize: 13 }}>🎁</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+      {/* Bandeau "Sur scène" — toi (hôte) en premier, puis invités, tuiles vidéo réelles */}
+      <View style={mv.stageRowWrap} pointerEvents="box-none">
+        <StageTileRow
+          tiles={[
+            {
+              identity: localParticipant.identity || 'host',
+              name:     'Toi',
+              track:    localTrack,
+              camOn:    localCamOn && !isVideoOff,
+              mirror,
+              badge:    'host' as StageBadge,
+              micOn:    !isMuted,
+              isSpeaking: localSpeaking,
+            },
+            ...thumbnailTracks.filter(t => !t.participant.isLocal).map(t => ({
+              identity: t.participant.identity,
+              name:     t.participant.name || t.participant.identity,
+              track:    t,
+              camOn:    !t.publication?.isMuted,
+              badge:    (onStage.has(t.participant.identity) ? 'bolt' : 'star') as StageBadge,
+              micOn:    !t.publication?.isMuted,
+              isSpeaking: isSpeaking(t.participant.identity),
+            } satisfies StageTile)),
+          ]}
+          onTapTile={(identity) => setSpotlightId(identity === localParticipant.identity ? null : identity)}
+          onLongPressTile={(identity) => {
+            if (identity === localParticipant.identity) return;
+            const t = thumbnailTracks.find(rt => rt.participant.identity === identity);
+            const tName = t?.participant.name || identity;
+            const isOnStage = onStage.has(identity);
+            Alert.alert(tName, 'Que veux-tu faire ?', [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Envoyer un cadeau', onPress: () => onGift(identity, tName) },
+              ...(isOnStage ? [{ text: 'Faire descendre', onPress: () => onDemote(identity, tName) }] : []),
+              { text: 'Bannir...', style: 'destructive' as const, onPress: () => onBan(identity, tName) },
+            ]);
+          }}
+        />
+      </View>
     </View>
   );
 };
@@ -425,7 +362,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const room                 = useRoomContext();
   const allParticipants      = useParticipants();
   const { currentUser }      = useUser();
-  const { addListener, removeListener } = useWs();
   const nav                  = useNavigation<Nav>();
   const remoteParticipants   = allParticipants.filter(p => !p.isLocal);
 
@@ -440,7 +376,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const [giftNotifs,   setGiftNotifs]   = useState<GiftNotif[]>([]);
   const [giftTicker,   setGiftTicker]   = useState<GiftTick[]>([]);
   const [giftHistory,  setGiftHistory]  = useState<GiftTick[]>([]);
-  const [showGifts,    setShowGifts]    = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
   const likeRef             = useRef<LiveLikeButtonRef>(null);
   const { floaters, spawn } = useReactionFloaters();
@@ -452,8 +387,8 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
   const [onStage,      setOnStage]      = useState<Set<string>>(new Set());
 
   const [showSettings,   setShowSettings]   = useState(false);
-  const [activeSpeaker,  setActiveSpeaker]  = useState<{ identity: string; name: string; avatarUrl?: string | null; isLocal: boolean } | null>(null);
-  const activeSpeakerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showMoreMenu,   setShowMoreMenu]   = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const [liveData,     setLiveData]     = useState<LiveStream | null>(null);
 
   const chatRef     = useRef<FlatList>(null);
@@ -475,33 +410,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
     setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
     setTimeout(() => setMessages(prev => prev.filter(m => m.id !== id)), 4000);
   }, []);
-
-  // Parleur actif — écoute RoomEvent.ActiveSpeakersChanged
-  useEffect(() => {
-    if (!room) return;
-    const onSpeakers = (speakers: any[]) => {
-      if (!speakers || speakers.length === 0) {
-        if (activeSpeakerTimer.current) clearTimeout(activeSpeakerTimer.current);
-        activeSpeakerTimer.current = setTimeout(() => setActiveSpeaker(null), 1200);
-        return;
-      }
-      if (activeSpeakerTimer.current) clearTimeout(activeSpeakerTimer.current);
-      const top = speakers[0];
-      const isLocal = top.identity === localParticipant.identity;
-      setActiveSpeaker({
-        identity:  top.identity,
-        name:      top.name || top.identity || '',
-        avatarUrl: top.metadata ? undefined : null,
-        isLocal,
-      });
-      activeSpeakerTimer.current = setTimeout(() => setActiveSpeaker(null), 2500);
-    };
-    room.on(RoomEvent.ActiveSpeakersChanged, onSpeakers);
-    return () => {
-      room.off(RoomEvent.ActiveSpeakersChanged, onSpeakers);
-      if (activeSpeakerTimer.current) clearTimeout(activeSpeakerTimer.current);
-    };
-  }, [room, localParticipant]);
 
   // Démarrer cam + mic
   useEffect(() => {
@@ -561,39 +469,47 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
 
   // WS live — chat + cadeaux + likes + demandes de scène
   useEffect(() => {
-    if (!liveId) return;
+    if (!liveId) { if (__DEV__) console.warn('[host WS] liveId manquant, WS non ouvert'); return; }
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    if (!accessToken) return;
+    if (!accessToken) { if (__DEV__) console.warn('[host WS] accessToken manquant, WS non ouvert'); return; }
     let ws: WebSocket;
     try {
       ws = new WebSocket(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}?token=${accessToken}`);
-    } catch { return; }
+      if (__DEV__) console.warn('[host WS] connexion ouverte vers', liveId);
+    } catch (e) { if (__DEV__) console.warn('[host WS] échec création WebSocket', e); return; }
     wsRef.current = ws;
+    ws.onopen  = () => { if (__DEV__) console.warn('[host WS] onopen — connecté'); };
+    ws.onerror = (e) => { if (__DEV__) console.warn('[host WS] onerror', e); };
+    ws.onclose = (e) => { if (__DEV__) console.warn('[host WS] onclose', e.code, e.reason); };
 
     ws.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data);
+        if (__DEV__) console.warn('[host WS] message reçu', d.type);
 
         // ── Messages chat en temps réel
-        if (d.type === 'comment_added' && d.comment) {
+        if (d.type === 'comment_added' && d.comment && String(d.comment.body ?? '').trim()) {
           const c = d.comment;
-          const incoming = {
-            id:     c.id ?? String(Date.now()),
-            user:   c.author?.display_name ?? c.author?.username ?? 'Anonyme',
-            userId: c.author?.id ? String(c.author.id) : undefined,
-            avatar: c.author?.avatar_url ?? null,
-            text:   c.body,
-          };
+          const incomingText   = c.body;
+          const incomingUser   = c.author?.display_name ?? c.author?.username ?? 'Anonyme';
           setMessages(prev => {
             // Remplacer le message optimiste local (même texte + même user) au lieu d'ajouter
             const localIdx = prev.findIndex(
-              m => m.id.startsWith('local-') && m.text === incoming.text && m.user === incoming.user,
+              m => m.id.startsWith('local-') && m.text === incomingText && m.user === incomingUser,
             );
             if (localIdx !== -1) {
+              // Garder l'id local pour ne pas changer la key React (évite un remount + re-fade visuel)
               const next = [...prev];
-              next[localIdx] = incoming;
+              next[localIdx] = { ...next[localIdx] };
               return next;
             }
+            const incoming = {
+              id:     c.id ?? String(Date.now()),
+              user:   incomingUser,
+              userId: c.author?.id ? String(c.author.id) : undefined,
+              avatar: c.author?.avatar_url ?? null,
+              text:   incomingText,
+            };
             // Pas de doublon — ajouter normalement
             if (prev.some(m => m.id === incoming.id)) return prev;
             return [...prev.slice(-149), incoming];
@@ -636,6 +552,32 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
             setTimeout(() => spawn(d.emoji), i * 150);
           }
         }
+
+        // ── Demande de montée sur scène (main levée)
+        if (d.type === 'live_hand_raise') {
+          const newReq: HandRequest = {
+            identity:    d.identity ?? '',
+            displayName: d.display_name ?? d.identity ?? '',
+            avatarUrl:   d.avatar_url ?? null,
+          };
+          setHandRequests(prev => {
+            if (prev.some(r => r.identity === d.identity)) return prev;
+            return [...prev, newReq];
+          });
+          setShowRequests(true);
+          addSysMsg(`${d.display_name ?? d.identity} veut monter sur scène`);
+        }
+
+        if (d.type === 'live_guest_invited') {
+          setOnStage(prev => new Set([...prev, d.identity ?? '']));
+          setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
+          addSysMsg(`${d.identity} est maintenant sur scène`);
+        }
+
+        if (d.type === 'live_guest_demoted') {
+          setOnStage(prev => { const next = new Set(prev); next.delete(d.identity ?? ''); return next; });
+          addSysMsg(`${d.identity} a été redescendu de scène`);
+        }
       } catch {}
     };
 
@@ -644,42 +586,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
     }, 25_000);
     return () => { clearInterval(ping); try { ws.close(); } catch {} };
   }, [liveId, addSysMsg]);
-
-  // Événements modération via le WS global (broadcast_all du backend)
-  useEffect(() => {
-    const handler = (d: { type: string; live_id?: string; identity?: string; display_name?: string; avatar_url?: string; [key: string]: any }) => {
-      if (!['live_hand_raise', 'live_guest_invited', 'live_guest_demoted'].includes(d.type)) return;
-      if (d.live_id !== liveId) return;
-
-      if (d.type === 'live_hand_raise') {
-        const newReq: HandRequest = {
-          identity:    d.identity ?? '',
-          displayName: d.display_name ?? d.identity ?? '',
-          avatarUrl:   d.avatar_url ?? null,
-        };
-        setHandRequests(prev => {
-          if (prev.some(r => r.identity === d.identity)) return prev;
-          return [...prev, newReq];
-        });
-        setShowRequests(true);
-        addSysMsg(`${d.display_name ?? d.identity} veut monter sur scène`);
-      }
-
-      if (d.type === 'live_guest_invited') {
-        setOnStage(prev => new Set([...prev, d.identity ?? '']));
-        setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
-        addSysMsg(`${d.identity} est maintenant sur scène`);
-      }
-
-      if (d.type === 'live_guest_demoted') {
-        setOnStage(prev => { const next = new Set(prev); next.delete(d.identity ?? ''); return next; });
-        addSysMsg(`${d.identity} a été redescendu de scène`);
-      }
-    };
-
-    addListener(handler);
-    return () => removeListener(handler);
-  }, [liveId, addSysMsg, addListener, removeListener]);
 
   // ── Actions modération
   const handleAccept = useCallback(async (req: HandRequest) => {
@@ -916,18 +822,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         {joinToasts.map(t => <JoinToast key={t.id} name={t.name} />)}
       </View>
 
-      {/* ── PARLEUR ACTIF ────────────────────────────────────────────── */}
-      {activeSpeaker && (
-        <View style={st.activeSpeakerWrap} pointerEvents="none">
-          <ActiveSpeakerToast
-            key={activeSpeaker.identity}
-            name={activeSpeaker.name}
-            avatarUrl={activeSpeaker.avatarUrl}
-            isLocal={activeSpeaker.isLocal}
-          />
-        </View>
-      )}
-
       {/* ── GIFT TICKER (gauche, au dessus du chat) ───────────────────── */}
       {giftTicker.length > 0 && (
         <View style={st.giftTickerZone} pointerEvents="none">
@@ -950,120 +844,88 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
       {/* ── HEADER ────────────────────────────────────────────────── */}
       {/* ══════════════════════════════════════════════════════════════ */}
       <View style={st.header}>
-        {/* Gauche : bouton fermer */}
+        {/* Bouton fermer */}
         <TouchableOpacity onPress={askEnd} style={st.closeBtn} activeOpacity={0.8} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="x" size={20} color="#fff" />
+          <Icon name="x" size={18} color="#fff" />
         </TouchableOpacity>
 
-        {/* Centre : LIVE pill + timer + badge abonnés */}
-        <View style={st.headerCenter}>
-          <View style={st.livePill}>
-            <View style={st.liveDot} />
-            <Text style={st.liveText}>LIVE</Text>
-            <Text style={st.timerText}>{fmt(elapsed)}</Text>
+        {/* Host info : avatar (point live pulsant) + nom + timer en dessous */}
+        <View style={st.hostInfo}>
+          <View style={st.hostAvatarWrap}>
+            {currentUser?.avatar_url
+              ? <Image source={{ uri: currentUser.avatar_url }} style={st.hostAvatar} />
+              : <Av name={currentUser?.display_name ?? currentUser?.username ?? 'Toi'} size={28} color="#F0365A" />
+            }
+            <PulsingLiveDot />
           </View>
-          {isPrivate && (
-            <View style={st.privatePill}>
-              <MCIcon name="lock-outline" size={9} color="#fff" />
-              <Text style={st.privateText}>Abonnés</Text>
+          <View style={st.hostMeta}>
+            <Text style={st.hostName} numberOfLines={1}>{currentUser?.display_name ?? currentUser?.username ?? 'Toi'}</Text>
+            <View style={st.hostTimerRow}>
+              <Text style={st.liveTagText}>LIVE</Text>
+              <Text style={st.timerText}>{fmt(elapsed)}</Text>
             </View>
-          )}
+          </View>
         </View>
 
-        {/* Droite : viewers + avatars */}
-        <View style={st.headerRight}>
-          <View style={st.viewerPill}>
-            <Icon name="eye" size={11} color="rgba(255,255,255,0.8)" />
-            <Text style={st.viewerCount}>{viewerCount}</Text>
-          </View>
-          {remoteParticipants.slice(0, 4).map((p, i) => (
-            <TouchableOpacity
-              key={p.identity}
-              style={[st.viewerAvatar, { marginLeft: i === 0 ? 4 : -7, zIndex: 10 - i }]}
-              onPress={() => giftRef.current?.openGift(p.identity, p.name || p.identity || '?')}
-              activeOpacity={0.75}
-            >
-              <Text style={st.viewerAvatarText}>{(p.name || p.identity || '?')[0].toUpperCase()}</Text>
-            </TouchableOpacity>
-          ))}
-          {viewerCount > 4 && (
-            <View style={[st.viewerAvatar, { marginLeft: -7, backgroundColor: 'rgba(255,255,255,0.22)' }]}>
-              <Text style={[st.viewerAvatarText, { fontSize: 8 }]}>+{viewerCount - 4}</Text>
-            </View>
-          )}
+        <View style={{ flex: 1 }} />
+
+        {/* Viewers — tap pour voir la liste des participants */}
+        <TouchableOpacity style={st.viewerPill} onPress={() => setShowParticipants(true)} activeOpacity={0.75}>
+          <Icon name="eye" size={11} color="rgba(255,255,255,0.8)" />
+          <Text style={st.viewerCount}>{viewerCount}</Text>
+        </TouchableOpacity>
+
+        {/* Coeur — compact : nombre à gauche, icône à droite */}
+        <View style={st.likeWrap}>
+          <LiveLikeButton ref={likeRef} total={likeCount} onLike={() => {}} compact />
         </View>
+
+        {/* Menu "..." — Paramètres / Copier le lien / Partager / Terminer le live */}
+        <TouchableOpacity
+          style={st.moreBtn}
+          onPress={() => setShowMoreMenu(true)}
+          activeOpacity={0.8}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon name="more-vertical" size={17} color="#fff" />
+        </TouchableOpacity>
       </View>
+
+      {/* Pill secondaire (privé) — sous le header pour ne pas l'encombrer */}
+      {isPrivate && (
+        <View style={st.subPillsRow} pointerEvents="none">
+          <View style={st.privatePill}>
+            <MCIcon name="lock-outline" size={9} color="#fff" />
+            <Text style={st.privateText}>Abonnés</Text>
+          </View>
+        </View>
+      )}
+
+      <LiveParticipantsModal
+        visible={showParticipants}
+        onClose={() => setShowParticipants(false)}
+        participants={allParticipants.map(p => ({
+          identity: p.identity,
+          name:     p.name || p.identity,
+          isHost:   p.isLocal,
+        }))}
+      />
 
       {/* ══════════════════════════════════════════════════════════════ */}
       {/* ── COLONNE DROITE — 5 actions host ─────────────────────── */}
       {/* ══════════════════════════════════════════════════════════════ */}
       <View style={st.sideCol}>
 
-        {/* Flip caméra */}
-        <TouchableOpacity
-          style={[st.sideItem, !isCameraEnabled && { opacity: 0.38 }]}
-          onPress={!isCameraEnabled ? undefined : flipCam}
-          activeOpacity={0.8}
-        >
-          <View style={st.sideCircle}>
-            <Icon name="refresh-cw" size={22} color="#fff" />
-          </View>
-          <Text style={st.sideLabel}>Retourner</Text>
-        </TouchableOpacity>
-
-        {/* Micro */}
-        <TouchableOpacity style={st.sideItem} onPress={toggleMute} activeOpacity={0.8}>
-          <View style={[st.sideCircle, !isMicrophoneEnabled && st.sideCircleOff]}>
-            <Icon name={isMicrophoneEnabled ? 'mic' : 'mic-off'} size={22} color={isMicrophoneEnabled ? '#fff' : '#F0365A'} />
-          </View>
-          <Text style={[st.sideLabel, !isMicrophoneEnabled && { color: '#F0365A' }]}>
-            {isMicrophoneEnabled ? 'Micro' : 'Micro off'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Caméra */}
-        <TouchableOpacity style={st.sideItem} onPress={toggleVideo} activeOpacity={0.8}>
-          <View style={[st.sideCircle, !isCameraEnabled && st.sideCircleOff]}>
-            <Icon name={isCameraEnabled ? 'video' : 'video-off'} size={22} color={isCameraEnabled ? '#fff' : '#F0365A'} />
-          </View>
-          <Text style={[st.sideLabel, !isCameraEnabled && { color: '#F0365A' }]}>
-            {isCameraEnabled ? 'Cam' : 'Cam off'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Réactions */}
-        <View style={[st.sideItem, { zIndex: 30, overflow: 'visible' }]}>
-          <View style={st.sideCircle}>
-            <LiveReactionPicker onReact={(emoji) => { spawn(emoji); handleReact(emoji); }} />
-          </View>
-          <Text style={st.sideLabel}>Réagir</Text>
-        </View>
-
-        {/* Paramètres — badge si demandes en attente */}
-        <TouchableOpacity style={st.sideItem} onPress={() => setShowSettings(true)} activeOpacity={0.8}>
-          <View style={[st.sideCircle, st.sideCircleSettings]}>
-            <Icon name="settings" size={22} color="#9B65F5" />
-            {pendingCount > 0 && (
-              <View style={st.sideBadge}>
-                <Text style={st.sideBadgeText}>{pendingCount}</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[st.sideLabel, { color: '#9B65F5' }]}>
-            {pendingCount > 0 ? `${pendingCount} main${pendingCount > 1 ? 's' : ''}` : 'Paramètres'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Cadeaux reçus (affiché uniquement si > 0) */}
-        {giftHistory.length > 0 && (
-          <TouchableOpacity style={st.sideItem} onPress={() => setShowGifts(v => !v)} activeOpacity={0.8}>
+        {/* Demandes de scène (main levée) — affiché uniquement si des demandes sont en attente */}
+        {pendingCount > 0 && (
+          <TouchableOpacity style={st.sideItem} onPress={() => { setShowRequests(v => !v); setShowOnStage(false); }} activeOpacity={0.8}>
             <View style={[st.sideCircle, { backgroundColor: 'rgba(255,215,0,0.14)', borderColor: 'rgba(255,215,0,0.4)' }]}>
-              <Icon name="gift" size={22} color="#FFD700" />
+              <Text style={{ fontSize: 22 }}>✋</Text>
               <View style={[st.sideBadge, { backgroundColor: '#FFD700' }]}>
-                <Text style={[st.sideBadgeText, { color: '#000' }]}>{giftHistory.length}</Text>
+                <Text style={[st.sideBadgeText, { color: '#000' }]}>{pendingCount}</Text>
               </View>
             </View>
-            <Text style={[st.sideLabel, { color: '#FFD700' }]}>Cadeaux</Text>
+            <Text style={[st.sideLabel, { color: '#FFD700' }]}>Demandes</Text>
           </TouchableOpacity>
         )}
 
@@ -1079,9 +941,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
             <Text style={[st.sideLabel, { color: '#3FEDB6' }]}>Scène</Text>
           </TouchableOpacity>
         )}
-
-        {/* Like count */}
-        <LiveLikeButton ref={likeRef} total={likeCount} onLike={() => {}} />
       </View>
 
       {/* ══════════════════════════════════════════════════════════════ */}
@@ -1091,6 +950,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         {/* Messages */}
         <FlatList
           ref={chatRef}
+          onContentSizeChange={() => chatRef.current?.scrollToEnd({ animated: false })}
           data={messages}
           keyExtractor={m => m.id}
           renderItem={({ item }) => {
@@ -1171,28 +1031,46 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
           contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingTop: 6 }}
         />
 
-        {/* Barre saisie */}
-        <View style={st.inputBar}>
-          {showInput ? (
-            <View style={st.inputRow}>
-              <TextInput
-                value={chatInput} onChangeText={setChatInput}
-                placeholder="Écris un message..." placeholderTextColor="rgba(255,255,255,0.38)"
-                style={st.chatInput} onSubmitEditing={sendChat} returnKeyType="send"
-                autoFocus onBlur={() => { if (!chatInput.trim()) setShowInput(false); }}
-              />
-              {chatInput.trim().length > 0 && (
-                <TouchableOpacity onPress={sendChat} style={st.sendBtn} disabled={sending}>
-                  <Icon name="send" size={16} color="#fff" />
+        {/* Barre saisie — emoji intégré à l'input, cam/micro séparés à droite */}
+        <View style={st.inputBarRow}>
+          <View style={st.inputBar}>
+            {showInput ? (
+              <View style={st.inputRow}>
+                <TextInput
+                  value={chatInput} onChangeText={setChatInput}
+                  placeholder="Écris un message..." placeholderTextColor="rgba(255,255,255,0.38)"
+                  style={st.chatInput} onSubmitEditing={sendChat} returnKeyType="send"
+                  autoFocus onBlur={() => { if (!chatInput.trim()) setShowInput(false); }}
+                />
+                <View style={[st.inputEmojiWrap, { zIndex: 30, overflow: 'visible' }]}>
+                  <LiveReactionPicker onReact={(emoji) => { spawn(emoji); handleReact(emoji); }} compact />
+                </View>
+                {chatInput.trim().length > 0 && (
+                  <TouchableOpacity onPress={sendChat} style={st.sendBtn} disabled={sending}>
+                    <Icon name="send" size={13} color="#fff" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={st.chatPillRow}>
+                <TouchableOpacity style={st.chatPill} onPress={() => setShowInput(true)} activeOpacity={0.8}>
+                  <Icon name="message-circle" size={14} color="rgba(255,255,255,0.5)" />
+                  <Text style={st.chatPillText}>Commenter...</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          ) : (
-            <TouchableOpacity style={st.chatPill} onPress={() => setShowInput(true)} activeOpacity={0.8}>
-              <Icon name="message-circle" size={15} color="rgba(255,255,255,0.5)" />
-              <Text style={st.chatPillText}>Commenter...</Text>
-            </TouchableOpacity>
-          )}
+                <View style={[st.inputEmojiWrap, { zIndex: 30, overflow: 'visible' }]}>
+                  <LiveReactionPicker onReact={(emoji) => { spawn(emoji); handleReact(emoji); }} compact />
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Toggles caméra / micro — séparés, à droite de l'input */}
+          <TouchableOpacity style={st.quickToggleBtn} onPress={toggleVideo} activeOpacity={0.8}>
+            <Icon name={isCameraEnabled ? 'video' : 'video-off'} size={14} color={isCameraEnabled ? '#fff' : '#F0365A'} />
+          </TouchableOpacity>
+          <TouchableOpacity style={st.quickToggleBtn} onPress={toggleMute} activeOpacity={0.8}>
+            <Icon name={isMicrophoneEnabled ? 'mic' : 'mic-off'} size={14} color={isMicrophoneEnabled ? '#fff' : '#F0365A'} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1205,32 +1083,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
           onRefuse={handleRefuse}
           onClose={() => setShowRequests(false)}
         />
-      )}
-
-      {showGifts && giftHistory.length > 0 && (
-        <Animated.View entering={SlideInRight.duration(260)} exiting={SlideOutRight.duration(200)} style={os.panel}>
-          <View style={os.header}>
-            <Text style={os.title}>Cadeaux ({giftHistory.length})</Text>
-            <Text style={[os.title, { color: '#FFD700', fontSize: 12 }]}>
-              {giftHistory.reduce((s, t) => s + t.GoGold, 0)} 🪙 total
-            </Text>
-            <TouchableOpacity onPress={() => setShowGifts(false)} style={os.closeBtn}>
-              <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
-            </TouchableOpacity>
-          </View>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 12, gap: 10 }}>
-            {giftHistory.slice(0, 20).map((t, i) => (
-              <View key={`${t.id}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Text style={{ fontSize: 24 }}>{t.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{t.senderName}</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>{t.giftName}</Text>
-                </View>
-                <Text style={{ color: '#FFD700', fontSize: 13, fontWeight: '800' }}>{t.GoGold} 🪙</Text>
-              </View>
-            ))}
-          </ScrollView>
-        </Animated.View>
       )}
 
       {showOnStage && onStage.size > 0 && (
@@ -1287,6 +1139,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         micOn={isMicrophoneEnabled}
         onToggleCam={toggleVideo}
         onToggleMic={toggleMute}
+        onFlipCam={flipCam}
         handRequests={handRequests.map(r => ({ identity: r.identity, name: r.displayName, avatar: r.avatarUrl }))}
         onInvite={(identity) => {
           const req = handRequests.find(r => r.identity === identity);
@@ -1295,6 +1148,15 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         onDismissHand={handleRefuse}
         onStopLive={onEnd}
         onMonetizationUpdated={(updated) => setLiveData(prev => prev ? { ...prev, ...updated } : prev)}
+      />
+
+      <LiveMoreMenu
+        visible={showMoreMenu}
+        onClose={() => setShowMoreMenu(false)}
+        isHost
+        liveId={liveId}
+        onOpenSettings={() => setShowSettings(true)}
+        onStopLive={askEnd}
       />
     </View>
   );
@@ -1397,6 +1259,11 @@ const hr = StyleSheet.create({
 // ── Styles HostVideoView ──────────────────────────────────────────────────────
 
 const mv = StyleSheet.create({
+  stageRowWrap: {
+    position: 'absolute', left: 0, right: 0,
+    top: Platform.OS === 'ios' ? 118 : 96,
+    zIndex: 12, paddingHorizontal: 12,
+  },
   noVideo:      { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
   noVideoText:  { color: '#888', fontSize: 13 },
   noVideoBg:    { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
@@ -1463,31 +1330,36 @@ const st = StyleSheet.create({
   // ── Header ────────────────────────────────────────────────────────────────────
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    paddingTop: Platform.OS === 'ios' ? 54 : 36,
-    paddingHorizontal: 14, paddingBottom: 10,
-    flexDirection: 'row', alignItems: 'center',
-    zIndex: 10,
+    paddingTop: Platform.OS === 'ios' ? 50 : 32,
+    paddingHorizontal: 10, paddingBottom: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4, zIndex: 20,
   },
   closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
   },
-  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  headerRight:  { flexDirection: 'row', alignItems: 'center' },
 
-  livePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#F0365A', borderRadius: 10,
-    paddingHorizontal: 9, paddingVertical: 5,
-    shadowColor: '#F0365A', shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-    elevation: 6,
+  hostInfo:      { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 96 },
+  hostAvatarWrap:{ position: 'relative' },
+  hostAvatar:    { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: '#F0365A' },
+  liveIndicator: {
+    position: 'absolute', bottom: -1, right: -1,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: '#050010',
   },
-  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  liveText:  { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 1 },
-  timerText: { color: 'rgba(255,255,255,0.88)', fontSize: 11, fontWeight: '600' },
+  hostMeta:  { flexShrink: 1 },
+  hostName:  { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
+  hostTimerRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
+  liveTagText: { color: '#F0365A', fontWeight: '900', fontSize: 8, letterSpacing: 0.4 },
+  timerText:   { color: 'rgba(255,255,255,0.7)', fontSize: 8, fontWeight: '600' },
 
+  subPillsRow: {
+    position: 'absolute', left: 14,
+    top: Platform.OS === 'ios' ? 92 : 74,
+    flexDirection: 'row', gap: 6, zIndex: 9,
+  },
   privatePill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(155,101,245,0.75)', borderRadius: 10,
@@ -1496,13 +1368,19 @@ const st = StyleSheet.create({
   privateText: { color: '#fff', fontWeight: '700', fontSize: 10 },
 
   viewerPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12,
-    paddingHorizontal: 7, paddingVertical: 4, marginRight: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  viewerCount:     { color: '#fff', fontSize: 11, fontWeight: '700' },
-  viewerAvatar:    { width: 26, height: 26, borderRadius: 13, backgroundColor: '#9B65F5', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#050010' },
-  viewerAvatarText:{ color: '#fff', fontSize: 9, fontWeight: '800' },
+  viewerCount: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  likeWrap:    { marginLeft: 0, marginRight: 2 },
+  moreBtn: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
 
   // ── Launch banner ─────────────────────────────────────────────────────────────
   launchBanner: {
@@ -1520,7 +1398,6 @@ const st = StyleSheet.create({
 
   // ── Toasts ────────────────────────────────────────────────────────────────────
   toastsContainer:   { position: 'absolute', top: Platform.OS === 'ios' ? 116 : 92, left: 14, zIndex: 30, gap: 4 },
-  activeSpeakerWrap: { position: 'absolute', bottom: Platform.OS === 'ios' ? 210 : 190, left: 14, zIndex: 25 },
   joinToast: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(5,0,16,0.7)', borderRadius: 20,
@@ -1558,8 +1435,6 @@ const st = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
   },
-  sideCircleOff:      { borderColor: '#F0365A', backgroundColor: 'rgba(240,54,90,0.15)' },
-  sideCircleSettings: { borderColor: 'rgba(155,101,245,0.5)', backgroundColor: 'rgba(155,101,245,0.12)' },
   sideLabel:   { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '600', textAlign: 'center' },
   sideBadge: {
     position: 'absolute', top: -3, right: -3,
@@ -1581,7 +1456,7 @@ const st = StyleSheet.create({
 
   // ── Zone bas (chat + input) ───────────────────────────────────────────────────
   bottomZone: {
-    position: 'absolute', bottom: 0, left: 0, right: 76,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingBottom: Platform.OS === 'ios' ? 38 : 22,
     paddingHorizontal: 12, zIndex: 20,
   },
@@ -1589,7 +1464,6 @@ const st = StyleSheet.create({
   chatRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginBottom: 6 },
   chatAvatar: { width: 26, height: 26, borderRadius: 13, marginTop: 2 },
   chatBubble: {
-    backgroundColor: 'rgba(5,0,16,0.55)', borderRadius: 14,
     paddingHorizontal: 10, paddingVertical: 5,
     flexDirection: 'row', flexWrap: 'wrap', maxWidth: 210,
   },
@@ -1600,24 +1474,34 @@ const st = StyleSheet.create({
   giftMsg:     { backgroundColor: 'rgba(255,215,0,0.16)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, alignSelf: 'flex-start' },
   giftMsgText: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
 
-  inputBar: { paddingTop: 4 },
-  chatPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+  inputBarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
+  inputBar: { flex: 1 },
+  quickToggleBtn: {
+    width: 34, height: 34, borderRadius: 17,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 26, paddingHorizontal: 16, paddingVertical: 11,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    alignSelf: 'stretch',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
   },
-  chatPillText: { color: 'rgba(255,255,255,0.45)', fontSize: 14, flex: 1 },
+  chatPillRow: { flexDirection: 'row', alignItems: 'center' },
+  chatPill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 22, paddingHorizontal: 14, paddingVertical: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    minHeight: 38,
+  },
+  chatPillText: { color: 'rgba(255,255,255,0.45)', fontSize: 13, flex: 1 },
   inputRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 26, paddingLeft: 16, paddingRight: 4, paddingVertical: 2,
+    borderRadius: 22, paddingLeft: 14, paddingRight: 4, paddingVertical: 2,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    minHeight: 38,
   },
-  chatInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8 },
+  chatInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 5 },
+  inputEmojiWrap: { alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   sendBtn:   {
-    backgroundColor: '#F0365A', borderRadius: 22, padding: 9, margin: 3,
+    backgroundColor: '#F0365A', borderRadius: 17, padding: 7, margin: 3,
     shadowColor: '#F0365A', shadowOpacity: 0.5, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
   },
 

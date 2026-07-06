@@ -49,6 +49,10 @@ import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
 import { BackButton } from '../../components/common';
+import { StageTileRow } from '../../components/live/StageTileRow';
+import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
+import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
+import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 
 // ── LiveKit quality config ─────────────────────────────────────────────────────
 
@@ -392,13 +396,6 @@ const MultiVideoView: React.FC<{
               </View>
         )}
 
-        {/* Label nom */}
-        {spotlightTrack && (
-          <View style={mv.spotLabel}>
-            <Text style={mv.spotLabelText} numberOfLines={1}>{spotlightName}</Text>
-          </View>
-        )}
-
         {/* Bouton cadeau sur le spotlight */}
         {spotlightTrack && !spotlightTrack.participant.isLocal && (
           <TouchableOpacity
@@ -420,38 +417,35 @@ const MultiVideoView: React.FC<{
           </View>
         )}
 
-        {/* Vignettes autres participants remotes (jamais le local) */}
-        {thumbnailTracks.length > 0 && (
-          <View style={mv.thumbsCol}>
-            {thumbnailTracks.map(t => {
-              const camOn = !t.publication?.isMuted;
-              const tName = t.participant.name || t.participant.identity;
-              return (
-                <TouchableOpacity
-                  key={t.participant.identity}
-                  style={mv.thumb}
-                  onPress={() => setSpotlightId(t.participant.identity)}
-                  activeOpacity={0.8}
-                >
-                  {camOn
-                    ? <VideoTrack trackRef={t} style={StyleSheet.absoluteFill} objectFit="cover" />
-                    : <View style={[StyleSheet.absoluteFill, mv.thumbNoCam]}><Av name={tName} size={40} /></View>
-                  }
-                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={mv.thumbGrad}>
-                    <Text style={mv.thumbLabel} numberOfLines={1}>{tName}</Text>
-                  </LinearGradient>
-                  <TouchableOpacity
-                    style={mv.thumbGiftBtn}
-                    onPress={() => onGift(t.participant.identity, tName)}
-                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                  >
-                    <Text style={{ fontSize: 13 }}>🎁</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
+        {/* Bandeau "Sur scène" — tuiles vidéo réelles, host en premier */}
+        <View style={mv.stageRowWrap} pointerEvents="box-none">
+          <StageTileRow
+            tiles={[
+              {
+                identity:  spotlightTrack?.participant.identity ?? 'host',
+                name:      hostName,
+                track:     spotlightTrack,
+                camOn:     spotlightCamOn,
+                avatarUrl: hostAvatarUrl,
+                badge:     'host' as StageBadge,
+                micOn:     spotlightCamOn,
+              },
+              ...thumbnailTracks.map(t => ({
+                identity: t.participant.identity,
+                name:     t.participant.name || t.participant.identity,
+                track:    t,
+                camOn:    !t.publication?.isMuted,
+                badge:    'star' as StageBadge,
+                micOn:    !t.publication?.isMuted,
+              } satisfies StageTile)),
+            ]}
+            onTapTile={(identity) => setSpotlightId(identity)}
+            onLongPressTile={(identity) => {
+              const t = remoteTracks.find(rt => rt.participant.identity === identity);
+              if (t) onGift(identity, t.participant.name || identity);
+            }}
+          />
+        </View>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -465,6 +459,15 @@ interface HandRequest {
   avatar?: string | null;
 }
 
+const PulsingLiveDot: React.FC = () => {
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    opacity.value = withRepeat(withTiming(0.3, { duration: 650 }), -1, true);
+  }, []);
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return <Animated.View style={[st.liveIndicator, animStyle]} />;
+};
+
 const LeaveStageBtn: React.FC<{ onPress: () => void }> = ({ onPress }) => {
   const opacity = useSharedValue(1);
   useEffect(() => {
@@ -474,7 +477,7 @@ const LeaveStageBtn: React.FC<{ onPress: () => void }> = ({ onPress }) => {
   return (
     <TouchableOpacity style={st.actionIconWrap} onPress={onPress} activeOpacity={0.8}>
       <Animated.View style={[st.actionIconCircle, st.actionIconCircleRed, animStyle]}>
-        <Icon name="arrow-down" size={18} color="#F0365A" />
+        <Icon name="arrow-down" size={14} color="#F0365A" />
       </Animated.View>
     </TouchableOpacity>
   );
@@ -522,6 +525,7 @@ const RoomContent: React.FC<{
   handRequests, onHandDismiss, onLiveUpdated, onStopLive,
 }) => {
   const { localParticipant } = useLocalParticipant();
+  const roomParticipants     = useParticipants();
   const { floaters, spawn }  = useReactionFloaters();
 
   // Exposer spawn au parent pour les réactions WS des autres
@@ -532,8 +536,9 @@ const RoomContent: React.FC<{
   const [handRaised,    setHandRaised]    = useState(false);
   const [checkingStage, setCheckingStage] = useState(false);
   const [showInput,     setShowInput]     = useState(false);
-  const [showGifts,     setShowGifts]     = useState(false);
   const [showSettings,  setShowSettings]  = useState(false);
+  const [showMoreMenu,  setShowMoreMenu]  = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const [showStageGate,    setShowStageGate]    = useState(false);
   const [showStageMenu,    setShowStageMenu]    = useState(false);
   const [freshLiveForGate, setFreshLiveForGate] = useState<LiveStream | null>(null);
@@ -660,7 +665,7 @@ const RoomContent: React.FC<{
         {/* Bouton retour */}
         <BackButton onPress={onLeave} transparent />
 
-        {/* Host info */}
+        {/* Host info : avatar (point live pulsant) + nom + timer en dessous */}
         <TouchableOpacity
           style={st.hostInfo}
           onPress={() => giftRef.current?.openGift(hostId, hostName)}
@@ -669,64 +674,75 @@ const RoomContent: React.FC<{
           <View style={st.hostAvatarWrap}>
             {live?.user?.avatar_url
               ? <Image source={{ uri: live.user.avatar_url }} style={st.hostAvatar} />
-              : <Av name={hostName} size={38} color="#F0365A" />
+              : <Av name={hostName} size={30} color="#F0365A" />
             }
-            <View style={st.liveIndicator} />
+            <PulsingLiveDot />
           </View>
           <View style={st.hostMeta}>
             <Text style={st.hostName} numberOfLines={1}>{hostName}</Text>
-            <View style={st.hostMetaRow}>
-              <LinearGradient colors={['#F0365A', '#9B65F5']} style={st.livePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                <View style={st.liveDot} />
-                <Text style={st.liveText}>LIVE</Text>
-                <Text style={st.timerText}>{fmt(elapsed)}</Text>
-              </LinearGradient>
-              {live?.is_private && (
-                <View style={st.privatePill}>
-                  <MCIcon name="lock" size={8} color="#fff" />
-                  <Text style={st.privateText}>Privé</Text>
-                </View>
-              )}
-              {live?.is_monetized && (
-                <View style={st.monetPill}>
-                  <Text style={st.monetPillText}>🔒 Payant</Text>
-                </View>
-              )}
+            <View style={st.hostTimerRow}>
+              <Text style={st.liveTagText}>LIVE</Text>
+              <Text style={st.timerText}>{fmt(elapsed)}</Text>
             </View>
           </View>
         </TouchableOpacity>
 
         <View style={{ flex: 1 }} />
 
-        {/* Viewers */}
-        <View style={st.viewerPill}>
+        {/* Viewers — tap pour voir la liste des participants */}
+        <TouchableOpacity style={st.viewerPill} onPress={() => setShowParticipants(true)} activeOpacity={0.75}>
           <Icon name="eye" size={11} color="rgba(255,255,255,0.8)" />
           <Text style={st.viewerCount}>{viewerCount}</Text>
-        </View>
+        </TouchableOpacity>
 
-        {/* Coeur */}
+        {/* Coeur — compact : nombre à gauche, icône à droite */}
         <View style={st.likeWrap}>
-          <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} />
+          <LiveLikeButton ref={likeRef} total={likeCount} onLike={onLike} compact />
         </View>
 
-        {/* Engrenage host */}
-        {isHost && (
-          <TouchableOpacity
-            style={st.settingsBtn}
-            onPress={() => setShowSettings(true)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            {handRequests.length > 0 && (
-              <View style={st.settingsBadge}>
-                <Text style={st.settingsBadgeText}>{handRequests.length}</Text>
-              </View>
-            )}
-            <View style={st.settingsBtnCircle}>
-              <Icon name="settings" size={17} color="#fff" />
+        {/* Menu "..." — regroupe Suivre/Paramètres/Partager/Signaler/Quitter/Terminer */}
+        <TouchableOpacity
+          style={st.settingsBtn}
+          onPress={() => setShowMoreMenu(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {isHost && handRequests.length > 0 && (
+            <View style={st.settingsBadge}>
+              <Text style={st.settingsBadgeText}>{handRequests.length}</Text>
             </View>
-          </TouchableOpacity>
-        )}
+          )}
+          <View style={st.settingsBtnCircle}>
+            <Icon name="more-vertical" size={17} color="#fff" />
+          </View>
+        </TouchableOpacity>
       </View>
+
+      {/* Pills secondaires (privé / payant) — sous le header pour ne pas l'encombrer */}
+      {(live?.is_private || live?.is_monetized) && (
+        <View style={st.subPillsRow} pointerEvents="none">
+          {live?.is_private && (
+            <View style={st.privatePill}>
+              <MCIcon name="lock" size={8} color="#fff" />
+              <Text style={st.privateText}>Privé</Text>
+            </View>
+          )}
+          {live?.is_monetized && (
+            <View style={st.monetPill}>
+              <Text style={st.monetPillText}>🔒 Payant</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      <LiveParticipantsModal
+        visible={showParticipants}
+        onClose={() => setShowParticipants(false)}
+        participants={roomParticipants.map(p => ({
+          identity:  p.identity,
+          name:      p.name || p.identity,
+          isHost:    p.identity === hostId || (isHost && p.isLocal),
+        }))}
+      />
 
       {/* ── BADGE SUR SCÈNE ───────────────────────────────────────────── */}
       {onStage && !isHost && (
@@ -762,6 +778,7 @@ const RoomContent: React.FC<{
         <View style={st.chatZone}>
           <FlatList
             ref={chatRef}
+            onContentSizeChange={() => chatRef.current?.scrollToEnd({ animated: false })}
             data={messages}
             keyExtractor={m => m.id}
             renderItem={({ item }) => {
@@ -782,7 +799,7 @@ const RoomContent: React.FC<{
                   }
                   <View style={{ flex: 1 }}>
                     <TouchableOpacity
-                      style={[st.chatBubble, isMine && st.chatBubbleMine]}
+                      style={st.chatBubble}
                       activeOpacity={(isMine || canModerate) ? 0.75 : 1}
                       onLongPress={() => {
                         if (isMine) {
@@ -826,13 +843,13 @@ const RoomContent: React.FC<{
 
         {/* ── BARRE D'ACTIONS ───────────────────────────────────────── */}
         <View style={st.actionBar}>
-          {/* Input / placeholder */}
+          {/* Input / placeholder — emoji intégré à l'intérieur */}
           <View style={st.inputWrap}>
             {showInput ? (
               <>
                 {editTarget && (
                   <TouchableOpacity onPress={() => { setEditTarget(null); setChatInput(''); setShowInput(false); }} style={st.editCancelBtn}>
-                    <Icon name="x" size={13} color="rgba(255,255,255,0.6)" />
+                    <Icon name="x" size={12} color="rgba(255,255,255,0.6)" />
                   </TouchableOpacity>
                 )}
                 <TextInput
@@ -849,6 +866,9 @@ const RoomContent: React.FC<{
                   autoFocus
                   onBlur={() => { if (!chatInput.trim()) { setShowInput(false); setEditTarget(null); } }}
                 />
+                <View style={[st.inputEmojiWrap, { zIndex: 30, overflow: 'visible' }]}>
+                  <LiveReactionPicker onReact={(emoji) => { spawn(emoji); onReact(emoji); }} compact />
+                </View>
                 <TouchableOpacity
                   onPress={() => {
                     if (editTarget) { onEditMsg(editTarget.id, chatInput.trim()); setEditTarget(null); setChatInput(''); setShowInput(false); }
@@ -857,38 +877,28 @@ const RoomContent: React.FC<{
                   style={[st.sendBtn, editTarget && { backgroundColor: '#3FEDB6' }]}
                   disabled={sending || !chatInput.trim()}
                 >
-                  <Icon name={editTarget ? 'check' : 'send'} size={15} color="#fff" />
+                  <Icon name={editTarget ? 'check' : 'send'} size={13} color="#fff" />
                 </TouchableOpacity>
               </>
             ) : (
-              <TouchableOpacity style={st.chatPlaceholder} onPress={() => setShowInput(true)} activeOpacity={0.8}>
-                <Icon name="message-circle" size={15} color="rgba(255,255,255,0.5)" />
-                <Text style={st.chatPlaceholderText}>Message...</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={st.chatPlaceholder} onPress={() => setShowInput(true)} activeOpacity={0.8}>
+                  <Icon name="message-circle" size={14} color="rgba(255,255,255,0.5)" />
+                  <Text style={st.chatPlaceholderText}>Message...</Text>
+                </TouchableOpacity>
+                <View style={[st.inputEmojiWrap, { zIndex: 30, overflow: 'visible' }]}>
+                  <LiveReactionPicker onReact={(emoji) => { spawn(emoji); onReact(emoji); }} compact />
+                </View>
+              </>
             )}
-          </View>
-
-          {/* Réactions */}
-          <View style={[st.actionIconWrap, { zIndex: 30, overflow: 'visible' }]}>
-            <LiveReactionPicker onReact={(emoji) => { spawn(emoji); onReact(emoji); }} />
           </View>
 
           {/* Cadeau */}
           <TouchableOpacity style={st.actionIconWrap} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
             <LinearGradient colors={['rgba(255,215,0,0.25)', 'rgba(255,165,0,0.15)']} style={st.actionIconCircle}>
-              <Text style={{ fontSize: 20 }}>🎁</Text>
+              <Text style={{ fontSize: 16 }}>🎁</Text>
             </LinearGradient>
           </TouchableOpacity>
-
-          {/* Historique cadeaux reçus */}
-          {giftHistory.length > 0 && (
-            <TouchableOpacity style={st.actionIconWrap} onPress={() => setShowGifts(v => !v)} activeOpacity={0.8}>
-              <View style={[st.actionIconCircle, { backgroundColor: 'rgba(255,215,0,0.15)', borderColor: 'rgba(255,215,0,0.4)' }]}>
-                <Icon name="star" size={18} color="#FFD700" />
-                <View style={st.giftBadge}><Text style={st.giftBadgeText}>{giftHistory.length}</Text></View>
-              </View>
-            </TouchableOpacity>
-          )}
 
           {/* Contrôles scène */}
           {onStage ? (
@@ -901,55 +911,15 @@ const RoomContent: React.FC<{
                 <View style={[st.actionIconCircle, handRaised && { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' }]}>
                   {checkingStage
                     ? <ActivityIndicator size="small" color="#FFD700" />
-                    : <Text style={{ fontSize: 18 }}>{handRaised ? '✋' : '🖐️'}</Text>
+                    : <Text style={{ fontSize: 14 }}>{handRaised ? '✋' : '🖐️'}</Text>
                   }
                 </View>
               </TouchableOpacity>
             )
           )}
 
-          {/* Quitter */}
-          <TouchableOpacity style={st.actionIconWrap} onPress={() => Alert.alert(
-            'Quitter le live ?',
-            'Es-tu sûr de vouloir quitter ce live ?',
-            [
-              { text: 'Annuler', style: 'cancel' },
-              { text: 'Quitter', style: 'destructive', onPress: onLeave },
-            ]
-          )} activeOpacity={0.8}>
-            <View style={[st.actionIconCircle, { backgroundColor: 'rgba(240,54,90,0.18)', borderColor: 'rgba(240,54,90,0.5)' }]}>
-              <Icon name="x" size={18} color="#F0365A" />
-            </View>
-          </TouchableOpacity>
         </View>
       </View>
-
-      {/* ── PANEL CADEAUX REÇUS ───────────────────────────────────────── */}
-      {showGifts && (
-        <Animated.View entering={SlideInUp.duration(280)} exiting={SlideOutDown.duration(220)} style={gp.panel}>
-          <View style={gp.header}>
-            <LinearGradient colors={['#9B65F5', '#F0365A']} style={gp.titleGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={gp.title}>Cadeaux reçus</Text>
-              <Text style={gp.totalBadge}>{giftHistory.reduce((s, t) => s + t.GoGold, 0)} GoGold</Text>
-            </LinearGradient>
-            <TouchableOpacity onPress={() => setShowGifts(false)} style={gp.closeBtn}>
-              <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
-            </TouchableOpacity>
-          </View>
-          <View style={gp.list}>
-            {giftHistory.slice(0, 20).map((t, i) => (
-              <View key={`${t.id}-${i}`} style={gp.row}>
-                <View style={gp.rowIconWrap}><Text style={gp.rowEmoji}>{t.emoji}</Text></View>
-                <View style={gp.rowInfo}>
-                  <Text style={gp.rowSender} numberOfLines={1}>{t.senderName}</Text>
-                  <Text style={gp.rowGift}>{t.giftName}</Text>
-                </View>
-                <Text style={gp.rowGoGold}>+{t.GoGold}</Text>
-              </View>
-            ))}
-          </View>
-        </Animated.View>
-      )}
 
       {/* ── MENU SCÈNE ───────────────────────────────────────────────── */}
       <Modal
@@ -1040,6 +1010,18 @@ const RoomContent: React.FC<{
           onMonetizationUpdated={onLiveUpdated}
         />
       )}
+
+      <LiveMoreMenu
+        visible={showMoreMenu}
+        onClose={() => setShowMoreMenu(false)}
+        isHost={isHost}
+        liveId={liveId}
+        hostId={hostId}
+        hostName={hostName}
+        onOpenSettings={() => setShowSettings(true)}
+        onStopLive={onStopLive}
+        onLeave={onLeave}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -1059,6 +1041,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [kicked,      setKicked]      = useState<'kicked' | 'banned' | null>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [messages,    setMessages]    = useState<ChatMsg[]>([]);
+  const localMsgSeq = useRef(0);
   const [chatInput,   setChatInput]   = useState('');
   const [sending,     setSending]     = useState(false);
   const [giftNotifs,  setGiftNotifs]  = useState<GiftNotif[]>([]);
@@ -1088,7 +1071,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const reactionThrottle  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { currentUser } = useUser();
-  const { lastLiveEnded, lastLiveViewersUpdated, addListener, removeListener } = useWs();
+  const { lastLiveEnded, lastLiveViewersUpdated } = useWs();
 
   const addSysMsg = useCallback((text: string) => {
     const id = `sys-${Date.now()}`;
@@ -1161,38 +1144,6 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     }
   }, [lastLiveViewersUpdated, liveId]);
 
-  // Événements modération via WS global (live_guest_invited / live_guest_demoted)
-  useEffect(() => {
-    const handler = (d: { type: string; live_id?: string; identity?: string; [key: string]: any }) => {
-      if (d.live_id !== liveId) return;
-
-      if (d.type === 'live_guest_invited' && d.identity === myIdentity) {
-        addSysMsg('Le host t\'a invité à monter sur scène !');
-        goOnStageRef.current?.();
-      }
-      if (d.type === 'live_guest_demoted' && d.identity === myIdentity) {
-        addSysMsg('Tu as été redescendu de scène.');
-        leaveStageRef.current?.();
-      }
-      // Demande de scène — ajouter à la liste du host
-      if (d.type === 'live_hand_raise' && d.live_id === liveId) {
-        setHandRequests(prev => {
-          if (prev.find(r => r.identity === d.identity)) return prev;
-          return [...prev, { identity: d.identity, name: d.display_name ?? d.identity, avatar: d.avatar_url ?? null }];
-        });
-      }
-      // Quand le host invite ou que l'utilisateur descend, retirer la demande
-      if (d.type === 'live_guest_invited' && d.live_id === liveId) {
-        setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
-      }
-      if (d.type === 'live_guest_demoted' && d.live_id === liveId) {
-        setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
-      }
-    };
-    addListener(handler);
-    return () => removeListener(handler);
-  }, [liveId, myIdentity, addSysMsg, addListener, removeListener]);
-
   // WS chat (commentaires, cadeaux, likes)
   useEffect(() => {
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -1207,7 +1158,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
       try {
         const d = JSON.parse(e.data);
 
-        if (d.type === 'comment_added' && d.comment) {
+        if (d.type === 'comment_added' && d.comment && String(d.comment.body ?? '').trim()) {
           const c = d.comment;
           const incomingText   = c.body;
           const incomingUserId = c.author?.id ? String(c.author.id) : undefined;
@@ -1216,6 +1167,12 @@ export const SimpleLiveViewerScreen: React.FC = () => {
             const localIdx = prev.findIndex(
               m => m.isLocal && m.text === incomingText && m.userId === incomingUserId,
             );
+            if (localIdx !== -1) {
+              // Garder l'id local pour ne pas changer la key React (évite un remount + re-fade visuel)
+              const updated = [...prev];
+              updated[localIdx] = { ...updated[localIdx], isLocal: false };
+              return updated;
+            }
             const newMsg = {
               id:     c.id ?? String(Date.now()),
               user:   c.author?.display_name ?? c.author?.username ?? 'Anonyme',
@@ -1223,11 +1180,6 @@ export const SimpleLiveViewerScreen: React.FC = () => {
               avatar: c.author?.avatar_url ?? null,
               text:   incomingText,
             };
-            if (localIdx !== -1) {
-              const updated = [...prev];
-              updated[localIdx] = newMsg;
-              return updated;
-            }
             return [...prev.slice(-149), newMsg];
           });
           setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
@@ -1275,6 +1227,30 @@ export const SimpleLiveViewerScreen: React.FC = () => {
           }
         }
 
+        // Demande de montée sur scène (main levée) — visible côté host
+        if (d.type === 'live_hand_raise' && d.live_id === liveId) {
+          setHandRequests(prev => {
+            if (prev.find(r => r.identity === d.identity)) return prev;
+            return [...prev, { identity: d.identity, name: d.display_name ?? d.identity, avatar: d.avatar_url ?? null }];
+          });
+        }
+
+        if (d.type === 'live_guest_invited' && d.live_id === liveId) {
+          setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
+          if (d.identity === myIdentity) {
+            addSysMsg('Le host t\'a invité à monter sur scène !');
+            goOnStageRef.current?.();
+          }
+        }
+
+        if (d.type === 'live_guest_demoted' && d.live_id === liveId) {
+          setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
+          if (d.identity === myIdentity) {
+            addSysMsg('Tu as été redescendu de scène.');
+            leaveStageRef.current?.();
+          }
+        }
+
         // Kick temporaire du live — ciblé par identity (= userId)
         if (
           d.type === 'viewer_kicked' &&
@@ -1314,7 +1290,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     setSending(true);
     // Affichage local immédiat
     setMessages(prev => [...prev.slice(-149), {
-      id:      `local-${Date.now()}`,
+      id:      `local-${Date.now()}-${localMsgSeq.current++}`,
       user:    currentUser?.display_name ?? currentUser?.username ?? 'Moi',
       userId:  currentUser?.id ? String(currentUser.id) : undefined,
       avatar:  currentUser?.avatar_url ?? null,
@@ -1523,6 +1499,11 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 // ── Styles MultiVideoView ─────────────────────────────────────────────────────
 
 const mv = StyleSheet.create({
+  stageRowWrap: {
+    position: 'absolute', left: 0, right: 0,
+    top: Platform.OS === 'ios' ? 118 : 98,
+    zIndex: 12, paddingHorizontal: 12,
+  },
   noVideo:       { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
   noVideoText:   { color: '#999', fontSize: 14 },
   noVideoBg:     { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
@@ -1533,12 +1514,6 @@ const mv = StyleSheet.create({
   noCamMicRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   noCamMicText:  { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   spotlightName: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  spotLabel: {
-    position: 'absolute', bottom: Platform.OS === 'ios' ? 260 : 240, left: 12, zIndex: 5,
-    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 3,
-  },
-  spotLabelText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   spotGiftBtn: {
     display: 'none',
   },
@@ -1579,31 +1554,29 @@ const st = StyleSheet.create({
   // ── Header ──────────────────────────────────────────────────────────────
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    paddingTop: Platform.OS === 'ios' ? 54 : 36,
-    paddingHorizontal: 14, paddingBottom: 14,
-    flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 20,
+    paddingTop: Platform.OS === 'ios' ? 50 : 32,
+    paddingHorizontal: 10, paddingBottom: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4, zIndex: 20,
   },
-  hostInfo:      { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  hostInfo:      { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 96 },
   hostAvatarWrap:{ position: 'relative' },
-  hostAvatar:    { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: '#F0365A' },
+  hostAvatar:    { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: '#F0365A' },
   liveIndicator: {
-    position: 'absolute', bottom: -2, right: -2,
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: '#F0365A', borderWidth: 2, borderColor: '#050010',
+    position: 'absolute', bottom: -1, right: -1,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: '#050010',
   },
-  hostMeta:    { flex: 1 },
-  hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3, flexWrap: 'wrap' },
-  hostName:    { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
+  hostMeta:  { flexShrink: 1 },
+  hostName:  { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
+  hostTimerRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
+  liveTagText: { color: '#F0365A', fontWeight: '900', fontSize: 8, letterSpacing: 0.4 },
+  timerText:   { color: 'rgba(255,255,255,0.7)', fontSize: 8, fontWeight: '600' },
 
-  livePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3,
-    alignSelf: 'flex-start',
+  subPillsRow: {
+    position: 'absolute', left: 12,
+    top: Platform.OS === 'ios' ? 92 : 74,
+    flexDirection: 'row', gap: 6, zIndex: 19,
   },
-  liveDot:  { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.9)' },
-  liveText: { color: '#fff', fontWeight: '900', fontSize: 9, letterSpacing: 1 },
-  timerText:{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '600' },
-
   privatePill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: 'rgba(123,63,242,0.7)', borderRadius: 8,
@@ -1620,15 +1593,15 @@ const st = StyleSheet.create({
   viewerPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12,
-    paddingHorizontal: 9, paddingVertical: 5,
+    paddingHorizontal: 8, paddingVertical: 4,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  viewerCount: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  likeWrap:    { marginLeft: 2 },
+  viewerCount: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  likeWrap:    { marginLeft: 0 },
 
-  settingsBtn:       { padding: 4, position: 'relative' },
+  settingsBtn:       { padding: 2, position: 'relative' },
   settingsBtnCircle: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 30, height: 30, borderRadius: 15,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
@@ -1664,14 +1637,8 @@ const st = StyleSheet.create({
   chatRow:   { flexDirection: 'row', alignItems: 'flex-end', gap: 7, marginBottom: 6 },
   chatAvatar:{ width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: 'rgba(155,101,245,0.5)' },
   chatBubble: {
-    backgroundColor: 'rgba(8,4,20,0.65)',
-    borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
     maxWidth: 230, flexDirection: 'row', flexWrap: 'wrap',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-  },
-  chatBubbleMine: {
-    backgroundColor: 'rgba(240,54,90,0.18)',
-    borderColor: 'rgba(240,54,90,0.35)',
   },
   chatUser: { color: '#9B65F5', fontSize: 12, fontWeight: '800' },
   chatText: { color: 'rgba(255,255,255,0.92)', fontSize: 13 },
@@ -1687,27 +1654,28 @@ const st = StyleSheet.create({
   actionBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 10, paddingVertical: 6,
-    gap: 8, marginTop: 2,
+    gap: 6, marginTop: 2,
   },
   inputWrap: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 26, paddingLeft: 14, paddingRight: 4,
+    borderRadius: 22, paddingLeft: 14, paddingRight: 4,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-    minHeight: 44, maxWidth: '55%',
+    minHeight: 38,
   },
-  chatField: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: Platform.OS === 'ios' ? 10 : 6 },
+  chatField: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: Platform.OS === 'ios' ? 8 : 5 },
+  inputEmojiWrap: { alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   sendBtn:   {
-    backgroundColor: '#F0365A', borderRadius: 20, padding: 8, margin: 2,
+    backgroundColor: '#F0365A', borderRadius: 17, padding: 7, margin: 2,
     alignItems: 'center', justifyContent: 'center',
   },
   editCancelBtn: { padding: 5 },
-  chatPlaceholder: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, paddingVertical: 10 },
+  chatPlaceholder: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, paddingVertical: 8 },
   chatPlaceholderText: { color: 'rgba(255,255,255,0.38)', fontSize: 13 },
 
   actionIconWrap:   { alignItems: 'center', justifyContent: 'center' },
   actionIconCircle: {
-    width: 44, height: 44, borderRadius: 22,
+    width: 34, height: 34, borderRadius: 17,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)',
@@ -1716,14 +1684,6 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(240,54,90,0.2)',
     borderColor: '#F0365A',
   },
-
-  giftBadge: {
-    position: 'absolute', top: -2, right: -2,
-    width: 15, height: 15, borderRadius: 8,
-    backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#050010',
-  },
-  giftBadgeText: { color: '#fff', fontSize: 7, fontWeight: '900' },
 
   // ── Ended ────────────────────────────────────────────────────────────────
   endedCard: {
@@ -1755,53 +1715,6 @@ const gt = StyleSheet.create({
   info:   { flex: 1 },
   sender: { color: '#fff', fontSize: 11, fontWeight: '800' },
   detail: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
-});
-
-// ── Styles panel cadeaux reçus ────────────────────────────────────────────────
-
-const gp = StyleSheet.create({
-  panel: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 80 : 64,
-    right: 10, left: 10,
-    maxHeight: 300,
-    backgroundColor: 'rgba(10,5,22,0.97)',
-    borderRadius: 22,
-    borderWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
-    zIndex: 50, overflow: 'hidden',
-    paddingBottom: 10,
-  },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingRight: 10,
-  },
-  titleGrad: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-  },
-  title:      { color: '#fff', fontSize: 14, fontWeight: '900' },
-  totalBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 3,
-    color: '#fff', fontSize: 11, fontWeight: '800',
-  },
-  closeBtn: { padding: 6 },
-  list: { paddingHorizontal: 12, paddingTop: 4 },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  rowIconWrap: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(155,101,245,0.15)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  rowEmoji:  { fontSize: 20 },
-  rowInfo:   { flex: 1 },
-  rowSender: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  rowGift:   { color: 'rgba(255,255,255,0.45)', fontSize: 10, marginTop: 1 },
-  rowGoGold:  { color: '#3FEDB6', fontSize: 13, fontWeight: '900' },
 });
 
 // ── Styles menu scène ─────────────────────────────────────────────────────────
