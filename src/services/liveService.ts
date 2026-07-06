@@ -51,9 +51,21 @@ export interface LiveStatus {
   current_viewers: number;
 }
 
+export interface LivesPage {
+  items:    LiveStream[];
+  total:    number;
+  page:     number;
+  has_more: boolean;
+}
+
 async function getLives(): Promise<LiveStream[]> {
-  const r = await apiClient.get<LiveStream[]>(Endpoints.lives.list);
-  return Array.isArray(r.data) ? r.data : [];
+  const page = await getLivesPage(1);
+  return page.items;
+}
+
+async function getLivesPage(page: number, limit = 20): Promise<LivesPage> {
+  const r = await apiClient.get<LivesPage>(`${Endpoints.lives.list}?page=${page}&limit=${limit}`);
+  return r.data ?? { items: [], total: 0, page, has_more: false };
 }
 
 async function getById(id: string): Promise<LiveStream> {
@@ -137,7 +149,7 @@ async function getLiveCost(): Promise<{ cost_gogold: number; balance: number; su
 }
 
 export const liveService = {
-  getLives, getById, startLive, stopLive, getToken, getStatus, stopAllMine,
+  getLives, getLivesPage, getById, startLive, stopLive, getToken, getStatus, stopAllMine,
   blockUserFromLives, unblockUserFromLives,
   invite, demote, ban, globalBan, getLiveCost,
   sendGiftForAccess, payGoGoldForAccess, checkAccess,

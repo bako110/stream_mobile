@@ -29,7 +29,7 @@ import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
   CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader, ShareBottomSheet, FriendsWhoLiked,
-  HeartRain, LikeNamesFeed,
+  HeartRain, LikeNamesFeed, AvatarWithBadge,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
@@ -99,6 +99,9 @@ export const ReelsScreen: React.FC = () => {
   const currentReelRef    = useRef<{ id: string; startTime: number } | null>(null);
   const viewedReelsRef    = useRef<Set<string>>(new Set());
   const activePlayerRef   = useRef<{ pause: () => void } | null>(null);
+  // Verrou global : un seul reel à la fois a le droit d'avoir du son (actif OU voisin
+  // immédiat en préchargement silencieux). Empêche deux players de sonner en même temps.
+  const audioOwnerRef     = useRef<string | null>(null);
   const mountedRef        = useRef(true);
   const searchTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchReqRef      = useRef('');
@@ -126,7 +129,7 @@ export const ReelsScreen: React.FC = () => {
 
   const [reels,         setReels]         = useState<Reel[]>(seedReel.length > 0 ? seedReel : []);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
-  const [reelAd,        setReelAd]        = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string } | null>(null);
+  const [reelAd,        setReelAd]        = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; advertiser_id?: string } | null>(null);
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
   const [editCaption,   setEditCaption]   = useState('');
@@ -272,7 +275,7 @@ export const ReelsScreen: React.FC = () => {
         }
       }
       // Charger la pub reels en arriere-plan
-      apiClient.get<{ id: string; title: string } | null>('/api/v1/ads/feed/next?placement=reels')
+      apiClient.get<{ id: string; title: string; advertiser_id?: string } | null>('/api/v1/ads/feed/next?placement=reels')
         .then(r => { if (r.data && mountedRef.current) setReelAd(r.data as any); })
         .catch(() => {});
 
@@ -618,6 +621,8 @@ export const ReelsScreen: React.FC = () => {
           muted={muted}
           screenW={SCREEN_W}
           screenH={SCREEN_H}
+          insetBottom={insets.bottom}
+          onAuthorPress={onAuthorPress}
         />
       );
     }
@@ -625,7 +630,7 @@ export const ReelsScreen: React.FC = () => {
       <VideoSlide
         reel={item}
         isActive={index === currentIndex && screenFocused}
-        isPreload={Math.abs(index - currentIndex) <= 1 && index !== currentIndex}
+        isPreload={Math.abs(index - currentIndex) <= 2 && index !== currentIndex}
         muted={muted}
         screenW={SCREEN_W}
         screenH={SCREEN_H}
@@ -638,6 +643,7 @@ export const ReelsScreen: React.FC = () => {
         onAuthorPress={onAuthorPress}
         onEnd={goNextReel}
         activePlayerRef={activePlayerRef}
+        audioOwnerRef={audioOwnerRef}
       />
     );
   }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
@@ -1068,11 +1074,13 @@ interface AdData {
   cta_url?: string;
   creative_url?: string;
   thumbnail_url?: string;
+  advertiser_id?: string;
 }
 
-const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW: number; screenH: number }> = memo(({
-  ad, isActive, muted, screenW, screenH,
+const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW: number; screenH: number; insetBottom: number; onAuthorPress: (userId: string) => void }> = memo(({
+  ad, isActive, muted, screenW, screenH, insetBottom, onAuthorPress,
 }) => {
+  const safeBottom = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
   const isVideo = !!(ad.creative_url && (ad.creative_url.includes('.m3u8') || ad.creative_url.includes('/hls/') || ad.creative_url.includes('video')));
   const player = useVideoPlayer(
     isVideo && ad.creative_url ? { uri: ad.creative_url } : 'about:blank',
@@ -1122,51 +1130,53 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         pointerEvents="none"
       />
 
-      {/* ── Contenu bas ── */}
-      <View style={{ position: 'absolute', bottom: 36, left: 0, right: 0, paddingHorizontal: 18 }}>
+      {/* ── Contenu bas — même position que les reels normaux (au-dessus de la barre de
+          commentaire), ordre annonceur → description → CTA, de haut en bas ── */}
+      <View style={{ position: 'absolute', bottom: safeBottom + 90, left: 0, right: 82, paddingHorizontal: 14, gap: 8 }}>
 
-        {/* Annonceur row */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          <View style={{ width: 46, height: 46, borderRadius: 23, overflow: 'hidden', borderWidth: 2, borderColor: '#fff' }}>
+        {/* Annonceur row — cliquable vers le profil de l'annonceur (advertiser_id = User.id) */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          disabled={!ad.advertiser_id}
+          onPress={() => ad.advertiser_id && onAuthorPress(ad.advertiser_id)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+        >
+          <View style={{ width: 30, height: 30, borderRadius: 15, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(0,0,0,0.45)' }}>
             {ad.thumbnail_url ? (
-              <Image source={{ uri: ad.thumbnail_url }} style={{ width: 46, height: 46 }} resizeMode="cover" />
+              <Image source={{ uri: ad.thumbnail_url }} style={{ width: 30, height: 30 }} resizeMode="cover" />
             ) : (
-              <LinearGradient colors={['#9B65F5', '#E0389A']} style={{ width: 46, height: 46, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="zap" size={20} color="#fff" />
-              </LinearGradient>
+              <View style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="zap" size={14} color="#fff" />
+              </View>
             )}
           </View>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{ad.title}</Text>
-            </View>
-            <Text style={{ color: '#ffffff99', fontSize: 12, fontWeight: '500', marginTop: 2 }}>Publicité</Text>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={1}>{ad.title}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '500', marginTop: 1 }}>Publicité</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Description */}
         {ad.description ? (
-          <Text style={{ color: '#ffffffDD', fontSize: 14, lineHeight: 20, marginBottom: 16, fontWeight: '400' }} numberOfLines={3}>
+          <Text style={{ color: '#fff', fontSize: 12, lineHeight: 17, fontWeight: '400', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 }} numberOfLines={3}>
             {ad.description}
           </Text>
         ) : null}
-
-        {/* CTA button */}
-        {ad.cta_url ? (
-          <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={{ overflow: 'hidden', borderRadius: 14 }}>
-            <LinearGradient
-              colors={['#9B65F5', '#E0389A']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, paddingHorizontal: 24 }}
-            >
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 }}>
-                {ad.cta_text || 'En savoir plus'}
-              </Text>
-              <MCIcon name="arrow-right" size={18} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
-        ) : null}
       </View>
+
+      {/* ── Colonne d'actions à droite — même position que les vrais reels ── */}
+      {ad.cta_url ? (
+        <View style={{ position: 'absolute', right: 8, bottom: safeBottom + 90, alignItems: 'center', gap: 4 }}>
+          <TouchableOpacity activeOpacity={0.85} onPress={handleCta} style={{ alignItems: 'center', gap: 3 }}>
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)' }}>
+              <MCIcon name="arrow-right" size={16} color="#fff" />
+            </View>
+            <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, maxWidth: 60, textAlign: 'center' }} numberOfLines={2}>
+              {ad.cta_text || 'En savoir plus'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 });
@@ -1189,12 +1199,13 @@ interface VideoSlideProps {
   onAuthorPress:        (userId: string) => void;
   onEnd:                () => void;
   activePlayerRef?:     React.RefObject<{ pause: () => void } | null>;
+  audioOwnerRef?:       React.RefObject<string | null>;
 }
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
   reel, isActive, isPreload, muted, screenW, screenH, insetBottom,
   colors, currentUserId, currentUserAvatar, currentUserInitial = 'M',
-  onToggleMute, onAuthorPress, onEnd, activePlayerRef,
+  onToggleMute, onAuthorPress, onEnd, activePlayerRef, audioOwnerRef,
 }) => {
   const nav = useNavigation<Nav>();
 
@@ -1403,21 +1414,26 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   }, [reel.id, editCaptionText, savingCaption]);
 
   const videoUri = reel.hls_url;
-  // Charge la source dès que ce slide est actif OU en préchargement (slide suivant/précédent)
-  const videoSource = useMemo(() => (videoUri && (isActive || isPreload))
+  const shouldLoad = !!videoUri && (isActive || isPreload);
+  // Charge la source dès que ce slide est actif OU en préchargement (slide suivant/précédent).
+  // La référence de l'objet source (et bufferConfig) ne doit JAMAIS changer entre preload et actif :
+  // sinon useVideoPlayer recrée le player en perdant tout le buffer déjà accumulé pendant le
+  // preload (= rechargement complet, latence visible à l'arrivée). Seul shouldLoad (bool) doit
+  // faire basculer entre l'URI réelle et 'about:blank', jamais l'objet lui-même.
+  const videoSource = useMemo(() => shouldLoad
     ? {
-        uri: videoUri,
+        uri: videoUri!,
         bufferConfig: {
           minBufferMs: 2_000,
           maxBufferMs: 50_000,
           bufferForPlaybackMs: 1_500,
           bufferForPlaybackAfterRebufferMs: 2_000,
           backBufferDurationMs: 2_000,
-          preferredForwardBufferDurationMs: isActive ? 30_000 : 10_000,
+          preferredForwardBufferDurationMs: 30_000,
         },
       }
     : 'about:blank',
-  [videoUri, isActive, isPreload]); // eslint-disable-line
+  [videoUri, shouldLoad]); // eslint-disable-line
 
   const hasMusic = !!(reel.music_url);
   const player = useVideoPlayer(videoSource, p => {
@@ -1446,7 +1462,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   useEffect(() => { musicIsActiveRef.current = isActive; }, [isActive]);
   useEffect(() => { musicOnEndRef.current    = onEnd;    }, [onEnd]);
 
+  // Jeton d'invalidation : incrémenté à chaque stopMusic() pour ignorer le résultat d'un
+  // chargement Sound async devenu obsolète (ex: on a scrollé loin avant que le fichier charge,
+  // ou le reel est redevenu inactif pendant le chargement réseau du fichier audio).
+  const musicLoadTokenRef = useRef(0);
+
   const stopMusic = useCallback(() => {
+    musicLoadTokenRef.current++;
     if (musicTimerRef.current)    { clearTimeout(musicTimerRef.current);      musicTimerRef.current    = null; }
     if (musicProgressRef.current) { clearInterval(musicProgressRef.current);  musicProgressRef.current = null; }
     if (musicSoundRef.current) {
@@ -1464,9 +1486,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     const clipDur  = endSec > startSec ? endSec - startSec : 0;
 
     stopMusic();
+    const myToken = ++musicLoadTokenRef.current;
     Sound.setCategory('Playback');
     const isRemote = url.startsWith('http://') || url.startsWith('https://');
     const snd = new Sound(url, isRemote ? (null as any) : '', err => {
+      // Ce chargement a été invalidé entre-temps (stopMusic()/nouveau startMusic() appelé
+      // pendant le chargement réseau) : ne jamais jouer un son devenu obsolète.
+      if (myToken !== musicLoadTokenRef.current) { snd.release(); return; }
       if (err) { console.warn('[ReelMusic] load error:', err); snd.release(); return; }
       if (!mountedRef.current) { snd.release(); return; }
       if (startSec > 0) snd.setCurrentTime(startSec);
@@ -1631,7 +1657,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     return () => { subEnd.remove(); subBuf.remove(); subLoad.remove(); subProgress.remove(); subState.remove(); subErr.remove(); };
   }, [player, clearStall]); // uniquement player — listeners stables
 
-  // Play/Pause selon isActive — le preload charge en silence mais ne joue pas
+  // Play/Pause selon isActive/isPreload — approche TikTok stricte : UN SEUL player peut
+  // jouer (et avoir du son) à la fois, celui du slide actif. Tous les voisins préchargés
+  // restent en vraie pause en permanence : jamais de lecture, jamais de son, jamais
+  // d'avancement de position avant l'activation. Le préchargement se limite au chargement
+  // de la source (bufferConfig, cf. videoSource plus haut) — la vitesse de démarrage se
+  // travaille via ce buffer, pas en faisant jouer les voisins en avance.
   useEffect(() => {
     if (!reel.hls_url) return;
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
@@ -1641,23 +1672,29 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       if (activePlayerRef) {
         (activePlayerRef as any).current = { pause: () => { try { player.pause(); } catch {} } };
       }
-      playTimerRef.current = setTimeout(() => {
-        if (!mountedRef.current || pausedRef.current) return;
-        if (endedRef.current) {
-          endedRef.current = false;
-          if (mountedRef.current) setEnded(false);
-          progressValue.value = 0;
-          try { player.seekTo(0); setTimeout(() => { try { player.play(); } catch {} }, 30); } catch {}
-        } else {
-          try { player.play(); } catch {}
-        }
-      }, 30);
+      if (audioOwnerRef) (audioOwnerRef as any).current = reel.id;
+      const targetMuted  = hasMusic ? true : muted;
+      const targetVolume = hasMusic ? 0    : (muted ? 0 : 1.0);
+      try { player.muted = targetMuted; player.volume = targetVolume; } catch {}
+      if (endedRef.current) {
+        endedRef.current = false;
+        if (mountedRef.current) setEnded(false);
+        progressValue.value = 0;
+        try { player.seekTo(0); setTimeout(() => { try { player.play(); } catch {} }, 30); } catch {}
+      } else {
+        try { player.play(); } catch {}
+      }
     } else {
-      // Preload ou inactif → pause (le buffer continue de se remplir en silence)
-      try { player.pause(); } catch {}
+      // Préchargement (isPreload) ou hors fenêtre : toujours pause + son coupé, jamais l'inverse.
+      if (audioOwnerRef && (audioOwnerRef as any).current === reel.id) (audioOwnerRef as any).current = null;
+      try {
+        player.pause();
+        player.muted  = true;
+        player.volume = 0;
+      } catch {}
     }
     return () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); };
-  }, [isActive, player]); // eslint-disable-line
+  }, [isActive, isPreload, player]); // eslint-disable-line
 
   // Reset états quand inactif — garde videoLoaded + ended pour retour sans rechargement
   useEffect(() => {
@@ -1682,10 +1719,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     return () => { if (stallingTimerRef.current) { clearTimeout(stallingTimerRef.current); stallingTimerRef.current = null; } };
   }, [videoPlaying, isActive, paused, ended, videoError]);
 
-  // Mute
+  // Mute — uniquement quand le reel est réellement actif : sinon ça écraserait le volume 0
+  // forcé pendant le préchargement du voisin immédiat ou la pause des autres slides.
   useEffect(() => {
-    try { player.muted = muted; player.volume = muted ? 0 : 1.0; } catch {}
-  }, [muted, player]);
+    if (!isActive) return;
+    try { player.muted = hasMusic ? true : muted; player.volume = hasMusic ? 0 : (muted ? 0 : 1.0); } catch {}
+  }, [muted, player, isActive, hasMusic]);
 
   // Ref info (concert / event / film)
   useEffect(() => {
@@ -1857,15 +1896,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const hPanFail   = Gesture.Pan().activeOffsetX([-10, 10]).failOffsetY([-10, 10]).minDistance(10);
 
   const safeBottom    = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
-  // 8 paddingV top + 8 paddingV bottom + 38 avatar height + 9 paddingV inner × 2 = 72 → 76 pour marge
-  const COMMENT_BAR_H = 76;
+  // 6 paddingV wrap top + 6 bottom + 26 avatar height + 6 paddingV inner × 2 = 56 → 66 pour marge
+  const COMMENT_BAR_H = 66;
 
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
-
-      {reel.thumbnail_url && isPortrait !== false && (
-        <Image source={{ uri: reel.thumbnail_url }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH, zIndex: -1 }} resizeMode="cover" />
-      )}
 
       <VideoView
         player={player}
@@ -1874,6 +1909,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         controls={false}
         surfaceType="texture"
       />
+
+      {/* Thumbnail par-dessus la vidéo tant qu'elle n'a pas encore de frame à afficher —
+          masque l'écran noir de démarrage (surtout visible en arrivant directement depuis
+          le Feed, sans preload préalable). Disparaît dès que videoPlaying passe à true. */}
+      {reel.thumbnail_url && isActive && !videoPlaying && (
+        <Image source={{ uri: reel.thumbnail_url }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }} resizeMode="cover" />
+      )}
 
       {/* Overlay filtre principal — zIndex 1 */}
       {(() => {
@@ -2064,24 +2106,27 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
               {refInfo.thumbnail
                 ? <Image source={{ uri: refInfo.thumbnail }} style={s.refThumb} />
                 : <View style={[s.refThumb, { backgroundColor: refInfo.color + '40', alignItems: 'center', justifyContent: 'center' }]}>
-                    <Icon name={refInfo.kind === 'Concert' ? 'music' : refInfo.kind === 'Événement' ? 'calendar' : 'film'} size={12} color="#fff" />
+                    <Icon name={refInfo.kind === 'Concert' ? 'music' : refInfo.kind === 'Événement' ? 'calendar' : 'film'} size={10} color="#fff" />
                   </View>
               }
               <View style={{ flex: 1, overflow: 'hidden' }}>
                 <Text style={s.refKind}>{refInfo.kind}</Text>
                 <Text style={s.refLabel} numberOfLines={1}>{refInfo.label}</Text>
               </View>
-              <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.5)" />
+              <Icon name="chevron-right" size={12} color="rgba(255,255,255,0.5)" />
             </View>
           )}
 
           <View style={s.authorRow}>
             <View style={{ position: 'relative' }}>
               <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)}>
-                {reel.author?.avatar_url
-                  ? <Image source={{ uri: reel.author.avatar_url }} style={s.avatar} />
-                  : <View style={[s.avatar, { backgroundColor: colors.primary }]}><Text style={s.avatarText}>{getAuthorInitial(reel.author)}</Text></View>
-                }
+                <AvatarWithBadge
+                  avatarUrl={reel.author?.avatar_url}
+                  initials={getAuthorInitial(reel.author)}
+                  size={30}
+                  accentColor={colors.primary}
+                  isLive={(reel.author as any)?.is_live}
+                />
               </TouchableOpacity>
               {!isOwnReel && (
                 <TouchableOpacity
@@ -2089,14 +2134,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   activeOpacity={0.85}
                   onPress={() => nav.navigate('CreateReel', { sourceReelId: reel.id, sourceReelUrl: reel.hls_url ?? undefined })}
                 >
-                  <Icon name="plus" size={10} color="#fff" />
+                  <Icon name="plus" size={9} color="#fff" />
                 </TouchableOpacity>
               )}
             </View>
             <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)} style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={s.authorName} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
-                {reel.author?.is_verified && <VerifiedBadge size={14} />}
+                {reel.author?.is_verified && <VerifiedBadge size={12} />}
               </View>
             </TouchableOpacity>
             {!isOwnReel && reel.author?.id && (
@@ -2104,11 +2149,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                 onPress={handleFollow}
                 activeOpacity={0.8}
                 disabled={followLoading}
-                style={{ paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, borderWidth: 1.5, borderColor: isFollowing ? 'rgba(255,255,255,0.4)' : '#fff', backgroundColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                style={{ paddingHorizontal: 11, paddingVertical: 4, borderRadius: 16, borderWidth: 1.5, borderColor: isFollowing ? 'rgba(255,255,255,0.4)' : '#fff', backgroundColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent', flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
                 {followLoading
                   ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
+                  : <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
                 }
               </TouchableOpacity>
             )}
@@ -2118,14 +2163,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
           {reel.music_name ? (
             <View style={s.musicBand} pointerEvents="none">
-              <MCIcon name="music-note" size={13} color="#fff" />
+              <MCIcon name="music-note" size={11} color="#fff" />
               <Text style={s.musicBandTxt} numberOfLines={1}>{reel.music_name}</Text>
             </View>
           ) : null}
 
           {reel.source_reel && (
             <View style={s.sourceBand}>
-              <Icon name={reel.remix_type === 'remix' ? 'git-merge' : 'repeat'} size={11} color="rgba(255,255,255,0.7)" />
+              <Icon name={reel.remix_type === 'remix' ? 'git-merge' : 'repeat'} size={9} color="rgba(255,255,255,0.7)" />
               {reel.source_reel.thumbnail_url
                 ? <Image source={{ uri: reel.source_reel.thumbnail_url }} style={s.sourceThumb} />
                 : null
@@ -2149,7 +2194,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
           <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
-            <Icon name={muted ? 'volume-x' : 'volume-2'} size={17} color="#fff" />
+            <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color="#fff" />
           </TouchableOpacity>
           <ActionBtn icon="heart-outline" iconActive="heart" useMCIcon label={formatCount(likes)} color={liked ? '#E0389A' : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder="#E0389A" activeGlow="#E0389A" />
           {!commentsDisabledSt && <ActionBtn icon="message-circle" label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
@@ -2160,7 +2205,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           {!isOwnReel && (
             <TouchableOpacity style={s.actionBtn} onPress={() => setShowRemix(true)} activeOpacity={0.8}>
               <View style={s.actionCircle}>
-                <Icon name="more-horizontal" size={17} color="#fff" />
+                <Icon name="more-horizontal" size={14} color="#fff" />
               </View>
               <Text style={s.actionLabel}>Plus</Text>
             </TouchableOpacity>
@@ -2168,14 +2213,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           {isOwnReel && (
             <TouchableOpacity style={s.actionBtn} onPress={() => setShowOwnerMenu(true)} activeOpacity={0.8}>
               <View style={s.actionCircle}>
-                <Icon name="more-vertical" size={17} color="#fff" />
+                <Icon name="more-vertical" size={14} color="#fff" />
               </View>
             </TouchableOpacity>
           )}
           {/* Bouton disque musique — en bas de la colonne, comme TikTok */}
           {reel.music_name ? (
             <View style={s.musicDisc} pointerEvents="none">
-              <MCIcon name="music-note" size={20} color="#000" />
+              <MCIcon name="music-note" size={16} color="#000" />
             </View>
           ) : null}
         </View>
@@ -2498,7 +2543,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             <TouchableOpacity onPress={handleSendComment} disabled={!commentText.trim() || sending} activeOpacity={0.8} style={s.commentBarSend}>
               {sending
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Icon name="arrow-up" size={16} color="#fff" />
+                : <Icon name="arrow-up" size={14} color="#fff" />
               }
             </TouchableOpacity>
           </View>
@@ -2526,7 +2571,7 @@ const ActionBtn: React.FC<{
         active && activeBorder     ? { borderColor: activeBorder, borderWidth: 1.5 } : {},
         active && activeGlow       ? { shadowColor: activeGlow, shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6 } : {},
       ]}>
-        {useMCIcon ? <MCIcon name={iconName} size={19} color={color} /> : <Icon name={iconName} size={17} color={color} />}
+        {useMCIcon ? <MCIcon name={iconName} size={16} color={color} /> : <Icon name={iconName} size={14} color={color} />}
       </View>
       {!!label && <Text style={[s.actionLabel, { color }]}>{label}</Text>}
     </TouchableOpacity>
@@ -2555,44 +2600,42 @@ const s = StyleSheet.create({
   retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 22, paddingHorizontal: 20, paddingVertical: 10 },
   retryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
-  reelInfo:   { position: 'absolute', left: 16, right: 82, gap: 8, zIndex: 3 },
-  authorRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar:       { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff', overflow: 'hidden' },
-  avatarText:   { color: '#fff', fontWeight: '800', fontSize: 14 },
-  avatarPlusBtn: { position: 'absolute', bottom: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
+  reelInfo:   { position: 'absolute', left: 14, right: 72, gap: 6, zIndex: 3 },
+  authorRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  avatarPlusBtn: { position: 'absolute', bottom: -3, right: -3, width: 15, height: 15, borderRadius: 8, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
 
-  musicBand:    { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#7B3FF2', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '80%', marginTop: 4 },
-  musicBandTxt: { color: '#fff', fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  musicBand:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#7B3FF2', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', maxWidth: '80%', marginTop: 3 },
+  musicBandTxt: { color: '#fff', fontSize: 10, fontWeight: '700', flexShrink: 1 },
   musicBandDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.6)' },
-  musicDisc:    { width: 46, height: 46, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  musicDisc:    { width: 38, height: 38, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
 
-  sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', maxWidth: '100%' },
-  sourceThumb: { width: 20, height: 20, borderRadius: 4, overflow: 'hidden' },
-  sourceText:  { color: 'rgba(255,255,255,0.75)', fontSize: 11 },
-  authorName: { color: '#fff', fontWeight: '800', fontSize: 15, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  caption:    { color: '#fff', fontSize: 13, lineHeight: 19, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
+  sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 9, paddingHorizontal: 7, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', maxWidth: '100%' },
+  sourceThumb: { width: 16, height: 16, borderRadius: 3, overflow: 'hidden' },
+  sourceText:  { color: 'rgba(255,255,255,0.75)', fontSize: 10 },
+  authorName: { color: '#fff', fontWeight: '800', fontSize: 13, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  caption:    { color: '#fff', fontSize: 12, lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
 
-  refBand:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignSelf: 'flex-start', maxWidth: '100%' },
-  refKindDot: { width: 7, height: 7, borderRadius: 4 },
-  refThumb:   { width: 32, height: 32, borderRadius: 8, overflow: 'hidden' },
-  refKind:    { color: 'rgba(255,255,255,0.55)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  refLabel:   { color: '#fff', fontSize: 12, fontWeight: '700' },
+  refBand:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignSelf: 'flex-start', maxWidth: '100%' },
+  refKindDot: { width: 6, height: 6, borderRadius: 3 },
+  refThumb:   { width: 26, height: 26, borderRadius: 6, overflow: 'hidden' },
+  refKind:    { color: 'rgba(255,255,255,0.55)', fontSize: 8, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  refLabel:   { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-  actions:      { position: 'absolute', right: 10, alignItems: 'center', gap: 10, zIndex: 3 },
-  actionBtn:    { alignItems: 'center', gap: 3 },
-  actionCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
-  actionLabel:  { fontSize: 10, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  muteBtn:      { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  actions:      { position: 'absolute', right: 8, alignItems: 'center', gap: 8, zIndex: 3 },
+  actionBtn:    { alignItems: 'center', gap: 2 },
+  actionCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
+  actionLabel:  { fontSize: 9, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  muteBtn:      { width: 27, height: 27, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 
-  commentBarWrap:      { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 12, paddingVertical: 8 },
+  commentBarWrap:      { position: 'absolute', left: 0, right: 0, zIndex: 5, paddingHorizontal: 10, paddingVertical: 6 },
   commentBarRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  commentBarAvatar:    { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', overflow: 'hidden', flexShrink: 0 },
-  commentBarAvatarTxt: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  commentBar:          { flexDirection: 'row', alignItems: 'center', borderRadius: 28, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, gap: 8 },
-  commentBarInput:     { flex: 1, fontSize: 13, color: '#fff', padding: 0, maxHeight: 60 },
-  commentBarSend:      { width: 32, height: 32, borderRadius: 16, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  commentBarAvatar:    { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', overflow: 'hidden', flexShrink: 0 },
+  commentBarAvatarTxt: { color: '#fff', fontWeight: '800', fontSize: 11 },
+  commentBar:          { flexDirection: 'row', alignItems: 'center', borderRadius: 24, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6, gap: 7 },
+  commentBarInput:     { flex: 1, fontSize: 12, color: '#fff', padding: 0, maxHeight: 60 },
+  commentBarSend:      { width: 27, height: 27, borderRadius: 14, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },

@@ -10,6 +10,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { GoFolyXLoader, BackButton } from '../../components/common';
+import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 import { communityService } from '../../services/communityService';
 import type { CommunityMemberData } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -49,6 +50,19 @@ const MEDAL_COLOR: Record<number, string> = { 1: '#F59E0B', 2: '#C0C0C0', 3: '#C
 const MemberAvatar: React.FC<{ member: CommunityMemberData; size: number; border?: string }> = ({ member, size, border }) => {
   const color = ROLE_COLOR[member.role] ?? '#3B82F6';
   const initials = ((member.display_name || member.username || '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase());
+
+  // En live : l'anneau live prend le pas sur la bordure de rôle (redondant sinon)
+  if (member.is_live) {
+    return (
+      <AvatarWithBadge
+        avatarUrl={member.avatar_url}
+        initials={initials}
+        size={size}
+        accentColor={color}
+        isLive
+      />
+    );
+  }
 
   if (member.avatar_url) {
     return (

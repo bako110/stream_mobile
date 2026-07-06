@@ -16,6 +16,7 @@ import { BorderRadius, Spacing } from '../../theme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import { BackButton } from '../../components/common';
+import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 
 interface UserResult {
   id:          string;
@@ -23,6 +24,7 @@ interface UserResult {
   full_name?:  string;
   display?:    string;   // champ calculé côté backend
   avatar_url?: string;
+  is_live?:    boolean;
 }
 
 function getInitials(name: string): string {
@@ -176,9 +178,13 @@ const UserRow: React.FC<{ user: UserResult; colors: any; onPress: () => void }> 
       onPress={onPress}
       activeOpacity={0.75}
     >
-      <View style={[styles.avatar, { backgroundColor: accent + '22' }]}>
-        <Text style={[styles.avatarText, { color: accent }]}>{getInitials(name)}</Text>
-      </View>
+      <AvatarWithBadge
+        avatarUrl={user.avatar_url}
+        initials={getInitials(name)}
+        size={44}
+        accentColor={accent}
+        isLive={user.is_live}
+      />
       <View style={styles.rowContent}>
         <Text style={[styles.rowName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
         <Text style={[styles.rowUsername, { color: colors.textTertiary }]} numberOfLines={1}>
@@ -231,8 +237,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: Spacing[3],
   },
-  avatar:     { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 17, fontWeight: '700' },
   rowContent: { flex: 1 },
   rowName:     { fontSize: 15, fontWeight: '600' },
   rowUsername: { fontSize: 13, marginTop: 2 },

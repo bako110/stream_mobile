@@ -114,12 +114,6 @@ export const eventsStyles = StyleSheet.create({
   cardContent: { padding: Spacing[3], gap: 6 },
 
   organizerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  organizerAvatar: { width: 24, height: 24, borderRadius: 12 },
-  organizerAvatarFallback: {
-    width: 24, height: 24, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  organizerInitials: { fontSize: 11, fontWeight: '700' },
   organizerName: { fontSize: 12, fontWeight: '600', flex: 1 },
 
   cardTopRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' },

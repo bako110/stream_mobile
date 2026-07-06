@@ -24,6 +24,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage } from '../../components/common';
+import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
@@ -548,7 +549,7 @@ const FeedHeaderBadges: React.FC<{
   const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 40, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
   return (
     <View style={{ paddingBottom: 10, marginHorizontal: -16 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.backgroundSecondary, borderRadius: 12, overflow: 'hidden' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden' }}>
         {/* Messages & Appels */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onMessages} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
@@ -582,7 +583,7 @@ const FeedHeaderBadges: React.FC<{
         </TouchableOpacity>
         {sep}
         {/* En direct */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1, backgroundColor: '#F0365A12' }]} onPress={onLive} activeOpacity={0.8}>
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onLive} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
             <MCIcon name="video-outline" size={24} color="#F0365A" />
             <View style={{ position: 'absolute', top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: colors.backgroundSecondary }} />
@@ -607,13 +608,29 @@ export const FeedScreen: React.FC = () => {
   const [filter,      setFilter]      = useState<FeedFilter>('all');
   const [items,       setItems]       = useState<FeedItem[]>([]);
   const [loading,     setLoading]     = useState(true);
-  const [currentAdData, setCurrentAdData] = useState<AdData | null>(null);
+  // Plusieurs campagnes peuvent être injectées dans le même feed (une par emplacement
+  // publicitaire) — map id → data, alimentée au fur et à mesure des tirages successifs.
+  const [adsById,     setAdsById]     = useState<Record<string, AdData>>({});
+  const seenAdIdsRef  = useRef<string[]>([]); // exclude_ids envoyés au backend, dans l'ordre
+  // slotId (__ad__slot_N) → id de la campagne tirée pour cet emplacement précis
+  const [adSlotMap,   setAdSlotMap]   = useState<Record<string, string>>({});
   const adInsertedRef = useRef<Set<string>>(new Set()); // évite double-injection
   const [refreshing,  setRefreshing]  = useState(false);
   const lastLoadedAtRef = useRef<number>(0);
+  // ── Scroll infini ────────────────────────────────────────────────────────
+  const feedPageRef      = useRef(1);
+  const [hasMoreFeed,    setHasMoreFeed]    = useState(true);
+  const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
+  const loadingMoreRef   = useRef(false);
+  const seenItemIdsRef   = useRef<Set<string>>(new Set());
+  // Continuité de l'espacement suggestions/communautés entre page 1 (load) et pages
+  // suivantes (loadMoreFeed) — reprend exactement où load('all') s'est arrêté.
+  const nonReelCountRef  = useRef(0);
+  const suggestCountRef  = useRef(0);
+  const commCountRef     = useRef(0);
+  const trendingCommRef  = useRef<CommunityData[]>([]);
   const feedListRef     = useRef<FlatList>(null);
   const [menuOpen,      setMenuOpen]      = useState(false);
-  const [filterDropOpen, setFilterDropOpen] = useState(false); // conservé pour éviter les refs cassées
   const [fabOpen,        setFabOpen]        = useState(false);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
@@ -645,8 +662,6 @@ export const FeedScreen: React.FC = () => {
 
   // Reel actif dans le feed (autoplay)
   const [activeReelId,      setActiveReelId]      = useState<string | null>(null);
-  const [activeCardId,      setActiveCardId]       = useState<string | null>(null);
-  const [activePostId,      setActivePostId]       = useState<string | null>(null);
   const [feedFocused,       setFeedFocused]        = useState(true);
   const [feedScrollEnabled, setFeedScrollEnabled]  = useState(true);
 
@@ -664,34 +679,9 @@ export const FeedScreen: React.FC = () => {
     const reelRowItem = viewableItems.find(v => v.item?.kind === 'reel_row');
     setActiveReelRowId(reelRowItem ? reelRowItem.item.id : null);
 
-    // Activer la vidéo de la première carte event/concert visible
-    const cardItem = viewableItems.find(v =>
-      (v.item?.kind === 'event' || v.item?.kind === 'concert') && (v.item?.data?.hls_url ?? v.item?.data?.video_url),
-    );
-    setActiveCardId(cardItem ? cardItem.item.id : null);
-
-    // Activer la vidéo du premier post visible avec video_url
-    const postItem = viewableItems.find(v =>
-      v.item?.kind === 'post' && ((v.item?.data as Post)?.hls_url ?? (v.item?.data as Post)?.video_url),
-    );
-    setActivePostId(postItem ? postItem.item.id : null);
-
     // Pub vidéo : ne joue que quand réellement visible à l'écran (coupe le stream sinon)
     setAdVisible(viewableItems.some(v => v.item?.kind === 'ad'));
   }).current;
-
-  // Tab underline animation
-  const TABS: { key: FeedFilter; label: string }[] = [
-    { key: 'all',       label: 'Pour toi'  },
-    { key: 'following', label: 'Suivis'    },
-    { key: 'live',      label: 'En direct' },
-  ];
-  const TAB_COUNT = TABS.length;
-  const TAB_W = Dimensions.get('window').width / TAB_COUNT;
-  const tabUnderlineX = useSharedValue(0);
-  const tabUnderlineStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: tabUnderlineX.value }],
-  }));
 
   // Sheet commentaires
   const [commentItem,    setCommentItem]    = useState<FeedItem | null>(null);
@@ -773,12 +763,32 @@ export const FeedScreen: React.FC = () => {
 
   useEffect(() => { loadSuggestions(); }, []);
 
-  // ── Chargement de la pub feed ─────────────────────────────────────────────
-  useEffect(() => {
-    apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=feed')
-      .then((res: { data: AdData | null }) => { if (res.data) setCurrentAdData(res.data); })
-      .catch(() => {});
+  // ── Chargement de la pub feed — une campagne par emplacement, jamais deux fois la
+  // même dans le même feed (exclude_ids envoyé au backend à chaque tirage). Retourne
+  // l'id de la pub obtenue (ou null si aucune campagne disponible/restante).
+  const fetchNextAd = useCallback(async (): Promise<string | null> => {
+    try {
+      const exclude = seenAdIdsRef.current.join(',');
+      const url = `/api/v1/ads/feed/next?placement=feed${exclude ? `&exclude_ids=${exclude}` : ''}`;
+      const res = await apiClient.get<AdData | null>(url);
+      if (!res.data) return null;
+      seenAdIdsRef.current.push(res.data.id);
+      setAdsById(prev => ({ ...prev, [res.data!.id]: res.data! }));
+      return res.data.id;
+    } catch {
+      return null;
+    }
   }, []);
+
+  // Attribue une campagne distincte à chaque emplacement pub du feed — séquentiel pour
+  // que chaque tirage voie bien l'exclusion mise à jour par les précédents (pas de doublon).
+  const assignAdsToSlots = useCallback(async (slotIds: string[]) => {
+    for (const slotId of slotIds) {
+      const adId = await fetchNextAd();
+      if (!adId) break; // plus aucune campagne disponible — les slots restants resteront vides
+      setAdSlotMap(prev => ({ ...prev, [slotId]: adId }));
+    }
+  }, [fetchNextAd]);
 
   // ── Suivi (follow) state ──────────────────────────────────────────────────
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
@@ -813,10 +823,27 @@ export const FeedScreen: React.FC = () => {
     }
   }, [followingSet, currentUser]);
 
+  // Espacement d'injection des suggestions/communautés/pub — partagé entre load('all')
+  // (page 1) et loadMoreFeed (pages suivantes) pour garder un rythme cohérent sur tout le flux.
+  const SUGGEST_EVERY = 8;
+  const COMM_EVERY    = 12;
+  const AD_EVERY       = 8;
+  const adSlotIdxRef  = useRef(0); // continue la numérotation des slots pub entre pages
+
   const load = useCallback(async (f: FeedFilter, silent = false) => {
 
     try {
       if (f === 'all') {
+        // Reset pagination — uniquement pour un vrai rechargement (1er montage, pull-to-
+        // refresh, changement de filtre). Un refresh silencieux (retour de focus) alors que
+        // l'utilisateur a déjà scrollé plus loin ne doit PAS réinitialiser la pagination —
+        // voir le early-return plus bas qui bloque ce cas avant de toucher aux items/refs.
+        if (!silent) {
+          feedPageRef.current = 1;
+          setHasMoreFeed(true);
+          adSlotIdxRef.current = 0;
+          seenAdIdsRef.current = [];
+        }
         // Charge moins en 4G/5G (hors wifi) pour limiter la conso data au premier écran
         const onWifi = networkService.isWifi();
         const feedLimit  = onWifi ? 30 : 15;
@@ -894,15 +921,12 @@ export const FeedScreen: React.FC = () => {
         }
 
         // Injecter suggestions, communities, pub et rangées de reels à intervalles réguliers
-        const SUGGEST_EVERY  = 8;
-        const COMM_EVERY     = 12;
         const REEL_ROW_EVERY = 5; // une rangée de reels toutes les 5 cartes
-        const AD_EVERY       = 8; // 1 pub toutes les 8 cartes
         const result: FeedItem[] = [];
         let suggestCount = 0;
         let commCount    = 0;
         let reelRowIdx   = 0;
-        let adCount      = 0;
+        const adSlotIds: string[] = [];
 
         nonReels.forEach((item, i) => {
           result.push(item);
@@ -919,10 +943,13 @@ export const FeedScreen: React.FC = () => {
             result.push({ kind: 'suggestions', id: `__suggestions__${suggestCount}`, data: null });
           }
 
-          // Publicité : une seule pub par feed, positionnée après la 8e carte
-          if (i === AD_EVERY - 1 && adCount === 0) {
-            adCount += 1;
-            result.push({ kind: 'ad', id: '__ad__1', data: null });
+          // Publicité : un emplacement toutes les AD_EVERY cartes — chaque slot recevra
+          // sa propre campagne (tirée séparément après coup, cf. fetchNextAd ci-dessous).
+          if (i === AD_EVERY - 1 || (i > AD_EVERY - 1 && (i - (AD_EVERY - 1)) % AD_EVERY === 0)) {
+            const slotId = `__ad__slot_${adSlotIdxRef.current}`;
+            adSlotIdxRef.current += 1;
+            adSlotIds.push(slotId);
+            result.push({ kind: 'ad', id: slotId, data: null });
           }
 
           // Communities : première à pos 10, puis toutes les COMM_EVERY
@@ -938,6 +965,23 @@ export const FeedScreen: React.FC = () => {
           reelRowIdx += 1;
         }
 
+        // En mode silent avec pagination déjà avancée (l'utilisateur a scrollé plus loin) :
+        // ne pas toucher aux items ni aux refs de pagination — un refresh silencieux de la
+        // page 1 ne doit jamais invalider les pages déjà chargées par loadMoreFeed.
+        if (silent && feedPageRef.current > 1) {
+          lastLoadedAtRef.current = Date.now();
+          return;
+        }
+
+        // Mémorise les clés composites (kind-id) chargées en page 1 pour dédupliquer
+        // les pages suivantes du scroll infini (loadMoreFeed)
+        seenItemIdsRef.current = new Set(result.map(i => `${i.kind}-${i.id}`));
+        // Continuité de l'espacement suggestions/communautés pour loadMoreFeed
+        nonReelCountRef.current = nonReels.length;
+        suggestCountRef.current = suggestCount;
+        commCountRef.current    = commCount;
+        trendingCommRef.current = commData;
+
         // En mode silent : ne remplacer les items que si le contenu a réellement changé
         // Evite le re-render + reset de scroll au retour sur l'écran
         if (silent) {
@@ -949,6 +993,8 @@ export const FeedScreen: React.FC = () => {
         } else {
           setItems(result);
         }
+        // Tire une campagne distincte pour chaque nouvel emplacement pub de cette page
+        if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
       } else if (f === 'following') {
         // Onglet Suivis — uniquement les posts des comptes suivis, triés par date
         const postsResult = await postService.getFeed(1, 50, true).catch(() => [] as Post[]);
@@ -982,7 +1028,7 @@ export const FeedScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [assignAdsToSlots]);
 
   // Recharge quand le filtre change
   // setLoading(true) uniquement si aucun item visible — évite le flash skeleton
@@ -993,6 +1039,104 @@ export const FeedScreen: React.FC = () => {
     if (itemsRef.current.length === 0) setLoading(true);
     load(filter);
   }, [filter]);
+
+  // Scroll infini — page suivante de posts + reels + événements/concerts (recherche),
+  // fusionnés et dédupliqués contre tout ce qui a déjà été chargé, ajoutés à la suite.
+  const loadMoreFeed = useCallback(async () => {
+    if (filter !== 'all') return; // pagination gérée uniquement pour le flux principal
+    if (loadingMoreRef.current || !hasMoreFeed) return;
+    loadingMoreRef.current = true;
+    setLoadingMoreFeed(true);
+
+    try {
+      const nextPage = feedPageRef.current + 1;
+      const onWifi = networkService.isWifi();
+      const feedLimit  = onWifi ? 30 : 15;
+      const reelsLimit = onWifi ? 20 : 10;
+      const postsLimit = onWifi ? 20 : 10;
+
+      const [feedResult, reelsResult, postsResult] = await Promise.all([
+        searchService.getFeed(nextPage, feedLimit).catch(() => ({ items: [] })),
+        reelService.getFeed({ page: nextPage, limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: nextPage })),
+        postService.getFeed(nextPage, postsLimit).catch(() => [] as Post[]),
+      ]);
+
+      const feedItems: FeedItem[] = (feedResult.items ?? [])
+        .filter((item: any) => item.kind !== 'reel' && item.id)
+        .map((item: any) => ({ kind: item.kind as 'event' | 'concert', id: item.id, data: item }));
+      const reelItems: FeedItem[] = (Array.isArray((reelsResult as any)?.items) ? (reelsResult as any).items : Array.isArray(reelsResult) ? reelsResult : [])
+        .filter((r: any) => r?.id)
+        .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
+      const postItems: FeedItem[] = (Array.isArray(postsResult) ? postsResult : [])
+        .filter((p: Post) => p.id)
+        .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
+
+      // Dédupliquer contre tout ce qui a déjà été affiché (page courante + précédentes)
+      const fresh = [...feedItems, ...reelItems, ...postItems].filter(item => {
+        const key = `${item.kind}-${item.id}`;
+        if (seenItemIdsRef.current.has(key)) return false;
+        seenItemIdsRef.current.add(key);
+        return true;
+      });
+
+      if (fresh.length === 0) {
+        setHasMoreFeed(false);
+      } else {
+        // Regrouper les reels de cette page en une rangée, injectée après le 1er post/event
+        // de la page (même logique de position que load('all') : première rangée à i===2)
+        const freshReels   = fresh.filter(i => i.kind === 'reel');
+        const freshNonReel = fresh.filter(i => i.kind !== 'reel');
+        const reelRow: FeedItem | null = freshReels.length > 0
+          ? { kind: 'reel_row', id: `__reel_row__page_${nextPage}`, data: freshReels.map(r => r.data).filter(Boolean) }
+          : null;
+
+        // Continue l'espacement suggestions/communautés exactement là où la page
+        // précédente (load('all') ou loadMoreFeed) s'est arrêtée.
+        const appended: FeedItem[] = [];
+        let reelRowInserted = false;
+        const commData = trendingCommRef.current;
+        const adSlotIds: string[] = [];
+        freshNonReel.forEach((item, localI) => {
+          const i = nonReelCountRef.current + localI; // index continu depuis le tout début du flux
+          appended.push(item);
+
+          if (!reelRowInserted && reelRow) {
+            appended.push(reelRow);
+            reelRowInserted = true;
+          }
+
+          if (i === 4 || (i > 4 && (i - 4) % SUGGEST_EVERY === 0)) {
+            suggestCountRef.current += 1;
+            appended.push({ kind: 'suggestions', id: `__suggestions__${suggestCountRef.current}`, data: null });
+          }
+
+          if (i === AD_EVERY - 1 || (i > AD_EVERY - 1 && (i - (AD_EVERY - 1)) % AD_EVERY === 0)) {
+            const slotId = `__ad__slot_${adSlotIdxRef.current}`;
+            adSlotIdxRef.current += 1;
+            adSlotIds.push(slotId);
+            appended.push({ kind: 'ad', id: slotId, data: null });
+          }
+
+          if (commData.length > 0 && (i === 9 || (i > 9 && (i - 9) % COMM_EVERY === 0))) {
+            commCountRef.current += 1;
+            appended.push({ kind: 'communities', id: `__communities__${commCountRef.current}`, data: commData });
+          }
+        });
+        // Si aucun post/event neuf mais des reels quand même, ajouter la rangée en fin
+        if (reelRow && !reelRowInserted) appended.push(reelRow);
+
+        nonReelCountRef.current += freshNonReel.length;
+        setItems(prev => [...prev, ...appended]);
+        feedPageRef.current = nextPage;
+        if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
+      }
+    } catch (err) {
+      if (__DEV__) console.warn('[FeedScreen] loadMoreFeed error:', err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMoreFeed(false);
+    }
+  }, [filter, hasMoreFeed, assignAdsToSlots]);
 
   // Près de toi — chargé dès que la position est disponible
   useEffect(() => {
@@ -1076,7 +1220,6 @@ export const FeedScreen: React.FC = () => {
         clearTimeout(timer);
         setFeedFocused(false);
         setActiveReelId(null);
-        setActivePostId(null);
         if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
         setSearchQuery('');
         setSearchResults(null);
@@ -1094,7 +1237,6 @@ export const FeedScreen: React.FC = () => {
     return () => {
       setFeedFocused(false);
       setActiveReelId(null);
-      setActivePostId(null);
       // Vider la recherche quand on quitte le tab
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       setSearchQuery('');
@@ -1294,10 +1436,14 @@ export const FeedScreen: React.FC = () => {
       );
     }
     if (item.kind === 'ad') {
-      if (!currentAdData) return null;
+      // item.id est le slotId (__ad__slot_N) — résolu vers la campagne qui lui a été
+      // attribuée par assignAdsToSlots. Reste null tant que le tirage n'a pas répondu.
+      const adId = adSlotMap[item.id];
+      const ad = adId ? adsById[adId] : null;
+      if (!ad) return null;
       return (
         <AdCard
-          ad={currentAdData}
+          ad={ad}
           colors={colors}
           isVisible={adVisible}
           onImpression={handleAdImpression}
@@ -1324,7 +1470,6 @@ export const FeedScreen: React.FC = () => {
           post={item.data as Post}
           colors={colors}
           currentUserId={currentUser?.id}
-          isActive={activePostId === item.id && feedFocused}
           onPress={() => (nav as any).navigate('PostDetail', { postId: item.id, initialPost: item.data })}
           onAuthorPress={() => {
             if (postAuthorId) (nav as any).navigate('UserProfile', { userId: postAuthorId });
@@ -1349,7 +1494,6 @@ export const FeedScreen: React.FC = () => {
         item={item}
         colors={colors}
         currentUserId={currentUser?.id}
-        isActive={activeCardId === item.id && feedFocused}
         isFollowing={!!aid && followingSet.has(aid)}
         onToggleFollow={() => { if (aid) handleToggleFollow(aid); }}
         onComment={(onCountChange, onCountLoaded) => { commentCountChangeRef.current = onCountChange; commentCountLoadedRef.current = onCountLoaded; openComments(item); }}
@@ -1361,7 +1505,7 @@ export const FeedScreen: React.FC = () => {
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, activeCardId, activePostId, feedFocused, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, sliceForBlock, suggestLoading, loadSuggestions]);
+  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, sliceForBlock, suggestLoading, loadSuggestions]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1479,56 +1623,9 @@ export const FeedScreen: React.FC = () => {
         </View>
 
 
-        {/* ── Tab bar + actions ─────────────────────────────────────────── */}
+        {/* ── Actions ────────────────────────────────────────────────────── */}
         {!searchOpen && (
-          <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, marginTop: 8, paddingBottom: 8 }}>
-            {/* Tab bar style Instagram — underline animée */}
-            <View style={{ flexDirection: 'row' }}>
-              {TABS.map((tab, idx) => {
-                const active = filter === tab.key;
-                return (
-                  <TouchableOpacity
-                    key={tab.key}
-                    onPress={() => {
-                      tabUnderlineX.value = withSpring(idx * TAB_W, { damping: 18, stiffness: 200 });
-                      setFilter(tab.key);
-                      setFilterDropOpen(false);
-                      load(tab.key);
-                    }}
-                    activeOpacity={0.7}
-                    style={{ flex: 1, alignItems: 'center', paddingVertical: 12 }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      {tab.key === 'live' && (
-                        <View style={{
-                          width: 7, height: 7, borderRadius: 4,
-                          backgroundColor: '#F0365A',
-                        }} />
-                      )}
-                      <Text style={{
-                        fontSize: 15,
-                        fontWeight: active ? '800' : '500',
-                        color: active ? colors.primary : colors.textTertiary,
-                        letterSpacing: 0.1,
-                      }}>
-                        {tab.label}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {/* Underline animée */}
-            <View style={{ height: 2, backgroundColor: 'transparent', marginTop: 4, marginBottom: 8 }}>
-              <Animated.View style={[{
-                position: 'absolute',
-                width: TAB_W,
-                height: 2,
-                borderRadius: 1,
-                backgroundColor: colors.primary,
-              }, tabUnderlineStyle]} />
-            </View>
-            {/* Actions */}
+          <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, marginTop: 8, paddingTop: 10, paddingBottom: 8 }}>
             <FeedHeaderBadges
               onMessages={goToMessages}
               onNotifs={goToNotifs}
@@ -1820,13 +1917,13 @@ export const FeedScreen: React.FC = () => {
                       <SrSection icon="users" label="Personnes" count={searchResults!.users!.length} accent="#7B3FF2" />
                       {searchResults!.users!.map((u: any, i: number) => (
                         <SrRow key={u.id} onPress={() => { closeSearch(); (nav as any).navigate('UserProfile', { userId: u.id }); }} last={i === searchResults!.users!.length - 1}>
-                          {u.avatar_url ? (
-                            <CachedImage uri={u.avatar_url} style={{ width: 52, height: 52, borderRadius: 26 }} />
-                          ) : (
-                            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#7B3FF2' + '20', alignItems: 'center', justifyContent: 'center' }}>
-                              <Text style={{ fontSize: 20, fontWeight: '800', color: '#7B3FF2' }}>{((u.display_name ?? u.username ?? '?')[0] ?? '?').toUpperCase()}</Text>
-                            </View>
-                          )}
+                          <AvatarWithBadge
+                            avatarUrl={u.avatar_url}
+                            initials={((u.display_name ?? u.username ?? '?')[0] ?? '?').toUpperCase()}
+                            size={52}
+                            accentColor="#7B3FF2"
+                            isLive={u.is_live}
+                          />
                           <View style={{ flex: 1 }}>
                             <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{u.display_name ?? u.username}</Text>
                             <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>@{u.username}</Text>
@@ -1956,17 +2053,24 @@ export const FeedScreen: React.FC = () => {
           ref={feedListRef}
           data={items}
           keyExtractor={item => `${item.kind}-${item.id}`}
-          extraData={currentAdData}
+          extraData={adSlotMap}
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           scrollEnabled={feedScrollEnabled}
           onViewableItemsChanged={onFeedViewableChanged}
           viewabilityConfig={feedViewabilityConfig}
           maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+          onEndReached={loadMoreFeed}
+          onEndReachedThreshold={0.6}
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
           )}
           ListHeaderComponent={feedListHeader}
+          ListFooterComponent={loadingMoreFeed ? (
+            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : null}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -3041,7 +3145,6 @@ interface FeedCardProps {
   colors:    AppColors;
   currentUserId?: string;
   isFollowing: boolean;
-  isActive:  boolean;
   onToggleFollow: () => void;
   onComment: (onCountChange: (delta: number) => void, onCountLoaded: (count: number) => void) => void;
   onPress:   () => void;
@@ -3222,14 +3325,7 @@ const cm = StyleSheet.create({
   actionSub:  { fontSize: 12, marginTop: 1 },
 });
 
-// Monté uniquement quand la carte est visible — joue dès le mount, pause quand invisible
-const CardVideo: React.FC<{ uri: string; playing: boolean }> = ({ uri, playing }) => {
-  const player = useVideoPlayer({ uri }, p => { p.loop = true; p.muted = true; });
-  useEffect(() => { if (playing) player.play(); else player.pause(); }, [playing]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" controls={false} surfaceType="texture" />;
-};
-
-const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, isActive, onToggleFollow, onComment, onPress, onAuthorPress, onHide }) => {
+const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, onToggleFollow, onComment, onPress, onAuthorPress, onHide }) => {
   const nav = useNavigation<Nav>();
   const isEvent  = item.kind === 'event';
   const isConcert = item.kind === 'concert';
@@ -3374,80 +3470,83 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   return (
     <View style={[fc.card, { backgroundColor: colors.surface }]}>
 
-      {/* ── Hero banner cliquable ────────────────────────────────────────── */}
-      <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={{ position: 'relative' }}>
-        <View style={{ height: BANNER_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
-          {videoUrl ? (
-            <CardVideo uri={videoUrl} playing={isActive} />
-          ) : thumbUrl ? (
+      {/* ── Hero banner — vidéo lue sur place, reste de la carte cliquable ── */}
+      <View style={{ height: BANNER_H, backgroundColor: '#0d0d1a', overflow: 'hidden', position: 'relative' }}>
+        {videoUrl ? (
+          <InlineVideoPlayer
+            uri={videoUrl}
+            thumbnailUri={thumbUrl}
+            aspectRatio={SW / BANNER_H}
+            borderRadius={0}
+            muted
+            autoPlay={false}
+            isActive={false}
+          />
+        ) : thumbUrl ? (
+          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
             <CachedImage uri={thumbUrl} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          ) : (
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
             <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name={cardIcon} size={60} color="rgba(255,255,255,0.18)" />
               </View>
             </LinearGradient>
-          )}
+          </TouchableOpacity>
+        )}
 
-          {/* Gradient bas */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
-            locations={[0.3, 0.65, 1]}
-            style={[StyleSheet.absoluteFill, { top: '20%' }]}
-            pointerEvents="none"
-          />
+        {/* Gradient bas */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
+          locations={[0.3, 0.65, 1]}
+          style={[StyleSheet.absoluteFill, { top: '20%' }]}
+          pointerEvents="none"
+        />
 
-          {/* Badges haut gauche */}
-          <View style={{ position: 'absolute', top: 12, left: 12, flexDirection: 'row', gap: 6 }}>
-            {isLive && (
-              <View style={fc.liveBadge}>
-                <View style={fc.liveDot} />
-                <Text style={fc.liveBadgeText}>LIVE</Text>
-              </View>
-            )}
-            {isFree && (
-              <View style={[fc.chipBadge, { backgroundColor: '#10B981EE' }]}>
-                <Text style={fc.chipBadgeText}>GRATUIT</Text>
-              </View>
-            )}
-            {!isFree && price != null && price > 0 && (
-              <View style={[fc.chipBadge, { backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }]}>
-                <Icon name="tag" size={9} color="#fff" />
-                <Text style={fc.chipBadgeText}>dès {price} €</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Badge type haut droite */}
-          <View style={[fc.typeBadge, { backgroundColor: accent + 'EE' }]}>
-            <Icon name={cardIcon} size={9} color="#fff" />
-            <Text style={fc.typeBadgeText}>{typeLabel}</Text>
-          </View>
-
-          {/* Muet si vidéo */}
-          {videoUrl && (
-            <View style={fc.mutedBadge}>
-              <Icon name="volume-x" size={10} color="#fff" />
+        {/* Badges haut gauche */}
+        <View style={{ position: 'absolute', top: 12, left: 12, flexDirection: 'row', gap: 6 }} pointerEvents="none">
+          {isLive && (
+            <View style={fc.liveBadge}>
+              <View style={fc.liveDot} />
+              <Text style={fc.liveBadgeText}>LIVE</Text>
             </View>
           )}
-
-          {/* Infos bas du hero */}
-          <View style={fc.heroBottom}>
-            <Text style={fc.heroTitle} numberOfLines={2}>{title}</Text>
-            <View style={fc.heroMeta}>
-              <Icon name="calendar" size={11} color="rgba(255,255,255,0.8)" />
-              <Text style={fc.heroMetaText}>{formatDate(date)}</Text>
-              {city ? (
-                <>
-                  <Text style={fc.heroMetaDot}>·</Text>
-                  <Icon name="map-pin" size={11} color="rgba(255,255,255,0.8)" />
-                  <Text style={fc.heroMetaText} numberOfLines={1}>{city}</Text>
-                </>
-              ) : null}
+          {isFree && (
+            <View style={[fc.chipBadge, { backgroundColor: '#10B981EE' }]}>
+              <Text style={fc.chipBadgeText}>GRATUIT</Text>
             </View>
-          </View>
+          )}
+          {!isFree && price != null && price > 0 && (
+            <View style={[fc.chipBadge, { backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }]}>
+              <Icon name="tag" size={9} color="#fff" />
+              <Text style={fc.chipBadgeText}>dès {price} €</Text>
+            </View>
+          )}
         </View>
-      </TouchableOpacity>
+
+        {/* Badge type haut droite */}
+        <View style={[fc.typeBadge, { backgroundColor: accent + 'EE' }]} pointerEvents="none">
+          <Icon name={cardIcon} size={9} color="#fff" />
+          <Text style={fc.typeBadgeText}>{typeLabel}</Text>
+        </View>
+
+        {/* Infos bas du hero — cliquable pour naviguer même sur une vidéo */}
+        <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={fc.heroBottom}>
+          <Text style={fc.heroTitle} numberOfLines={2}>{title}</Text>
+          <View style={fc.heroMeta}>
+            <Icon name="calendar" size={11} color="rgba(255,255,255,0.8)" />
+            <Text style={fc.heroMetaText}>{formatDate(date)}</Text>
+            {city ? (
+              <>
+                <Text style={fc.heroMetaDot}>·</Text>
+                <Icon name="map-pin" size={11} color="rgba(255,255,255,0.8)" />
+                <Text style={fc.heroMetaText} numberOfLines={1}>{city}</Text>
+              </>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {/* ── Header auteur ───────────────────────────────────────────────── */}
       <View style={fc.header}>
@@ -3459,6 +3558,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
             accentColor={accent}
             isVerified={!!author?.is_verified}
             isOnline={(author as any)?.is_online ?? undefined}
+            isLive={(author as any)?.is_live ?? undefined}
           />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[fc.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{authorName}</Text>
@@ -3609,7 +3709,6 @@ const fc = StyleSheet.create({
   chipBadgeText:  { fontSize: 9, fontWeight: '800', color: '#fff' },
   typeBadge:      { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   typeBadgeText:  { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  mutedBadge:     { position: 'absolute', bottom: 56, right: 12, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   heroBottom:     { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 },
   heroTitle:      { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: -0.3, lineHeight: 24, marginBottom: 6 },
   heroMeta:       { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },

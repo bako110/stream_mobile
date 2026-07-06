@@ -8,7 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
-import { AppHeader, SkeletonFeed } from '../../components/common';
+import { AppHeader, SkeletonFeed, AvatarWithBadge } from '../../components/common';
 import { eventService } from '../../services';
 import type { Event, EventType } from '../../types';
 import type { AppColors } from '../../theme/colors';
@@ -219,15 +219,13 @@ const EventCard: React.FC<EventCardProps> = ({ event, colors, onPress, onDelete 
         {/* Organisateur */}
         {event.organizer && (
           <View style={s.organizerRow}>
-            {event.organizer.avatar_url ? (
-              <Image source={{ uri: event.organizer.avatar_url }} style={s.organizerAvatar} />
-            ) : (
-              <View style={[s.organizerAvatarFallback, { backgroundColor: accent + '33' }]}>
-                <Text style={[s.organizerInitials, { color: accent }]}>
-                  {(event.organizer.display_name || event.organizer.username || '?')[0].toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <AvatarWithBadge
+              avatarUrl={event.organizer.avatar_url}
+              initials={(event.organizer.display_name || event.organizer.username || '?')[0].toUpperCase()}
+              size={24}
+              accentColor={accent}
+              isLive={(event.organizer as any)?.is_live}
+            />
             <Text style={[s.organizerName, { color: colors.textSecondary }]} numberOfLines={1}>
               {event.organizer.display_name || event.organizer.username || 'Organisateur'}
             </Text>

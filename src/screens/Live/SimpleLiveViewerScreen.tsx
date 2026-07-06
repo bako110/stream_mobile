@@ -558,7 +558,7 @@ const RoomContent: React.FC<{
     } catch {}
   }, [localParticipant]);
 
-  // Descendre de scène : couper cam + micro
+  // Descendre de scène : couper cam + micro, et notifier le serveur (host + web resynchronisés)
   const leaveStage = useCallback(async () => {
     try {
       await localParticipant.setCameraEnabled(false);
@@ -566,7 +566,8 @@ const RoomContent: React.FC<{
       setCamOn(false); setMicOn(false);
       setOnStage(false); setHandRaised(false);
     } catch {}
-  }, [localParticipant]);
+    try { await apiClient.post(Endpoints.lives.demote(liveId, myIdentity)); } catch {}
+  }, [localParticipant, liveId, myIdentity]);
 
   // Exposer les fonctions au parent via les refs
   useEffect(() => {
@@ -689,9 +690,15 @@ const RoomContent: React.FC<{
 
         <View style={{ flex: 1 }} />
 
-        {/* Viewers — tap pour voir la liste des participants */}
-        <TouchableOpacity style={st.viewerPill} onPress={() => setShowParticipants(true)} activeOpacity={0.75}>
-          <Icon name="eye" size={11} color="rgba(255,255,255,0.8)" />
+        {/* Participants — avatars des 3 derniers + total, tap = liste complète */}
+        <TouchableOpacity style={st.participantsPill} onPress={() => setShowParticipants(true)} activeOpacity={0.75}>
+          <View style={st.participantsStack}>
+            {roomParticipants.slice(-3).map((p, i) => (
+              <View key={p.identity} style={[st.participantAvatar, { marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }]}>
+                <Text style={st.participantAvatarText}>{(p.name || p.identity || '?')[0].toUpperCase()}</Text>
+              </View>
+            ))}
+          </View>
           <Text style={st.viewerCount}>{viewerCount}</Text>
         </TouchableOpacity>
 
@@ -1590,12 +1597,19 @@ const st = StyleSheet.create({
   },
   monetPillText: { color: '#F59E0B', fontSize: 9, fontWeight: '700' },
 
-  viewerPill: {
+  participantsPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12,
-    paddingHorizontal: 8, paddingVertical: 4,
+    paddingHorizontal: 6, paddingVertical: 3,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
+  participantsStack: { flexDirection: 'row', alignItems: 'center' },
+  participantAvatar: {
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#9B65F5', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#050010',
+  },
+  participantAvatarText: { color: '#fff', fontSize: 7, fontWeight: '800' },
   viewerCount: { color: '#fff', fontSize: 10, fontWeight: '800' },
   likeWrap:    { marginLeft: 0 },
 
@@ -1659,7 +1673,7 @@ const st = StyleSheet.create({
   inputWrap: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 22, paddingLeft: 14, paddingRight: 4,
+    borderRadius: 22, paddingLeft: 14, paddingRight: 8,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     minHeight: 38,
   },

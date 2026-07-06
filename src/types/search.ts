@@ -10,6 +10,7 @@ export interface SearchUser {
   last_name: string | null;
   avatar_url: string | null;
   bio: string | null;
+  is_live?: boolean;
 }
 
 export interface SearchResults {

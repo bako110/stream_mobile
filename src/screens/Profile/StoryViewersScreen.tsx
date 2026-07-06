@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  Image, StyleSheet, ActivityIndicator, Platform,
+  StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
+import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 import { storyService } from '../../services/storyService';
 import type { StoryViewerUser } from '../../types/story';
 
@@ -78,13 +78,13 @@ export const StoryViewersScreen: React.FC = () => {
                 onPress={() => nav.navigate('UserProfile', { userId: v.id })}
                 activeOpacity={0.7}
               >
-                {v.avatar_url ? (
-                  <Image source={{ uri: v.avatar_url }} style={s.avatar} />
-                ) : (
-                  <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.avatarFallback}>
-                    <Text style={s.avatarInitial}>{name[0].toUpperCase()}</Text>
-                  </LinearGradient>
-                )}
+                <AvatarWithBadge
+                  avatarUrl={v.avatar_url}
+                  initials={name[0].toUpperCase()}
+                  size={44}
+                  accentColor="#7B3FF2"
+                  isLive={v.is_live}
+                />
                 <View style={{ flex: 1 }}>
                   <Text style={[s.name, { color: colors.textPrimary }]}>{name}</Text>
                   {v.username && (
@@ -117,9 +117,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  avatar:        { width: 46, height: 46, borderRadius: 23 },
-  avatarFallback:{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: '#fff', fontSize: 17, fontWeight: '700' },
   name:          { fontSize: 15, fontWeight: '600' },
   username:      { fontSize: 12, marginTop: 2 },
   time:          { fontSize: 12 },

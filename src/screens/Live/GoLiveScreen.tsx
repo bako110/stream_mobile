@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, StyleSheet,
   StatusBar, Platform, Alert, ActivityIndicator, Animated,
-  ScrollView, Modal, FlatList,
+  ScrollView, Modal, FlatList, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -10,8 +10,10 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
+import { useUser } from '../../context/UserContext';
+import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 import { liveService } from '../../services/liveService';
-import type { MonetizationType } from '../../services/liveService';
+import type { MonetizationType, LiveStream } from '../../services/liveService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -25,9 +27,16 @@ interface GiftType {
   gogold_cost: number;
 }
 
+function formatViewers(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
+  return String(n ?? 0);
+}
+
 export const GoLiveScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const { currentUser } = useUser();
   const nav = useNavigation<Nav>();
 
   // Form
@@ -49,9 +58,41 @@ export const GoLiveScreen: React.FC = () => {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Découvrir les lives — pagination réelle, triée par audience côté backend
+  const [discoverLives,     setDiscoverLives]     = useState<LiveStream[]>([]);
+  const [discoverLoading,   setDiscoverLoading]   = useState(true);
+  const [discoverPage,      setDiscoverPage]      = useState(1);
+  const [discoverHasMore,   setDiscoverHasMore]   = useState(false);
+  const [discoverLoadingMore, setDiscoverLoadingMore] = useState(false);
+
   useEffect(() => {
     liveService.stopAllMine().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    liveService.getLivesPage(1)
+      .then(res => {
+        setDiscoverLives(res.items);
+        setDiscoverPage(1);
+        setDiscoverHasMore(res.has_more);
+      })
+      .catch(() => {})
+      .finally(() => setDiscoverLoading(false));
+  }, []);
+
+  const loadMoreLives = () => {
+    if (discoverLoadingMore || !discoverHasMore) return;
+    setDiscoverLoadingMore(true);
+    const nextPage = discoverPage + 1;
+    liveService.getLivesPage(nextPage)
+      .then(res => {
+        setDiscoverLives(prev => [...prev, ...res.items]);
+        setDiscoverPage(nextPage);
+        setDiscoverHasMore(res.has_more);
+      })
+      .catch(() => {})
+      .finally(() => setDiscoverLoadingMore(false));
+  };
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -149,6 +190,12 @@ export const GoLiveScreen: React.FC = () => {
         contentContainerStyle={st.body}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+          if (distanceFromBottom < 300) loadMoreLives();
+        }}
+        scrollEventThrottle={200}
       >
         {/* ── Carte principale ─────────────────────────────────────────── */}
         <View style={[st.mainCard, { backgroundColor: colors.surface, borderColor: '#F0365A40' }]}>
@@ -161,9 +208,18 @@ export const GoLiveScreen: React.FC = () => {
           {/* Icône + labels */}
           <View style={st.cardTop}>
             <Animated.View style={[st.liveIconWrap, { transform: [{ scale: pulseAnim }] }]}>
-              <LinearGradient colors={['#F0365A', '#E0389A']} style={st.liveIconGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                <Icon name="radio" size={28} color="#fff" />
-              </LinearGradient>
+              {currentUser?.avatar_url ? (
+                <View style={st.liveIconGrad}>
+                  <Image source={{ uri: currentUser.avatar_url }} style={StyleSheet.absoluteFill} />
+                  <View style={st.liveIconOverlay}>
+                    <Icon name="radio" size={15} color="#fff" />
+                  </View>
+                </View>
+              ) : (
+                <LinearGradient colors={['#F0365A', '#E0389A']} style={st.liveIconGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <Icon name="radio" size={15} color="#fff" />
+                </LinearGradient>
+              )}
             </Animated.View>
             <View style={st.cardLabels}>
               <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Live spontané</Text>
@@ -182,9 +238,9 @@ export const GoLiveScreen: React.FC = () => {
               onPress={() => setShowMeta(v => !v)}
               activeOpacity={0.8}
             >
-              <MCIcon name="text-box-outline" size={16} color={showMeta ? '#3B82F6' : colors.textSecondary} />
+              <MCIcon name="text-box-outline" size={11} color={showMeta ? '#3B82F6' : colors.textSecondary} />
               <Text style={[st.optionBtnText, { color: showMeta ? '#3B82F6' : colors.textSecondary }]}>Métadonnées</Text>
-              <MCIcon name={showMeta ? 'chevron-up' : 'chevron-down'} size={14} color={showMeta ? '#3B82F6' : colors.textTertiary} />
+              <MCIcon name={showMeta ? 'chevron-up' : 'chevron-down'} size={11} color={showMeta ? '#3B82F6' : colors.textTertiary} />
             </TouchableOpacity>
 
             {/* Monétiser */}
@@ -193,13 +249,13 @@ export const GoLiveScreen: React.FC = () => {
               onPress={openMonetModal}
               activeOpacity={0.8}
             >
-              <MCIcon name="currency-usd" size={16} color={isMonetized ? '#F59E0B' : colors.textSecondary} />
+              <MCIcon name="currency-usd" size={11} color={isMonetized ? '#F59E0B' : colors.textSecondary} />
               <Text style={[st.optionBtnText, { color: isMonetized ? '#F59E0B' : colors.textSecondary }]} numberOfLines={1}>
                 {isMonetized ? monetLabel() : 'Monétiser'}
               </Text>
               {isMonetized && (
                 <TouchableOpacity onPress={cancelMonetisation} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <MCIcon name="close-circle" size={14} color="#F59E0B" />
+                  <MCIcon name="close-circle" size={11} color="#F59E0B" />
                 </TouchableOpacity>
               )}
             </TouchableOpacity>
@@ -209,7 +265,7 @@ export const GoLiveScreen: React.FC = () => {
           {showMeta && (
             <View style={[st.metaBox, { borderTopColor: colors.divider }]}>
               <View style={[st.inputWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                <Icon name="type" size={15} color={colors.textTertiary} style={st.inputIcon} />
+                <Icon name="type" size={12} color={colors.textTertiary} style={st.inputIcon} />
                 <TextInput
                   value={title}
                   onChangeText={setTitle}
@@ -220,7 +276,7 @@ export const GoLiveScreen: React.FC = () => {
                 />
               </View>
               <View style={[st.inputWrap, st.inputWrapMulti, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                <Icon name="align-left" size={15} color={colors.textTertiary} style={[st.inputIcon, { marginTop: 2 }]} />
+                <Icon name="align-left" size={12} color={colors.textTertiary} style={[st.inputIcon, { marginTop: 2 }]} />
                 <TextInput
                   value={description}
                   onChangeText={setDescription}
@@ -242,12 +298,12 @@ export const GoLiveScreen: React.FC = () => {
               onPress={() => setIsPrivate(false)}
               activeOpacity={0.8}
             >
-              <MCIcon name="earth" size={18} color={!isPrivate ? '#10B981' : colors.textTertiary} />
+              <MCIcon name="earth" size={12} color={!isPrivate ? '#10B981' : colors.textTertiary} />
               <View style={{ flex: 1 }}>
                 <Text style={[st.privacyLabel, { color: !isPrivate ? '#10B981' : colors.textSecondary }]}>Public</Text>
                 <Text style={[st.privacySub,   { color: colors.textTertiary }]}>Tout le monde peut voir</Text>
               </View>
-              {!isPrivate && <MCIcon name="check-circle" size={18} color="#10B981" />}
+              {!isPrivate && <MCIcon name="check-circle" size={12} color="#10B981" />}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -255,12 +311,12 @@ export const GoLiveScreen: React.FC = () => {
               onPress={() => setIsPrivate(true)}
               activeOpacity={0.8}
             >
-              <MCIcon name="lock" size={18} color={isPrivate ? '#7B3FF2' : colors.textTertiary} />
+              <MCIcon name="lock" size={12} color={isPrivate ? '#7B3FF2' : colors.textTertiary} />
               <View style={{ flex: 1 }}>
                 <Text style={[st.privacyLabel, { color: isPrivate ? '#7B3FF2' : colors.textSecondary }]}>Abonnés seulement</Text>
                 <Text style={[st.privacySub,   { color: colors.textTertiary }]}>Uniquement tes abonnés</Text>
               </View>
-              {isPrivate && <MCIcon name="check-circle" size={18} color="#7B3FF2" />}
+              {isPrivate && <MCIcon name="check-circle" size={12} color="#7B3FF2" />}
             </TouchableOpacity>
           </View>
 
@@ -304,17 +360,94 @@ export const GoLiveScreen: React.FC = () => {
           <LinearGradient colors={['#7B3FF218', '#9B65F50C']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
           <View style={st.concertInner}>
             <LinearGradient colors={['#7B3FF2', '#9B65F5']} style={st.concertIconGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-              <Icon name="music" size={22} color="#fff" />
+              <Icon name="music" size={13} color="#fff" />
             </LinearGradient>
             <View style={st.concertLabels}>
               <Text style={[st.concertTitle, { color: colors.textPrimary }]}>Concert live</Text>
               <Text style={[st.concertSub,   { color: colors.textSecondary }]}>Programme, vends des billets et diffuse</Text>
             </View>
             <View style={[st.arrowWrap, { backgroundColor: colors.backgroundSecondary }]}>
-              <Icon name="arrow-right" size={16} color={colors.textSecondary} />
+              <Icon name="arrow-right" size={12} color={colors.textSecondary} />
             </View>
           </View>
         </TouchableOpacity>
+
+        {/* ── Découvrir les lives ─────────────────────────────────────── */}
+        {(discoverLoading || discoverLives.length > 0) && (
+          <View style={st.discoverSection}>
+            <View style={st.discoverHeader}>
+              <Text style={[st.discoverTitle, { color: colors.textPrimary }]}>Découvrir les lives</Text>
+            </View>
+
+            {discoverLoading ? (
+              <ActivityIndicator color="#F0365A" style={{ marginTop: 20 }} />
+            ) : (
+              <View style={st.discoverGrid}>
+                {discoverLives.map(live => (
+                  <View key={live.id} style={st.discoverCard}>
+                  <TouchableOpacity
+                    style={[st.discoverCardInner, { backgroundColor: colors.surface }]}
+                    activeOpacity={0.88}
+                    onPress={() => nav.navigate('SimpleLiveViewer', { liveId: live.id })}
+                  >
+                    {live.thumbnail_url ? (
+                      <Image source={{ uri: live.thumbnail_url }} style={st.discoverThumb} />
+                    ) : live.user?.avatar_url ? (
+                      <>
+                        <Image source={{ uri: live.user.avatar_url }} style={[st.discoverThumb, st.discoverThumbBlurBg]} blurRadius={18} />
+                        <View style={st.discoverThumbAvatarCenterWrap}>
+                          <AvatarWithBadge
+                            avatarUrl={live.user.avatar_url}
+                            initials={(live.user?.display_name || live.user?.username || '?')[0].toUpperCase()}
+                            size={52}
+                            accentColor="#7B3FF2"
+                            isLive
+                          />
+                        </View>
+                      </>
+                    ) : (
+                      <LinearGradient colors={['#7B3FF2', '#F0365A']} style={st.discoverThumb} />
+                    )}
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.75)']}
+                      style={st.discoverThumbGrad}
+                    />
+
+                    <View style={st.discoverLiveBadge}>
+                      <View style={st.discoverLiveDot} />
+                      <Text style={st.discoverLiveBadgeText}>LIVE</Text>
+                    </View>
+                    <View style={st.discoverViewerBadge}>
+                      <Icon name="eye" size={10} color="#fff" />
+                      <Text style={st.discoverViewerText}>{formatViewers(live.current_viewers)}</Text>
+                    </View>
+
+                    <View style={st.discoverCardBottom}>
+                      <Text style={st.discoverCardTitle} numberOfLines={1}>{live.title}</Text>
+                      <View style={st.discoverAuthorRow}>
+                        <AvatarWithBadge
+                          avatarUrl={live.user?.avatar_url}
+                          initials={(live.user?.display_name || live.user?.username || '?')[0].toUpperCase()}
+                          size={20}
+                          accentColor="#7B3FF2"
+                          isLive
+                        />
+                        <Text style={st.discoverAuthorName} numberOfLines={1}>
+                          {live.user?.display_name || live.user?.username || 'Utilisateur'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {discoverLoadingMore && (
+              <ActivityIndicator color="#F0365A" style={{ marginTop: 14 }} />
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* ── Modal Monétisation ──────────────────────────────────────────── */}
@@ -439,74 +572,113 @@ const st = StyleSheet.create({
   backBtn:     { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '800' },
 
-  body: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40, gap: 16 },
+  body: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 32, gap: 8 },
 
   // ── Main card ──────────────────────────────────────────────────────────────
-  mainCard: { borderRadius: 24, borderWidth: 1.5, overflow: 'hidden', padding: 20 },
-  cardTop:  { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  mainCard: { borderRadius: 14, borderWidth: 1.5, overflow: 'hidden', padding: 10 },
+  cardTop:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   liveIconWrap: { flexShrink: 0 },
-  liveIconGrad: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  liveIconGrad: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  liveIconOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(240,54,90,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   cardLabels:   { flex: 1 },
-  cardTitle:    { fontSize: 18, fontWeight: '800', marginBottom: 4 },
-  cardSub:      { fontSize: 13, lineHeight: 18 },
+  cardTitle:    { fontSize: 13, fontWeight: '800', marginBottom: 1 },
+  cardSub:      { fontSize: 10, lineHeight: 13 },
 
   // ── Boutons Métadonnées / Monétiser ────────────────────────────────────────
-  optionRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  optionRow: { flexDirection: 'row', gap: 5, marginBottom: 2 },
   optionBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 12, borderWidth: 1.5,
-    paddingHorizontal: 10, paddingVertical: 9,
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: 8, borderWidth: 1.5,
+    paddingHorizontal: 7, paddingVertical: 5,
   },
-  optionBtnText: { flex: 1, fontSize: 12, fontWeight: '600' },
+  optionBtnText: { flex: 1, fontSize: 10, fontWeight: '600' },
 
   // ── Métadonnées collapsibles ───────────────────────────────────────────────
-  metaBox: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, gap: 8, marginTop: 8 },
+  metaBox: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 5, marginTop: 5 },
   inputWrap: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 14, borderWidth: 1,
-    paddingHorizontal: 14, minHeight: 48,
+    borderRadius: 10, borderWidth: 1,
+    paddingHorizontal: 10, minHeight: 34,
   },
-  inputWrapMulti: { alignItems: 'flex-start', paddingVertical: 10 },
-  inputIcon:      { marginRight: 10 },
-  input:          { flex: 1, fontSize: 14 },
-  inputMulti:     { minHeight: 60, textAlignVertical: 'top' },
+  inputWrapMulti: { alignItems: 'flex-start', paddingVertical: 6 },
+  inputIcon:      { marginRight: 7 },
+  input:          { flex: 1, fontSize: 12 },
+  inputMulti:     { minHeight: 40, textAlignVertical: 'top' },
 
   // ── Visibilité ─────────────────────────────────────────────────────────────
-  privacyRow:      { gap: 8 },
+  privacyRow:      { gap: 5 },
   privacyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 14, borderWidth: 1.5, borderColor: 'transparent',
-    paddingHorizontal: 14, paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 10, borderWidth: 1.5, borderColor: 'transparent',
+    paddingHorizontal: 10, paddingVertical: 7,
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   privacyBtnActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
-  privacyLabel:     { fontSize: 13, fontWeight: '700' },
-  privacySub:       { fontSize: 11, marginTop: 1 },
+  privacyLabel:     { fontSize: 11, fontWeight: '700' },
+  privacySub:       { fontSize: 9, marginTop: 1 },
 
   // ── Badge monétisation ─────────────────────────────────────────────────────
   monetBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#F59E0B18', borderRadius: 10, borderWidth: 1, borderColor: '#F59E0B44',
-    paddingHorizontal: 12, paddingVertical: 7, marginTop: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#F59E0B18', borderRadius: 8, borderWidth: 1, borderColor: '#F59E0B44',
+    paddingHorizontal: 8, paddingVertical: 5, marginTop: 6,
   },
-  monetBadgeText: { color: '#F59E0B', fontSize: 12, fontWeight: '600', flex: 1 },
+  monetBadgeText: { color: '#F59E0B', fontSize: 10, fontWeight: '600', flex: 1 },
 
   // ── Go Live btn ────────────────────────────────────────────────────────────
   goBtn: {
-    borderRadius: 26, height: 54,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    borderRadius: 16, height: 36,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
-  liveDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff', opacity: 0.9 },
-  goBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', opacity: 0.9 },
+  goBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.2 },
 
   // ── Concert card ───────────────────────────────────────────────────────────
-  concertCard: { borderRadius: 20, borderWidth: 1.5, overflow: 'hidden', padding: 18 },
-  concertInner: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  concertIconGrad: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  concertCard: { borderRadius: 12, borderWidth: 1.5, overflow: 'hidden', padding: 9 },
+  concertInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  concertIconGrad: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   concertLabels: { flex: 1 },
-  concertTitle:  { fontSize: 16, fontWeight: '700', marginBottom: 3 },
-  concertSub:    { fontSize: 13, lineHeight: 17 },
-  arrowWrap:     { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  concertTitle:  { fontSize: 12, fontWeight: '700', marginBottom: 1 },
+  concertSub:    { fontSize: 10, lineHeight: 12 },
+  arrowWrap:     { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+
+  // ── Découvrir les lives ──────────────────────────────────────────────────────
+  discoverSection: { marginTop: 4 },
+  discoverHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  discoverTitle:   { fontSize: 17, fontWeight: '800' },
+  discoverGrid:    { flexDirection: 'row', flexWrap: 'wrap' },
+  discoverCard:      { width: '50%', padding: 5 },
+  discoverCardInner: { aspectRatio: 0.82, borderRadius: 16, overflow: 'hidden' },
+  discoverThumb:     StyleSheet.absoluteFill,
+  discoverThumbBlurBg: { opacity: 0.55 },
+  discoverThumbAvatarCenterWrap: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  discoverThumbGrad: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
+  discoverLiveBadge: {
+    position: 'absolute', top: 8, left: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#F0365A', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 3,
+  },
+  discoverLiveDot:      { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
+  discoverLiveBadgeText:{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  discoverViewerBadge: {
+    position: 'absolute', top: 8, right: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 3,
+  },
+  discoverViewerText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  discoverCardBottom: { position: 'absolute', left: 10, right: 10, bottom: 10, gap: 6 },
+  discoverCardTitle:  { color: '#fff', fontSize: 13, fontWeight: '700' },
+  discoverAuthorRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  discoverAuthorName: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600', flexShrink: 1 },
 
   // ── Modal monétisation ─────────────────────────────────────────────────────
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },

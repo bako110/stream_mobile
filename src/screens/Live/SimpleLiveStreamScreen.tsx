@@ -869,9 +869,15 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
 
         <View style={{ flex: 1 }} />
 
-        {/* Viewers — tap pour voir la liste des participants */}
-        <TouchableOpacity style={st.viewerPill} onPress={() => setShowParticipants(true)} activeOpacity={0.75}>
-          <Icon name="eye" size={11} color="rgba(255,255,255,0.8)" />
+        {/* Participants — avatars des 3 derniers + total, tap = liste complète */}
+        <TouchableOpacity style={st.participantsPill} onPress={() => setShowParticipants(true)} activeOpacity={0.75}>
+          <View style={st.participantsStack}>
+            {allParticipants.slice(-3).map((p, i) => (
+              <View key={p.identity} style={[st.participantAvatar, { marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }]}>
+                <Text style={st.participantAvatarText}>{(p.name || p.identity || '?')[0].toUpperCase()}</Text>
+              </View>
+            ))}
+          </View>
           <Text style={st.viewerCount}>{viewerCount}</Text>
         </TouchableOpacity>
 
@@ -1052,15 +1058,13 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
                 )}
               </View>
             ) : (
-              <View style={st.chatPillRow}>
-                <TouchableOpacity style={st.chatPill} onPress={() => setShowInput(true)} activeOpacity={0.8}>
-                  <Icon name="message-circle" size={14} color="rgba(255,255,255,0.5)" />
-                  <Text style={st.chatPillText}>Commenter...</Text>
-                </TouchableOpacity>
+              <TouchableOpacity style={st.chatPill} onPress={() => setShowInput(true)} activeOpacity={0.8}>
+                <Icon name="message-circle" size={14} color="rgba(255,255,255,0.5)" />
+                <Text style={st.chatPillText}>Commenter...</Text>
                 <View style={[st.inputEmojiWrap, { zIndex: 30, overflow: 'visible' }]}>
                   <LiveReactionPicker onReact={(emoji) => { spawn(emoji); handleReact(emoji); }} compact />
                 </View>
-              </View>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -1367,12 +1371,19 @@ const st = StyleSheet.create({
   },
   privateText: { color: '#fff', fontWeight: '700', fontSize: 10 },
 
-  viewerPill: {
+  participantsPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12,
-    paddingHorizontal: 8, paddingVertical: 4,
+    paddingHorizontal: 6, paddingVertical: 3,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
+  participantsStack: { flexDirection: 'row', alignItems: 'center' },
+  participantAvatar: {
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#9B65F5', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#050010',
+  },
+  participantAvatarText: { color: '#fff', fontSize: 7, fontWeight: '800' },
   viewerCount: { color: '#fff', fontSize: 10, fontWeight: '800' },
   likeWrap:    { marginLeft: 0, marginRight: 2 },
   moreBtn: {
@@ -1482,7 +1493,6 @@ const st = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
   },
-  chatPillRow: { flexDirection: 'row', alignItems: 'center' },
   chatPill: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(255,255,255,0.1)',

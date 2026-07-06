@@ -30,6 +30,7 @@ import { LikersBottomSheet } from './LikersBottomSheet';
 import { FriendsWhoLiked } from './FriendsWhoLiked';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { CachedImage } from './CachedImage';
+import { AvatarWithBadge } from './AvatarWithBadge';
 
 const { width: SW } = Dimensions.get('window');
 const GAP    = 2;
@@ -176,7 +177,7 @@ const VideoFsModal: React.FC<{
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface PostCardProps {
-  post: Post; colors: AppColors; currentUserId?: string; isActive?: boolean;
+  post: Post; colors: AppColors; currentUserId?: string;
   onPress: () => void; onAuthorPress?: () => void; onProfilePress?: (userId: string) => void;
   onDelete?: (postId: string) => void; onToggleFollow?: () => void;
   isFollowing?: boolean; onHide?: () => void;
@@ -184,7 +185,7 @@ interface PostCardProps {
 
 // ── PostCard ──────────────────────────────────────────────────────────────────
 const PostCardInner: React.FC<PostCardProps> = ({
-  post, colors, currentUserId, isActive = false, onPress, onAuthorPress, onProfilePress,
+  post, colors, currentUserId, onPress, onAuthorPress, onProfilePress,
   onDelete, onToggleFollow, isFollowing = false, onHide,
 }) => {
   const nav    = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -284,77 +285,88 @@ const PostCardInner: React.FC<PostCardProps> = ({
   return (
     <View style={[pc.card, { backgroundColor: colors.surface }]}>
 
-      {/* ── Hero media cliquable (comme FeedCard événement) ─────────────────── */}
+      {/* ── Hero media (vidéo = lecture sur place ; image = cliquable vers le détail) ── */}
       {hasMedia && (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={{ position: 'relative' }}>
-          <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
-            {(post.hls_url ?? post.video_url) && images.length === 0 ? (
-              <InlineVideoPlayer
-                uri={(post.hls_url ?? post.video_url)!}
-                thumbnailUri={post.thumbnail_url}
-                aspectRatio={videoAspectRatio}
-                borderRadius={0}
-                muted
-                isActive={isActive}
-              />
-            ) : images.length === 1 ? (
-              <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-            ) : (
-              <ImageGrid
-                urls={images}
-                onPressImage={i => nav.navigate('ImageGallery', { urls: images, initialIndex: i })}
-              />
-            )}
-
-            {/* Dégradé bas pour lire le texte overlay */}
-            {images.length === 1 && (
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.85)']}
-                locations={[0.35, 0.7, 1]}
-                style={[StyleSheet.absoluteFill, { top: '20%' }]}
-                pointerEvents="none"
-              />
-            )}
-
-            {/* Feeling badge haut gauche */}
+        (post.hls_url ?? post.video_url) && images.length === 0 ? (
+          <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden', position: 'relative' }}>
+            <InlineVideoPlayer
+              uri={(post.hls_url ?? post.video_url)!}
+              thumbnailUri={post.thumbnail_url}
+              aspectRatio={videoAspectRatio}
+              borderRadius={0}
+              muted
+              autoPlay={false}
+              isActive={false}
+            />
             {post.feeling && (
               <View style={{ position: 'absolute', top: 12, left: 12,
                 backgroundColor: colors.primary + 'DD', borderRadius: 8,
-                paddingHorizontal: 8, paddingVertical: 4 }}>
+                paddingHorizontal: 8, paddingVertical: 4 }}
+                pointerEvents="none">
                 <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>
                   {post.feeling.toUpperCase()}
                 </Text>
               </View>
             )}
-
-
-            {/* Corps du post en overlay bas (si 1 image) */}
-            {images.length === 1 && post.body ? (
-              <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff', lineHeight: 20 }} numberOfLines={2}>
-                  {post.body}
-                </Text>
-              </View>
-            ) : null}
           </View>
-        </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={{ position: 'relative' }}>
+            <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
+              {images.length === 1 ? (
+                <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <ImageGrid
+                  urls={images}
+                  onPressImage={i => nav.navigate('ImageGallery', { urls: images, initialIndex: i })}
+                />
+              )}
+
+              {/* Dégradé bas pour lire le texte overlay */}
+              {images.length === 1 && (
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.85)']}
+                  locations={[0.35, 0.7, 1]}
+                  style={[StyleSheet.absoluteFill, { top: '20%' }]}
+                  pointerEvents="none"
+                />
+              )}
+
+              {/* Feeling badge haut gauche */}
+              {post.feeling && (
+                <View style={{ position: 'absolute', top: 12, left: 12,
+                  backgroundColor: colors.primary + 'DD', borderRadius: 8,
+                  paddingHorizontal: 8, paddingVertical: 4 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>
+                    {post.feeling.toUpperCase()}
+                  </Text>
+                </View>
+              )}
+
+              {/* Corps du post en overlay bas (si 1 image) */}
+              {images.length === 1 && post.body ? (
+                <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff', lineHeight: 20 }} numberOfLines={2}>
+                    {post.body}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        )
       )}
 
       {/* ── Header auteur (sous le media, comme FeedCard) ───────────────────── */}
       <View style={pc.header}>
         <TouchableOpacity style={pc.headerLeft} activeOpacity={0.75} onPress={onAuthorPress}>
-          <View style={pc.avatarWrap}>
-            {author?.avatar_url ? (
-              <CachedImage uri={author.avatar_url} style={pc.avatar} />
-            ) : (
-              <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={pc.avatar}>
-                <Text style={[pc.avatarText, { fontSize: 15 }]}>{initials}</Text>
-              </LinearGradient>
-            )}
-            {author?.is_online != null && (
-              <View style={[pc.onlineDot, { backgroundColor: author.is_online ? '#22C55E' : '#92400E' }]} />
-            )}
-          </View>
+          <AvatarWithBadge
+            avatarUrl={author?.avatar_url}
+            initials={initials}
+            size={40}
+            accentColor={colors.primary}
+            isOnline={author?.is_online}
+            isLive={author?.is_live}
+            style={pc.avatarWrap}
+          />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Text style={[pc.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
@@ -669,10 +681,7 @@ const pc = StyleSheet.create({
   // Header
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   headerLeft:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarWrap:   { width: 44, height: 44, overflow: 'visible' },
-  avatar:       { width: 42, height: 42, borderRadius: 21, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  avatarText:   { color: '#fff', fontWeight: '800' },
-  onlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#fff', zIndex: 10 },
+  avatarWrap:   { overflow: 'visible' },
   authorName:   { fontSize: 14, fontWeight: '700', letterSpacing: -0.1 },
   time:         { fontSize: 11, fontWeight: '500' },
   dot:          { width: 3, height: 3, borderRadius: 1.5 },

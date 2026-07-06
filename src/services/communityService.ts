@@ -48,6 +48,7 @@ export interface CommunityMemberData {
   avatar_url: string | null;
   role: string;
   joined_at: string | null;
+  is_live?: boolean;
 }
 
 export interface CreateCommunityPayload {

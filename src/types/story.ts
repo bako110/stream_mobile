@@ -73,4 +73,5 @@ export interface StoryViewerUser {
   display_name: string | null;
   avatar_url: string | null;
   viewed_at: string;
+  is_live?: boolean;
 }

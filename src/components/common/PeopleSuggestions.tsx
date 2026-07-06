@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Image, Dimensions, ScrollView,
+  ActivityIndicator, Dimensions, ScrollView, Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/userService';
+import { liveService } from '../../services/liveService';
 import { useWs } from '../../context/WebSocketContext';
 import { VerifiedBadge } from './VerifiedBadge';
+import { AvatarWithBadge } from './AvatarWithBadge';
 import type { UserPublic } from '../../types';
 
 const { width: SW } = Dimensions.get('window');
@@ -30,7 +33,27 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
   const { theme } = useTheme();
   const { colors } = theme;
   const { liveUserIds } = useWs();
+  const nav = useNavigation<any>();
   const [itemState, setItemState] = useState<ItemState>({});
+  const [joiningLiveId, setJoiningLiveId] = useState<string | null>(null);
+
+  const joinUserLive = useCallback(async (userId: string) => {
+    if (joiningLiveId) return;
+    setJoiningLiveId(userId);
+    try {
+      const lives = await liveService.getLives();
+      const live = lives.find(l => String(l.user_id) === String(userId));
+      if (live) {
+        nav.navigate('SimpleLiveViewer', { liveId: live.id });
+      } else {
+        Alert.alert('Live introuvable', 'Ce live n\'est plus disponible.');
+      }
+    } catch {
+      Alert.alert('Erreur', 'Impossible de rejoindre le live pour le moment.');
+    } finally {
+      setJoiningLiveId(null);
+    }
+  }, [joiningLiveId, nav]);
 
   const handleFollow = async (userId: string) => {
     setItemState(s => ({ ...s, [userId]: 'loading' }));
@@ -115,48 +138,30 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
 
                   {/* Avatar chevauchant */}
                   <View style={{ alignSelf: 'center', marginTop: -(AVATAR_SZ / 2) }}>
-                    {(item.is_live || liveUserIds.has(item.id)) ? (
-                      <LinearGradient
-                        colors={['#F0365A', '#E0389A', '#7B3FF2']}
-                        style={[st.liveRing, { padding: 2.5 }]}
-                      >
-                        <TouchableOpacity
-                          style={[st.avatarWrap, { borderColor: colors.background, borderWidth: 0 }]}
-                          onPress={() => onUserPress(item.id)}
-                          activeOpacity={0.9}
-                        >
-                          {item.avatar_url ? (
-                            <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
-                          ) : (
-                            <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={st.avatarImg}>
-                              <Text style={st.initial}>{initials}</Text>
-                            </LinearGradient>
-                          )}
-                        </TouchableOpacity>
-                        <View style={st.liveBadge}>
-                          <Text style={st.liveBadgeText}>LIVE</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const isLive = item.is_live || liveUserIds.has(item.id);
+                        if (isLive) joinUserLive(item.id);
+                        else onUserPress(item.id);
+                      }}
+                      activeOpacity={0.9}
+                      disabled={joiningLiveId === item.id}
+                    >
+                      <AvatarWithBadge
+                        avatarUrl={item.avatar_url}
+                        initials={initials}
+                        size={AVATAR_SZ}
+                        accentColor={colors.primary}
+                        isOnline={item.is_online}
+                        isLive={item.is_live || liveUserIds.has(item.id)}
+                        style={{ borderWidth: 3, borderColor: colors.background, borderRadius: (AVATAR_SZ + 6) / 2 }}
+                      />
+                      {joiningLiveId === item.id && (
+                        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+                          <ActivityIndicator color="#fff" />
                         </View>
-                      </LinearGradient>
-                    ) : (
-                      <>
-                        <TouchableOpacity
-                          style={[st.avatarWrap, { borderColor: colors.background }]}
-                          onPress={() => onUserPress(item.id)}
-                          activeOpacity={0.9}
-                        >
-                          {item.avatar_url ? (
-                            <Image source={{ uri: item.avatar_url }} style={st.avatarImg} />
-                          ) : (
-                            <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={st.avatarImg}>
-                              <Text style={st.initial}>{initials}</Text>
-                            </LinearGradient>
-                          )}
-                        </TouchableOpacity>
-                        {item.is_online != null && (
-                          <View style={[st.onlineDot, { borderColor: colors.background, backgroundColor: item.is_online ? '#22C55E' : '#92400E' }]} />
-                        )}
-                      </>
-                    )}
+                      )}
+                    </TouchableOpacity>
                   </View>
 
                   {/* Infos */}
@@ -221,12 +226,6 @@ const st = StyleSheet.create({
   closeBtn:   { position: 'absolute', top: 8, right: 8, zIndex: 10, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
 
   avatarWrap: { width: AVATAR_SZ + 4, height: AVATAR_SZ + 4, borderRadius: (AVATAR_SZ + 4) / 2, borderWidth: 3, overflow: 'visible', alignSelf: 'center' },
-  avatarImg:  { width: AVATAR_SZ, height: AVATAR_SZ, borderRadius: AVATAR_SZ / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  initial:    { color: '#fff', fontWeight: '800', fontSize: AVATAR_SZ * 0.38 },
-  onlineDot:  { position: 'absolute', bottom: 2, right: 2, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22C55E', borderWidth: 2 },
-  liveRing:   { width: AVATAR_SZ + 4 + 6, height: AVATAR_SZ + 4 + 6, borderRadius: (AVATAR_SZ + 4 + 6) / 2, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
-  liveBadge:  { position: 'absolute', alignSelf: 'center', bottom: -3, backgroundColor: '#F0365A', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1.5 },
-  liveBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800', letterSpacing: 0.3 },
 
   cardBody:   { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, paddingTop: AVATAR_SZ / 2 + 8, gap: 4 },
   name:       { fontSize: 14, fontWeight: '700', textAlign: 'center' },

@@ -20,6 +20,7 @@ import { BackButton, SkeletonUserProfile, VerifiedBadge } from '../../components
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { postService } from '../../services/postService';
+import { liveService } from '../../services/liveService';
 import { useWs } from '../../context/WebSocketContext';
 import type { UserPublicProfile, UserPublic } from '../../types/user';
 import type { Event } from '../../types/event';
@@ -58,9 +59,28 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const [myId, setMyId] = useState<string | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
+  const [joiningLive, setJoiningLive] = useState(false);
   const openViewer = (url: string, label: string) => {
     navigation.navigate('ImageViewer', { url, label });
   };
+
+  const joinProfileLive = useCallback(async () => {
+    if (joiningLive) return;
+    setJoiningLive(true);
+    try {
+      const lives = await liveService.getLives();
+      const live = lives.find(l => String(l.user_id) === String(userId));
+      if (live) {
+        navigation.navigate('SimpleLiveViewer', { liveId: live.id });
+      } else {
+        Alert.alert('Live introuvable', 'Ce live n\'est plus disponible.');
+      }
+    } catch {
+      Alert.alert('Erreur', 'Impossible de rejoindre le live pour le moment.');
+    } finally {
+      setJoiningLive(false);
+    }
+  }, [joiningLive, userId, navigation]);
 
   // Content tabs
   const [activeTab, setActiveTab] = useState<ContentTab>('publications');
@@ -307,8 +327,12 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* ── Avatar ──────────────────────────────────────────────────── */}
         <View style={styles.avatarSection}>
           <TouchableOpacity
-            activeOpacity={profile.avatar_url ? 0.85 : 1}
-            onPress={() => profile.avatar_url && openViewer(profile.avatar_url, 'Photo de profil')}
+            activeOpacity={profile.avatar_url || profileIsLive ? 0.85 : 1}
+            disabled={joiningLive}
+            onPress={() => {
+              if (profileIsLive) joinProfileLive();
+              else if (profile.avatar_url) openViewer(profile.avatar_url, 'Photo de profil');
+            }}
           >
             {profileIsLive ? (
               <LinearGradient colors={['#F0365A', '#E0389A', '#7B3FF2']} style={styles.avatarRingLive}>
@@ -318,6 +342,11 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                   ) : (
                     <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
                       <Text style={styles.avatarInitial}>{initials}</Text>
+                    </View>
+                  )}
+                  {joiningLive && (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', borderRadius: 40 }]}>
+                      <ActivityIndicator color="#fff" />
                     </View>
                   )}
                 </View>
