@@ -35,6 +35,7 @@ import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { ConversationSummary, ConversationRequestStatus } from '../../services/messageService';
 import { useMediaDownload, fmtSize } from '../../hooks/useMediaDownload';
+import { getChatBackground } from '../../assets';
 
 interface RouteParams {
   partnerId:   string;
@@ -1340,27 +1341,11 @@ export const ChatScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Fond décoratif de la zone messages */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <LinearGradient
-          colors={isDark
-            ? [colors.background, colors.primary + '10', colors.background]
-            : [colors.background, colors.primary + '08', colors.gradientEnd + '06']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Cercle décoratif haut-droite */}
-        <View style={{
-          position: 'absolute', top: -60, right: -60,
-          width: 220, height: 220, borderRadius: 110,
-          backgroundColor: colors.primary + (isDark ? '0D' : '08'),
-        }} />
-        {/* Cercle décoratif bas-gauche */}
-        <View style={{
-          position: 'absolute', bottom: 60, left: -80,
-          width: 260, height: 260, borderRadius: 130,
-          backgroundColor: colors.gradientEnd + (isDark ? '0A' : '07'),
-        }} />
-      </View>
+      <Image
+        source={getChatBackground(isDark)}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor="transparent"
