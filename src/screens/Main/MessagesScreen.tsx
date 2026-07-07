@@ -23,7 +23,6 @@ import type { ConversationSummary } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BackButton } from '../../components/common';
-import { getChatBackground } from '../../assets';
 
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -297,12 +296,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* Fond décoratif de la liste des discussions */}
-      <Image
-        source={getChatBackground(isDark)}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-      />
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor="transparent"
