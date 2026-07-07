@@ -167,6 +167,7 @@ export const ChatScreen: React.FC = () => {
   const [partnerOnline,   setPartnerOnline]   = useState(initialIsOnline ?? false);
   const [partnerLastSeen, setPartnerLastSeen] = useState<string | null>(initialLastSeen ?? null);
   const [isBlocked,       setIsBlocked]       = useState(false);
+  const [messagesDisabled, setMessagesDisabled] = useState(false);
 
   const [replyingTo,        setReplyingTo]        = useState<Message | null>(null);
   const [pinnedMessages,    setPinnedMessages]    = useState<Message[]>([]);
@@ -245,6 +246,8 @@ export const ChatScreen: React.FC = () => {
         setPartnerLastSeen(payload.last_seen_at);
       } else if (payload.type === 'error' && payload.detail === 'blocked') {
         setIsBlocked(true);
+      } else if (payload.type === 'error' && payload.detail === 'messages_disabled') {
+        setMessagesDisabled(true);
       } else if (payload.type === 'message_reaction') {
         const { message_id, emoji } = payload as any;
         setReactions(prev => {
@@ -1526,8 +1529,18 @@ export const ChatScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Bannière messages désactivés par le destinataire */}
+      {!isBlocked && messagesDisabled && (
+        <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+          <Icon name="message-square" size={16} color={colors.textTertiary} />
+          <Text style={[styles.blockedText, { color: colors.textTertiary }]}>
+            Cet utilisateur n'accepte pas les messages privés.
+          </Text>
+        </View>
+      )}
+
       {/* Input bar */}
-      {!isRecording && !isBlocked && (
+      {!isRecording && !isBlocked && !messagesDisabled && (
         <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
           <View style={styles.inputRow}>
             {/* Emoji */}
