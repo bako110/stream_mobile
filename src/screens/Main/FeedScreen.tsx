@@ -29,6 +29,7 @@ import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
+import type { PostFeedCursor } from '../../services/postService';
 import { apiClient } from '../../api/client';
 import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
 import { favoriteService } from '../../services/favoriteService';
@@ -619,6 +620,10 @@ export const FeedScreen: React.FC = () => {
   const lastLoadedAtRef = useRef<number>(0);
   // ── Scroll infini ────────────────────────────────────────────────────────
   const feedPageRef      = useRef(1);
+  // Curseur posts (created_at+id du dernier post reçu) — /posts/feed pagine par curseur,
+  // pas par numéro de page (le tri dépend du temps/boost, "page=N" ne serait pas stable).
+  const postCursorRef    = useRef<PostFeedCursor | null>(null);
+  const postsHasMoreRef  = useRef(true);
   const [hasMoreFeed,    setHasMoreFeed]    = useState(true);
   const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
   const loadingMoreRef   = useRef(false);
@@ -628,7 +633,13 @@ export const FeedScreen: React.FC = () => {
   const nonReelCountRef  = useRef(0);
   const suggestCountRef  = useRef(0);
   const commCountRef     = useRef(0);
-  const trendingCommRef  = useRef<CommunityData[]>([]);
+  // Pool cumulatif de communautés, complété au fil du scroll (au lieu de répéter les 5
+  // mêmes communautés à chaque bloc "communities" injecté dans le flux).
+  const COMM_SLICE = 5;
+  const trendingCommRef      = useRef<CommunityData[]>([]);
+  const commPageRef          = useRef(1);
+  const commExhaustedRef     = useRef(false);
+  const commFetchingRef      = useRef(false);
   const feedListRef     = useRef<FlatList>(null);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [fabOpen,        setFabOpen]        = useState(false);
@@ -739,29 +750,106 @@ export const FeedScreen: React.FC = () => {
 
 
 
-  // ── Suggestions — pool de 30 (boosted en tête côté backend), tranches de 10 par bloc ──
+  // ── Suggestions — pool cumulatif par tranches de 10, complété au fil du scroll
+  // (au lieu de boucler en modulo sur les 30 premières suggestions à l'infini) ──
+  const SUGGEST_SLICE = 10;
   const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(true);
+  const suggestExhaustedRef = useRef(false); // plus aucune suggestion à charger côté backend
+  const suggestFetchingRef  = useRef(false);  // évite les fetchs concurrents
+
+  const suggestPoolRef = useRef<UserPublic[]>([]);
+  useEffect(() => { suggestPoolRef.current = suggestPool; }, [suggestPool]);
 
   const loadSuggestions = useCallback(async () => {
     try {
       const data = await userService.getSuggestions(30);
       const list = Array.isArray(data) ? data : [];
       setSuggestPool(list);
+      suggestExhaustedRef.current = list.length < 30;
     } catch { /* silencieux */ }
     finally { setSuggestLoading(false); }
   }, []);
 
-  // Retourne la tranche du pool correspondant au numero de bloc (1-based)
-  // Bloc 1 → [0..9], Bloc 2 → [10..19], Bloc 3 → [20..29], au-delà → tranche finale
+  // Complète le pool en arrière-plan quand on approche de la fin (pas de boucle bloquante,
+  // le bloc affiche la tranche déjà disponible pendant que le fetch se termine).
+  const fetchMoreSuggestions = useCallback(async () => {
+    if (suggestFetchingRef.current || suggestExhaustedRef.current) return;
+    suggestFetchingRef.current = true;
+    try {
+      const offset = suggestPoolRef.current.length;
+      const data = await userService.getSuggestions(SUGGEST_SLICE, offset);
+      const list = Array.isArray(data) ? data : [];
+      if (list.length < SUGGEST_SLICE) suggestExhaustedRef.current = true;
+      if (list.length > 0) {
+        setSuggestPool(prev => {
+          const seen = new Set(prev.map(u => u.id));
+          return [...prev, ...list.filter(u => !seen.has(u.id))];
+        });
+      }
+    } catch { /* silencieux */ }
+    finally { suggestFetchingRef.current = false; }
+  }, []);
+
+  // Retourne la tranche du pool correspondant au numero de bloc (1-based). Bloc 1 → [0..9],
+  // bloc 2 → [10..19], etc. Si le pool ne couvre pas encore ce bloc, déclenche un fetch en
+  // arrière-plan (non bloquant) et retourne ce qui est disponible en attendant.
   const sliceForBlock = useCallback((blockIndex: number): UserPublic[] => {
     if (suggestPool.length === 0) return [];
-    const SLICE = 10;
-    const start = ((blockIndex - 1) * SLICE) % suggestPool.length;
-    return suggestPool.slice(start, start + SLICE);
-  }, [suggestPool]);
+    const start = (blockIndex - 1) * SUGGEST_SLICE;
+    if (start >= suggestPool.length && !suggestExhaustedRef.current) {
+      fetchMoreSuggestions();
+    }
+    if (start >= suggestPool.length) {
+      // Pool réellement épuisé côté backend — reboucler plutôt qu'un bloc vide
+      const wrapped = start % suggestPool.length;
+      return suggestPool.slice(wrapped, wrapped + SUGGEST_SLICE);
+    }
+    return suggestPool.slice(start, start + SUGGEST_SLICE);
+  }, [suggestPool, fetchMoreSuggestions]);
 
   useEffect(() => { loadSuggestions(); }, []);
+
+  // Complète le pool de communautés en arrière-plan (même pattern que fetchMoreSuggestions)
+  // — évite de répéter indéfiniment les mêmes 5 communautés à chaque bloc du flux.
+  const fetchMoreCommunities = useCallback(async () => {
+    if (commFetchingRef.current || commExhaustedRef.current) return;
+    commFetchingRef.current = true;
+    try {
+      const nextCommPage = commPageRef.current + 1;
+      const data = await communityService.list(nextCommPage, 8).catch(() => []);
+      const list = Array.isArray(data) ? data : [];
+      if (list.length === 0) {
+        commExhaustedRef.current = true;
+      } else {
+        commPageRef.current = nextCommPage;
+        if (list.length < 8) commExhaustedRef.current = true;
+        setTrendingComm(prev => {
+          const seen = new Set(prev.map(c => String(c.id)));
+          const merged = [...prev, ...list.filter(c => !seen.has(String(c.id)))];
+          trendingCommRef.current = merged;
+          return merged;
+        });
+      }
+    } catch { /* silencieux */ }
+    finally { commFetchingRef.current = false; }
+  }, []);
+
+  // Retourne la tranche de communautés pour le bloc N (1-based), déclenche un fetch de
+  // la page suivante si le pool ne couvre pas encore ce bloc.
+  const sliceForCommBlock = useCallback((blockIndex: number): CommunityData[] => {
+    const pool = trendingCommRef.current;
+    if (pool.length === 0) return [];
+    const start = (blockIndex - 1) * COMM_SLICE;
+    if (start >= pool.length && !commExhaustedRef.current) {
+      fetchMoreCommunities();
+    }
+    if (start >= pool.length) {
+      const wrapped = start % pool.length;
+      return pool.slice(wrapped, wrapped + COMM_SLICE);
+    }
+    return pool.slice(start, start + COMM_SLICE);
+  }, [fetchMoreCommunities]);
 
   // ── Chargement de la pub feed — une campagne par emplacement, jamais deux fois la
   // même dans le même feed (exclude_ids envoyé au backend à chaque tirage). Retourne
@@ -838,25 +926,44 @@ export const FeedScreen: React.FC = () => {
         // refresh, changement de filtre). Un refresh silencieux (retour de focus) alors que
         // l'utilisateur a déjà scrollé plus loin ne doit PAS réinitialiser la pagination —
         // voir le early-return plus bas qui bloque ce cas avant de toucher aux items/refs.
+        // Refresh silencieux alors que l'utilisateur a déjà scrollé plus loin (pages > 1) :
+        // sortir tout de suite, AVANT tout fetch réseau et toute écriture de ref — sinon un
+        // fetch page 1 (posts cursor=null, communities page=1, etc.) écraserait silencieusement
+        // les refs de pagination déjà avancées (postCursorRef, trendingCommRef, commPageRef...)
+        // avec des valeurs de page 1, cassant loadMoreFeed au prochain scroll sans que rien
+        // ne se voie tout de suite (les items affichés, eux, ne changent pas).
+        if (silent && feedPageRef.current > 1) {
+          lastLoadedAtRef.current = Date.now();
+          return;
+        }
+
         if (!silent) {
           feedPageRef.current = 1;
           setHasMoreFeed(true);
           adSlotIdxRef.current = 0;
           seenAdIdsRef.current = [];
+          postCursorRef.current = null;
+          postsHasMoreRef.current = true;
+          commPageRef.current = 1;
+          commExhaustedRef.current = false;
+          trendingCommRef.current = [];
         }
         // Charge moins en 4G/5G (hors wifi) pour limiter la conso data au premier écran
         const onWifi = networkService.isWifi();
         const feedLimit  = onWifi ? 30 : 15;
         const reelsLimit = onWifi ? 20 : 10;
         const postsLimit = onWifi ? 20 : 10;
-        const [feedResult, reelsResult, postsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
+        const [feedResult, reelsResult, postsPage, commResult, liveConcerts, spontLivesResult] = await Promise.all([
           searchService.getFeed(1, feedLimit).catch(() => ({ items: [] })),
           reelService.getFeed({ limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: 1 })),
-          postService.getFeed(1, postsLimit).catch(() => [] as Post[]),
+          postService.getFeed(postsLimit, false, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null })),
           communityService.list(1, 8).catch(() => []),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
         ]);
+        const postsResult = postsPage.items;
+        postCursorRef.current = postsPage.next_cursor;
+        postsHasMoreRef.current = postsPage.has_more;
         setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
         setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
         const commData: CommunityData[] = Array.isArray(commResult)
@@ -952,10 +1059,12 @@ export const FeedScreen: React.FC = () => {
             result.push({ kind: 'ad', id: slotId, data: null });
           }
 
-          // Communities : première à pos 10, puis toutes les COMM_EVERY
+          // Communities : première à pos 10, puis toutes les COMM_EVERY — chaque bloc
+          // affiche une tranche différente du pool (renouvelé via fetchMoreCommunities
+          // quand épuisé), pas toujours les mêmes communautés.
           if (commData.length > 0 && (i === 9 || (i > 9 && (i - 9) % COMM_EVERY === 0))) {
             commCount += 1;
-            result.push({ kind: 'communities', id: `__communities__${commCount}`, data: commData });
+            result.push({ kind: 'communities', id: `__communities__${commCount}`, data: sliceForCommBlock(commCount) });
           }
         });
 
@@ -965,14 +1074,6 @@ export const FeedScreen: React.FC = () => {
           reelRowIdx += 1;
         }
 
-        // En mode silent avec pagination déjà avancée (l'utilisateur a scrollé plus loin) :
-        // ne pas toucher aux items ni aux refs de pagination — un refresh silencieux de la
-        // page 1 ne doit jamais invalider les pages déjà chargées par loadMoreFeed.
-        if (silent && feedPageRef.current > 1) {
-          lastLoadedAtRef.current = Date.now();
-          return;
-        }
-
         // Mémorise les clés composites (kind-id) chargées en page 1 pour dédupliquer
         // les pages suivantes du scroll infini (loadMoreFeed)
         seenItemIdsRef.current = new Set(result.map(i => `${i.kind}-${i.id}`));
@@ -980,7 +1081,15 @@ export const FeedScreen: React.FC = () => {
         nonReelCountRef.current = nonReels.length;
         suggestCountRef.current = suggestCount;
         commCountRef.current    = commCount;
-        trendingCommRef.current = commData;
+        // NE PAS écraser trendingCommRef par commData ici : fetchMoreCommunities (déclenché
+        // en fire-and-forget par sliceForCommBlock pendant la construction de `result` juste
+        // au-dessus) peut résoudre de façon asynchrone et avoir déjà fusionné un pool plus
+        // riche dans trendingCommRef via setTrendingComm — écraser ici l'annulerait en race
+        // condition selon le timing réseau. On ne (re)initialise le pool que s'il est encore
+        // vide (vrai premier chargement) ; sinon on garde le pool déjà accumulé tel quel.
+        if (trendingCommRef.current.length === 0) {
+          trendingCommRef.current = commData;
+        }
 
         // En mode silent : ne remplacer les items que si le contenu a réellement changé
         // Evite le re-render + reset de scroll au retour sur l'écran
@@ -997,8 +1106,8 @@ export const FeedScreen: React.FC = () => {
         if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
       } else if (f === 'following') {
         // Onglet Suivis — uniquement les posts des comptes suivis, triés par date
-        const postsResult = await postService.getFeed(1, 50, true).catch(() => [] as Post[]);
-        const postItems: FeedItem[] = (Array.isArray(postsResult) ? postsResult : [])
+        const postsPage = await postService.getFeed(50, true, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null }));
+        const postItems: FeedItem[] = postsPage.items
           .filter((p: Post) => p.id)
           .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
         postItems.sort((a, b) => {
@@ -1055,11 +1164,15 @@ export const FeedScreen: React.FC = () => {
       const reelsLimit = onWifi ? 20 : 10;
       const postsLimit = onWifi ? 20 : 10;
 
-      const [feedResult, reelsResult, postsResult] = await Promise.all([
+      const [feedResult, reelsResult, postsPage] = await Promise.all([
         searchService.getFeed(nextPage, feedLimit).catch(() => ({ items: [] })),
         reelService.getFeed({ page: nextPage, limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: nextPage })),
-        postService.getFeed(nextPage, postsLimit).catch(() => [] as Post[]),
+        postsHasMoreRef.current
+          ? postService.getFeed(postsLimit, false, postCursorRef.current).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null }))
+          : Promise.resolve({ items: [] as Post[], has_more: false, next_cursor: null }),
       ]);
+      postCursorRef.current = postsPage.next_cursor;
+      postsHasMoreRef.current = postsPage.has_more;
 
       const feedItems: FeedItem[] = (feedResult.items ?? [])
         .filter((item: any) => item.kind !== 'reel' && item.id)
@@ -1067,7 +1180,7 @@ export const FeedScreen: React.FC = () => {
       const reelItems: FeedItem[] = (Array.isArray((reelsResult as any)?.items) ? (reelsResult as any).items : Array.isArray(reelsResult) ? reelsResult : [])
         .filter((r: any) => r?.id)
         .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
-      const postItems: FeedItem[] = (Array.isArray(postsResult) ? postsResult : [])
+      const postItems: FeedItem[] = postsPage.items
         .filter((p: Post) => p.id)
         .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
 
@@ -1119,7 +1232,7 @@ export const FeedScreen: React.FC = () => {
 
           if (commData.length > 0 && (i === 9 || (i > 9 && (i - 9) % COMM_EVERY === 0))) {
             commCountRef.current += 1;
-            appended.push({ kind: 'communities', id: `__communities__${commCountRef.current}`, data: commData });
+            appended.push({ kind: 'communities', id: `__communities__${commCountRef.current}`, data: sliceForCommBlock(commCountRef.current) });
           }
         });
         // Si aucun post/event neuf mais des reels quand même, ajouter la rangée en fin
