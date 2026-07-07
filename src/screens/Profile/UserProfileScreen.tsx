@@ -278,11 +278,8 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   ];
   const totalPubs = publications.length + userPosts.length;
 
-  // Profil privé : aucun champ personnel n'est retourné par le backend
-  const isPrivateProfile = !isMe && !profile.is_followed &&
-    !profile.first_name && !profile.last_name &&
-    !profile.location && !profile.website && !profile.phone &&
-    !profile.date_of_birth && !profile.created_at;
+  // Profil privé : le backend renvoie is_private=true et un profil minimal
+  const isPrivateProfile = !isMe && !!profile.is_private;
 
   function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -495,22 +492,16 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                   </>
                 )}
               </TouchableOpacity>
-              {profile.privacy_allow_messages !== false ? (
-                <TouchableOpacity
-                  style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-                  onPress={() => navigation.navigate('Chat', {
-                    partnerId:   profile!.id,
-                    partnerName: profile!.display_name || profile!.username,
-                    avatarUrl:   profile!.avatar_url ?? undefined,
-                  })}
-                >
-                  <Icon name="message-circle" size={16} color={colors.textPrimary} />
-                </TouchableOpacity>
-              ) : (
-                <View style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, opacity: 0.35 }]}>
-                  <Icon name="message-circle" size={16} color={colors.textDisabled} />
-                </View>
-              )}
+              <TouchableOpacity
+                style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                onPress={() => navigation.navigate('Chat', {
+                  partnerId:   profile!.id,
+                  partnerName: profile!.display_name || profile!.username,
+                  avatarUrl:   profile!.avatar_url ?? undefined,
+                })}
+              >
+                <Icon name="message-circle" size={16} color={colors.textPrimary} />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
                 onPress={() => navigation.navigate('Transfer', {
