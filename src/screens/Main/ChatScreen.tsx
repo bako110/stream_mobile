@@ -33,7 +33,7 @@ import { useWs } from '../../context/WebSocketContext';
 import { AvatarWithBadge } from '../../components/common';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
-import type { ConversationSummary } from '../../services/messageService';
+import type { ConversationSummary, ConversationRequestStatus } from '../../services/messageService';
 import { useMediaDownload, fmtSize } from '../../hooks/useMediaDownload';
 
 interface RouteParams {
@@ -167,7 +167,8 @@ export const ChatScreen: React.FC = () => {
   const [partnerOnline,   setPartnerOnline]   = useState(initialIsOnline ?? false);
   const [partnerLastSeen, setPartnerLastSeen] = useState<string | null>(initialLastSeen ?? null);
   const [isBlocked,       setIsBlocked]       = useState(false);
-  const [messagesDisabled, setMessagesDisabled] = useState(false);
+  const [requestStatus,   setRequestStatus]   = useState<ConversationRequestStatus>('none');
+  const [requestActionLoading, setRequestActionLoading] = useState(false);
 
   const [replyingTo,        setReplyingTo]        = useState<Message | null>(null);
   const [pinnedMessages,    setPinnedMessages]    = useState<Message[]>([]);
@@ -246,8 +247,14 @@ export const ChatScreen: React.FC = () => {
         setPartnerLastSeen(payload.last_seen_at);
       } else if (payload.type === 'error' && payload.detail === 'blocked') {
         setIsBlocked(true);
-      } else if (payload.type === 'error' && payload.detail === 'messages_disabled') {
-        setMessagesDisabled(true);
+      } else if (payload.type === 'error' && payload.detail === 'conversation_blocked') {
+        setRequestStatus('blocked');
+      } else if (payload.type === 'error' && payload.detail === 'pending_limit') {
+        setRequestStatus('pending_outgoing');
+      } else if (payload.type === 'conversation_accepted' && payload.user_id === partnerId) {
+        setRequestStatus('accepted');
+      } else if (payload.type === 'conversation_blocked' && payload.user_id === partnerId) {
+        setRequestStatus('blocked');
       } else if (payload.type === 'message_reaction') {
         const { message_id, emoji } = payload as any;
         setReactions(prev => {
@@ -293,11 +300,11 @@ export const ChatScreen: React.FC = () => {
     }).catch(() => {});
   }, []);
 
-  // Connaître à l'avance si le partenaire autorise les messages — évite de
+  // Connaître à l'avance le statut de la demande de conversation — évite de
   // laisser taper un message qui échouera silencieusement à l'envoi
   useEffect(() => {
-    userService.getPublicProfile(partnerId)
-      .then(p => { if (p.privacy_allow_messages === false) setMessagesDisabled(true); })
+    messageService.getRequestStatus(partnerId)
+      .then(r => setRequestStatus(r.status))
       .catch(() => {});
   }, [partnerId]);
 
@@ -365,9 +372,19 @@ export const ChatScreen: React.FC = () => {
       const msg = await messageService.sendMessage(partnerId, content, 'text', undefined, undefined, replyingTo?.id);
       setReplyingTo(null);
       setMessages(prev => prev.map(m => m.id === tempId ? msg : m));
+      setRequestStatus(prev =>
+        prev === 'none' ? 'pending_outgoing' :
+        prev === 'pending_incoming' ? 'accepted' :
+        prev
+      );
     } catch (e: any) {
       setMessages(prev => prev.filter(m => m.id !== tempId));
-      if (e?.response?.status === 403 || e?.status === 403) {
+      const code = (e?.data as any)?.detail?.code;
+      if (code === 'conversation_blocked') {
+        setRequestStatus('blocked');
+      } else if (code === 'pending_limit') {
+        setRequestStatus('pending_outgoing');
+      } else if (e?.status === 403) {
         setIsBlocked(true);
       } else {
         setText(content);
@@ -1527,7 +1544,7 @@ export const ChatScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Bannière blocage */}
+      {/* Bannière blocage de compte (UserBlock) */}
       {isBlocked && (
         <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
           <Icon name="slash" size={16} color={colors.textTertiary} />
@@ -1537,18 +1554,69 @@ export const ChatScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Bannière messages désactivés par le destinataire */}
-      {!isBlocked && messagesDisabled && (
+      {/* Demande de conversation entrante — j'ai reçu un 1er message, je décide */}
+      {!isBlocked && requestStatus === 'pending_incoming' && (
+        <View style={[styles.requestBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+          <Text style={[styles.blockedText, { color: colors.textTertiary, marginBottom: 10 }]}>
+            {partnerName} vous a envoyé un message. Autoriser cette personne à vous écrire ?
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              style={[styles.requestBtn, { backgroundColor: colors.primary }]}
+              disabled={requestActionLoading}
+              onPress={async () => {
+                setRequestActionLoading(true);
+                try { await messageService.acceptConversation(partnerId); setRequestStatus('accepted'); }
+                catch {} finally { setRequestActionLoading(false); }
+              }}
+            >
+              <Text style={styles.requestBtnText}>Autoriser</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.requestBtn, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.divider }]}
+              disabled={requestActionLoading}
+              onPress={async () => {
+                setRequestActionLoading(true);
+                try { await messageService.blockConversation(partnerId); setRequestStatus('blocked_by_me'); }
+                catch {} finally { setRequestActionLoading(false); }
+              }}
+            >
+              <Text style={[styles.requestBtnText, { color: colors.textPrimary }]}>Bloquer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* J'ai envoyé le message initial, j'attends la décision du destinataire */}
+      {!isBlocked && requestStatus === 'pending_outgoing' && (
         <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
-          <Icon name="message-square" size={16} color={colors.textTertiary} />
+          <Icon name="clock" size={16} color={colors.textTertiary} />
           <Text style={[styles.blockedText, { color: colors.textTertiary }]}>
-            Cet utilisateur n'accepte pas les messages privés.
+            En attente que {partnerName} autorise la conversation.
           </Text>
         </View>
       )}
 
-      {/* Input bar */}
-      {!isRecording && !isBlocked && !messagesDisabled && (
+      {/* Conversation bloquée */}
+      {!isBlocked && (requestStatus === 'blocked' || requestStatus === 'blocked_by_me') && (
+        <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+          <Icon name="slash" size={16} color={colors.textTertiary} />
+          <Text style={[styles.blockedText, { color: colors.textTertiary }]}>
+            {requestStatus === 'blocked_by_me'
+              ? 'Vous avez bloqué cette conversation.'
+              : 'Cette personne a bloqué la conversation.'}
+          </Text>
+        </View>
+      )}
+
+      {/* Input bar — masquée seulement si je suis en attente de reponse (pending_outgoing)
+          ou si la conversation est bloquee ; reste active pour pending_incoming car
+          repondre vaut acceptation implicite */}
+      {!isRecording && !isBlocked
+        && requestStatus !== 'pending_outgoing'
+        && requestStatus !== 'blocked'
+        && requestStatus !== 'blocked_by_me'
+        && (
         <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
           <View style={styles.inputRow}>
             {/* Emoji */}
@@ -2202,6 +2270,19 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   blockedText: { fontSize: 13, textAlign: 'center', flex: 1 },
+
+  requestBanner: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  requestBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  requestBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
   // Action sheet
   actionSheet: {

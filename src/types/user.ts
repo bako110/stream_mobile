@@ -115,4 +115,5 @@ export interface UserPublicProfile extends UserPublic {
   created_at?:            string | null;
   privacy_allow_messages?: boolean;
   privacy_profile_public?: boolean;
+  is_private?:             boolean;
 }

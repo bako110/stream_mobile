@@ -23,6 +23,8 @@ export interface AttachmentMeta {
   hls_url?:       string;
 }
 
+export type ConversationRequestStatus = 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'blocked' | 'blocked_by_me';
+
 export interface ConversationSummary {
   partner_id:   string;
   partner: {
@@ -39,6 +41,7 @@ export interface ConversationSummary {
   last_time:     string;
   last_type?:    MessageType;
   unread_count:  number;
+  request_status?: ConversationRequestStatus;
 }
 
 export interface Message {
@@ -98,6 +101,19 @@ export const messageService = {
 
   async markRead(partnerId: string): Promise<void> {
     await apiClient.put(Endpoints.messages.markRead(partnerId));
+  },
+
+  async getRequestStatus(partnerId: string): Promise<{ status: ConversationRequestStatus }> {
+    const res = await apiClient.get<{ status: ConversationRequestStatus }>(Endpoints.messages.requestStatus(partnerId));
+    return res.data;
+  },
+
+  async acceptConversation(partnerId: string): Promise<void> {
+    await apiClient.post(Endpoints.messages.acceptConversation(partnerId));
+  },
+
+  async blockConversation(partnerId: string): Promise<void> {
+    await apiClient.post(Endpoints.messages.blockConversation(partnerId));
   },
 
   async editMessage(messageId: string, content: string): Promise<Message> {

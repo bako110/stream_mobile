@@ -675,6 +675,11 @@ const ConversationRow: React.FC<{
               {name}
             </Text>
             {conv.partner?.is_verified && <VerifiedBadge size={13} />}
+            {conv.request_status === 'pending_incoming' && (
+              <View style={[sst.newRequestPill, { backgroundColor: colors.primary }]}>
+                <Text style={sst.newRequestPillText}>Demande</Text>
+              </View>
+            )}
           </View>
           <Text style={[styles.convTime, { color: unread ? colors.primary : colors.textTertiary, fontWeight: unread ? '600' : '400' }]}>
             {formatTime(conv.last_time)}
@@ -823,6 +828,10 @@ const sst = StyleSheet.create({
     width: 22, height: 22, borderRadius: 11, borderWidth: 2,
     alignItems: 'center', justifyContent: 'center',
   },
+  newRequestPill: {
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8,
+  },
+  newRequestPillText: { fontSize: 10, fontWeight: '700', color: '#fff' },
 });
 
 const cst = StyleSheet.create({

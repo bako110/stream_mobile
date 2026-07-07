@@ -184,14 +184,6 @@ export const PrivacyScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>COMMUNICATION</Text>
           <View style={[s.section, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
             <Row
-              icon="message-circle" label="Autoriser les messages"
-              description="Recevoir des messages de tout le monde"
-              color="#3B82F6"
-              value={settings.privacy_allow_messages}
-              saving={saving === 'privacy_allow_messages'}
-              onChange={toggle('privacy_allow_messages')}
-            />
-            <Row
               icon="wifi" label="Afficher le statut en ligne"
               description="Montrer quand vous êtes connecté(e)"
               color="#7B3FF2"
