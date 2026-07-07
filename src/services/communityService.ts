@@ -49,6 +49,7 @@ export interface CommunityMemberData {
   role: string;
   joined_at: string | null;
   is_live?: boolean;
+  gogold?: number;
 }
 
 export interface CreateCommunityPayload {
@@ -154,7 +155,7 @@ export interface LeaderboardEntry {
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
-  GoGold: number;
+  gogold: number;
   weekly_gogold: number;
   streak: number;
   is_me: boolean;
@@ -162,7 +163,7 @@ export interface LeaderboardEntry {
 
 export interface LeaderboardMyStats {
   rank: number;
-  GoGold: number;
+  gogold: number;
   weekly_gogold: number;
   gogold_to_next: number;
   streak: number;
@@ -193,7 +194,7 @@ export interface CommunityStats {
     name: string;
     username: string;
     avatar_url: string | null;
-    GoGold: number;
+    gogold: number;
     posts: number;
   }[];
   activity: { day: string; msgs: number }[];

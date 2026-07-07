@@ -105,7 +105,7 @@ const PodiumCard: React.FC<{
   member: CommunityMemberData; rank: 1 | 2 | 3;
   onPress: () => void; maxGoGold: number;
 }> = ({ member, rank, onPress, maxGoGold }) => {
-  const GoGold = (member as any).GoGold ?? 0;
+  const GoGold = member.gogold ?? 0;
   const mc = MEDAL_COLOR[rank];
   const gradients: Record<number, string[]> = {
     1: ['#4A2080', '#7B3FF2'], 2: ['#1C1830', '#2A2248'], 3: ['#1A1530', '#251D42'],
@@ -143,7 +143,7 @@ const PodiumCard: React.FC<{
 // ── Carte membre ──────────────────────────────────────────────────────────────
 const MemberCard: React.FC<{ member: CommunityMemberData; rank?: number; onPress: () => void; colors: any }> = ({ member, rank, onPress, colors }) => {
   const roleColor = ROLE_COLOR[member.role] ?? '#3B82F6';
-  const GoGold = (member as any).GoGold ?? 0;
+  const GoGold = member.gogold ?? 0;
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}
       style={[st.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -244,9 +244,9 @@ export default function CommunityMembersScreen({ route }: Props) {
   };
 
   // Podium — top 3 par GoGold si disponible
-  const sorted = [...members].sort((a, b) => ((b as any).GoGold ?? 0) - ((a as any).GoGold ?? 0));
+  const sorted = [...members].sort((a, b) => (b.gogold ?? 0) - (a.gogold ?? 0));
   const top3 = sorted.slice(0, 3);
-  const maxGoGold = (top3[0] as any)?.GoGold ?? 0;
+  const maxGoGold = top3[0]?.gogold ?? 0;
   const showPodium = roleFilter === 'all' && search.trim() === '' && top3.length === 3 && maxGoGold > 0;
 
   if (blockedForPublic || blockedForMembers) {

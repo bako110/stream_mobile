@@ -373,7 +373,7 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
                 <View style={styles.contribRight}>
                   <View style={styles.goGoldRow}>
                     <Text style={styles.lightningIcon}>⚡</Text>
-                    <Text style={[styles.goGoldValue, { color: COIN_COLOR }]}>{fmtNum(user.GoGold)}</Text>
+                    <Text style={[styles.goGoldValue, { color: COIN_COLOR }]}>{fmtNum(user.gogold)}</Text>
                   </View>
                   <View style={styles.postsRow}>
                     <Icon name="edit-3" size={10} color={colors.textTertiary} />

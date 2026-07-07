@@ -1291,24 +1291,6 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           activeOpacity={0.7}
           onPress={() => {
             setSettingsOpen(false);
-            setTimeout(() => (nav as any).navigate('CommunityLeaderboard', { communityId, communityName: community?.name ?? '' }), 250);
-          }}
-        >
-          <View style={[s.secIcon, { backgroundColor: '#F59E0B20' }]}>
-            <Icon name="award" size={18} color="#F59E0B" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.secLabel, { color: colors.textPrimary }]}>Classement</Text>
-            <Text style={[s.secDesc, { color: colors.textTertiary }]}>Voir le classement XP des membres</Text>
-          </View>
-          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[s.secRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
-          activeOpacity={0.7}
-          onPress={() => {
-            setSettingsOpen(false);
             setTimeout(() => (nav as any).navigate('CommunityTreasury', { communityId, communityName: community?.name ?? '' }), 250);
           }}
         >
@@ -1882,7 +1864,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     Contenu réservé aux membres
                   </Text>
                   <Text style={[s.lockedSub, { color: colors.textTertiary }]}>
-                    Rejoignez cette communauté pour accéder aux événements, au classement, à l'annuaire des membres et aux statistiques.
+                    Rejoignez cette communauté pour accéder aux événements, à l'annuaire des membres et aux statistiques.
                   </Text>
                 </View>
               ) : (
@@ -1897,18 +1879,6 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                         <Icon name="calendar" size={20} color="#FF7A2F" />
                       </View>
                       <Text style={[s.navLabel, { color: colors.textPrimary }]}>Événements</Text>
-                      <Icon name="chevron-right" size={13} color={colors.textTertiary} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[s.navCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-                      onPress={() => (nav as any).navigate('CommunityLeaderboard', { communityId, communityName: community.name })}
-                      activeOpacity={0.75}
-                    >
-                      <View style={[s.navIcon, { backgroundColor: '#F59E0B20' }]}>
-                        <Icon name="award" size={20} color="#F59E0B" />
-                      </View>
-                      <Text style={[s.navLabel, { color: colors.textPrimary }]}>Classement</Text>
                       <Icon name="chevron-right" size={13} color={colors.textTertiary} />
                     </TouchableOpacity>
 

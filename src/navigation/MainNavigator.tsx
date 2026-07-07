@@ -68,7 +68,6 @@ import { CommunityFundDetailScreen }      from '../screens/Detail/CommunityFundD
 import { CommunityTreasuryScreen }        from '../screens/Detail/CommunityTreasuryScreen';
 import { CommunityTreasurerScreen }       from '../screens/Detail/CommunityTreasurerScreen';
 import { CommunityMemberProfileScreen }   from '../screens/Detail/CommunityMemberProfileScreen';
-import { CommunityLeaderboardScreen }     from '../screens/Detail/CommunityLeaderboardScreen';
 import { CommunityMemberCreatorStatsScreen } from '../screens/Detail/CommunityMemberCreatorStatsScreen';
 import { CommunityJoinRequestsScreen }   from '../screens/Detail/CommunityJoinRequestsScreen';
 import { CommunityChannelsScreen }        from '../screens/Detail/CommunityChannelsScreen';
@@ -183,7 +182,6 @@ export type MainStackParamList = {
   CommunityTreasury:       { communityId: string; communityName: string };
   CommunityTreasurer:      { communityId: string; communityName: string; myRole: string; myId: string };
   CommunityMemberProfile:  { communityId: string; communityName: string; memberId: string; memberName: string };
-  CommunityLeaderboard:        { communityId: string; communityName: string };
   CommunityMemberCreatorStats: { communityId: string; communityName: string; memberId: string; memberName: string };
   CommunityJoinRequests:       { communityId: string; communityName: string };
   CommunityChannels:           { communityId: string; communityName: string; myRole: string | null };
@@ -534,7 +532,6 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="CommunityTreasury"        component={CommunityTreasuryScreen}        options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CommunityTreasurer"       component={CommunityTreasurerScreen}       options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CommunityMemberProfile"  component={CommunityMemberProfileScreen}  options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="CommunityLeaderboard"         component={CommunityLeaderboardScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityMemberCreatorStats"  component={CommunityMemberCreatorStatsScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityJoinRequests"   component={CommunityJoinRequestsScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityChannels"       component={CommunityChannelsScreen}       options={{ animation: 'slide_from_right' }} />
