@@ -293,6 +293,14 @@ export const ChatScreen: React.FC = () => {
     }).catch(() => {});
   }, []);
 
+  // Connaître à l'avance si le partenaire autorise les messages — évite de
+  // laisser taper un message qui échouera silencieusement à l'envoi
+  useEffect(() => {
+    userService.getPublicProfile(partnerId)
+      .then(p => { if (p.privacy_allow_messages === false) setMessagesDisabled(true); })
+      .catch(() => {});
+  }, [partnerId]);
+
   const loadMessages = useCallback(async (p = 1) => {
     try {
       const data = await messageService.getMessages(partnerId, p, 30);
