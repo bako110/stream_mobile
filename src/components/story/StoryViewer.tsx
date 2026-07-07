@@ -1138,12 +1138,16 @@ export const StoryViewer: React.FC<Props> = ({
 
         {/* ── Tap zones (double-tap = like) ─────────────────────────────── */}
         <View style={s.tapZones} pointerEvents="box-none">
-          <TouchableWithoutFeedback onPress={goPrev}>
+          <TouchableWithoutFeedback
+            onPress={goPrev}
+            onPressIn={() => setPaused(true)}
+            onPressOut={() => setPaused(false)}
+          >
             <View style={s.tapLeft} />
           </TouchableWithoutFeedback>
           <TouchableWithoutFeedback
             onPress={handleTapRight}
-            onLongPress={() => setPaused(true)}
+            onPressIn={() => setPaused(true)}
             onPressOut={() => setPaused(false)}
           >
             <View style={s.tapRight} />

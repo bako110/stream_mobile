@@ -10,6 +10,7 @@ import { useWs } from '../context/WebSocketContext';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 import { FeedScreen as HomeScreen } from '../screens/Main/FeedScreen';
+import { ExplorerMenuScreen } from '../screens/Main/ExplorerMenuScreen';
 import { CommunitiesScreen as CommunitiesTabScreen } from '../screens/Main/CommunitiesScreen';
 import { ReelsScreen }              from '../screens/Main/ReelsScreen';
 import { ProfileScreen }            from '../screens/Main/ProfileScreen';
@@ -137,6 +138,7 @@ export type MainStackParamList = {
   Tabs:            undefined;
   Planning:        undefined;
   Feed:            undefined;
+  ExplorerMenu:    undefined;
   CreateEvent:     { eventId?: string }  | undefined;
   CreateConcert:   { concertId?: string } | undefined;
   CreateReel:      { reelPublished?: boolean; sourceReelId?: string; sourceReelUrl?: string } | undefined;
@@ -340,7 +342,9 @@ const Tabs: React.FC<{ onLogout: () => void }> = ({ onLogout }) => (
     tabBar={props => <AppTabBar {...props} />}
     screenOptions={{ headerShown: false }}
   >
-    <Tab.Screen name="Home"        component={HomeScreen} />
+    <Tab.Screen name="Home">
+      {() => <HomeScreen onLogout={onLogout} />}
+    </Tab.Screen>
     <Tab.Screen name="Communities" component={CommunitiesTabScreen} />
     <Tab.Screen name="Reels"       component={ReelsScreen} options={{ tabBarStyle: { display: 'none' } }} />
     <Tab.Screen name="Profile">
@@ -440,6 +444,7 @@ const SettingsWrapper = useCallback(
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} /></>} />
         <Stack.Screen name="Feed"           component={FeedScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="ExplorerMenu"   children={() => <ExplorerMenuScreen onLogout={onLogout} />} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateEvent"    component={CreateEventWrapper}    options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateConcert"  component={CreateConcertWrapper}  options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="ConcertDetail"  component={ConcertDetailWrapper}  options={{ animation: 'slide_from_right' }} />

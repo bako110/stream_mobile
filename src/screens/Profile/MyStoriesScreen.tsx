@@ -2,7 +2,7 @@
 import {
   View, Text, TouchableOpacity, Image,
   StyleSheet, Alert, RefreshControl, Platform,
-  FlatList, Modal,
+  FlatList, Modal, Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -272,14 +272,18 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
         )}
         ListFooterComponent={
           stories.length > 0 ? (
-            <View style={[s.footer, { backgroundColor: colors.surfaceElevated }]}>
+            <TouchableOpacity
+              style={[s.footer, { backgroundColor: colors.surfaceElevated }]}
+              activeOpacity={0.7}
+              onPress={() => Linking.openURL('https://gofolyx.com/chiffrement')}
+            >
               <MaterialIcon name="lock-outline" size={14} color={colors.textTertiary} />
               <Text style={[s.footerText, { color: colors.textTertiary }]}>
                 Vos mises à jour de statut sont{' '}
                 <Text style={{ color: colors.primary, fontWeight: '700' }}>chiffrées de bout en bout</Text>
                 {'. Elles disparaissent au bout de 24 heures.'}
               </Text>
-            </View>
+            </TouchableOpacity>
           ) : null
         }
         contentContainerStyle={{ flexGrow: 1 }}
