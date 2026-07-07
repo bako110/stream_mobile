@@ -8,27 +8,29 @@ import { Endpoints } from '../../api/endpoints';
 import { Row, Card, PageHeader } from './_shared';
 
 interface NotifPrefs {
-  notif_push_enabled: boolean;
-  notif_likes:        boolean;
-  notif_comments:     boolean;
-  notif_follows:      boolean;
-  notif_messages:     boolean;
-  notif_community:    boolean;
-  notif_events:       boolean;
-  notif_wallet:       boolean;
-  notif_live:         boolean;
+  notif_push_enabled:  boolean;
+  notif_likes:         boolean;
+  notif_comments:      boolean;
+  notif_follows:       boolean;
+  notif_messages:      boolean;
+  notif_community:     boolean;
+  notif_events:        boolean;
+  notif_wallet:        boolean;
+  notif_live:          boolean;
+  notif_profile_views: boolean;
 }
 
 const DEFAULT_PREFS: NotifPrefs = {
-  notif_push_enabled: true,
-  notif_likes:        true,
-  notif_comments:     true,
-  notif_follows:      true,
-  notif_messages:     true,
-  notif_community:    true,
-  notif_events:       true,
-  notif_wallet:       true,
-  notif_live:         true,
+  notif_push_enabled:  true,
+  notif_likes:         true,
+  notif_comments:      true,
+  notif_follows:       true,
+  notif_messages:      true,
+  notif_community:     true,
+  notif_events:        true,
+  notif_wallet:        true,
+  notif_live:          true,
+  notif_profile_views: true,
 };
 
 export const SettingsNotificationsScreen: React.FC = () => {
@@ -154,6 +156,7 @@ export const SettingsNotificationsScreen: React.FC = () => {
             <Row icon="message-circle" label="Commentaires & mentions" right={sw('notif_comments')}  />
             <Row icon="user-plus"      label="Abonnements"            right={sw('notif_follows')}    />
             <Row icon="send"           label="Messages directs"        right={sw('notif_messages')}   />
+            <Row icon="eye"            label="Visites de profil"      right={sw('notif_profile_views')} />
             <Row icon="users"          label="Communautés"            right={sw('notif_community')}  />
             <Row icon="calendar"       label="Événements & rappels"   right={sw('notif_events')}     />
             <Row icon="zap"            label="Wallet & transactions"  right={sw('notif_wallet')}     />

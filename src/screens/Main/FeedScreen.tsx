@@ -8,7 +8,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
-  Modal, Dimensions, Linking,
+  Modal, Dimensions, Linking, InteractionManager,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
@@ -24,6 +24,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage } from '../../components/common';
+import { cacheImage } from '../../services/imageCacheService';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
@@ -613,6 +614,11 @@ export const FeedScreen: React.FC = () => {
   // publicitaire) — map id → data, alimentée au fur et à mesure des tirages successifs.
   const [adsById,     setAdsById]     = useState<Record<string, AdData>>({});
   const seenAdIdsRef  = useRef<string[]>([]); // exclude_ids envoyés au backend, dans l'ordre
+  // File d'attente sérialisant tous les appels à assignAdsToSlots (load('all') et
+  // loadMoreFeed peuvent tous deux en déclencher un, potentiellement en même temps si un
+  // refresh silencieux chevauche le prefetch anticipé) — évite que deux tirages concurrents
+  // lisent/écrivent seenAdIdsRef de façon incohérente.
+  const adAssignQueueRef = useRef<Promise<void>>(Promise.resolve());
   // slotId (__ad__slot_N) → id de la campagne tirée pour cet emplacement précis
   const [adSlotMap,   setAdSlotMap]   = useState<Record<string, string>>({});
   const adInsertedRef = useRef<Set<string>>(new Set()); // évite double-injection
@@ -682,6 +688,82 @@ export const FeedScreen: React.FC = () => {
   }).current;
   const [activeReelRowId, setActiveReelRowId] = useState<string | null>(null);
   const [adVisible, setAdVisible] = useState(false);
+  // Ref stable vers loadMoreFeed — onFeedViewableChanged est figé au montage (useRef().current,
+  // imposé par onViewableItemsChanged qui n'accepte pas de callback changeant de référence),
+  // donc on ne peut pas appeler loadMoreFeed directement dedans (sa référence change à chaque
+  // render selon ses dépendances). Synchronisée juste après la définition de loadMoreFeed.
+  const loadMoreFeedRef = useRef<() => void>(() => {});
+
+  // Distance en nombre d'items restants à laquelle on déclenche le chargement de la page
+  // suivante — l'utilisateur ne doit jamais voir de spinner/attente en scrollant normalement,
+  // le contenu doit déjà être là bien avant qu'il n'atteigne la fin de ce qui est chargé.
+  const PREFETCH_ITEMS_REMAINING = 6;
+  // Nombre d'items à l'avance dont on précharge l'image sur disque — évite l'écran noir/flash
+  // au scroll rapide (CachedImage ne télécharge sinon qu'une fois le composant réellement monté).
+  const IMAGE_PREFETCH_AHEAD = 4;
+  const prefetchedImagesRef = useRef<Set<string>>(new Set());
+
+  // Retourne les images visuelles "de base" d'un item — limité aux médias propres à l'item
+  // (pas les pools suggestions/communautés, qui ont leur propre fetch et dont le recalcul
+  // via map/flatMap à chaque tick de scroll était coûteux pour un bénéfice marginal).
+  const extractItemImageUrls = (item: FeedItem): string[] => {
+    switch (item.kind) {
+      case 'event':
+      case 'concert':
+      case 'reel':
+        return item.data?.thumbnail_url ? [item.data.thumbnail_url] : [];
+      case 'post': {
+        const urls: string[] = [];
+        if (Array.isArray(item.data?.image_urls) && item.data.image_urls.length > 0) {
+          urls.push(item.data.image_urls[0]); // seule la 1ère image du carrousel est visible sans interaction
+        } else if (item.data?.image_url) {
+          urls.push(item.data.image_url);
+        } else if (item.data?.thumbnail_url) {
+          urls.push(item.data.thumbnail_url);
+        }
+        return urls;
+      }
+      case 'reel_row':
+        // Rangée entière, mais plafonnée : pas besoin de précharger les 10 reels d'une
+        // rangée avant qu'elle ne soit visible, seules les premières vignettes comptent.
+        return Array.isArray(item.data)
+          ? item.data.slice(0, 4).map((r: any) => r?.thumbnail_url).filter(Boolean)
+          : [];
+      default:
+        return []; // suggestions/communities/ad : pas de prefetch via ce chemin générique
+    }
+  };
+
+  const prefetchUpcomingImages = (fromIndex: number) => {
+    const list = itemsRef.current;
+    for (let i = fromIndex; i < Math.min(fromIndex + IMAGE_PREFETCH_AHEAD, list.length); i++) {
+      for (const url of extractItemImageUrls(list[i])) {
+        if (url && !prefetchedImagesRef.current.has(url)) {
+          prefetchedImagesRef.current.add(url);
+          cacheImage(url).catch(() => {});
+        }
+      }
+    }
+  };
+
+  // onViewableItemsChanged attend minimumViewTime (200ms) qu'un item se stabilise à l'écran
+  // avant de se déclencher — en scroll rapide (fling), l'utilisateur traverse des items en
+  // moins de 200ms chacun, donc ce callback ne se déclenche JAMAIS pendant le mouvement,
+  // uniquement une fois le scroll arrêté. Le prefetch d'images doit au contraire réagir
+  // pendant le scroll lui-même : on calcule l'item approximatif visible directement depuis
+  // la position brute de défilement (onScroll), MAIS le calcul réel est différé hors de la
+  // frame de scroll (InteractionManager) pour ne jamais bloquer le geste en cours — un
+  // scroll rapide + chargement réseau simultané ne doit jamais figer le JS thread.
+  const AVG_ITEM_HEIGHT = 420; // estimation grossière, mélange posts/reels/pubs/suggestions
+  const lastScrollPrefetchIndexRef = useRef(-1);
+  const handleFeedScroll = (e: any) => {
+    const offsetY = e.nativeEvent?.contentOffset?.y ?? 0;
+    const approxIndex = Math.floor(offsetY / AVG_ITEM_HEIGHT);
+    if (approxIndex > lastScrollPrefetchIndexRef.current) {
+      lastScrollPrefetchIndexRef.current = approxIndex;
+      InteractionManager.runAfterInteractions(() => prefetchUpcomingImages(approxIndex + 1));
+    }
+  };
 
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     setActiveReelId(null);
@@ -692,6 +774,22 @@ export const FeedScreen: React.FC = () => {
 
     // Pub vidéo : ne joue que quand réellement visible à l'écran (coupe le stream sinon)
     setAdVisible(viewableItems.some(v => v.item?.kind === 'ad'));
+
+    // Prefetch anticipé : dès que l'item le plus bas visible est à moins de N items de la
+    // fin du contenu déjà chargé, on lance loadMoreFeed en arrière-plan — l'utilisateur ne
+    // doit jamais "sentir" le chargement en scrollant (voir aussi onEndReached en secours).
+    const lastVisibleIndex = viewableItems.length > 0
+      ? Math.max(...viewableItems.map(v => v.index ?? -1))
+      : -1;
+    if (lastVisibleIndex >= 0 && itemsRef.current.length - 1 - lastVisibleIndex <= PREFETCH_ITEMS_REMAINING) {
+      loadMoreFeedRef.current();
+    }
+
+    // Précharge sur disque les images des prochains items, avant qu'ils ne soient montés —
+    // évite le flash/écran noir le temps que CachedImage télécharge à la volée au scroll rapide.
+    if (lastVisibleIndex >= 0) {
+      prefetchUpcomingImages(lastVisibleIndex + 1);
+    }
   }).current;
 
   // Sheet commentaires
@@ -856,11 +954,18 @@ export const FeedScreen: React.FC = () => {
   // l'id de la pub obtenue (ou null si aucune campagne disponible/restante).
   const fetchNextAd = useCallback(async (): Promise<string | null> => {
     try {
-      const exclude = seenAdIdsRef.current.join(',');
+      // Dédupliqué avant envoi : load('all') et loadMoreFeed peuvent toutes deux appeler
+      // assignAdsToSlots sur ce même seenAdIdsRef partagé (ex: refresh silencieux qui se
+      // chevauche avec le prefetch anticipé) — sans garde explicite entre les deux, deux
+      // appels concurrents peuvent pousser le même id ou lire un historique pas encore à
+      // jour, produisant un exclude_ids avec des doublons observés côté logs serveur.
+      const exclude = Array.from(new Set(seenAdIdsRef.current)).join(',');
       const url = `/api/v1/ads/feed/next?placement=feed${exclude ? `&exclude_ids=${exclude}` : ''}`;
       const res = await apiClient.get<AdData | null>(url);
       if (!res.data) return null;
-      seenAdIdsRef.current.push(res.data.id);
+      if (!seenAdIdsRef.current.includes(res.data.id)) {
+        seenAdIdsRef.current.push(res.data.id);
+      }
       setAdsById(prev => ({ ...prev, [res.data!.id]: res.data! }));
       return res.data.id;
     } catch {
@@ -870,12 +975,19 @@ export const FeedScreen: React.FC = () => {
 
   // Attribue une campagne distincte à chaque emplacement pub du feed — séquentiel pour
   // que chaque tirage voie bien l'exclusion mise à jour par les précédents (pas de doublon).
-  const assignAdsToSlots = useCallback(async (slotIds: string[]) => {
-    for (const slotId of slotIds) {
-      const adId = await fetchNextAd();
-      if (!adId) break; // plus aucune campagne disponible — les slots restants resteront vides
-      setAdSlotMap(prev => ({ ...prev, [slotId]: adId }));
-    }
+  // Chaînée sur adAssignQueueRef pour sérialiser aussi les appels concurrents entre eux
+  // (load('all') vs loadMoreFeed) — un seul tirage de pub à la fois dans toute la session.
+  const assignAdsToSlots = useCallback((slotIds: string[]): Promise<void> => {
+    const run = async () => {
+      for (const slotId of slotIds) {
+        const adId = await fetchNextAd();
+        if (!adId) break; // plus aucune campagne disponible — les slots restants resteront vides
+        setAdSlotMap(prev => ({ ...prev, [slotId]: adId }));
+      }
+    };
+    const next = adAssignQueueRef.current.then(run, run);
+    adAssignQueueRef.current = next;
+    return next;
   }, [fetchNextAd]);
 
   // ── Suivi (follow) state ──────────────────────────────────────────────────
@@ -1059,12 +1171,12 @@ export const FeedScreen: React.FC = () => {
             result.push({ kind: 'ad', id: slotId, data: null });
           }
 
-          // Communities : première à pos 10, puis toutes les COMM_EVERY — chaque bloc
-          // affiche une tranche différente du pool (renouvelé via fetchMoreCommunities
-          // quand épuisé), pas toujours les mêmes communautés.
+          // Communities : première à pos 10, puis toutes les COMM_EVERY — data résolu au
+          // rendu (sliceForCommBlock dans renderItem), pas figé ici : reflète le pool
+          // renouvelé par fetchMoreCommunities même après l'insertion de ce bloc.
           if (commData.length > 0 && (i === 9 || (i > 9 && (i - 9) % COMM_EVERY === 0))) {
             commCount += 1;
-            result.push({ kind: 'communities', id: `__communities__${commCount}`, data: sliceForCommBlock(commCount) });
+            result.push({ kind: 'communities', id: `__communities__${commCount}`, data: null });
           }
         });
 
@@ -1232,7 +1344,7 @@ export const FeedScreen: React.FC = () => {
 
           if (commData.length > 0 && (i === 9 || (i > 9 && (i - 9) % COMM_EVERY === 0))) {
             commCountRef.current += 1;
-            appended.push({ kind: 'communities', id: `__communities__${commCountRef.current}`, data: sliceForCommBlock(commCountRef.current) });
+            appended.push({ kind: 'communities', id: `__communities__${commCountRef.current}`, data: null });
           }
         });
         // Si aucun post/event neuf mais des reels quand même, ajouter la rangée en fin
@@ -1250,6 +1362,7 @@ export const FeedScreen: React.FC = () => {
       setLoadingMoreFeed(false);
     }
   }, [filter, hasMoreFeed, assignAdsToSlots]);
+  useEffect(() => { loadMoreFeedRef.current = loadMoreFeed; }, [loadMoreFeed]);
 
   // Près de toi — chargé dès que la position est disponible
   useEffect(() => {
@@ -1467,7 +1580,10 @@ export const FeedScreen: React.FC = () => {
       );
     }
     if (item.kind === 'communities') {
-      const allComms: CommunityData[] = Array.isArray(item.data) ? item.data : [];
+      // Calculé au rendu (pas figé à l'insertion) — se met à jour automatiquement quand
+      // fetchMoreCommunities enrichit le pool en arrière-plan (voir sliceForCommBlock).
+      const commBlockNum = parseInt(item.id.split('__communities__')[1] ?? '1', 10) || 1;
+      const allComms: CommunityData[] = sliceForCommBlock(commBlockNum);
       const myCommIds = new Set<string>();
       const JOINED = new Set(['member', 'admin', 'moderator']);
       const comms = allComms.filter(c => !myCommIds.has(String(c.id)) && !JOINED.has(c.join_status as string));
@@ -1618,7 +1734,7 @@ export const FeedScreen: React.FC = () => {
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, sliceForBlock, suggestLoading, loadSuggestions]);
+  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, sliceForBlock, sliceForCommBlock, suggestLoading, loadSuggestions]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -2173,8 +2289,11 @@ export const FeedScreen: React.FC = () => {
           onViewableItemsChanged={onFeedViewableChanged}
           viewabilityConfig={feedViewabilityConfig}
           maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+          onScroll={handleFeedScroll}
+          scrollEventThrottle={100}
           onEndReached={loadMoreFeed}
           onEndReachedThreshold={0.6}
+          updateCellsBatchingPeriod={50}
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
           )}
@@ -2224,7 +2343,7 @@ export const FeedScreen: React.FC = () => {
           }
           renderItem={renderItem}
           removeClippedSubviews
-          maxToRenderPerBatch={6}
+          maxToRenderPerBatch={4}
           windowSize={7}
           initialNumToRender={5}
         />
