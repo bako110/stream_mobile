@@ -137,7 +137,7 @@ export const RichText: React.FC<Props> = ({
       style={textStyle}
       numberOfLines={expanded ? undefined : (maxLines || undefined)}
       ellipsizeMode="tail"
-      onPress={maxLines > 0 && isTruncated && !expanded ? () => setExpanded(true) : undefined}
+      onPress={maxLines > 0 && isTruncated ? () => setExpanded(v => !v) : undefined}
       suppressHighlighting
     >
       {renderSegs()}
