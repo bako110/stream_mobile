@@ -4,7 +4,6 @@ import {
   StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput,
   ScrollView, KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
-import NetInfo from '@react-native-community/netinfo';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -259,7 +258,6 @@ export const CommunitiesScreen: React.FC = () => {
   const [query,          setQuery]          = useState('');
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
-  const [isOffline,      setIsOffline]      = useState(false);
   const [createOpen,     setCreateOpen]     = useState(false);
   const [templateOpen,   setTemplateOpen]   = useState(false);
   const [joinOpen,       setJoinOpen]       = useState(false);
@@ -355,15 +353,6 @@ export const CommunitiesScreen: React.FC = () => {
   };
 
   const load = useCallback(async (silent = false) => {
-    const net = await NetInfo.fetch();
-    const online = !!(net.isConnected && net.isInternetReachable !== false);
-    setIsOffline(!online);
-    if (!online) {
-      setAll([]);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
     if (!silent) setLoading(true);
     try {
       const data = tab === 'mine'
@@ -1170,16 +1159,6 @@ export const CommunitiesScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* ── Bannière hors-ligne ── */}
-      {isOffline && (
-        <View style={[S.offlineBanner, { backgroundColor: colors.surface }]}>
-          <Icon name="wifi-off" size={14} color="#F97316" />
-          <Text style={[S.offlineTxt, { color: colors.textSecondary }]}>
-            Pas de connexion — les communautés ne sont pas disponibles hors ligne.
-          </Text>
-        </View>
-      )}
-
       {/* ── Corps ── */}
       {renderList()}
 
@@ -1343,16 +1322,6 @@ export const CommunitiesScreen: React.FC = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
   root: { flex: 1 },
-  offlineBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F9731630',
-  },
-  offlineTxt: { fontSize: 13, flex: 1 },
   emptyContainer: {
     flexGrow: 1,
     alignItems: 'center',

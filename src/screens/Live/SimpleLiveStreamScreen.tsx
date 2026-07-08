@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import Animated, {
   FadeIn, FadeOut, SlideInRight, SlideOutRight,
-  useAnimatedStyle, useSharedValue, withRepeat, withTiming, withSequence, Easing,
+  useAnimatedStyle, useSharedValue, withRepeat, withTiming,
 } from 'react-native-reanimated';
 import {
   LiveKitRoom,
@@ -116,42 +116,6 @@ const PulsingLiveDot: React.FC = () => {
   return <Animated.View style={[st.liveIndicator, animStyle]} />;
 };
 
-// ── Anneau pulsant "parle en ce moment" ──────────────────────────────────────
-
-const SpeakingRing: React.FC<{ color?: string; size: number; borderWidth?: number }> = ({
-  color = '#3FEDB6', size, borderWidth = 3,
-}) => {
-  const scale   = useSharedValue(1);
-  const opacity = useSharedValue(0.9);
-
-  useEffect(() => {
-    scale.value   = withRepeat(withSequence(
-      withTiming(1.12, { duration: 380, easing: Easing.out(Easing.quad) }),
-      withTiming(1,    { duration: 380, easing: Easing.in(Easing.quad) }),
-    ), -1, false);
-    opacity.value = withRepeat(withSequence(
-      withTiming(0.35, { duration: 380 }),
-      withTiming(0.9,  { duration: 380 }),
-    ), -1, false);
-  }, []);
-
-  const ring = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity:   opacity.value,
-  }));
-
-  return (
-    <Animated.View
-      style={[ring, {
-        position: 'absolute', top: 0, left: 0,
-        width: size, height: size, borderRadius: size / 2,
-        borderWidth, borderColor: color,
-        pointerEvents: 'none',
-      }]}
-    />
-  );
-};
-
 // ── Zone vidéo host ───────────────────────────────────────────────────────────
 
 const HostVideoView: React.FC<{
@@ -175,7 +139,6 @@ const HostVideoView: React.FC<{
   const localCamOn      = localTrack ? !localTrack.publication?.isMuted : false;
   const spotlightTrack  = allTracks.find(t => t.participant.identity === spotlightId) ?? localTrack ?? allTracks[0] ?? null;
   const thumbnailTracks = allTracks.filter(t => t !== spotlightTrack);
-  const showLocalPip    = spotlightTrack && !spotlightTrack.participant.isLocal && localTrack;
   const spotlightName   = spotlightTrack ? (spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity)) : '';
   const spotlightCamOn  = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
 
@@ -242,25 +205,10 @@ const HostVideoView: React.FC<{
             </View>
       )}
 
-      {/* PiP local quand viewer spotlighté */}
-      {showLocalPip && localTrack && (
-        <TouchableOpacity style={mv.pip} onPress={() => setSpotlightId(null)} activeOpacity={0.85}>
-          {localCamOn
-            ? <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} mirror={mirror} objectFit="cover" />
-            : <View style={[StyleSheet.absoluteFill, mv.thumbNoCam]}><Av name="Toi" size={40} /></View>
-          }
-          {/* Anneau pulsant si le host parle */}
-          {localSpeaking && <SpeakingRing color="#F0365A" size={mv.pip.width as number} borderWidth={3} />}
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={mv.pipGrad}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-              {localSpeaking && <View style={mv.pipSpeakDot} />}
-              <Text style={mv.pipLabel}>Toi</Text>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
-
-      {/* Bandeau "Sur scène" — toi (hôte) en premier, puis invités, tuiles vidéo réelles */}
+      {/* Bandeau "Sur scène" — toi (hôte) en premier, puis invités, tuiles vidéo réelles.
+          Plus de PiP flottant séparé : quand un viewer est spotlighté, ta propre tuile
+          dans le bandeau reste l'unique endroit où tu apparais (avatar si caméra off,
+          flux vidéo sinon), évitant toute superposition avec le spotlight. */}
       <View style={mv.stageRowWrap} pointerEvents="box-none">
         <StageTileRow
           tiles={[
@@ -1298,13 +1246,6 @@ const mv = StyleSheet.create({
   noCamCamPillText: { color: '#F0365A', fontSize: 13, fontWeight: '700' },
   noCamBadgeText:{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
   spotName:     { color: '#fff', fontSize: 16, fontWeight: '700' },
-  pip: {
-    position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, right: 12,
-    width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.45)', zIndex: 15,
-  },
-  pipGrad:  { position: 'absolute', bottom: 0, left: 0, right: 0, height: 30, justifyContent: 'flex-end', paddingBottom: 4 },
-  pipLabel: { color: '#fff', fontSize: 9, textAlign: 'center' },
   thumbsCol:{ position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, left: 12, zIndex: 15, gap: 8 },
   thumb: {
     width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
@@ -1321,7 +1262,6 @@ const mv = StyleSheet.create({
   thumbGiftBtn:  { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 2 },
   thumbSpeaking: { borderColor: '#3FEDB6', borderWidth: 2.5 },
   thumbSpeakDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#3FEDB6' },
-  pipSpeakDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#F0365A' },
 });
 
 // ── Styles page ───────────────────────────────────────────────────────────────

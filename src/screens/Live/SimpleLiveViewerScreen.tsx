@@ -334,21 +334,27 @@ const sas = StyleSheet.create({
 const MultiVideoView: React.FC<{
   hostName:      string;
   hostAvatarUrl: string | null | undefined;
+  myName:        string;
+  myAvatarUrl:   string | null | undefined;
+  onStage:       boolean;
   onGift: (id: string, name: string) => void;
   onTap:  () => void;
-}> = ({ hostName, hostAvatarUrl, onGift, onTap }) => {
+}> = ({ hostName, hostAvatarUrl, myName, myAvatarUrl, onStage, onGift, onTap }) => {
   const allTracks    = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const participants = useParticipants();
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
+  const localParticipant = participants.find(p => p.isLocal);
   const localTrack      = allTracks.find(t => t.participant.isLocal) ?? null;
   const remoteTracks    = allTracks.filter(t => !t.participant.isLocal);
   const defaultSpotlight = remoteTracks[0] ?? null;
   const spotlightTrack   = remoteTracks.find(t => t.participant.identity === spotlightId) ?? defaultSpotlight;
-  // Vignettes = autres remotes seulement (le local est dans le PiP)
+  // Vignettes = autres remotes (le local, s'il est sur scène, a sa propre tuile réservée
+  // dans le bandeau — plus de PiP flottant séparé qui pouvait se superposer au spotlight)
   const thumbnailTracks  = remoteTracks.filter(t => t !== spotlightTrack);
-  const localCamOn       = localTrack ? !localTrack.publication?.isMuted : false;
-  const showLocalPip     = localTrack && localCamOn && spotlightTrack;
+  // "Sur scène" = vraiment invité (onStage, géré par RoomContent via goOnStage/leaveStage),
+  // pas simplement connecté à la room — un simple spectateur ne doit pas apparaître ici.
+  const localOnStage     = onStage && !!localParticipant;
 
   const spotlightName  = spotlightTrack
     ? (spotlightTrack.participant.name || spotlightTrack.participant.identity)
@@ -407,17 +413,10 @@ const MultiVideoView: React.FC<{
           </TouchableOpacity>
         )}
 
-        {/* PiP local "Toi" — coin bas gauche, visible seulement quand on est sur scène */}
-        {showLocalPip && localTrack && (
-          <View style={mv.pip} pointerEvents="none">
-            <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
-            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={mv.pipGrad}>
-              <Text style={mv.pipLabel}>Toi</Text>
-            </LinearGradient>
-          </View>
-        )}
-
-        {/* Bandeau "Sur scène" — tuiles vidéo réelles, host en premier */}
+        {/* Bandeau "Sur scène" — une seule zone claire et alignée pour tous les
+            participants (host, invités, et toi si tu es sur scène). Chaque tuile
+            réserve sa place avec la photo de profil dès la montée sur scène, et
+            bascule automatiquement sur le flux caméra dès qu'il est actif. */}
         <View style={mv.stageRowWrap} pointerEvents="box-none">
           <StageTileRow
             tiles={[
@@ -429,6 +428,7 @@ const MultiVideoView: React.FC<{
                 avatarUrl: hostAvatarUrl,
                 badge:     'host' as StageBadge,
                 micOn:     spotlightCamOn,
+                isSpeaking: spotlightTrack ? !!participants.find(p => p.identity === spotlightTrack.participant.identity)?.isSpeaking : false,
               },
               ...thumbnailTracks.map(t => ({
                 identity: t.participant.identity,
@@ -437,7 +437,21 @@ const MultiVideoView: React.FC<{
                 camOn:    !t.publication?.isMuted,
                 badge:    'star' as StageBadge,
                 micOn:    !t.publication?.isMuted,
+                isSpeaking: !!participants.find(p => p.identity === t.participant.identity)?.isSpeaking,
               } satisfies StageTile)),
+              // Toi — dès que tu es sur scène, ta place est réservée avec ta photo de
+              // profil ; dès que tu actives la caméra, le flux la remplace automatiquement
+              // (même tuile, pas d'élément séparé qui pourrait se superposer au spotlight).
+              ...(localOnStage ? [{
+                identity: localParticipant!.identity,
+                name: myName || 'Toi',
+                track: localTrack,
+                camOn: localTrack ? !localTrack.publication?.isMuted : false,
+                avatarUrl: myAvatarUrl,
+                badge: 'star' as StageBadge,
+                micOn: localTrack ? !localTrack.publication?.isMuted : false,
+                isSpeaking: !!localParticipant?.isSpeaking,
+              } satisfies StageTile] : []),
             ]}
             onTapTile={(identity) => setSpotlightId(identity)}
             onLongPressTile={(identity) => {
@@ -487,6 +501,8 @@ const RoomContent: React.FC<{
   live:         LiveStream | null;
   liveId:       string;
   myIdentity:   string;
+  myName:       string;
+  myAvatarUrl:  string | null | undefined;
   isHost:       boolean;
   viewerCount:  number;
   messages:     ChatMsg[];
@@ -511,13 +527,13 @@ const RoomContent: React.FC<{
   onReact:      (emoji: string) => void;
   elapsed:      number;
   goOnStageRef:  { current: (() => void) | null };
-  leaveStageRef: { current: (() => void) | null };
+  leaveStageRef: { current: ((notifyServer?: boolean) => void) | null };
   handRequests:  HandRequest[];
   onHandDismiss: (identity: string) => void;
   onLiveUpdated: (patch: Partial<LiveStream>) => void;
   onStopLive:    () => void;
 }> = ({
-  live, liveId, myIdentity, isHost, viewerCount, messages, chatInput, setChatInput,
+  live, liveId, myIdentity, myName, myAvatarUrl, isHost, viewerCount, messages, chatInput, setChatInput,
   sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, onDeleteMsg, onEditMsg,
   giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike, likeRef,
   reactionSpawnRef, onReact,
@@ -558,15 +574,21 @@ const RoomContent: React.FC<{
     } catch {}
   }, [localParticipant]);
 
-  // Descendre de scène : couper cam + micro, et notifier le serveur (host + web resynchronisés)
-  const leaveStage = useCallback(async () => {
+  // Descendre de scène : couper cam + micro. notifyServer=true uniquement pour une
+  // descente volontaire (clic utilisateur) — quand on réagit à l'événement WS
+  // "live_guest_demoted" (le serveur nous informe qu'on a déjà été redescendu),
+  // notifyServer doit être false, sinon on rappelle l'API demote, qui refait
+  // diffuser le même événement WS, qui redéclenche cet appel : boucle infinie.
+  const leaveStage = useCallback(async (notifyServer: boolean = true) => {
     try {
       await localParticipant.setCameraEnabled(false);
       await localParticipant.setMicrophoneEnabled(false);
       setCamOn(false); setMicOn(false);
       setOnStage(false); setHandRaised(false);
     } catch {}
-    try { await apiClient.post(Endpoints.lives.demote(liveId, myIdentity)); } catch {}
+    if (notifyServer) {
+      try { await apiClient.post(Endpoints.lives.demote(liveId, myIdentity)); } catch {}
+    }
   }, [localParticipant, liveId, myIdentity]);
 
   // Exposer les fonctions au parent via les refs
@@ -637,6 +659,9 @@ const RoomContent: React.FC<{
       <MultiVideoView
         hostName={hostName}
         hostAvatarUrl={live?.user?.avatar_url}
+        myAvatarUrl={myAvatarUrl}
+        myName={myName}
+        onStage={onStage}
         onGift={(id, name) => giftRef.current?.openGift(id, name)}
         onTap={() => likeRef.current?.trigger()}
       />
@@ -1071,7 +1096,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const pendingLikes = useRef(0);
   // Refs vers les fonctions de RoomContent pour réagir aux WS
   const goOnStageRef      = useRef<(() => void) | null>(null);
-  const leaveStageRef     = useRef<(() => void) | null>(null);
+  const leaveStageRef     = useRef<((notifyServer?: boolean) => void) | null>(null);
   // Ref vers le bouton coeur pour déclencher l'animation depuis le WS
   const remoteLikeRef     = useRef<import('../../components/live/LiveLikeButton').LiveLikeButtonRef | null>(null);
   const reactionSpawnRef  = useRef<((emoji: string) => void) | null>(null);
@@ -1254,7 +1279,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
           setHandRequests(prev => prev.filter(r => r.identity !== d.identity));
           if (d.identity === myIdentity) {
             addSysMsg('Tu as été redescendu de scène.');
-            leaveStageRef.current?.();
+            // notifyServer=false : cet événement VIENT du serveur (host qui nous a
+            // redescendu, ou notre propre demote déjà envoyé) — le renvoyer créerait
+            // une boucle infinie de POST demote / diffusion WS.
+            leaveStageRef.current?.(false);
           }
         }
 
@@ -1469,6 +1497,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         live={live}
         liveId={liveId}
         myIdentity={myIdentity}
+        myName={currentUser?.display_name ?? currentUser?.username ?? 'Toi'}
+        myAvatarUrl={currentUser?.avatar_url}
         isHost={isHost}
         viewerCount={viewerCount}
         messages={messages}
@@ -1524,16 +1554,6 @@ const mv = StyleSheet.create({
   spotGiftBtn: {
     display: 'none',
   },
-  pip: {
-    position: 'absolute', top: Platform.OS === 'ios' ? 115 : 95, left: 12,
-    width: 72, height: 108, borderRadius: 12, overflow: 'hidden',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)', zIndex: 15,
-  },
-  pipGrad: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
-    justifyContent: 'flex-end', paddingBottom: 3,
-  },
-  pipLabel: { color: '#fff', fontSize: 9, textAlign: 'center' },
   thumbsCol: {
     position: 'absolute', top: Platform.OS === 'ios' ? 115 : 95,
     left: 92, zIndex: 15, gap: 8,

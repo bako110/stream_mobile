@@ -2415,81 +2415,32 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   );
 };
 
-// ── MiniReelPlayer — mini carte reel avec autoplay muet ──────────────────────
-
-// Durée max de preview dans le feed : 2 segments HLS (~4s) puis pause
-const PREVIEW_DURATION_MS = 4000;
+// ── MiniReelPlayer — mini carte reel, image statique uniquement ──────────────
+// Pas de chargement/lecture vidéo tant que l'utilisateur n'a pas cliqué : seule
+// la miniature (thumbnail) s'affiche. La vidéo ne charge qu'à l'ouverture du
+// reel en plein écran (onPress → navigation), jamais en arrière-plan dans le feed.
 
 const MiniReelPlayer: React.FC<{
   reel: any; w: number; h: number;
   isActive: boolean; feedFocused: boolean; onPress: () => void;
-}> = React.memo(({ reel, w, h, isActive, feedFocused, onPress }) => {
-  const [muted,    setMuted]    = useState(true);
-  const [previewed,setPreviewed]= useState(false); // a déjà joué son preview
-
-  const videoUri  = reel.hls_url ?? null;
-  const previewRef= useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const player = useVideoPlayer(
-    videoUri ? {
-      uri: videoUri,
-      bufferConfig: {
-        minBufferMs: 1_000, maxBufferMs: 8_000,
-        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 800,
-      },
-    } : 'about:blank',
-    (p: any) => { p.muted = true; p.volume = 0; p.loop = false; },
-  );
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      if (previewRef.current) clearTimeout(previewRef.current);
-      try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
-    };
-  }, []); // eslint-disable-line
-
-  useEffect(() => {
-    if (!videoUri) return;
-    if (isActive && feedFocused && !previewed) {
-      // Joue le preview et arrête après PREVIEW_DURATION_MS
-      try { player.play(); } catch {}
-      previewRef.current = setTimeout(() => {
-        try { player.pause(); } catch {}
-        setPreviewed(true);
-      }, PREVIEW_DURATION_MS);
-    } else if (!isActive || !feedFocused) {
-      // Hors écran ou feed sans focus → pause immédiate
-      if (previewRef.current) { clearTimeout(previewRef.current); previewRef.current = null; }
-      try { player.pause(); } catch {}
-      // Reset preview si la rangée quitte l'écran (pour rejouer si l'user revient)
-      if (!isActive) setPreviewed(false);
-    }
-  }, [isActive, feedFocused, videoUri, previewed]);
-
-  useEffect(() => {
-    try { player.muted = muted; player.volume = muted ? 0 : 1; } catch {}
-  }, [muted]);
-
+}> = React.memo(({ reel, w, h, onPress }) => {
+  const videoUri = reel.hls_url ?? null;
   const author   = reel.author;
   const name     = author?.display_name ?? author?.username ?? '';
   const initials = name[0]?.toUpperCase() ?? '?';
 
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[rrS.thumb, { width: w, height: h }]}>
-      {videoUri ? (
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          controls={false}
-          surfaceType="texture"
-        />
-      ) : reel.thumbnail_url ? (
+      {reel.thumbnail_url ? (
         <CachedImage uri={reel.thumbnail_url} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} resizeMode="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: 14 }]}>
           <Icon name="film" size={28} color="rgba(255,255,255,0.18)" />
+        </View>
+      )}
+      {videoUri && (
+        <View pointerEvents="none" style={rrS.playBadgeMini}>
+          <Icon name="play" size={16} color="#fff" />
         </View>
       )}
 
@@ -2523,18 +2474,6 @@ const MiniReelPlayer: React.FC<{
       })()}
 
       <LinearGradient colors={['transparent', 'transparent', 'rgba(0,0,0,0.8)']} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} />
-
-
-      {/* Bouton son */}
-      {videoUri && isActive && (
-        <TouchableOpacity
-          style={rrS.muteBtnMini}
-          onPress={e => { e.stopPropagation(); setMuted(v => !v); }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Icon name={muted ? 'volume-x' : 'volume-2'} size={13} color="#fff" />
-        </TouchableOpacity>
-      )}
 
       {/* Infos bas */}
       <View style={rrS.thumbBottom}>
@@ -2640,52 +2579,10 @@ const HeroReelPlayer: React.FC<{
   h: number;
   isVisible: boolean;
   onPress: () => void;
-}> = React.memo(({ reel, w, h, isVisible, onPress }) => {
-  const [muted, setMuted] = useState(true);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+}> = React.memo(({ reel, w, h, onPress }) => {
+  // Pas de lecteur vidéo ici — image statique uniquement, la vidéo ne charge
+  // qu'à l'ouverture du reel en plein écran (onPress).
   const videoUri = reel.hls_url ?? null;
-
-  const player = useVideoPlayer(
-    videoUri ? {
-      uri: videoUri,
-      bufferConfig: {
-        minBufferMs: 2_000, maxBufferMs: 15_000,
-        bufferForPlaybackMs: 300, bufferForPlaybackAfterRebufferMs: 1_000,
-        preferredForwardBufferDurationMs: 5_000,
-      },
-    } : 'about:blank',
-    (p: any) => { p.muted = true; p.volume = 0; p.loop = true; },
-  );
-
-  // Cleanup complet au démontage
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      try { player.pause(); player.replaceSourceAsync({ uri: 'about:blank' }).catch(() => {}); } catch {}
-    };
-  }, []); // eslint-disable-line
-
-  // Jouer seulement si visible à l'écran ET feed au premier plan
-  useEffect(() => {
-    if (!videoUri) return;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (isVisible) {
-      timerRef.current = setTimeout(() => { try { player.play(); } catch {} }, 200);
-    } else {
-      try { player.pause(); } catch {}
-    }
-    return () => {
-      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-      try { player.pause(); } catch {}
-    };
-  }, [videoUri, isVisible]); // eslint-disable-line
-
-  // Sync mute
-  useEffect(() => {
-    try { player.muted = muted; player.volume = muted ? 0 : 1; } catch {}
-  }, [muted]);
-
   const author   = reel.author;
   const name     = author?.display_name ?? author?.username ?? '';
   const initials = name[0]?.toUpperCase() ?? '?';
@@ -2696,16 +2593,7 @@ const HeroReelPlayer: React.FC<{
       onPress={onPress}
       style={[rrS.thumb, { width: w, height: h }]}
     >
-      {/* Vidéo en autoplay muet */}
-      {videoUri ? (
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          controls={false}
-          surfaceType="texture"
-        />
-      ) : reel.thumbnail_url ? (
+      {reel.thumbnail_url ? (
         <CachedImage uri={reel.thumbnail_url} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: 18 }]}>
@@ -2719,16 +2607,13 @@ const HeroReelPlayer: React.FC<{
         style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
       />
 
-
-      {/* Bouton son haut droite */}
+      {/* Badge lecture centré */}
       {videoUri && (
-        <TouchableOpacity
-          style={rrS.muteBtn}
-          onPress={e => { e.stopPropagation(); setMuted(v => !v); }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Icon name={muted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
-        </TouchableOpacity>
+        <View pointerEvents="none" style={rrS.playBtn}>
+          <View style={[rrS.playCircle, rrS.playCircleLarge]}>
+            <Icon name="play" size={22} color="#fff" />
+          </View>
+        </View>
       )}
 
       {/* Durée */}
@@ -2956,6 +2841,7 @@ const rrS = StyleSheet.create({
 
   muteBtn:          { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   muteBtnMini:      { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  playBadgeMini:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   durationBadge:    { position: 'absolute', top: 52, right: 10, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
   durationTxt:      { color: '#fff', fontSize: 10, fontWeight: '700' },
 
