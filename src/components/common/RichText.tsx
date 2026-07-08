@@ -71,11 +71,14 @@ export const RichText: React.FC<Props> = ({
   const [expanded, setExpanded] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
 
-  const onTextLayout = useCallback((e: any) => {
-    if (!expanded && maxLines > 0 && e.nativeEvent.lines.length > maxLines) {
+  // Mesure du nombre RÉEL de lignes — doit se faire sans numberOfLines, sinon
+  // onTextLayout ne rapporte jamais plus de lignes que la limite déjà appliquée
+  // (la troncature ne serait donc jamais détectée).
+  const onFullTextLayout = useCallback((e: any) => {
+    if (maxLines > 0 && e.nativeEvent.lines.length > maxLines) {
       setIsTruncated(true);
     }
-  }, [expanded, maxLines]);
+  }, [maxLines]);
 
   const segs = parse(text);
 
@@ -134,11 +137,24 @@ export const RichText: React.FC<Props> = ({
       style={textStyle}
       numberOfLines={expanded ? undefined : (maxLines || undefined)}
       ellipsizeMode="tail"
-      onTextLayout={maxLines > 0 ? onTextLayout : undefined}
+      onPress={maxLines > 0 && isTruncated && !expanded ? () => setExpanded(true) : undefined}
+      suppressHighlighting
     >
       {renderSegs()}
     </Text>
   );
+
+  // Clone invisible et non-tronqué du texte, uniquement pour mesurer le
+  // nombre réel de lignes qu'il occuperait sans limite.
+  const measureNode = maxLines > 0 && !isTruncated ? (
+    <Text
+      style={[textStyle, st.measure]}
+      onTextLayout={onFullTextLayout}
+      aria-hidden
+    >
+      {renderSegs()}
+    </Text>
+  ) : null;
 
   const toggleNode = !maxLines ? null : isTruncated && !expanded ? (
     <TouchableOpacity onPress={() => setExpanded(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}>
@@ -156,6 +172,7 @@ export const RichText: React.FC<Props> = ({
     return (
       <View>
         {textNode}
+        {measureNode}
         {toggleNode}
       </View>
     );
@@ -164,6 +181,7 @@ export const RichText: React.FC<Props> = ({
   return (
     <View>
       {textNode}
+      {measureNode}
       {toggleNode}
       {/* Preview card pour chaque URL — max 1 affichée pour ne pas surcharger */}
       <LinkPreviewCard url={urls[0]} />
@@ -173,4 +191,8 @@ export const RichText: React.FC<Props> = ({
 
 const st = StyleSheet.create({
   toggle: { fontSize: 13, fontWeight: '600', marginTop: 4 },
+  measure: {
+    position: 'absolute', left: 0, right: 0, top: 0,
+    opacity: 0, zIndex: -1,
+  },
 });
