@@ -160,8 +160,6 @@ export const Endpoints = {
     byUser:         (userId: string) => `${V1}/reels/user/${userId}`,
     update:         (id: string) => `${V1}/reels/${id}`,
     delete:         (id: string) => `${V1}/reels/${id}`,
-    download:       (id: string) => `${V1}/reels/${id}/download`,
-    downloadStatus: (id: string, jobId: string) => `${V1}/reels/${id}/download/status/${jobId}`,
   },
 
   // ── Social (prefix: /api/v1/social) ───────────────────────────────────────
