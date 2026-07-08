@@ -6,11 +6,11 @@ export const USE_LOCAL_API = false; // Mettre à true pour le développement loc
 
 export const API_BASE_URL = USE_LOCAL_API
   ? 'http://localhost:8000' // local via adb reverse (USB)
-  : 'http://178.104.248.78'; // prod (port 80 is default)
+  : 'https://gofolyx.com'; // prod — HTTPS/HTTP2, évite la sérialisation des requêtes parallèles
 
 export const WS_BASE_URL = USE_LOCAL_API
   ? 'ws://localhost:8000'
-  : 'ws://178.104.248.78';
+  : 'wss://gofolyx.com';
 
 export const API_TIMEOUT = 30_000; // 30s (Fly.dev cold start)
 
