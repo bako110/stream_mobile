@@ -517,39 +517,39 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           >
             <Icon name="more-horizontal" size={20} color={colors.textTertiary} />
           </TouchableOpacity>
-        </View>
 
-        {/* Menu contextuel */}
-        {menuOpen && (
-          <View style={[s.ctxMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TouchableOpacity style={s.ctxItem} onPress={() => { setMenuOpen(false); handleShare(); }}>
-              <MCIcon name="share-outline" size={16} color={colors.textSecondary} />
-              <Text style={[s.ctxTxt, { color: colors.textSecondary }]}>Partager</Text>
-            </TouchableOpacity>
-            <View style={[s.ctxSep, { backgroundColor: colors.divider }]} />
-            <TouchableOpacity style={s.ctxItem} onPress={handleDownloadAll} disabled={downloading}>
-              {downloading
-                ? <ActivityIndicator size="small" color={colors.primary} />
-                : <Icon name="download" size={15} color={colors.textSecondary} />
-              }
-              <Text style={[s.ctxTxt, { color: colors.textSecondary }]}>
-                {downloading ? 'Téléchargement...' : 'Télécharger'}
-              </Text>
-            </TouchableOpacity>
-            <View style={[s.ctxSep, { backgroundColor: colors.divider }]} />
-            {isOwn ? (
-              <TouchableOpacity style={s.ctxItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
-                <Icon name="trash-2" size={15} color="#EF4444" />
-                <Text style={[s.ctxTxt, { color: '#EF4444' }]}>Supprimer</Text>
+          {/* Menu contextuel — ancré sous le bouton ···, jamais tronqué par le reste de la carte */}
+          {menuOpen && (
+            <View style={[s.ctxMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TouchableOpacity style={s.ctxItem} onPress={() => { setMenuOpen(false); handleShare(); }}>
+                <MCIcon name="share-outline" size={16} color={colors.textSecondary} />
+                <Text style={[s.ctxTxt, { color: colors.textSecondary }]}>Partager</Text>
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={s.ctxItem} onPress={handleReport}>
-                <Icon name="flag" size={15} color={colors.textSecondary} />
-                <Text style={[s.ctxTxt, { color: colors.textSecondary }]}>Signaler</Text>
+              <View style={[s.ctxSep, { backgroundColor: colors.divider }]} />
+              <TouchableOpacity style={s.ctxItem} onPress={handleDownloadAll} disabled={downloading}>
+                {downloading
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Icon name="download" size={15} color={colors.textSecondary} />
+                }
+                <Text style={[s.ctxTxt, { color: colors.textSecondary }]}>
+                  {downloading ? 'Téléchargement...' : 'Télécharger'}
+                </Text>
               </TouchableOpacity>
-            )}
-          </View>
-        )}
+              <View style={[s.ctxSep, { backgroundColor: colors.divider }]} />
+              {isOwn ? (
+                <TouchableOpacity style={s.ctxItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
+                  <Icon name="trash-2" size={15} color="#EF4444" />
+                  <Text style={[s.ctxTxt, { color: '#EF4444' }]}>Supprimer</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={s.ctxItem} onPress={handleReport}>
+                  <Icon name="flag" size={15} color={colors.textSecondary} />
+                  <Text style={[s.ctxTxt, { color: colors.textSecondary }]}>Signaler</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
 
         {/* Feeling pill */}
         {post.feeling ? (
@@ -570,6 +570,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <RichText
               text={post.body}
+              maxLines={6}
               primaryColor={colors.primary}
               textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
             />
@@ -826,12 +827,12 @@ const s = StyleSheet.create({
   postCard: {
     marginHorizontal: 12,
     borderRadius: 18,
-    overflow: 'hidden',
     marginBottom: 10,
   },
 
   // En-tête auteur
   authorRow: {
+    position: 'relative',
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 12,
   },
@@ -875,7 +876,7 @@ const s = StyleSheet.create({
 
   // Menu contextuel ···
   ctxMenu: {
-    position: 'absolute', top: 62, right: 16, zIndex: 20,
+    position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 20,
     borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
     minWidth: 170, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12,
