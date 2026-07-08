@@ -28,9 +28,9 @@ const PLAN_LABELS: Record<string, string> = {
 
 const PLAN_PRICES: Record<string, string> = {
   free:    '0 €/mois',
-  basic:   '5,99 €/mois',
-  premium: '9,99 €/mois',
-  family:  '14,99 €/mois',
+  basic:   '3,99 €/mois',
+  premium: '6,99 €/mois',
+  family:  '9,99 €/mois',
 };
 
 const PLAN_FEATURES: Record<string, string[]> = {
@@ -44,9 +44,9 @@ const PAID_PLANS: PlanType[] = ['basic', 'premium', 'family'];
 
 // 1 EUR = 100 GoGold (aligné sur le backend)
 const PLAN_COINS: Record<string, number> = {
-  basic:   Math.round(5.99  * 100),  // 599
-  premium: Math.round(9.99  * 100),  // 999
-  family:  Math.round(14.99 * 100),  // 1499
+  basic:   Math.round(3.99 * 100),  // 399
+  premium: Math.round(6.99 * 100),  // 699
+  family:  Math.round(9.99 * 100),  // 999
 };
 
 // ── Utilitaire date ────────────────────────────────────────────────────────────

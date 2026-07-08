@@ -12,10 +12,10 @@ export interface PlanConfig {
 }
 
 export const PLAN_CONFIG: Record<PlanType, PlanConfig> = {
-  free:    { price: 0,     screens: 1, profiles: 1, downloads: 0,  quality: '480p'  },
-  basic:   { price: 5.99,  screens: 1, profiles: 1, downloads: 0,  quality: '720p'  },
-  premium: { price: 9.99,  screens: 2, profiles: 3, downloads: 10, quality: '1080p' },
-  family:  { price: 14.99, screens: 5, profiles: 6, downloads: 30, quality: '4k'    },
+  free:    { price: 0,    screens: 1, profiles: 1, downloads: 0,  quality: '480p'  },
+  basic:   { price: 3.99, screens: 1, profiles: 1, downloads: 0,  quality: '720p'  },
+  premium: { price: 6.99, screens: 2, profiles: 3, downloads: 10, quality: '1080p' },
+  family:  { price: 9.99, screens: 5, profiles: 6, downloads: 30, quality: '4k'    },
 };
 
 export interface Subscription {
