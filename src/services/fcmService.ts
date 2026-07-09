@@ -223,7 +223,15 @@ export async function handleBackgroundFCM(
       received_at:  Date.now(),
     }));
 
-    await showIncomingCallNotification(callerId, callerName, callerAvatar || null, callType);
+    // Priorité au vrai écran d'appel natif (ConnectionService) — écran par-dessus
+    // le verrouillage, routage audio système, comme WhatsApp. Notifee reste le
+    // secours si le module natif est indisponible (ex: build sans le module).
+    const { callConnectionService } = require('../services/callConnectionService');
+    if (callConnectionService.isAvailable) {
+      await callConnectionService.reportIncomingCall(callerId, callerName, callType === 'video');
+    } else {
+      await showIncomingCallNotification(callerId, callerName, callerAvatar || null, callType);
+    }
     return;
   }
 
@@ -404,7 +412,38 @@ async function _unregisterToken(token: string): Promise<void> {
 }
 
 // ── Main setup (call after login) ─────────────────────────────────────────────
+// Reprend un appel accepté depuis la notification pendant que l'app était en
+// arrière-plan/tuée. Appelé en tout premier dans setupFCM() — avant permissions,
+// token FCM et enregistrement réseau — pour qu'un souci sur ces étapes annexes
+// (lentes, potentiellement en échec) ne retarde/empêche jamais la reprise d'un
+// appel déjà accepté par l'utilisateur (sinon: splash → accueil, appel perdu).
+export function resumePendingCallAccept(): void {
+  const pendingRaw = storage.getItem('pending_call_accept');
+  if (!pendingRaw) return;
+  storage.removeItem('pending_call_accept');
+  try {
+    const pending = JSON.parse(pendingRaw);
+    let offer: any = null;
+    const incomingRaw = storage.getItem('pending_incoming_call');
+    if (incomingRaw) {
+      storage.removeItem('pending_incoming_call');
+      try { offer = JSON.parse(incomingRaw).offer ?? null; } catch {}
+    }
+    navigate('Call', {
+      partnerId:    pending.caller_id,
+      partnerName:  pending.caller_name ?? 'Inconnu',
+      partnerAvatar: pending.caller_avatar || null,
+      callType:     pending.call_type ?? 'voice',
+      isIncoming:   true,
+      autoAccept:   true,
+      offer,
+    });
+  } catch {}
+}
+
 export async function setupFCM(): Promise<void> {
+  resumePendingCallAccept();
+
   await _createChannels();
 
   const m = getMessaging();
@@ -497,31 +536,6 @@ export async function setupFCM(): Promise<void> {
   const initialNotifee = await notifee.getInitialNotification();
   if (initialNotifee) {
     _handleNotificationOpen(initialNotifee.notification.data as Record<string, string>);
-  }
-
-  // Acceptation depuis background (bouton "Accepter" sur la notification)
-  const pendingRaw = storage.getItem('pending_call_accept');
-  if (pendingRaw) {
-    storage.removeItem('pending_call_accept');
-    try {
-      const pending = JSON.parse(pendingRaw);
-      // Récupérer l'offer depuis pending_incoming_call si dispo
-      let offer: any = null;
-      const incomingRaw = storage.getItem('pending_incoming_call');
-      if (incomingRaw) {
-        storage.removeItem('pending_incoming_call');
-        try { offer = JSON.parse(incomingRaw).offer ?? null; } catch {}
-      }
-      navigate('Call', {
-        partnerId:    pending.caller_id,
-        partnerName:  pending.caller_name ?? 'Inconnu',
-        partnerAvatar: pending.caller_avatar || null,
-        callType:     pending.call_type ?? 'voice',
-        isIncoming:   true,
-        autoAccept:   true,
-        offer,
-      });
-    } catch {}
   }
 }
 

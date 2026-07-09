@@ -22,6 +22,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
+import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { RichText } from '../../components/common/RichText';
 import { apiClient, Endpoints } from '../../api';
 import { reelService, socialService, authService } from '../../services';
@@ -65,6 +66,7 @@ const formatCount = (n: number): string => {
 // ─── ReelsScreen ─────────────────────────────────────────────────────────────
 
 export const ReelsScreen: React.FC = () => {
+  useKeepAwake();
   const [screenDims, setScreenDims] = useState(() => Dimensions.get('screen'));
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ screen }) => setScreenDims(screen));

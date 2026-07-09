@@ -40,6 +40,7 @@ import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
+import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useWs } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
@@ -1061,6 +1062,7 @@ const RoomContent: React.FC<{
 // ── Page principale ────────────────────────────────────────────────────────────
 
 export const SimpleLiveViewerScreen: React.FC = () => {
+  useKeepAwake();
   const nav   = useNavigation<Nav>();
   const route = useRoute<RouteT>();
   const { liveId } = route.params;

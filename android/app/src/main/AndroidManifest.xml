@@ -33,7 +33,11 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Ecran d'appel natif (ConnectionService self-managed, comme WhatsApp) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
 
     <queries>
         <package android:name="com.facebook.katana" />
@@ -81,6 +85,17 @@
             <data android:scheme="https" android:host="gofolyx.com" />
         </intent-filter>
       </activity>
+
+      <!-- Ecran d'appel natif — ConnectionService self-managed -->
+      <service
+          android:name=".callconnection.CallConnectionService"
+          android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+          android:foregroundServiceType="phoneCall"
+          android:exported="true">
+        <intent-filter>
+            <action android:name="android.telecom.ConnectionService" />
+        </intent-filter>
+      </service>
 
       <!-- Icône et couleur des notifications FCM -->
       <meta-data

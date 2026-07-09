@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { useKeepAwake } from '../../hooks/useKeepAwake';
 import type { Reel } from '../../types';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
@@ -22,6 +23,7 @@ const getAuthorLabel = (author?: Reel['author']) => {
 };
 
 export const ReelPlayerScreen: React.FC = () => {
+  useKeepAwake();
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const insets = useSafeAreaInsets();

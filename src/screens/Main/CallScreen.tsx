@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useActiveCall } from '../../context/ActiveCallContext';
+import { callConnectionService } from '../../services/callConnectionService';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_H * 0.15;
@@ -266,6 +267,7 @@ export const CallScreen: React.FC = () => {
         connectedAtRef.current = Date.now();
         notifyCallConnected(partnerId);
         startCall({ partnerId, partnerName, partnerAvatar, callType });
+        callConnectionService.reportCallActive(partnerId);
         if (mountedRef.current) setCallState('connected');
       }
     };
@@ -342,6 +344,7 @@ export const CallScreen: React.FC = () => {
     notifyCallEnded(partnerId);
     markCallEnded(partnerId);
     sendWs({ type: 'call_hangup', to: partnerId });
+    callConnectionService.endCallLocal(partnerId);
     if (mountedRef.current) setCallState('ended');
   }, [partnerId, endActiveCall, notifyCallEnded, markCallEnded, sendWs]);
 
@@ -355,6 +358,7 @@ export const CallScreen: React.FC = () => {
     const start = async () => {
       if (!isIncoming) {
         try {
+          callConnectionService.reportOutgoingCall(partnerId, partnerName);
           const stream = await getLocalStream();
           if (!mountedRef.current) return;
           InCallManager.start({ media: isVideo ? 'video' : 'audio' });
@@ -463,6 +467,7 @@ export const CallScreen: React.FC = () => {
         if (!wasConnected && !isIncoming) playRejected();
         notifyCallEnded(partnerId);
         markCallEnded(partnerId);
+        callConnectionService.endCall(partnerId);
         if (mountedRef.current) setCallState('ended');
         return;
       }
@@ -781,15 +786,21 @@ export const CallScreen: React.FC = () => {
 
       {/* Écran verrouillé */}
       {isLocked && callState === 'connected' && (
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
-          onPress={() => { setShowUnlockHint(true); setTimeout(() => setShowUnlockHint(false), 1400); }}
-        >
-          <View style={styles.lockOverlay}>
-            <Icon name="lock" size={20} color="rgba(255,255,255,0.5)" />
-            {showUnlockHint && <Text style={styles.lockHint}>Touchez et maintenez pour déverrouiller</Text>}
-          </View>
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => { setShowUnlockHint(true); setTimeout(() => setShowUnlockHint(false), 1400); }}
+          >
+            <View style={styles.lockIconTop}>
+              <Icon name="lock" size={20} color="rgba(255,255,255,0.5)" />
+            </View>
+          </TouchableOpacity>
+          {showUnlockHint && (
+            <Text style={[styles.lockHint, { bottom: insets.bottom + 100 }]}>
+              Touchez et maintenez pour déverrouiller
+            </Text>
+          )}
           <TouchableOpacity
             style={[styles.unlockBtn, { bottom: insets.bottom + 32 }]}
             onLongPress={toggleLock}
@@ -798,7 +809,7 @@ export const CallScreen: React.FC = () => {
           >
             <Icon name="unlock" size={20} color="#fff" />
           </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* Controls */}
@@ -1103,8 +1114,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(29,185,84,0.25)',
   },
   connectedLabel: {
-    position: 'absolute',
-    bottom: -48,
+    marginTop: 20,
     color: 'rgba(255,255,255,0.45)',
     fontSize: 13,
     fontWeight: '500',
@@ -1218,16 +1228,24 @@ const styles = StyleSheet.create({
   },
 
   // ── Verrouillage ──────────────────────────────────────────────────────────────
-  lockOverlay: {
+  lockIconTop: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
+    paddingTop: 100,
   },
   lockHint: {
-    color: 'rgba(255,255,255,0.6)',
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 13,
     fontWeight: '500',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    alignSelf: 'center',
   },
   unlockBtn: {
     position: 'absolute',

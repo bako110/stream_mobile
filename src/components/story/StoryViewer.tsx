@@ -5,13 +5,6 @@ import {
   TouchableWithoutFeedback, Alert, TextInput, Modal, Platform,
   FlatList, ActivityIndicator, Easing, Linking,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Reanimated, {
-  useAnimatedStyle as useReanimatedStyle,
-  useSharedValue,
-  withTiming as reanimatedWithTiming,
-  runOnJS,
-} from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import type { TextLayer, DrawPath, MaskRect, StickerLayer } from './StoryMediaEditor';
 import { VideoView, useVideoPlayer } from 'react-native-video';
@@ -72,100 +65,17 @@ const BUFFER_CFG = {
   bufferForPlaybackAfterRebufferMs: 1500,   // 1.5s après rebuffer
 };
 
-// ── Image avec fondu au chargement + pinch-to-zoom ───────────────────────────
-const ZOOM_MAX = 4;
-const ZOOM_DOUBLE_TAP = 2.5;
-
-const StoryImageView = React.memo(({ uri, bgColor, onZoomChange }: { uri: string; bgColor?: string; onZoomChange?: (zoomed: boolean) => void }) => {
+// ── Image avec fondu au chargement ───────────────────────────────────────────
+const StoryImageView = React.memo(({ uri, bgColor }: { uri: string; bgColor?: string }) => {
   const opacity = useRef(new Animated.Value(0)).current;
-
-  const scale      = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedX      = useSharedValue(0);
-  const savedY      = useSharedValue(0);
-
-  const notifyZoom = useCallback((zoomed: boolean) => { onZoomChange?.(zoomed); }, [onZoomChange]);
-
-  const clamp = (s: number) => {
-    'worklet';
-    const maxX = Math.max(0, (W * (s - 1)) / 2);
-    const maxY = Math.max(0, (H * (s - 1)) / 2);
-    translateX.value = Math.min(maxX, Math.max(-maxX, translateX.value));
-    translateY.value = Math.min(maxY, Math.max(-maxY, translateY.value));
-  };
-
-  const reset = () => {
-    'worklet';
-    scale.value      = reanimatedWithTiming(1);
-    savedScale.value = 1;
-    translateX.value = reanimatedWithTiming(0);
-    translateY.value = reanimatedWithTiming(0);
-    savedX.value = 0;
-    savedY.value = 0;
-    runOnJS(notifyZoom)(false);
-  };
-
-  const pinchGesture = Gesture.Pinch()
-    .onUpdate(e => {
-      scale.value = Math.min(ZOOM_MAX, Math.max(1, savedScale.value * e.scale));
-    })
-    .onEnd(() => {
-      if (scale.value <= 1) { reset(); return; }
-      savedScale.value = scale.value;
-      clamp(scale.value);
-      runOnJS(notifyZoom)(true);
-    });
-
-  const panGesture = Gesture.Pan()
-    .averageTouches(true)
-    .onUpdate(e => {
-      if (scale.value <= 1) return;
-      translateX.value = savedX.value + e.translationX;
-      translateY.value = savedY.value + e.translationY;
-    })
-    .onEnd(() => {
-      if (scale.value <= 1) return;
-      clamp(scale.value);
-      savedX.value = translateX.value;
-      savedY.value = translateY.value;
-    });
-
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(() => {
-      if (scale.value > 1) {
-        reset();
-      } else {
-        scale.value      = reanimatedWithTiming(ZOOM_DOUBLE_TAP);
-        savedScale.value = ZOOM_DOUBLE_TAP;
-        runOnJS(notifyZoom)(true);
-      }
-    });
-
-  const composedGesture = Gesture.Simultaneous(pinchGesture, panGesture, doubleTapGesture);
-
-  const zoomStyle = useReanimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-  }));
-
   return (
     <View style={[s.media, { backgroundColor: bgColor ?? '#000' }]}>
-      <GestureDetector gesture={composedGesture}>
-        <Reanimated.View style={[s.media, zoomStyle]}>
-          <Animated.Image
-            source={{ uri }}
-            style={[s.media, { opacity }]}
-            resizeMode="contain"
-            onLoad={() => Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start()}
-          />
-        </Reanimated.View>
-      </GestureDetector>
+      <Animated.Image
+        source={{ uri }}
+        style={[s.media, { opacity }]}
+        resizeMode="contain"
+        onLoad={() => Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start()}
+      />
     </View>
   );
 });
@@ -643,15 +553,6 @@ export const StoryViewer: React.FC<Props> = ({
   const [groupIdx,    setGroupIdx]    = useState(initialGroupIndex);
   const [storyIdx,    setStoryIdx]    = useState(initialStoryIndex ?? 0);
   const [paused,      setPaused]      = useState(false);
-  // Tant qu'une image de story est zoomée, on désactive swipe (fermer/naviguer) et
-  // tap zones (avancer/reculer) pour éviter tout conflit avec le geste de pincement.
-  const [isZoomed,    setIsZoomed]    = useState(false);
-  const isZoomedRef = useRef(false);
-  const setZoomed = useCallback((zoomed: boolean) => {
-    isZoomedRef.current = zoomed;
-    setIsZoomed(zoomed);
-    setPaused(zoomed);
-  }, []);
   const [storyAd,     setStoryAd]     = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string } | null>(null);
   const [showStoryAd, setShowStoryAd] = useState(false);
   const storyAdTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -946,7 +847,7 @@ export const StoryViewer: React.FC<Props> = ({
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
-        !isZoomedRef.current && (Math.abs(gs.dy) > 10 || Math.abs(gs.dx) > 15),
+        Math.abs(gs.dy) > 10 || Math.abs(gs.dx) > 15,
       onPanResponderGrant: () => setPaused(true),
       onPanResponderMove: (_, gs) => {
         // Swipe vertical → translateY (fermer)
@@ -1117,7 +1018,7 @@ export const StoryViewer: React.FC<Props> = ({
           <View style={[s.media, { backgroundColor: story.background_color ?? '#7B3FF2' }]} />
         )}
         {story.media_type === 'image' && story.media_url && (
-          <StoryImageView key={story.id} uri={story.media_url} bgColor={story.background_color ?? undefined} onZoomChange={setZoomed} />
+          <StoryImageView uri={story.media_url} bgColor={story.background_color ?? undefined} />
         )}
         {story.media_type === 'video' && story.media_url && (
           <StoryVideoView
@@ -1236,9 +1137,7 @@ export const StoryViewer: React.FC<Props> = ({
         )}
 
         {/* ── Tap zones (double-tap = like) ─────────────────────────────── */}
-        {/* Désactivées pendant un zoom actif — sinon un appui pendant le pinch
-            déclencherait aussi la navigation avant/arrière de la story. */}
-        <View style={s.tapZones} pointerEvents={isZoomed ? 'none' : 'box-none'}>
+        <View style={s.tapZones} pointerEvents="box-none">
           <TouchableWithoutFeedback
             onPress={goPrev}
             onPressIn={() => setPaused(true)}

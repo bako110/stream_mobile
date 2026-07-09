@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
+import { useKeepAwake } from '../../hooks/useKeepAwake';
 
 interface Props {
   route: {
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
+  useKeepAwake();
   const { url, title, videoId, contentId, episodeId, contentType, thumbnailUrl, totalSeconds } = route.params;
   const insets = useSafeAreaInsets();
   const [downloading, setDownloading] = useState(false);

@@ -17,6 +17,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { concertService } from '../../services';
+import { useKeepAwake } from '../../hooks/useKeepAwake';
 import type { Concert } from '../../types';
 
 interface Props {
@@ -213,6 +214,7 @@ const StreamControls: React.FC<{
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
+  useKeepAwake();
   const nav = useNavigation();
   const [concert,  setConcert]  = useState<Concert | null>(null);
   const [token,    setToken]    = useState<string | null>(null);

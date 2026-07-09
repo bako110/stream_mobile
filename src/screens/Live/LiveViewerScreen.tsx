@@ -21,6 +21,7 @@ import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
+import { useKeepAwake } from '../../hooks/useKeepAwake';
 import type { Concert } from '../../types';
 import { BackButton } from '../../components/common';
 
@@ -76,6 +77,7 @@ const ArtistVideoView: React.FC = () => {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
+  useKeepAwake();
   const nav = useNavigation();
 
   const [concert, setConcert] = useState<Concert | null>(null);
