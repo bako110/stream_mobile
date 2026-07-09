@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useActiveCall } from '../../context/ActiveCallContext';
 import { useWs } from '../../context/WebSocketContext';
+import type { WsPayload } from '../../context/WebSocketContext';
 
 function formatElapsed(s: number): string {
   const m = Math.floor(s / 60);
@@ -19,9 +20,26 @@ function getInitials(name: string): string {
 
 export const ActiveCallBar: React.FC = () => {
   const { activeCall, endCall } = useActiveCall();
-  const { sendMessage: sendWs, notifyCallEnded, markCallEnded } = useWs();
+  const { sendMessage: sendWs, notifyCallEnded, markCallEnded, addListener, removeListener } = useWs();
   const nav    = useNavigation<any>();
   const insets = useSafeAreaInsets();
+
+  // CallScreen est démonté une fois l'appel minimisé — sans ce listener, un
+  // call_hangup reçu pendant que l'appel est minimisé ne serait jamais traité
+  // et la barre resterait affichée pour un appel déjà terminé côté distant.
+  useEffect(() => {
+    if (!activeCall?.isActive) return;
+    const partnerId = activeCall.partnerId;
+    const handler = (payload: WsPayload) => {
+      const senderId = payload.from ?? payload.sender_id;
+      if (payload.type === 'call_hangup' && senderId === partnerId) {
+        markCallEnded(partnerId);
+        endCall();
+      }
+    };
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [activeCall?.isActive, activeCall?.partnerId, addListener, removeListener, markCallEnded, endCall]);
 
   if (!activeCall?.isActive) return null;
 
@@ -143,7 +161,7 @@ const styles = StyleSheet.create({
   },
   hangupBtn: {
     width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#E0389A',
+    backgroundColor: '#E53935',
     alignItems: 'center', justifyContent: 'center',
   },
 });

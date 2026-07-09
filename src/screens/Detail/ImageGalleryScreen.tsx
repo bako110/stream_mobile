@@ -1,11 +1,12 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
-  View, Image, FlatList, TouchableOpacity, Text,
-  StatusBar, Platform, Dimensions, StyleSheet, ActivityIndicator,
+  View, FlatList, TouchableOpacity, Text,
+  StatusBar, Platform, Dimensions, StyleSheet,
   NativeScrollEvent, NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import { ZoomableImage } from '../../components/common/ZoomableImage';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -15,30 +16,10 @@ interface Props {
   onBack: () => void;
 }
 
-const ImageItem: React.FC<{ uri: string }> = ({ uri }) => {
-  const [loaded, setLoaded] = useState(false);
-  return (
-    <View style={{ width: SW, height: SH, alignItems: 'center', justifyContent: 'center' }}>
-      {!loaded && (
-        <ActivityIndicator
-          color="rgba(255,255,255,0.5)"
-          size="large"
-          style={{ position: 'absolute' }}
-        />
-      )}
-      <Image
-        source={{ uri }}
-        style={{ width: SW, height: SH }}
-        resizeMode="contain"
-        onLoad={() => setLoaded(true)}
-      />
-    </View>
-  );
-};
-
 export const ImageGalleryScreen: React.FC<Props> = ({ urls, initialIndex = 0, onBack }) => {
   const insets = useSafeAreaInsets();
   const [currentIdx, setCurrentIdx] = useState(initialIndex);
+  const [isZoomed,   setIsZoomed]   = useState(false);
   const flatRef = useRef<FlatList>(null);
 
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -55,12 +36,15 @@ export const ImageGalleryScreen: React.FC<Props> = ({ urls, initialIndex = 0, on
         data={urls}
         horizontal
         pagingEnabled
+        scrollEnabled={!isZoomed}
         showsHorizontalScrollIndicator={false}
         initialScrollIndex={initialIndex}
         getItemLayout={(_, i) => ({ length: SW, offset: SW * i, index: i })}
         keyExtractor={(u, i) => u + i}
         onMomentumScrollEnd={onScroll}
-        renderItem={({ item }) => <ImageItem uri={item} />}
+        renderItem={({ item }) => (
+          <ZoomableImage uri={item} width={SW} height={SH} onZoomChange={setIsZoomed} />
+        )}
         decelerationRate="fast"
       />
 

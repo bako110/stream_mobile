@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import {
-  View, Image, Text, StatusBar, StyleSheet, TouchableOpacity, Alert, Platform,
-  PermissionsAndroid,
+  View, Text, StatusBar, StyleSheet, TouchableOpacity, Alert, Platform,
+  PermissionsAndroid, Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton } from '../../components/common';
+import { ZoomableImage } from '../../components/common/ZoomableImage';
+
+const { width: SW, height: SH } = Dimensions.get('window');
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const RNBlobUtil = require('react-native-blob-util').default;
@@ -71,7 +74,7 @@ export const ImageViewerScreen: React.FC<Props> = ({ route, navigation }) => {
   return (
     <View style={s.root}>
       <StatusBar hidden />
-      <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+      <ZoomableImage uri={url} width={SW} height={SH} />
 
       {/* Header */}
       <View style={s.header}>

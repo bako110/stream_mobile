@@ -821,6 +821,7 @@ export const ChatScreen: React.FC = () => {
     nav.navigate('Call', {
       partnerId,
       partnerName,
+      partnerAvatar: partnerAvatarUrl,
       callType,
       isIncoming: false,
     });

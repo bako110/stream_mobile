@@ -3,11 +3,14 @@ import {
   View, Text, FlatList, TouchableOpacity, Image, Modal,
   StyleSheet, ActivityIndicator, Alert, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, Switch,
-  StatusBar,
+  StatusBar, Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GoFolyXLoader } from '../../components/common';
+import { ZoomableImage } from '../../components/common/ZoomableImage';
+
+const { width: VIEWER_W, height: VIEWER_H } = Dimensions.get('window');
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -2044,7 +2047,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             </View>
           </TouchableOpacity>
           {viewerUrl && (
-            <Image source={{ uri: viewerUrl }} style={s.viewerImg} resizeMode="contain" />
+            <ZoomableImage uri={viewerUrl} width={VIEWER_W} height={VIEWER_H} />
           )}
         </View>
       </Modal>

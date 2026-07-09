@@ -329,6 +329,7 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
     navigate('Call', {
       partnerId:    data.caller_id   ?? data.from,
       partnerName:  data.caller_name ?? '',
+      partnerAvatar: data.caller_avatar || null,
       callType:     (data.call_type as 'voice' | 'video') ?? 'voice',
       isIncoming:   true,
       autoAccept:   data._accept === 'true',

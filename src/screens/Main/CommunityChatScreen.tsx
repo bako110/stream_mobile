@@ -24,6 +24,7 @@ import { uploadAudioFile, uploadFileFromUri } from '../../services/uploadService
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { BoostPrompt, BackButton } from '../../components/common';
+import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -159,6 +160,7 @@ export const CommunityChatScreen: React.FC = () => {
   const [imgViewerList,  setImgViewerList]  = useState<string[]>([]);
   const [imgViewerIdx,   setImgViewerIdx]   = useState(0);
   const [imgViewerOpen,  setImgViewerOpen]  = useState(false);
+  const [imgViewerZoomed, setImgViewerZoomed] = useState(false);
   const [viewerIsMe,     setViewerIsMe]     = useState(false);
   const [dlProgress,     setDlProgress]     = useState(0);
   const [dlBusy,         setDlBusy]         = useState(false);
@@ -2519,11 +2521,11 @@ export const CommunityChatScreen: React.FC = () => {
       </Modal>
 
       {/* ── Image viewer ── */}
-      <Modal visible={imgViewerOpen} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setImgViewerOpen(false)}>
+      <Modal visible={imgViewerOpen} transparent statusBarTranslucent animationType="fade" onRequestClose={() => { setImgViewerOpen(false); setImgViewerZoomed(false); }}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <StatusBar hidden />
           {/* Fermer */}
-          <TouchableOpacity style={S.viewerClose} onPress={() => setImgViewerOpen(false)}>
+          <TouchableOpacity style={S.viewerClose} onPress={() => { setImgViewerOpen(false); setImgViewerZoomed(false); }}>
             <View style={S.viewerCloseInner}><Icon name="x" size={20} color="#fff" /></View>
           </TouchableOpacity>
           {/* Compteur */}
@@ -2551,12 +2553,13 @@ export const CommunityChatScreen: React.FC = () => {
           )}
           <ScrollView
             horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+            scrollEnabled={!imgViewerZoomed}
             contentOffset={{ x: imgViewerIdx * W, y: 0 }}
             onMomentumScrollEnd={e => setImgViewerIdx(Math.round(e.nativeEvent.contentOffset.x / W))}
           >
             {imgViewerList.map((url, i) => (
               <View key={i} style={{ width: W, height: H, alignItems: 'center', justifyContent: 'center' }}>
-                <Image source={{ uri: url }} style={{ width: W, height: H }} resizeMode="contain" />
+                <ZoomableImage uri={url} width={W} height={H} onZoomChange={setImgViewerZoomed} />
               </View>
             ))}
           </ScrollView>

@@ -660,6 +660,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState<'all'|'users'|'events'|'concerts'|'reels'|'films'>('all');
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  const [popularContent, setPopularContent] = useState<any[]>([]);
+  const [popularLoading, setPopularLoading] = useState(false);
+  const popularLoadedRef = useRef(false);
   const searchBarWidth = useSharedValue(0);
   const searchBarOpacity = useSharedValue(0);
 
@@ -819,6 +822,25 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const openSearch = useCallback(() => {
     setSearchOpen(true);
     refreshHistory();
+    if (!popularLoadedRef.current) {
+      popularLoadedRef.current = true;
+      setPopularLoading(true);
+      Promise.allSettled([
+        searchService.getTrending(),
+        searchService.getUpcomingEvents(),
+      ]).then(([contentRes, eventsRes]) => {
+        const content = contentRes.status === 'fulfilled' ? contentRes.value.slice(0, 5).map(i => ({ ...i, __kind: 'content' })) : [];
+        const events  = eventsRes.status  === 'fulfilled' ? eventsRes.value.slice(0, 4).map(i  => ({ ...i, __kind: 'event'   })) : [];
+        // Mélange films/séries et événements plutôt que de tout concaténer d'un bloc
+        const merged: any[] = [];
+        const maxLen = Math.max(content.length, events.length);
+        for (let i = 0; i < maxLen; i++) {
+          if (content[i]) merged.push(content[i]);
+          if (events[i])  merged.push(events[i]);
+        }
+        setPopularContent(merged);
+      }).finally(() => setPopularLoading(false));
+    }
     searchBarWidth.value  = withSpring(1, { damping: 18, stiffness: 200 });
     searchBarOpacity.value = withTiming(1, { duration: 200 });
     setTimeout(() => searchInputRef.current?.focus(), 250);
@@ -1505,8 +1527,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const onNavMyStories   = useCallback(() => nav.navigate('MyStories'), [nav]);
   const onNavChat        = useCallback((partnerId: string, partnerName: string, avatarUrl?: string) =>
     nav.navigate('Chat', { partnerId, partnerName, avatarUrl }), [nav]);
-  const onNavCall        = useCallback((partnerId: string, partnerName: string, callType: 'voice' | 'video') =>
-    nav.navigate('Call', { partnerId, partnerName, callType, isIncoming: false }), [nav]);
+  const onNavCall        = useCallback((partnerId: string, partnerName: string, callType: 'voice' | 'video', avatarUrl?: string) =>
+    nav.navigate('Call', { partnerId, partnerName, partnerAvatar: avatarUrl, callType, isIncoming: false }), [nav]);
 
   const feedListHeader = useMemo(() => (
     <>
@@ -2010,6 +2032,83 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                     ))}
                   </View>
                 </View>
+
+                {/* ── Suggestions (contenu populaire + événements à venir) ── */}
+                {(popularLoading || popularContent.length > 0) && (
+                  <View style={{ paddingTop: 24, paddingBottom: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 12 }}>
+                      <Icon name="trending-up" size={12} color={colors.textTertiary} />
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>
+                        Meilleures suggestions
+                      </Text>
+                    </View>
+                    {popularLoading ? (
+                      <View style={{ paddingHorizontal: 16 }}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      </View>
+                    ) : (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+                        {popularContent.map(item => {
+                          const isEvent = item.__kind === 'event';
+                          const fmtV = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
+                          const fmtDate = (iso?: string) => {
+                            if (!iso) return null;
+                            const d = new Date(iso);
+                            return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+                          };
+                          return (
+                            <TouchableOpacity
+                              key={`${item.__kind}-${item.id}`}
+                              activeOpacity={0.85}
+                              style={{ width: 120 }}
+                              onPress={() => {
+                                closeSearch();
+                                if (isEvent) {
+                                  (nav as any).navigate('EventDetail', { eventId: item.id });
+                                } else if (item.type === 'serie' || item.content_type === 'serie') {
+                                  (nav as any).navigate('SerieEpisodes', { item });
+                                } else {
+                                  (nav as any).navigate('FilmDetail', { item });
+                                }
+                              }}
+                            >
+                              <View style={{ width: 120, height: 170, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.backgroundSecondary }}>
+                                {item.thumbnail_url ? (
+                                  <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                                ) : (
+                                  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Icon name={isEvent ? 'calendar' : 'film'} size={26} color={colors.textTertiary} />
+                                  </View>
+                                )}
+                                <View style={{ position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff' }}>{isEvent ? 'Événement' : 'Populaire'}</Text>
+                                </View>
+                              </View>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: 6 }} numberOfLines={1}>
+                                {item.title ?? 'Sans titre'}
+                              </Text>
+                              {isEvent ? (
+                                !!item.starts_at && (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                    <Icon name="calendar" size={10} color={colors.textTertiary} />
+                                    <Text style={{ fontSize: 11, color: colors.textTertiary }}>{fmtDate(item.starts_at)}</Text>
+                                  </View>
+                                )
+                              ) : (
+                                !!item.view_count && (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                    <Icon name="eye" size={10} color={colors.textTertiary} />
+                                    <Text style={{ fontSize: 11, color: colors.textTertiary }}>{fmtV(item.view_count)}</Text>
+                                  </View>
+                                )
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    )}
+                  </View>
+                )}
 
                 {/* Astuce */}
                 <View style={{ marginHorizontal: 16, marginTop: 28, borderRadius: 16, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>

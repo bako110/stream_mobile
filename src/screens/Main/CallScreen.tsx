@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
   Platform, Vibration, Animated, Easing, PermissionsAndroid,
-  Image, Dimensions, PanResponder,
+  Image, Dimensions, PanResponder, TextInput, FlatList, KeyboardAvoidingView,
 } from 'react-native';
 import {
   RTCPeerConnection,
@@ -73,6 +73,16 @@ export const CallScreen: React.FC = () => {
   const [isCamOff,     setIsCamOff]     = useState(false);
   const [localStream,  setLocalStream]  = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isFrontCam,   setIsFrontCam]   = useState(true);
+  const [isLocked,     setIsLocked]     = useState(false);
+  const [showUnlockHint, setShowUnlockHint] = useState(false);
+  const [networkQuality, setNetworkQuality] = useState<'good' | 'medium' | 'poor' | 'unknown'>('unknown');
+  const [connIssue,    setConnIssue]    = useState<'reconnecting' | 'lost' | null>(null);
+  const [chatOpen,      setChatOpen]     = useState(false);
+  const [chatMessages,  setChatMessages] = useState<{ id: string; text: string; fromMe: boolean; at: number }[]>([]);
+  const [chatDraft,     setChatDraft]    = useState('');
+  const [unreadChat,    setUnreadChat]   = useState(0);
+  const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
 
   const pcRef             = useRef<RTCPeerConnection | null>(null);
   const timerRef          = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -83,6 +93,9 @@ export const CallScreen: React.FC = () => {
   const mountedRef        = useRef(true);
   const connectedAtRef    = useRef<number | null>(null);
   const iInitiatedEndRef  = useRef(false);
+  const statsIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastBytesRef      = useRef<{ bytes: number; at: number } | null>(null);
+  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pulseAnim  = useRef(new Animated.Value(1)).current;
   const pulse2Anim = useRef(new Animated.Value(1)).current;
@@ -247,6 +260,8 @@ export const CallScreen: React.FC = () => {
     };
 
     const onConnected = () => {
+      if (disconnectTimerRef.current) { clearTimeout(disconnectTimerRef.current); disconnectTimerRef.current = null; }
+      if (mountedRef.current) setConnIssue(null);
       if (stateRef.current !== 'connected') {
         connectedAtRef.current = Date.now();
         notifyCallConnected(partnerId);
@@ -255,12 +270,31 @@ export const CallScreen: React.FC = () => {
       }
     };
 
+    const onIceTrouble = (s: string) => {
+      if (stateRef.current !== 'connected') return;
+      if (s === 'disconnected') {
+        if (mountedRef.current) setConnIssue('reconnecting');
+        if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) setConnIssue('lost');
+          hangupRef.current?.();
+        }, 15_000);
+      } else if (s === 'failed') {
+        try { (pc as any).restartIce?.(); } catch {}
+        if (mountedRef.current) setConnIssue('lost');
+        hangupRef.current?.();
+      }
+    };
+
     (pc as any).oniceconnectionstatechange = () => {
       const s = (pc as any).iceConnectionState as string;
       if (s === 'connected' || s === 'completed') onConnected();
+      else if (s === 'disconnected' || s === 'failed') onIceTrouble(s);
     };
     (pc as any).onconnectionstatechange = () => {
-      if ((pc as any).connectionState === 'connected') onConnected();
+      const s = (pc as any).connectionState as string;
+      if (s === 'connected') onConnected();
+      else if (s === 'disconnected' || s === 'failed') onIceTrouble(s);
     };
 
     return pc;
@@ -430,6 +464,24 @@ export const CallScreen: React.FC = () => {
         notifyCallEnded(partnerId);
         markCallEnded(partnerId);
         if (mountedRef.current) setCallState('ended');
+        return;
+      }
+
+      if (payload.type === 'call_chat') {
+        const text = String(payload.text ?? '').slice(0, 500);
+        if (!text || !mountedRef.current) return;
+        setChatMessages(prev => [...prev, { id: `${Date.now()}-r`, text, fromMe: false, at: Date.now() }]);
+        setUnreadChat(n => n + 1);
+        return;
+      }
+
+      if (payload.type === 'call_reaction') {
+        const emoji = String(payload.emoji ?? '').slice(0, 8);
+        if (!emoji || !mountedRef.current) return;
+        const id = `${Date.now()}-${Math.random()}`;
+        const x = 20 + Math.random() * 60;
+        setFloatingReactions(prev => [...prev, { id, emoji, x }]);
+        setTimeout(() => { if (mountedRef.current) setFloatingReactions(prev => prev.filter(r => r.id !== id)); }, 2200);
       }
     };
 
@@ -437,6 +489,39 @@ export const CallScreen: React.FC = () => {
     drainCallBuffer(partnerId).forEach(p => handler(p));
     return () => removeListener(handler);
   }, [partnerId, isVideo, isIncoming, addListener, removeListener, sendWs, flushPendingCandidates, notifyCallConnected, notifyCallEnded, markCallEnded, drainCallBuffer]);
+
+  // ── Qualité réseau (stats WebRTC) ─────────────────────────────────────────────
+  useEffect(() => {
+    if (callState !== 'connected') {
+      if (statsIntervalRef.current) { clearInterval(statsIntervalRef.current); statsIntervalRef.current = null; }
+      lastBytesRef.current = null;
+      return;
+    }
+    statsIntervalRef.current = setInterval(async () => {
+      const pc = pcRef.current;
+      if (!pc) return;
+      try {
+        const report = await (pc as any).getStats();
+        let packetsLost = 0, packetsReceived = 0, bytesReceived = 0, rtt: number | null = null;
+        report.forEach((stat: any) => {
+          if (stat.type === 'inbound-rtp' && (stat.kind === 'audio' || stat.kind === 'video')) {
+            packetsLost     += stat.packetsLost ?? 0;
+            packetsReceived += stat.packetsReceived ?? 0;
+            bytesReceived   += stat.bytesReceived ?? 0;
+          }
+          if (stat.type === 'candidate-pair' && stat.state === 'succeeded' && stat.currentRoundTripTime != null) {
+            rtt = stat.currentRoundTripTime * 1000;
+          }
+        });
+        const lossRatio = packetsReceived > 0 ? packetsLost / (packetsLost + packetsReceived) : 0;
+        let quality: typeof networkQuality = 'good';
+        if (lossRatio > 0.08 || (rtt !== null && rtt > 400)) quality = 'poor';
+        else if (lossRatio > 0.02 || (rtt !== null && rtt > 200)) quality = 'medium';
+        if (mountedRef.current) setNetworkQuality(quality);
+      } catch { /* stats indisponibles sur ce device */ }
+    }, 3000);
+    return () => { if (statsIntervalRef.current) { clearInterval(statsIntervalRef.current); statsIntervalRef.current = null; } };
+  }, [callState]);
 
   useEffect(() => {
     if (callState === 'connected') {
@@ -453,6 +538,8 @@ export const CallScreen: React.FC = () => {
     stopRingback();
     stopRejected();
     Vibration.cancel();
+    if (statsIntervalRef.current) { clearInterval(statsIntervalRef.current); statsIntervalRef.current = null; }
+    if (disconnectTimerRef.current) { clearTimeout(disconnectTimerRef.current); disconnectTimerRef.current = null; }
     // Stopper tous les tracks (caméra + micro)
     const stream = localStreamRef.current;
     if (stream) {
@@ -493,6 +580,35 @@ export const CallScreen: React.FC = () => {
     const t = localStreamRef.current?.getVideoTracks()[0];
     if (t) { t.enabled = !t.enabled; setIsCamOff(!t.enabled); }
   }, []);
+
+  const switchCamera = useCallback(() => {
+    const t = localStreamRef.current?.getVideoTracks()[0] as any;
+    if (t?._switchCamera) { t._switchCamera(); setIsFrontCam(v => !v); }
+  }, []);
+
+  const toggleLock = useCallback(() => {
+    setIsLocked(v => {
+      const next = !v;
+      if (next) { setShowUnlockHint(true); setTimeout(() => setShowUnlockHint(false), 1800); }
+      return next;
+    });
+  }, []);
+
+  const sendChatMessage = useCallback(() => {
+    const text = chatDraft.trim().slice(0, 500);
+    if (!text) return;
+    sendWs({ type: 'call_chat', to: partnerId, text });
+    setChatMessages(prev => [...prev, { id: `${Date.now()}-m`, text, fromMe: true, at: Date.now() }]);
+    setChatDraft('');
+  }, [chatDraft, partnerId, sendWs]);
+
+  const sendReaction = useCallback((emoji: string) => {
+    sendWs({ type: 'call_reaction', to: partnerId, emoji });
+    const id = `${Date.now()}-${Math.random()}`;
+    const x = 20 + Math.random() * 60;
+    setFloatingReactions(prev => [...prev, { id, emoji, x }]);
+    setTimeout(() => setFloatingReactions(prev => prev.filter(r => r.id !== id)), 2200);
+  }, [partnerId, sendWs]);
 
   const showIncomingUI = isIncoming && callState === 'ringing' && !autoAccept;
 
@@ -603,7 +719,7 @@ export const CallScreen: React.FC = () => {
 
       {/* Top bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
-        {callState === 'connected' ? (
+        {callState === 'connected' && !isLocked ? (
           <TouchableOpacity style={styles.minimizeBtn} onPress={minimize} activeOpacity={0.8}>
             <Icon name="chevron-down" size={22} color="rgba(255,255,255,0.8)" />
           </TouchableOpacity>
@@ -612,15 +728,26 @@ export const CallScreen: React.FC = () => {
         )}
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={styles.topName}>{partnerName}</Text>
-          <Text style={styles.topStatus}>
-            {callState === 'ringing'
-              ? (isIncoming ? 'Connexion en cours…' : 'Appel en cours…')
-              : callState === 'connected'
-              ? formatElapsed(elapsed)
-              : 'Appel terminé'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.topStatus}>
+              {connIssue === 'reconnecting'
+                ? 'Reconnexion…'
+                : callState === 'ringing'
+                ? (isIncoming ? 'Connexion en cours…' : 'Appel en cours…')
+                : callState === 'connected'
+                ? formatElapsed(elapsed)
+                : 'Appel terminé'}
+            </Text>
+            {callState === 'connected' && !connIssue && <NetworkBadge quality={networkQuality} />}
+          </View>
         </View>
-        <View style={{ width: 36 }} />
+        {callState === 'connected' && !isLocked ? (
+          <TouchableOpacity style={styles.minimizeBtn} onPress={toggleLock} activeOpacity={0.8}>
+            <Icon name="unlock" size={18} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
       </View>
 
       {/* Avatar (voice ou vidéo en attente) */}
@@ -647,48 +774,219 @@ export const CallScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Controls */}
-      <View style={[styles.controls, { paddingBottom: insets.bottom + 32 }]}>
-        {callState === 'connected' && (
-          <View style={styles.controlRow}>
-            <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
-              <View style={[styles.controlIcon, isMuted && styles.controlIconOn]}>
-                <Icon name={isMuted ? 'mic-off' : 'mic'} size={22} color="#fff" />
-              </View>
-              <Text style={styles.controlLabel}>{isMuted ? 'Micro coupé' : 'Micro'}</Text>
-            </TouchableOpacity>
+      {/* Réactions flottantes */}
+      {floatingReactions.map(r => (
+        <FloatingReaction key={r.id} emoji={r.emoji} x={r.x} bottom={insets.bottom + 160} />
+      ))}
 
-            <TouchableOpacity style={styles.controlBtn} onPress={toggleSpeaker}>
-              <View style={[styles.controlIcon, isSpeaker && styles.controlIconOn]}>
-                <Icon name={isSpeaker ? 'volume-2' : 'volume-x'} size={22} color="#fff" />
-              </View>
-              <Text style={styles.controlLabel}>Haut-parleur</Text>
-            </TouchableOpacity>
-
-            {isVideo && (
-              <TouchableOpacity style={styles.controlBtn} onPress={toggleCamera}>
-                <View style={[styles.controlIcon, isCamOff && styles.controlIconOn]}>
-                  <Icon name={isCamOff ? 'camera-off' : 'camera'} size={22} color="#fff" />
-                </View>
-                <Text style={styles.controlLabel}>Caméra</Text>
-              </TouchableOpacity>
-            )}
+      {/* Écran verrouillé */}
+      {isLocked && callState === 'connected' && (
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => { setShowUnlockHint(true); setTimeout(() => setShowUnlockHint(false), 1400); }}
+        >
+          <View style={styles.lockOverlay}>
+            <Icon name="lock" size={20} color="rgba(255,255,255,0.5)" />
+            {showUnlockHint && <Text style={styles.lockHint}>Touchez et maintenez pour déverrouiller</Text>}
           </View>
-        )}
-
-        {callState === 'ended' ? (
-          <View style={styles.endedWrap}>
-            <Text style={styles.endedText}>Appel terminé</Text>
-          </View>
-        ) : (
-          <TouchableOpacity style={styles.hangupBtn} onPress={hangup} activeOpacity={0.85}>
-            <Icon name="phone-off" size={28} color="#fff" />
+          <TouchableOpacity
+            style={[styles.unlockBtn, { bottom: insets.bottom + 32 }]}
+            onLongPress={toggleLock}
+            delayLongPress={500}
+            activeOpacity={0.8}
+          >
+            <Icon name="unlock" size={20} color="#fff" />
           </TouchableOpacity>
-        )}
-      </View>
+        </TouchableOpacity>
+      )}
+
+      {/* Controls */}
+      {!isLocked && (
+        <View style={[styles.controls, { paddingBottom: insets.bottom + 32 }]}>
+          {callState === 'connected' && (
+            <>
+              <View style={styles.controlRow}>
+                <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
+                  <View style={[styles.controlIcon, isMuted && styles.controlIconOn]}>
+                    <Icon name={isMuted ? 'mic-off' : 'mic'} size={22} color="#fff" />
+                  </View>
+                  <Text style={styles.controlLabel}>{isMuted ? 'Micro coupé' : 'Micro'}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.controlBtn} onPress={toggleSpeaker}>
+                  <View style={[styles.controlIcon, isSpeaker && styles.controlIconOn]}>
+                    <Icon name={isSpeaker ? 'volume-2' : 'volume-x'} size={22} color="#fff" />
+                  </View>
+                  <Text style={styles.controlLabel}>Haut-parleur</Text>
+                </TouchableOpacity>
+
+                {isVideo && (
+                  <TouchableOpacity style={styles.controlBtn} onPress={toggleCamera}>
+                    <View style={[styles.controlIcon, isCamOff && styles.controlIconOn]}>
+                      <Icon name={isCamOff ? 'camera-off' : 'camera'} size={22} color="#fff" />
+                    </View>
+                    <Text style={styles.controlLabel}>Caméra</Text>
+                  </TouchableOpacity>
+                )}
+
+                {isVideo && !isCamOff && (
+                  <TouchableOpacity style={styles.controlBtn} onPress={switchCamera}>
+                    <View style={styles.controlIcon}>
+                      <Icon name="refresh-cw" size={20} color="#fff" />
+                    </View>
+                    <Text style={styles.controlLabel}>Basculer</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={styles.controlRow}>
+                <TouchableOpacity style={styles.controlBtn} onPress={() => { setChatOpen(true); setUnreadChat(0); }}>
+                  <View style={styles.controlIcon}>
+                    <Icon name="message-circle" size={20} color="#fff" />
+                    {unreadChat > 0 && (
+                      <View style={styles.unreadDot}><Text style={styles.unreadDotText}>{unreadChat > 9 ? '9+' : unreadChat}</Text></View>
+                    )}
+                  </View>
+                  <Text style={styles.controlLabel}>Chat</Text>
+                </TouchableOpacity>
+
+                <View style={styles.controlBtn}>
+                  <View style={styles.reactionRow}>
+                    {['❤️', '😂', '👍', '🔥'].map(e => (
+                      <TouchableOpacity key={e} onPress={() => sendReaction(e)} style={styles.reactionBtn}>
+                        <Text style={styles.reactionEmoji}>{e}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Text style={styles.controlLabel}>Réagir</Text>
+                </View>
+
+                <TouchableOpacity style={styles.controlBtn} onPress={toggleLock}>
+                  <View style={styles.controlIcon}>
+                    <Icon name="lock" size={19} color="#fff" />
+                  </View>
+                  <Text style={styles.controlLabel}>Verrouiller</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {callState === 'ended' ? (
+            <View style={styles.endedWrap}>
+              <Text style={styles.endedText}>Appel terminé</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.hangupBtn} onPress={hangup} activeOpacity={0.85}>
+              <Icon name="phone-off" size={28} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* Chat pendant l'appel */}
+      {chatOpen && (
+        <CallChatPanel
+          messages={chatMessages}
+          draft={chatDraft}
+          onChangeDraft={setChatDraft}
+          onSend={sendChatMessage}
+          onClose={() => setChatOpen(false)}
+          insetsBottom={insets.bottom}
+        />
+      )}
     </View>
   );
 };
+
+function NetworkBadge({ quality }: { quality: 'good' | 'medium' | 'poor' | 'unknown' }) {
+  if (quality === 'unknown') return null;
+  const bars = quality === 'good' ? 3 : quality === 'medium' ? 2 : 1;
+  const color = quality === 'good' ? '#3FEDB6' : quality === 'medium' ? '#F5A623' : '#E53935';
+  return (
+    <View style={styles.netBadge}>
+      {[0, 1, 2].map(i => (
+        <View key={i} style={[styles.netBar, { height: 4 + i * 3, backgroundColor: i < bars ? color : 'rgba(255,255,255,0.2)' }]} />
+      ))}
+    </View>
+  );
+}
+
+function FloatingReaction({ emoji, x, bottom }: { emoji: string; x: number; bottom: number }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  }, [anim]);
+  return (
+    <Animated.Text
+      style={[
+        styles.floatingEmoji,
+        {
+          left: `${x}%`,
+          bottom,
+          opacity: anim.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] }),
+          transform: [
+            { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -180] }) },
+            { scale: anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.4, 1.1, 1] }) },
+          ],
+        },
+      ]}
+    >
+      {emoji}
+    </Animated.Text>
+  );
+}
+
+function CallChatPanel({
+  messages, draft, onChangeDraft, onSend, onClose, insetsBottom,
+}: {
+  messages: { id: string; text: string; fromMe: boolean; at: number }[];
+  draft: string;
+  onChangeDraft: (v: string) => void;
+  onSend: () => void;
+  onClose: () => void;
+  insetsBottom: number;
+}) {
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.chatPanel}
+    >
+      <View style={styles.chatHeader}>
+        <Text style={styles.chatHeaderTitle}>Messages</Text>
+        <TouchableOpacity onPress={onClose} style={styles.chatCloseBtn}>
+          <Icon name="chevron-down" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        data={[...messages].reverse()}
+        keyExtractor={m => m.id}
+        style={styles.chatList}
+        inverted
+        renderItem={({ item }) => (
+          <View style={[styles.chatBubble, item.fromMe ? styles.chatBubbleMe : styles.chatBubbleThem]}>
+            <Text style={styles.chatBubbleText}>{item.text}</Text>
+          </View>
+        )}
+        ListEmptyComponent={<Text style={styles.chatEmpty}>Envoie un message sans quitter l'appel</Text>}
+      />
+      <View style={[styles.chatInputRow, { paddingBottom: insetsBottom + 10 }]}>
+        <TextInput
+          value={draft}
+          onChangeText={onChangeDraft}
+          placeholder="Message…"
+          placeholderTextColor="rgba(255,255,255,0.4)"
+          style={styles.chatInput}
+          onSubmitEditing={onSend}
+          returnKeyType="send"
+        />
+        <TouchableOpacity onPress={onSend} style={styles.chatSendBtn}>
+          <Icon name="send" size={17} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0817' },
@@ -744,10 +1042,10 @@ const styles = StyleSheet.create({
   },
   acceptBtn: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: '#1DB954',
+    backgroundColor: '#3FEDB6',
     alignItems: 'center', justifyContent: 'center',
     elevation: 8,
-    shadowColor: '#1DB954',
+    shadowColor: '#3FEDB6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 10,
@@ -859,15 +1157,15 @@ const styles = StyleSheet.create({
   controlRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 36,
+    gap: 22,
   },
   controlBtn: {
     alignItems: 'center',
     gap: 8,
-    minWidth: 72,
+    minWidth: 64,
   },
   controlIcon: {
-    width: 56, height: 56, borderRadius: 28,
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1,
@@ -905,5 +1203,157 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 15,
     fontWeight: '600',
+  },
+
+  // ── Qualité réseau ────────────────────────────────────────────────────────────
+  netBadge: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+    paddingBottom: 1,
+  },
+  netBar: {
+    width: 3,
+    borderRadius: 1,
+  },
+
+  // ── Verrouillage ──────────────────────────────────────────────────────────────
+  lockOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  lockHint: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  unlockBtn: {
+    position: 'absolute',
+    alignSelf: 'center',
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Réactions ─────────────────────────────────────────────────────────────────
+  reactionRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  reactionBtn: {
+    width: 26, height: 26,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  reactionEmoji: {
+    fontSize: 18,
+  },
+  floatingEmoji: {
+    position: 'absolute',
+    fontSize: 32,
+    zIndex: 30,
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: -4, right: -4,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#E53935',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  unreadDotText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  // ── Chat pendant l'appel ──────────────────────────────────────────────────────
+  chatPanel: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: '55%',
+    backgroundColor: 'rgba(15,8,23,0.97)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    zIndex: 40,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  chatHeaderTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  chatCloseBtn: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  chatList: {
+    flex: 1,
+    paddingHorizontal: 14,
+  },
+  chatEmpty: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 24,
+    transform: [{ scaleY: -1 }],
+  },
+  chatBubble: {
+    maxWidth: '78%',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 16,
+    marginVertical: 4,
+  },
+  chatBubbleMe: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#7B3FF2',
+  },
+  chatBubbleThem: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  chatBubbleText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  chatInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  chatSendBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: '#7B3FF2',
+    alignItems: 'center', justifyContent: 'center',
   },
 });

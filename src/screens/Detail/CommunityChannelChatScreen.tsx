@@ -21,6 +21,7 @@ import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
 import { GoFolyXLoader, BackButton } from '../../components/common';
+import { ZoomableImage } from '../../components/common/ZoomableImage';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -123,6 +124,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
   const [imgViewerList, setImgViewerList] = useState<string[]>([]);
   const [imgViewerIdx,  setImgViewerIdx]  = useState(0);
   const [imgViewerOpen, setImgViewerOpen] = useState(false);
+  const [imgViewerZoomed, setImgViewerZoomed] = useState(false);
 
   // Indicateurs temps réel (autres membres)
   type TypingUser = { user_id: string; username: string | null; display_name: string | null };
@@ -1139,18 +1141,22 @@ export const CommunityChannelChatScreen: React.FC = () => {
       </Modal>
 
       {/* Image viewer plein écran */}
-      <Modal visible={imgViewerOpen} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setImgViewerOpen(false)}>
+      <Modal visible={imgViewerOpen} transparent statusBarTranslucent animationType="fade" onRequestClose={() => { setImgViewerOpen(false); setImgViewerZoomed(false); }}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <StatusBar hidden />
-          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 20, zIndex: 10 }} onPress={() => setImgViewerOpen(false)}>
+          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 20, zIndex: 10 }} onPress={() => { setImgViewerOpen(false); setImgViewerZoomed(false); }}>
             <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="x" size={20} color="#fff" />
             </View>
           </TouchableOpacity>
-          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: imgViewerIdx * W, y: 0 }}>
+          <ScrollView
+            horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+            scrollEnabled={!imgViewerZoomed}
+            contentOffset={{ x: imgViewerIdx * W, y: 0 }}
+          >
             {imgViewerList.map((url, i) => (
               <View key={i} style={{ width: W, height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-                <Image source={{ uri: url }} style={{ width: W, height: W * 1.3 }} resizeMode="contain" />
+                <ZoomableImage uri={url} width={W} height={W * 1.3} onZoomChange={setImgViewerZoomed} />
               </View>
             ))}
           </ScrollView>

@@ -37,4 +37,9 @@ export const searchService = {
     const res = await apiClient.get<any>(`${Endpoints.search.trendingReels}`);
     return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
   },
+
+  async getUpcomingEvents(): Promise<any[]> {
+    const res = await apiClient.get<any>(`${Endpoints.search.upcomingEvents}`);
+    return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+  },
 };

@@ -328,9 +328,9 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
             setViewerOpen(false);
             nav.navigate('Chat', { partnerId, partnerName, avatarUrl });
           }}
-          onNavigateToCall={(partnerId, partnerName, callType) => {
+          onNavigateToCall={(partnerId, partnerName, callType, avatarUrl) => {
             setViewerOpen(false);
-            nav.navigate('Call', { partnerId, partnerName, callType, isIncoming: false });
+            nav.navigate('Call', { partnerId, partnerName, partnerAvatar: avatarUrl, callType, isIncoming: false });
           }}
         />
       )}
