@@ -10,6 +10,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonSubscriptions } from '../../components/common';
 import { subscriptionService, WalletCheck } from '../../services/subscriptionService';
 import type { Subscription, PlanType } from '../../types';
+import { PLAN_CONFIG } from '../../types/subscription';
 
 // ── Config plans alignée sur backend (basic / premium / family) ────────────────
 const PLAN_COLORS: Record<string, string[]> = {
@@ -26,12 +27,14 @@ const PLAN_LABELS: Record<string, string> = {
   family:  'Family',
 };
 
-const PLAN_PRICES: Record<string, string> = {
-  free:    '0 €/mois',
-  basic:   '3,99 €/mois',
-  premium: '6,99 €/mois',
-  family:  '9,99 €/mois',
-};
+// Prix dérivés de PLAN_CONFIG (types/subscription.ts) — source unique partagée
+// avec le reste de l'app, jamais de prix dupliqué en dur ici.
+const PLAN_PRICES: Record<string, string> = Object.fromEntries(
+  Object.entries(PLAN_CONFIG).map(([plan, cfg]) => [
+    plan,
+    cfg.price === 0 ? '0 €/mois' : `${cfg.price.toFixed(2).replace('.', ',')} €/mois`,
+  ]),
+);
 
 const PLAN_FEATURES: Record<string, string[]> = {
   free:    ['480p', '1 écran', '1 profil', 'Sans téléchargement'],
@@ -43,11 +46,9 @@ const PLAN_FEATURES: Record<string, string[]> = {
 const PAID_PLANS: PlanType[] = ['basic', 'premium', 'family'];
 
 // 1 EUR = 100 GoGold (aligné sur le backend)
-const PLAN_COINS: Record<string, number> = {
-  basic:   Math.round(3.99 * 100),  // 399
-  premium: Math.round(6.99 * 100),  // 699
-  family:  Math.round(9.99 * 100),  // 999
-};
+const PLAN_COINS: Record<string, number> = Object.fromEntries(
+  PAID_PLANS.map(plan => [plan, Math.round(PLAN_CONFIG[plan].price * 100)]),
+);
 
 // ── Utilitaire date ────────────────────────────────────────────────────────────
 const fmtDate = (d: string) =>
