@@ -59,6 +59,7 @@ import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
 import { BattleChallengeSheet } from '../../components/live/BattleChallengeSheet';
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 import type { LiveStream } from '../../services/liveService';
+import { markLiveEnteringBattle, isLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 
 // ── LiveKit quality config ─────────────────────────────────────────────────────
 
@@ -307,7 +308,7 @@ const JoinToast: React.FC<{ name: string }> = ({ name }) => (
 
 // ── Contenu principal ─────────────────────────────────────────────────────────
 
-const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: boolean }> = ({ liveId, onEnd, isPrivate = false }) => {
+const StreamContent: React.FC<{ liveId: string; onEnd: () => void; onBattleStarted: () => void; isPrivate?: boolean }> = ({ liveId, onEnd, onBattleStarted, isPrivate = false }) => {
   const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
   const room                 = useRoomContext();
   const allParticipants      = useParticipants();
@@ -533,10 +534,14 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         // ── Battle : l'invitation qu'on a envoyee a ete acceptee → le battle demarre,
         // les deux hosts (A et B) sont rediriges vers l'ecran de battle en split-screen.
         if (d.type === 'battle_started' && d.battle_id) {
-          // replace (pas navigate) : sinon ce live reste monte en dessous avec son propre
-          // LiveKitRoom connecte en parallele de celui du battle, ce qui peut empecher les
-          // tracks video du battle de s'afficher correctement (deux connexions LiveKit
-          // actives simultanement sur le meme appareil).
+          // markLiveEnteringBattle AVANT le replace : le useEffect de cleanup du screen
+          // parent appelle liveService.stopLive() au demontage sauf si ce live est marque
+          // comme "en cours de transition vers un battle" — sans ca, remplacer cet ecran par
+          // BattleScreen demonte ce composant et arrete le live tout seul, ce qui cloture
+          // immediatement le battle par forfait (score 0-0 des le debut). Le live doit
+          // continuer a tourner normalement pendant tout le battle.
+          markLiveEnteringBattle(liveId);
+          onBattleStarted();
           nav.replace('BattleScreen', { battleId: d.battle_id });
         }
         if (d.type === 'battle_invite_response' && d.accepted === false) {
@@ -1168,7 +1173,7 @@ export const SimpleLiveStreamScreen: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      if (!endedRef.current) {
+      if (!endedRef.current && !isLiveEnteringBattle(liveId)) {
         liveService.stopLive(liveId).catch(() => {});
       }
     };
@@ -1184,7 +1189,12 @@ export const SimpleLiveStreamScreen: React.FC = () => {
 
   return (
     <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={CREATOR_ROOM_OPTIONS}>
-      <StreamContent liveId={liveId} onEnd={handleEnd} isPrivate={isPrivate} />
+      <StreamContent
+        liveId={liveId}
+        onEnd={handleEnd}
+        onBattleStarted={() => { endedRef.current = true; }}
+        isPrivate={isPrivate}
+      />
     </LiveKitRoom>
   );
 };

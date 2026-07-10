@@ -11,6 +11,7 @@ import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useTheme } from '../../hooks/useTheme';
 import { battleService } from '../../services/battleService';
+import { markLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 
 interface BattleInvitePayload extends WsPayload {
   type:         'battle_invite';
@@ -55,8 +56,12 @@ export const BattleInviteModal: React.FC = () => {
       const battle = await battleService.respond(invite.battle_id, accept);
       close();
       if (accept && battle.status === 'active') {
-        // replace (pas navigate) : sinon l'ecran de live reste monte en dessous avec son
-        // propre LiveKitRoom connecte en parallele de celui du battle.
+        // Marque le live de l'hote qui accepte AVANT le replace : sinon demonter son
+        // ecran de live declenche l'arret automatique du live (cleanup), ce qui cloture
+        // le battle par forfait immediatement (score 0-0). Le WS de son propre ecran de
+        // live recevra aussi "battle_started" mais on ne peut pas garantir qu'il l'aura
+        // deja traite avant que ce replace ne demonte l'ecran.
+        markLiveEnteringBattle(battle.live_b_id);
         nav.replace('BattleScreen', { battleId: battle.id });
       }
     } catch {

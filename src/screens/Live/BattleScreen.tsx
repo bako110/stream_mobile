@@ -30,6 +30,7 @@ import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
+import { clearLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -231,7 +232,12 @@ export const BattleScreen: React.FC = () => {
 
       if (payload.type === 'battle_ended') {
         setEnded({ winner_id: payload.winner_id, score_a: payload.score_a, score_b: payload.score_b });
-        setBattle(prev => prev ? { ...prev, status: 'ended', score_a: payload.score_a, score_b: payload.score_b, winner_id: payload.winner_id } : prev);
+        setBattle(prev => {
+          if (!prev) return prev;
+          clearLiveEnteringBattle(prev.live_a_id);
+          clearLiveEnteringBattle(prev.live_b_id);
+          return { ...prev, status: 'ended', score_a: payload.score_a, score_b: payload.score_b, winner_id: payload.winner_id };
+        });
       }
     };
     addListener(handler);
@@ -331,6 +337,10 @@ export const BattleScreen: React.FC = () => {
           onPress: async () => {
             setLeaving(true);
             try { await battleService.end(battleId, true); } catch {}
+            if (battle) {
+              clearLiveEnteringBattle(battle.live_a_id);
+              clearLiveEnteringBattle(battle.live_b_id);
+            }
             nav.goBack();
           },
         },
