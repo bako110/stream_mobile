@@ -425,6 +425,12 @@ export const Endpoints = {
     create: `${V1}/reports`,
   },
 
+  // ── Feedback / avis utilisateurs sur l'application ────────────────────────
+  feedback: {
+    create: `${V1}/feedback`,
+    mine:    `${V1}/feedback/me`,
+  },
+
   // ── Support tickets ───────────────────────────────────────────────────────
   support: {
     createTicket:  `${V1}/support/tickets`,

@@ -166,8 +166,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   const myIdConfirmedRef  = useRef<boolean>(false);
   const activeChatRef   = useRef<string | null>(null);
   const pendingCalls    = useRef<Map<string, PendingCall>>(new Map());
-  // Buffer des events call (ice/answer) arrivés avant que CallScreen soit monté
-  const callEventBuffer = useRef<Map<string, WsPayload[]>>(new Map());
+  // Buffer des events call (ice/answer/hangup) arrivés avant que CallScreen soit monté.
+  // Chaque entrée garde son heure de réception : au drain, on ignore tout ce qui date de
+  // plus de CALL_EVENT_BUFFER_TTL_MS — sans ça, un call_hangup d'un appel déjà terminé
+  // pouvait rester piégé indéfiniment et être rejoué au montage du PROCHAIN appel avec
+  // cette même personne, le terminant instantanément côté appelant à tort.
+  const callEventBuffer = useRef<Map<string, { payload: WsPayload; receivedAt: number }[]>>(new Map());
+  const CALL_EVENT_BUFFER_TTL_MS = 10_000;
   // IDs des appels déjà acceptés — bloquer les call_offer dupliqués
   const acceptedCalls   = useRef<Set<string>>(new Set());
   // IDs destinataires des appels sortants en cours — bloquer l'écho call_offer
@@ -232,11 +237,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     onNotification:       ()  => { if (isMounted.current) setUnreadNotifications(n => n + 1); },
   }));
 
-  // CallScreen appelle drainCallBuffer au montage pour récupérer les events reçus avant lui
+  // CallScreen appelle drainCallBuffer au montage pour récupérer les events reçus avant lui.
+  // Les entrées trop anciennes (> TTL) sont ignorées — elles appartiennent à un appel déjà
+  // terminé, pas à celui qu'on vient de monter.
   const drainCallBuffer = useCallback((partnerId: string): WsPayload[] => {
     const buf = callEventBuffer.current.get(partnerId) ?? [];
     callEventBuffer.current.delete(partnerId);
-    return buf;
+    const now = Date.now();
+    return buf
+      .filter(entry => now - entry.receivedAt <= CALL_EVENT_BUFFER_TTL_MS)
+      .map(entry => entry.payload);
   }, []);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -448,11 +458,15 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           setMissedCallCount(c => c + 1);
         }
 
+        // Bufferisé avec timestamp — drainCallBuffer() ignore tout ce qui a expiré
+        // (CALL_EVENT_BUFFER_TTL_MS), pour qu'un vieux call_hangup ne survive jamais
+        // assez longtemps pour être rejoué au montage d'un appel ultérieur avec la
+        // même personne (voir commentaire sur callEventBuffer plus haut).
         if ((payload.type === 'call_ice' || payload.type === 'call_answer' || payload.type === 'call_hangup') && isMounted.current) {
           const fromId = payload.from ?? payload.sender_id;
           if (fromId) {
             const buf = callEventBuffer.current.get(fromId) ?? [];
-            buf.push(payload);
+            buf.push({ payload, receivedAt: Date.now() });
             callEventBuffer.current.set(fromId, buf);
           }
         }

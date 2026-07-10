@@ -28,9 +28,32 @@ export const callConnectionService = {
     try { await CallConnectionModule.setup(); } catch { /* PhoneAccount déjà enregistré ou non supporté */ }
   },
 
-  async reportIncomingCall(callId: string, callerName: string, isVideo: boolean): Promise<void> {
+  /** true si l'app est déjà exemptée de l'optimisation de batterie (Android uniquement). */
+  async isIgnoringBatteryOptimizations(): Promise<boolean> {
+    if (!available) return true;
+    try { return await CallConnectionModule.isIgnoringBatteryOptimizations(); } catch { return true; }
+  },
+
+  /**
+   * Ouvre le dialogue système demandant d'exempter l'app de l'optimisation de batterie.
+   * Certains fabricants (Xiaomi/MIUI, Huawei, Samsung...) tuent l'app en arrière-plan
+   * même pour un appel entrant prioritaire sans cette exemption — sans elle, l'app peut
+   * ne jamais se réveiller quand elle est complètement fermée.
+   */
+  async requestIgnoreBatteryOptimizations(): Promise<void> {
     if (!available) return;
-    try { await CallConnectionModule.reportIncomingCall(callId, callerName, isVideo); } catch { /* fallback Notifee reste actif */ }
+    try { await CallConnectionModule.requestIgnoreBatteryOptimizations(); } catch {}
+  },
+
+  /**
+   * Lance l'écran d'appel natif. Propage l'erreur (ne l'avale pas) — l'appelant
+   * (fcmService.ts) doit savoir si ça a réellement échoué pour afficher la
+   * notification Notifee de secours, sinon un échec silencieux ici laisse
+   * l'appel entrant totalement invisible côté destinataire.
+   */
+  async reportIncomingCall(callId: string, callerName: string, isVideo: boolean): Promise<void> {
+    if (!available) throw new Error('CallConnectionModule unavailable');
+    await CallConnectionModule.reportIncomingCall(callId, callerName, isVideo);
   },
 
   async reportOutgoingCall(callId: string, callerName: string): Promise<void> {

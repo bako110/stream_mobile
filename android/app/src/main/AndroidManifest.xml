@@ -38,6 +38,9 @@
     <!-- Ecran d'appel natif (ConnectionService self-managed, comme WhatsApp) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <!-- Exemption optimisation batterie — evite que certains fabricants (Xiaomi/MIUI,
+         Huawei, Samsung) tuent l'app avant qu'un appel entrant ne puisse la reveiller -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <queries>
         <package android:name="com.facebook.katana" />

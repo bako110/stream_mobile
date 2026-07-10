@@ -24,6 +24,23 @@ import { UpdateBanner } from '../components/common/UpdateBanner';
 
 type AppState = 'splash' | 'onboarding' | 'auth' | 'main';
 
+const BATTERY_OPT_ASKED_KEY = 'battery_opt_exemption_asked';
+
+// Demande une seule fois (par install) l'exemption d'optimisation de batterie —
+// sans elle, certains fabricants (Xiaomi/MIUI, Huawei, Samsung...) peuvent tuer
+// l'app assez agressivement pour qu'un appel entrant ne la réveille jamais quand
+// elle est complètement fermée (aucune notification, aucune sonnerie côté destinataire).
+async function maybeRequestBatteryExemption(): Promise<void> {
+  try {
+    if (storage.getBoolean(BATTERY_OPT_ASKED_KEY)) return;
+    const alreadyIgnoring = await callConnectionService.isIgnoringBatteryOptimizations();
+    if (!alreadyIgnoring) {
+      await callConnectionService.requestIgnoreBatteryOptimizations();
+    }
+    storage.setBoolean(BATTERY_OPT_ASKED_KEY, true);
+  } catch { /* pas bloquant — l'app reste utilisable sans cette exemption */ }
+}
+
 const NAV_THEME_LIGHT: Theme = {
   ...DefaultTheme,
   colors: {
@@ -148,6 +165,7 @@ export const RootNavigator: React.FC = () => {
       setTimeout(() => {
         setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       }, 500);
+      setTimeout(() => { maybeRequestBatteryExemption(); }, 2000);
       navigatePendingUrl();
     };
 
@@ -192,6 +210,7 @@ export const RootNavigator: React.FC = () => {
     setTimeout(() => {
       setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
     }, 500);
+    setTimeout(() => { maybeRequestBatteryExemption(); }, 2000);
     navigatePendingUrl();
   };
   const handleLogout = () => {

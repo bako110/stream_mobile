@@ -2,7 +2,11 @@ package com.gofolyx.mobile.callconnection
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
@@ -93,6 +97,37 @@ class CallConnectionModule(reactContext: ReactApplicationContext) :
       promise.resolve(account?.isEnabled == true)
     } catch (e: Exception) {
       promise.resolve(false)
+    }
+  }
+
+  /**
+   * Certains fabricants (Xiaomi/MIUI, Huawei, Samsung...) tuent agressivement les apps
+   * en arrière-plan même pour un message FCM prioritaire, sauf si l'app est exemptée de
+   * l'optimisation de batterie — sans quoi un appel entrant peut ne jamais réveiller
+   * l'app quand elle est complètement fermée (aucune notification, aucune sonnerie).
+   */
+  @ReactMethod
+  fun isIgnoringBatteryOptimizations(promise: Promise) {
+    try {
+      val pm = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+      promise.resolve(pm.isIgnoringBatteryOptimizations(reactApplicationContext.packageName))
+    } catch (e: Exception) {
+      promise.resolve(true) // en cas de doute, ne pas re-solliciter l'utilisateur
+    }
+  }
+
+  /** Ouvre le dialogue système demandant d'exempter l'app de l'optimisation de batterie. */
+  @ReactMethod
+  fun requestIgnoreBatteryOptimizations(promise: Promise) {
+    try {
+      val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+        data = Uri.parse("package:${reactApplicationContext.packageName}")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      reactApplicationContext.startActivity(intent)
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("BATTERY_OPT_ERROR", e.message, e)
     }
   }
 

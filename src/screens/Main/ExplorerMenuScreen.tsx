@@ -207,6 +207,20 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
           </View>
           <Icon name="chevron-right" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          activeOpacity={0.75}
+          onPress={() => (nav as any).navigate('Feedback')}
+        >
+          <View style={[mnu.listIcon, { backgroundColor: '#7B3FF218' }]}>
+            <Icon name="edit-3" size={20} color="#7B3FF2" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>Donner mon avis</Text>
+            <Text style={[mnu.listSub, { color: colors.textTertiary }]}>Bug, suggestion ou avis général</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
 
       </ScrollView>
     </View>

@@ -122,6 +122,7 @@ import { SettingsVerificationScreen }         from '../screens/Settings/Settings
 import { SettingsSecurityScreen }            from '../screens/Settings/SettingsSecurityScreen';
 import { SupportScreen }                      from '../screens/Main/SupportScreen';
 import { SupportChatScreen }                  from '../screens/Main/SupportChatScreen';
+import { FeedbackScreen }                     from '../screens/Main/FeedbackScreen';
 import { ReelPlayerScreen }                  from '../screens/Main/ReelPlayerScreen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -238,6 +239,7 @@ export type MainStackParamList = {
   PolitiqueConfidentialite:  undefined;
   Support:                   undefined;
   SupportChat:               undefined;
+  Feedback:                  undefined;
   SettingsVerification:      { user?: any } | undefined;
   SettingsSecurity:          undefined;
 };
@@ -560,6 +562,7 @@ const SettingsWrapper = useCallback(
         </Stack.Screen>
         <Stack.Screen name="Support"     component={SupportScreen}     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="SupportChat" component={SupportChatScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="Feedback"    component={FeedbackScreen}    options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack.Navigator>
       <UploadProgressBanner />
       <NotificationToast />

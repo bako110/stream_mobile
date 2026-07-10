@@ -224,12 +224,21 @@ export async function handleBackgroundFCM(
     }));
 
     // Priorité au vrai écran d'appel natif (ConnectionService) — écran par-dessus
-    // le verrouillage, routage audio système, comme WhatsApp. Notifee reste le
-    // secours si le module natif est indisponible (ex: build sans le module).
+    // le verrouillage, routage audio système, comme WhatsApp. On affiche AUSSI la
+    // notification Notifee en secours à chaque fois : reportIncomingCall() peut
+    // échouer silencieusement (PhoneAccount jamais activé par l'utilisateur dans
+    // les réglages système, ConnectionService refusé par l'OS, etc.) — sans ce
+    // filet, l'appel n'était plus signalé du tout côté destinataire (aucune
+    // notification, aucune sonnerie) alors que l'appelant voyait "ça sonne".
     const { callConnectionService } = require('../services/callConnectionService');
+    let nativeCallOk = false;
     if (callConnectionService.isAvailable) {
-      await callConnectionService.reportIncomingCall(callerId, callerName, callType === 'video');
-    } else {
+      try {
+        await callConnectionService.reportIncomingCall(callerId, callerName, callType === 'video');
+        nativeCallOk = true;
+      } catch { /* nativeCallOk reste false → notification de secours ci-dessous */ }
+    }
+    if (!nativeCallOk) {
       await showIncomingCallNotification(callerId, callerName, callerAvatar || null, callType);
     }
     return;
