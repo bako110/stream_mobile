@@ -227,6 +227,9 @@ export const BattleScreen: React.FC = () => {
   const [goal, setGoal]       = useState<BattleGoal | null>(null);
   const [ranking, setRanking] = useState<BattleRanking | null>(null);
   const [floaters, setFloaters] = useState<{ id: string; side: 'a' | 'b'; drift: number }[]>([]);
+  // Compteur de coeurs par camp — purement indicatif, sans effet sur le score du match.
+  const [heartCountA, setHeartCountA] = useState(0);
+  const [heartCountB, setHeartCountB] = useState(0);
   const [ended, setEnded]     = useState<{ winner_id: string | null; score_a: number; score_b: number } | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [showChat, setShowChat] = useState(true);
@@ -360,6 +363,7 @@ export const BattleScreen: React.FC = () => {
       const drift = (Math.random() - 0.5) * 40;
       setFloaters(prev => [...prev, { id, side: d.side, drift }]);
       setTimeout(() => setFloaters(prev => prev.filter(f => f.id !== id)), HEART_RISE_DURATION);
+      if (d.side === 'a') setHeartCountA(c => c + 1); else setHeartCountB(c => c + 1);
     }
     if (d.type === 'battle_score_update') {
       setBattle(prev => prev ? { ...prev, score_a: d.score_a, score_b: d.score_b } : prev);
@@ -478,6 +482,8 @@ export const BattleScreen: React.FC = () => {
         goal={goal}
         ranking={ranking}
         floaters={floaters}
+        heartCountA={heartCountA}
+        heartCountB={heartCountB}
         ended={ended}
         leaving={leaving}
         myId={currentUser?.id ?? null}
@@ -517,6 +523,8 @@ const BattleContent: React.FC<{
   goal: BattleGoal | null;
   ranking: BattleRanking | null;
   floaters: { id: string; side: 'a' | 'b'; drift: number }[];
+  heartCountA: number;
+  heartCountB: number;
   ended: { winner_id: string | null; score_a: number; score_b: number } | null;
   leaving: boolean;
   myId: string | null;
@@ -546,7 +554,7 @@ const BattleContent: React.FC<{
   onSendChat: () => void;
   onClose: () => void;
 }> = ({
-  battle, remaining, goal, ranking, floaters, ended, leaving, myId, myHostSide, followedSide,
+  battle, remaining, goal, ranking, floaters, heartCountA, heartCountB, ended, leaving, myId, myHostSide, followedSide,
   hostNameA, hostNameB, hostAvatarA, hostAvatarB,
   showChat, showRanking, setShowChat, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
@@ -695,6 +703,12 @@ const BattleContent: React.FC<{
             {leadingSide === 'a' && <Text style={styles.hostBadgeCrown}>👑</Text>}
           </Animated.View>
 
+          {/* Compteur de coeurs recus — purement indicatif, sans effet sur le score */}
+          <View style={[styles.heartCounter, styles.heartCounterA]}>
+            <Text style={styles.heartCounterIcon}>❤️</Text>
+            <Text style={styles.heartCounterText}>{heartCountA}</Text>
+          </View>
+
           {giftTicker.filter(t => t.side === 'a').map(t => (
             <Animated.View key={t.id} entering={ZoomIn.duration(280)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
               <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
@@ -733,6 +747,12 @@ const BattleContent: React.FC<{
               ? <Image source={{ uri: hostAvatarB }} style={styles.hostBadgeAvatar} />
               : <View style={[styles.hostBadgeAvatar, styles.hostBadgeAvatarFallback]}><Icon name="user" size={12} color="#fff" /></View>}
           </Animated.View>
+
+          {/* Compteur de coeurs recus — purement indicatif, sans effet sur le score */}
+          <View style={[styles.heartCounter, styles.heartCounterB]}>
+            <Text style={styles.heartCounterIcon}>❤️</Text>
+            <Text style={styles.heartCounterText}>{heartCountB}</Text>
+          </View>
 
           {giftTicker.filter(t => t.side === 'b').map(t => (
             <Animated.View key={t.id} entering={ZoomIn.duration(280)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
@@ -987,6 +1007,19 @@ const styles = StyleSheet.create({
   hostBadgeAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   hostBadgeName: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1 },
   hostBadgeCrown: { fontSize: 12 },
+
+  // Compteur de coeurs recus par camp — juste sous le bandeau nom/avatar
+  heartCounter: {
+    position: 'absolute', top: 32,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 14,
+    paddingVertical: 2, paddingHorizontal: 7,
+    zIndex: 15,
+  },
+  heartCounterA: { left: 6 },
+  heartCounterB: { right: 6 },
+  heartCounterIcon: { fontSize: 11 },
+  heartCounterText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   // Zone basse — 50% de l'ecran, fixe : chat (flexible) + actions + saisie (toujours visibles)
   bottomZone: {
