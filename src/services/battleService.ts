@@ -97,8 +97,8 @@ async function react(battleId: string, side: 'a' | 'b'): Promise<void> {
   await apiClient.post(Endpoints.battles.react(battleId), { side });
 }
 
-async function end(battleId: string): Promise<Battle> {
-  const r = await apiClient.post<Battle>(Endpoints.battles.end(battleId));
+async function end(battleId: string, forfeit = false): Promise<Battle> {
+  const r = await apiClient.post<Battle>(Endpoints.battles.end(battleId), { forfeit });
   return r.data;
 }
 
