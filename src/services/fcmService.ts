@@ -91,6 +91,7 @@ export async function showIncomingCallNotification(
   callerName: string,
   callerAvatar: string | null,
   callType: 'voice' | 'video',
+  callId?: string | null,
 ): Promise<void> {
   await notifee.displayNotification({
     id:    `call_${callerId}`,
@@ -124,6 +125,7 @@ export async function showIncomingCallNotification(
       caller_id:   callerId,
       caller_name: callerName,
       caller_avatar: callerAvatar ?? '',
+      call_id:     callId ?? '',
     },
   });
 }
@@ -165,6 +167,7 @@ export function setupNotifeeBackgroundHandler(): void {
             caller_name:  data.caller_name,
             caller_avatar: data.caller_avatar ?? '',
             call_type:    data.call_type ?? 'voice',
+            call_id:      data.call_id ?? null,
           }));
         }
       }
@@ -257,24 +260,17 @@ export async function handleBackgroundFCM(
       received_at:  Date.now(),
     }));
 
-    // Priorité au vrai écran d'appel natif (ConnectionService) — écran par-dessus
-    // le verrouillage, routage audio système, comme WhatsApp. On affiche AUSSI la
-    // notification Notifee en secours à chaque fois : reportIncomingCall() peut
-    // échouer silencieusement (PhoneAccount jamais activé par l'utilisateur dans
-    // les réglages système, ConnectionService refusé par l'OS, etc.) — sans ce
-    // filet, l'appel n'était plus signalé du tout côté destinataire (aucune
-    // notification, aucune sonnerie) alors que l'appelant voyait "ça sonne".
+    // L'écran d'appel plein écran vient TOUJOURS de Notifee (fullScreenAction) —
+    // un ConnectionService self-managed n'affiche par lui-même AUCUNE UI système
+    // (contrairement à ce qu'on pensait) : il ne fait qu'intégrer l'appel au
+    // système Telecom (routage audio natif, bouton volume, interruption par un
+    // appel GSM classique). Sans cette notification, l'appel restait invisible
+    // même quand reportIncomingCall() "réussissait" silencieusement.
     const { callConnectionService } = require('../services/callConnectionService');
-    let nativeCallOk = false;
     if (callConnectionService.isAvailable) {
-      try {
-        await callConnectionService.reportIncomingCall(callerId, callerName, callType === 'video');
-        nativeCallOk = true;
-      } catch { /* nativeCallOk reste false → notification de secours ci-dessous */ }
+      try { await callConnectionService.reportIncomingCall(callerId, callerName, callType === 'video'); } catch {}
     }
-    if (!nativeCallOk) {
-      await showIncomingCallNotification(callerId, callerName, callerAvatar || null, callType);
-    }
+    await showIncomingCallNotification(callerId, callerName, callerAvatar || null, callType, callId);
     return;
   }
 
