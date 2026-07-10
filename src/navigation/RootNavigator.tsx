@@ -25,6 +25,7 @@ import { UpdateBanner } from '../components/common/UpdateBanner';
 type AppState = 'splash' | 'onboarding' | 'auth' | 'main';
 
 const BATTERY_OPT_ASKED_KEY = 'battery_opt_exemption_asked';
+const FULLSCREEN_INTENT_ASKED_KEY = 'fullscreen_intent_permission_asked';
 
 // Demande une seule fois (par install) l'exemption d'optimisation de batterie —
 // sans elle, certains fabricants (Xiaomi/MIUI, Huawei, Samsung...) peuvent tuer
@@ -39,6 +40,21 @@ async function maybeRequestBatteryExemption(): Promise<void> {
     }
     storage.setBoolean(BATTERY_OPT_ASKED_KEY, true);
   } catch { /* pas bloquant — l'app reste utilisable sans cette exemption */ }
+}
+
+// Demande une seule fois (par install) l'autorisation plein écran — requise depuis
+// Android 14 en plus de USE_FULL_SCREEN_INTENT dans le manifest, sinon la notification
+// d'appel entrant est degradee silencieusement (visible dans le tiroir, mais sans
+// reveil d'ecran ni sonnerie prioritaire) : l'appel semble ne "rien faire".
+async function maybeRequestFullScreenIntentPermission(): Promise<void> {
+  try {
+    if (storage.getBoolean(FULLSCREEN_INTENT_ASKED_KEY)) return;
+    const allowed = await callConnectionService.canUseFullScreenIntent();
+    if (!allowed) {
+      await callConnectionService.requestFullScreenIntentPermission();
+    }
+    storage.setBoolean(FULLSCREEN_INTENT_ASKED_KEY, true);
+  } catch { /* pas bloquant */ }
 }
 
 const NAV_THEME_LIGHT: Theme = {
@@ -166,7 +182,7 @@ export const RootNavigator: React.FC = () => {
       setTimeout(() => {
         setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       }, 500);
-      setTimeout(() => { maybeRequestBatteryExemption(); }, 2000);
+      setTimeout(() => { maybeRequestBatteryExemption(); maybeRequestFullScreenIntentPermission(); }, 2000);
       navigatePendingUrl();
     };
 
@@ -211,7 +227,7 @@ export const RootNavigator: React.FC = () => {
     setTimeout(() => {
       setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
     }, 500);
-    setTimeout(() => { maybeRequestBatteryExemption(); }, 2000);
+    setTimeout(() => { maybeRequestBatteryExemption(); maybeRequestFullScreenIntentPermission(); }, 2000);
     navigatePendingUrl();
   };
   const handleLogout = () => {

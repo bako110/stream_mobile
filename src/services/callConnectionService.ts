@@ -59,6 +59,23 @@ export const callConnectionService = {
   },
 
   /**
+   * Depuis Android 14, une notification plein écran (appel entrant) nécessite une
+   * autorisation explicite en plus de la déclaration manifest — sinon le système la
+   * dégrade silencieusement en notification normale (visible dans le tiroir mais sans
+   * réveil d'écran ni sonnerie prioritaire). true sur Android < 14 (rien à demander).
+   */
+  async canUseFullScreenIntent(): Promise<boolean> {
+    if (!available) return true;
+    try { return await CallConnectionModule.canUseFullScreenIntent(); } catch { return true; }
+  },
+
+  /** Ouvre le réglage système dédié à cette autorisation (no-op sur Android < 14). */
+  async requestFullScreenIntentPermission(): Promise<void> {
+    if (!available) return;
+    try { await CallConnectionModule.requestFullScreenIntentPermission(); } catch {}
+  },
+
+  /**
    * Lance l'écran d'appel natif. Propage l'erreur (ne l'avale pas) — l'appelant
    * (fcmService.ts) doit savoir si ça a réellement échoué pour afficher la
    * notification Notifee de secours, sinon un échec silencieux ici laisse

@@ -1,9 +1,11 @@
 package com.gofolyx.mobile.callconnection
 
+import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
@@ -128,6 +130,40 @@ class CallConnectionModule(reactContext: ReactApplicationContext) :
       promise.resolve(true)
     } catch (e: Exception) {
       promise.reject("BATTERY_OPT_ERROR", e.message, e)
+    }
+  }
+
+  /**
+   * Depuis Android 14 (API 34), USE_FULL_SCREEN_INTENT dans le manifest ne suffit
+   * plus : l'utilisateur doit aussi l'autoriser explicitement, sinon le systeme
+   * degrade silencieusement la notification d'appel en notification normale
+   * (pas de reveil d'ecran, pas de sonnerie prioritaire) — elle apparait dans le
+   * tiroir mais l'appel entrant passe inapercu, exactement le symptome observe.
+   */
+  @ReactMethod
+  fun canUseFullScreenIntent(promise: Promise) {
+    if (Build.VERSION.SDK_INT < 34) { promise.resolve(true); return }
+    try {
+      val nm = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      promise.resolve(nm.canUseFullScreenIntent())
+    } catch (e: Exception) {
+      promise.resolve(true)
+    }
+  }
+
+  /** Ouvre le réglage système dédié à l'autorisation plein écran (Android 14+ uniquement). */
+  @ReactMethod
+  fun requestFullScreenIntentPermission(promise: Promise) {
+    if (Build.VERSION.SDK_INT < 34) { promise.resolve(true); return }
+    try {
+      val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+        data = Uri.parse("package:${reactApplicationContext.packageName}")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      reactApplicationContext.startActivity(intent)
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("FULLSCREEN_INTENT_ERROR", e.message, e)
     }
   }
 
