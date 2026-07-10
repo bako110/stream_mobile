@@ -704,45 +704,49 @@ const BattleContent: React.FC<{
           />
         )}
 
+        {/* Envoyer un cadeau — une carte par competiteur, cote a cote, sans ambiguite sur le destinataire */}
+        <View style={styles.giftRow}>
+          <TouchableOpacity
+            style={[styles.giftCard, styles.giftCardA]}
+            onPress={() => battle && giftOverlayA.current?.openGift(battle.host_a_id, hostNameA)}
+            activeOpacity={0.85}
+          >
+            {hostAvatarA
+              ? <Image source={{ uri: hostAvatarA }} style={styles.giftCardAvatar} />
+              : <View style={[styles.giftCardAvatar, styles.giftCardAvatarFallback]}><Icon name="user" size={14} color="#fff" /></View>}
+            <Text style={styles.giftCardName} numberOfLines={1}>{hostNameA}</Text>
+            <View style={styles.giftCardIconWrap}>
+              <Text style={styles.giftCardIcon}>🎁</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.giftCard, styles.giftCardB]}
+            onPress={() => battle && giftOverlayB.current?.openGift(battle.host_b_id, hostNameB)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.giftCardIconWrap}>
+              <Text style={styles.giftCardIcon}>🎁</Text>
+            </View>
+            <Text style={styles.giftCardName} numberOfLines={1}>{hostNameB}</Text>
+            {hostAvatarB
+              ? <Image source={{ uri: hostAvatarB }} style={styles.giftCardAvatar} />
+              : <View style={[styles.giftCardAvatar, styles.giftCardAvatarFallback]}><Icon name="user" size={14} color="#fff" /></View>}
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.actionsRow}>
-          <Animated.View entering={ZoomIn.duration(300).delay(50)}>
-            <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
-              <Icon name="heart" size={15} color="#fff" />
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View entering={ZoomIn.duration(300).delay(100)}>
-            <TouchableOpacity
-              style={[styles.reactBtn, styles.reactBtnA]}
-              onPress={() => battle && giftOverlayA.current?.openGift(battle.host_a_id, hostNameA)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.giftBtnEmoji}>🎁</Text>
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View entering={ZoomIn.duration(300).delay(150)}>
-            <TouchableOpacity style={[styles.reactBtn, styles.reactBtnB]} onPress={() => onReact('b')} activeOpacity={0.8}>
-              <Icon name="heart" size={15} color="#fff" />
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View entering={ZoomIn.duration(300).delay(200)}>
-            <TouchableOpacity
-              style={[styles.reactBtn, styles.reactBtnB]}
-              onPress={() => battle && giftOverlayB.current?.openGift(battle.host_b_id, hostNameB)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.giftBtnEmoji}>🎁</Text>
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View entering={ZoomIn.duration(300).delay(250)}>
-            <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
-              <Icon name="award" size={15} color="#FFD700" />
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View entering={ZoomIn.duration(300).delay(300)}>
-            <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
-              <Icon name={showChat ? 'message-circle' : 'message-square'} size={15} color="#fff" />
-            </TouchableOpacity>
-          </Animated.View>
+          <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
+            <Icon name="heart" size={15} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.reactBtn, styles.reactBtnB]} onPress={() => onReact('b')} activeOpacity={0.8}>
+            <Icon name="heart" size={15} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
+            <Icon name="award" size={15} color="#FFD700" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
+            <Icon name={showChat ? 'message-circle' : 'message-square'} size={15} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.chatInputRow}>
@@ -883,7 +887,25 @@ const styles = StyleSheet.create({
     width: '100%', height: BOTTOM_ZONE_H, backgroundColor: '#0B0812',
     borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden',
   },
-  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4 },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 4, paddingBottom: 4 },
+
+  // Envoyer un cadeau — carte dediee par competiteur, sans ambiguite sur le destinataire
+  giftRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingTop: 8 },
+  giftCard: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 16, paddingVertical: 8, paddingHorizontal: 10,
+    borderWidth: 1,
+  },
+  giftCardA: { backgroundColor: 'rgba(123,63,242,0.14)', borderColor: 'rgba(123,63,242,0.4)' },
+  giftCardB: { backgroundColor: 'rgba(240,54,90,0.14)', borderColor: 'rgba(240,54,90,0.4)' },
+  giftCardAvatar: { width: 26, height: 26, borderRadius: 13 },
+  giftCardAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  giftCardName: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '700' },
+  giftCardIconWrap: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
+  },
+  giftCardIcon: { fontSize: 15 },
 
   scoreBarTrack: { width: '100%', height: 10, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.15)', overflow: 'hidden', flexDirection: 'row' },
   scoreBarFillA: { height: '100%', backgroundColor: '#7B3FF2', borderRadius: 6 },
