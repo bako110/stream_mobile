@@ -61,12 +61,16 @@ export function MonetisationScreen() {
   const { colors } = theme;
 
   const [monetStatus, setMonetStatus] = useState<MonetStatus | null>(null);
+  const [adminNote, setAdminNote] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     apiClient
-      .get<{ status: MonetStatus }>(Endpoints.monetization.status)
-      .then(res => setMonetStatus(res.data.status))
+      .get<{ status: MonetStatus; admin_note: string | null }>(Endpoints.monetization.status)
+      .then(res => {
+        setMonetStatus(res.data.status);
+        setAdminNote(res.data.admin_note ?? null);
+      })
       .catch(() => setMonetStatus('none'))
       .finally(() => setFetching(false));
   }, []);
@@ -95,6 +99,12 @@ export function MonetisationScreen() {
           </View>
           <Text style={[gateStyles.title, { color: colors.textPrimary }]}>{cfg.title}</Text>
           <Text style={[gateStyles.message, { color: colors.textSecondary }]}>{cfg.message}</Text>
+          {monetStatus === 'rejected' && adminNote && (
+            <View style={[gateStyles.reasonBox, { backgroundColor: '#EF444415' }]}>
+              <Text style={[gateStyles.reasonLabel, { color: '#EF4444' }]}>Motif du refus</Text>
+              <Text style={[gateStyles.reasonText, { color: colors.textSecondary }]}>{adminNote}</Text>
+            </View>
+          )}
           <TouchableOpacity
             style={[gateStyles.btn, { backgroundColor: GREEN }]}
             onPress={() => nav.navigate('MonetisationRequest')}
@@ -160,6 +170,9 @@ const gateStyles = StyleSheet.create({
   message:  { fontSize: 14, textAlign: 'center', lineHeight: 21 },
   btn:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24, marginTop: 8 },
   btnText:  { color: '#fff', fontSize: 15, fontWeight: '700' },
+  reasonBox:   { borderRadius: 12, padding: 14, gap: 4, width: '100%' },
+  reasonLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  reasonText:  { fontSize: 13, lineHeight: 19 },
 });
 
 const styles = StyleSheet.create({

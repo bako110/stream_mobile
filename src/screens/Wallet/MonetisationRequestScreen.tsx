@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { BackButton } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -20,12 +20,12 @@ const CONTENT_TYPES = [
   { id: 'other',    icon: 'grid',       label: 'Autre' },
 ];
 
-const REQUIREMENTS = [
-  { icon: 'users',      label: 'Au moins 100 abonnés' },
-  { icon: 'film',       label: 'Au moins 5 contenus publiés' },
-  { icon: 'calendar',   label: 'Compte créé depuis 30 jours' },
-  { icon: 'check-circle', label: 'Respect des CGU GoFolyX' },
-];
+interface EligibilityInfo {
+  followers_count: number;
+  followers_required: number;
+  eligible: boolean;
+  eligibility_reasons: string[];
+}
 
 export default function MonetisationRequestScreen() {
   const nav               = useNavigation<any>();
@@ -37,6 +37,16 @@ export default function MonetisationRequestScreen() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [submitting,   setSubmitting]   = useState(false);
   const [submitted,    setSubmitted]    = useState(false);
+  const [elig,         setElig]         = useState<EligibilityInfo | null>(null);
+  const [loadingElig,  setLoadingElig]  = useState(true);
+
+  useEffect(() => {
+    apiClient
+      .get<EligibilityInfo>(Endpoints.monetization.status)
+      .then(res => setElig(res.data))
+      .catch(() => setElig(null))
+      .finally(() => setLoadingElig(false));
+  }, []);
 
   function toggleType(id: string) {
     setSelectedTypes(prev =>
@@ -61,13 +71,15 @@ export default function MonetisationRequestScreen() {
     setSubmitting(true);
     try {
       await apiClient.post(Endpoints.monetization.request, {
-        bio:          bio.trim(),
-        payout_email: payoutEmail.trim(),
-        content_types: selectedTypes,
+        creator_type:  selectedTypes[0],
+        display_name:  bio.trim().slice(0, 60),
+        description:   bio.trim(),
+        accepts_terms: true,
       });
       setSubmitted(true);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible d\'envoyer la demande. Réessayez.');
+      const detail = e?.response?.data?.detail;
+      Alert.alert('Demande refusée', detail || e?.message || 'Impossible d\'envoyer la demande. Réessayez.');
     } finally {
       setSubmitting(false);
     }
@@ -107,17 +119,56 @@ export default function MonetisationRequestScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
-        {/* Requirements */}
+        {/* Requirements — conditions du programme + progression reelle */}
         <View style={[s.requireCard, { backgroundColor: colors.surface }]}>
           <Text style={[s.requireTitle, { color: colors.textPrimary }]}>Conditions requises</Text>
-          {REQUIREMENTS.map(r => (
-            <View key={r.label} style={s.requireRow}>
-              <View style={[s.requireIcon, { backgroundColor: '#10B98122' }]}>
-                <Icon name={r.icon} size={14} color="#10B981" />
+
+          {loadingElig ? (
+            <ActivityIndicator size="small" color="#10B981" style={{ marginVertical: 8 }} />
+          ) : (
+            <>
+              <View style={s.requireRow}>
+                <View style={[s.requireIcon, { backgroundColor: elig && elig.followers_count >= elig.followers_required ? '#10B98122' : '#EF444422' }]}>
+                  <Icon name="users" size={14} color={elig && elig.followers_count >= elig.followers_required ? '#10B981' : '#EF4444'} />
+                </View>
+                <Text style={[s.requireLabel, { color: colors.textSecondary }]}>
+                  {elig ? `${elig.followers_count} / ${elig.followers_required} abonnés` : `Au moins 1000 abonnés`}
+                </Text>
               </View>
-              <Text style={[s.requireLabel, { color: colors.textSecondary }]}>{r.label}</Text>
-            </View>
-          ))}
+              <View style={s.requireRow}>
+                <View style={[s.requireIcon, { backgroundColor: '#7B3FF222' }]}>
+                  <Icon name="calendar" size={14} color="#7B3FF2" />
+                </View>
+                <Text style={[s.requireLabel, { color: colors.textSecondary }]}>Compte créé depuis au moins 30 jours</Text>
+              </View>
+              <View style={s.requireRow}>
+                <View style={[s.requireIcon, { backgroundColor: '#7B3FF222' }]}>
+                  <Icon name="film" size={14} color="#7B3FF2" />
+                </View>
+                <Text style={[s.requireLabel, { color: colors.textSecondary }]}>Au moins 3 publications par semaine en moyenne</Text>
+              </View>
+              <View style={s.requireRow}>
+                <View style={[s.requireIcon, { backgroundColor: '#7B3FF222' }]}>
+                  <Icon name="shield" size={14} color="#7B3FF2" />
+                </View>
+                <Text style={[s.requireLabel, { color: colors.textSecondary }]}>Aucune restriction sur le compte, respect des CGU GoFolyX</Text>
+              </View>
+              <View style={s.requireRow}>
+                <View style={[s.requireIcon, { backgroundColor: '#7B3FF222' }]}>
+                  <Icon name="clock" size={14} color="#7B3FF2" />
+                </View>
+                <Text style={[s.requireLabel, { color: colors.textSecondary }]}>Validation automatique sous 24h si les conditions restent remplies</Text>
+              </View>
+
+              {elig && !elig.eligible && elig.eligibility_reasons.length > 0 && (
+                <View style={[s.blockedNote, { backgroundColor: '#EF444415' }]}>
+                  {elig.eligibility_reasons.map(reason => (
+                    <Text key={reason} style={[s.blockedText, { color: '#EF4444' }]}>{reason}</Text>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
         </View>
 
         {/* Content types */}
@@ -187,8 +238,8 @@ export default function MonetisationRequestScreen() {
         {/* Submit */}
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={submitting}
-          style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden' }}
+          disabled={submitting || loadingElig || (elig ? !elig.eligible : false)}
+          style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden', opacity: elig && !elig.eligible ? 0.5 : 1 }}
           activeOpacity={0.8}
         >
           <LinearGradient colors={['#10B981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitBtn}>
@@ -218,7 +269,9 @@ const s = StyleSheet.create({
   requireTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   requireRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
   requireIcon:  { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  requireLabel: { fontSize: 13 },
+  requireLabel: { fontSize: 13, flex: 1 },
+  blockedNote:  { borderRadius: 10, padding: 10, gap: 4, marginTop: 4 },
+  blockedText:  { fontSize: 12, lineHeight: 17 },
 
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },
 
