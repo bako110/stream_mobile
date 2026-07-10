@@ -523,6 +523,20 @@ const BattleContent: React.FC<{
   const pctA = total > 0 ? (scoreA / total) * 100 : 50;
   const leadingSide: 'a' | 'b' | null = total === 0 ? null : scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : null;
 
+  // Bandeau "X mene le combat" — apparait/disparait en fondu a chaque changement de leader,
+  // comme les notifications defilantes de TikTok, puis se retire tout seul apres quelques secondes.
+  const [leadBanner, setLeadBanner] = useState<{ id: string; side: 'a' | 'b' } | null>(null);
+  const prevLeadRef = useRef<'a' | 'b' | null>(null);
+  const leadBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (leadingSide && leadingSide !== prevLeadRef.current) {
+      if (leadBannerTimerRef.current) clearTimeout(leadBannerTimerRef.current);
+      setLeadBanner({ id: `${Date.now()}`, side: leadingSide });
+      leadBannerTimerRef.current = setTimeout(() => setLeadBanner(null), 3000);
+    }
+    prevLeadRef.current = leadingSide;
+  }, [leadingSide]);
+
   const topDonor = ranking?.top_donor;
 
   return (
@@ -679,6 +693,21 @@ const BattleContent: React.FC<{
           </Animated.Text>
         ))}
       </View>
+
+      {/* Bandeau "X mene le combat" — juste sous la video, apparait/disparait en fondu */}
+      {leadBanner && (
+        <Animated.View
+          key={leadBanner.id}
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(400)}
+          style={[styles.leadBanner, leadBanner.side === 'a' ? styles.leadBannerA : styles.leadBannerB]}
+          pointerEvents="none"
+        >
+          <Text style={styles.leadBannerText} numberOfLines={1}>
+            🔥 {leadBanner.side === 'a' ? hostNameA : hostNameB} mène le combat !
+          </Text>
+        </Animated.View>
+      )}
 
       {/* Zone basse — 25% de l'ecran : chat fusionne + boutons de soutien */}
       <KeyboardAvoidingView
@@ -856,6 +885,16 @@ const styles = StyleSheet.create({
   },
   videoInner: { ...StyleSheet.absoluteFill, borderRadius: 20 },
   noVideo: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
+
+  // Bandeau "X mene le combat" — juste sous la zone video
+  leadBanner: {
+    marginHorizontal: 14, marginTop: 6,
+    paddingVertical: 6, paddingHorizontal: 14,
+    borderRadius: 20, alignItems: 'center',
+  },
+  leadBannerA: { backgroundColor: 'rgba(123,63,242,0.18)' },
+  leadBannerB: { backgroundColor: 'rgba(240,54,90,0.18)' },
+  leadBannerText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   // Badge VS central entre les deux cartes
   vsWrap: { position: 'absolute', top: '50%', left: 0, right: 0, alignItems: 'center', zIndex: 25, marginTop: -16 },
