@@ -586,50 +586,48 @@ const BattleContent: React.FC<{
           />
         )}
 
-        <View style={styles.bottomControlsRow}>
-          <View style={styles.chatInputRow}>
-            <TextInput
-              value={chatInput}
-              onChangeText={setChatInput}
-              placeholder="Écris un commentaire…"
-              placeholderTextColor="rgba(255,255,255,0.4)"
-              style={styles.chatInput}
-              onSubmitEditing={onSendChat}
-              returnKeyType="send"
-            />
-            <TouchableOpacity onPress={onSendChat} style={styles.chatSendBtn}>
-              <Icon name="send" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
+            <Icon name="heart" size={15} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.reactBtn, styles.reactBtnA]}
+            onPress={() => battle && giftOverlayA.current?.openGift(battle.host_a_id, hostNameA)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.giftBtnEmoji}>🎁</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.reactBtn, styles.reactBtnB]} onPress={() => onReact('b')} activeOpacity={0.8}>
+            <Icon name="heart" size={15} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.reactBtn, styles.reactBtnB]}
+            onPress={() => battle && giftOverlayB.current?.openGift(battle.host_b_id, hostNameB)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.giftBtnEmoji}>🎁</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
+            <Icon name="award" size={15} color="#FFD700" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
+            <Icon name={showChat ? 'message-circle' : 'message-square'} size={15} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.actionsRow}>
-            <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
-              <Icon name="heart" size={16} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.reactBtn, styles.reactBtnA]}
-              onPress={() => battle && giftOverlayA.current?.openGift(battle.host_a_id, hostNameA)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.giftBtnEmoji}>🎁</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.reactBtn, styles.reactBtnB]} onPress={() => onReact('b')} activeOpacity={0.8}>
-              <Icon name="heart" size={16} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.reactBtn, styles.reactBtnB]}
-              onPress={() => battle && giftOverlayB.current?.openGift(battle.host_b_id, hostNameB)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.giftBtnEmoji}>🎁</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
-              <Icon name="award" size={16} color="#FFD700" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
-              <Icon name={showChat ? 'message-circle' : 'message-square'} size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.chatInputRow}>
+          <TextInput
+            value={chatInput}
+            onChangeText={setChatInput}
+            placeholder="Écris un commentaire…"
+            placeholderTextColor="rgba(255,255,255,0.4)"
+            style={styles.chatInput}
+            onSubmitEditing={onSendChat}
+            returnKeyType="send"
+          />
+          <TouchableOpacity onPress={onSendChat} style={styles.chatSendBtn}>
+            <Icon name="send" size={16} color="#fff" />
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
 
@@ -701,14 +699,13 @@ const styles = StyleSheet.create({
 
   // Zone video — 75% de l'ecran, les deux hosts cote a cote horizontalement
   videoZone: { width: '100%', height: VIDEO_ZONE_H, flexDirection: 'row', backgroundColor: '#111' },
-  videoHalf: { flex: 1, backgroundColor: '#111' },
+  videoHalf: { flex: 1, backgroundColor: '#111', overflow: 'hidden', position: 'relative' },
   videoDivider: { width: 2, backgroundColor: '#000' },
   noVideo: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
 
-  // Zone basse — 25% de l'ecran, fixe : chat + controles
-  bottomZone: { width: '100%', height: BOTTOM_ZONE_H, backgroundColor: '#0B0812', paddingTop: 6 },
-  bottomControlsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 10, paddingBottom: 10, paddingTop: 4 },
-  actionsRow: { flexDirection: 'row', gap: 8 },
+  // Zone basse — 25% de l'ecran, fixe : chat (flexible) + actions + saisie (toujours visibles)
+  bottomZone: { width: '100%', height: BOTTOM_ZONE_H, backgroundColor: '#0B0812' },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 },
 
   centerBar: { position: 'absolute', top: VIDEO_ZONE_H / 2 - 34, left: 0, right: 0, alignItems: 'center', gap: 4 },
   scoreBarTrack: { width: '86%', height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden', flexDirection: 'row' },
@@ -772,9 +769,9 @@ const styles = StyleSheet.create({
   chatUser: { fontWeight: '800' },
   chatUserA: { color: '#C4B5FD' },
   chatUserB: { color: '#FCA5C5' },
-  chatInputRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  chatInput: { flex: 1, color: '#fff', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
-  chatSendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingBottom: 10, paddingTop: 2 },
+  chatInput: { flex: 1, minWidth: 0, color: '#fff', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
+  chatSendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   // Panneau classement
   rankingOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 60 },

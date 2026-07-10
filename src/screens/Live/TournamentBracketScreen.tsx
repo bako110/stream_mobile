@@ -99,9 +99,14 @@ export const TournamentBracketScreen: React.FC = () => {
     try {
       const { live, token, livekit_url } = await liveService.startLive({ title: 'Battle de tournoi' });
       const updated = await tournamentService.markMatchReady(match.id, live.id);
-      nav.navigate('SimpleLiveStream', { liveId: live.id, publisherToken: token, livekitUrl: livekit_url });
       if (updated.status === 'live' && updated.battle_id) {
-        setTimeout(() => nav.navigate('BattleScreen', { battleId: updated.battle_id! }), 400);
+        // On ne passe jamais par SimpleLiveStream dans ce cas : l'autre participant
+        // etait deja pret, le battle demarre immediatement — naviguer directement
+        // vers BattleScreen evite de laisser un LiveKitRoom de live simple connecte
+        // en parallele de celui du battle.
+        nav.replace('BattleScreen', { battleId: updated.battle_id });
+      } else {
+        nav.navigate('SimpleLiveStream', { liveId: live.id, publisherToken: token, livekitUrl: livekit_url });
       }
     } catch (e: any) {
       Alert.alert('Erreur', e?.message || "Impossible de démarrer le match.");

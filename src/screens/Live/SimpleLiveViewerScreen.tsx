@@ -1315,7 +1315,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         // Battle : le host de ce live vient d'accepter/demarrer un battle — les viewers
         // basculent aussi vers l'ecran de battle en split-screen (comme les deux hosts).
         if (d.type === 'battle_started' && d.battle_id) {
-          nav.navigate('BattleScreen', { battleId: d.battle_id });
+          // replace (pas navigate) : sinon ce live reste monte en dessous avec son propre
+          // LiveKitRoom connecte en parallele de celui du battle, ce qui peut empecher les
+          // tracks video du battle de s'afficher correctement.
+          nav.replace('BattleScreen', { battleId: d.battle_id });
         }
       } catch {}
     };

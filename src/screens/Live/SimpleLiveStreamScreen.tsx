@@ -533,7 +533,11 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         // ── Battle : l'invitation qu'on a envoyee a ete acceptee → le battle demarre,
         // les deux hosts (A et B) sont rediriges vers l'ecran de battle en split-screen.
         if (d.type === 'battle_started' && d.battle_id) {
-          nav.navigate('BattleScreen', { battleId: d.battle_id });
+          // replace (pas navigate) : sinon ce live reste monte en dessous avec son propre
+          // LiveKitRoom connecte en parallele de celui du battle, ce qui peut empecher les
+          // tracks video du battle de s'afficher correctement (deux connexions LiveKit
+          // actives simultanement sur le meme appareil).
+          nav.replace('BattleScreen', { battleId: d.battle_id });
         }
         if (d.type === 'battle_invite_response' && d.accepted === false) {
           addSysMsg('Le créateur a refusé le battle.');

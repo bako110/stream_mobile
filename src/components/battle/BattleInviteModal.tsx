@@ -55,7 +55,9 @@ export const BattleInviteModal: React.FC = () => {
       const battle = await battleService.respond(invite.battle_id, accept);
       close();
       if (accept && battle.status === 'active') {
-        nav.navigate('BattleScreen', { battleId: battle.id });
+        // replace (pas navigate) : sinon l'ecran de live reste monte en dessous avec son
+        // propre LiveKitRoom connecte en parallele de celui du battle.
+        nav.replace('BattleScreen', { battleId: battle.id });
       }
     } catch {
       close();
