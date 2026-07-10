@@ -176,6 +176,43 @@ export function setupNotifeeBackgroundHandler(): void {
   });
 }
 
+// ── Fetch GET /call/pending avec un access token garanti frais ───────────────
+// Le token stocke peut avoir expire pendant que l'app etait tuee/en arriere-plan
+// (headless task — pas de garantie que RootNavigator ait deja tourne pour
+// enregistrer le refresh via apiClient). Sur 401, on rafraichit directement via
+// fetch (independant d'apiClient/authService) puis on retente une fois.
+async function _fetchPendingCallWithRefresh(apiBaseUrl: string): Promise<any | null> {
+  let token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  if (!token) return null;
+
+  const doFetch = (t: string) => fetch(`${apiBaseUrl}/api/v1/messages/call/pending`, {
+    headers: { Authorization: `Bearer ${t}` },
+  });
+
+  let res = await doFetch(token);
+  if (res.status === 401) {
+    const refreshToken = storage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    if (!refreshToken) return null;
+    try {
+      const refreshRes = await fetch(`${apiBaseUrl}/api/v1/auth/refresh`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!refreshRes.ok) return null;
+      const refreshed = await refreshRes.json();
+      token = refreshed.access_token;
+      storage.setItem(STORAGE_KEYS.ACCESS_TOKEN, refreshed.access_token);
+      storage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshed.refresh_token);
+      res = await doFetch(token!);
+    } catch {
+      return null;
+    }
+  }
+  if (!res.ok) return null;
+  return res.json();
+}
+
 // ── Handle FCM message (background/quit) ─────────────────────────────────────
 // Called by setBackgroundMessageHandler — runs in a headless JS task.
 // FCM sends data-only messages so this handler always fires (no OS interception).
@@ -202,16 +239,10 @@ export async function handleBackgroundFCM(
     let callId: string | null = (data.call_id as string) || null;
     try {
       const { API_BASE_URL } = require('../utils/constants');
-      const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      if (token) {
-        const res = await fetch(`${API_BASE_URL}/api/v1/messages/call/pending`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const payload = await res.json();
-          offer  = payload.sdp ?? null;
-          callId = payload.call_id ?? callId;
-        }
+      const payload = await _fetchPendingCallWithRefresh(API_BASE_URL);
+      if (payload) {
+        offer  = payload.sdp ?? null;
+        callId = payload.call_id ?? callId;
       }
     } catch {}
 
@@ -500,16 +531,8 @@ export async function setupFCM(): Promise<void> {
     let offer: any = null;
     try {
       const { API_BASE_URL } = require('../utils/constants');
-      const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      if (token) {
-        const res = await fetch(`${API_BASE_URL}/api/v1/messages/call/pending`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const payload = await res.json();
-          offer = payload.sdp ?? null;
-        }
-      }
+      const payload = await _fetchPendingCallWithRefresh(API_BASE_URL);
+      if (payload) offer = payload.sdp ?? null;
     } catch {}
     navigate('Call', {
       partnerId:    callerId,

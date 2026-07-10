@@ -13,6 +13,13 @@ import { Row, Card, PageHeader } from './_shared';
 type MonetStatus = 'none' | 'pending' | 'approved' | 'rejected';
 type CreatorType = 'musician' | 'creator' | 'dj' | 'comedian' | 'brand' | 'other';
 
+interface EligibilityInfo {
+  followers_count: number;
+  followers_required: number;
+  eligible: boolean;
+  eligibility_reasons: string[];
+}
+
 const CREATOR_TYPES: { key: CreatorType; icon: string; label: string; sub: string }[] = [
   { key: 'musician', icon: 'music',      label: 'Musicien',              sub: 'Artiste, chanteur, groupe' },
   { key: 'creator',  icon: 'video',      label: 'Créateur de contenu',   sub: 'Vidéaste, streamer, influenceur' },
@@ -33,6 +40,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
   const [status,       setStatus]       = useState<MonetStatus>('none');
   const [adminNote,    setAdminNote]    = useState<string | null>(null);
+  const [elig,         setElig]         = useState<EligibilityInfo | null>(null);
   const [fetching,     setFetching]     = useState(true);
   const [step,         setStep]         = useState(0);
   const [creatorType,  setCreatorType]  = useState<CreatorType | null>(null);
@@ -50,11 +58,17 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
   const fetchStatus = async () => {
     try {
-      const res = await apiClient.get<{ status: MonetStatus; admin_note: string | null }>(
+      const res = await apiClient.get<{ status: MonetStatus; admin_note: string | null } & EligibilityInfo>(
         Endpoints.monetization.status,
       );
       setStatus(res.data.status);
       setAdminNote(res.data.admin_note ?? null);
+      setElig({
+        followers_count:     res.data.followers_count,
+        followers_required:  res.data.followers_required,
+        eligible:            res.data.eligible,
+        eligibility_reasons: res.data.eligibility_reasons,
+      });
     } catch {}
     finally { setFetching(false); }
   };
@@ -140,15 +154,30 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
       <Card>
         <Text style={[ms.sectionLabel, { color: colors.textTertiary }]}>CONDITIONS REQUISES</Text>
-        {[
-          'Minimum 500 abonnés sur GoFolyX',
-          "Contenu original publié régulièrement (min. 3 posts/mois)",
-          'Compte actif depuis au moins 30 jours',
-          "Respecter les conditions d'utilisation GoFolyX",
-          'Contenu conforme aux règles de la communauté',
-        ].map((item, i, arr) => (
-          <Row key={i} icon="check" label={item} color={GREEN} last={i === arr.length - 1} />
-        ))}
+        {(() => {
+          const followersOk = !elig || elig.followers_count >= elig.followers_required;
+          const items: { icon: string; label: string; ok: boolean }[] = [
+            {
+              icon:  'users',
+              label: elig ? `${elig.followers_count} / ${elig.followers_required} abonnés sur GoFolyX` : 'Minimum 1000 abonnés sur GoFolyX',
+              ok:    followersOk,
+            },
+            { icon: 'film',         label: 'Au moins 3 publications par semaine en moyenne', ok: true },
+            { icon: 'calendar',     label: 'Compte actif depuis au moins 30 jours',           ok: true },
+            { icon: 'shield',       label: "Aucune restriction sur le compte, respect des CGU GoFolyX", ok: true },
+            { icon: 'clock',        label: 'Validation automatique sous 24h si les conditions restent remplies', ok: true },
+          ];
+          return items.map((item, i, arr) => (
+            <Row key={i} icon={item.icon} label={item.label} color={item.ok ? GREEN : '#EF4444'} last={i === arr.length - 1} />
+          ));
+        })()}
+        {elig && !elig.eligible && elig.eligibility_reasons.length > 0 && (
+          <View style={{ marginTop: 10, borderRadius: 10, padding: 10, gap: 4, backgroundColor: '#EF444415' }}>
+            {elig.eligibility_reasons.map(reason => (
+              <Text key={reason} style={{ fontSize: 12, lineHeight: 17, color: '#EF4444' }}>{reason}</Text>
+            ))}
+          </View>
+        )}
       </Card>
 
       <Card>
@@ -165,8 +194,9 @@ export const SettingsMonetisationScreen: React.FC = () => {
       </Card>
 
       <TouchableOpacity
-        style={[ms.primaryBtn, { backgroundColor: GREEN }]}
+        style={[ms.primaryBtn, { backgroundColor: elig && !elig.eligible ? colors.border : GREEN }]}
         onPress={() => setStep(1)}
+        disabled={!!elig && !elig.eligible}
       >
         <Text style={ms.primaryBtnText}>Faire une demande</Text>
         <Icon name="arrow-right" size={16} color="#fff" />

@@ -35,6 +35,19 @@ export const callConnectionService = {
   },
 
   /**
+   * true si le PhoneAccount GoFolyX est actif dans les réglages système. addNewIncomingCall()
+   * peut résoudre sans erreur même si le compte n'est pas active — Android crée la Connection
+   * en interne de façon asynchrone et peut échouer silencieusement plus tard (l'utilisateur n'a
+   * jamais activé le compte dans Réglages > Appli tél. > Comptes d'appel). Sans cette vérification
+   * en amont, un appel entrant pouvait rester totalement invisible (ni écran natif, ni fallback
+   * Notifee, car le JS croyait le natif réussi).
+   */
+  async isAccountEnabled(): Promise<boolean> {
+    if (!available) return false;
+    try { return await CallConnectionModule.isAccountEnabled(); } catch { return false; }
+  },
+
+  /**
    * Ouvre le dialogue système demandant d'exempter l'app de l'optimisation de batterie.
    * Certains fabricants (Xiaomi/MIUI, Huawei, Samsung...) tuent l'app en arrière-plan
    * même pour un appel entrant prioritaire sans cette exemption — sans elle, l'app peut
@@ -50,9 +63,16 @@ export const callConnectionService = {
    * (fcmService.ts) doit savoir si ça a réellement échoué pour afficher la
    * notification Notifee de secours, sinon un échec silencieux ici laisse
    * l'appel entrant totalement invisible côté destinataire.
+   *
+   * Vérifie d'abord que le PhoneAccount est actif : addNewIncomingCall() peut
+   * résoudre sans lever d'erreur même si le compte n'est pas active côté système
+   * (la Connection echoue de façon asynchrone, apres coup) — sans ce garde-fou,
+   * l'appel restait invisible (ni ecran natif, ni Notifee).
    */
   async reportIncomingCall(callId: string, callerName: string, isVideo: boolean): Promise<void> {
     if (!available) throw new Error('CallConnectionModule unavailable');
+    const enabled = await this.isAccountEnabled();
+    if (!enabled) throw new Error('PhoneAccount not enabled');
     await CallConnectionModule.reportIncomingCall(callId, callerName, isVideo);
   },
 
