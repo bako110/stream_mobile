@@ -2,7 +2,7 @@
  * BattleChallengeSheet — bottom sheet ouvert depuis LiveMoreMenu (host uniquement) pour
  * choisir un autre créateur actuellement en direct et lui envoyer une invitation de battle.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, Image, ActivityIndicator, FlatList, TextInput,
 } from 'react-native';
@@ -10,6 +10,8 @@ import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { battleService } from '../../services/battleService';
 import type { EligibleCreator } from '../../services/battleService';
+import { useWs } from '../../context/WebSocketContext';
+import type { WsPayload } from '../../context/WebSocketContext';
 
 interface Props {
   visible: boolean;
@@ -18,22 +20,42 @@ interface Props {
 }
 
 export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId }) => {
+  const { addListener, removeListener } = useWs();
   const [loading, setLoading]     = useState(true);
   const [creators, setCreators]   = useState<EligibleCreator[]>([]);
   const [inviting, setInviting]   = useState<string | null>(null);
   const [sentTo, setSentTo]       = useState<string | null>(null);
+  const [pendingBattleId, setPendingBattleId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [search, setSearch]       = useState('');
 
   useEffect(() => {
     if (!visible) return;
     setLoading(true);
     setSentTo(null);
+    setPendingBattleId(null);
     setSearch('');
     battleService.listEligible(liveId)
       .then(setCreators)
       .catch(() => setCreators([]))
       .finally(() => setLoading(false));
   }, [visible, liveId]);
+
+  // Si l'invite repond (refuse) ou que l'invitation expire pendant que le sheet est
+  // encore ouvert, on redonne la main pour permettre d'inviter quelqu'un d'autre.
+  useEffect(() => {
+    if (!visible) return;
+    const handler = (payload: WsPayload) => {
+      const p = payload as any;
+      if (!pendingBattleId || p.battle_id !== pendingBattleId) return;
+      if (p.type === 'battle_invite_response' && p.accepted === false) {
+        setSentTo(null);
+        setPendingBattleId(null);
+      }
+    };
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [visible, pendingBattleId, addListener, removeListener]);
 
   const filteredCreators = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -42,16 +64,30 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
   }, [creators, search]);
 
   const handleInvite = async (creator: EligibleCreator) => {
-    if (inviting) return;
+    if (inviting || pendingBattleId) return;
     setInviting(creator.live_id);
     try {
-      await battleService.invite(liveId, creator.live_id);
+      const battle = await battleService.invite(liveId, creator.live_id);
       setSentTo(creator.live_id);
+      setPendingBattleId(battle.id);
     } catch {
     } finally {
       setInviting(null);
     }
   };
+
+  const handleCancel = useCallback(async () => {
+    if (!pendingBattleId || cancelling) return;
+    setCancelling(true);
+    try {
+      await battleService.cancel(pendingBattleId);
+    } catch {
+    } finally {
+      setSentTo(null);
+      setPendingBattleId(null);
+      setCancelling(false);
+    }
+  }, [pendingBattleId, cancelling]);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
@@ -120,13 +156,13 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
                         </View>
                         <TouchableOpacity
                           style={[s.inviteBtn, isSent && s.inviteBtnSent]}
-                          onPress={() => handleInvite(item)}
-                          disabled={!!inviting || isSent}
+                          onPress={() => isSent ? handleCancel() : handleInvite(item)}
+                          disabled={(!!inviting && !isSent) || (!!pendingBattleId && !isSent) || cancelling}
                           activeOpacity={0.8}
                         >
-                          {inviting === item.live_id
+                          {inviting === item.live_id || (isSent && cancelling)
                             ? <ActivityIndicator size="small" color="#fff" />
-                            : <Text style={s.inviteBtnText}>{isSent ? 'Envoyé' : 'Défier'}</Text>
+                            : <Text style={s.inviteBtnText}>{isSent ? 'Annuler' : 'Défier'}</Text>
                           }
                         </TouchableOpacity>
                       </View>
