@@ -16,7 +16,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { liveService, type LiveStream } from '../../services/liveService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import { BackButton } from '../../components/common';
+import { BackButton, LiveThumbnailBackground } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 const { width: W } = Dimensions.get('window');
@@ -92,17 +92,12 @@ export const SimpleLiveListScreen: React.FC = () => {
           onPress={() => handlePress(item)}
         >
           <View style={st.thumbWrap}>
-            {item.thumbnail_url ? (
-              <Image source={{ uri: item.thumbnail_url }} style={st.thumb} />
-            ) : (
-              <LinearGradient
-                colors={['#F0365A', '#E0389A']}
-                style={[st.thumb, st.thumbCenter]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              >
-                <Icon name="radio" size={32} color="#fff" />
-              </LinearGradient>
-            )}
+            <LiveThumbnailBackground
+              thumbnailUrl={item.thumbnail_url}
+              avatarUrl={user?.avatar_url}
+              initials={initial}
+              avatarSize={44}
+            />
             <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={StyleSheet.absoluteFill} />
 
             {/* LIVE badge */}

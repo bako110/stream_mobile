@@ -23,7 +23,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
@@ -420,13 +420,12 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                   }}
                 >
                   <View style={{ width: 110, height: 150, position: 'relative' }}>
-                    {live.thumbnail_url ? (
-                      <CachedImage uri={live.thumbnail_url} style={{ width: 110, height: 150 }} resizeMode="cover" />
-                    ) : (
-                      <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={{ width: 110, height: 150, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 40, fontWeight: '900' }}>{liveInitial}</Text>
-                      </LinearGradient>
-                    )}
+                    <LiveThumbnailBackground
+                      thumbnailUrl={live.thumbnail_url}
+                      avatarUrl={live.user?.avatar_url}
+                      initials={liveInitial}
+                      avatarSize={40}
+                    />
                     <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
 
                     {/* Badge LIVE */}

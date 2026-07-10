@@ -23,7 +23,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { localCache } from '../../utils/storage';
 import { useWs } from '../../context/WebSocketContext';
-import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, AvatarWithBadge, FriendsWhoLiked } from '../../components/common';
+import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, AvatarWithBadge, FriendsWhoLiked, LiveThumbnailBackground } from '../../components/common';
 import {
   concertService, eventService, authService, searchService,
   socialService,
@@ -103,8 +103,12 @@ const SpontLiveCard: React.FC<SpontLiveCardProps> = React.memo(({ live, isOwn, o
   return (
     <TouchableOpacity key={live.id} style={s.spontCard} activeOpacity={0.88} onPress={handlePress}>
       <View style={s.spontThumb}>
-        <LinearGradient colors={['#1a1a2e', '#2d1b3d']} style={StyleSheet.absoluteFill} />
-        <Text style={s.spontBgInitials}>{initials}</Text>
+        <LiveThumbnailBackground
+          thumbnailUrl={live.thumbnail_url}
+          avatarUrl={live.user?.avatar_url}
+          initials={initials}
+          avatarSize={40}
+        />
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.82)']} style={[StyleSheet.absoluteFill, { top: '40%' }]} />
         <View style={s.spontLivePill}>
           <View style={s.spontLiveDotSmall} />

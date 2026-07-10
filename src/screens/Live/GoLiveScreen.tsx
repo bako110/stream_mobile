@@ -12,6 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
+import { LiveThumbnailBackground } from '../../components/common/LiveThumbnailBackground';
 import { liveService } from '../../services/liveService';
 import type { MonetizationType, LiveStream } from '../../services/liveService';
 import { apiClient } from '../../api/client';
@@ -390,24 +391,11 @@ export const GoLiveScreen: React.FC = () => {
                     activeOpacity={0.88}
                     onPress={() => nav.navigate('SimpleLiveViewer', { liveId: live.id })}
                   >
-                    {live.thumbnail_url ? (
-                      <Image source={{ uri: live.thumbnail_url }} style={st.discoverThumb} />
-                    ) : live.user?.avatar_url ? (
-                      <>
-                        <Image source={{ uri: live.user.avatar_url }} style={[st.discoverThumb, st.discoverThumbBlurBg]} blurRadius={18} />
-                        <View style={st.discoverThumbAvatarCenterWrap}>
-                          <AvatarWithBadge
-                            avatarUrl={live.user.avatar_url}
-                            initials={(live.user?.display_name || live.user?.username || '?')[0].toUpperCase()}
-                            size={52}
-                            accentColor="#7B3FF2"
-                            isLive
-                          />
-                        </View>
-                      </>
-                    ) : (
-                      <LinearGradient colors={['#7B3FF2', '#F0365A']} style={st.discoverThumb} />
-                    )}
+                    <LiveThumbnailBackground
+                      thumbnailUrl={live.thumbnail_url}
+                      avatarUrl={live.user?.avatar_url}
+                      initials={(live.user?.display_name || live.user?.username || '?')[0].toUpperCase()}
+                    />
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.75)']}
                       style={st.discoverThumbGrad}
