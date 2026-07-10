@@ -10,8 +10,13 @@ import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Share from 'react-native-share';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { userService } from '../../services/userService';
 import { useUser } from '../../context/UserContext';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
+
+type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 interface Props {
   visible:  boolean;
@@ -30,6 +35,7 @@ export const LiveMoreMenu: React.FC<Props> = ({
   visible, onClose, isHost, liveId, hostId, hostName, onOpenSettings, onStopLive, onLeave, onOpenBattle,
 }) => {
   const { currentUser } = useUser();
+  const nav = useNavigation<Nav>();
   const [isFollowed, setIsFollowed] = useState<boolean | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
 
@@ -138,6 +144,13 @@ export const LiveMoreMenu: React.FC<Props> = ({
                   <Text style={s.label}>Défier un créateur (Battle)</Text>
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity style={s.row} onPress={() => run(() => nav.navigate('TournamentList'))} activeOpacity={0.75}>
+                <View style={[s.iconWrap, s.iconWrapBattle]}>
+                  <Icon name="award" size={18} color="#7B3FF2" />
+                </View>
+                <Text style={s.label}>Tournois</Text>
+              </TouchableOpacity>
 
               {!isHost && onLeave && (
                 <TouchableOpacity style={s.row} onPress={handleLeaveConfirm} activeOpacity={0.75}>
