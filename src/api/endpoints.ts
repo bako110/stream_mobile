@@ -405,7 +405,7 @@ export const Endpoints = {
   // ── Battles live entre créateurs ─────────────────────────────────────────
   battles: {
     byId:       (id: string) => `${V1}/battles/${id}`,
-    eligible:      (liveId: string)  => `${V1}/battles/eligible/${liveId}`,
+    eligible:      (liveId: string, page = 1, limit = 20)  => `${V1}/battles/eligible/${liveId}?page=${page}&limit=${limit}`,
     activeForLive: (liveId: string)  => `${V1}/battles/active-for-live/${liveId}`,
     invite:     `${V1}/battles/invite`,
     respond:    (id: string) => `${V1}/battles/${id}/respond`,

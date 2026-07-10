@@ -22,7 +22,10 @@ interface Props {
 export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId }) => {
   const { addListener, removeListener } = useWs();
   const [loading, setLoading]     = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [creators, setCreators]   = useState<EligibleCreator[]>([]);
+  const [page, setPage]           = useState(1);
+  const [hasMore, setHasMore]     = useState(false);
   const [inviting, setInviting]   = useState<string | null>(null);
   const [sentTo, setSentTo]       = useState<string | null>(null);
   const [pendingBattleId, setPendingBattleId] = useState<string | null>(null);
@@ -35,11 +38,27 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
     setSentTo(null);
     setPendingBattleId(null);
     setSearch('');
-    battleService.listEligible(liveId)
-      .then(setCreators)
-      .catch(() => setCreators([]))
+    setPage(1);
+    battleService.listEligible(liveId, 1)
+      .then(p => { setCreators(p.items); setHasMore(p.has_more); })
+      .catch(() => { setCreators([]); setHasMore(false); })
       .finally(() => setLoading(false));
   }, [visible, liveId]);
+
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || !hasMore || search.trim()) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const p = await battleService.listEligible(liveId, nextPage);
+      setCreators(prev => [...prev, ...p.items]);
+      setHasMore(p.has_more);
+      setPage(nextPage);
+    } catch {
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loading, loadingMore, hasMore, search, page, liveId]);
 
   // Si l'invite repond (refuse) ou que l'invitation expire pendant que le sheet est
   // encore ouvert, on redonne la main pour permettre d'inviter quelqu'un d'autre.
@@ -139,6 +158,11 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
                   data={filteredCreators}
                   keyExtractor={c => c.live_id}
                   style={{ maxHeight: 360 }}
+                  onEndReached={loadMore}
+                  onEndReachedThreshold={0.4}
+                  ListFooterComponent={loadingMore ? (
+                    <ActivityIndicator color="#7B3FF2" style={{ marginVertical: 12 }} />
+                  ) : null}
                   renderItem={({ item }) => {
                     const isSent = sentTo === item.live_id;
                     return (

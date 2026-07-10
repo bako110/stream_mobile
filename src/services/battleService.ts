@@ -31,6 +31,12 @@ export interface EligibleCreator {
   current_viewers:   number;
 }
 
+export interface EligibleCreatorsPage {
+  items:    EligibleCreator[];
+  page:     number;
+  has_more: boolean;
+}
+
 export interface BattleToken {
   token:     string;
   ws_url:    string;
@@ -71,9 +77,9 @@ async function get(battleId: string): Promise<Battle> {
   return r.data;
 }
 
-async function listEligible(liveId: string): Promise<EligibleCreator[]> {
-  const r = await apiClient.get<EligibleCreator[]>(Endpoints.battles.eligible(liveId));
-  return r.data ?? [];
+async function listEligible(liveId: string, page = 1, limit = 20): Promise<EligibleCreatorsPage> {
+  const r = await apiClient.get<EligibleCreatorsPage>(Endpoints.battles.eligible(liveId, page, limit));
+  return r.data ?? { items: [], page, has_more: false };
 }
 
 async function getActiveForLive(liveId: string): Promise<Battle | null> {
