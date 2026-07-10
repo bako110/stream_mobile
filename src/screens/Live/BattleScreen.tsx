@@ -1,8 +1,10 @@
 /**
- * BattleScreen — match live entre deux créateurs, split-screen vertical (comme TikTok
- * Live Battle) : host A en haut, host B en bas, score + countdown superposés, cadeaux
- * animés par camp, chat fusionné des deux lives, classement des supporters, objectif
- * communautaire/boss, effets/annonces IA, et abandon (forfait) qui notifie l'autre côté.
+ * BattleScreen — match live entre deux créateurs, cartes vidéo arrondies côte à côte
+ * (façon TikTok Live Battle) séparées par un badge "VS", avec halo lumineux pulsé
+ * autour du camp en tête, bandeau nom+avatar par créateur, score + countdown
+ * superposés, cadeaux animés par camp, chat fusionné des deux lives, classement des
+ * supporters, objectif communautaire/boss, effets/annonces IA, et abandon (forfait)
+ * qui notifie l'autre côté.
  */
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
@@ -10,7 +12,10 @@ import {
   ActivityIndicator, Image, Dimensions, FlatList, TextInput,
   Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, {
+  FadeIn, FadeOut, SlideInDown, SlideOutDown, SlideInUp, ZoomIn, BounceIn, LinearTransition,
+  useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring, withSequence, Easing,
+} from 'react-native-reanimated';
 import {
   LiveKitRoom, useTracks, useLocalParticipant, VideoTrack,
 } from '@livekit/react-native';
@@ -76,6 +81,55 @@ function weatherIcon(weather: string): string {
   }
 }
 
+/** Halo lumineux qui respire doucement autour du cadre du camp en tete du score. */
+const PulsingHalo: React.FC<{ color: string }> = ({ color }) => {
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [pulse]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.35 + pulse.value * 0.45,
+    shadowOpacity: 0.35 + pulse.value * 0.45,
+  }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFill,
+        style,
+        {
+          borderWidth: 3,
+          borderColor: color,
+          borderRadius: 22,
+          shadowColor: color,
+          shadowOffset: { width: 0, height: 0 },
+          shadowRadius: 16,
+          elevation: 12,
+        },
+      ]}
+    />
+  );
+};
+
+/** Nombre qui rebondit legerement a chaque changement de valeur (score). */
+const BouncyNumber: React.FC<{ value: number; style: any }> = ({ value, style }) => {
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    scale.value = withSequence(
+      withTiming(1.35, { duration: 140, easing: Easing.out(Easing.quad) }),
+      withSpring(1, { damping: 6, stiffness: 180 }),
+    );
+  }, [value, scale]);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <Animated.Text style={[style, animStyle]}>{value}</Animated.Text>
+  );
+};
+
 /** Ouvre une connexion brute vers /comments/ws/{targetType}/{targetId}, avec reconnexion simple. */
 function useRoomSocket(
   targetType: 'live' | 'battle',
@@ -140,6 +194,8 @@ export const BattleScreen: React.FC = () => {
   const [effectBanner, setEffectBanner] = useState<EffectBanner | null>(null);
   const [hostNameA, setHostNameA] = useState('Créateur A');
   const [hostNameB, setHostNameB] = useState('Créateur B');
+  const [hostAvatarA, setHostAvatarA] = useState<string | null>(null);
+  const [hostAvatarB, setHostAvatarB] = useState<string | null>(null);
 
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatRef   = useRef<FlatList<ChatMsg>>(null);
@@ -193,12 +249,12 @@ export const BattleScreen: React.FC = () => {
   useEffect(() => {
     if (battle?.host_a_id) {
       userService.getPublicProfile(battle.host_a_id)
-        .then(p => setHostNameA(p.display_name || p.username || 'Créateur A'))
+        .then(p => { setHostNameA(p.display_name || p.username || 'Créateur A'); setHostAvatarA(p.avatar_url); })
         .catch(() => {});
     }
     if (battle?.host_b_id) {
       userService.getPublicProfile(battle.host_b_id)
-        .then(p => setHostNameB(p.display_name || p.username || 'Créateur B'))
+        .then(p => { setHostNameB(p.display_name || p.username || 'Créateur B'); setHostAvatarB(p.avatar_url); })
         .catch(() => {});
     }
   }, [battle?.host_a_id, battle?.host_b_id]);
@@ -374,6 +430,8 @@ export const BattleScreen: React.FC = () => {
         myHostSide={myHostSide}
         hostNameA={hostNameA}
         hostNameB={hostNameB}
+        hostAvatarA={hostAvatarA}
+        hostAvatarB={hostAvatarB}
         showChat={showChat}
         showRanking={showRanking}
         setShowChat={setShowChat}
@@ -410,6 +468,8 @@ const BattleContent: React.FC<{
   myHostSide: 'a' | 'b' | null;
   hostNameA: string;
   hostNameB: string;
+  hostAvatarA: string | null;
+  hostAvatarB: string | null;
   showChat: boolean;
   showRanking: boolean;
   setShowChat: (v: boolean) => void;
@@ -431,7 +491,7 @@ const BattleContent: React.FC<{
   onClose: () => void;
 }> = ({
   battle, remaining, goal, ranking, floaters, ended, leaving, myId, myHostSide,
-  hostNameA, hostNameB,
+  hostNameA, hostNameB, hostAvatarA, hostAvatarB,
   showChat, showRanking, setShowChat, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
   giftTicker, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
@@ -460,6 +520,7 @@ const BattleContent: React.FC<{
   const scoreB = battle?.score_b ?? 0;
   const total = scoreA + scoreB;
   const pctA = total > 0 ? (scoreA / total) * 100 : 50;
+  const leadingSide: 'a' | 'b' | null = total === 0 ? null : scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : null;
 
   const topDonor = ranking?.top_donor;
 
@@ -469,12 +530,23 @@ const BattleContent: React.FC<{
 
       {/* Zone video — les deux hosts cote a cote horizontalement, 75% de l'ecran */}
       <View style={styles.videoZone}>
-        <View style={styles.videoHalf}>
+        <Animated.View entering={FadeIn.duration(400)} style={styles.videoHalf}>
           {trackA
-            ? <VideoTrack trackRef={trackA} style={StyleSheet.absoluteFill} objectFit="cover" />
-            : <View style={[StyleSheet.absoluteFill, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
+            ? <VideoTrack trackRef={trackA} style={styles.videoInner} objectFit="cover" />
+            : <View style={[styles.videoInner, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
+          {leadingSide === 'a' && <PulsingHalo color="#7B3FF2" />}
+
+          {/* Bandeau nom + avatar du camp A */}
+          <Animated.View entering={SlideInUp.duration(450).delay(100)} style={[styles.hostBadge, styles.hostBadgeA]}>
+            {hostAvatarA
+              ? <Image source={{ uri: hostAvatarA }} style={styles.hostBadgeAvatar} />
+              : <View style={[styles.hostBadgeAvatar, styles.hostBadgeAvatarFallback]}><Icon name="user" size={12} color="#fff" /></View>}
+            <Text style={styles.hostBadgeName} numberOfLines={1}>{hostNameA}</Text>
+            {leadingSide === 'a' && <Text style={styles.hostBadgeCrown}>👑</Text>}
+          </Animated.View>
+
           {giftTicker.filter(t => t.side === 'a').map(t => (
-            <Animated.View key={t.id} entering={FadeIn.duration(250)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
+            <Animated.View key={t.id} entering={ZoomIn.duration(280)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
               <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                 <Text style={styles.giftTickEmoji}>{t.emoji}</Text>
                 <Text style={styles.giftTickText} numberOfLines={1}>
@@ -489,14 +561,31 @@ const BattleContent: React.FC<{
             incomingNotifs={giftNotifsA}
             onNotifShown={onGiftShownA}
           />
+        </Animated.View>
+
+        <View style={styles.vsWrap} pointerEvents="none">
+          <Animated.View entering={BounceIn.duration(600).delay(200)} style={styles.vsBadge}>
+            <Text style={styles.vsText}>VS</Text>
+          </Animated.View>
         </View>
-        <View style={styles.videoDivider} />
-        <View style={styles.videoHalf}>
+
+        <Animated.View entering={FadeIn.duration(400)} style={styles.videoHalf}>
           {trackB
-            ? <VideoTrack trackRef={trackB} style={StyleSheet.absoluteFill} objectFit="cover" />
-            : <View style={[StyleSheet.absoluteFill, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
+            ? <VideoTrack trackRef={trackB} style={styles.videoInner} objectFit="cover" />
+            : <View style={[styles.videoInner, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
+          {leadingSide === 'b' && <PulsingHalo color="#F0365A" />}
+
+          {/* Bandeau nom + avatar du camp B */}
+          <Animated.View entering={SlideInUp.duration(450).delay(150)} style={[styles.hostBadge, styles.hostBadgeB]}>
+            {leadingSide === 'b' && <Text style={styles.hostBadgeCrown}>👑</Text>}
+            <Text style={styles.hostBadgeName} numberOfLines={1}>{hostNameB}</Text>
+            {hostAvatarB
+              ? <Image source={{ uri: hostAvatarB }} style={styles.hostBadgeAvatar} />
+              : <View style={[styles.hostBadgeAvatar, styles.hostBadgeAvatarFallback]}><Icon name="user" size={12} color="#fff" /></View>}
+          </Animated.View>
+
           {giftTicker.filter(t => t.side === 'b').map(t => (
-            <Animated.View key={t.id} entering={FadeIn.duration(250)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
+            <Animated.View key={t.id} entering={ZoomIn.duration(280)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
               <LinearGradient colors={['#F0365A', '#9B1C3F']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                 <Text style={styles.giftTickEmoji}>{t.emoji}</Text>
                 <Text style={styles.giftTickText} numberOfLines={1}>
@@ -511,20 +600,23 @@ const BattleContent: React.FC<{
             incomingNotifs={giftNotifsB}
             onNotifShown={onGiftShownB}
           />
-        </View>
+        </Animated.View>
 
         {/* Score bar + countdown centraux, superposes sur la zone video */}
         <View style={styles.centerBar} pointerEvents="none">
           <View style={styles.scoreBarTrack}>
-            <View style={[styles.scoreBarFillA, { width: `${pctA}%` }]} />
+            <Animated.View
+              layout={LinearTransition.springify().damping(16).stiffness(120)}
+              style={[styles.scoreBarFillA, { width: `${pctA}%` }]}
+            />
           </View>
           <View style={styles.countdownWrap}>
             <Text style={styles.countdownText}>{formatCountdown(remaining)}</Text>
           </View>
           <View style={styles.scoresRow}>
-            <Text style={styles.scoreText}>{scoreA}</Text>
+            <BouncyNumber value={scoreA} style={styles.scoreText} />
             <Icon name="zap" size={16} color="#FFD700" />
-            <Text style={styles.scoreText}>{scoreB}</Text>
+            <BouncyNumber value={scoreB} style={styles.scoreText} />
           </View>
         </View>
 
@@ -538,31 +630,39 @@ const BattleContent: React.FC<{
 
         {/* Objectif communautaire / boss */}
         {goal && goal.status === 'active' && (
-          <View style={[styles.goalBanner, goal.mode === 'boss' && styles.goalBannerBoss]}>
+          <Animated.View
+            entering={SlideInDown.duration(400).springify()}
+            style={[styles.goalBanner, goal.mode === 'boss' && styles.goalBannerBoss]}
+          >
             <Text style={styles.goalTitle}>{goal.mode === 'boss' ? '🐉 ' : '🎯 '}{goal.title}</Text>
             <View style={styles.goalBarTrack}>
-              <View style={[styles.goalBarFill, { width: `${goal.progress_pct}%` }]} />
+              <Animated.View
+                layout={LinearTransition.springify().damping(14)}
+                style={[styles.goalBarFill, { width: `${goal.progress_pct}%` }]}
+              />
             </View>
             <Text style={styles.goalPct}>{Math.round(goal.progress_pct)}%</Text>
-          </View>
+          </Animated.View>
         )}
 
         {/* Top supporter en badge permanent */}
         {topDonor && (
-          <TouchableOpacity style={styles.topDonorBadge} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
-            {topDonor.avatar_url
-              ? <Image source={{ uri: topDonor.avatar_url }} style={styles.topDonorAvatar} />
-              : <View style={[styles.topDonorAvatar, styles.topDonorAvatarFallback]}><Icon name="user" size={10} color="#fff" /></View>}
-            <Text style={styles.topDonorLabel} numberOfLines={1}>👑 {topDonor.display_name ?? 'Supporter'}</Text>
-          </TouchableOpacity>
+          <Animated.View entering={ZoomIn.duration(350).springify()}>
+            <TouchableOpacity style={styles.topDonorBadge} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
+              {topDonor.avatar_url
+                ? <Image source={{ uri: topDonor.avatar_url }} style={styles.topDonorAvatar} />
+                : <View style={[styles.topDonorAvatar, styles.topDonorAvatarFallback]}><Icon name="user" size={10} color="#fff" /></View>}
+              <Text style={styles.topDonorLabel} numberOfLines={1}>👑 {topDonor.display_name ?? 'Supporter'}</Text>
+            </TouchableOpacity>
+          </Animated.View>
         )}
 
         {/* Reactions flottantes */}
         {floaters.map(f => (
           <Animated.Text
             key={f.id}
-            entering={FadeIn.duration(150)}
-            exiting={FadeOut.duration(400)}
+            entering={BounceIn.duration(400)}
+            exiting={FadeOut.duration(500)}
             style={[styles.floater, f.side === 'a' ? styles.floaterA : styles.floaterB]}
           >
             ❤️
@@ -600,32 +700,44 @@ const BattleContent: React.FC<{
         )}
 
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
-            <Icon name="heart" size={15} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.reactBtn, styles.reactBtnA]}
-            onPress={() => battle && giftOverlayA.current?.openGift(battle.host_a_id, hostNameA)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.giftBtnEmoji}>🎁</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.reactBtn, styles.reactBtnB]} onPress={() => onReact('b')} activeOpacity={0.8}>
-            <Icon name="heart" size={15} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.reactBtn, styles.reactBtnB]}
-            onPress={() => battle && giftOverlayB.current?.openGift(battle.host_b_id, hostNameB)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.giftBtnEmoji}>🎁</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
-            <Icon name="award" size={15} color="#FFD700" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
-            <Icon name={showChat ? 'message-circle' : 'message-square'} size={15} color="#fff" />
-          </TouchableOpacity>
+          <Animated.View entering={ZoomIn.duration(300).delay(50)}>
+            <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
+              <Icon name="heart" size={15} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
+          <Animated.View entering={ZoomIn.duration(300).delay(100)}>
+            <TouchableOpacity
+              style={[styles.reactBtn, styles.reactBtnA]}
+              onPress={() => battle && giftOverlayA.current?.openGift(battle.host_a_id, hostNameA)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.giftBtnEmoji}>🎁</Text>
+            </TouchableOpacity>
+          </Animated.View>
+          <Animated.View entering={ZoomIn.duration(300).delay(150)}>
+            <TouchableOpacity style={[styles.reactBtn, styles.reactBtnB]} onPress={() => onReact('b')} activeOpacity={0.8}>
+              <Icon name="heart" size={15} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
+          <Animated.View entering={ZoomIn.duration(300).delay(200)}>
+            <TouchableOpacity
+              style={[styles.reactBtn, styles.reactBtnB]}
+              onPress={() => battle && giftOverlayB.current?.openGift(battle.host_b_id, hostNameB)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.giftBtnEmoji}>🎁</Text>
+            </TouchableOpacity>
+          </Animated.View>
+          <Animated.View entering={ZoomIn.duration(300).delay(250)}>
+            <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
+              <Icon name="award" size={15} color="#FFD700" />
+            </TouchableOpacity>
+          </Animated.View>
+          <Animated.View entering={ZoomIn.duration(300).delay(300)}>
+            <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
+              <Icon name={showChat ? 'message-circle' : 'message-square'} size={15} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
         </View>
 
         <View style={styles.chatInputRow}>
@@ -659,14 +771,14 @@ const BattleContent: React.FC<{
                 keyExtractor={(item, idx) => `${item.id}-${idx}`}
                 style={{ maxHeight: SCREEN_H * 0.4 }}
                 renderItem={({ item, index }) => (
-                  <View style={styles.rankRow}>
+                  <Animated.View entering={SlideInDown.duration(300).delay(index * 40)} style={styles.rankRow}>
                     <Text style={styles.rankPos}>{index + 1}</Text>
                     {item.avatar_url
                       ? <Image source={{ uri: item.avatar_url }} style={styles.rankAvatar} />
                       : <View style={[styles.rankAvatar, styles.rankAvatarFallback]}><Icon name="user" size={14} color="rgba(255,255,255,0.5)" /></View>}
                     <Text style={styles.rankName} numberOfLines={1}>{item.display_name ?? 'Supporter'}</Text>
                     <Text style={styles.rankAmount}>{item.gogold_spent} 🪙</Text>
-                  </View>
+                  </Animated.View>
                 )}
               />
             )}
@@ -682,22 +794,26 @@ const BattleContent: React.FC<{
 
       {/* Ecran de fin */}
       {ended && (
-        <View style={styles.endedOverlay}>
-          <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.endedCard}>
-            <Icon name="award" size={48} color="#FFD700" />
-            <Text style={styles.endedTitle}>
-              {ended.winner_id === null
-                ? 'Match nul !'
-                : ended.winner_id === myId
-                ? 'Vous avez gagné !'
-                : 'Battle terminé'}
-            </Text>
-            <Text style={styles.endedScore}>{ended.score_a} — {ended.score_b}</Text>
-            <TouchableOpacity style={styles.endedBtn} onPress={onClose}>
-              <Text style={styles.endedBtnText}>Fermer</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
+        <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
+          <Animated.View entering={BounceIn.duration(700).delay(150)}>
+            <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.endedCard}>
+              <Animated.View entering={ZoomIn.duration(500).delay(400)}>
+                <Icon name="award" size={48} color="#FFD700" />
+              </Animated.View>
+              <Text style={styles.endedTitle}>
+                {ended.winner_id === null
+                  ? 'Match nul !'
+                  : ended.winner_id === myId
+                  ? 'Vous avez gagné !'
+                  : 'Battle terminé'}
+              </Text>
+              <Text style={styles.endedScore}>{ended.score_a} — {ended.score_b}</Text>
+              <TouchableOpacity style={styles.endedBtn} onPress={onClose}>
+                <Text style={styles.endedBtnText}>Fermer</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </Animated.View>
+        </Animated.View>
       )}
     </View>
   );
@@ -710,20 +826,54 @@ const styles = StyleSheet.create({
   root:  { flex: 1, backgroundColor: '#000' },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  // Zone video — 75% de l'ecran, les deux hosts cote a cote horizontalement
-  videoZone: { width: '100%', height: VIDEO_ZONE_H, flexDirection: 'row', backgroundColor: '#111' },
-  videoHalf: { flex: 1, backgroundColor: '#111', overflow: 'hidden', position: 'relative' },
-  videoDivider: { width: 2, backgroundColor: '#000' },
+  // Zone video — 75% de l'ecran, les deux hosts en cartes arrondies cote a cote
+  videoZone: {
+    width: '100%', height: VIDEO_ZONE_H, flexDirection: 'row',
+    backgroundColor: '#000', padding: 6, gap: 6,
+  },
+  videoHalf: {
+    flex: 1, backgroundColor: '#111', overflow: 'hidden', position: 'relative',
+    borderRadius: 22,
+  },
+  videoInner: { ...StyleSheet.absoluteFill, borderRadius: 22 },
   noVideo: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
 
+  // Badge VS central entre les deux cartes
+  vsWrap: { position: 'absolute', top: '50%', left: 0, right: 0, alignItems: 'center', zIndex: 25, marginTop: -18 },
+  vsBadge: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#FFD700', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#fff',
+    shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 8, elevation: 10,
+  },
+  vsText: { color: '#1a1030', fontSize: 13, fontWeight: '900' },
+
+  // Bandeau nom + avatar par camp
+  hostBadge: {
+    position: 'absolute', top: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20,
+    paddingVertical: 4, paddingHorizontal: 8, maxWidth: '92%',
+    zIndex: 15,
+  },
+  hostBadgeA: { left: 8 },
+  hostBadgeB: { right: 8 },
+  hostBadgeAvatar: { width: 22, height: 22, borderRadius: 11 },
+  hostBadgeAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  hostBadgeName: { color: '#fff', fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  hostBadgeCrown: { fontSize: 13 },
+
   // Zone basse — 25% de l'ecran, fixe : chat (flexible) + actions + saisie (toujours visibles)
-  bottomZone: { width: '100%', height: BOTTOM_ZONE_H, backgroundColor: '#0B0812' },
-  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 },
+  bottomZone: {
+    width: '100%', height: BOTTOM_ZONE_H, backgroundColor: '#0B0812',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden',
+  },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4 },
 
   centerBar: { position: 'absolute', top: VIDEO_ZONE_H / 2 - 34, left: 0, right: 0, alignItems: 'center', gap: 4 },
-  scoreBarTrack: { width: '86%', height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden', flexDirection: 'row' },
-  scoreBarFillA: { height: '100%', backgroundColor: '#7B3FF2' },
-  countdownWrap: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4, marginTop: 6 },
+  scoreBarTrack: { width: '86%', height: 10, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden', flexDirection: 'row' },
+  scoreBarFillA: { height: '100%', backgroundColor: '#7B3FF2', borderRadius: 6 },
+  countdownWrap: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4, marginTop: 6 },
   countdownText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   scoresRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   scoreText: { color: '#fff', fontSize: 16, fontWeight: '800' },
@@ -731,23 +881,23 @@ const styles = StyleSheet.create({
   effectBanner: {
     position: 'absolute', top: 100, left: 16, right: 16,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 14, padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 20, padding: 10,
     borderWidth: 1, borderColor: 'rgba(255,215,0,0.35)',
   },
   effectIcon: { fontSize: 20 },
   effectText: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '700' },
 
-  goalBanner: { position: 'absolute', top: 54, left: 16, right: 16, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 16, padding: 12, gap: 6 },
+  goalBanner: { position: 'absolute', top: 54, left: 16, right: 16, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 20, padding: 12, gap: 6 },
   goalBannerBoss: { borderWidth: 1.5, borderColor: '#EF4444' },
   goalTitle: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  goalBarTrack: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
-  goalBarFill: { height: '100%', backgroundColor: '#FFD700' },
+  goalBarTrack: { height: 8, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
+  goalBarFill: { height: '100%', backgroundColor: '#FFD700', borderRadius: 6 },
   goalPct: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600', alignSelf: 'flex-end' },
 
   topDonorBadge: {
     position: 'absolute', top: VIDEO_ZONE_H / 2 - 68, left: 16,
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 16, paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4,
     maxWidth: 150, zIndex: 20,
   },
   topDonorAvatar: { width: 18, height: 18, borderRadius: 9 },
@@ -760,7 +910,7 @@ const styles = StyleSheet.create({
 
   // Cadeaux compacts par cote (retrecis pour tenir dans le split-screen)
   giftTick: { position: 'absolute', bottom: 6, left: 6, right: 6, zIndex: 30 },
-  giftTickGrad: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 14, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
+  giftTickGrad: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
   giftTickEmoji: { fontSize: 13 },
   giftTickText: { color: '#fff', fontSize: 10, flexShrink: 1 },
   giftTickSender: { fontWeight: '800' },
@@ -788,11 +938,11 @@ const styles = StyleSheet.create({
 
   // Panneau classement
   rankingOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 60 },
-  rankingSheet: { backgroundColor: '#14101f', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: 30, gap: 10 },
+  rankingSheet: { backgroundColor: '#14101f', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, paddingBottom: 30, gap: 10 },
   rankingHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center' },
   rankingTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
   rankingEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center', paddingVertical: 20 },
-  rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 14 },
   rankPos: { width: 20, color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   rankAvatar: { width: 30, height: 30, borderRadius: 15 },
   rankAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
@@ -802,9 +952,9 @@ const styles = StyleSheet.create({
   surpriseText: { color: 'rgba(255,255,255,0.75)', fontSize: 12 },
 
   endedOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 70 },
-  endedCard: { width: '80%', borderRadius: 24, padding: 28, alignItems: 'center', gap: 12 },
+  endedCard: { width: '80%', borderRadius: 28, padding: 28, alignItems: 'center', gap: 12 },
   endedTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
   endedScore: { color: 'rgba(255,255,255,0.9)', fontSize: 28, fontWeight: '900' },
-  endedBtn: { marginTop: 8, backgroundColor: '#fff', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 28 },
+  endedBtn: { marginTop: 8, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
   endedBtnText: { color: '#4C1D95', fontSize: 14, fontWeight: '800' },
 });
