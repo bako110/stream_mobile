@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, RefreshControl,
-  StyleSheet, StatusBar, Platform, Dimensions,
+  StyleSheet, StatusBar, Platform, Dimensions, ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -30,12 +30,17 @@ export const SimpleLiveListScreen: React.FC = () => {
 
   const [lives, setLives] = useState<LiveStream[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const data = await liveService.getLives();
-      setLives(data);
+      const p = await liveService.getLivesPage(1);
+      setLives(p.items);
+      setHasMore(p.has_more);
+      setPage(1);
     } catch { /* silencieux */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -43,9 +48,24 @@ export const SimpleLiveListScreen: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    const iv = setInterval(() => { liveService.getLives().then(d => setLives(d)).catch(() => {}); }, 15_000);
+    const iv = setInterval(() => {
+      liveService.getLivesPage(1).then(p => { setLives(p.items); setHasMore(p.has_more); setPage(1); }).catch(() => {});
+    }, 15_000);
     return () => clearInterval(iv);
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const p = await liveService.getLivesPage(nextPage);
+      setLives(prev => [...prev, ...p.items]);
+      setHasMore(p.has_more);
+      setPage(nextPage);
+    } catch { /* silencieux */ }
+    finally { setLoadingMore(false); }
+  }, [loading, loadingMore, hasMore, page]);
 
   const handlePress = (live: LiveStream) => {
     const isHost = currentUser?.id === live.user_id;
@@ -171,6 +191,11 @@ export const SimpleLiveListScreen: React.FC = () => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />
           }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={loadingMore ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+          ) : null}
           ListEmptyComponent={
             <Animated.View entering={FadeIn} style={st.empty}>
               <View style={[st.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
