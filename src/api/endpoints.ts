@@ -400,6 +400,32 @@ export const Endpoints = {
     adminReject:  (id: string) => `${V1}/monetization/admin/requests/${id}/reject`,
   },
 
+  // ── Battles live entre créateurs ─────────────────────────────────────────
+  battles: {
+    eligible:   (liveId: string)  => `${V1}/battles/eligible/${liveId}`,
+    invite:     `${V1}/battles/invite`,
+    respond:    (id: string) => `${V1}/battles/${id}/respond`,
+    cancel:     (id: string) => `${V1}/battles/${id}/cancel`,
+    token:      (id: string) => `${V1}/battles/${id}/token`,
+    react:      (id: string) => `${V1}/battles/${id}/react`,
+    end:        (id: string) => `${V1}/battles/${id}/end`,
+    ranking:    (id: string) => `${V1}/battles/${id}/ranking`,
+    createGoal: (id: string) => `${V1}/battles/${id}/goals`,
+    activeGoal: (id: string) => `${V1}/battles/${id}/goals/active`,
+  },
+
+  // ── Tournois entre créateurs ──────────────────────────────────────────────
+  tournaments: {
+    open:            `${V1}/tournaments/open`,
+    create:          `${V1}/tournaments`,
+    join:            (id: string) => `${V1}/tournaments/${id}/join`,
+    leave:           (id: string) => `${V1}/tournaments/${id}/join`,
+    generateBracket: (id: string) => `${V1}/tournaments/${id}/generate-bracket`,
+    bracket:         (id: string) => `${V1}/tournaments/${id}/bracket`,
+    cancel:          (id: string) => `${V1}/tournaments/${id}/cancel`,
+    matchReady:      (matchId: string) => `${V1}/tournaments/matches/${matchId}/ready`,
+  },
+
   // ── Système ───────────────────────────────────────────────────────────────
   system: {
     health: '/health',

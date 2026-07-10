@@ -19,6 +19,7 @@ import { AppTabBar, NotificationToast, BoostPrompt } from '../components/common'
 import { UploadProgressBanner } from '../components/common/UploadProgressBanner';
 import { ActiveCallBar }        from '../components/call/ActiveCallBar';
 import { ActiveCallProvider }   from '../context/ActiveCallContext';
+import { BattleInviteModal }    from '../components/battle/BattleInviteModal';
 
 // ── Écrans stack ──────────────────────────────────────────────────────────────
 import { FeedScreen }            from '../screens/Main/FeedScreen';
@@ -89,6 +90,7 @@ import { SimpleLiveListScreen }    from '../screens/Live/SimpleLiveListScreen';
 import { GoLiveScreen }            from '../screens/Live/GoLiveScreen';
 import { SimpleLiveStreamScreen }  from '../screens/Live/SimpleLiveStreamScreen';
 import { SimpleLiveViewerScreen }  from '../screens/Live/SimpleLiveViewerScreen';
+import { BattleScreen }            from '../screens/Live/BattleScreen';
 import WalletScreen                from '../screens/Wallet/WalletScreen';
 import BuyGoGoldScreen              from '../screens/Wallet/BuyGoGoldScreen';
 import CreatorDashboardScreen      from '../screens/Wallet/CreatorDashboardScreen';
@@ -199,6 +201,7 @@ export type MainStackParamList = {
   GoLive:            undefined;
   SimpleLiveStream:  { liveId: string; publisherToken?: string; livekitUrl?: string; userId?: string; isPrivate?: boolean };
   SimpleLiveViewer:  { liveId: string };
+  BattleScreen:      { battleId: string };
   Activity:        undefined;
   MyStories:       undefined;
   StoryViewers:    { storyId: string; viewCount: number; myId?: string };
@@ -489,6 +492,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="GoLive"            component={GoLiveScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SimpleLiveStream"  component={SimpleLiveStreamScreen}  options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SimpleLiveViewer"  component={SimpleLiveViewerScreen}  options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="BattleScreen"       component={BattleScreen}            options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="MyStories"      component={MyStoriesScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="StoryViewers"   component={StoryViewersScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="LiveStream"     component={LiveStreamWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
@@ -569,6 +573,7 @@ const SettingsWrapper = useCallback(
       <NotificationToast />
       <ActiveCallBar />
       <IncomingCallHandler />
+      <BattleInviteModal />
     </ActiveCallProvider>
   );
 };

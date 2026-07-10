@@ -56,6 +56,7 @@ import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
 import { StageTileRow } from '../../components/live/StageTileRow';
 import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
 import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
+import { BattleChallengeSheet } from '../../components/live/BattleChallengeSheet';
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 import type { LiveStream } from '../../services/liveService';
 
@@ -337,6 +338,7 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
 
   const [showSettings,   setShowSettings]   = useState(false);
   const [showMoreMenu,   setShowMoreMenu]   = useState(false);
+  const [showBattleChallenge, setShowBattleChallenge] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [liveData,     setLiveData]     = useState<LiveStream | null>(null);
 
@@ -526,6 +528,15 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         if (d.type === 'live_guest_demoted') {
           setOnStage(prev => { const next = new Set(prev); next.delete(d.identity ?? ''); return next; });
           addSysMsg(`${d.identity} a été redescendu de scène`);
+        }
+
+        // ── Battle : l'invitation qu'on a envoyee a ete acceptee → le battle demarre,
+        // les deux hosts (A et B) sont rediriges vers l'ecran de battle en split-screen.
+        if (d.type === 'battle_started' && d.battle_id) {
+          nav.navigate('BattleScreen', { battleId: d.battle_id });
+        }
+        if (d.type === 'battle_invite_response' && d.accepted === false) {
+          addSysMsg('Le créateur a refusé le battle.');
         }
       } catch {}
     };
@@ -1110,6 +1121,13 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; isPrivate?: b
         liveId={liveId}
         onOpenSettings={() => setShowSettings(true)}
         onStopLive={askEnd}
+        onOpenBattle={() => setShowBattleChallenge(true)}
+      />
+
+      <BattleChallengeSheet
+        visible={showBattleChallenge}
+        onClose={() => setShowBattleChallenge(false)}
+        liveId={liveId}
       />
     </View>
   );

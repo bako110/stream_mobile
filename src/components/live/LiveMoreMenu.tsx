@@ -23,10 +23,11 @@ interface Props {
   onOpenSettings?: () => void;
   onStopLive?:     () => void;
   onLeave?:        () => void;
+  onOpenBattle?:   () => void;
 }
 
 export const LiveMoreMenu: React.FC<Props> = ({
-  visible, onClose, isHost, liveId, hostId, hostName, onOpenSettings, onStopLive, onLeave,
+  visible, onClose, isHost, liveId, hostId, hostName, onOpenSettings, onStopLive, onLeave, onOpenBattle,
 }) => {
   const { currentUser } = useUser();
   const [isFollowed, setIsFollowed] = useState<boolean | null>(null);
@@ -129,6 +130,15 @@ export const LiveMoreMenu: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
+              {isHost && onOpenBattle && (
+                <TouchableOpacity style={s.row} onPress={() => run(onOpenBattle)} activeOpacity={0.75}>
+                  <View style={[s.iconWrap, s.iconWrapBattle]}>
+                    <Icon name="zap" size={18} color="#7B3FF2" />
+                  </View>
+                  <Text style={s.label}>Défier un créateur (Battle)</Text>
+                </TouchableOpacity>
+              )}
+
               {!isHost && onLeave && (
                 <TouchableOpacity style={s.row} onPress={handleLeaveConfirm} activeOpacity={0.75}>
                   <View style={s.iconWrap}>
@@ -204,6 +214,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   iconWrapDanger: { backgroundColor: 'rgba(240,54,90,0.12)' },
+  iconWrapBattle: { backgroundColor: 'rgba(123,63,242,0.15)' },
   label:       { color: '#fff', fontSize: 15, fontWeight: '600' },
   labelDanger: { color: '#F0365A' },
   cancelBtn: {
