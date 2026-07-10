@@ -22,7 +22,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useWs } from '../../context/WebSocketContext';
+import { useWs, generateCallId } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useActiveCall } from '../../context/ActiveCallContext';
 import { callConnectionService } from '../../services/callConnectionService';
@@ -49,6 +49,7 @@ interface RouteParams {
   isIncoming:     boolean;
   offer?:         any;
   autoAccept?:    boolean;
+  callId?:        string | null;
 }
 
 type CallState = 'ringing' | 'connected' | 'ended';
@@ -65,7 +66,14 @@ export const CallScreen: React.FC = () => {
   const route     = useRoute();
   const {
     partnerId, partnerName, partnerAvatar, callType, isIncoming, offer, autoAccept,
+    callId: routeCallId,
   } = route.params as RouteParams;
+
+  // ID unique de cet appel — genere localement pour un appel sortant, recu du call_offer
+  // pour un appel entrant. Tout event (hangup/ice/answer) dont le call_id ne correspond
+  // pas est ignore : un appel precedent avec la meme personne ne peut plus jamais
+  // affecter celui-ci, meme si son hangup arrive en retard.
+  const callIdRef = useRef<string>(routeCallId || (isIncoming ? '' : generateCallId()));
 
   const [callState,    setCallState]    = useState<CallState>('ringing');
   const [elapsed,      setElapsed]      = useState(0);
@@ -257,7 +265,7 @@ export const CallScreen: React.FC = () => {
     };
 
     (pc as any).onicecandidate = (event: any) => {
-      if (event.candidate) sendWs({ type: 'call_ice', to: partnerId, candidate: event.candidate.toJSON() });
+      if (event.candidate) sendWs({ type: 'call_ice', to: partnerId, call_id: callIdRef.current, candidate: event.candidate.toJSON() });
     };
 
     const onConnected = () => {
@@ -266,7 +274,7 @@ export const CallScreen: React.FC = () => {
       if (stateRef.current !== 'connected') {
         connectedAtRef.current = Date.now();
         notifyCallConnected(partnerId);
-        startCall({ partnerId, partnerName, partnerAvatar, callType });
+        startCall({ partnerId, partnerName, partnerAvatar, callType, callId: callIdRef.current });
         callConnectionService.reportCallActive(partnerId);
         if (mountedRef.current) setCallState('connected');
       }
@@ -327,7 +335,7 @@ export const CallScreen: React.FC = () => {
         await pc.setLocalDescription(answer);
         const answerPayload = (answer as any).toJSON ? (answer as any).toJSON() : { type: answer.type, sdp: answer.sdp };
         console.log('[CALL] sending call_answer to=', partnerId);
-        sendWs({ type: 'call_answer', to: partnerId, sdp: answerPayload });
+        sendWs({ type: 'call_answer', to: partnerId, call_id: callIdRef.current, sdp: answerPayload });
       }
     } catch (e) { console.log('[CALL] acceptCall error', e); hangupRef.current?.(); }
   }, [offer, partnerId, isVideo, getLocalStream, createPC, flushPendingCandidates, sendWs, markCallAccepted]);
@@ -343,7 +351,7 @@ export const CallScreen: React.FC = () => {
     endActiveCall();
     notifyCallEnded(partnerId);
     markCallEnded(partnerId);
-    sendWs({ type: 'call_hangup', to: partnerId });
+    sendWs({ type: 'call_hangup', to: partnerId, call_id: callIdRef.current });
     callConnectionService.endCallLocal(partnerId);
     if (mountedRef.current) setCallState('ended');
   }, [partnerId, endActiveCall, notifyCallEnded, markCallEnded, sendWs]);
@@ -370,8 +378,8 @@ export const CallScreen: React.FC = () => {
           );
           await pc.setLocalDescription(offerDesc);
           const sdpPayload = (offerDesc as any).toJSON ? (offerDesc as any).toJSON() : { type: offerDesc.type, sdp: offerDesc.sdp };
-          console.log('[CALL] sending call_offer to=', partnerId, 'sdp type=', sdpPayload.type);
-          sendWs({ type: 'call_offer', to: partnerId, to_name: partnerName, to_avatar: partnerAvatar ?? null, call_type: callType, sdp: sdpPayload });
+          console.log('[CALL] sending call_offer to=', partnerId, 'sdp type=', sdpPayload.type, 'call_id=', callIdRef.current);
+          sendWs({ type: 'call_offer', to: partnerId, call_id: callIdRef.current, to_name: partnerName, to_avatar: partnerAvatar ?? null, call_type: callType, sdp: sdpPayload });
         } catch (e) { console.log('[CALL] outgoing start error', e); }
       } else if (autoAccept) {
         markCallAccepted(partnerId);
@@ -389,7 +397,7 @@ export const CallScreen: React.FC = () => {
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             const ans2 = (answer as any).toJSON ? (answer as any).toJSON() : { type: answer.type, sdp: answer.sdp };
-            sendWs({ type: 'call_answer', to: partnerId, sdp: ans2 });
+            sendWs({ type: 'call_answer', to: partnerId, call_id: callIdRef.current, sdp: ans2 });
           }
         } catch {}
       } else {
@@ -416,6 +424,20 @@ export const CallScreen: React.FC = () => {
     const handler = async (payload: WsPayload) => {
       const senderId = payload.from ?? payload.sender_id;
       if (senderId !== partnerId && payload.to !== partnerId) return;
+
+      // Ignorer tout event d'un appel precedent avec la meme personne (ex: hangup d'un
+      // rejet qui arrive juste apres qu'on ait relance un nouvel appel). Si notre propre
+      // call_id est inconnu (callIdRef vide — edge case ancienne version), on ne filtre
+      // pas pour ne pas casser le comportement existant.
+      if (
+        callIdRef.current &&
+        payload.call_id &&
+        payload.call_id !== callIdRef.current &&
+        payload.type !== 'call_chat' &&
+        payload.type !== 'call_reaction'
+      ) {
+        return;
+      }
 
       if (payload.type === 'call_answer') {
         stopRingback();
@@ -457,7 +479,7 @@ export const CallScreen: React.FC = () => {
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           const ans3 = (answer as any).toJSON ? (answer as any).toJSON() : { type: answer.type, sdp: answer.sdp };
-          sendWs({ type: 'call_answer', to: partnerId, sdp: ans3 });
+          sendWs({ type: 'call_answer', to: partnerId, call_id: callIdRef.current, sdp: ans3 });
         } catch (e) { console.log('[CALL] re-offer answer error', e); }
         return;
       }

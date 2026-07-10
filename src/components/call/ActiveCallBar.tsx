@@ -51,11 +51,12 @@ export const ActiveCallBar: React.FC = () => {
       callType:      activeCall.callType,
       isIncoming:    false,
       fromMinimized: true,
+      callId:        activeCall.callId,
     });
   };
 
   const handleHangup = () => {
-    sendWs({ type: 'call_hangup', to: activeCall.partnerId });
+    sendWs({ type: 'call_hangup', to: activeCall.partnerId, call_id: activeCall.callId });
     notifyCallEnded(activeCall.partnerId);
     markCallEnded(activeCall.partnerId);
     endCall();

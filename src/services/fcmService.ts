@@ -199,6 +199,7 @@ export async function handleBackgroundFCM(
 
     // Récupérer le SDP complet depuis le backend (le headless task peut faire fetch)
     let offer: any = null;
+    let callId: string | null = (data.call_id as string) || null;
     try {
       const { API_BASE_URL } = require('../utils/constants');
       const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -208,7 +209,8 @@ export async function handleBackgroundFCM(
         });
         if (res.ok) {
           const payload = await res.json();
-          offer = payload.sdp ?? null;
+          offer  = payload.sdp ?? null;
+          callId = payload.call_id ?? callId;
         }
       }
     } catch {}
@@ -219,6 +221,7 @@ export async function handleBackgroundFCM(
       caller_name:  callerName,
       caller_avatar: callerAvatar,
       call_type:    callType,
+      call_id:      callId,
       offer,
       received_at:  Date.now(),
     }));
@@ -351,6 +354,7 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
       isIncoming:   true,
       autoAccept:   data._accept === 'true',
       offer:        undefined,
+      callId:       data.call_id || null,
     });
   } else if (type === 'missed_call') {
     navigate('Messages', { initialTab: 'calls' });
@@ -433,10 +437,15 @@ export function resumePendingCallAccept(): void {
   try {
     const pending = JSON.parse(pendingRaw);
     let offer: any = null;
+    let callId: string | null = pending.call_id ?? null;
     const incomingRaw = storage.getItem('pending_incoming_call');
     if (incomingRaw) {
       storage.removeItem('pending_incoming_call');
-      try { offer = JSON.parse(incomingRaw).offer ?? null; } catch {}
+      try {
+        const incoming = JSON.parse(incomingRaw);
+        offer  = incoming.offer ?? null;
+        callId = incoming.call_id ?? callId;
+      } catch {}
     }
     navigate('Call', {
       partnerId:    pending.caller_id,
@@ -446,6 +455,7 @@ export function resumePendingCallAccept(): void {
       isIncoming:   true,
       autoAccept:   true,
       offer,
+      callId,
     });
   } catch {}
 }

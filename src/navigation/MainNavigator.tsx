@@ -425,6 +425,7 @@ const IncomingCallHandler: React.FC = () => {
       callType:      pendingIncomingCall.callType,
       isIncoming:    true,
       offer:         pendingIncomingCall.offer,
+      callId:        pendingIncomingCall.callId,
     });
   }, [pendingIncomingCall, clearPendingIncomingCall]);
 

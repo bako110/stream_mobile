@@ -45,9 +45,17 @@ interface PendingCall {
   avatarUrl?:  string;
   callType:    'voice' | 'video';
   direction:   'incoming' | 'outgoing';
+  callId:      string | null;
   startedAt:   string;
   connectedAt: number | null;   // Date.now() when connected
   timeoutId:   ReturnType<typeof setTimeout> | null;
+}
+
+// Génère un identifiant unique par appel — permet de distinguer deux appels successifs
+// avec la même personne, pour qu'un call_hangup de l'appel précédent ne puisse jamais
+// être confondu avec un event du nouvel appel (voir filtrage par call_id dans CallScreen).
+export function generateCallId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export interface CallLogEntry {
@@ -67,6 +75,7 @@ export interface IncomingCallPayload {
   partnerAvatar: string | null;
   callType:      'voice' | 'video';
   offer:         any;
+  callId:        string | null;
 }
 
 interface WebSocketContextValue {
@@ -89,6 +98,7 @@ interface WebSocketContextValue {
   markCallAccepted:    (partnerId: string) => void;
   markCallEnded:       (partnerId: string) => void;
   isOutgoingCall:      (partnerId: string) => boolean;
+  getActiveCallId:     (partnerId: string) => string | null;
   // Buffer: events arrivés avant que CallScreen soit monté
   drainCallBuffer:     (partnerId: string) => WsPayload[];
   // Appel entrant en attente de navigation
@@ -130,6 +140,7 @@ const Ctx = createContext<WebSocketContextValue>({
   markCallAccepted:         () => {},
   markCallEnded:            () => {},
   isOutgoingCall:           () => false,
+  getActiveCallId:          () => null,
   drainCallBuffer:          () => [],
   pendingIncomingCall:      null,
   clearPendingIncomingCall: () => {},
@@ -272,6 +283,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     avatarUrl:   string | undefined,
     callType:    'voice' | 'video',
     direction:   'incoming' | 'outgoing',
+    callId:      string | null = null,
   ) => {
     // Cancel any existing pending entry for this partner (duplicate offer)
     const existing = pendingCalls.current.get(partnerId);
@@ -285,12 +297,18 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     }, CALL_TIMEOUT);
 
     pendingCalls.current.set(partnerId, {
-      partnerId, partnerName, avatarUrl, callType, direction,
+      partnerId, partnerName, avatarUrl, callType, direction, callId,
       startedAt:   new Date().toISOString(),
       connectedAt: null,
       timeoutId,
     });
   }, [finalisePendingCall]);
+
+  // ── Call ID de l'appel en cours avec ce partenaire — permet à CallScreen de
+  // filtrer les events (hangup/ice/answer) d'un appel précédent déjà terminé ───
+  const getActiveCallId = useCallback((partnerId: string): string | null => {
+    return pendingCalls.current.get(partnerId)?.callId ?? null;
+  }, []);
 
   // ── Called by CallScreen when WebRTC actually connects ────────────────────
 
@@ -422,6 +440,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
               payload.from_avatar ?? undefined,
               payload.call_type ?? 'voice',
               'incoming',
+              payload.call_id ?? null,
             );
             // App au premier plan → naviguer directement
             if (AppState.currentState === 'active' || AppState.currentState === 'inactive') {
@@ -431,6 +450,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
                 partnerAvatar: payload.from_avatar ?? null,
                 callType:      payload.call_type ?? 'voice',
                 offer:         payload.sdp ?? null,
+                callId:        payload.call_id ?? null,
               });
             }
             // App en background → FCM + MMKV gèrent le réveil (handleBackgroundFCM)
@@ -545,6 +565,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
                 partnerAvatar: p.caller_avatar || null,
                 callType:      p.call_type ?? 'voice',
                 offer:         p.offer ?? null,
+                callId:        p.call_id ?? null,
               });
             }
           } catch {}
@@ -588,6 +609,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           p.to_avatar ?? undefined,
           p.call_type ?? 'voice',
           'outgoing',
+          p.call_id ?? null,
         );
       }
       wsRef.current!.send(JSON.stringify(payload));
@@ -612,6 +634,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     markCallAccepted,
     markCallEnded,
     isOutgoingCall,
+    getActiveCallId,
     drainCallBuffer,
     clearPendingIncomingCall,
     pendingIncomingCall,
@@ -632,7 +655,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     sendMessage, isConnected, addListener, removeListener,
     refreshUnread, setActiveChat,
     notifyCallConnected, notifyCallEnded, markCallAccepted, markCallEnded,
-    isOutgoingCall, drainCallBuffer,
+    isOutgoingCall, getActiveCallId, drainCallBuffer,
     pendingIncomingCall, clearPendingIncomingCall,
     lastNewFollower, lastGoGoldTransfer, lastGiftReceived, lastStoryAdded,
     lastStoryView, lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate,

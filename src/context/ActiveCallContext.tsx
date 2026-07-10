@@ -6,6 +6,7 @@ interface ActiveCallState {
   partnerName: string;
   partnerAvatar?: string | null;
   callType:    'voice' | 'video';
+  callId:      string;
   elapsed:     number;
 }
 

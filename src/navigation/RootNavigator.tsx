@@ -100,6 +100,7 @@ export const RootNavigator: React.FC = () => {
           caller_name:  pending?.caller_name ?? 'Inconnu',
           caller_avatar: pending?.caller_avatar ?? '',
           call_type:    pending?.call_type ?? 'voice',
+          call_id:      pending?.call_id ?? null,
         }));
         resumePendingCallAccept();
       } else if (event === 'reject' || event === 'hangup') {
