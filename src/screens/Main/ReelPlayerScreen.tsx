@@ -35,7 +35,17 @@ export const ReelPlayerScreen: React.FC = () => {
   const [muted,  setMuted]  = useState(false);
 
   const player = useVideoPlayer(
-    reel?.hls_url ? { uri: reel.hls_url } : { uri: 'about:blank' },
+    reel?.hls_url
+      ? {
+          uri: reel.hls_url,
+          bufferConfig: {
+            minBufferMs: 2_000,
+            maxBufferMs: 50_000,
+            bufferForPlaybackMs: 1_500,
+            bufferForPlaybackAfterRebufferMs: 2_000,
+          },
+        }
+      : { uri: 'about:blank' },
     p => {
       p.loop   = true;
       p.muted  = false;

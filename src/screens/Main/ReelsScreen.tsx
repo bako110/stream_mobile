@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { useIsWifi } from '../../hooks/useIsWifi';
 import { RichText } from '../../components/common/RichText';
 import { apiClient, Endpoints } from '../../api';
 import { reelService, socialService, authService } from '../../services';
@@ -67,6 +68,7 @@ const formatCount = (n: number): string => {
 
 export const ReelsScreen: React.FC = () => {
   useKeepAwake();
+  const isWifi = useIsWifi();
   const [screenDims, setScreenDims] = useState(() => Dimensions.get('screen'));
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ screen }) => setScreenDims(screen));
@@ -626,11 +628,16 @@ export const ReelsScreen: React.FC = () => {
         />
       );
     }
+    // Hors wifi, on ne précharge que le voisin immédiat (1) au lieu de 2 devant/derrière —
+    // chaque voisin préchargé télécharge jusqu'à preferredForwardBufferDurationMs de HLS
+    // même sans être affiché, ce qui consommait des données mobiles pour rien.
+    const preloadWindow = isWifi ? 2 : 1;
     return (
       <VideoSlide
         reel={item}
         isActive={index === currentIndex && screenFocused}
-        isPreload={Math.abs(index - currentIndex) <= 2 && index !== currentIndex}
+        isPreload={Math.abs(index - currentIndex) <= preloadWindow && index !== currentIndex}
+        isWifi={isWifi}
         muted={muted}
         screenW={SCREEN_W}
         screenH={SCREEN_H}
@@ -646,7 +653,7 @@ export const ReelsScreen: React.FC = () => {
         audioOwnerRef={audioOwnerRef}
       />
     );
-  }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H]);
+  }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H, isWifi]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -1187,6 +1194,7 @@ interface VideoSlideProps {
   reel:                 Reel;
   isActive:             boolean;
   isPreload:            boolean;
+  isWifi:               boolean;
   muted:                boolean;
   screenW:              number;
   screenH:              number;
@@ -1203,7 +1211,7 @@ interface VideoSlideProps {
 }
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
-  reel, isActive, isPreload, muted, screenW, screenH, insetBottom,
+  reel, isActive, isPreload, isWifi, muted, screenW, screenH, insetBottom,
   colors, currentUserId, currentUserAvatar, currentUserInitial = 'M',
   onToggleMute, onAuthorPress, onEnd, activePlayerRef, audioOwnerRef,
 }) => {
@@ -1341,20 +1349,32 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   // sinon useVideoPlayer recrée le player en perdant tout le buffer déjà accumulé pendant le
   // preload (= rechargement complet, latence visible à l'arrivée). Seul shouldLoad (bool) doit
   // faire basculer entre l'URI réelle et 'about:blank', jamais l'objet lui-même.
+  // Hors wifi, on réduit fortement le buffer avant de jouer — un voisin préchargé n'a besoin
+  // que de quelques secondes pour démarrer instantanément, pas de 30s de vidéo téléchargée
+  // pour rien s'il n'est jamais atteint (swipe dans l'autre sens, appel qui interrompt, etc.).
   const videoSource = useMemo(() => shouldLoad
     ? {
         uri: videoUri!,
-        bufferConfig: {
-          minBufferMs: 2_000,
-          maxBufferMs: 50_000,
-          bufferForPlaybackMs: 1_500,
-          bufferForPlaybackAfterRebufferMs: 2_000,
-          backBufferDurationMs: 2_000,
-          preferredForwardBufferDurationMs: 30_000,
-        },
+        bufferConfig: isWifi
+          ? {
+              minBufferMs: 2_000,
+              maxBufferMs: 50_000,
+              bufferForPlaybackMs: 1_500,
+              bufferForPlaybackAfterRebufferMs: 2_000,
+              backBufferDurationMs: 2_000,
+              preferredForwardBufferDurationMs: 30_000,
+            }
+          : {
+              minBufferMs: 2_000,
+              maxBufferMs: 15_000,
+              bufferForPlaybackMs: 1_500,
+              bufferForPlaybackAfterRebufferMs: 2_000,
+              backBufferDurationMs: 1_000,
+              preferredForwardBufferDurationMs: 6_000,
+            },
       }
     : 'about:blank',
-  [videoUri, shouldLoad]); // eslint-disable-line
+  [videoUri, shouldLoad, isWifi]); // eslint-disable-line
 
   const hasMusic = !!(reel.music_url);
   const player = useVideoPlayer(videoSource, p => {

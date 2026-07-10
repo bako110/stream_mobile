@@ -19,6 +19,8 @@ import { useWs } from '../../context/WebSocketContext';
 import { GoFolyXLoader, HeartRain, LikeNamesFeed } from '../common';
 import { getLocalUri, getLocalUriAsync, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
 import { apiClient } from '../../api/client';
+import { networkService } from '../../services/networkService';
+import { useIsWifi } from '../../hooks/useIsWifi';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -57,12 +59,22 @@ interface Props {
 
 // ── Lecteur vidéo story ───────────────────────────────────────────────────────
 
-// Buffer continu — charge tous les segments HLS au fur et à mesure
+// Buffer continu — charge tous les segments HLS au fur et à mesure (story affichée à l'écran)
 const BUFFER_CFG = {
   minBufferMs:                      8000,   // garde au moins 8s chargées en permanence
   maxBufferMs:                      60000,  // charge jusqu'à 60s en avance (toute la story)
   bufferForPlaybackMs:              500,    // attend 500ms avant de démarrer (évite les micro-stops)
   bufferForPlaybackAfterRebufferMs: 1500,   // 1.5s après rebuffer
+};
+
+// Buffer réduit pour les voisins PRÉCHARGÉS (pas encore affichés) — un voisin n'a besoin
+// que de quelques secondes pour démarrer instantanément, pas de 60s de vidéo entière
+// téléchargée pour rien s'il n'est jamais atteint.
+const PRELOAD_BUFFER_CFG = {
+  minBufferMs:                      2000,
+  maxBufferMs:                      8000,
+  bufferForPlaybackMs:              500,
+  bufferForPlaybackAfterRebufferMs: 1500,
 };
 
 // ── Image avec fondu au chargement ───────────────────────────────────────────
@@ -183,15 +195,19 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
 const VideoPreloader: React.FC<{ uri: string }> = ({ uri }) => {
   const localUri = getLocalUri(uri);
   const playUri  = localUri ?? uri;
+  // Hors wifi, on ne précharge qu'un buffer minimal et on ne télécharge pas le fichier
+  // complet en cache — sinon chaque voisin (jusqu'à 4 en simultané) coûte des Mo de
+  // données mobiles même s'il n'est jamais visionné.
+  const isWifi = networkService.isWifi();
 
   const player = useVideoPlayer(
-    { uri: playUri, bufferConfig: BUFFER_CFG },
+    { uri: playUri, bufferConfig: isWifi ? BUFFER_CFG : PRELOAD_BUFFER_CFG },
     p => { p.muted = true; p.volume = 0; },
   );
   useEffect(() => {
     player.preload().catch(() => {});
-    // Sauvegarde en background si pas encore en cache
-    if (!localUri && uri && !uri.includes('.m3u8')) {
+    // Sauvegarde en background si pas encore en cache — uniquement en wifi
+    if (isWifi && !localUri && uri && !uri.includes('.m3u8')) {
       cacheInBackground(uri).catch(() => {});
     }
     return () => { try { player.pause(); } catch {} };
@@ -549,6 +565,7 @@ export const StoryViewer: React.FC<Props> = ({
   onClose, onNavigateToChat, onNavigateToCall,
 }) => {
   const { addListener, removeListener } = useWs();
+  const isWifi = useIsWifi();
 
   const [groupIdx,    setGroupIdx]    = useState(initialGroupIndex);
   const [storyIdx,    setStoryIdx]    = useState(initialStoryIndex ?? 0);
@@ -599,7 +616,7 @@ export const StoryViewer: React.FC<Props> = ({
   // ── Video ──────────────────────────────────────────────────────────────────
 
 
-  // ── Prefetch agressif — stories + 2 groupes en avance + groupe précédent ────
+  // ── Prefetch — stories + groupes en avance (portée réduite hors wifi) ───────
 
   useEffect(() => {
     const urls: string[] = [];
@@ -607,27 +624,26 @@ export const StoryViewer: React.FC<Props> = ({
 
     // Toutes les stories restantes du groupe courant
     for (let i = storyIdx + 1; i < curStories.length; i++) {
-      const url = curStories[i]?.media_url;
-      if (url) urls.push(url);
+      const st = curStories[i];
+      if (st?.media_url && st.media_type === 'image') urls.push(st.media_url);
     }
-    // 2 groupes suivants complets
-    for (let g = groupIdx + 1; g <= Math.min(groupIdx + 2, groups.length - 1); g++) {
+    // Groupes suivants — uniquement en wifi (2 groupes), sinon seulement le prochain
+    const aheadLimit = isWifi ? groupIdx + 2 : groupIdx + 1;
+    for (let g = groupIdx + 1; g <= Math.min(aheadLimit, groups.length - 1); g++) {
       for (const st of groups[g]?.stories ?? []) {
-        if (st.media_url) urls.push(st.media_url);
+        if (st.media_url && st.media_type === 'image') urls.push(st.media_url);
       }
     }
-    // 1 groupe précédent (navigation retour)
-    if (groupIdx > 0) {
+    // Groupe précédent (navigation retour) — uniquement en wifi
+    if (isWifi && groupIdx > 0) {
       for (const st of groups[groupIdx - 1]?.stories ?? []) {
-        if (st.media_url) urls.push(st.media_url);
+        if (st.media_url && st.media_type === 'image') urls.push(st.media_url);
       }
     }
 
-    // Prefetch images en arrière-plan
-    urls.forEach(url => {
-      if (!url.includes('.m3u8')) Image.prefetch(url).catch(() => {});
-    });
-  }, [storyIdx, groupIdx]);
+    // Prefetch images en arrière-plan — jamais de vidéo via Image.prefetch
+    urls.forEach(url => { Image.prefetch(url).catch(() => {}); });
+  }, [storyIdx, groupIdx, isWifi]);
 
   // ── Charger pub stories une seule fois au montage ─────────────────────────
   useEffect(() => {
@@ -996,17 +1012,20 @@ export const StoryViewer: React.FC<Props> = ({
         <StatusBar hidden translucent backgroundColor="transparent" />
 
         {/* ── Préchargeurs vidéo invisibles ─────────────────────────────────────
-            Story suivante + 2 premiers groupes suivants + groupe précédent     */}
+            Wifi : story suivante + 2 premiers groupes suivants + groupe précédent.
+            Hors wifi : uniquement la story suivante immédiate — préchargement des
+            groupes est un pur confort visuel, pas une nécessité, et coûtait jusqu'à
+            4 vidéos entières téléchargées en données mobiles pour rien. */}
         {group.stories[storyIdx + 1]?.media_type === 'video' && group.stories[storyIdx + 1]?.media_url && (
           <VideoPreloader key={`cur-next-${group.stories[storyIdx + 1].id}`} uri={group.stories[storyIdx + 1].mp4_url ?? group.stories[storyIdx + 1].media_url!} />
         )}
-        {[groupIdx + 1, groupIdx + 2].map(gi => {
+        {isWifi && [groupIdx + 1, groupIdx + 2].map(gi => {
           const g = groups[gi];
           const st = g?.stories[0];
           if (!st || st.media_type !== 'video' || !st.media_url) return null;
           return <VideoPreloader key={`grp-${gi}-${st.id}`} uri={st.mp4_url ?? st.media_url!} />;
         })}
-        {groupIdx > 0 && (() => {
+        {isWifi && groupIdx > 0 && (() => {
           const prev = groups[groupIdx - 1];
           const lastSt = prev?.stories[prev.stories.length - 1];
           if (!lastSt || lastSt.media_type !== 'video' || !lastSt.media_url) return null;
