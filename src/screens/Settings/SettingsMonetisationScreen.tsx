@@ -98,8 +98,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
       setStatus('pending');
       setStep(0);
     } catch (e: any) {
-      const detail = e?.response?.data?.detail ?? '';
-      Alert.alert('Erreur', detail || "Impossible d'envoyer la demande.");
+      Alert.alert('Demande refusée', e?.message || "Impossible d'envoyer la demande.");
     } finally { setLoading(false); }
   };
 

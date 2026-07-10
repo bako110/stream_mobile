@@ -78,8 +78,7 @@ export default function MonetisationRequestScreen() {
       });
       setSubmitted(true);
     } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      Alert.alert('Demande refusée', detail || e?.message || 'Impossible d\'envoyer la demande. Réessayez.');
+      Alert.alert('Demande refusée', e?.message || 'Impossible d\'envoyer la demande. Réessayez.');
     } finally {
       setSubmitting(false);
     }
@@ -94,7 +93,7 @@ export default function MonetisationRequestScreen() {
         </LinearGradient>
         <Text style={[s.successTitle, { color: colors.textPrimary }]}>Demande envoyée !</Text>
         <Text style={[s.successSub, { color: colors.textSecondary }]}>
-          Notre équipe examine votre dossier sous 2 à 5 jours ouvrés. Vous serez notifié par email et notification.
+          Votre dossier est vérifié automatiquement sous 24h. Vous serez notifié dès que la décision est prise.
         </Text>
         <TouchableOpacity
           onPress={() => nav.goBack()}
