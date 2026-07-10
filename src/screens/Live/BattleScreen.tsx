@@ -23,6 +23,7 @@ import type { Battle, BattleGoal, BattleRanking } from '../../services/battleSer
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
+import { userService } from '../../services/userService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
@@ -30,7 +31,7 @@ import { storage } from '../../utils/storage';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 
-const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
+const { height: SCREEN_H } = Dimensions.get('window');
 
 interface RouteParams {
   battleId: string;
@@ -136,6 +137,8 @@ export const BattleScreen: React.FC = () => {
   const [giftNotifsA, setGiftNotifsA] = useState<GiftNotif[]>([]);
   const [giftNotifsB, setGiftNotifsB] = useState<GiftNotif[]>([]);
   const [effectBanner, setEffectBanner] = useState<EffectBanner | null>(null);
+  const [hostNameA, setHostNameA] = useState('Créateur A');
+  const [hostNameB, setHostNameB] = useState('Créateur B');
 
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatRef   = useRef<FlatList<ChatMsg>>(null);
@@ -185,6 +188,19 @@ export const BattleScreen: React.FC = () => {
   const refreshRanking = useCallback(() => {
     battleService.getRanking(battleId).then(setRanking).catch(() => {});
   }, [battleId]);
+
+  useEffect(() => {
+    if (battle?.host_a_id) {
+      userService.getPublicProfile(battle.host_a_id)
+        .then(p => setHostNameA(p.display_name || p.username || 'Créateur A'))
+        .catch(() => {});
+    }
+    if (battle?.host_b_id) {
+      userService.getPublicProfile(battle.host_b_id)
+        .then(p => setHostNameB(p.display_name || p.username || 'Créateur B'))
+        .catch(() => {});
+    }
+  }, [battle?.host_a_id, battle?.host_b_id]);
 
   const showEffect = useCallback((message: string, weather: string) => {
     if (effectTimerRef.current) clearTimeout(effectTimerRef.current);
@@ -343,6 +359,8 @@ export const BattleScreen: React.FC = () => {
         leaving={leaving}
         myId={currentUser?.id ?? null}
         myHostSide={myHostSide}
+        hostNameA={hostNameA}
+        hostNameB={hostNameB}
         showChat={showChat}
         showRanking={showRanking}
         setShowChat={setShowChat}
@@ -377,6 +395,8 @@ const BattleContent: React.FC<{
   leaving: boolean;
   myId: string | null;
   myHostSide: 'a' | 'b' | null;
+  hostNameA: string;
+  hostNameB: string;
   showChat: boolean;
   showRanking: boolean;
   setShowChat: (v: boolean) => void;
@@ -398,6 +418,7 @@ const BattleContent: React.FC<{
   onClose: () => void;
 }> = ({
   battle, remaining, goal, ranking, floaters, ended, leaving, myId, myHostSide,
+  hostNameA, hostNameB,
   showChat, showRanking, setShowChat, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
   giftTicker, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
@@ -433,134 +454,120 @@ const BattleContent: React.FC<{
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
 
-      {/* Split-screen vertical */}
-      <View style={styles.half}>
-        {trackA
-          ? <VideoTrack trackRef={trackA} style={StyleSheet.absoluteFill} objectFit="cover" />
-          : <View style={[StyleSheet.absoluteFill, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
-        {giftTicker.filter(t => t.side === 'a').map(t => (
-          <Animated.View key={t.id} entering={FadeIn.duration(250)} exiting={FadeOut.duration(350)} style={[styles.giftTick, styles.giftTickA]}>
-            <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={styles.giftTickEmoji}>{t.emoji}</Text>
-              <Text style={styles.giftTickText} numberOfLines={1}>
-                <Text style={styles.giftTickSender}>{t.senderName} </Text>· {t.GoGold}🪙
-              </Text>
-            </LinearGradient>
-          </Animated.View>
-        ))}
-        <LiveGiftOverlay
-          ref={giftOverlayA}
-          liveId={battle?.live_a_id ?? ''}
-          incomingNotifs={giftNotifsA}
-          onNotifShown={onGiftShownA}
-        />
-      </View>
-      <View style={styles.half}>
-        {trackB
-          ? <VideoTrack trackRef={trackB} style={StyleSheet.absoluteFill} objectFit="cover" />
-          : <View style={[StyleSheet.absoluteFill, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
-        {giftTicker.filter(t => t.side === 'b').map(t => (
-          <Animated.View key={t.id} entering={FadeIn.duration(250)} exiting={FadeOut.duration(350)} style={[styles.giftTick, styles.giftTickB]}>
-            <LinearGradient colors={['#F0365A', '#9B1C3F']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={styles.giftTickEmoji}>{t.emoji}</Text>
-              <Text style={styles.giftTickText} numberOfLines={1}>
-                <Text style={styles.giftTickSender}>{t.senderName} </Text>· {t.GoGold}🪙
-              </Text>
-            </LinearGradient>
-          </Animated.View>
-        ))}
-        <LiveGiftOverlay
-          ref={giftOverlayB}
-          liveId={battle?.live_b_id ?? ''}
-          incomingNotifs={giftNotifsB}
-          onNotifShown={onGiftShownB}
-        />
-      </View>
-
-      {/* Divider + score bar centrale */}
-      <View style={styles.centerBar} pointerEvents="none">
-        <View style={styles.scoreBarTrack}>
-          <View style={[styles.scoreBarFillA, { width: `${pctA}%` }]} />
+      {/* Zone video — les deux hosts cote a cote horizontalement, 75% de l'ecran */}
+      <View style={styles.videoZone}>
+        <View style={styles.videoHalf}>
+          {trackA
+            ? <VideoTrack trackRef={trackA} style={StyleSheet.absoluteFill} objectFit="cover" />
+            : <View style={[StyleSheet.absoluteFill, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
+          {giftTicker.filter(t => t.side === 'a').map(t => (
+            <Animated.View key={t.id} entering={FadeIn.duration(250)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
+              <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Text style={styles.giftTickEmoji}>{t.emoji}</Text>
+                <Text style={styles.giftTickText} numberOfLines={1}>
+                  <Text style={styles.giftTickSender}>{t.senderName} </Text>· {t.GoGold}🪙
+                </Text>
+              </LinearGradient>
+            </Animated.View>
+          ))}
+          <LiveGiftOverlay
+            ref={giftOverlayA}
+            liveId={battle?.live_a_id ?? ''}
+            incomingNotifs={giftNotifsA}
+            onNotifShown={onGiftShownA}
+          />
         </View>
-        <View style={styles.countdownWrap}>
-          <Text style={styles.countdownText}>{formatCountdown(remaining)}</Text>
+        <View style={styles.videoDivider} />
+        <View style={styles.videoHalf}>
+          {trackB
+            ? <VideoTrack trackRef={trackB} style={StyleSheet.absoluteFill} objectFit="cover" />
+            : <View style={[StyleSheet.absoluteFill, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
+          {giftTicker.filter(t => t.side === 'b').map(t => (
+            <Animated.View key={t.id} entering={FadeIn.duration(250)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
+              <LinearGradient colors={['#F0365A', '#9B1C3F']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Text style={styles.giftTickEmoji}>{t.emoji}</Text>
+                <Text style={styles.giftTickText} numberOfLines={1}>
+                  <Text style={styles.giftTickSender}>{t.senderName} </Text>· {t.GoGold}🪙
+                </Text>
+              </LinearGradient>
+            </Animated.View>
+          ))}
+          <LiveGiftOverlay
+            ref={giftOverlayB}
+            liveId={battle?.live_b_id ?? ''}
+            incomingNotifs={giftNotifsB}
+            onNotifShown={onGiftShownB}
+          />
         </View>
-        <View style={styles.scoresRow}>
-          <Text style={styles.scoreText}>{scoreA}</Text>
-          <Icon name="zap" size={16} color="#FFD700" />
-          <Text style={styles.scoreText}>{scoreB}</Text>
-        </View>
-      </View>
 
-      {/* Bandeau effets/annonces IA */}
-      {effectBanner && (
-        <Animated.View entering={FadeIn.duration(250)} exiting={FadeOut.duration(400)} style={styles.effectBanner} pointerEvents="none">
-          <Text style={styles.effectIcon}>{weatherIcon(effectBanner.weather)}</Text>
-          <Text style={styles.effectText} numberOfLines={2}>{effectBanner.message}</Text>
-        </Animated.View>
-      )}
-
-      {/* Objectif communautaire / boss */}
-      {goal && goal.status === 'active' && (
-        <View style={[styles.goalBanner, goal.mode === 'boss' && styles.goalBannerBoss]}>
-          <Text style={styles.goalTitle}>{goal.mode === 'boss' ? '🐉 ' : '🎯 '}{goal.title}</Text>
-          <View style={styles.goalBarTrack}>
-            <View style={[styles.goalBarFill, { width: `${goal.progress_pct}%` }]} />
+        {/* Score bar + countdown centraux, superposes sur la zone video */}
+        <View style={styles.centerBar} pointerEvents="none">
+          <View style={styles.scoreBarTrack}>
+            <View style={[styles.scoreBarFillA, { width: `${pctA}%` }]} />
           </View>
-          <Text style={styles.goalPct}>{Math.round(goal.progress_pct)}%</Text>
+          <View style={styles.countdownWrap}>
+            <Text style={styles.countdownText}>{formatCountdown(remaining)}</Text>
+          </View>
+          <View style={styles.scoresRow}>
+            <Text style={styles.scoreText}>{scoreA}</Text>
+            <Icon name="zap" size={16} color="#FFD700" />
+            <Text style={styles.scoreText}>{scoreB}</Text>
+          </View>
         </View>
-      )}
 
-      {/* Top supporter en badge permanent */}
-      {topDonor && (
-        <TouchableOpacity style={styles.topDonorBadge} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
-          {topDonor.avatar_url
-            ? <Image source={{ uri: topDonor.avatar_url }} style={styles.topDonorAvatar} />
-            : <View style={[styles.topDonorAvatar, styles.topDonorAvatarFallback]}><Icon name="user" size={10} color="#fff" /></View>}
-          <Text style={styles.topDonorLabel} numberOfLines={1}>👑 {topDonor.display_name ?? 'Supporter'}</Text>
-        </TouchableOpacity>
-      )}
+        {/* Bandeau effets/annonces IA */}
+        {effectBanner && (
+          <Animated.View entering={FadeIn.duration(250)} exiting={FadeOut.duration(400)} style={styles.effectBanner} pointerEvents="none">
+            <Text style={styles.effectIcon}>{weatherIcon(effectBanner.weather)}</Text>
+            <Text style={styles.effectText} numberOfLines={2}>{effectBanner.message}</Text>
+          </Animated.View>
+        )}
 
-      {/* Reactions flottantes */}
-      {floaters.map(f => (
-        <Animated.Text
-          key={f.id}
-          entering={FadeIn.duration(150)}
-          exiting={FadeOut.duration(400)}
-          style={[styles.floater, f.side === 'a' ? styles.floaterA : styles.floaterB]}
-        >
-          ❤️
-        </Animated.Text>
-      ))}
+        {/* Objectif communautaire / boss */}
+        {goal && goal.status === 'active' && (
+          <View style={[styles.goalBanner, goal.mode === 'boss' && styles.goalBannerBoss]}>
+            <Text style={styles.goalTitle}>{goal.mode === 'boss' ? '🐉 ' : '🎯 '}{goal.title}</Text>
+            <View style={styles.goalBarTrack}>
+              <View style={[styles.goalBarFill, { width: `${goal.progress_pct}%` }]} />
+            </View>
+            <Text style={styles.goalPct}>{Math.round(goal.progress_pct)}%</Text>
+          </View>
+        )}
 
-      {/* Boutons de soutien */}
-      <View style={styles.reactRow}>
-        <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
-          <Icon name="heart" size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.reactBtn, styles.reactBtnB]} onPress={() => onReact('b')} activeOpacity={0.8}>
-          <Icon name="heart" size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
-          <Icon name="award" size={18} color="#FFD700" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
-          <Icon name={showChat ? 'message-circle' : 'message-square'} size={18} color="#fff" />
+        {/* Top supporter en badge permanent */}
+        {topDonor && (
+          <TouchableOpacity style={styles.topDonorBadge} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
+            {topDonor.avatar_url
+              ? <Image source={{ uri: topDonor.avatar_url }} style={styles.topDonorAvatar} />
+              : <View style={[styles.topDonorAvatar, styles.topDonorAvatarFallback]}><Icon name="user" size={10} color="#fff" /></View>}
+            <Text style={styles.topDonorLabel} numberOfLines={1}>👑 {topDonor.display_name ?? 'Supporter'}</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Reactions flottantes */}
+        {floaters.map(f => (
+          <Animated.Text
+            key={f.id}
+            entering={FadeIn.duration(150)}
+            exiting={FadeOut.duration(400)}
+            style={[styles.floater, f.side === 'a' ? styles.floaterA : styles.floaterB]}
+          >
+            ❤️
+          </Animated.Text>
+        ))}
+
+        {/* Fermer / quitter */}
+        <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8} disabled={leaving}>
+          {leaving ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="x" size={20} color="#fff" />}
         </TouchableOpacity>
       </View>
 
-      {/* Fermer / quitter */}
-      <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8} disabled={leaving}>
-        {leaving ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="x" size={20} color="#fff" />}
-      </TouchableOpacity>
-
-      {/* Chat fusionne (A + B) */}
-      {showChat && !ended && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.chatWrap}
-          pointerEvents="box-none"
-        >
+      {/* Zone basse — 25% de l'ecran : chat fusionne + boutons de soutien */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.bottomZone}
+      >
+        {showChat && !ended && (
           <FlatList
             ref={chatRef}
             data={messages}
@@ -577,6 +584,9 @@ const BattleContent: React.FC<{
               </View>
             )}
           />
+        )}
+
+        <View style={styles.bottomControlsRow}>
           <View style={styles.chatInputRow}>
             <TextInput
               value={chatInput}
@@ -591,8 +601,37 @@ const BattleContent: React.FC<{
               <Icon name="send" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      )}
+
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
+              <Icon name="heart" size={16} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reactBtn, styles.reactBtnA]}
+              onPress={() => battle && giftOverlayA.current?.openGift(battle.host_a_id, hostNameA)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.giftBtnEmoji}>🎁</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.reactBtn, styles.reactBtnB]} onPress={() => onReact('b')} activeOpacity={0.8}>
+              <Icon name="heart" size={16} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reactBtn, styles.reactBtnB]}
+              onPress={() => battle && giftOverlayB.current?.openGift(battle.host_b_id, hostNameB)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.giftBtnEmoji}>🎁</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
+              <Icon name="award" size={16} color="#FFD700" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
+              <Icon name={showChat ? 'message-circle' : 'message-square'} size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
 
       {/* Panneau classement supporters */}
       {showRanking && (
@@ -653,13 +692,25 @@ const BattleContent: React.FC<{
   );
 };
 
+const VIDEO_ZONE_H = SCREEN_H * 0.75;
+const BOTTOM_ZONE_H = SCREEN_H * 0.25;
+
 const styles = StyleSheet.create({
   root:  { flex: 1, backgroundColor: '#000' },
   center: { alignItems: 'center', justifyContent: 'center' },
-  half:  { width: '100%', height: SCREEN_H / 2, backgroundColor: '#111' },
+
+  // Zone video — 75% de l'ecran, les deux hosts cote a cote horizontalement
+  videoZone: { width: '100%', height: VIDEO_ZONE_H, flexDirection: 'row', backgroundColor: '#111' },
+  videoHalf: { flex: 1, backgroundColor: '#111' },
+  videoDivider: { width: 2, backgroundColor: '#000' },
   noVideo: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
 
-  centerBar: { position: 'absolute', top: SCREEN_H / 2 - 34, left: 0, right: 0, alignItems: 'center', gap: 4 },
+  // Zone basse — 25% de l'ecran, fixe : chat + controles
+  bottomZone: { width: '100%', height: BOTTOM_ZONE_H, backgroundColor: '#0B0812', paddingTop: 6 },
+  bottomControlsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 10, paddingBottom: 10, paddingTop: 4 },
+  actionsRow: { flexDirection: 'row', gap: 8 },
+
+  centerBar: { position: 'absolute', top: VIDEO_ZONE_H / 2 - 34, left: 0, right: 0, alignItems: 'center', gap: 4 },
   scoreBarTrack: { width: '86%', height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden', flexDirection: 'row' },
   scoreBarFillA: { height: '100%', backgroundColor: '#7B3FF2' },
   countdownWrap: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4, marginTop: 6 },
@@ -684,38 +735,35 @@ const styles = StyleSheet.create({
   goalPct: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600', alignSelf: 'flex-end' },
 
   topDonorBadge: {
-    position: 'absolute', top: SCREEN_H / 2 - 68, left: 16,
+    position: 'absolute', top: VIDEO_ZONE_H / 2 - 68, left: 16,
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 16, paddingHorizontal: 8, paddingVertical: 4,
-    maxWidth: 150,
+    maxWidth: 150, zIndex: 20,
   },
   topDonorAvatar: { width: 18, height: 18, borderRadius: 9 },
   topDonorAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   topDonorLabel: { color: '#FFD700', fontSize: 10, fontWeight: '700', flexShrink: 1 },
 
-  floater: { position: 'absolute', fontSize: 24, bottom: 190 },
-  floaterA: { right: 44 },
-  floaterB: { right: 100 },
+  floater: { position: 'absolute', fontSize: 24, bottom: 20 },
+  floaterA: { left: '25%' },
+  floaterB: { left: '75%' },
 
   // Cadeaux compacts par cote (retrecis pour tenir dans le split-screen)
-  giftTick: { position: 'absolute', left: 8, maxWidth: SCREEN_W * 0.55, zIndex: 30 },
-  giftTickA: { bottom: 6 },
-  giftTickB: { bottom: 6 },
-  giftTickGrad: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 14, paddingHorizontal: 8, paddingVertical: 4 },
+  giftTick: { position: 'absolute', bottom: 6, left: 6, right: 6, zIndex: 30 },
+  giftTickGrad: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 14, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
   giftTickEmoji: { fontSize: 13 },
   giftTickText: { color: '#fff', fontSize: 10, flexShrink: 1 },
   giftTickSender: { fontWeight: '800' },
 
-  reactRow: { position: 'absolute', right: 10, bottom: 46, gap: 10 },
-  reactBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  reactBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
   reactBtnA: { backgroundColor: '#7B3FF2CC' },
   reactBtnB: { backgroundColor: '#F0365ACC' },
+  giftBtnEmoji: { fontSize: 16 },
 
   closeBtn: { position: 'absolute', top: 50, left: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 40 },
 
   // Chat fusionne
-  chatWrap: { position: 'absolute', left: 8, right: 60, bottom: 4, maxHeight: SCREEN_H * 0.24 },
-  chatList: { maxHeight: SCREEN_H * 0.18 },
+  chatList: { flex: 1 },
   chatRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 2, paddingHorizontal: 4 },
   chatSideDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
   chatSideDotA: { backgroundColor: '#7B3FF2' },
@@ -724,7 +772,7 @@ const styles = StyleSheet.create({
   chatUser: { fontWeight: '800' },
   chatUserA: { color: '#C4B5FD' },
   chatUserB: { color: '#FCA5C5' },
-  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, paddingHorizontal: 4 },
+  chatInputRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   chatInput: { flex: 1, color: '#fff', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
   chatSendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
 
