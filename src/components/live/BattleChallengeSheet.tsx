@@ -2,9 +2,9 @@
  * BattleChallengeSheet — bottom sheet ouvert depuis LiveMoreMenu (host uniquement) pour
  * choisir un autre créateur actuellement en direct et lui envoyer une invitation de battle.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Modal, Image, ActivityIndicator, FlatList,
+  View, Text, StyleSheet, TouchableOpacity, Modal, Image, ActivityIndicator, FlatList, TextInput,
 } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
@@ -22,16 +22,24 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
   const [creators, setCreators]   = useState<EligibleCreator[]>([]);
   const [inviting, setInviting]   = useState<string | null>(null);
   const [sentTo, setSentTo]       = useState<string | null>(null);
+  const [search, setSearch]       = useState('');
 
   useEffect(() => {
     if (!visible) return;
     setLoading(true);
     setSentTo(null);
+    setSearch('');
     battleService.listEligible(liveId)
       .then(setCreators)
       .catch(() => setCreators([]))
       .finally(() => setLoading(false));
   }, [visible, liveId]);
+
+  const filteredCreators = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return creators;
+    return creators.filter(c => (c.host_name ?? '').toLowerCase().includes(q));
+  }, [creators, search]);
 
   const handleInvite = async (creator: EligibleCreator) => {
     if (inviting) return;
@@ -58,6 +66,26 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
               </View>
               <Text style={s.sub}>Choisis un créateur actuellement en direct pour lui envoyer une invitation de battle.</Text>
 
+              {!loading && creators.length > 0 && (
+                <View style={s.searchWrap}>
+                  <Icon name="search" size={16} color="rgba(255,255,255,0.4)" />
+                  <TextInput
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder="Rechercher un créateur…"
+                    placeholderTextColor="rgba(255,255,255,0.4)"
+                    style={s.searchInput}
+                    autoCorrect={false}
+                    returnKeyType="search"
+                  />
+                  {search.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+                      <Icon name="x" size={16} color="rgba(255,255,255,0.5)" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
               {loading ? (
                 <ActivityIndicator color="#7B3FF2" style={{ marginVertical: 24 }} />
               ) : creators.length === 0 ? (
@@ -65,9 +93,14 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
                   <Icon name="video-off" size={28} color="rgba(255,255,255,0.3)" />
                   <Text style={s.emptyText}>Aucun autre créateur en direct pour le moment.</Text>
                 </View>
+              ) : filteredCreators.length === 0 ? (
+                <View style={s.emptyWrap}>
+                  <Icon name="search" size={28} color="rgba(255,255,255,0.3)" />
+                  <Text style={s.emptyText}>Aucun créateur ne correspond à « {search} ».</Text>
+                </View>
               ) : (
                 <FlatList
-                  data={creators}
+                  data={filteredCreators}
                   keyExtractor={c => c.live_id}
                   style={{ maxHeight: 360 }}
                   renderItem={({ item }) => {
@@ -125,6 +158,12 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   title: { color: '#fff', fontSize: 16, fontWeight: '800' },
   sub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 18, marginBottom: 12 },
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14,
+    paddingHorizontal: 12, paddingVertical: 9, marginBottom: 12,
+  },
+  searchInput: { flex: 1, color: '#fff', fontSize: 14, padding: 0 },
   emptyWrap: { alignItems: 'center', gap: 8, paddingVertical: 28 },
   emptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
