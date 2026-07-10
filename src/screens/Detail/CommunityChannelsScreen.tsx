@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
-import { BackButton, BoostPrompt, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, ChannelType } from '../../services/communityService';
 
@@ -63,7 +63,6 @@ export const CommunityChannelsScreen: React.FC = () => {
 
   // Modal création/édition
   const [createOpen,  setCreateOpen]  = useState(false);
-  const [boostVisible, setBoostVisible] = useState(false);
   const [editChannel, setEditChannel] = useState<CommunityChannel | null>(null);
   const [saving,      setSaving]      = useState(false);
 
@@ -158,7 +157,6 @@ export const CommunityChannelsScreen: React.FC = () => {
         if (formPassword.trim()) payload.password = formPassword.trim();
         const created = await communityService.createChannel(communityId, payload);
         setChannels(prev => [...prev, created]);
-        setBoostVisible(true);
       }
       setCreateOpen(false);
     } catch { Alert.alert('Erreur', editChannel ? 'Impossible de modifier le canal.' : 'Impossible de créer le canal.'); }
@@ -579,12 +577,6 @@ export const CommunityChannelsScreen: React.FC = () => {
         </View>
       </Modal>
 
-      <BoostPrompt
-        visible={boostVisible}
-        contentType="post"
-        onBoost={() => { setBoostVisible(false); nav.navigate('CreateAd', { ad: null }); }}
-        onDismiss={() => setBoostVisible(false)}
-      />
     </View>
   );
 };

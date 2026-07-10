@@ -1088,17 +1088,37 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
         const feedLimit  = onWifi ? 30 : 15;
         const reelsLimit = onWifi ? 20 : 10;
         const postsLimit = onWifi ? 20 : 10;
-        const [feedResult, reelsResult, postsPage, commResult, liveConcerts, spontLivesResult] = await Promise.all([
+
+        // Chargement progressif : les posts (contenu principal, requête la plus rapide et la
+        // plus utile) sont attendus seuls en premier — dès qu'ils répondent, on affiche l'écran
+        // (setLoading(false) + items partiels) au lieu d'attendre les 5 autres endpoints
+        // (reels, events/concerts, communautés, lives) via un seul Promise.all bloquant. Si un
+        // de ces 5 tombe sur un cold start ou une requête lente, l'utilisateur voit déjà son
+        // feed au lieu de fixer un skeleton. Les 5 autres sont lancés juste après en arrière-
+        // plan et fusionnés silencieusement dès qu'ils sont prêts (voir plus bas).
+        const postsPage = await postService.getFeed(postsLimit, false, null)
+          .catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null }));
+        const postsResult = postsPage.items;
+        postCursorRef.current = postsPage.next_cursor;
+        postsHasMoreRef.current = postsPage.has_more;
+
+        if (!silent) {
+          const earlyPostItems: FeedItem[] = postsResult
+            .filter((p: Post) => p.id)
+            .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
+          if (earlyPostItems.length > 0) {
+            setItems(earlyPostItems);
+            setLoading(false);
+          }
+        }
+
+        const [feedResult, reelsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
           searchService.getFeed(1, feedLimit).catch(() => ({ items: [] })),
           reelService.getFeed({ limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: 1 })),
-          postService.getFeed(postsLimit, false, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null })),
           communityService.list(1, 8).catch(() => []),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
         ]);
-        const postsResult = postsPage.items;
-        postCursorRef.current = postsPage.next_cursor;
-        postsHasMoreRef.current = postsPage.has_more;
         setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
         setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
         const commData: CommunityData[] = Array.isArray(commResult)

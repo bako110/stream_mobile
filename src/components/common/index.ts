@@ -50,7 +50,6 @@ export { InlineVideoPlayer }     from './InlineVideoPlayer';
 export { UploadProgressBanner }  from './UploadProgressBanner';
 export { LikersBottomSheet }     from './LikersBottomSheet';
 export { FriendsWhoLiked }       from './FriendsWhoLiked';
-export { BoostPrompt } from './BoostPrompt';
 export { GoFolyXLoader } from './GoFolyXLoader';
 export { CachedImage } from './CachedImage';
 export { HeartRain, RecentLikersAvatars, LikeNamesFeed } from './HeartRain';

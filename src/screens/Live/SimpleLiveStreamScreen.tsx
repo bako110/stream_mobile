@@ -51,7 +51,6 @@ import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
-import { BoostPrompt } from '../../components/common';
 import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
 import { StageTileRow } from '../../components/live/StageTileRow';
 import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
@@ -347,7 +346,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; onBattleStart
   const wsRef       = useRef<WebSocket | null>(null);
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showLaunchBanner, setShowLaunchBanner] = useState(true);
-  const [showBoost,        setShowBoost]        = useState(false);
   const giftRef  = useRef<LiveGiftOverlayRef>(null);
 
   useEffect(() => {
@@ -370,7 +368,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; onBattleStart
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
     const bannerTimer = setTimeout(() => setShowLaunchBanner(false), 4000);
-    const boostTimer  = setTimeout(() => setShowBoost(true), 5500);
 
     // Couper la caméra en background pour éviter le crash Android
     const handleAppState = (next: AppStateStatus) => {
@@ -384,7 +381,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; onBattleStart
 
     return () => {
       clearTimeout(bannerTimer);
-      clearTimeout(boostTimer);
       sub.remove();
       if (timerRef.current) clearInterval(timerRef.current);
       localParticipant.setCameraEnabled(false).catch(() => {});
@@ -1094,13 +1090,6 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; onBattleStart
         liveId={liveId}
         incomingNotifs={giftNotifs}
         onNotifShown={(id) => setGiftNotifs(prev => prev.filter(n => n.id !== id))}
-      />
-
-      <BoostPrompt
-        visible={showBoost}
-        contentType="live"
-        onBoost={() => { setShowBoost(false); nav.navigate('CreateAd', { ad: null }); }}
-        onDismiss={() => setShowBoost(false)}
       />
 
       <LiveSettingsSheet

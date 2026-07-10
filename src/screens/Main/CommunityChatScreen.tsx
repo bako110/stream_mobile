@@ -23,7 +23,7 @@ import Geolocation from '@react-native-community/geolocation';
 import { uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
-import { BoostPrompt, BackButton } from '../../components/common';
+import { BackButton } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
 
@@ -131,7 +131,6 @@ export const CommunityChatScreen: React.FC = () => {
   const [page,           setPage]           = useState(1);
   const [hasMore,        setHasMore]        = useState(true);
   const [editingMsg,     setEditingMsg]     = useState<CommunityMessage | null>(null);
-  const [boostType,      setBoostType]      = useState<'post' | 'event' | 'concert' | 'live' | null>(null);
   const [replyingTo,     setReplyingTo]     = useState<CommunityMessage | null>(null);
   const [menuMsg,        setMenuMsg]        = useState<CommunityMessage | null>(null);
   const [pinnedMsgs,     setPinnedMsgs]     = useState<CommunityMessage[]>([]);
@@ -459,13 +458,11 @@ export const CommunityChatScreen: React.FC = () => {
 
     if (isConnected) {
       sendWsMessage({ type: 'message', content, message_type: msgType, reply_to_id });
-      if (isAnnouncement) setBoostType('post');
     } else {
       try {
         const msg = await communityService.sendMessage(communityId, content, msgType, [], reply_to_id ?? undefined);
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-        if (isAnnouncement) setBoostType('post');
       } catch { setText(content); }
     }
     setSending(false);
@@ -788,7 +785,6 @@ export const CommunityChatScreen: React.FC = () => {
       setMessages(prev => [...prev, res as CommunityMessage]);
       setPollQ(''); setPollOpts(['', '']); setPollMulti(false);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-      setBoostType('post');
     } catch { Alert.alert('Erreur', 'Impossible de créer le sondage'); }
     finally { setSending(false); }
   };
@@ -2566,12 +2562,6 @@ export const CommunityChatScreen: React.FC = () => {
         </View>
       </Modal>
 
-      <BoostPrompt
-        visible={!!boostType}
-        contentType={boostType ?? 'post'}
-        onBoost={() => { setBoostType(null); nav.navigate('CreateAd', { ad: null }); }}
-        onDismiss={() => setBoostType(null)}
-      />
     </View>
   );
 };

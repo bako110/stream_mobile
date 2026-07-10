@@ -371,6 +371,8 @@ export const Endpoints = {
     blockUser:           (userId: string) => `${V1}/lives/block/${userId}`,
     unblockUser:         (userId: string) => `${V1}/lives/block/${userId}`,
     listBlocks:          `${V1}/lives/blocks`,
+    listBans:            `${V1}/lives/bans`,
+    removeBan:           (userId: string) => `${V1}/lives/bans/${userId}`,
     monetization:        (id: string) => `${V1}/lives/${id}/monetization`,
     stageMonetization:   (id: string) => `${V1}/lives/${id}/stage-monetization`,
   },
@@ -403,7 +405,8 @@ export const Endpoints = {
   // ── Battles live entre créateurs ─────────────────────────────────────────
   battles: {
     byId:       (id: string) => `${V1}/battles/${id}`,
-    eligible:   (liveId: string)  => `${V1}/battles/eligible/${liveId}`,
+    eligible:      (liveId: string)  => `${V1}/battles/eligible/${liveId}`,
+    activeForLive: (liveId: string)  => `${V1}/battles/active-for-live/${liveId}`,
     invite:     `${V1}/battles/invite`,
     respond:    (id: string) => `${V1}/battles/${id}/respond`,
     cancel:     (id: string) => `${V1}/battles/${id}/cancel`,

@@ -33,6 +33,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { liveService } from '../../services/liveService';
+import { battleService } from '../../services/battleService';
 import type { LiveStream } from '../../services/liveService';
 import { LiveAccessGate } from '../../components/live/LiveAccessGate';
 import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
@@ -1122,6 +1123,15 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         if (l.status !== 'active') { setEnded(true); setLoading(false); return; }
         setViewerCount(l.current_viewers + 1);
 
+        // Le host de ce live est peut-etre deja en plein battle (rejoint apres le debut
+        // du match, donc apres l'emission de l'evenement WS "battle_started" — sans ce
+        // check, ce viewer resterait bloque sur le live simple sans jamais voir le match).
+        const activeBattle = await battleService.getActiveForLive(liveId).catch(() => null);
+        if (activeBattle && activeBattle.status === 'active') {
+          nav.replace('BattleScreen', { battleId: activeBattle.id, followedHostId: l.user_id });
+          return;
+        }
+
         // Si le live est monétisé, vérifier si l'utilisateur a déjà l'accès
         if (l.is_monetized) {
           try {
@@ -1318,7 +1328,9 @@ export const SimpleLiveViewerScreen: React.FC = () => {
           // replace (pas navigate) : sinon ce live reste monte en dessous avec son propre
           // LiveKitRoom connecte en parallele de celui du battle, ce qui peut empecher les
           // tracks video du battle de s'afficher correctement.
-          nav.replace('BattleScreen', { battleId: d.battle_id });
+          // followedHostId : permet a BattleScreen de couper l'audio du camp adverse pour
+          // ce viewer, qui ne suivait que ce host avant le debut du match.
+          nav.replace('BattleScreen', { battleId: d.battle_id, followedHostId: live?.user_id });
         }
       } catch {}
     };

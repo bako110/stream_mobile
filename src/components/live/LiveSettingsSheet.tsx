@@ -4,10 +4,10 @@
  *  - Acces au live  (is_monetized / monetization_*)  → PATCH /monetization
  *  - Montee scene   (stage_monetized / stage_*)       → PATCH /stage-monetization
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  ScrollView, TextInput, FlatList, ActivityIndicator, Alert,
+  ScrollView, TextInput, FlatList, ActivityIndicator, Alert, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -16,7 +16,7 @@ import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
-import type { LiveStream } from '../../services/liveService';
+import { liveService, type LiveStream, type BannedUser } from '../../services/liveService';
 
 interface HandRequest {
   identity: string;
@@ -233,6 +233,47 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   const { theme } = useTheme();
   const { colors } = theme;
 
+  // ── Utilisateurs bannis ────────────────────────────────────────────────────
+  const [bannedUsers,    setBannedUsers]    = useState<BannedUser[]>([]);
+  const [bansLoading,    setBansLoading]    = useState(false);
+  const [unbanningId,    setUnbanningId]    = useState<string | null>(null);
+
+  const loadBans = useCallback(async () => {
+    setBansLoading(true);
+    try {
+      const list = await liveService.listBans();
+      setBannedUsers(list);
+    } catch {}
+    setBansLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (visible) loadBans();
+  }, [visible, loadBans]);
+
+  const handleUnban = (user: BannedUser) => {
+    Alert.alert(
+      'Débannir cet utilisateur',
+      `${user.display_name ?? user.username ?? 'Cet utilisateur'} pourra à nouveau rejoindre tes lives.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Débannir', style: 'destructive',
+          onPress: async () => {
+            setUnbanningId(user.banned_user_id);
+            try {
+              await liveService.unban(user.banned_user_id);
+              setBannedUsers(prev => prev.filter(u => u.banned_user_id !== user.banned_user_id));
+            } catch {
+              Alert.alert('Erreur', 'Impossible de débannir cet utilisateur.');
+            }
+            setUnbanningId(null);
+          },
+        },
+      ],
+    );
+  };
+
   // ── Monetisation acces au live ─────────────────────────────────────────────
   const saveAccessMonet = async (type: 'gogold' | 'gift', GoGold: number | null, gift: GiftType | null) => {
     const payload: any = {
@@ -399,6 +440,61 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             ))
           )}
 
+          {/* ── Utilisateurs bannis ─────────────────────────────────────────── */}
+          <View style={s.monetSectionHeader}>
+            <View style={[s.monetSectionIcon, { backgroundColor: 'rgba(240,54,90,0.12)' }]}>
+              <Icon name="slash" size={16} color="#F0365A" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.sectionLabelInline, { color: colors.textPrimary }]}>
+                Utilisateurs bannis
+                {bannedUsers.length > 0 && <Text style={{ color: '#F0365A' }}> ({bannedUsers.length})</Text>}
+              </Text>
+              <Text style={[s.sectionSub, { color: colors.textSecondary }]}>Bannis de tes lives</Text>
+            </View>
+          </View>
+
+          {bansLoading ? (
+            <View style={[s.emptyCard, { backgroundColor: colors.backgroundSecondary }]}>
+              <ActivityIndicator color="#F0365A" />
+            </View>
+          ) : bannedUsers.length === 0 ? (
+            <View style={[s.emptyCard, { backgroundColor: colors.backgroundSecondary }]}>
+              <Text style={[s.emptyText, { color: colors.textTertiary }]}>Aucun utilisateur banni</Text>
+            </View>
+          ) : (
+            bannedUsers.map(user => (
+              <View key={user.banned_user_id} style={[s.handCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <View style={s.handLeft}>
+                  {user.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url }} style={s.banAvatar} />
+                  ) : (
+                    <View style={[s.banAvatar, s.banAvatarFallback, { backgroundColor: colors.border }]}>
+                      <Icon name="user" size={16} color={colors.textSecondary} />
+                    </View>
+                  )}
+                  <Text style={[s.handName, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {user.display_name ?? user.username ?? 'Utilisateur'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[s.dismissBtn, { width: undefined, height: 34, paddingHorizontal: 12, borderColor: '#F0365A', flexDirection: 'row', gap: 6 }]}
+                  onPress={() => handleUnban(user)}
+                  disabled={unbanningId === user.banned_user_id}
+                  activeOpacity={0.8}
+                >
+                  {unbanningId === user.banned_user_id
+                    ? <ActivityIndicator color="#F0365A" size="small" />
+                    : <>
+                        <Icon name="unlock" size={14} color="#F0365A" />
+                        <Text style={{ color: '#F0365A', fontSize: 13, fontWeight: '600' }}>Débannir</Text>
+                      </>
+                  }
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+
           {/* ── Monetisation acces au live ─────────────────────────────────── */}
           <View style={s.monetSectionHeader}>
             <View style={[s.monetSectionIcon, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
@@ -494,6 +590,8 @@ const s = StyleSheet.create({
   acceptBtnGrad:{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8 },
   acceptBtnText:{ color: '#fff', fontSize: 13, fontWeight: '700' },
   dismissBtn:   { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  banAvatar:         { width: 32, height: 32, borderRadius: 16 },
+  banAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
 
   monetCard:        { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
   monetActive:      { flexDirection: 'row', alignItems: 'center', gap: 10 },

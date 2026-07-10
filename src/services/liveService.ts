@@ -58,6 +58,14 @@ export interface LivesPage {
   has_more: boolean;
 }
 
+export interface BannedUser {
+  banned_user_id: string;
+  created_at:     string;
+  username?:      string | null;
+  display_name?:  string | null;
+  avatar_url?:    string | null;
+}
+
 async function getLives(): Promise<LiveStream[]> {
   const page = await getLivesPage(1);
   return page.items;
@@ -109,6 +117,15 @@ async function unblockUserFromLives(userId: string): Promise<void> {
   await apiClient.delete(Endpoints.lives.unblockUser(userId));
 }
 
+async function listBans(): Promise<BannedUser[]> {
+  const r = await apiClient.get<BannedUser[]>(Endpoints.lives.listBans);
+  return r.data ?? [];
+}
+
+async function unban(userId: string): Promise<void> {
+  await apiClient.delete(Endpoints.lives.removeBan(userId));
+}
+
 async function stopLive(id: string): Promise<void> {
   await apiClient.post(Endpoints.lives.stop(id));
 }
@@ -150,7 +167,7 @@ async function getLiveCost(): Promise<{ cost_gogold: number; balance: number; su
 
 export const liveService = {
   getLives, getLivesPage, getById, startLive, stopLive, getToken, getStatus, stopAllMine,
-  blockUserFromLives, unblockUserFromLives,
+  blockUserFromLives, unblockUserFromLives, listBans, unban,
   invite, demote, ban, globalBan, getLiveCost,
   sendGiftForAccess, payGoGoldForAccess, checkAccess,
 };

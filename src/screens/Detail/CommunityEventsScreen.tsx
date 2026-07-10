@@ -22,7 +22,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { ExpandableText, BoostPrompt, GoFolyXLoader, BackButton } from '../../components/common';
+import { ExpandableText, GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityEvent } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -528,7 +528,6 @@ export function CommunityEventsScreen({ route }: Props) {
   const [refreshing,    setRefreshing]    = useState(false);
   const [formVisible,   setFormVisible]   = useState(false);
   const [editingEvent,  setEditingEvent]  = useState<CommunityEvent | null>(null);
-  const [boostVisible,  setBoostVisible]  = useState(false);
 
   const headerFade = useRef(new Animated.Value(0)).current;
 
@@ -581,7 +580,6 @@ export function CommunityEventsScreen({ route }: Props) {
     } else {
       const created = await communityService.createEvent(communityId, data);
       setEvents(evs => [created, ...evs]);
-      setBoostVisible(true);
     }
     setEditingEvent(null);
   };
@@ -792,13 +790,6 @@ export function CommunityEventsScreen({ route }: Props) {
         insets={insets}
       />
 
-      {/* Boost après création */}
-      <BoostPrompt
-        visible={boostVisible}
-        contentType="event"
-        onBoost={() => { setBoostVisible(false); navigation.navigate('CreateAd', { ad: null }); }}
-        onDismiss={() => setBoostVisible(false)}
-      />
     </View>
   );
 }

@@ -76,6 +76,11 @@ async function listEligible(liveId: string): Promise<EligibleCreator[]> {
   return r.data ?? [];
 }
 
+async function getActiveForLive(liveId: string): Promise<Battle | null> {
+  const r = await apiClient.get<Battle | null>(Endpoints.battles.activeForLive(liveId));
+  return r.data ?? null;
+}
+
 async function invite(liveAId: string, liveBId: string): Promise<Battle> {
   const r = await apiClient.post<Battle>(Endpoints.battles.invite, {
     live_a_id: liveAId, live_b_id: liveBId,
@@ -128,6 +133,7 @@ async function getActiveGoal(battleId: string): Promise<BattleGoal | null> {
 export const battleService = {
   get,
   listEligible,
+  getActiveForLive,
   invite,
   respond,
   cancel,

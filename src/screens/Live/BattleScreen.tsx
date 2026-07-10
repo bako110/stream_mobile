@@ -18,9 +18,9 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring, withSequence, Easing,
 } from 'react-native-reanimated';
 import {
-  LiveKitRoom, useTracks, useLocalParticipant, VideoTrack,
+  LiveKitRoom, useTracks, useLocalParticipant, useConnectionState, VideoTrack,
 } from '@livekit/react-native';
-import { Track } from 'livekit-client';
+import { Track, VideoPresets, ConnectionState, RemoteTrackPublication } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -37,11 +37,28 @@ import { storage } from '../../utils/storage';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { clearLiveEnteringBattle } from '../../utils/battleTransitionFlags';
+import { useKeepAwake } from '../../hooks/useKeepAwake';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
+// ── LiveKit quality config ─────────────────────────────────────────────────────
+// Chaque host publie et souscrit symetriquement dans la meme room de battle —
+// sans ces options explicites, la publication/souscription video peut echouer
+// silencieusement a la connexion initiale et ne se retablir qu'a une reconnexion.
+const BATTLE_ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: true,
+  publishDefaults: {
+    videoCodec: 'h264' as const,
+    simulcast: true,
+    videoSimulcastLayers: [VideoPresets.h720],
+    videoEncoding: { maxBitrate: 4_000_000, maxFramerate: 30 },
+  },
+};
+
 interface RouteParams {
   battleId: string;
+  followedHostId?: string;
 }
 
 interface ChatMsg {
@@ -64,6 +81,32 @@ interface EffectBanner {
   id: string;
   message: string;
   weather: string;
+}
+
+// Cœur de soutien — monte du bas vers le haut avec un léger drift horizontal et un
+// fondu progressif, façon TikTok Live Battle (purement visuel, sans impact sur le score).
+const HEART_RISE_DURATION = 1800;
+const HEART_RISE_DISTANCE = 160;
+
+function RisingHeart({ drift }: { drift: number }) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: HEART_RISE_DURATION, easing: Easing.out(Easing.quad) });
+  }, []); // eslint-disable-line
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: progress.value * -HEART_RISE_DISTANCE },
+      { translateX: progress.value * drift },
+      { scale: 0.7 + progress.value * 0.5 },
+    ],
+    opacity: progress.value < 0.1 ? progress.value / 0.1 : progress.value > 0.7 ? (1 - progress.value) / 0.3 : 1,
+  }));
+
+  return (
+    <Animated.Text style={[styles.floater, style]}>❤️</Animated.Text>
+  );
 }
 
 function formatCountdown(sec: number): string {
@@ -171,9 +214,10 @@ function useRoomSocket(
 export const BattleScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const route = useRoute();
-  const { battleId } = route.params as RouteParams;
+  const { battleId, followedHostId } = route.params as RouteParams;
   const { currentUser } = useUser();
   const { addListener, removeListener } = useWs();
+  useKeepAwake();
 
   const [battle, setBattle]   = useState<Battle | null>(null);
   const [token, setToken]     = useState<string | null>(null);
@@ -182,7 +226,7 @@ export const BattleScreen: React.FC = () => {
   const [remaining, setRemaining] = useState(0);
   const [goal, setGoal]       = useState<BattleGoal | null>(null);
   const [ranking, setRanking] = useState<BattleRanking | null>(null);
-  const [floaters, setFloaters] = useState<{ id: string; side: 'a' | 'b' }[]>([]);
+  const [floaters, setFloaters] = useState<{ id: string; side: 'a' | 'b'; drift: number }[]>([]);
   const [ended, setEnded]     = useState<{ winner_id: string | null; score_a: number; score_b: number } | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [showChat, setShowChat] = useState(true);
@@ -208,6 +252,14 @@ export const BattleScreen: React.FC = () => {
   const myHostSide: 'a' | 'b' | null = !battle || !currentUser
     ? null
     : currentUser.id === battle.host_a_id ? 'a' : currentUser.id === battle.host_b_id ? 'b' : null;
+
+  // Cote suivi par un viewer (pas un host) avant l'entree en battle — sert a couper
+  // l'audio du camp adverse pour lui. Un host, lui, doit toujours entendre les deux cotes.
+  const followedSide: 'a' | 'b' | null = myHostSide
+    ? null
+    : !battle || !followedHostId
+      ? null
+      : followedHostId === battle.host_a_id ? 'a' : followedHostId === battle.host_b_id ? 'b' : null;
 
   useEffect(() => {
     let mounted = true;
@@ -305,8 +357,9 @@ export const BattleScreen: React.FC = () => {
   useRoomSocket('battle', battleId, useCallback((d: any) => {
     if (d.type === 'battle_reaction') {
       const id = `${Date.now()}-${Math.random()}`;
-      setFloaters(prev => [...prev, { id, side: d.side }]);
-      setTimeout(() => setFloaters(prev => prev.filter(f => f.id !== id)), 1800);
+      const drift = (Math.random() - 0.5) * 40;
+      setFloaters(prev => [...prev, { id, side: d.side, drift }]);
+      setTimeout(() => setFloaters(prev => prev.filter(f => f.id !== id)), HEART_RISE_DURATION);
     }
     if (d.type === 'battle_score_update') {
       setBattle(prev => prev ? { ...prev, score_a: d.score_a, score_b: d.score_b } : prev);
@@ -418,7 +471,7 @@ export const BattleScreen: React.FC = () => {
   }
 
   return (
-    <LiveKitRoom serverUrl={wsUrl} token={token} connect>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={BATTLE_ROOM_OPTIONS}>
       <BattleContent
         battle={battle}
         remaining={remaining}
@@ -429,6 +482,7 @@ export const BattleScreen: React.FC = () => {
         leaving={leaving}
         myId={currentUser?.id ?? null}
         myHostSide={myHostSide}
+        followedSide={followedSide}
         hostNameA={hostNameA}
         hostNameB={hostNameB}
         hostAvatarA={hostAvatarA}
@@ -462,11 +516,12 @@ const BattleContent: React.FC<{
   remaining: number;
   goal: BattleGoal | null;
   ranking: BattleRanking | null;
-  floaters: { id: string; side: 'a' | 'b' }[];
+  floaters: { id: string; side: 'a' | 'b'; drift: number }[];
   ended: { winner_id: string | null; score_a: number; score_b: number } | null;
   leaving: boolean;
   myId: string | null;
   myHostSide: 'a' | 'b' | null;
+  followedSide: 'a' | 'b' | null;
   hostNameA: string;
   hostNameB: string;
   hostAvatarA: string | null;
@@ -491,7 +546,7 @@ const BattleContent: React.FC<{
   onSendChat: () => void;
   onClose: () => void;
 }> = ({
-  battle, remaining, goal, ranking, floaters, ended, leaving, myId, myHostSide,
+  battle, remaining, goal, ranking, floaters, ended, leaving, myId, myHostSide, followedSide,
   hostNameA, hostNameB, hostAvatarA, hostAvatarB,
   showChat, showRanking, setShowChat, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
@@ -499,20 +554,36 @@ const BattleContent: React.FC<{
   effectBanner, onReact, onSendChat, onClose,
 }) => {
   const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  const allAudioTracks = useTracks([Track.Source.Microphone], { onlySubscribed: false });
   const { localParticipant } = useLocalParticipant();
+  const connectionState = useConnectionState();
+
+  // Viewer qui ne suit qu'un camp : coupe l'audio de l'adversaire cote reception, sans
+  // toucher a la publication (les hosts, eux, doivent toujours s'entendre l'un l'autre).
+  useEffect(() => {
+    if (!battle || !followedSide) return;
+    const mutedHostId = followedSide === 'a' ? battle.host_b_id : battle.host_a_id;
+    const pub = allAudioTracks.find(t => t.participant.identity === mutedHostId)?.publication;
+    if (!(pub instanceof RemoteTrackPublication)) return;
+    pub.setEnabled(false);
+    return () => pub.setEnabled(true);
+  }, [battle, followedSide, allAudioTracks]);
 
   // Seul un host publie sa camera/micro dans la room de battle — un viewer ne detient
   // qu'un token subscriber, setCameraEnabled echouerait silencieusement de toute facon,
   // mais on evite explicitement de lui demander la permission camera pour rien.
+  // On attend l'etat Connected (pas juste le montage du composant) car la publication
+  // demandee avant la fin de la negociation WebRTC echoue silencieusement (.catch avale
+  // l'erreur) et ne se rattrapait jamais tant que l'ecran n'etait pas remonte (hot-reload).
   useEffect(() => {
-    if (!myHostSide) return;
+    if (!myHostSide || connectionState !== ConnectionState.Connected) return;
     localParticipant.setCameraEnabled(true).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     return () => {
       localParticipant.setCameraEnabled(false).catch(() => {});
       localParticipant.setMicrophoneEnabled(false).catch(() => {});
     };
-  }, [myHostSide, localParticipant]);
+  }, [myHostSide, localParticipant, connectionState]);
 
   const trackA = battle ? allTracks.find(t => t.participant.identity === battle.host_a_id) : null;
   const trackB = battle ? allTracks.find(t => t.participant.identity === battle.host_b_id) : null;
@@ -681,16 +752,12 @@ const BattleContent: React.FC<{
           />
         </Animated.View>
 
-        {/* Reactions flottantes — defilent verticalement au-dessus des cartes video */}
+        {/* Reactions flottantes — montent du bas vers le haut a cote de chaque camp,
+            purement visuelles (ne comptent pas dans le score, seuls les cadeaux comptent) */}
         {floaters.map(f => (
-          <Animated.Text
-            key={f.id}
-            entering={BounceIn.duration(400)}
-            exiting={FadeOut.duration(500)}
-            style={[styles.floater, f.side === 'a' ? styles.floaterA : styles.floaterB]}
-          >
-            ❤️
-          </Animated.Text>
+          <View key={f.id} style={f.side === 'a' ? styles.floaterAnchorA : styles.floaterAnchorB} pointerEvents="none">
+            <RisingHeart drift={f.drift} />
+          </View>
         ))}
       </View>
 
@@ -984,9 +1051,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
   },
 
-  floater: { position: 'absolute', fontSize: 20, bottom: '10%' },
-  floaterA: { left: '25%' },
-  floaterB: { left: '75%' },
+  floaterAnchorA: { position: 'absolute', bottom: '10%', left: '25%' },
+  floaterAnchorB: { position: 'absolute', bottom: '10%', left: '75%' },
+  floater: { fontSize: 20 },
 
   // Cadeaux compacts par cote (retrecis pour tenir dans le split-screen)
   giftTick: { position: 'absolute', bottom: 4, left: 4, right: 4, zIndex: 30 },
