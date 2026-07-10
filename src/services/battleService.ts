@@ -66,6 +66,11 @@ export interface BattleGoal {
   ended_at:         string | null;
 }
 
+async function get(battleId: string): Promise<Battle> {
+  const r = await apiClient.get<Battle>(Endpoints.battles.byId(battleId));
+  return r.data;
+}
+
 async function listEligible(liveId: string): Promise<EligibleCreator[]> {
   const r = await apiClient.get<EligibleCreator[]>(Endpoints.battles.eligible(liveId));
   return r.data ?? [];
@@ -121,6 +126,7 @@ async function getActiveGoal(battleId: string): Promise<BattleGoal | null> {
 }
 
 export const battleService = {
+  get,
   listEligible,
   invite,
   respond,

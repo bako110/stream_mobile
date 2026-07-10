@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import {
-  LiveKitRoom, useTracks, VideoTrack,
+  LiveKitRoom, useTracks, useLocalParticipant, VideoTrack,
 } from '@livekit/react-native';
 import { Track } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
@@ -152,8 +152,22 @@ export const BattleScreen: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        const t = await battleService.getToken(battleId);
+        // Recupere l'etat courant du battle des l'ouverture — sans ca, live_a_id/
+        // live_b_id/host_a_id/host_b_id restent vides tant qu'aucun evenement WS
+        // "battle_started" n'a ete recu APRES le montage de l'ecran, ce qui bloque
+        // tout affichage video si l'ecran est ouvert apres coup (relance app, retour
+        // en arriere, viewer qui rejoint en cours de match).
+        const [b, t] = await Promise.all([
+          battleService.get(battleId),
+          battleService.getToken(battleId),
+        ]);
         if (!mounted) return;
+        setBattle(b);
+        if (b.status === 'active') {
+          setRemaining(Math.max(0, b.duration_seconds - Math.floor((Date.now() - new Date(b.started_at ?? Date.now()).getTime()) / 1000)));
+        } else if (b.status === 'ended') {
+          setEnded({ winner_id: b.winner_id, score_a: b.score_a, score_b: b.score_b });
+        }
         setToken(t.token);
         setWsUrl(t.ws_url);
         const activeGoal = await battleService.getActiveGoal(battleId).catch(() => null);
@@ -328,6 +342,7 @@ export const BattleScreen: React.FC = () => {
         ended={ended}
         leaving={leaving}
         myId={currentUser?.id ?? null}
+        myHostSide={myHostSide}
         showChat={showChat}
         showRanking={showRanking}
         setShowChat={setShowChat}
@@ -361,6 +376,7 @@ const BattleContent: React.FC<{
   ended: { winner_id: string | null; score_a: number; score_b: number } | null;
   leaving: boolean;
   myId: string | null;
+  myHostSide: 'a' | 'b' | null;
   showChat: boolean;
   showRanking: boolean;
   setShowChat: (v: boolean) => void;
@@ -381,13 +397,27 @@ const BattleContent: React.FC<{
   onSendChat: () => void;
   onClose: () => void;
 }> = ({
-  battle, remaining, goal, ranking, floaters, ended, leaving, myId,
+  battle, remaining, goal, ranking, floaters, ended, leaving, myId, myHostSide,
   showChat, showRanking, setShowChat, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
   giftTicker, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
   effectBanner, onReact, onSendChat, onClose,
 }) => {
   const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  const { localParticipant } = useLocalParticipant();
+
+  // Seul un host publie sa camera/micro dans la room de battle — un viewer ne detient
+  // qu'un token subscriber, setCameraEnabled echouerait silencieusement de toute facon,
+  // mais on evite explicitement de lui demander la permission camera pour rien.
+  useEffect(() => {
+    if (!myHostSide) return;
+    localParticipant.setCameraEnabled(true).catch(() => {});
+    localParticipant.setMicrophoneEnabled(true).catch(() => {});
+    return () => {
+      localParticipant.setCameraEnabled(false).catch(() => {});
+      localParticipant.setMicrophoneEnabled(false).catch(() => {});
+    };
+  }, [myHostSide, localParticipant]);
 
   const trackA = battle ? allTracks.find(t => t.participant.identity === battle.host_a_id) : null;
   const trackB = battle ? allTracks.find(t => t.participant.identity === battle.host_b_id) : null;
