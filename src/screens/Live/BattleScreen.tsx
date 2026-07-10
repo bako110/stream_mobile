@@ -251,6 +251,9 @@ export const BattleScreen: React.FC = () => {
       setFloaters(prev => [...prev, { id, side: d.side }]);
       setTimeout(() => setFloaters(prev => prev.filter(f => f.id !== id)), 1800);
     }
+    if (d.type === 'battle_score_update') {
+      setBattle(prev => prev ? { ...prev, score_a: d.score_a, score_b: d.score_b } : prev);
+    }
     if (d.type === 'battle_goal_started' || d.type === 'battle_goal_progress') {
       setGoal(d as unknown as BattleGoal);
     }
