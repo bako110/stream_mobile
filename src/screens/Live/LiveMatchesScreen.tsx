@@ -21,6 +21,8 @@ import { battleService } from '../../services/battleService';
 import type { ActiveBattle } from '../../services/battleService';
 import { tournamentService } from '../../services/tournamentService';
 import type { ActiveTournament } from '../../services/tournamentService';
+import { useWs } from '../../context/WebSocketContext';
+import type { WsPayload } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -66,6 +68,15 @@ const BattleCard: React.FC<{ battle: ActiveBattle; onWatch: () => void }> = ({ b
   const { colors } = theme;
   const total = battle.score_a + battle.score_b;
   const pctA = total > 0 ? (battle.score_a / total) * 100 : 50;
+
+  // Tick local chaque seconde — sans ca le "temps restant" ne bougeait qu'au
+  // prochain rafraichissement de la liste (jusqu'a 60s avec le nouveau polling
+  // de secours), au lieu de defiler naturellement comme un vrai chronometre.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => forceTick(t => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
 
   return (
     <Animated.View entering={FadeIn.duration(300)} style={[st.battleCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -234,6 +245,7 @@ export const LiveMatchesScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
+  const { addListener, removeListener } = useWs();
 
   const [tab, setTab] = useState<Tab>('1v1');
 
@@ -281,10 +293,36 @@ export const LiveMatchesScreen: React.FC = () => {
   useEffect(() => { loadBattles(); }, [loadBattles]);
   useEffect(() => { loadTournaments(); }, [loadTournaments]);
 
+  // Filet de securite : recharge de temps en temps au cas ou un evenement WS
+  // serait manque (reconnexion, perte reseau ponctuelle) — le WS reste la source
+  // principale de mise a jour, ce polling espace ne sert que de rattrapage.
   useEffect(() => {
-    const iv = setInterval(() => { loadBattles(); }, 15_000);
+    const iv = setInterval(() => { loadBattles(); loadTournaments(); }, 60_000);
     return () => clearInterval(iv);
-  }, [loadBattles]);
+  }, [loadBattles, loadTournaments]);
+
+  // Temps reel : demarrage/fin de battle, score, tournoi qui change de statut ou
+  // dont le nombre de participants bouge — sans ca la liste ne se mettait a jour
+  // qu'au prochain polling (jusqu'a 15s de retard pour les battles, jamais pour
+  // les tournois hors pull-to-refresh).
+  useEffect(() => {
+    const handler = (payload: WsPayload) => {
+      const p = payload as any;
+      if (p.type === 'battle_started_broadcast') {
+        loadBattles();
+      } else if (p.type === 'battle_ended_broadcast') {
+        setBattles(prev => prev.filter(b => b.id !== p.battle_id));
+      } else if (p.type === 'battle_score_update_broadcast') {
+        setBattles(prev => prev.map(b => b.id === p.battle_id ? { ...b, score_a: p.score_a, score_b: p.score_b } : b));
+      } else if (p.type === 'tournament_status_changed') {
+        loadTournaments();
+      } else if (p.type === 'tournament_participants_updated') {
+        setTournaments(prev => prev.map(t => t.id === p.tournament_id ? { ...t, participants_count: p.participants_count } : t));
+      }
+    };
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [addListener, removeListener, loadBattles, loadTournaments]);
 
   const loadMoreBattles = useCallback(async () => {
     if (battlesLoading || battlesLoadingMore || !battlesHasMore) return;
