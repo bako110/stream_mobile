@@ -1,5 +1,5 @@
 /**
- * BattleScreen — match live entre deux créateurs, ecran en 3 zones (25% / 50% / 25%) :
+ * BattleScreen — match live entre deux créateurs, ecran en 3 zones (15% / 40% / 45%) :
  * header (fermer, countdown, score, objectif/effets, top supporter), zone vidéo
  * avec les deux hosts en cartes arrondies centrées côte à côte (façon TikTok
  * Live Battle) séparées par un badge "VS" — halo lumineux pulsé autour du camp en
@@ -628,7 +628,7 @@ const BattleContent: React.FC<{
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
 
-      {/* Header — 25% de l'ecran : fermer, countdown, score, objectif/effets, top supporter */}
+      {/* Header — 15% de l'ecran : fermer, countdown, score, objectif/effets, top supporter */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8} disabled={leaving}>
@@ -697,9 +697,20 @@ const BattleContent: React.FC<{
         )}
       </View>
 
-      {/* Zone video — 50% de l'ecran, les deux hosts en cartes arrondies centrees */}
+      {/* Zone video — 40% de l'ecran, les deux hosts en cartes arrondies centrees */}
       <View style={styles.videoZone}>
-        <Animated.View entering={FadeIn.duration(400)} style={styles.videoHalf}>
+        <LinearGradient
+          colors={['#150F24', '#1C0F18', '#150F24']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          style={[
+            styles.videoHalf, styles.videoHalfA,
+            leadingSide === 'a' && [styles.videoHalfLeading, styles.videoHalfLeadingA],
+          ]}
+        >
           {trackA
             ? <VideoTrack trackRef={trackA} style={styles.videoInner} objectFit="cover" />
             : <View style={[styles.videoInner, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
@@ -744,7 +755,13 @@ const BattleContent: React.FC<{
           </Animated.View>
         </View>
 
-        <Animated.View entering={FadeIn.duration(400)} style={styles.videoHalf}>
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          style={[
+            styles.videoHalf, styles.videoHalfB,
+            leadingSide === 'b' && [styles.videoHalfLeading, styles.videoHalfLeadingB],
+          ]}
+        >
           {trackB
             ? <VideoTrack trackRef={trackB} style={styles.videoInner} objectFit="cover" />
             : <View style={[styles.videoInner, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
@@ -807,7 +824,7 @@ const BattleContent: React.FC<{
         </Animated.View>
       )}
 
-      {/* Zone basse — 25% de l'ecran : chat fusionne + boutons de soutien */}
+      {/* Zone basse — 45% de l'ecran : chat fusionne + boutons de soutien */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.bottomZone}
@@ -966,32 +983,38 @@ const BattleContent: React.FC<{
   );
 };
 
-const HEADER_H = SCREEN_H * 0.25;
-const VIDEO_ZONE_H = SCREEN_H * 0.50;
-const BOTTOM_ZONE_H = SCREEN_H * 0.25;
+const HEADER_H = SCREEN_H * 0.15;
+const VIDEO_ZONE_H = SCREEN_H * 0.40;
+const BOTTOM_ZONE_H = SCREEN_H * 0.45;
 
 const styles = StyleSheet.create({
   root:  { flex: 1, backgroundColor: '#000' },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  // Header — 25% de l'ecran : fermer, countdown, score, objectif/effets, top supporter
+  // Header — 15% de l'ecran : fermer, countdown, score, objectif/effets, top supporter
   header: {
-    width: '100%', height: HEADER_H, backgroundColor: '#0B0812',
+    width: '100%', height: HEADER_H, backgroundColor: 'rgba(11,8,18,0.92)',
     paddingTop: 46, paddingHorizontal: 14, paddingBottom: 10,
     borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(155,101,245,0.35)',
   },
   headerTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   headerCenter: { flex: 1, alignItems: 'center', gap: 6 },
 
-  // Zone video — 50% de l'ecran, les deux hosts en cartes arrondies centrees
+  // Zone video — 40% de l'ecran, les deux hosts en cartes arrondies centrees
   videoZone: {
     width: '100%', height: VIDEO_ZONE_H, flexDirection: 'row',
     backgroundColor: '#000', padding: 6, gap: 6, alignItems: 'center',
   },
   videoHalf: {
     flex: 1, height: '100%', backgroundColor: '#111', overflow: 'hidden', position: 'relative',
-    borderRadius: 20,
+    borderRadius: 22, borderWidth: 1.5,
   },
+  videoHalfA: { borderColor: 'rgba(155,101,245,0.45)' },
+  videoHalfB: { borderColor: 'rgba(240,54,90,0.45)' },
+  videoHalfLeading: { borderWidth: 2, shadowOpacity: 0.9, shadowRadius: 14, elevation: 10 },
+  videoHalfLeadingA: { borderColor: '#9B65F5', shadowColor: '#9B65F5' },
+  videoHalfLeadingB: { borderColor: '#F0365A', shadowColor: '#F0365A' },
   videoInner: { ...StyleSheet.absoluteFill, borderRadius: 20 },
   noVideo: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
 
@@ -1043,10 +1066,11 @@ const styles = StyleSheet.create({
   heartCounterIcon: { fontSize: 11 },
   heartCounterText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-  // Zone basse — 25% de l'ecran, fixe : chat (flexible) + actions + saisie (toujours visibles)
+  // Zone basse — 45% de l'ecran, fixe : chat (flexible) + actions + saisie (toujours visibles)
   bottomZone: {
-    width: '100%', height: BOTTOM_ZONE_H, backgroundColor: '#0B0812',
+    width: '100%', height: BOTTOM_ZONE_H, backgroundColor: 'rgba(11,8,18,0.94)',
     borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden',
+    borderTopWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
   },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 4, paddingBottom: 4 },
 
@@ -1068,9 +1092,19 @@ const styles = StyleSheet.create({
   },
   giftCardIcon: { fontSize: 15 },
 
-  scoreBarTrack: { width: '100%', height: 10, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.15)', overflow: 'hidden', flexDirection: 'row' },
-  scoreBarFillA: { height: '100%', backgroundColor: '#7B3FF2', borderRadius: 6 },
-  countdownWrap: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4 },
+  scoreBarTrack: {
+    width: '100%', height: 10, borderRadius: 6, overflow: 'hidden', flexDirection: 'row',
+    backgroundColor: 'rgba(240,54,90,0.20)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  scoreBarFillA: {
+    height: '100%', backgroundColor: '#9B65F5', borderRadius: 6,
+    shadowColor: '#9B65F5', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 6, elevation: 6,
+  },
+  countdownWrap: {
+    backgroundColor: 'rgba(155,101,245,0.14)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4,
+    borderWidth: 1, borderColor: 'rgba(155,101,245,0.4)',
+  },
   countdownText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   scoresRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   scoreText: { color: '#fff', fontSize: 16, fontWeight: '800' },
