@@ -141,7 +141,9 @@ export const HomeScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
-  const userLocation = useUserLocation();
+  // false — ne demande pas la permission localisation des l'arrivee sur l'accueil,
+  // uniquement du contenu secondaire ("pres de toi") en beneficie ici.
+  const userLocation = useUserLocation(false);
   const { lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated } = useWs();
 
   const [items,         setItems]         = useState<FeedItem[]>([]);
@@ -202,13 +204,8 @@ export const HomeScreen: React.FC = () => {
 
   // ── Contacts — chargement silencieux en fond ──────────────────────────────────
 
-  const loadContactIdsSilent = useCallback(async (): Promise<string[]> => {
+  const matchContacts = useCallback(async (): Promise<string[]> => {
     try {
-      const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
-      let status = await check(perm);
-      if (status === RESULTS.DENIED) status = await request(perm);
-      if (status !== RESULTS.GRANTED) return [];
-
       const contacts = await Contacts.getAll();
       const phones: string[] = [];
       for (const c of contacts) {
@@ -228,6 +225,26 @@ export const HomeScreen: React.FC = () => {
       return [];
     }
   }, []);
+
+  // Demande la permission (popup systeme) — reserve a une action explicite de
+  // l'utilisateur (clic sur le filtre "Contacts"), jamais declenchee automatiquement.
+  const loadContactIdsSilent = useCallback(async (): Promise<string[]> => {
+    const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
+    let status = await check(perm);
+    if (status === RESULTS.DENIED) status = await request(perm);
+    if (status !== RESULTS.GRANTED) return [];
+    return matchContacts();
+  }, [matchContacts]);
+
+  // Si la permission a deja ete accordee par le passe, profite-en pour booster le
+  // feed silencieusement (simple lecture, `check()` ne declenche aucun popup) —
+  // sinon ne fait rien tant que l'utilisateur n'a pas explicitement demande l'acces.
+  const loadContactIdsIfAlreadyGranted = useCallback(async (): Promise<string[]> => {
+    const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
+    const status = await check(perm);
+    if (status !== RESULTS.GRANTED) return [];
+    return matchContacts();
+  }, [matchContacts]);
 
   // ── Chargement concerts LIVE ─────────────────────────────────────────────────
 
@@ -384,10 +401,12 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     load(filter, { reset: true });
 
-    // Contacts — une seule fois, en fond, sans bloquer
+    // Contacts — une seule fois, en fond, sans bloquer. Ne redemande jamais la
+    // permission ici : si deja accordee par le passe, boost silencieux ; sinon
+    // attend une action explicite (clic sur le filtre "Contacts" plus bas).
     if (!contactsAskedRef.current) {
       contactsAskedRef.current = true;
-      loadContactIdsSilent().then(ids => {
+      loadContactIdsIfAlreadyGranted().then(ids => {
         if (!ids.length) return;
         setContactIds(ids);
         setContactsReady(true);

@@ -7,10 +7,16 @@ export interface UserCoords {
   lon: number;
 }
 
-export function useUserLocation(): UserCoords | null {
+/**
+ * `enabled` par defaut a false — ne demande la permission localisation que quand
+ * l'appelant l'active explicitement (ex: ouverture d'une section "a proximite"),
+ * plutot qu'automatiquement des le montage de l'ecran d'accueil.
+ */
+export function useUserLocation(enabled: boolean = true): UserCoords | null {
   const [coords, setCoords] = useState<UserCoords | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     const run = async () => {
@@ -40,7 +46,7 @@ export function useUserLocation(): UserCoords | null {
 
     run();
     return () => { cancelled = true; };
-  }, []);
+  }, [enabled]);
 
   return coords;
 }

@@ -606,7 +606,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const nav = useNavigation<Nav>();
   const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated, lastPresenceUpdate } = useWs();
   const { currentUser } = useUser();
-  const userLocation = useUserLocation();
+  // false — ne demande pas la permission localisation des l'arrivee sur le feed,
+  // uniquement la section secondaire "Pres de toi" en beneficie ici.
+  const userLocation = useUserLocation(false);
 
   const [filter,      setFilter]      = useState<FeedFilter>('all');
   const [items,       setItems]       = useState<FeedItem[]>([]);
