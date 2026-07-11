@@ -236,7 +236,6 @@ export const BattleScreen: React.FC = () => {
   const [heartCountB, setHeartCountB] = useState(0);
   const [ended, setEnded]     = useState<{ winner_id: string | null; score_a: number; score_b: number } | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const [showChat, setShowChat] = useState(true);
   const [showRanking, setShowRanking] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -497,9 +496,7 @@ export const BattleScreen: React.FC = () => {
         hostNameB={hostNameB}
         hostAvatarA={hostAvatarA}
         hostAvatarB={hostAvatarB}
-        showChat={showChat}
         showRanking={showRanking}
-        setShowChat={setShowChat}
         setShowRanking={setShowRanking}
         chatInput={chatInput}
         setChatInput={setChatInput}
@@ -538,9 +535,7 @@ const BattleContent: React.FC<{
   hostNameB: string;
   hostAvatarA: string | null;
   hostAvatarB: string | null;
-  showChat: boolean;
   showRanking: boolean;
-  setShowChat: (v: boolean) => void;
   setShowRanking: (v: boolean) => void;
   chatInput: string;
   setChatInput: (v: string) => void;
@@ -560,7 +555,7 @@ const BattleContent: React.FC<{
 }> = ({
   battle, remaining, goal, ranking, floaters, heartCountA, heartCountB, ended, leaving, myId, myHostSide, followedSide,
   hostNameA, hostNameB, hostAvatarA, hostAvatarB,
-  showChat, showRanking, setShowChat, setShowRanking,
+  showRanking, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
   giftTicker, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
   effectBanner, onReact, onSendChat, onClose,
@@ -829,7 +824,7 @@ const BattleContent: React.FC<{
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.bottomZone}
       >
-        {showChat && !ended && (
+        {!ended && (
           <FlatList
             ref={chatRef}
             data={messages}
@@ -887,9 +882,6 @@ const BattleContent: React.FC<{
           </TouchableOpacity>
           <TouchableOpacity style={styles.reactBtn} onPress={() => setShowRanking(true)} activeOpacity={0.8}>
             <Icon name="award" size={15} color="#FFD700" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.reactBtn} onPress={() => setShowChat(!showChat)} activeOpacity={0.8}>
-            <Icon name={showChat ? 'message-circle' : 'message-square'} size={15} color="#fff" />
           </TouchableOpacity>
         </View>
 
