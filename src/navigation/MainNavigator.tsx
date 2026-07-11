@@ -93,7 +93,8 @@ import { SimpleLiveViewerScreen }  from '../screens/Live/SimpleLiveViewerScreen'
 import { BattleScreen }            from '../screens/Live/BattleScreen';
 import { TournamentListScreen }    from '../screens/Live/TournamentListScreen';
 import { TournamentBracketScreen } from '../screens/Live/TournamentBracketScreen';
-import { LiveMatchesScreen }       from '../screens/Live/LiveMatchesScreen';
+import { LiveOneVsOneScreen }      from '../screens/Live/LiveOneVsOneScreen';
+import { LiveTournamentsScreen }   from '../screens/Live/LiveTournamentsScreen';
 import WalletScreen                from '../screens/Wallet/WalletScreen';
 import BuyGoGoldScreen              from '../screens/Wallet/BuyGoGoldScreen';
 import CreatorDashboardScreen      from '../screens/Wallet/CreatorDashboardScreen';
@@ -207,7 +208,8 @@ export type MainStackParamList = {
   BattleScreen:      { battleId: string; followedHostId?: string };
   TournamentList:    undefined;
   TournamentBracket: { tournamentId: string };
-  LiveMatches:       undefined;
+  LiveOneVsOne:      undefined;
+  LiveTournaments:   undefined;
   Activity:        undefined;
   MyStories:       undefined;
   StoryViewers:    { storyId: string; viewCount: number; myId?: string };
@@ -468,7 +470,8 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="BattleScreen"       component={BattleScreen}            options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="TournamentList"     component={TournamentListScreen} />
         <Stack.Screen name="TournamentBracket"  component={TournamentBracketScreen} />
-        <Stack.Screen name="LiveMatches"        component={LiveMatchesScreen} />
+        <Stack.Screen name="LiveOneVsOne"       component={LiveOneVsOneScreen} />
+        <Stack.Screen name="LiveTournaments"    component={LiveTournamentsScreen} />
         <Stack.Screen name="MyStories"      component={MyStoriesScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="StoryViewers"   component={StoryViewersScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="LiveStream"     component={LiveStreamWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
