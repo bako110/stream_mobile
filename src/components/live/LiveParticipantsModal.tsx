@@ -111,10 +111,11 @@ export const LiveParticipantsModal: React.FC<{
 const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
+    width: '100%',
     backgroundColor: '#14101f',
     borderTopLeftRadius: 22, borderTopRightRadius: 22,
     paddingTop: 10, paddingBottom: 20, paddingHorizontal: 18,
-    maxHeight: '65%',
+    height: '65%',
     borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.08)',
   },
   handle: {
@@ -133,7 +134,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 8, marginBottom: 6,
   },
   searchInput: { flex: 1, color: '#fff', fontSize: 13, padding: 0 },
-  list: { marginTop: 4 },
+  list: { flex: 1, marginTop: 4 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 10,
