@@ -1,7 +1,7 @@
 /**
- * BattleScreen — match live entre deux créateurs, ecran en 3 zones (25% / 25% / 50%) :
+ * BattleScreen — match live entre deux créateurs, ecran en 3 zones (25% / 50% / 25%) :
  * header (fermer, countdown, score, objectif/effets, top supporter), zone vidéo
- * compacte avec les deux hosts en cartes arrondies centrées côte à côte (façon TikTok
+ * avec les deux hosts en cartes arrondies centrées côte à côte (façon TikTok
  * Live Battle) séparées par un badge "VS" — halo lumineux pulsé autour du camp en
  * tête, bandeau nom+avatar par créateur, cadeaux animés — puis zone basse (chat
  * fusionné des deux lives, classement des supporters, actions). Abandon (forfait)
@@ -38,6 +38,7 @@ import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { clearLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import { participantAvatarUrl } from '../../utils/livekitParticipant';
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 
@@ -220,6 +221,7 @@ export const BattleScreen: React.FC = () => {
   const { currentUser } = useUser();
   const { addListener, removeListener } = useWs();
   useKeepAwake();
+  useEffect(() => { configureLiveAudioSession(); }, []);
 
   const [battle, setBattle]   = useState<Battle | null>(null);
   const [token, setToken]     = useState<string | null>(null);
@@ -695,7 +697,7 @@ const BattleContent: React.FC<{
         )}
       </View>
 
-      {/* Zone video — 25% de l'ecran, les deux hosts en cartes arrondies centrees */}
+      {/* Zone video — 50% de l'ecran, les deux hosts en cartes arrondies centrees */}
       <View style={styles.videoZone}>
         <Animated.View entering={FadeIn.duration(400)} style={styles.videoHalf}>
           {trackA
@@ -965,8 +967,8 @@ const BattleContent: React.FC<{
 };
 
 const HEADER_H = SCREEN_H * 0.25;
-const VIDEO_ZONE_H = SCREEN_H * 0.25;
-const BOTTOM_ZONE_H = SCREEN_H * 0.50;
+const VIDEO_ZONE_H = SCREEN_H * 0.50;
+const BOTTOM_ZONE_H = SCREEN_H * 0.25;
 
 const styles = StyleSheet.create({
   root:  { flex: 1, backgroundColor: '#000' },
@@ -981,7 +983,7 @@ const styles = StyleSheet.create({
   headerTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   headerCenter: { flex: 1, alignItems: 'center', gap: 6 },
 
-  // Zone video — 25% de l'ecran, les deux hosts en cartes arrondies centrees
+  // Zone video — 50% de l'ecran, les deux hosts en cartes arrondies centrees
   videoZone: {
     width: '100%', height: VIDEO_ZONE_H, flexDirection: 'row',
     backgroundColor: '#000', padding: 6, gap: 6, alignItems: 'center',
@@ -1041,7 +1043,7 @@ const styles = StyleSheet.create({
   heartCounterIcon: { fontSize: 11 },
   heartCounterText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-  // Zone basse — 50% de l'ecran, fixe : chat (flexible) + actions + saisie (toujours visibles)
+  // Zone basse — 25% de l'ecran, fixe : chat (flexible) + actions + saisie (toujours visibles)
   bottomZone: {
     width: '100%', height: BOTTOM_ZONE_H, backgroundColor: '#0B0812',
     borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden',

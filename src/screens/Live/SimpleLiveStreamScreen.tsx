@@ -44,6 +44,7 @@ import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import { participantAvatarUrl } from '../../utils/livekitParticipant';
@@ -1140,6 +1141,8 @@ export const SimpleLiveStreamScreen: React.FC = () => {
   const nav   = useNavigation<Nav>();
   const route = useRoute<RouteT>();
   const { liveId, publisherToken: initialToken, livekitUrl: initialUrl, isPrivate = false } = route.params;
+
+  useEffect(() => { configureLiveAudioSession(); }, []);
 
   const [token,  setToken]  = useState<string | null>(initialToken ?? null);
   const [wsUrl,  setWsUrl]  = useState<string | null>(initialUrl  ?? null);

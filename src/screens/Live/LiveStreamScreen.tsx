@@ -18,6 +18,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { concertService } from '../../services';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import type { Concert } from '../../types';
 
 interface Props {
@@ -215,6 +216,7 @@ const StreamControls: React.FC<{
 
 export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
   useKeepAwake();
+  useEffect(() => { configureLiveAudioSession(); }, []);
   const nav = useNavigation();
   const [concert,  setConcert]  = useState<Concert | null>(null);
   const [token,    setToken]    = useState<string | null>(null);

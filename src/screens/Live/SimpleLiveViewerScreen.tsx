@@ -43,6 +43,7 @@ import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import { useWs } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
@@ -1069,6 +1070,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const nav   = useNavigation<Nav>();
   const route = useRoute<RouteT>();
   const { liveId } = route.params;
+
+  useEffect(() => { configureLiveAudioSession(); }, []);
 
   const [live,        setLive]        = useState<LiveStream | null>(null);
   const [loading,     setLoading]     = useState(true);
