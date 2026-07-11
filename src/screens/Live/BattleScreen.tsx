@@ -18,7 +18,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring, withSequence, Easing,
 } from 'react-native-reanimated';
 import {
-  LiveKitRoom, useTracks, useLocalParticipant, useConnectionState, VideoTrack,
+  LiveKitRoom, useTracks, useLocalParticipant, useConnectionState, useParticipants, VideoTrack,
 } from '@livekit/react-native';
 import { Track, VideoPresets, ConnectionState, RemoteTrackPublication } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
@@ -38,6 +38,8 @@ import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { clearLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { participantAvatarUrl } from '../../utils/livekitParticipant';
+import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -565,6 +567,8 @@ const BattleContent: React.FC<{
   const allAudioTracks = useTracks([Track.Source.Microphone], { onlySubscribed: false });
   const { localParticipant } = useLocalParticipant();
   const connectionState = useConnectionState();
+  const roomParticipants = useParticipants();
+  const [showParticipants, setShowParticipants] = useState(false);
 
   // Viewer qui ne suit qu'un camp : coupe l'audio de l'adversaire cote reception, sans
   // toucher a la publication (les hosts, eux, doivent toujours s'entendre l'un l'autre).
@@ -627,6 +631,11 @@ const BattleContent: React.FC<{
         <View style={styles.headerTopRow}>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8} disabled={leaving}>
             {leaving ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="x" size={20} color="#fff" />}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.participantsBtn} onPress={() => setShowParticipants(true)} activeOpacity={0.8}>
+            <Icon name="users" size={13} color="#fff" />
+            <Text style={styles.participantsBtnText}>{roomParticipants.length}</Text>
           </TouchableOpacity>
 
           <View style={styles.headerCenter}>
@@ -917,6 +926,17 @@ const BattleContent: React.FC<{
         </View>
       )}
 
+      <LiveParticipantsModal
+        visible={showParticipants}
+        onClose={() => setShowParticipants(false)}
+        participants={roomParticipants.map(p => ({
+          identity:  p.identity,
+          name:      p.name || p.identity,
+          avatarUrl: participantAvatarUrl(p.metadata),
+          isHost:    p.identity === battle?.host_a_id || p.identity === battle?.host_b_id,
+        }))}
+      />
+
       {/* Ecran de fin */}
       {ended && (
         <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
@@ -1101,6 +1121,12 @@ const styles = StyleSheet.create({
   giftBtnEmoji: { fontSize: 16 },
 
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  participantsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10,
+  },
+  participantsBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   // Chat fusionne
   chatList: { flex: 1 },
