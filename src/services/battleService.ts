@@ -37,6 +37,24 @@ export interface EligibleCreatorsPage {
   has_more: boolean;
 }
 
+export interface ActiveBattle extends Battle {
+  host_a_name:       string | null;
+  host_a_avatar:     string | null;
+  host_a_verified:   boolean;
+  host_b_name:       string | null;
+  host_b_avatar:     string | null;
+  host_b_verified:   boolean;
+  viewer_count:      number;
+  gifts_count:       number;
+  supporters_count:  number;
+}
+
+export interface ActiveBattlesPage {
+  items:    ActiveBattle[];
+  page:     number;
+  has_more: boolean;
+}
+
 export interface BattleToken {
   token:     string;
   ws_url:    string;
@@ -85,6 +103,11 @@ async function listEligible(liveId: string, page = 1, limit = 20): Promise<Eligi
 async function getActiveForLive(liveId: string): Promise<Battle | null> {
   const r = await apiClient.get<Battle | null>(Endpoints.battles.activeForLive(liveId));
   return r.data ?? null;
+}
+
+async function listActive(page = 1, limit = 20): Promise<ActiveBattlesPage> {
+  const r = await apiClient.get<ActiveBattlesPage>(Endpoints.battles.active(page, limit));
+  return r.data ?? { items: [], page, has_more: false };
 }
 
 async function invite(liveAId: string, liveBId: string): Promise<Battle> {
@@ -140,6 +163,7 @@ export const battleService = {
   get,
   listEligible,
   getActiveForLive,
+  listActive,
   invite,
   respond,
   cancel,

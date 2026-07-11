@@ -11,6 +11,9 @@ export interface Tournament {
   name:                    string;
   format:                  8 | 16 | 32 | 64;
   status:                  TournamentStatus;
+  image_url:               string | null;
+  prize:                   string | null;
+  spectator_count:         number;
   created_by:              string;
   registration_closes_at:  string | null;
   battle_duration_seconds: number;
@@ -23,6 +26,17 @@ export interface Tournament {
 export interface OpenTournament extends Tournament {
   participants_count: number;
   max_participants:   number;
+}
+
+export interface ActiveTournament extends OpenTournament {
+  organizer_name:   string | null;
+  organizer_avatar: string | null;
+}
+
+export interface ActiveTournamentsPage {
+  items:    ActiveTournament[];
+  page:     number;
+  has_more: boolean;
 }
 
 export interface TournamentParticipant {
@@ -59,11 +73,18 @@ async function listOpen(): Promise<OpenTournament[]> {
   return r.data ?? [];
 }
 
+async function listActive(page = 1, limit = 20): Promise<ActiveTournamentsPage> {
+  const r = await apiClient.get<ActiveTournamentsPage>(Endpoints.tournaments.active(page, limit));
+  return r.data ?? { items: [], page, has_more: false };
+}
+
 async function create(
   name: string, format: 8 | 16 | 32 | 64, battleDurationSeconds = 180,
+  imageUrl?: string, prize?: string,
 ): Promise<Tournament> {
   const r = await apiClient.post<Tournament>(Endpoints.tournaments.create, {
     name, format, battle_duration_seconds: battleDurationSeconds,
+    image_url: imageUrl, prize,
   });
   return r.data;
 }
@@ -101,6 +122,7 @@ async function markMatchReady(matchId: string, liveId: string): Promise<Tourname
 
 export const tournamentService = {
   listOpen,
+  listActive,
   create,
   join,
   leave,

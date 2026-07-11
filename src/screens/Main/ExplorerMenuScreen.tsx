@@ -97,6 +97,7 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
             { icon: 'tv',          label: 'Séries',        color: '#7B3FF2', screen: 'Series'      },
             { icon: 'play-circle', label: 'Reels',         color: '#FF7A2F', screen: 'Reels'       },
             { icon: 'radio',       label: 'Lives',         color: '#F0365A', screen: 'SimpleLiveList' },
+            { icon: 'zap',         label: 'Live Matchs',   color: '#9B65F5', screen: 'LiveMatches' },
             { icon: 'music',       label: 'Concerts live', color: '#E0389A', screen: 'LiveList'    },
             { icon: 'calendar',    label: 'Événements',    color: '#10B981', screen: 'Events'      },
             { icon: 'trending-up', label: 'Tendances',     color: '#F59E0B', screen: 'Trending'    },

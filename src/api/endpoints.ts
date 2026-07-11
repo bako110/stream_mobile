@@ -407,6 +407,7 @@ export const Endpoints = {
     byId:       (id: string) => `${V1}/battles/${id}`,
     eligible:      (liveId: string, page = 1, limit = 20)  => `${V1}/battles/eligible/${liveId}?page=${page}&limit=${limit}`,
     activeForLive: (liveId: string)  => `${V1}/battles/active-for-live/${liveId}`,
+    active:        (page = 1, limit = 20) => `${V1}/battles/active?page=${page}&limit=${limit}`,
     invite:     `${V1}/battles/invite`,
     respond:    (id: string) => `${V1}/battles/${id}/respond`,
     cancel:     (id: string) => `${V1}/battles/${id}/cancel`,
@@ -421,6 +422,7 @@ export const Endpoints = {
   // ── Tournois entre créateurs ──────────────────────────────────────────────
   tournaments: {
     open:            `${V1}/tournaments/open`,
+    active:          (page = 1, limit = 20) => `${V1}/tournaments/active?page=${page}&limit=${limit}`,
     create:          `${V1}/tournaments`,
     join:            (id: string) => `${V1}/tournaments/${id}/join`,
     leave:           (id: string) => `${V1}/tournaments/${id}/join`,
