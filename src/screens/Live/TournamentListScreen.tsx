@@ -69,7 +69,7 @@ export const TournamentListScreen: React.FC = () => {
     if (!name.trim() || creating) return;
     setCreating(true);
     try {
-      const t = await tournamentService.create(name.trim(), format);
+      const t = await tournamentService.create({ name: name.trim(), format });
       setShowCreate(false);
       setName('');
       await load();

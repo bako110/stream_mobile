@@ -421,15 +421,18 @@ export const Endpoints = {
 
   // ── Tournois entre créateurs ──────────────────────────────────────────────
   tournaments: {
-    open:            `${V1}/tournaments/open`,
-    active:          (page = 1, limit = 20) => `${V1}/tournaments/active?page=${page}&limit=${limit}`,
-    create:          `${V1}/tournaments`,
-    join:            (id: string) => `${V1}/tournaments/${id}/join`,
-    leave:           (id: string) => `${V1}/tournaments/${id}/join`,
-    generateBracket: (id: string) => `${V1}/tournaments/${id}/generate-bracket`,
-    bracket:         (id: string) => `${V1}/tournaments/${id}/bracket`,
-    cancel:          (id: string) => `${V1}/tournaments/${id}/cancel`,
-    matchReady:      (matchId: string) => `${V1}/tournaments/matches/${matchId}/ready`,
+    open:               `${V1}/tournaments/open`,
+    active:             (page = 1, limit = 20) => `${V1}/tournaments/active?page=${page}&limit=${limit}`,
+    create:             `${V1}/tournaments`,
+    join:               (id: string) => `${V1}/tournaments/${id}/join`,
+    leave:              (id: string) => `${V1}/tournaments/${id}/join`,
+    pending:            (id: string) => `${V1}/tournaments/${id}/pending`,
+    approveParticipant: (id: string, userId: string) => `${V1}/tournaments/${id}/participants/${userId}/approve`,
+    rejectParticipant:  (id: string, userId: string) => `${V1}/tournaments/${id}/participants/${userId}/reject`,
+    generateBracket:    (id: string) => `${V1}/tournaments/${id}/generate-bracket`,
+    bracket:            (id: string) => `${V1}/tournaments/${id}/bracket`,
+    cancel:             (id: string) => `${V1}/tournaments/${id}/cancel`,
+    matchReady:         (matchId: string) => `${V1}/tournaments/matches/${matchId}/ready`,
   },
 
   // ── Système ───────────────────────────────────────────────────────────────

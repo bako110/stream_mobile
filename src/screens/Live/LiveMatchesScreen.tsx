@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, Image,
-  ActivityIndicator, StatusBar, RefreshControl, Modal, TextInput, Alert,
+  ActivityIndicator, StatusBar, RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -20,7 +20,8 @@ import { BackButton, VerifiedBadge } from '../../components/common';
 import { battleService } from '../../services/battleService';
 import type { ActiveBattle } from '../../services/battleService';
 import { tournamentService } from '../../services/tournamentService';
-import type { ActiveTournament } from '../../services/tournamentService';
+import type { ActiveTournament, Tournament } from '../../services/tournamentService';
+import { CreateTournamentModal } from '../../components/live/CreateTournamentModal';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -28,7 +29,6 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 type Tab = '1v1' | 'tournaments';
-const FORMATS: Array<8 | 16 | 32 | 64> = [8, 16, 32, 64];
 
 function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -267,10 +267,6 @@ export const LiveMatchesScreen: React.FC = () => {
 
   // Création de tournoi
   const [showCreate, setShowCreate] = useState(false);
-  const [name, setName]     = useState('');
-  const [format, setFormat] = useState<8 | 16 | 32 | 64>(8);
-  const [prize, setPrize]   = useState('');
-  const [creating, setCreating] = useState(false);
 
   const loadBattles = useCallback(async () => {
     try {
@@ -361,21 +357,9 @@ export const LiveMatchesScreen: React.FC = () => {
     nav.navigate('TournamentBracket', { tournamentId: tournament.id });
   };
 
-  const handleCreateTournament = async () => {
-    if (!name.trim() || creating) return;
-    setCreating(true);
-    try {
-      const t = await tournamentService.create(name.trim(), format, 180, undefined, prize.trim() || undefined);
-      setShowCreate(false);
-      setName('');
-      setPrize('');
-      await loadTournaments();
-      nav.navigate('TournamentBracket', { tournamentId: t.id });
-    } catch (e: any) {
-      Alert.alert('Impossible de créer le tournoi', e?.response?.data?.detail ?? e?.message ?? 'Une erreur est survenue.');
-    } finally {
-      setCreating(false);
-    }
+  const handleTournamentCreated = async (t: Tournament) => {
+    await loadTournaments();
+    nav.navigate('TournamentBracket', { tournamentId: t.id });
   };
 
   return (
@@ -455,64 +439,11 @@ export const LiveMatchesScreen: React.FC = () => {
         )
       )}
 
-      {/* Modal création de tournoi */}
-      <Modal visible={showCreate} transparent animationType="fade" onRequestClose={() => setShowCreate(false)}>
-        <View style={st.modalBackdrop}>
-          <View style={[st.modalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[st.modalTitle, { color: colors.textPrimary }]}>Créer un tournoi</Text>
-
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Nom du tournoi"
-              placeholderTextColor={colors.textTertiary}
-              style={[st.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
-              maxLength={200}
-            />
-
-            <TextInput
-              value={prize}
-              onChangeText={setPrize}
-              placeholder="Récompense (optionnel, ex: 500 GoGold)"
-              placeholderTextColor={colors.textTertiary}
-              style={[st.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
-              maxLength={200}
-            />
-
-            <Text style={[st.fieldLabel, { color: colors.textTertiary }]}>NOMBRE DE PARTICIPANTS</Text>
-            <View style={st.formatRow}>
-              {FORMATS.map(f => (
-                <TouchableOpacity
-                  key={f}
-                  onPress={() => setFormat(f)}
-                  style={[
-                    st.formatChip,
-                    { borderColor: format === f ? '#9B65F5' : colors.border, backgroundColor: format === f ? '#9B65F522' : colors.backgroundSecondary },
-                  ]}
-                >
-                  <Text style={{ color: format === f ? '#9B65F5' : colors.textSecondary, fontWeight: '700' }}>{f}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={st.modalActions}>
-              <TouchableOpacity style={[st.modalBtn, { borderColor: colors.border }]} onPress={() => setShowCreate(false)}>
-                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[st.modalBtn, st.modalBtnPrimary, !name.trim() && { opacity: 0.5 }]}
-                onPress={handleCreateTournament}
-                disabled={!name.trim() || creating}
-              >
-                {creating
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={{ color: '#fff', fontWeight: '700' }}>Créer</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <CreateTournamentModal
+        visible={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={handleTournamentCreated}
+      />
     </View>
   );
 };

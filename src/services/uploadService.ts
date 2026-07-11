@@ -8,7 +8,7 @@ import { storage } from '../utils/storage';
 import { compressVideo, cleanupTempVideos } from './videoCompressService';
 import { apiClient } from '../api/client';
 
-export type UploadFolder = 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'content';
+export type UploadFolder = 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'content' | 'tournaments';
 export type VideoFolder  = 'reels' | 'stories' | 'messages' | 'events' | 'concerts' | 'content' | 'posts';
 export type AudioFolder  = 'messages' | 'stories' | 'reels';
 

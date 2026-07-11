@@ -32,6 +32,9 @@ const ROUND_LABELS: Record<TournamentRound, string> = {
   quarterfinal:   'Quarts',
   semifinal:      'Demies',
   final:          'Finale',
+  group_stage:    'Phase de groupes',
+  losers_round:   'Bracket des perdants',
+  grand_final:    'Grande finale',
 };
 
 export const TournamentBracketScreen: React.FC = () => {
