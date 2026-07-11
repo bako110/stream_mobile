@@ -494,9 +494,17 @@ export const BattleScreen: React.FC = () => {
       nav.goBack();
       return;
     }
+
+    const myScore     = myHostSide === 'b' ? battle.score_b : battle.score_a;
+    const otherScore   = myHostSide === 'b' ? battle.score_a : battle.score_b;
+    const isLeading    = myScore > otherScore;
+    const halfGogold   = Math.floor(myScore / 2);
+
     Alert.alert(
       'Quitter le battle ?',
-      'Si tu quittes maintenant, tu perds automatiquement ce match.',
+      isLeading && halfGogold > 0
+        ? `Tu es en tête, mais si tu abandonnes maintenant tu perds automatiquement ce match ET tu reverses la moitié de tes GoGold gagnés (${halfGogold} GoGold) à ton adversaire.`
+        : 'Si tu quittes maintenant, tu perds automatiquement ce match.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -514,7 +522,7 @@ export const BattleScreen: React.FC = () => {
         },
       ],
     );
-  }, [isHost, battle, battleId, nav]);
+  }, [isHost, battle, battleId, nav, myHostSide]);
 
   if (loading || !token || !wsUrl) {
     return (
