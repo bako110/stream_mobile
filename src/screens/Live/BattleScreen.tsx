@@ -1220,7 +1220,7 @@ const styles = StyleSheet.create({
   },
 
   floaterAnchorA: { position: 'absolute', bottom: '10%', left: '25%' },
-  floaterAnchorB: { position: 'absolute', bottom: '10%', left: '75%' },
+  floaterAnchorB: { position: 'absolute', bottom: '10%', left: '60%' },
   floater: { fontSize: 20 },
 
   // Cadeaux compacts par cote (retrecis pour tenir dans le split-screen)
