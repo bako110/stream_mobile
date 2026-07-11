@@ -46,6 +46,7 @@ import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
+import { participantAvatarUrl } from '../../utils/livekitParticipant';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
@@ -876,9 +877,10 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; onBattleStart
         visible={showParticipants}
         onClose={() => setShowParticipants(false)}
         participants={allParticipants.map(p => ({
-          identity: p.identity,
-          name:     p.name || p.identity,
-          isHost:   p.isLocal,
+          identity:  p.identity,
+          name:      p.name || p.identity,
+          avatarUrl: participantAvatarUrl(p.metadata),
+          isHost:    p.isLocal,
         }))}
       />
 

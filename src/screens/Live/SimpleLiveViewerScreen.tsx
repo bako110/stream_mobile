@@ -34,6 +34,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { liveService } from '../../services/liveService';
 import { battleService } from '../../services/battleService';
+import { participantAvatarUrl } from '../../utils/livekitParticipant';
 import type { LiveStream } from '../../services/liveService';
 import { LiveAccessGate } from '../../components/live/LiveAccessGate';
 import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
@@ -774,6 +775,7 @@ const RoomContent: React.FC<{
         participants={roomParticipants.map(p => ({
           identity:  p.identity,
           name:      p.name || p.identity,
+          avatarUrl: participantAvatarUrl(p.metadata),
           isHost:    p.identity === hostId || (isHost && p.isLocal),
         }))}
       />

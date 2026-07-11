@@ -2,8 +2,8 @@
  * LiveParticipantsModal — Liste des participants connectés au live (LiveKit room),
  * ouverte en tapant sur le badge "N spectateurs" du header.
  */
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Image } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Image, TextInput } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 
@@ -25,6 +25,19 @@ export const LiveParticipantsModal: React.FC<{
   onClose: () => void;
   participants: LiveParticipantInfo[];
 }> = ({ visible, onClose, participants }) => {
+  const [search, setSearch] = useState('');
+
+  // Hote en premier, puis le reste — recherche par nom appliquee par-dessus.
+  const sorted = useMemo(
+    () => [...participants].sort((a, b) => (b.isHost ? 1 : 0) - (a.isHost ? 1 : 0)),
+    [participants],
+  );
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter(p => (p.name ?? '').toLowerCase().includes(q));
+  }, [sorted, search]);
+
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={onClose}>
@@ -40,11 +53,33 @@ export const LiveParticipantsModal: React.FC<{
                 </TouchableOpacity>
               </View>
 
+              {participants.length > 5 && (
+                <View style={s.searchWrap}>
+                  <Icon name="search" size={15} color="rgba(255,255,255,0.4)" />
+                  <TextInput
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder="Rechercher un participant…"
+                    placeholderTextColor="rgba(255,255,255,0.4)"
+                    style={s.searchInput}
+                    autoCorrect={false}
+                    returnKeyType="search"
+                  />
+                  {search.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+                      <Icon name="x" size={15} color="rgba(255,255,255,0.5)" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
               <FlatList
-                data={participants}
+                data={filtered}
                 keyExtractor={p => p.identity}
                 style={s.list}
                 showsVerticalScrollIndicator={false}
+                initialNumToRender={20}
+                windowSize={7}
                 renderItem={({ item }) => (
                   <View style={s.row}>
                     {item.avatarUrl
@@ -59,7 +94,11 @@ export const LiveParticipantsModal: React.FC<{
                     )}
                   </View>
                 )}
-                ListEmptyComponent={<Text style={s.empty}>Aucun participant pour l'instant</Text>}
+                ListEmptyComponent={
+                  <Text style={s.empty}>
+                    {search ? `Aucun participant ne correspond à « ${search} ».` : "Aucun participant pour l'instant"}
+                  </Text>
+                }
               />
             </View>
           </TouchableOpacity>
@@ -88,6 +127,12 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   title: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 8, marginBottom: 6,
+  },
+  searchInput: { flex: 1, color: '#fff', fontSize: 13, padding: 0 },
   list: { marginTop: 4 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
