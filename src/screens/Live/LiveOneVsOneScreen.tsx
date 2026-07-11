@@ -105,7 +105,7 @@ export const LiveOneVsOneScreen: React.FC = () => {
         <FlatList
           data={battles}
           keyExtractor={b => b.id}
-          numColumns={1}
+          numColumns={2}
           contentContainerStyle={st.list}
           renderItem={({ item }) => <BattleCard battle={item} onWatch={() => handleWatch(item)} />}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9B65F5" />}
@@ -128,7 +128,7 @@ const st = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 18, fontWeight: '800' },
-  list: { padding: 14, gap: 14 },
+  list: { padding: 8 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
