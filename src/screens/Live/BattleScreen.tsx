@@ -44,6 +44,10 @@ import { LiveParticipantsModal } from '../../components/live/LiveParticipantsMod
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
+// A partir de ce montant, un cadeau declenche l'animation plein ecran avec le nom
+// du donateur (en plus de la couronne temporaire, systematique quel que soit le montant).
+const BIG_GIFT_THRESHOLD = 500;
+
 // ── LiveKit quality config ─────────────────────────────────────────────────────
 // Chaque host publie et souscrit symetriquement dans la meme room de battle —
 // sans ces options explicites, la publication/souscription video peut echouer
@@ -109,6 +113,33 @@ function RisingHeart({ drift }: { drift: number }) {
 
   return (
     <Animated.Text style={[styles.floater, style]}>❤️</Animated.Text>
+  );
+}
+
+// Couronne temporaire — pop + leger rebond au-dessus de l'avatar du destinataire
+// a chaque cadeau recu, puis fondu (independant du score, purement festif).
+const CROWN_DURATION = 2600;
+
+function CrownPop() {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withSequence(
+      withTiming(1, { duration: 320, easing: Easing.out(Easing.back(1.8)) }),
+      withTiming(1, { duration: CROWN_DURATION - 320 - 400 }),
+      withTiming(0, { duration: 400, easing: Easing.in(Easing.quad) }),
+    );
+  }, []); // eslint-disable-line
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: progress.value }, { translateY: (1 - progress.value) * 10 }],
+    opacity: progress.value,
+  }));
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.crownPop, style]}>
+      <Text style={styles.crownPopEmoji}>👑</Text>
+    </Animated.View>
   );
 }
 
@@ -242,6 +273,13 @@ export const BattleScreen: React.FC = () => {
   const [giftTicker, setGiftTicker] = useState<GiftTick[]>([]);
   const [giftNotifsA, setGiftNotifsA] = useState<GiftNotif[]>([]);
   const [giftNotifsB, setGiftNotifsB] = useState<GiftNotif[]>([]);
+  // Couronne temporaire sur l'avatar du destinataire — a chaque cadeau, quel que
+  // soit son montant. Cle unique (id) pour rejouer l'animation meme si le meme
+  // camp recoit deux cadeaux coup sur coup.
+  const [crownA, setCrownA] = useState<string | null>(null);
+  const [crownB, setCrownB] = useState<string | null>(null);
+  // Overlay plein ecran pour les gros cadeaux (>= BIG_GIFT_THRESHOLD GoGold)
+  const [bigGift, setBigGift] = useState<{ id: string; senderName: string; emoji: string; giftName: string; GoGold: number } | null>(null);
   const [effectBanner, setEffectBanner] = useState<EffectBanner | null>(null);
   const [hostNameA, setHostNameA] = useState('Créateur A');
   const [hostNameB, setHostNameB] = useState('Créateur B');
@@ -407,6 +445,16 @@ export const BattleScreen: React.FC = () => {
       if (side === 'a') setGiftNotifsA(prev => [...prev, notif]);
       else setGiftNotifsB(prev => [...prev, notif]);
       refreshRanking();
+
+      // Couronne temporaire sur l'avatar du destinataire — a chaque cadeau, sans condition de montant
+      if (side === 'a') setCrownA(tick.id); else setCrownB(tick.id);
+      setTimeout(() => { if (side === 'a') setCrownA(prev => prev === tick.id ? null : prev); else setCrownB(prev => prev === tick.id ? null : prev); }, 2600);
+
+      // Gros cadeau — animation plein ecran avec le nom du donateur
+      if (tick.GoGold >= BIG_GIFT_THRESHOLD) {
+        setBigGift({ id: tick.id, senderName, emoji: tick.emoji, giftName: tick.giftName, GoGold: tick.GoGold });
+        setTimeout(() => setBigGift(prev => prev?.id === tick.id ? null : prev), 3800);
+      }
     }
   }, [refreshRanking]);
 
@@ -503,6 +551,9 @@ export const BattleScreen: React.FC = () => {
         messages={messages}
         chatRef={chatRef}
         giftTicker={giftTicker}
+        crownA={crownA}
+        crownB={crownB}
+        bigGift={bigGift}
         giftNotifsA={giftNotifsA}
         giftNotifsB={giftNotifsB}
         onGiftShownA={(id) => setGiftNotifsA(prev => prev.filter(n => n.id !== id))}
@@ -542,6 +593,9 @@ const BattleContent: React.FC<{
   messages: ChatMsg[];
   chatRef: React.RefObject<FlatList<ChatMsg> | null>;
   giftTicker: GiftTick[];
+  crownA: string | null;
+  crownB: string | null;
+  bigGift: { id: string; senderName: string; emoji: string; giftName: string; GoGold: number } | null;
   giftNotifsA: GiftNotif[];
   giftNotifsB: GiftNotif[];
   onGiftShownA: (id: string) => void;
@@ -557,7 +611,7 @@ const BattleContent: React.FC<{
   hostNameA, hostNameB, hostAvatarA, hostAvatarB,
   showRanking, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
-  giftTicker, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
+  giftTicker, crownA, crownB, bigGift, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
   effectBanner, onReact, onSendChat, onClose,
 }) => {
   const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
@@ -713,6 +767,7 @@ const BattleContent: React.FC<{
 
           {/* Bandeau nom + avatar du camp A */}
           <Animated.View entering={SlideInUp.duration(450).delay(100)} style={[styles.hostBadge, styles.hostBadgeA]}>
+            {crownA && <CrownPop key={crownA} />}
             {hostAvatarA
               ? <Image source={{ uri: hostAvatarA }} style={styles.hostBadgeAvatar} />
               : <View style={[styles.hostBadgeAvatar, styles.hostBadgeAvatarFallback]}><Icon name="user" size={12} color="#fff" /></View>}
@@ -769,6 +824,7 @@ const BattleContent: React.FC<{
             {hostAvatarB
               ? <Image source={{ uri: hostAvatarB }} style={styles.hostBadgeAvatar} />
               : <View style={[styles.hostBadgeAvatar, styles.hostBadgeAvatarFallback]}><Icon name="user" size={12} color="#fff" /></View>}
+            {crownB && <CrownPop key={crownB} />}
           </Animated.View>
 
           {/* Compteur de coeurs recus — purement indicatif, sans effet sur le score */}
@@ -852,7 +908,7 @@ const BattleContent: React.FC<{
           >
             {hostAvatarA
               ? <Image source={{ uri: hostAvatarA }} style={styles.giftCardAvatar} />
-              : <View style={[styles.giftCardAvatar, styles.giftCardAvatarFallback]}><Icon name="user" size={14} color="#fff" /></View>}
+              : <View style={[styles.giftCardAvatar, styles.giftCardAvatarFallback]}><Icon name="user" size={10} color="#fff" /></View>}
             <Text style={styles.giftCardName} numberOfLines={1}>{hostNameA}</Text>
             <View style={styles.giftCardIconWrap}>
               <Text style={styles.giftCardIcon}>🎁</Text>
@@ -869,7 +925,7 @@ const BattleContent: React.FC<{
             <Text style={styles.giftCardName} numberOfLines={1}>{hostNameB}</Text>
             {hostAvatarB
               ? <Image source={{ uri: hostAvatarB }} style={styles.giftCardAvatar} />
-              : <View style={[styles.giftCardAvatar, styles.giftCardAvatarFallback]}><Icon name="user" size={14} color="#fff" /></View>}
+              : <View style={[styles.giftCardAvatar, styles.giftCardAvatarFallback]}><Icon name="user" size={10} color="#fff" /></View>}
           </TouchableOpacity>
         </View>
 
@@ -947,6 +1003,31 @@ const BattleContent: React.FC<{
           isHost:    p.identity === battle?.host_a_id || p.identity === battle?.host_b_id,
         }))}
       />
+
+      {/* Gros cadeau — banniere plein ecran avec trone + nom du donateur, "il est le roi" */}
+      {bigGift && (
+        <Animated.View
+          key={bigGift.id}
+          entering={ZoomIn.duration(450).springify()}
+          exiting={FadeOut.duration(350)}
+          style={styles.bigGiftOverlay}
+          pointerEvents="none"
+        >
+          <LinearGradient colors={['#F59E0B', '#F0365A', '#9B65F5']} style={styles.bigGiftGlow} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <View style={styles.bigGiftThroneWrap}>
+              <Animated.Text entering={BounceIn.duration(650).delay(100)} style={styles.bigGiftThrone}>🪑</Animated.Text>
+              <Animated.Text entering={ZoomIn.duration(500).delay(350).springify()} style={styles.bigGiftCrownOnThrone}>👑</Animated.Text>
+            </View>
+            <Text style={styles.bigGiftKingLabel}>LE ROI DU MATCH</Text>
+            <Animated.Text entering={BounceIn.duration(600).delay(500)} style={styles.bigGiftEmoji}>{bigGift.emoji}</Animated.Text>
+            <Text style={styles.bigGiftGiftName}>{bigGift.giftName}</Text>
+            <Text style={styles.bigGiftSender} numberOfLines={1}>{bigGift.senderName}</Text>
+            <View style={styles.bigGiftGogoldPill}>
+              <Text style={styles.bigGiftGogoldText}>🪙 {bigGift.GoGold.toLocaleString('fr-FR')} GoGold</Text>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      )}
 
       {/* Ecran de fin */}
       {ended && (
@@ -1044,6 +1125,12 @@ const styles = StyleSheet.create({
   hostBadgeAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   hostBadgeName: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1 },
   hostBadgeCrown: { fontSize: 12 },
+  crownPop: {
+    position: 'absolute', top: -20, left: 0, right: 0, alignItems: 'center', zIndex: 20,
+  },
+  crownPopEmoji: {
+    fontSize: 22, textShadowColor: 'rgba(255,215,0,0.9)', textShadowRadius: 8, textShadowOffset: { width: 0, height: 0 },
+  },
 
   // Compteur de coeurs recus par camp — juste sous le bandeau nom/avatar
   heartCounter: {
@@ -1067,22 +1154,22 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 4, paddingBottom: 4 },
 
   // Envoyer un cadeau — carte dediee par competiteur, sans ambiguite sur le destinataire
-  giftRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingTop: 8 },
+  giftRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingTop: 6 },
   giftCard: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderRadius: 16, paddingVertical: 8, paddingHorizontal: 10,
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 13, paddingVertical: 5, paddingHorizontal: 7,
     borderWidth: 1,
   },
   giftCardA: { backgroundColor: 'rgba(123,63,242,0.14)', borderColor: 'rgba(123,63,242,0.4)' },
   giftCardB: { backgroundColor: 'rgba(240,54,90,0.14)', borderColor: 'rgba(240,54,90,0.4)' },
-  giftCardAvatar: { width: 26, height: 26, borderRadius: 13 },
+  giftCardAvatar: { width: 19, height: 19, borderRadius: 10 },
   giftCardAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  giftCardName: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '700' },
+  giftCardName: { flex: 1, color: '#fff', fontSize: 11, fontWeight: '700' },
   giftCardIconWrap: {
-    width: 28, height: 28, borderRadius: 14,
+    width: 20, height: 20, borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
   },
-  giftCardIcon: { fontSize: 15 },
+  giftCardIcon: { fontSize: 11 },
 
   scoreBarTrack: {
     width: '100%', height: 10, borderRadius: 6, overflow: 'hidden', flexDirection: 'row',
@@ -1184,6 +1271,30 @@ const styles = StyleSheet.create({
   rankAmount: { color: '#FFD700', fontSize: 12, fontWeight: '700' },
   surpriseRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' },
   surpriseText: { color: 'rgba(255,255,255,0.75)', fontSize: 12 },
+
+  bigGiftOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', zIndex: 80, backgroundColor: 'rgba(0,0,0,0.35)' },
+  bigGiftGlow: {
+    width: '78%', borderRadius: 28, paddingVertical: 26, paddingHorizontal: 20, alignItems: 'center', gap: 6,
+    shadowColor: '#F0365A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 24, elevation: 20,
+  },
+  bigGiftThroneWrap: { alignItems: 'center', justifyContent: 'center' },
+  bigGiftThrone: {
+    fontSize: 90,
+    textShadowColor: 'rgba(255,215,0,0.85)', textShadowRadius: 18, textShadowOffset: { width: 0, height: 0 },
+  },
+  bigGiftCrownOnThrone: { position: 'absolute', top: -8, alignSelf: 'center', fontSize: 34 },
+  bigGiftKingLabel: {
+    color: '#FFD700', fontSize: 13, fontWeight: '900', letterSpacing: 1.5,
+    marginTop: 10, textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 },
+  },
+  bigGiftEmoji: { fontSize: 44, marginTop: 4 },
+  bigGiftGiftName: { color: '#fff', fontSize: 16, fontWeight: '800', marginTop: 4 },
+  bigGiftSender: { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', marginTop: 2 },
+  bigGiftGogoldPill: {
+    marginTop: 8, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 16,
+    paddingVertical: 6, paddingHorizontal: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  bigGiftGogoldText: { color: '#FFD700', fontSize: 14, fontWeight: '800' },
 
   endedOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 70 },
   endedCard: { width: '80%', borderRadius: 28, padding: 28, alignItems: 'center', gap: 12 },
