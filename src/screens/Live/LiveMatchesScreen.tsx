@@ -393,6 +393,7 @@ export const LiveMatchesScreen: React.FC = () => {
           <View style={st.center}><ActivityIndicator color="#9B65F5" /></View>
         ) : (
           <FlatList
+            key="battles-list"
             data={battles}
             keyExtractor={b => b.id}
             numColumns={1}
@@ -415,8 +416,10 @@ export const LiveMatchesScreen: React.FC = () => {
           <View style={st.center}><ActivityIndicator color="#9B65F5" /></View>
         ) : (
           <FlatList
+            key="tournaments-list"
             data={tournaments}
             keyExtractor={t => t.id}
+            numColumns={1}
             contentContainerStyle={st.list}
             renderItem={({ item }) => <TournamentCard tournament={item} onView={() => handleViewTournament(item)} />}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9B65F5" />}
