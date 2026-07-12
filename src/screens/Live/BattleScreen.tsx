@@ -290,7 +290,7 @@ export const BattleScreen: React.FC = () => {
   // Compteur de coeurs par camp — purement indicatif, sans effet sur le score du match.
   const [heartCountA, setHeartCountA] = useState(0);
   const [heartCountB, setHeartCountB] = useState(0);
-  const [ended, setEnded]     = useState<{ winner_id: string | null; score_a: number; score_b: number } | null>(null);
+  const [ended, setEnded]     = useState<{ winner_id: string | null; score_a: number; score_b: number; forfeitBy?: string | null; forfeitPenalty?: number } | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -409,7 +409,10 @@ export const BattleScreen: React.FC = () => {
       }
 
       if (payload.type === 'battle_ended') {
-        setEnded({ winner_id: payload.winner_id, score_a: payload.score_a, score_b: payload.score_b });
+        setEnded({
+          winner_id: payload.winner_id, score_a: payload.score_a, score_b: payload.score_b,
+          forfeitBy: payload.forfeit_by ?? null, forfeitPenalty: payload.forfeit_penalty ?? 0,
+        });
         setBattle(prev => {
           if (!prev) return prev;
           clearLiveEnteringBattle(prev.live_a_id);
@@ -1105,6 +1108,14 @@ const BattleContent: React.FC<{
                     {winnerName} remporte ce round, mais chaque champion a connu la défaite avant de gagner.
                   </Text>
                   <Text style={styles.comfortScore}>{ended.score_a} — {ended.score_b}</Text>
+                  {!!ended.forfeitPenalty && ended.forfeitBy === myId && (
+                    <View style={styles.comfortPenaltyBox}>
+                      <Icon name="arrow-up-right" size={14} color="#F0365A" />
+                      <Text style={styles.comfortPenaltyText}>
+                        {ended.forfeitPenalty.toLocaleString('fr-FR')} GoGold reversés à ton adversaire pour avoir quitté en menant
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.comfortEncourageBox}>
                     <Icon name="trending-up" size={16} color="#9B65F5" />
                     <Text style={styles.comfortEncourageText}>La prochaine victoire est pour toi. Reviens plus fort !</Text>
@@ -1152,6 +1163,15 @@ const BattleContent: React.FC<{
                     <Text style={styles.championGogoldEmoji}>🪙</Text>
                     <Text style={styles.championGogoldText}>{winnerGoGold.toLocaleString('fr-FR')} GoGold</Text>
                   </View>
+
+                  {!!ended.forfeitPenalty && ended.forfeitBy && ended.forfeitBy !== myId && (
+                    <View style={styles.championBonusBox}>
+                      <Icon name="gift" size={13} color="#fff" />
+                      <Text style={styles.championBonusText}>
+                        +{ended.forfeitPenalty.toLocaleString('fr-FR')} GoGold bonus — l'adversaire a abandonné en menant
+                      </Text>
+                    </View>
+                  )}
 
                   <Text style={styles.championScore}>{ended.score_a} — {ended.score_b}</Text>
 
@@ -1427,6 +1447,12 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
   },
   comfortEncourageText: { color: '#C4A8FA', fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  comfortPenaltyBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(240,54,90,0.12)',
+    borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginTop: 2,
+    borderWidth: 1, borderColor: 'rgba(240,54,90,0.3)',
+  },
+  comfortPenaltyText: { color: '#F0365A', fontSize: 11, fontWeight: '700', flexShrink: 1 },
   comfortBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
   comfortBtnText: { color: '#3A3F52', fontSize: 14, fontWeight: '800' },
 
@@ -1456,6 +1482,11 @@ const styles = StyleSheet.create({
   },
   championGogoldEmoji: { fontSize: 16 },
   championGogoldText: { color: '#FFD700', fontSize: 16, fontWeight: '900' },
+  championBonusBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 12, paddingVertical: 7, paddingHorizontal: 12, marginTop: 2, maxWidth: '90%',
+  },
+  championBonusText: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
   championScore: { color: 'rgba(255,255,255,0.85)', fontSize: 16, fontWeight: '700', marginTop: 4 },
   championBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 32 },
   championBtnText: { color: '#B8860B', fontSize: 14, fontWeight: '900' },
