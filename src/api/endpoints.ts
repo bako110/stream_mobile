@@ -431,6 +431,7 @@ export const Endpoints = {
     rejectParticipant:  (id: string, userId: string) => `${V1}/tournaments/${id}/participants/${userId}/reject`,
     generateBracket:    (id: string) => `${V1}/tournaments/${id}/generate-bracket`,
     bracket:            (id: string) => `${V1}/tournaments/${id}/bracket`,
+    standings:          (id: string) => `${V1}/tournaments/${id}/standings`,
     cancel:             (id: string) => `${V1}/tournaments/${id}/cancel`,
     matchReady:         (matchId: string) => `${V1}/tournaments/matches/${matchId}/ready`,
   },

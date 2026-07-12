@@ -16,7 +16,7 @@ import { useUser } from '../../context/UserContext';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { tournamentService } from '../../services/tournamentService';
-import type { TournamentBracket, TournamentMatch, TournamentRound } from '../../services/tournamentService';
+import type { TournamentBracket, TournamentMatch, TournamentRound, TournamentStanding } from '../../services/tournamentService';
 import { liveService } from '../../services/liveService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { BackButton } from '../../components/common';
@@ -47,6 +47,7 @@ export const TournamentBracketScreen: React.FC = () => {
   const { addListener, removeListener } = useWs();
 
   const [bracket, setBracket]   = useState<TournamentBracket | null>(null);
+  const [standings, setStandings] = useState<TournamentStanding[]>([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [startingMatch, setStartingMatch] = useState<string | null>(null);
@@ -55,6 +56,9 @@ export const TournamentBracketScreen: React.FC = () => {
     try {
       const data = await tournamentService.getBracket(tournamentId);
       setBracket(data);
+      if (data.tournament.tournament_type === 'league' || data.tournament.tournament_type === 'group_stage') {
+        tournamentService.getStandings(tournamentId).then(setStandings).catch(() => {});
+      }
     } catch {} finally { setLoading(false); setRefreshing(false); }
   }, [tournamentId]);
 
@@ -145,6 +149,16 @@ export const TournamentBracketScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#7B3FF2" />}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
+        {tournament.prize_pool > 0 && (
+          <View style={styles.prizePoolCard}>
+            <Text style={styles.prizePoolEmoji}>🏆</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.prizePoolLabel}>Cagnotte du tournoi</Text>
+              <Text style={styles.prizePoolValue}>{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
+            </View>
+          </View>
+        )}
+
         {tournament.status === 'registration' && (
           <View style={[styles.regCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.regTitle, { color: colors.textPrimary }]}>Inscriptions ouvertes</Text>
@@ -178,6 +192,26 @@ export const TournamentBracketScreen: React.FC = () => {
             <Text style={styles.winnerText}>
               {participants.find(p => p.user_id === tournament.winner_id)?.display_name ?? 'Champion'} remporte le tournoi !
             </Text>
+            {tournament.prize_pool > 0 && (
+              <Text style={styles.winnerPrizeText}>+{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
+            )}
+          </View>
+        )}
+
+        {standings.length > 0 && (
+          <View style={[styles.standingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.standingsTitle, { color: colors.textPrimary }]}>Classement</Text>
+            {standings.map(s => (
+              <View key={s.user_id} style={styles.standingsRow}>
+                <Text style={[styles.standingsRank, { color: colors.textTertiary }]}>{s.rank}</Text>
+                {s.avatar_url
+                  ? <Image source={{ uri: s.avatar_url }} style={styles.standingsAvatar} />
+                  : <View style={[styles.standingsAvatar, styles.slotAvatarFallback]}><Icon name="user" size={12} color="rgba(255,255,255,0.4)" /></View>}
+                <Text style={[styles.standingsName, { color: colors.textPrimary }]} numberOfLines={1}>{s.display_name ?? 'Participant'}</Text>
+                <Text style={[styles.standingsStat, { color: colors.textTertiary }]}>{s.wins}V {s.draws}N {s.losses}D</Text>
+                <Text style={[styles.standingsPoints, { color: colors.textPrimary }]}>{s.points} pts</Text>
+              </View>
+            ))}
           </View>
         )}
 
@@ -250,6 +284,24 @@ const styles = StyleSheet.create({
 
   winnerCard: { alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 12, borderRadius: 16, padding: 20, backgroundColor: '#FFD70022' },
   winnerText: { fontSize: 15, fontWeight: '800', color: '#B45309', textAlign: 'center' },
+  winnerPrizeText: { fontSize: 18, fontWeight: '900', color: '#B45309' },
+
+  prizePoolCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16, marginBottom: 4,
+    borderRadius: 16, padding: 14, backgroundColor: '#FFD70018', borderWidth: 1, borderColor: '#FFD70040',
+  },
+  prizePoolEmoji: { fontSize: 26 },
+  prizePoolLabel: { fontSize: 11, fontWeight: '700', color: '#B45309', textTransform: 'uppercase', letterSpacing: 0.4 },
+  prizePoolValue: { fontSize: 18, fontWeight: '900', color: '#B45309', marginTop: 2 },
+
+  standingsCard: { marginHorizontal: 16, marginBottom: 16, borderRadius: 16, borderWidth: 1, padding: 14, gap: 4 },
+  standingsTitle: { fontSize: 14, fontWeight: '800', marginBottom: 6 },
+  standingsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
+  standingsRank: { width: 18, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  standingsAvatar: { width: 24, height: 24, borderRadius: 12 },
+  standingsName: { flex: 1, fontSize: 13, fontWeight: '600' },
+  standingsStat: { fontSize: 11, fontWeight: '600' },
+  standingsPoints: { fontSize: 13, fontWeight: '800', minWidth: 48, textAlign: 'right' },
 
   bracketRow: { paddingHorizontal: 16, gap: 20, paddingBottom: 20 },
   roundCol: { width: 180, gap: 12 },

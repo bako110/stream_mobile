@@ -44,6 +44,7 @@ export interface Tournament {
 export interface OpenTournament extends Tournament {
   participants_count: number;
   max_participants:   number;
+  prize_pool:         number;
 }
 
 export interface ActiveTournament extends OpenTournament {
@@ -95,9 +96,25 @@ export interface TournamentMatch {
 }
 
 export interface TournamentBracket {
-  tournament:   Tournament;
+  tournament:   Tournament & { prize_pool: number };
   participants: TournamentParticipant[];
   matches:      TournamentMatch[];
+}
+
+export interface TournamentStanding {
+  rank:             number;
+  user_id:          string;
+  display_name:     string | null;
+  avatar_url:       string | null;
+  seed:             number | null;
+  eliminated_round: TournamentRound | null;
+  points:           number;
+  wins:             number;
+  draws:            number;
+  losses:           number;
+  score_for:        number;
+  score_against:    number;
+  differential:     number;
 }
 
 export interface CreateTournamentPayload {
@@ -193,6 +210,11 @@ async function getBracket(tournamentId: string): Promise<TournamentBracket> {
   return r.data;
 }
 
+async function getStandings(tournamentId: string): Promise<TournamentStanding[]> {
+  const r = await apiClient.get<TournamentStanding[]>(Endpoints.tournaments.standings(tournamentId));
+  return r.data ?? [];
+}
+
 async function cancel(tournamentId: string): Promise<Tournament> {
   const r = await apiClient.post<Tournament>(Endpoints.tournaments.cancel(tournamentId));
   return r.data;
@@ -216,6 +238,7 @@ export const tournamentService = {
   rejectParticipant,
   generateBracket,
   getBracket,
+  getStandings,
   cancel,
   markMatchReady,
 };

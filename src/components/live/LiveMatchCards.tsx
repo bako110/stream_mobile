@@ -156,6 +156,11 @@ export const TournamentCard: React.FC<{ tournament: ActiveTournament; onView: ()
               <Text style={s.tourPrizeEmoji}>🏆</Text>
               <Text style={s.tourPrizeText} numberOfLines={1}>{tournament.prize}</Text>
             </View>
+          ) : tournament.prize_pool > 0 ? (
+            <View style={s.tourPrizeRow}>
+              <Text style={s.tourPrizeEmoji}>🪙</Text>
+              <Text style={s.tourPrizeText} numberOfLines={1}>{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
+            </View>
           ) : (
             <View style={s.tourOrganizerRow}>
               {tournament.organizer_avatar
