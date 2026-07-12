@@ -348,7 +348,7 @@ export const BattleScreen: React.FC = () => {
         if (b.status === 'active') {
           setRemaining(Math.max(0, b.duration_seconds - Math.floor((Date.now() - new Date(b.started_at ?? Date.now()).getTime()) / 1000)));
         } else if (b.status === 'ended') {
-          setEnded({ winner_id: b.winner_id, score_a: b.score_a, score_b: b.score_b });
+          setEnded({ winner_id: b.winner_id, score_a: b.score_a, score_b: b.score_b, forfeitBy: null, forfeitPenalty: 0 });
         }
         setToken(t.token);
         setWsUrl(t.ws_url);
@@ -613,7 +613,7 @@ const BattleContent: React.FC<{
   floaters: { id: string; side: 'a' | 'b'; drift: number }[];
   heartCountA: number;
   heartCountB: number;
-  ended: { winner_id: string | null; score_a: number; score_b: number } | null;
+  ended: { winner_id: string | null; score_a: number; score_b: number; forfeitBy?: string | null; forfeitPenalty?: number } | null;
   leaving: boolean;
   myId: string | null;
   myHostSide: 'a' | 'b' | null;
