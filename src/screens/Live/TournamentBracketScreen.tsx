@@ -124,6 +124,7 @@ export const TournamentBracketScreen: React.FC = () => {
 
   const rounds = bracket ? Array.from(new Set(bracket.matches.map(m => m.round))) : [];
   const myMatch = findMyMatch();
+  const liveMatches = bracket?.matches.filter(m => m.status === 'live' && m.battle_id) ?? [];
 
   if (loading || !bracket) {
     return (
@@ -170,6 +171,39 @@ export const TournamentBracketScreen: React.FC = () => {
                 <Text style={styles.regBtnText}>Démarrer le tournoi maintenant</Text>
               </TouchableOpacity>
             )}
+          </View>
+        )}
+
+        {liveMatches.length > 0 && (
+          <View style={styles.liveCenterSection}>
+            <View style={styles.liveCenterHeader}>
+              <View style={styles.liveCenterDot} />
+              <Text style={[styles.liveCenterTitle, { color: colors.textPrimary }]}>
+                {liveMatches.length} match{liveMatches.length > 1 ? 's' : ''} en direct
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.liveCenterRow}>
+              {liveMatches.map(match => {
+                const partA = participants.find(p => p.id === match.participant_a_id);
+                const partB = participants.find(p => p.id === match.participant_b_id);
+                return (
+                  <TouchableOpacity
+                    key={match.id}
+                    activeOpacity={0.8}
+                    onPress={() => match.battle_id && nav.navigate('BattleScreen', { battleId: match.battle_id })}
+                    style={[styles.liveCenterCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <Text style={[styles.liveCenterNames, { color: colors.textPrimary }]} numberOfLines={1}>
+                      {partA?.display_name ?? '—'} <Text style={{ color: colors.textTertiary }}>vs</Text> {partB?.display_name ?? '—'}
+                    </Text>
+                    <View style={styles.liveCenterWatchBtn}>
+                      <Icon name="play" size={10} color="#fff" />
+                      <Text style={styles.liveCenterWatchText}>Regarder</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         )}
 
@@ -223,8 +257,15 @@ export const TournamentBracketScreen: React.FC = () => {
                 const partA = participants.find(p => p.id === match.participant_a_id);
                 const partB = participants.find(p => p.id === match.participant_b_id);
                 const isMine = match.id === myMatch?.id;
+                const isTappable = match.status === 'live' && !!match.battle_id;
                 return (
-                  <View key={match.id} style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: isMine ? '#7B3FF2' : colors.border }]}>
+                  <TouchableOpacity
+                    key={match.id}
+                    activeOpacity={isTappable ? 0.7 : 1}
+                    disabled={!isTappable}
+                    onPress={() => match.battle_id && nav.navigate('BattleScreen', { battleId: match.battle_id })}
+                    style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: isMine ? '#7B3FF2' : colors.border }]}
+                  >
                     <MatchSlot
                       name={partA?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
                       avatar={partA?.avatar_url}
@@ -241,7 +282,10 @@ export const TournamentBracketScreen: React.FC = () => {
                     {match.status === 'live' && (
                       <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>EN DIRECT</Text></View>
                     )}
-                  </View>
+                    {isTappable && (
+                      <View style={styles.watchHint}><Icon name="play" size={9} color="#fff" /></View>
+                    )}
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -282,6 +326,19 @@ const styles = StyleSheet.create({
   readyBtn: { backgroundColor: '#7B3FF2', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 },
   readyBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
+  liveCenterSection: { marginTop: 16, marginBottom: 4 },
+  liveCenterHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 16, marginBottom: 8 },
+  liveCenterDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
+  liveCenterTitle: { fontSize: 13, fontWeight: '800' },
+  liveCenterRow: { paddingHorizontal: 16, gap: 10 },
+  liveCenterCard: { width: 200, borderRadius: 14, borderWidth: 1, padding: 12, gap: 8 },
+  liveCenterNames: { fontSize: 12, fontWeight: '700' },
+  liveCenterWatchBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#7B3FF2',
+    borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, alignSelf: 'flex-start',
+  },
+  liveCenterWatchText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+
   winnerCard: { alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 12, borderRadius: 16, padding: 20, backgroundColor: '#FFD70022' },
   winnerText: { fontSize: 15, fontWeight: '800', color: '#B45309', textAlign: 'center' },
   winnerPrizeText: { fontSize: 18, fontWeight: '900', color: '#B45309' },
@@ -315,4 +372,8 @@ const styles = StyleSheet.create({
   slotNameWinner: { fontWeight: '800' },
   liveBadge: { position: 'absolute', top: -8, right: 8, backgroundColor: '#EF4444', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   liveBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  watchHint: {
+    position: 'absolute', bottom: -8, right: 8, backgroundColor: '#7B3FF2', borderRadius: 9,
+    width: 18, height: 18, alignItems: 'center', justifyContent: 'center',
+  },
 });
