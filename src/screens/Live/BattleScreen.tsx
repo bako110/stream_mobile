@@ -1069,7 +1069,10 @@ const BattleContent: React.FC<{
         const winnerAvatar = ended.winner_id === battle?.host_a_id ? hostAvatarA : hostAvatarB;
         const winnerGoGold = ended.winner_id === battle?.host_a_id ? ended.score_a : ended.score_b;
 
-        if (!iWon) {
+        const iLost = ended.winner_id !== null && !iWon;
+
+        // ── Match nul — ecran neutre inchange ──────────────────────────────────
+        if (ended.winner_id === null) {
           return (
             <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
               <Animated.View entering={BounceIn.duration(700).delay(150)}>
@@ -1077,17 +1080,37 @@ const BattleContent: React.FC<{
                   <Animated.View entering={ZoomIn.duration(500).delay(400)}>
                     <Icon name="award" size={48} color="#FFD700" />
                   </Animated.View>
-                  <Text style={styles.endedTitle}>
-                    {ended.winner_id === null ? 'Match nul !' : 'Battle terminé'}
-                  </Text>
-                  {ended.winner_id !== null && (
-                    <Text style={styles.endedSubtitle}>
-                      {winnerName} remporte le match
-                    </Text>
-                  )}
+                  <Text style={styles.endedTitle}>Match nul !</Text>
                   <Text style={styles.endedScore}>{ended.score_a} — {ended.score_b}</Text>
                   <TouchableOpacity style={styles.endedBtn} onPress={onClose}>
                     <Text style={styles.endedBtnText}>Fermer</Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </Animated.View>
+            </Animated.View>
+          );
+        }
+
+        // ── Ecran perdant — decouragement doux + reconfort/encouragement ───────
+        if (iLost) {
+          return (
+            <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
+              <Animated.View entering={FadeIn.duration(700).delay(150)}>
+                <LinearGradient colors={['#3A3F52', '#20232F']} style={styles.comfortCard}>
+                  <Animated.View entering={ZoomIn.duration(500).delay(300)}>
+                    <Text style={styles.comfortEmoji}>💙</Text>
+                  </Animated.View>
+                  <Text style={styles.comfortTitle}>Ce n'est que partie remise</Text>
+                  <Text style={styles.comfortSubtitle}>
+                    {winnerName} remporte ce round, mais chaque champion a connu la défaite avant de gagner.
+                  </Text>
+                  <Text style={styles.comfortScore}>{ended.score_a} — {ended.score_b}</Text>
+                  <View style={styles.comfortEncourageBox}>
+                    <Icon name="trending-up" size={16} color="#9B65F5" />
+                    <Text style={styles.comfortEncourageText}>La prochaine victoire est pour toi. Reviens plus fort !</Text>
+                  </View>
+                  <TouchableOpacity style={styles.comfortBtn} onPress={onClose}>
+                    <Text style={styles.comfortBtnText}>Fermer</Text>
                   </TouchableOpacity>
                 </LinearGradient>
               </Animated.View>
@@ -1388,10 +1411,24 @@ const styles = StyleSheet.create({
   endedOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 70 },
   endedCard: { width: '80%', borderRadius: 28, padding: 28, alignItems: 'center', gap: 12 },
   endedTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  endedSubtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' },
   endedScore: { color: 'rgba(255,255,255,0.9)', fontSize: 28, fontWeight: '900' },
   endedBtn: { marginTop: 8, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
   endedBtnText: { color: '#4C1D95', fontSize: 14, fontWeight: '800' },
+
+  // ── Ecran perdant — decouragement doux + reconfort ─────────────────────────
+  comfortCard: { width: '84%', borderRadius: 28, padding: 26, alignItems: 'center', gap: 10 },
+  comfortEmoji: { fontSize: 40, marginBottom: 2 },
+  comfortTitle: { color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  comfortSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', textAlign: 'center', lineHeight: 19 },
+  comfortScore: { color: 'rgba(255,255,255,0.85)', fontSize: 24, fontWeight: '900', marginTop: 4 },
+  comfortEncourageBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(155,101,245,0.15)',
+    borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14, marginTop: 6,
+    borderWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
+  },
+  comfortEncourageText: { color: '#C4A8FA', fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  comfortBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
+  comfortBtnText: { color: '#3A3F52', fontSize: 14, fontWeight: '800' },
 
   // ── Ecran champion (vainqueur) — decor dore/floral ─────────────────────────
   fallingPetal: { position: 'absolute', top: -20, fontSize: 22, zIndex: 71 },
