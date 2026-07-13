@@ -126,6 +126,41 @@ export const TournamentBracketScreen: React.FC = () => {
   const myMatch = findMyMatch();
   const liveMatches = bracket?.matches.filter(m => m.status === 'live' && m.battle_id) ?? [];
 
+  // ── Statut + position du joueur — vue d'ensemble immediate en entrant sur l'ecran ──
+  const myStatus = (): { label: string; color: string; icon: string; opponentName: string | null } | null => {
+    if (!bracket || !myParticipant) return null;
+    if (bracket.tournament.status === 'completed') {
+      const won = bracket.tournament.winner_id === currentUser?.id;
+      return won
+        ? { label: 'Champion du tournoi 🏆', color: '#FFD700', icon: 'award', opponentName: null }
+        : { label: 'Tournoi terminé', color: '#9CA3AF', icon: 'flag', opponentName: null };
+    }
+    if (bracket.tournament.status === 'registration') {
+      return { label: 'Inscrit — en attente du démarrage', color: '#7B3FF2', icon: 'clock', opponentName: null };
+    }
+    if (myParticipant.eliminated_round) {
+      return { label: 'Éliminé', color: '#EF4444', icon: 'x-circle', opponentName: null };
+    }
+    if (myMatch) {
+      const opp = myMatch.participant_a_id === myParticipant.id
+        ? participants.find(p => p.id === myMatch.participant_b_id)
+        : participants.find(p => p.id === myMatch.participant_a_id);
+      return { label: 'À toi de jouer', color: '#10B981', icon: 'zap', opponentName: opp?.display_name ?? 'Adversaire à confirmer' };
+    }
+    const myLiveMatch = liveMatches.find(m => m.participant_a_id === myParticipant.id || m.participant_b_id === myParticipant.id);
+    if (myLiveMatch) {
+      const opp = myLiveMatch.participant_a_id === myParticipant.id
+        ? participants.find(p => p.id === myLiveMatch.participant_b_id)
+        : participants.find(p => p.id === myLiveMatch.participant_a_id);
+      return { label: 'Match en cours', color: '#EF4444', icon: 'radio', opponentName: opp?.display_name ?? null };
+    }
+    return { label: 'Qualifié — en attente du prochain match', color: '#F59E0B', icon: 'check-circle', opponentName: null };
+  };
+  const currentPhase = rounds.length > 0
+    ? ROUND_LABELS[rounds.find(r => bracket?.matches.some(m => m.round === r && m.status !== 'completed')) ?? rounds[rounds.length - 1]]
+    : null;
+  const status = myStatus();
+
   if (loading || !bracket) {
     return (
       <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -150,6 +185,23 @@ export const TournamentBracketScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#7B3FF2" />}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
+        {status && (
+          <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.statusIconWrap, { backgroundColor: status.color + '20' }]}>
+              <Icon name={status.icon} size={18} color={status.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
+              {currentPhase && (
+                <Text style={[styles.statusPhase, { color: colors.textTertiary }]}>Phase actuelle : {currentPhase}</Text>
+              )}
+              {status.opponentName && (
+                <Text style={[styles.statusOpponent, { color: colors.textPrimary }]}>Adversaire : {status.opponentName}</Text>
+              )}
+            </View>
+          </View>
+        )}
+
         {tournament.prize_pool > 0 && (
           <View style={styles.prizePoolCard}>
             <Text style={styles.prizePoolEmoji}>🏆</Text>
@@ -314,6 +366,15 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
+
+  statusCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16,
+    borderRadius: 16, borderWidth: 1, padding: 14,
+  },
+  statusIconWrap: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  statusLabel: { fontSize: 14, fontWeight: '800' },
+  statusPhase: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  statusOpponent: { fontSize: 12, fontWeight: '600', marginTop: 2 },
 
   regCard: { margin: 16, borderRadius: 16, borderWidth: 1, padding: 16, gap: 8 },
   regTitle: { fontSize: 15, fontWeight: '700' },
