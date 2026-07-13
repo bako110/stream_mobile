@@ -117,6 +117,36 @@ export interface TournamentStanding {
   differential:     number;
 }
 
+export interface TournamentFinanceParticipant {
+  user_id:          string;
+  display_name:     string | null;
+  avatar_url:       string | null;
+  gogold_generated: number;
+  gifts_count:      number;
+  eliminated_round: TournamentRound | null;
+}
+
+export interface TournamentFinanceMatch {
+  match_id:              string;
+  round:                 TournamentRound;
+  group_number:          number | null;
+  status:                TournamentMatchStatus;
+  participant_a_id:      string | null;
+  participant_b_id:      string | null;
+  winner_participant_id: string | null;
+  gogold_generated:      number;
+}
+
+export interface TournamentFinanceReport {
+  tournament_id:    string;
+  entry_fees_total: number;
+  gifts_total:      number;
+  wallet_total:     number;
+  by_participant:   TournamentFinanceParticipant[];
+  by_round:         { round: TournamentRound; gogold_generated: number }[];
+  by_match:         TournamentFinanceMatch[];
+}
+
 export interface CreateTournamentPayload {
   name: string;
   format: 8 | 16 | 32 | 64;
@@ -227,6 +257,18 @@ async function markMatchReady(matchId: string, liveId: string): Promise<Tourname
   return r.data;
 }
 
+async function getFinanceReport(tournamentId: string): Promise<TournamentFinanceReport> {
+  const r = await apiClient.get<TournamentFinanceReport>(Endpoints.tournaments.finance(tournamentId));
+  return r.data;
+}
+
+async function rewardParticipant(tournamentId: string, participantUserId: string, amountGogold: number): Promise<void> {
+  await apiClient.post(Endpoints.tournaments.reward(tournamentId), {
+    participant_user_id: participantUserId,
+    amount_gogold: amountGogold,
+  });
+}
+
 export const tournamentService = {
   listOpen,
   listActive,
@@ -241,4 +283,6 @@ export const tournamentService = {
   getStandings,
   cancel,
   markMatchReady,
+  getFinanceReport,
+  rewardParticipant,
 };

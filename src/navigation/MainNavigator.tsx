@@ -95,6 +95,7 @@ import { SimpleLiveViewerScreen }  from '../screens/Live/SimpleLiveViewerScreen'
 import { BattleScreen }            from '../screens/Live/BattleScreen';
 import { TournamentListScreen }    from '../screens/Live/TournamentListScreen';
 import { TournamentBracketScreen } from '../screens/Live/TournamentBracketScreen';
+import { TournamentFinanceScreen } from '../screens/Live/TournamentFinanceScreen';
 import { LiveMatchesHubScreen }    from '../screens/Live/LiveMatchesHubScreen';
 import { LiveOneVsOneScreen }      from '../screens/Live/LiveOneVsOneScreen';
 import { LiveTournamentsScreen }   from '../screens/Live/LiveTournamentsScreen';
@@ -211,6 +212,7 @@ export type MainStackParamList = {
   BattleScreen:      { battleId: string; followedHostId?: string };
   TournamentList:    undefined;
   TournamentBracket: { tournamentId: string };
+  TournamentFinance: { tournamentId: string };
   LiveMatches:       undefined;
   LiveOneVsOne:      undefined;
   LiveTournaments:   undefined;
@@ -475,6 +477,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="BattleScreen"       component={BattleScreen}            options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="TournamentList"     component={TournamentListScreen} />
         <Stack.Screen name="TournamentBracket"  component={TournamentBracketScreen} />
+        <Stack.Screen name="TournamentFinance"  component={TournamentFinanceScreen} />
         <Stack.Screen name="LiveMatches"         component={LiveMatchesHubScreen} />
         <Stack.Screen name="LiveOneVsOne"       component={LiveOneVsOneScreen} />
         <Stack.Screen name="LiveTournaments"    component={LiveTournamentsScreen} />

@@ -432,6 +432,8 @@ export const Endpoints = {
     generateBracket:    (id: string) => `${V1}/tournaments/${id}/generate-bracket`,
     bracket:            (id: string) => `${V1}/tournaments/${id}/bracket`,
     standings:          (id: string) => `${V1}/tournaments/${id}/standings`,
+    finance:            (id: string) => `${V1}/tournaments/${id}/finance`,
+    reward:             (id: string) => `${V1}/tournaments/${id}/reward`,
     cancel:             (id: string) => `${V1}/tournaments/${id}/cancel`,
     matchReady:         (matchId: string) => `${V1}/tournaments/matches/${matchId}/ready`,
   },

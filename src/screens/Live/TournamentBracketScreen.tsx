@@ -204,7 +204,16 @@ export const TournamentBracketScreen: React.FC = () => {
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{tournament.name}</Text>
-        <View style={{ width: 38 }} />
+        {isOrganizer && tournament.status !== 'registration' ? (
+          <TouchableOpacity
+            style={styles.financeBtn}
+            onPress={() => nav.navigate('TournamentFinance', { tournamentId })}
+          >
+            <Icon name="dollar-sign" size={18} color="#F59E0B" />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 38 }} />
+        )}
       </View>
 
       <ScrollView
@@ -445,6 +454,10 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
+  financeBtn: {
+    width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(245,158,11,0.15)',
+  },
 
   statusCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16,
