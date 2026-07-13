@@ -17,7 +17,7 @@ export interface Country {
   flag: string;   // emoji
 }
 
-const COUNTRIES: Country[] = [
+export const COUNTRIES: Country[] = [
   // ── Afrique de l'Ouest ──────────────────────────────────────────────────────
   { code: 'BF', name: 'Burkina Faso',            dial: '+226', flag: '🇧🇫' },
   { code: 'CI', name: "Côte d'Ivoire",           dial: '+225', flag: '🇨🇮' },

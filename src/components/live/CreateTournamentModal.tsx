@@ -13,6 +13,8 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { ImagePickerSection } from '../common/ImagePickerSection';
+import { CountryMultiSelect } from '../common/CountryMultiSelect';
+import { DateTimeField } from '../common/DateTimeField';
 import { tournamentService } from '../../services/tournamentService';
 import type { Tournament, TournamentType, TournamentRegistrationMode } from '../../services/tournamentService';
 
@@ -52,12 +54,12 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
   const [isPrivate, setIsPrivate] = useState(false);
   const [password, setPassword] = useState('');
   const [registrationMode, setRegistrationMode] = useState<TournamentRegistrationMode>('open');
-  const [allowedCountries, setAllowedCountries] = useState('');
+  const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
   const [allowedLanguages, setAllowedLanguages] = useState('');
 
   const [timezone, setTimezone] = useState('');
-  const [scheduledStartAt, setScheduledStartAt] = useState('');
-  const [registrationClosesAt, setRegistrationClosesAt] = useState('');
+  const [scheduledStartAt, setScheduledStartAt] = useState<Date | null>(null);
+  const [registrationClosesAt, setRegistrationClosesAt] = useState<Date | null>(null);
 
   const [rules, setRules] = useState('');
   const [sponsorName, setSponsorName] = useState('');
@@ -70,8 +72,8 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
     setStep(0); setName(''); setDescription(''); setImageUrl(null);
     setTournamentType('single_elimination'); setFormat(8); setPrize('');
     setIsPrivate(false); setPassword(''); setRegistrationMode('open');
-    setAllowedCountries(''); setAllowedLanguages('');
-    setTimezone(''); setScheduledStartAt(''); setRegistrationClosesAt('');
+    setAllowedCountries([]); setAllowedLanguages('');
+    setTimezone(''); setScheduledStartAt(null); setRegistrationClosesAt(null);
     setRules(''); setSponsorName(''); setSponsorLogoUrl(null); setEntryFeeGogold('');
   };
 
@@ -95,15 +97,13 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
         isPrivate,
         password: isPrivate ? password.trim() : undefined,
         registrationMode,
-        allowedCountries: allowedCountries.trim()
-          ? allowedCountries.split(',').map(c => c.trim().toUpperCase()).filter(Boolean)
-          : undefined,
+        allowedCountries: allowedCountries.length > 0 ? allowedCountries : undefined,
         allowedLanguages: allowedLanguages.trim()
           ? allowedLanguages.split(',').map(l => l.trim().toLowerCase()).filter(Boolean)
           : undefined,
         timezone: timezone.trim() || undefined,
-        scheduledStartAt: scheduledStartAt.trim() || undefined,
-        registrationClosesAt: registrationClosesAt.trim() || undefined,
+        scheduledStartAt: scheduledStartAt ? scheduledStartAt.toISOString() : undefined,
+        registrationClosesAt: registrationClosesAt ? registrationClosesAt.toISOString() : undefined,
         rules: rules.trim() || undefined,
         sponsorName: sponsorName.trim() || undefined,
         sponsorLogoUrl: sponsorLogoUrl ?? undefined,
@@ -271,13 +271,10 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
                   </Text>
                 )}
 
-                <TextInput
-                  value={allowedCountries}
-                  onChangeText={setAllowedCountries}
-                  placeholder="Pays autorisés (ex: FR, CI, SN) — vide = tous"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
-                  autoCapitalize="characters"
+                <CountryMultiSelect
+                  selectedCodes={allowedCountries}
+                  onChange={setAllowedCountries}
+                  placeholder="Pays autorisés — vide = tous"
                 />
                 <TextInput
                   value={allowedLanguages}
@@ -307,22 +304,20 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
                   placeholderTextColor={colors.textTertiary}
                   style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
                 />
-                <TextInput
+                <DateTimeField
+                  label="Fin des inscriptions"
                   value={registrationClosesAt}
-                  onChangeText={setRegistrationClosesAt}
-                  placeholder="Fin des inscriptions (AAAA-MM-JJTHH:MM)"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+                  onChange={setRegistrationClosesAt}
+                  placeholder="Sélectionner date et heure"
                 />
-                <TextInput
+                <DateTimeField
+                  label="Début des matchs prévu"
                   value={scheduledStartAt}
-                  onChangeText={setScheduledStartAt}
-                  placeholder="Début des matchs prévu (AAAA-MM-JJTHH:MM)"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+                  onChange={setScheduledStartAt}
+                  placeholder="Sélectionner date et heure"
                 />
                 <Text style={[s.typeHint, { color: colors.textTertiary }]}>
-                  Format ISO — ex: 2026-08-15T18:00. Des rappels seront envoyés aux participants avant chaque étape clé.
+                  Des rappels seront envoyés aux participants avant chaque étape clé.
                 </Text>
               </View>
             )}
