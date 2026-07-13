@@ -135,10 +135,8 @@ export const LiveTournamentsScreen: React.FC = () => {
               </LinearGradient>
             </Animated.View>
           ) : null}
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.duration(350).delay(Math.min(index, 8) * 60)}>
-              <TournamentCard tournament={item} onView={() => handleView(item)} />
-            </Animated.View>
+          renderItem={({ item }) => (
+            <TournamentCard tournament={item} onView={() => handleView(item)} />
           )}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F59E0B" />}
           onEndReached={loadMore}

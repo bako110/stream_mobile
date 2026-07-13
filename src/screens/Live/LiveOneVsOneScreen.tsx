@@ -130,10 +130,8 @@ export const LiveOneVsOneScreen: React.FC = () => {
               </LinearGradient>
             </Animated.View>
           ) : null}
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.duration(350).delay(Math.min(index, 8) * 60)}>
-              <BattleCard battle={item} onWatch={() => handleWatch(item)} />
-            </Animated.View>
+          renderItem={({ item }) => (
+            <BattleCard battle={item} onWatch={() => handleWatch(item)} />
           )}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9B65F5" />}
           onEndReached={loadMore}
