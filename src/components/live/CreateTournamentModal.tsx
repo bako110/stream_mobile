@@ -14,6 +14,8 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { ImagePickerSection } from '../common/ImagePickerSection';
 import { CountryMultiSelect } from '../common/CountryMultiSelect';
+import { LanguageMultiSelect } from '../common/LanguageMultiSelect';
+import { TimezoneSelect } from '../common/TimezoneSelect';
 import { DateTimeField } from '../common/DateTimeField';
 import { tournamentService } from '../../services/tournamentService';
 import type { Tournament, TournamentType, TournamentRegistrationMode } from '../../services/tournamentService';
@@ -55,7 +57,7 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
   const [password, setPassword] = useState('');
   const [registrationMode, setRegistrationMode] = useState<TournamentRegistrationMode>('open');
   const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
-  const [allowedLanguages, setAllowedLanguages] = useState('');
+  const [allowedLanguages, setAllowedLanguages] = useState<string[]>([]);
 
   const [timezone, setTimezone] = useState('');
   const [scheduledStartAt, setScheduledStartAt] = useState<Date | null>(null);
@@ -72,7 +74,7 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
     setStep(0); setName(''); setDescription(''); setImageUrl(null);
     setTournamentType('single_elimination'); setFormat(8); setPrize('');
     setIsPrivate(false); setPassword(''); setRegistrationMode('open');
-    setAllowedCountries([]); setAllowedLanguages('');
+    setAllowedCountries([]); setAllowedLanguages([]);
     setTimezone(''); setScheduledStartAt(null); setRegistrationClosesAt(null);
     setRules(''); setSponsorName(''); setSponsorLogoUrl(null); setEntryFeeGogold('');
   };
@@ -98,10 +100,8 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
         password: isPrivate ? password.trim() : undefined,
         registrationMode,
         allowedCountries: allowedCountries.length > 0 ? allowedCountries : undefined,
-        allowedLanguages: allowedLanguages.trim()
-          ? allowedLanguages.split(',').map(l => l.trim().toLowerCase()).filter(Boolean)
-          : undefined,
-        timezone: timezone.trim() || undefined,
+        allowedLanguages: allowedLanguages.length > 0 ? allowedLanguages : undefined,
+        timezone: timezone || undefined,
         scheduledStartAt: scheduledStartAt ? scheduledStartAt.toISOString() : undefined,
         registrationClosesAt: registrationClosesAt ? registrationClosesAt.toISOString() : undefined,
         rules: rules.trim() || undefined,
@@ -276,12 +276,10 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
                   onChange={setAllowedCountries}
                   placeholder="Pays autorisés — vide = tous"
                 />
-                <TextInput
-                  value={allowedLanguages}
-                  onChangeText={setAllowedLanguages}
-                  placeholder="Langues autorisées (ex: fr, en) — vide = toutes"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+                <LanguageMultiSelect
+                  selectedCodes={allowedLanguages}
+                  onChange={setAllowedLanguages}
+                  placeholder="Langues autorisées — vide = toutes"
                 />
 
                 <TextInput
@@ -297,12 +295,10 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
 
             {step === 2 && (
               <View style={{ gap: 12 }}>
-                <TextInput
+                <TimezoneSelect
                   value={timezone}
-                  onChangeText={setTimezone}
-                  placeholder="Fuseau horaire (ex: Africa/Abidjan)"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+                  onChange={setTimezone}
+                  placeholder="Sélectionner un fuseau horaire"
                 />
                 <DateTimeField
                   label="Fin des inscriptions"
