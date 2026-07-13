@@ -476,7 +476,7 @@ export const BattleScreen: React.FC = () => {
 
       // Couronne temporaire sur l'avatar du destinataire — a chaque cadeau, sans condition de montant
       if (side === 'a') setCrownA(tick.id); else setCrownB(tick.id);
-      setTimeout(() => { if (side === 'a') setCrownA(prev => prev === tick.id ? null : prev); else setCrownB(prev => prev === tick.id ? null : prev); }, 2600);
+      setTimeout(() => { if (side === 'a') setCrownA(prev => prev === tick.id ? null : prev); else setCrownB(prev => prev === tick.id ? null : prev); }, CROWN_DURATION);
 
       // Gros cadeau — animation plein ecran avec le nom du donateur
       if (tick.GoGold >= BIG_GIFT_THRESHOLD) {

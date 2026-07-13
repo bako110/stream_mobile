@@ -340,13 +340,13 @@ export const LiveGiftOverlay = React.forwardRef<LiveGiftOverlayRef, Props>((
       const next = incomingNotifs[0];
       playGiftSound('received');
       setActiveNotif(next);
-      setFloats(prev => [...prev, { id: `notif-${next.id}`, emoji: next.emoji }]);
+      setFloats(prev => [...prev.slice(-7), { id: `notif-${next.id}`, emoji: next.emoji }]);
     }
   }, [incomingNotifs, activeNotif]);
 
   const handleGiftSent = useCallback((emoji: string) => {
     playGiftSound('sent');
-    setFloats(prev => [...prev, { id: `sent-${Date.now()}`, emoji }]);
+    setFloats(prev => [...prev.slice(-7), { id: `sent-${Date.now()}`, emoji }]);
   }, []);
 
   return (
