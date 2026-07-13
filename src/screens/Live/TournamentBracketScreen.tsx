@@ -91,6 +91,7 @@ export const TournamentBracketScreen: React.FC = () => {
   const [joining, setJoining] = useState(false);
 
   const [generating, setGenerating] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<TournamentMatch | null>(null);
 
   const [showEdit, setShowEdit] = useState(false);
   const [editDescription, setEditDescription] = useState('');
@@ -519,7 +520,7 @@ export const TournamentBracketScreen: React.FC = () => {
                   <Animated.View key={match.id} entering={FadeInRight.duration(350).delay(i * 70)}>
                     <TouchableOpacity
                       activeOpacity={0.85}
-                      onPress={() => match.battle_id && nav.navigate('BattleScreen', { battleId: match.battle_id })}
+                      onPress={() => setSelectedMatch(match)}
                       style={[styles.liveCenterCard, { backgroundColor: colors.surface, borderColor: '#EF444440' }]}
                     >
                       <Text style={[styles.liveCenterNames, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -605,13 +606,13 @@ export const TournamentBracketScreen: React.FC = () => {
                 const partB = participants.find(p => p.id === match.participant_b_id);
                 const isMine = match.id === myMatch?.id;
                 const isLive = match.status === 'live';
-                const isTappable = isLive && !!match.battle_id;
+                const isTappable = match.status !== 'pending';
                 return (
                   <Animated.View key={match.id} entering={FadeInDown.duration(350).delay(roundIdx * 90 + matchIdx * 50)}>
                     <TouchableOpacity
                       activeOpacity={isTappable ? 0.7 : 1}
                       disabled={!isTappable}
-                      onPress={() => match.battle_id && nav.navigate('BattleScreen', { battleId: match.battle_id })}
+                      onPress={() => setSelectedMatch(match)}
                       style={[
                         styles.matchCard,
                         { backgroundColor: colors.surface, borderColor: isMine ? '#7B3FF2' : isLive ? '#EF444455' : colors.border },
@@ -638,7 +639,9 @@ export const TournamentBracketScreen: React.FC = () => {
                         </View>
                       )}
                       {isTappable && (
-                        <View style={styles.watchHint}><Icon name="play" size={9} color="#fff" /></View>
+                        <View style={styles.watchHint}>
+                          <Icon name={isLive ? 'play' : 'info'} size={9} color="#fff" />
+                        </View>
                       )}
                     </TouchableOpacity>
                   </Animated.View>
@@ -756,9 +759,81 @@ export const TournamentBracketScreen: React.FC = () => {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal visible={!!selectedMatch} transparent animationType="fade" onRequestClose={() => setSelectedMatch(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            {selectedMatch && (() => {
+              const partA = participants.find(p => p.id === selectedMatch.participant_a_id);
+              const partB = participants.find(p => p.id === selectedMatch.participant_b_id);
+              const isLive = selectedMatch.status === 'live';
+              const isCompleted = selectedMatch.status === 'completed' || selectedMatch.status === 'bye';
+              return (
+                <>
+                  <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{ROUND_LABELS[selectedMatch.round]}</Text>
+                  <Text style={[styles.modalSub, { color: colors.textTertiary }]}>
+                    {isLive ? 'Match en direct' : isCompleted ? 'Match terminé' : 'Match prêt à démarrer'}
+                  </Text>
+
+                  <View style={styles.matchDetailRow}>
+                    <MatchDetailSide
+                      name={partA?.display_name ?? 'En attente'}
+                      avatar={partA?.avatar_url}
+                      isWinner={selectedMatch.winner_participant_id === selectedMatch.participant_a_id}
+                      color={colors.textPrimary}
+                    />
+                    <Text style={[styles.matchDetailVs, { color: colors.textTertiary }]}>VS</Text>
+                    <MatchDetailSide
+                      name={partB?.display_name ?? 'En attente'}
+                      avatar={partB?.avatar_url}
+                      isWinner={selectedMatch.winner_participant_id === selectedMatch.participant_b_id}
+                      color={colors.textPrimary}
+                    />
+                  </View>
+
+                  {isLive && (
+                    <View style={styles.matchDetailReadyRow}>
+                      <Icon name={selectedMatch.a_ready ? 'check-circle' : 'clock'} size={14} color={selectedMatch.a_ready ? '#10B981' : colors.textTertiary} />
+                      <Text style={[styles.matchDetailReadyText, { color: colors.textSecondary }]}>{partA?.display_name ?? '—'}</Text>
+                      <Icon name={selectedMatch.b_ready ? 'check-circle' : 'clock'} size={14} color={selectedMatch.b_ready ? '#10B981' : colors.textTertiary} style={{ marginLeft: 16 }} />
+                      <Text style={[styles.matchDetailReadyText, { color: colors.textSecondary }]}>{partB?.display_name ?? '—'}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSelectedMatch(null)}>
+                      <Text style={[styles.modalCancelText, { color: colors.textTertiary }]}>Fermer</Text>
+                    </TouchableOpacity>
+                    {isLive && selectedMatch.battle_id && (
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => { const battleId = selectedMatch.battle_id!; setSelectedMatch(null); nav.navigate('BattleScreen', { battleId }); }}
+                      >
+                        <LinearGradient colors={['#9B65F5', '#7B3FF2']} style={styles.modalSendBtn}>
+                          <Text style={styles.modalSendText}>Regarder le direct</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
+
+const MatchDetailSide: React.FC<{ name: string; avatar?: string | null; isWinner: boolean; color: string }> = ({ name, avatar, isWinner, color }) => (
+  <View style={styles.matchDetailSide}>
+    {avatar
+      ? <Image source={{ uri: avatar }} style={styles.matchDetailAvatar} />
+      : <View style={[styles.matchDetailAvatar, styles.slotAvatarFallback]}><Icon name="user" size={18} color="rgba(255,255,255,0.4)" /></View>}
+    <Text style={[styles.matchDetailName, { color }, isWinner && { color: '#FFD700', fontWeight: '800' }]} numberOfLines={2}>{name}</Text>
+    {isWinner && <Icon name="award" size={14} color="#FFD700" />}
+  </View>
+);
 
 const MatchSlot: React.FC<{ name: string; avatar?: string | null; isWinner: boolean; color: string }> = ({ name, avatar, isWinner, color }) => (
   <View style={styles.slot}>
@@ -910,4 +985,12 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: -8, right: 8, backgroundColor: '#7B3FF2', borderRadius: 9,
     width: 18, height: 18, alignItems: 'center', justifyContent: 'center',
   },
+
+  matchDetailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 6, gap: 10 },
+  matchDetailSide: { flex: 1, alignItems: 'center', gap: 6 },
+  matchDetailAvatar: { width: 52, height: 52, borderRadius: 26 },
+  matchDetailName: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  matchDetailVs: { fontSize: 12, fontWeight: '800' },
+  matchDetailReadyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, marginBottom: 8 },
+  matchDetailReadyText: { fontSize: 11, fontWeight: '600', marginLeft: 5 },
 });
