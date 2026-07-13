@@ -238,6 +238,23 @@ export const TournamentBracketScreen: React.FC = () => {
   const myMatch = findMyMatch();
   const liveMatches = bracket?.matches.filter(m => m.status === 'live' && m.battle_id) ?? [];
 
+  // ── Pagination par round — uniquement pour les formats a progression sequentielle
+  // stricte (elimination simple, ou le bracket final knockout d'une phase de groupes) :
+  // un seul round est actif a la fois. Double_elimination (deux brackets winners/losers
+  // en parallele) et league/group_stage (tous les matchs actifs d'emblee) restent affiches
+  // integralement, une pagination round-par-round n'y aurait pas de sens.
+  const isSequentialBracket = bracket
+    ? bracket.tournament.tournament_type === 'single_elimination'
+    || (bracket.tournament.tournament_type === 'group_stage' && rounds.every(r => r !== 'group_stage'))
+    : false;
+  // Round actif = le premier round (dans l'ordre du bracket) qui a encore un match non
+  // termine — s'adapte naturellement au nombre de participants restants (moins de matchs
+  // a mesure que des joueurs sont elimines, un "bye" saute directement au round suivant).
+  const activeRoundIdx = rounds.findIndex(r => bracket?.matches.some(m => m.round === r && m.status !== 'completed'));
+  const displayedRoundIdx = isSequentialBracket
+    ? (activeRoundIdx === -1 ? rounds.length - 1 : activeRoundIdx)
+    : -1;
+
   // ── Statut + position du joueur — vue d'ensemble immediate en entrant sur l'ecran ──
   const myStatus = (): { label: string; color: string; icon: string; opponentName: string | null } | null => {
     if (!bracket || !myParticipant) return null;
@@ -304,6 +321,54 @@ export const TournamentBracketScreen: React.FC = () => {
 
   const { tournament, participants } = bracket;
   const isOrganizer = tournament.created_by === currentUser?.id;
+
+  const renderMatchCard = (match: TournamentMatch, matchIdx: number, fullWidth: boolean, roundIdx = 0) => {
+    const partA = participants.find(p => p.id === match.participant_a_id);
+    const partB = participants.find(p => p.id === match.participant_b_id);
+    const isMine = match.id === myMatch?.id;
+    const isLive = match.status === 'live';
+    const isTappable = match.status !== 'pending';
+    return (
+      <Animated.View key={match.id} entering={FadeInDown.duration(350).delay(roundIdx * 90 + matchIdx * 50)} style={fullWidth ? { width: '100%' } : undefined}>
+        <TouchableOpacity
+          activeOpacity={isTappable ? 0.7 : 1}
+          disabled={!isTappable}
+          onPress={() => setSelectedMatch(match)}
+          style={[
+            styles.matchCard,
+            fullWidth && styles.matchCardFullWidth,
+            { backgroundColor: colors.surface, borderColor: isMine ? '#7B3FF2' : isLive ? '#EF444455' : colors.border },
+            isMine && styles.matchCardMine,
+          ]}
+        >
+          <MatchSlot
+            name={partA?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
+            avatar={partA?.avatar_url}
+            isWinner={match.winner_participant_id === match.participant_a_id}
+            color={colors.textPrimary}
+          />
+          <View style={[styles.matchDivider, { backgroundColor: colors.divider }]} />
+          <MatchSlot
+            name={partB?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
+            avatar={partB?.avatar_url}
+            isWinner={match.winner_participant_id === match.participant_b_id}
+            color={colors.textPrimary}
+          />
+          {isLive && (
+            <View style={styles.liveBadge}>
+              <LiveDot size={6} />
+              <Text style={styles.liveBadgeText}>DIRECT</Text>
+            </View>
+          )}
+          {isTappable && (
+            <View style={styles.watchHint}>
+              <Icon name={isLive ? 'play' : 'info'} size={9} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -597,59 +662,70 @@ export const TournamentBracketScreen: React.FC = () => {
           </Animated.View>
         )}
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bracketRow}>
-          {rounds.map((round, roundIdx) => (
-            <Animated.View key={round} entering={FadeInRight.duration(400).delay(roundIdx * 90)} style={styles.roundCol}>
-              <Text style={[styles.roundTitle, { color: colors.textSecondary }]}>{ROUND_LABELS[round]}</Text>
-              {bracket.matches.filter(m => m.round === round).sort((a, b) => a.position - b.position).map((match, matchIdx) => {
-                const partA = participants.find(p => p.id === match.participant_a_id);
-                const partB = participants.find(p => p.id === match.participant_b_id);
-                const isMine = match.id === myMatch?.id;
-                const isLive = match.status === 'live';
-                const isTappable = match.status !== 'pending';
-                return (
-                  <Animated.View key={match.id} entering={FadeInDown.duration(350).delay(roundIdx * 90 + matchIdx * 50)}>
-                    <TouchableOpacity
-                      activeOpacity={isTappable ? 0.7 : 1}
-                      disabled={!isTappable}
-                      onPress={() => setSelectedMatch(match)}
-                      style={[
-                        styles.matchCard,
-                        { backgroundColor: colors.surface, borderColor: isMine ? '#7B3FF2' : isLive ? '#EF444455' : colors.border },
-                        isMine && styles.matchCardMine,
-                      ]}
-                    >
-                      <MatchSlot
-                        name={partA?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
-                        avatar={partA?.avatar_url}
-                        isWinner={match.winner_participant_id === match.participant_a_id}
-                        color={colors.textPrimary}
-                      />
-                      <View style={[styles.matchDivider, { backgroundColor: colors.divider }]} />
-                      <MatchSlot
-                        name={partB?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
-                        avatar={partB?.avatar_url}
-                        isWinner={match.winner_participant_id === match.participant_b_id}
-                        color={colors.textPrimary}
-                      />
-                      {isLive && (
-                        <View style={styles.liveBadge}>
-                          <LiveDot size={6} />
-                          <Text style={styles.liveBadgeText}>DIRECT</Text>
-                        </View>
-                      )}
-                      {isTappable && (
-                        <View style={styles.watchHint}>
-                          <Icon name={isLive ? 'play' : 'info'} size={9} color="#fff" />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })}
-            </Animated.View>
-          ))}
-        </ScrollView>
+        {isSequentialBracket ? (
+          <Animated.View key={rounds[displayedRoundIdx]} entering={FadeInDown.duration(400).springify()} style={styles.roundPage}>
+            <View style={styles.roundPageHeader}>
+              <Text style={[styles.roundPageTitle, { color: colors.textPrimary }]}>
+                {ROUND_LABELS[rounds[displayedRoundIdx]]}
+              </Text>
+              <Text style={[styles.roundPageProgress, { color: colors.textTertiary }]}>
+                Étape {displayedRoundIdx + 1} / {rounds.length}
+              </Text>
+            </View>
+            <View style={styles.roundPageDots}>
+              {rounds.map((r, i) => (
+                <View
+                  key={r}
+                  style={[
+                    styles.roundPageDot,
+                    { backgroundColor: i < displayedRoundIdx ? '#10B981' : i === displayedRoundIdx ? '#7B3FF2' : colors.border },
+                  ]}
+                />
+              ))}
+            </View>
+
+            <View style={styles.roundPageGrid}>
+              {bracket.matches.filter(m => m.round === rounds[displayedRoundIdx]).sort((a, b) => a.position - b.position).map((match, matchIdx) =>
+                renderMatchCard(match, matchIdx, true))}
+            </View>
+
+            {displayedRoundIdx > 0 && (
+              <View style={[styles.roundPagePrevBox, { borderColor: colors.border }]}>
+                <Text style={[styles.roundPagePrevTitle, { color: colors.textSecondary }]}>
+                  Résultats · {ROUND_LABELS[rounds[displayedRoundIdx - 1]]}
+                </Text>
+                {bracket.matches.filter(m => m.round === rounds[displayedRoundIdx - 1]).sort((a, b) => a.position - b.position).map(match => {
+                  const winner = participants.find(p => p.id === match.winner_participant_id);
+                  const loser = participants.find(p => p.id === (
+                    match.winner_participant_id === match.participant_a_id ? match.participant_b_id : match.participant_a_id
+                  ));
+                  return (
+                    <View key={match.id} style={styles.roundPagePrevRow}>
+                      <Icon name="award" size={12} color="#FFD700" />
+                      <Text style={[styles.roundPagePrevText, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {winner?.display_name ?? '—'}
+                      </Text>
+                      <Text style={[styles.roundPagePrevVs, { color: colors.textTertiary }]}>bat</Text>
+                      <Text style={[styles.roundPagePrevText, { color: colors.textTertiary }]} numberOfLines={1}>
+                        {loser?.display_name ?? '—'}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </Animated.View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bracketRow}>
+            {rounds.map((round, roundIdx) => (
+              <Animated.View key={round} entering={FadeInRight.duration(400).delay(roundIdx * 90)} style={styles.roundCol}>
+                <Text style={[styles.roundTitle, { color: colors.textSecondary }]}>{ROUND_LABELS[round]}</Text>
+                {bracket.matches.filter(m => m.round === round).sort((a, b) => a.position - b.position).map((match, matchIdx) =>
+                  renderMatchCard(match, matchIdx, false, roundIdx))}
+              </Animated.View>
+            ))}
+          </ScrollView>
+        )}
       </ScrollView>
 
       <Modal visible={showJoin} transparent animationType="fade" onRequestClose={() => setShowJoin(false)}>
@@ -966,9 +1042,23 @@ const styles = StyleSheet.create({
   roundCol: { width: 184, gap: 14 },
   roundTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   matchCard: { borderRadius: 14, borderWidth: 1.5, padding: 11, gap: 7 },
+  matchCardFullWidth: { width: '100%' },
   matchCardMine: {
     shadowColor: '#7B3FF2', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
   },
+
+  roundPage: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 20, gap: 14 },
+  roundPageHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  roundPageTitle: { fontSize: 18, fontWeight: '900' },
+  roundPageProgress: { fontSize: 12, fontWeight: '700' },
+  roundPageDots: { flexDirection: 'row', gap: 6 },
+  roundPageDot: { flex: 1, height: 4, borderRadius: 2 },
+  roundPageGrid: { gap: 12 },
+  roundPagePrevBox: { marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 14, gap: 8 },
+  roundPagePrevTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 2 },
+  roundPagePrevRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  roundPagePrevText: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  roundPagePrevVs: { fontSize: 11, fontWeight: '600' },
   matchDivider: { height: StyleSheet.hairlineWidth },
   slot: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 4 },
   slotAvatar: { width: 24, height: 24, borderRadius: 12 },
