@@ -122,6 +122,7 @@ export const TournamentBracketScreen: React.FC = () => {
       if (payload.tournament_id !== tournamentId) return;
       if (
         payload.type === 'tournament_bracket_generated' ||
+        payload.type === 'tournament_round_generated' ||
         payload.type === 'tournament_match_ready_update' ||
         payload.type === 'tournament_match_started' ||
         payload.type === 'tournament_completed' ||
