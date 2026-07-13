@@ -90,6 +90,8 @@ export const TournamentBracketScreen: React.FC = () => {
   const [joinInviteCode, setJoinInviteCode] = useState('');
   const [joining, setJoining] = useState(false);
 
+  const [generating, setGenerating] = useState(false);
+
   const [showEdit, setShowEdit] = useState(false);
   const [editDescription, setEditDescription] = useState('');
   const [editRules, setEditRules] = useState('');
@@ -141,11 +143,15 @@ export const TournamentBracketScreen: React.FC = () => {
   };
 
   const handleGenerateBracket = async () => {
+    if (generating) return;
+    setGenerating(true);
     try {
       await tournamentService.generateBracket(tournamentId);
       await load();
     } catch (e: any) {
       Alert.alert('Impossible de démarrer', e?.message || 'Une erreur est survenue.');
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -398,10 +404,16 @@ export const TournamentBracketScreen: React.FC = () => {
                   <Text style={[styles.regEditBtnText, { color: colors.textPrimary }]}>Modifier</Text>
                 </TouchableOpacity>
                 {participants.length >= 2 && (
-                  <TouchableOpacity activeOpacity={0.85} onPress={handleGenerateBracket} style={{ flex: 1 }}>
-                    <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.regBtn}>
-                      <Icon name="play" size={14} color="#fff" />
-                      <Text style={styles.regBtnText}>Démarrer maintenant</Text>
+                  <TouchableOpacity activeOpacity={0.85} onPress={handleGenerateBracket} disabled={generating} style={{ flex: 1 }}>
+                    <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.regBtn, generating && { opacity: 0.6 }]}>
+                      {generating ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Icon name="play" size={14} color="#fff" />
+                          <Text style={styles.regBtnText}>Démarrer maintenant</Text>
+                        </>
+                      )}
                     </LinearGradient>
                   </TouchableOpacity>
                 )}
