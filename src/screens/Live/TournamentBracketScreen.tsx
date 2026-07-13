@@ -169,15 +169,15 @@ export const TournamentBracketScreen: React.FC = () => {
     }
     if (myMatch) {
       const opp = myMatch.participant_a_id === myParticipant.id
-        ? participants.find(p => p.id === myMatch.participant_b_id)
-        : participants.find(p => p.id === myMatch.participant_a_id);
+        ? bracket.participants.find(p => p.id === myMatch.participant_b_id)
+        : bracket.participants.find(p => p.id === myMatch.participant_a_id);
       return { label: 'À toi de jouer', color: '#10B981', icon: 'zap', opponentName: opp?.display_name ?? 'Adversaire à confirmer' };
     }
     const myLiveMatch = liveMatches.find(m => m.participant_a_id === myParticipant.id || m.participant_b_id === myParticipant.id);
     if (myLiveMatch) {
       const opp = myLiveMatch.participant_a_id === myParticipant.id
-        ? participants.find(p => p.id === myLiveMatch.participant_b_id)
-        : participants.find(p => p.id === myLiveMatch.participant_a_id);
+        ? bracket.participants.find(p => p.id === myLiveMatch.participant_b_id)
+        : bracket.participants.find(p => p.id === myLiveMatch.participant_a_id);
       return { label: 'Match en cours', color: '#EF4444', icon: 'radio', opponentName: opp?.display_name ?? null };
     }
     return { label: 'Qualifié — en attente du prochain match', color: '#F59E0B', icon: 'check-circle', opponentName: null };
