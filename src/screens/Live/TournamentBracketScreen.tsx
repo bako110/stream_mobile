@@ -75,17 +75,22 @@ export const TournamentBracketScreen: React.FC = () => {
   const [bracket, setBracket]   = useState<TournamentBracket | null>(null);
   const [standings, setStandings] = useState<TournamentStanding[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [startingMatch, setStartingMatch] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
+      setLoadError(null);
       const data = await tournamentService.getBracket(tournamentId);
       setBracket(data);
       if (data.tournament.tournament_type === 'league' || data.tournament.tournament_type === 'group_stage') {
         tournamentService.getStandings(tournamentId).then(setStandings).catch(() => {});
       }
-    } catch {} finally { setLoading(false); setRefreshing(false); }
+    } catch (e: any) {
+      console.log('[TournamentBracket] load error', e?.message, e?.response?.data, e?.response?.status);
+      setLoadError(e?.response?.data?.detail || e?.message || 'Impossible de charger ce tournoi.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [tournamentId]);
 
   useEffect(() => { load(); }, [load]);
@@ -187,10 +192,31 @@ export const TournamentBracketScreen: React.FC = () => {
     : null;
   const status = myStatus();
 
-  if (loading || !bracket) {
+  if (loading) {
     return (
       <View style={[styles.root, { backgroundColor: colors.background }]}>
         <ActivityIndicator color="#7B3FF2" style={{ marginTop: 80 }} />
+      </View>
+    );
+  }
+
+  if (loadError || !bracket) {
+    return (
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tournoi</Text>
+          <View style={{ width: 38 }} />
+        </View>
+        <View style={styles.errorBox}>
+          <Icon name="alert-triangle" size={32} color="#EF4444" />
+          <Text style={[styles.errorText, { color: colors.textPrimary }]}>
+            {loadError ?? "Ce tournoi n'a pas pu être chargé."}
+          </Text>
+          <TouchableOpacity style={styles.errorRetryBtn} onPress={() => { setLoading(true); load(); }}>
+            <Text style={styles.errorRetryText}>Réessayer</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -458,6 +484,11 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(245,158,11,0.15)',
   },
+
+  errorBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
+  errorText: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  errorRetryBtn: { backgroundColor: '#7B3FF2', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 22, marginTop: 6 },
+  errorRetryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   statusCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16,
