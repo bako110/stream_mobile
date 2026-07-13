@@ -1,13 +1,19 @@
 /**
  * TournamentBracketScreen — tableau du tournoi en direct (scrollable horizontalement
  * par round), avec possibilite de cloturer les inscriptions manuellement et de se
- * declarer "pret" pour son propre match (demarre un live puis confirme).
+ * declarer "pret" pour son propre match (demarre un live puis confirme). Design
+ * haut de gamme : degrades subtils, ombres douces, entrees animees echelonnees,
+ * pulsation douce sur les elements en direct.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
   ActivityIndicator, Image, Alert, RefreshControl,
 } from 'react-native';
+import Animated, {
+  FadeInDown, FadeInRight, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing,
+} from 'react-native-reanimated';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -35,6 +41,26 @@ const ROUND_LABELS: Record<TournamentRound, string> = {
   group_stage:    'Phase de groupes',
   losers_round:   'Bracket des perdants',
   grand_final:    'Grande finale',
+};
+
+// Pulsation douce du point rouge "en direct" — attire l'oeil sans etre criard.
+const LiveDot: React.FC<{ size?: number }> = ({ size = 8 }) => {
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.4, { duration: 900, easing: Easing.out(Easing.ease) }),
+        withTiming(1, { duration: 900, easing: Easing.in(Easing.ease) }),
+      ),
+      -1, true,
+    );
+  }, []); // eslint-disable-line
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <View style={{ width: size, height: size }}>
+      <Animated.View style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#EF4444' }, style]} />
+    </View>
+  );
 };
 
 export const TournamentBracketScreen: React.FC = () => {
@@ -186,161 +212,214 @@ export const TournamentBracketScreen: React.FC = () => {
         contentContainerStyle={{ paddingBottom: 40 }}
       >
         {status && (
-          <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.statusIconWrap, { backgroundColor: status.color + '20' }]}>
-              <Icon name={status.icon} size={18} color={status.color} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
-              {currentPhase && (
-                <Text style={[styles.statusPhase, { color: colors.textTertiary }]}>Phase actuelle : {currentPhase}</Text>
-              )}
-              {status.opponentName && (
-                <Text style={[styles.statusOpponent, { color: colors.textPrimary }]}>Adversaire : {status.opponentName}</Text>
-              )}
-            </View>
-          </View>
+          <Animated.View entering={FadeInDown.duration(400).springify()}>
+            <LinearGradient
+              colors={[status.color + '22', status.color + '08']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={[styles.statusCard, { borderColor: status.color + '45' }]}
+            >
+              <View style={[styles.statusIconWrap, { backgroundColor: status.color + '25', shadowColor: status.color }]}>
+                <Icon name={status.icon} size={19} color={status.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
+                {currentPhase && (
+                  <Text style={[styles.statusPhase, { color: colors.textTertiary }]}>Phase actuelle · {currentPhase}</Text>
+                )}
+                {status.opponentName && (
+                  <Text style={[styles.statusOpponent, { color: colors.textPrimary }]}>Adversaire : {status.opponentName}</Text>
+                )}
+              </View>
+              {status.label === 'Match en cours' && <LiveDot size={9} />}
+            </LinearGradient>
+          </Animated.View>
         )}
 
         {tournament.prize_pool > 0 && (
-          <View style={styles.prizePoolCard}>
-            <Text style={styles.prizePoolEmoji}>🏆</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.prizePoolLabel}>Cagnotte du tournoi</Text>
-              <Text style={styles.prizePoolValue}>{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
-            </View>
-          </View>
+          <Animated.View entering={FadeInDown.duration(400).delay(60).springify()}>
+            <LinearGradient
+              colors={['#FFD70020', '#FFA00010']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.prizePoolCard}
+            >
+              <View style={styles.prizePoolIconWrap}>
+                <Text style={styles.prizePoolEmoji}>🏆</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.prizePoolLabel}>Cagnotte du tournoi</Text>
+                <Text style={styles.prizePoolValue}>{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
+              </View>
+            </LinearGradient>
+          </Animated.View>
         )}
 
         {tournament.status === 'registration' && (
-          <View style={[styles.regCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.regTitle, { color: colors.textPrimary }]}>Inscriptions ouvertes</Text>
-            <Text style={[styles.regSub, { color: colors.textTertiary }]}>
-              {participants.length} / {tournament.format} inscrits
-            </Text>
+          <Animated.View
+            entering={FadeInDown.duration(400).delay(120).springify()}
+            style={[styles.regCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <View style={styles.regHeaderRow}>
+              <Text style={[styles.regTitle, { color: colors.textPrimary }]}>Inscriptions ouvertes</Text>
+              <View style={[styles.regCountPill, { backgroundColor: '#7B3FF218' }]}>
+                <Text style={styles.regCountText}>{participants.length} / {tournament.format}</Text>
+              </View>
+            </View>
+            <View style={[styles.regProgressTrack, { backgroundColor: colors.divider }]}>
+              <View style={[styles.regProgressFill, { width: `${Math.min(100, (participants.length / tournament.format) * 100)}%` }]} />
+            </View>
             {isOrganizer && participants.length >= 2 && (
-              <TouchableOpacity style={styles.regBtn} onPress={handleGenerateBracket}>
-                <Text style={styles.regBtnText}>Démarrer le tournoi maintenant</Text>
+              <TouchableOpacity activeOpacity={0.85} onPress={handleGenerateBracket}>
+                <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.regBtn}>
+                  <Icon name="play" size={14} color="#fff" />
+                  <Text style={styles.regBtnText}>Démarrer le tournoi maintenant</Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
-          </View>
+          </Animated.View>
         )}
 
         {liveMatches.length > 0 && (
-          <View style={styles.liveCenterSection}>
+          <Animated.View entering={FadeInDown.duration(400).delay(160).springify()} style={styles.liveCenterSection}>
             <View style={styles.liveCenterHeader}>
-              <View style={styles.liveCenterDot} />
+              <LiveDot />
               <Text style={[styles.liveCenterTitle, { color: colors.textPrimary }]}>
                 {liveMatches.length} match{liveMatches.length > 1 ? 's' : ''} en direct
               </Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.liveCenterRow}>
-              {liveMatches.map(match => {
+              {liveMatches.map((match, i) => {
                 const partA = participants.find(p => p.id === match.participant_a_id);
                 const partB = participants.find(p => p.id === match.participant_b_id);
                 return (
-                  <TouchableOpacity
-                    key={match.id}
-                    activeOpacity={0.8}
-                    onPress={() => match.battle_id && nav.navigate('BattleScreen', { battleId: match.battle_id })}
-                    style={[styles.liveCenterCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  >
-                    <Text style={[styles.liveCenterNames, { color: colors.textPrimary }]} numberOfLines={1}>
-                      {partA?.display_name ?? '—'} <Text style={{ color: colors.textTertiary }}>vs</Text> {partB?.display_name ?? '—'}
-                    </Text>
-                    <View style={styles.liveCenterWatchBtn}>
-                      <Icon name="play" size={10} color="#fff" />
-                      <Text style={styles.liveCenterWatchText}>Regarder</Text>
-                    </View>
-                  </TouchableOpacity>
+                  <Animated.View key={match.id} entering={FadeInRight.duration(350).delay(i * 70)}>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => match.battle_id && nav.navigate('BattleScreen', { battleId: match.battle_id })}
+                      style={[styles.liveCenterCard, { backgroundColor: colors.surface, borderColor: '#EF444440' }]}
+                    >
+                      <Text style={[styles.liveCenterNames, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {partA?.display_name ?? '—'} <Text style={{ color: colors.textTertiary }}>vs</Text> {partB?.display_name ?? '—'}
+                      </Text>
+                      <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.liveCenterWatchBtn}>
+                        <Icon name="play" size={10} color="#fff" />
+                        <Text style={styles.liveCenterWatchText}>Regarder</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
                 );
               })}
             </ScrollView>
-          </View>
+          </Animated.View>
         )}
 
         {myMatch && (
-          <View style={[styles.myMatchCard, { backgroundColor: '#7B3FF215', borderColor: '#7B3FF2' }]}>
-            <Icon name="zap" size={18} color="#7B3FF2" />
-            <Text style={[styles.myMatchText, { color: colors.textPrimary }]}>C'est ton tour de jouer !</Text>
-            <TouchableOpacity style={styles.readyBtn} onPress={handleReady} disabled={!!startingMatch}>
-              {startingMatch
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.readyBtnText}>Je suis prêt</Text>
-              }
-            </TouchableOpacity>
-          </View>
+          <Animated.View entering={FadeInDown.duration(400).delay(200).springify()}>
+            <LinearGradient colors={['#7B3FF230', '#7B3FF210']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.myMatchCard}>
+              <View style={styles.myMatchIconWrap}>
+                <Icon name="zap" size={18} color="#7B3FF2" />
+              </View>
+              <Text style={[styles.myMatchText, { color: colors.textPrimary }]}>C'est ton tour de jouer !</Text>
+              <TouchableOpacity activeOpacity={0.85} onPress={handleReady} disabled={!!startingMatch}>
+                <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.readyBtn}>
+                  {startingMatch
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={styles.readyBtnText}>Je suis prêt</Text>
+                  }
+                </LinearGradient>
+              </TouchableOpacity>
+            </LinearGradient>
+          </Animated.View>
         )}
 
         {tournament.status === 'completed' && tournament.winner_id && (
-          <View style={[styles.winnerCard]}>
-            <Icon name="award" size={32} color="#FFD700" />
-            <Text style={styles.winnerText}>
-              {participants.find(p => p.user_id === tournament.winner_id)?.display_name ?? 'Champion'} remporte le tournoi !
-            </Text>
-            {tournament.prize_pool > 0 && (
-              <Text style={styles.winnerPrizeText}>+{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
-            )}
-          </View>
+          <Animated.View entering={FadeInDown.duration(500).delay(80).springify()}>
+            <LinearGradient colors={['#FFD70030', '#FFA00015']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.winnerCard}>
+              <View style={styles.winnerIconWrap}>
+                <Icon name="award" size={34} color="#FFD700" />
+              </View>
+              <Text style={styles.winnerText}>
+                {participants.find(p => p.user_id === tournament.winner_id)?.display_name ?? 'Champion'} remporte le tournoi !
+              </Text>
+              {tournament.prize_pool > 0 && (
+                <Text style={styles.winnerPrizeText}>+{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
+              )}
+            </LinearGradient>
+          </Animated.View>
         )}
 
         {standings.length > 0 && (
-          <View style={[styles.standingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Animated.View
+            entering={FadeInDown.duration(400).delay(240).springify()}
+            style={[styles.standingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
             <Text style={[styles.standingsTitle, { color: colors.textPrimary }]}>Classement</Text>
-            {standings.map(s => (
-              <View key={s.user_id} style={styles.standingsRow}>
-                <Text style={[styles.standingsRank, { color: colors.textTertiary }]}>{s.rank}</Text>
+            {standings.map((s, i) => (
+              <Animated.View
+                key={s.user_id}
+                entering={FadeInDown.duration(300).delay(280 + i * 40)}
+                style={[styles.standingsRow, s.rank === 1 && styles.standingsRowFirst]}
+              >
+                <Text style={[styles.standingsRank, { color: s.rank === 1 ? '#FFD700' : colors.textTertiary }]}>{s.rank}</Text>
                 {s.avatar_url
                   ? <Image source={{ uri: s.avatar_url }} style={styles.standingsAvatar} />
                   : <View style={[styles.standingsAvatar, styles.slotAvatarFallback]}><Icon name="user" size={12} color="rgba(255,255,255,0.4)" /></View>}
                 <Text style={[styles.standingsName, { color: colors.textPrimary }]} numberOfLines={1}>{s.display_name ?? 'Participant'}</Text>
                 <Text style={[styles.standingsStat, { color: colors.textTertiary }]}>{s.wins}V {s.draws}N {s.losses}D</Text>
                 <Text style={[styles.standingsPoints, { color: colors.textPrimary }]}>{s.points} pts</Text>
-              </View>
+              </Animated.View>
             ))}
-          </View>
+          </Animated.View>
         )}
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bracketRow}>
-          {rounds.map(round => (
-            <View key={round} style={styles.roundCol}>
+          {rounds.map((round, roundIdx) => (
+            <Animated.View key={round} entering={FadeInRight.duration(400).delay(roundIdx * 90)} style={styles.roundCol}>
               <Text style={[styles.roundTitle, { color: colors.textSecondary }]}>{ROUND_LABELS[round]}</Text>
-              {bracket.matches.filter(m => m.round === round).sort((a, b) => a.position - b.position).map(match => {
+              {bracket.matches.filter(m => m.round === round).sort((a, b) => a.position - b.position).map((match, matchIdx) => {
                 const partA = participants.find(p => p.id === match.participant_a_id);
                 const partB = participants.find(p => p.id === match.participant_b_id);
                 const isMine = match.id === myMatch?.id;
-                const isTappable = match.status === 'live' && !!match.battle_id;
+                const isLive = match.status === 'live';
+                const isTappable = isLive && !!match.battle_id;
                 return (
-                  <TouchableOpacity
-                    key={match.id}
-                    activeOpacity={isTappable ? 0.7 : 1}
-                    disabled={!isTappable}
-                    onPress={() => match.battle_id && nav.navigate('BattleScreen', { battleId: match.battle_id })}
-                    style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: isMine ? '#7B3FF2' : colors.border }]}
-                  >
-                    <MatchSlot
-                      name={partA?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
-                      avatar={partA?.avatar_url}
-                      isWinner={match.winner_participant_id === match.participant_a_id}
-                      color={colors.textPrimary}
-                    />
-                    <View style={[styles.matchDivider, { backgroundColor: colors.divider }]} />
-                    <MatchSlot
-                      name={partB?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
-                      avatar={partB?.avatar_url}
-                      isWinner={match.winner_participant_id === match.participant_b_id}
-                      color={colors.textPrimary}
-                    />
-                    {match.status === 'live' && (
-                      <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>EN DIRECT</Text></View>
-                    )}
-                    {isTappable && (
-                      <View style={styles.watchHint}><Icon name="play" size={9} color="#fff" /></View>
-                    )}
-                  </TouchableOpacity>
+                  <Animated.View key={match.id} entering={FadeInDown.duration(350).delay(roundIdx * 90 + matchIdx * 50)}>
+                    <TouchableOpacity
+                      activeOpacity={isTappable ? 0.7 : 1}
+                      disabled={!isTappable}
+                      onPress={() => match.battle_id && nav.navigate('BattleScreen', { battleId: match.battle_id })}
+                      style={[
+                        styles.matchCard,
+                        { backgroundColor: colors.surface, borderColor: isMine ? '#7B3FF2' : isLive ? '#EF444455' : colors.border },
+                        isMine && styles.matchCardMine,
+                      ]}
+                    >
+                      <MatchSlot
+                        name={partA?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
+                        avatar={partA?.avatar_url}
+                        isWinner={match.winner_participant_id === match.participant_a_id}
+                        color={colors.textPrimary}
+                      />
+                      <View style={[styles.matchDivider, { backgroundColor: colors.divider }]} />
+                      <MatchSlot
+                        name={partB?.display_name ?? (match.status === 'pending' ? '—' : 'En attente')}
+                        avatar={partB?.avatar_url}
+                        isWinner={match.winner_participant_id === match.participant_b_id}
+                        color={colors.textPrimary}
+                      />
+                      {isLive && (
+                        <View style={styles.liveBadge}>
+                          <LiveDot size={6} />
+                          <Text style={styles.liveBadgeText}>DIRECT</Text>
+                        </View>
+                      )}
+                      {isTappable && (
+                        <View style={styles.watchHint}><Icon name="play" size={9} color="#fff" /></View>
+                      )}
+                    </TouchableOpacity>
+                  </Animated.View>
                 );
               })}
-            </View>
+            </Animated.View>
           ))}
         </ScrollView>
       </ScrollView>
@@ -351,9 +430,9 @@ export const TournamentBracketScreen: React.FC = () => {
 const MatchSlot: React.FC<{ name: string; avatar?: string | null; isWinner: boolean; color: string }> = ({ name, avatar, isWinner, color }) => (
   <View style={styles.slot}>
     {avatar ? (
-      <Image source={{ uri: avatar }} style={styles.slotAvatar} />
+      <Image source={{ uri: avatar }} style={[styles.slotAvatar, isWinner && styles.slotAvatarWinner]} />
     ) : (
-      <View style={[styles.slotAvatar, styles.slotAvatarFallback]}>
+      <View style={[styles.slotAvatar, styles.slotAvatarFallback, isWinner && styles.slotAvatarWinner]}>
         <Icon name="user" size={12} color="rgba(255,255,255,0.4)" />
       </View>
     )}
@@ -369,70 +448,92 @@ const styles = StyleSheet.create({
 
   statusCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16,
-    borderRadius: 16, borderWidth: 1, padding: 14,
+    borderRadius: 18, borderWidth: 1.5, padding: 14,
   },
-  statusIconWrap: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  statusLabel: { fontSize: 14, fontWeight: '800' },
-  statusPhase: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  statusOpponent: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  statusIconWrap: {
+    width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 3,
+  },
+  statusLabel: { fontSize: 14, fontWeight: '800', letterSpacing: 0.2 },
+  statusPhase: { fontSize: 12, fontWeight: '600', marginTop: 3 },
+  statusOpponent: { fontSize: 12, fontWeight: '700', marginTop: 2 },
 
-  regCard: { margin: 16, borderRadius: 16, borderWidth: 1, padding: 16, gap: 8 },
-  regTitle: { fontSize: 15, fontWeight: '700' },
-  regSub: { fontSize: 13 },
-  regBtn: { marginTop: 8, backgroundColor: '#7B3FF2', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  regBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  regCard: { margin: 16, marginTop: 12, borderRadius: 18, borderWidth: 1, padding: 16, gap: 10 },
+  regHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  regTitle: { fontSize: 15, fontWeight: '800' },
+  regCountPill: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  regCountText: { color: '#7B3FF2', fontSize: 12, fontWeight: '800' },
+  regProgressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  regProgressFill: { height: '100%', backgroundColor: '#7B3FF2', borderRadius: 3 },
+  regBtn: { flexDirection: 'row', gap: 8, borderRadius: 13, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
+  regBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
-  myMatchCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 12, borderRadius: 14, borderWidth: 1.5, padding: 14 },
-  myMatchText: { flex: 1, fontSize: 14, fontWeight: '700' },
-  readyBtn: { backgroundColor: '#7B3FF2', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 },
-  readyBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  myMatchCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 4, borderRadius: 16, padding: 14 },
+  myMatchIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(123,63,242,0.18)', alignItems: 'center', justifyContent: 'center' },
+  myMatchText: { flex: 1, fontSize: 14, fontWeight: '800' },
+  readyBtn: { borderRadius: 11, paddingVertical: 9, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  readyBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
 
-  liveCenterSection: { marginTop: 16, marginBottom: 4 },
-  liveCenterHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 16, marginBottom: 8 },
-  liveCenterDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
-  liveCenterTitle: { fontSize: 13, fontWeight: '800' },
+  liveCenterSection: { marginTop: 18, marginBottom: 4 },
+  liveCenterHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 10 },
+  liveCenterTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
   liveCenterRow: { paddingHorizontal: 16, gap: 10 },
-  liveCenterCard: { width: 200, borderRadius: 14, borderWidth: 1, padding: 12, gap: 8 },
+  liveCenterCard: { width: 210, borderRadius: 16, borderWidth: 1.5, padding: 13, gap: 10 },
   liveCenterNames: { fontSize: 12, fontWeight: '700' },
   liveCenterWatchBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#7B3FF2',
-    borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, alignSelf: 'flex-start',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: 10, paddingVertical: 7, paddingHorizontal: 11, alignSelf: 'flex-start',
   },
-  liveCenterWatchText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  liveCenterWatchText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 
-  winnerCard: { alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 12, borderRadius: 16, padding: 20, backgroundColor: '#FFD70022' },
+  winnerCard: { alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, marginBottom: 12, borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#FFD70040' },
+  winnerIconWrap: {
+    width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,215,0,0.15)', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4, shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 4,
+  },
   winnerText: { fontSize: 15, fontWeight: '800', color: '#B45309', textAlign: 'center' },
-  winnerPrizeText: { fontSize: 18, fontWeight: '900', color: '#B45309' },
+  winnerPrizeText: { fontSize: 19, fontWeight: '900', color: '#B45309' },
 
   prizePoolCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16, marginBottom: 4,
-    borderRadius: 16, padding: 14, backgroundColor: '#FFD70018', borderWidth: 1, borderColor: '#FFD70040',
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    borderRadius: 18, padding: 15, borderWidth: 1, borderColor: '#FFD70035',
   },
-  prizePoolEmoji: { fontSize: 26 },
-  prizePoolLabel: { fontSize: 11, fontWeight: '700', color: '#B45309', textTransform: 'uppercase', letterSpacing: 0.4 },
-  prizePoolValue: { fontSize: 18, fontWeight: '900', color: '#B45309', marginTop: 2 },
+  prizePoolIconWrap: {
+    width: 46, height: 46, borderRadius: 14, backgroundColor: 'rgba(255,215,0,0.15)', alignItems: 'center', justifyContent: 'center',
+  },
+  prizePoolEmoji: { fontSize: 24 },
+  prizePoolLabel: { fontSize: 11, fontWeight: '700', color: '#B45309', textTransform: 'uppercase', letterSpacing: 0.5 },
+  prizePoolValue: { fontSize: 19, fontWeight: '900', color: '#B45309', marginTop: 2 },
 
-  standingsCard: { marginHorizontal: 16, marginBottom: 16, borderRadius: 16, borderWidth: 1, padding: 14, gap: 4 },
-  standingsTitle: { fontSize: 14, fontWeight: '800', marginBottom: 6 },
-  standingsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  standingsRank: { width: 18, fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  standingsAvatar: { width: 24, height: 24, borderRadius: 12 },
-  standingsName: { flex: 1, fontSize: 13, fontWeight: '600' },
+  standingsCard: { marginHorizontal: 16, marginTop: 12, marginBottom: 16, borderRadius: 18, borderWidth: 1, padding: 15, gap: 2 },
+  standingsTitle: { fontSize: 15, fontWeight: '800', marginBottom: 8 },
+  standingsRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, borderRadius: 10 },
+  standingsRowFirst: { backgroundColor: 'rgba(255,215,0,0.08)' },
+  standingsRank: { width: 18, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  standingsAvatar: { width: 26, height: 26, borderRadius: 13 },
+  standingsName: { flex: 1, fontSize: 13, fontWeight: '700' },
   standingsStat: { fontSize: 11, fontWeight: '600' },
-  standingsPoints: { fontSize: 13, fontWeight: '800', minWidth: 48, textAlign: 'right' },
+  standingsPoints: { fontSize: 13, fontWeight: '900', minWidth: 48, textAlign: 'right' },
 
-  bracketRow: { paddingHorizontal: 16, gap: 20, paddingBottom: 20 },
-  roundCol: { width: 180, gap: 12 },
-  roundTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  matchCard: { borderRadius: 12, borderWidth: 1, padding: 10, gap: 6 },
+  bracketRow: { paddingHorizontal: 16, gap: 22, paddingBottom: 20, paddingTop: 4 },
+  roundCol: { width: 184, gap: 14 },
+  roundTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  matchCard: { borderRadius: 14, borderWidth: 1.5, padding: 11, gap: 7 },
+  matchCardMine: {
+    shadowColor: '#7B3FF2', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
+  },
   matchDivider: { height: StyleSheet.hairlineWidth },
-  slot: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
-  slotAvatar: { width: 22, height: 22, borderRadius: 11 },
+  slot: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 4 },
+  slotAvatar: { width: 24, height: 24, borderRadius: 12 },
+  slotAvatarWinner: { borderWidth: 1.5, borderColor: '#10B981' },
   slotAvatarFallback: { backgroundColor: 'rgba(120,120,120,0.2)', alignItems: 'center', justifyContent: 'center' },
   slotName: { flex: 1, fontSize: 12, fontWeight: '600' },
   slotNameWinner: { fontWeight: '800' },
-  liveBadge: { position: 'absolute', top: -8, right: 8, backgroundColor: '#EF4444', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  liveBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  liveBadge: {
+    position: 'absolute', top: -9, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#EF4444', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3,
+  },
+  liveBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
   watchHint: {
     position: 'absolute', bottom: -8, right: 8, backgroundColor: '#7B3FF2', borderRadius: 9,
     width: 18, height: 18, alignItems: 'center', justifyContent: 'center',
