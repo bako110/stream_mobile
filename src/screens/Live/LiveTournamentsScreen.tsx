@@ -2,6 +2,8 @@
  * LiveTournamentsScreen — "Tournois", ecran dedie (Explorer) listant les
  * tournois en cours + bouton creer. Extrait de l'ancien LiveMatchesScreen
  * (onglets fusionnes en deux ecrans separes, navigables independamment).
+ * Design haut de gamme : fond degrade sombre, header a bordure lumineuse,
+ * box de resume en tete de liste.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -9,10 +11,10 @@ import {
   ActivityIndicator, StatusBar, RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 import { TournamentCard } from '../../components/live/LiveMatchCards';
 import { CreateTournamentModal } from '../../components/live/CreateTournamentModal';
@@ -25,8 +27,6 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 export const LiveTournamentsScreen: React.FC = () => {
-  const { theme } = useTheme();
-  const { colors } = theme;
   const nav = useNavigation<Nav>();
   const { addListener, removeListener } = useWs();
 
@@ -95,37 +95,63 @@ export const LiveTournamentsScreen: React.FC = () => {
     nav.navigate('TournamentBracket', { tournamentId: t.id });
   };
 
-  return (
-    <View style={[st.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+  const totalParticipants = tournaments.reduce((sum, t) => sum + (t.participants_count ?? 0), 0);
 
-      <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Tournois</Text>
+  return (
+    <View style={st.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={['#2A1F0A', '#0B0812', '#0B0812']} style={StyleSheet.absoluteFill} />
+
+      <View style={st.header}>
+        <BackButton onPress={() => nav.goBack()} color="#fff" transparent />
+        <Text style={st.headerTitle}>Tournois</Text>
         <TouchableOpacity onPress={() => setShowCreate(true)} style={st.createBtn}>
-          <Icon name="plus" size={22} color="#9B65F5" />
+          <Icon name="plus" size={22} color="#F59E0B" />
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <View style={st.center}><ActivityIndicator color="#9B65F5" /></View>
+        <View style={st.center}><ActivityIndicator color="#F59E0B" /></View>
       ) : (
         <FlatList
           data={tournaments}
           keyExtractor={t => t.id}
           numColumns={2}
           contentContainerStyle={st.list}
-          renderItem={({ item }) => <TournamentCard tournament={item} onView={() => handleView(item)} />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9B65F5" />}
+          ListHeaderComponent={tournaments.length > 0 ? (
+            <Animated.View entering={FadeInDown.duration(400).springify()}>
+              <LinearGradient colors={['#F59E0B22', '#F59E0B10']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.summaryCard}>
+                <View style={st.summaryIconWrap}>
+                  <Icon name="award" size={20} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.summaryTitle}>
+                    {tournaments.length} tournoi{tournaments.length > 1 ? 's' : ''} actif{tournaments.length > 1 ? 's' : ''}
+                  </Text>
+                  <Text style={st.summarySub}>
+                    {totalParticipants.toLocaleString('fr-FR')} participant{totalParticipants > 1 ? 's' : ''} au total
+                  </Text>
+                </View>
+              </LinearGradient>
+            </Animated.View>
+          ) : null}
+          renderItem={({ item, index }) => (
+            <Animated.View entering={FadeInDown.duration(350).delay(Math.min(index, 8) * 60)}>
+              <TournamentCard tournament={item} onView={() => handleView(item)} />
+            </Animated.View>
+          )}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F59E0B" />}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
-          ListFooterComponent={loadingMore ? <ActivityIndicator color="#9B65F5" style={{ marginVertical: 16 }} /> : null}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color="#F59E0B" style={{ marginVertical: 16 }} /> : null}
           ListEmptyComponent={
             <View style={st.empty}>
-              <Icon name="award" size={32} color={colors.textTertiary} />
-              <Text style={[st.emptyText, { color: colors.textTertiary }]}>Aucun tournoi en cours pour le moment.</Text>
-              <TouchableOpacity onPress={() => setShowCreate(true)} activeOpacity={0.85} style={{ marginTop: 12 }}>
-                <LinearGradient colors={['#9B65F5', '#7B3FF2']} style={st.emptyCreateBtn}>
+              <View style={st.emptyIconWrap}>
+                <Icon name="award" size={30} color="#F59E0B" />
+              </View>
+              <Text style={st.emptyText}>Aucun tournoi en cours pour le moment.</Text>
+              <TouchableOpacity onPress={() => setShowCreate(true)} activeOpacity={0.85} style={{ marginTop: 4 }}>
+                <LinearGradient colors={['#F59E0B', '#D97706']} style={st.emptyCreateBtn}>
                   <Icon name="plus" size={14} color="#fff" />
                   <Text style={st.emptyCreateBtnText}>Créer un tournoi</Text>
                 </LinearGradient>
@@ -145,14 +171,35 @@ export const LiveTournamentsScreen: React.FC = () => {
 };
 
 const st = StyleSheet.create({
-  root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
+  root: { flex: 1, backgroundColor: '#0B0812' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(245,158,11,0.25)',
+    backgroundColor: 'rgba(42,31,10,0.55)',
+  },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#F0EFF8' },
   createBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+
+  summaryCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 8, marginTop: 8, marginBottom: 6,
+    borderRadius: 18, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', padding: 15,
+  },
+  summaryIconWrap: {
+    width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(245,158,11,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  summaryTitle: { color: '#F0EFF8', fontSize: 14, fontWeight: '800' },
+  summarySub: { color: '#9390AB', fontSize: 12, fontWeight: '600', marginTop: 2 },
+
   list: { padding: 8 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyText: { fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
+  empty: { alignItems: 'center', paddingTop: 60, gap: 14 },
+  emptyIconWrap: {
+    width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(245,158,11,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyText: { fontSize: 13, textAlign: 'center', paddingHorizontal: 32, color: '#9390AB', fontWeight: '600' },
   emptyCreateBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 11 },
   emptyCreateBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });
