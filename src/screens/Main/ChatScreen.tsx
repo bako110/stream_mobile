@@ -30,6 +30,7 @@ import { uploadAudioFile, uploadMessageImage, uploadFileFromUri } from '../../se
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { useWs } from '../../context/WebSocketContext';
+import { useActiveVoice } from '../../context/ActiveVoiceContext';
 import { AvatarWithBadge } from '../../components/common';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
@@ -131,10 +132,12 @@ export const ChatScreen: React.FC = () => {
   const partnerRecordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Audio playback
-  const [playingId,    setPlayingId]    = useState<string | null>(null);
-  const [playProgress, setPlayProgress] = useState(0);
-  const [playDuration, setPlayDuration] = useState(0);
+  // Audio playback — instance et etat partages (survit a la navigation, pilotable
+  // depuis la barre flottante ActiveVoiceBar une fois l'ecran quitte).
+  const { activeVoice, playVoice } = useActiveVoice();
+  const playingId    = activeVoice?.source === 'chat' && activeVoice.returnParams?.partnerId === partnerId ? activeVoice.messageId : null;
+  const playProgress = playingId ? activeVoice!.progress : 0;
+  const playDuration = playingId ? activeVoice!.duration : 0;
 
   // Attachment modal
   const [showAttach,  setShowAttach]  = useState(false);
@@ -502,32 +505,11 @@ export const ChatScreen: React.FC = () => {
   };
 
   // ── Audio playback ────────────────────────────────────────────────────────
-  const playAudio = async (msgId: string, url: string) => {
-    if (playingId) {
-      await audioRecorder.stopPlayer();
-      audioRecorder.removePlayBackListener();
-      if (playingId === msgId) {
-        setPlayingId(null);
-        return;
-      }
-    }
-    setPlayingId(msgId);
-    setPlayProgress(0);
-    try {
-      await audioRecorder.startPlayer(url);
-      audioRecorder.addPlayBackListener((e: any) => {
-        setPlayProgress(e.currentPosition);
-        setPlayDuration(e.duration);
-        if (e.currentPosition >= e.duration - 100) {
-          audioRecorder.stopPlayer();
-          audioRecorder.removePlayBackListener();
-          setPlayingId(null);
-          setPlayProgress(0);
-        }
-      });
-    } catch {
-      setPlayingId(null);
-    }
+  const playAudio = (msgId: string, url: string) => {
+    playVoice({
+      messageId: msgId, url, title: partnerName, avatarUrl: partnerAvatarUrl ?? null,
+      source: 'chat', returnParams: { partnerId, partnerName, avatarUrl: partnerAvatarUrl },
+    });
   };
 
   // ── Attachment handlers ───────────────────────────────────────────────────
@@ -941,7 +923,7 @@ export const ChatScreen: React.FC = () => {
         return <Text style={styles.stickerText}>{item.content}</Text>;
       case 'voice': {
         const duration = item.attachment_meta?.duration ?? 0;
-        const isPlaying = playingId === item.id;
+        const isPlaying = playingId === item.id && !!activeVoice?.isPlaying;
         return (
           <View style={styles.voiceBubble}>
             <TouchableOpacity

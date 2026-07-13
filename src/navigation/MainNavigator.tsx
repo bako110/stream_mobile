@@ -19,6 +19,8 @@ import { AppTabBar, NotificationToast } from '../components/common';
 import { UploadProgressBanner } from '../components/common/UploadProgressBanner';
 import { ActiveCallBar }        from '../components/call/ActiveCallBar';
 import { ActiveCallProvider }   from '../context/ActiveCallContext';
+import { ActiveVoiceBar }       from '../components/call/ActiveVoiceBar';
+import { ActiveVoiceProvider }  from '../context/ActiveVoiceContext';
 import { BattleInviteModal }    from '../components/battle/BattleInviteModal';
 
 // ── Écrans stack ──────────────────────────────────────────────────────────────
@@ -422,6 +424,7 @@ const SettingsWrapper = useCallback(
 
   return (
     <ActiveCallProvider>
+    <ActiveVoiceProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} /></>} />
         <Stack.Screen name="Feed"           component={FeedScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
@@ -554,8 +557,10 @@ const SettingsWrapper = useCallback(
       <UploadProgressBanner />
       <NotificationToast />
       <ActiveCallBar />
+      <ActiveVoiceBar />
       <IncomingCallHandler />
       <BattleInviteModal />
+    </ActiveVoiceProvider>
     </ActiveCallProvider>
   );
 };

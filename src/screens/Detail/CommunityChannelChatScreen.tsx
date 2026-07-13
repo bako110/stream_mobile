@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { useActiveVoice } from '../../context/ActiveVoiceContext';
 import { communityService } from '../../services/communityService';
 import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
@@ -102,9 +103,10 @@ export const CommunityChannelChatScreen: React.FC = () => {
   // Enregistrement vocal
   const [isRecording,  setIsRecording]  = useState(false);
   const [recordTime,   setRecordTime]   = useState('0:00');
-  const [playingId,    setPlayingId]    = useState<string | null>(null);
-  const [playProgress, setPlayProgress] = useState(0);
-  const [playDuration, setPlayDuration] = useState(0);
+  const { activeVoice, playVoice } = useActiveVoice();
+  const playingId    = activeVoice?.source === 'channel' && activeVoice.returnParams?.channelId === channelId ? activeVoice.messageId : null;
+  const playProgress = playingId ? activeVoice!.progress : 0;
+  const playDuration = playingId ? activeVoice!.duration : 0;
 
   // Preview avant envoi fichier
   type FilePending = { uri: string; name: string; size?: number; mimeType?: string };
@@ -384,27 +386,11 @@ export const CommunityChannelChatScreen: React.FC = () => {
     setIsRecording(false);
   };
 
-  const playAudio = async (msgId: string, url: string) => {
-    if (playingId) {
-      await audioRecorderChannel.stopPlayer();
-      audioRecorderChannel.removePlayBackListener();
-      if (playingId === msgId) { setPlayingId(null); return; }
-    }
-    setPlayingId(msgId);
-    setPlayProgress(0);
-    try {
-      await audioRecorderChannel.startPlayer(url);
-      audioRecorderChannel.addPlayBackListener((e: any) => {
-        setPlayProgress(e.currentPosition);
-        setPlayDuration(e.duration);
-        if (e.currentPosition >= e.duration - 100) {
-          audioRecorderChannel.stopPlayer();
-          audioRecorderChannel.removePlayBackListener();
-          setPlayingId(null);
-          setPlayProgress(0);
-        }
-      });
-    } catch { setPlayingId(null); }
+  const playAudio = (msgId: string, url: string) => {
+    playVoice({
+      messageId: msgId, url, title: channelName, avatarUrl: channelAvatar ?? null,
+      source: 'channel', returnParams: { communityId, communityName, channelId, channelName, channelAvatar, myRole, isAnnouncement },
+    });
   };
 
   // ── Audio ────────────────────────────────────────────────────────────────────
@@ -632,7 +618,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       if (msg.message_type === 'audio') {
         const meta = msg.metadata ?? {};
         const url = msg.media_urls[0];
-        const isPlaying = playingId === msg.id;
+        const isPlaying = playingId === msg.id && !!activeVoice?.isPlaying;
         const durSec = meta.duration ?? 0;
         const progress = isPlaying && playDuration > 0 ? playProgress / playDuration : 0;
         const durLabel = isPlaying && playDuration > 0

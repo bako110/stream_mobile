@@ -26,6 +26,7 @@ import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { BackButton } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
+import { useActiveVoice } from '../../context/ActiveVoiceContext';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const RNBlobUtil = require('react-native-blob-util').default;
@@ -181,9 +182,10 @@ export const CommunityChatScreen: React.FC = () => {
   // Enregistrement vocal
   const [isRecording,  setIsRecording]  = useState(false);
   const [recordTime,   setRecordTime]   = useState('0:00');
-  const [playingId,    setPlayingId]    = useState<string | null>(null);
-  const [playProgress, setPlayProgress] = useState(0);
-  const [playDuration, setPlayDuration] = useState(0);
+  const { activeVoice, playVoice } = useActiveVoice();
+  const playingId    = activeVoice?.source === 'community' && activeVoice.returnParams?.communityId === communityId ? activeVoice.messageId : null;
+  const playProgress = playingId ? activeVoice!.progress : 0;
+  const playDuration = playingId ? activeVoice!.duration : 0;
 
   // preview avant envoi (style WhatsApp)
   const [mediaPreview,      setMediaPreview]      = useState<{ uri: string; name: string }[]>([]);
@@ -596,27 +598,11 @@ export const CommunityChatScreen: React.FC = () => {
     setIsRecording(false);
   };
 
-  const playAudio = async (msgId: string, url: string) => {
-    if (playingId) {
-      await audioRecorderCommunity.stopPlayer();
-      audioRecorderCommunity.removePlayBackListener();
-      if (playingId === msgId) { setPlayingId(null); return; }
-    }
-    setPlayingId(msgId);
-    setPlayProgress(0);
-    try {
-      await audioRecorderCommunity.startPlayer(url);
-      audioRecorderCommunity.addPlayBackListener((e: any) => {
-        setPlayProgress(e.currentPosition);
-        setPlayDuration(e.duration);
-        if (e.currentPosition >= e.duration - 100) {
-          audioRecorderCommunity.stopPlayer();
-          audioRecorderCommunity.removePlayBackListener();
-          setPlayingId(null);
-          setPlayProgress(0);
-        }
-      });
-    } catch { setPlayingId(null); }
+  const playAudio = (msgId: string, url: string) => {
+    playVoice({
+      messageId: msgId, url, title: communityTitle, avatarUrl: null,
+      source: 'community', returnParams: { communityId, communityName: communityTitle },
+    });
   };
 
   const handlePickAudio = async () => {
@@ -1423,7 +1409,7 @@ export const CommunityChatScreen: React.FC = () => {
       if (msg.message_type === 'audio') {
         const meta = msg.metadata ?? {};
         const url = msg.media_urls[0];
-        const isPlaying = playingId === msg.id;
+        const isPlaying = playingId === msg.id && !!activeVoice?.isPlaying;
         const durSec = meta.duration ?? 0;
         const progress = isPlaying && playDuration > 0 ? playProgress / playDuration : 0;
         const durLabel = isPlaying && playDuration > 0
