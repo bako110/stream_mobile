@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useActiveCall } from '../../context/ActiveCallContext';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
+import { closePersistedCall } from '../../screens/Main/CallScreen';
 
 function formatElapsed(s: number): string {
   const m = Math.floor(s / 60);
@@ -34,6 +35,7 @@ export const ActiveCallBar: React.FC = () => {
       const senderId = payload.from ?? payload.sender_id;
       if (payload.type === 'call_hangup' && senderId === partnerId) {
         markCallEnded(partnerId);
+        closePersistedCall();
         endCall();
       }
     };
@@ -59,6 +61,7 @@ export const ActiveCallBar: React.FC = () => {
     sendWs({ type: 'call_hangup', to: activeCall.partnerId, call_id: activeCall.callId });
     notifyCallEnded(activeCall.partnerId);
     markCallEnded(activeCall.partnerId);
+    closePersistedCall();
     endCall();
   };
 

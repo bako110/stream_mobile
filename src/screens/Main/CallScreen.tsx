@@ -27,6 +27,30 @@ import type { WsPayload } from '../../context/WebSocketContext';
 import { useActiveCall } from '../../context/ActiveCallContext';
 import { callConnectionService } from '../../services/callConnectionService';
 
+// Store hors-composant : survit au demontage de CallScreen quand l'utilisateur
+// minimise l'appel (nav.goBack() demonte reellement l'ecran react-navigation).
+// Sans ca, minimiser detruisait la RTCPeerConnection/les tracks media, et revenir
+// via ActiveCallBar relancait un tout nouvel appel sortant au lieu de reprendre
+// la communication en cours.
+interface PersistedCall {
+  callId:       string;
+  pc:           RTCPeerConnection | null;
+  localStream:  MediaStream | null;
+  remoteStream: MediaStream | null;
+}
+let persistedCall: PersistedCall | null = null;
+
+/** Ferme et vide la connexion persistee — a appeler quand l'appel minimise se
+ * termine sans jamais rouvrir CallScreen (raccroche distant ou local pendant
+ * que seule ActiveCallBar est affichee), sinon la RTCPeerConnection et les
+ * tracks media resteraient ouverts indefiniment en memoire. */
+export function closePersistedCall(): void {
+  if (!persistedCall) return;
+  try { persistedCall.localStream?.getTracks().forEach((t: any) => { try { t.stop(); } catch {} }); } catch {}
+  try { persistedCall.pc?.close(); } catch {}
+  persistedCall = null;
+}
+
 const { height: SCREEN_H } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_H * 0.15;
 const AVATAR_SIZE     = 120;
@@ -102,6 +126,10 @@ export const CallScreen: React.FC = () => {
   const mountedRef        = useRef(true);
   const connectedAtRef    = useRef<number | null>(null);
   const iInitiatedEndRef  = useRef(false);
+  // true uniquement pendant le nav.goBack() declenche par minimize() — permet au
+  // cleanup de demontage de distinguer "l'utilisateur minimise" (garder la connexion
+  // vivante dans persistedCall) de "l'appel se termine vraiment" (tout fermer).
+  const isMinimizingRef   = useRef(false);
   const statsIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastBytesRef      = useRef<{ bytes: number; at: number } | null>(null);
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -341,6 +369,7 @@ export const CallScreen: React.FC = () => {
   }, [offer, partnerId, isVideo, getLocalStream, createPC, flushPendingCandidates, sendWs, markCallAccepted]);
 
   const minimize = useCallback(() => {
+    isMinimizingRef.current = true;
     minimizeCall();
     nav.goBack();
   }, [minimizeCall, nav]);
@@ -364,6 +393,24 @@ export const CallScreen: React.FC = () => {
     markCallAccepted(partnerId);
 
     const start = async () => {
+      // Reprise d'un appel minimise (retour depuis ActiveCallBar) : la connexion
+      // est deja vivante dans persistedCall (sauvegardee au demontage precedent) —
+      // on rattache simplement l'UI dessus, sans relancer un nouvel offer/appel.
+      if (persistedCall && persistedCall.callId === callIdRef.current && persistedCall.pc) {
+        pcRef.current = persistedCall.pc;
+        localStreamRef.current = persistedCall.localStream;
+        remoteStreamRef.current = persistedCall.remoteStream;
+        persistedCall = null;
+        if (mountedRef.current) {
+          setLocalStream(localStreamRef.current);
+          setRemoteStream(remoteStreamRef.current);
+          setCallState('connected');
+          InCallManager.start({ media: isVideo ? 'video' : 'audio' });
+          InCallManager.setSpeakerphoneOn(isSpeaker);
+        }
+        return;
+      }
+
       if (!isIncoming) {
         try {
           callConnectionService.reportOutgoingCall(partnerId, partnerName);
@@ -416,7 +463,27 @@ export const CallScreen: React.FC = () => {
     return () => {
       mountedRef.current = false;
       clearTimeout(timeout);
-      cleanupCall();
+      if (isMinimizingRef.current) {
+        // L'utilisateur minimise l'appel (ActiveCallBar reste affichee) : la
+        // communication continue en arriere-plan, on ne ferme rien — on se contente
+        // d'arreter les sonneries/vibrations et de sauvegarder la connexion pour
+        // que le prochain montage de CallScreen (retour depuis la barre) la reprenne
+        // au lieu de relancer un nouvel appel.
+        InCallManager.stop();
+        stopIncoming();
+        stopRingback();
+        stopRejected();
+        Vibration.cancel();
+        if (statsIntervalRef.current) { clearInterval(statsIntervalRef.current); statsIntervalRef.current = null; }
+        persistedCall = {
+          callId:       callIdRef.current,
+          pc:           pcRef.current,
+          localStream:  localStreamRef.current,
+          remoteStream: remoteStreamRef.current,
+        };
+      } else {
+        cleanupCall();
+      }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
