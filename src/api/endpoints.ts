@@ -424,6 +424,7 @@ export const Endpoints = {
     open:               `${V1}/tournaments/open`,
     active:             (page = 1, limit = 20) => `${V1}/tournaments/active?page=${page}&limit=${limit}`,
     create:             `${V1}/tournaments`,
+    update:             (id: string) => `${V1}/tournaments/${id}`,
     join:               (id: string) => `${V1}/tournaments/${id}/join`,
     leave:              (id: string) => `${V1}/tournaments/${id}/join`,
     pending:            (id: string) => `${V1}/tournaments/${id}/pending`,

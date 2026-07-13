@@ -170,6 +170,26 @@ export interface CreateTournamentPayload {
   entryFeeGogold?: number;
 }
 
+export interface UpdateTournamentPayload {
+  name?: string;
+  description?: string;
+  imageUrl?: string;
+  prize?: string;
+  isPrivate?: boolean;
+  password?: string;
+  registrationMode?: TournamentRegistrationMode;
+  allowedCountries?: string[];
+  allowedLanguages?: string[];
+  timezone?: string;
+  registrationOpensAt?: string;
+  registrationClosesAt?: string;
+  scheduledStartAt?: string;
+  rules?: string;
+  sponsorName?: string;
+  sponsorLogoUrl?: string;
+  entryFeeGogold?: number;
+}
+
 async function listOpen(): Promise<OpenTournament[]> {
   const r = await apiClient.get<OpenTournament[]>(Endpoints.tournaments.open);
   return r.data ?? [];
@@ -202,6 +222,29 @@ async function create(payload: CreateTournamentPayload): Promise<Tournament> {
     sponsor_name: payload.sponsorName,
     sponsor_logo_url: payload.sponsorLogoUrl,
     entry_fee_gogold: payload.entryFeeGogold ?? 0,
+  });
+  return r.data;
+}
+
+async function update(tournamentId: string, payload: UpdateTournamentPayload): Promise<Tournament> {
+  const r = await apiClient.patch<Tournament>(Endpoints.tournaments.update(tournamentId), {
+    name: payload.name,
+    description: payload.description,
+    image_url: payload.imageUrl,
+    prize: payload.prize,
+    is_private: payload.isPrivate,
+    password: payload.password,
+    registration_mode: payload.registrationMode,
+    allowed_countries: payload.allowedCountries,
+    allowed_languages: payload.allowedLanguages,
+    timezone: payload.timezone,
+    registration_opens_at: payload.registrationOpensAt,
+    registration_closes_at: payload.registrationClosesAt,
+    scheduled_start_at: payload.scheduledStartAt,
+    rules: payload.rules,
+    sponsor_name: payload.sponsorName,
+    sponsor_logo_url: payload.sponsorLogoUrl,
+    entry_fee_gogold: payload.entryFeeGogold,
   });
   return r.data;
 }
@@ -273,6 +316,7 @@ export const tournamentService = {
   listOpen,
   listActive,
   create,
+  update,
   join,
   leave,
   listPendingParticipants,

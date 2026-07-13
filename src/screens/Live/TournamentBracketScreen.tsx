@@ -8,7 +8,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
-  ActivityIndicator, Image, Alert, RefreshControl,
+  ActivityIndicator, Image, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Animated, {
   FadeInDown, FadeInRight, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing,
@@ -41,6 +41,12 @@ const ROUND_LABELS: Record<TournamentRound, string> = {
   group_stage:    'Phase de groupes',
   losers_round:   'Bracket des perdants',
   grand_final:    'Grande finale',
+};
+
+const REGISTRATION_MODE_LABELS: Record<string, string> = {
+  open:        'Inscription libre — rejoins directement',
+  approval:    "Inscription sur validation — l'organisateur doit accepter",
+  invite_only: "Sur invitation uniquement — code requis",
 };
 
 // Pulsation douce du point rouge "en direct" — attire l'oeil sans etre criard.
@@ -78,6 +84,19 @@ export const TournamentBracketScreen: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [startingMatch, setStartingMatch] = useState<string | null>(null);
+
+  const [showJoin, setShowJoin] = useState(false);
+  const [joinPassword, setJoinPassword] = useState('');
+  const [joinInviteCode, setJoinInviteCode] = useState('');
+  const [joining, setJoining] = useState(false);
+
+  const [showEdit, setShowEdit] = useState(false);
+  const [editDescription, setEditDescription] = useState('');
+  const [editRules, setEditRules] = useState('');
+  const [editSponsorName, setEditSponsorName] = useState('');
+  const [editEntryFee, setEditEntryFee] = useState('');
+  const [editPrize, setEditPrize] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -127,6 +146,61 @@ export const TournamentBracketScreen: React.FC = () => {
       await load();
     } catch (e: any) {
       Alert.alert('Impossible de démarrer', e?.message || 'Une erreur est survenue.');
+    }
+  };
+
+  const handleOpenJoin = () => {
+    if (bracket?.tournament.has_password || bracket?.tournament.registration_mode === 'invite_only') {
+      setShowJoin(true);
+    } else {
+      handleJoin();
+    }
+  };
+
+  const handleJoin = async () => {
+    setJoining(true);
+    try {
+      const result = await tournamentService.join(tournamentId, joinPassword || undefined, joinInviteCode || undefined);
+      setShowJoin(false);
+      setJoinPassword('');
+      setJoinInviteCode('');
+      if (result.status === 'pending') {
+        Alert.alert('Demande envoyée', "L'organisateur doit valider ta demande d'inscription.");
+      }
+      await load();
+    } catch (e: any) {
+      Alert.alert('Impossible de rejoindre', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const handleOpenEdit = () => {
+    if (!bracket) return;
+    setEditDescription(bracket.tournament.description ?? '');
+    setEditRules(bracket.tournament.rules ?? '');
+    setEditSponsorName(bracket.tournament.sponsor_name ?? '');
+    setEditEntryFee(String(bracket.tournament.entry_fee_gogold ?? 0));
+    setEditPrize(bracket.tournament.prize ?? '');
+    setShowEdit(true);
+  };
+
+  const handleSaveEdit = async () => {
+    setSaving(true);
+    try {
+      await tournamentService.update(tournamentId, {
+        description: editDescription.trim() || undefined,
+        rules: editRules.trim() || undefined,
+        sponsorName: editSponsorName.trim() || undefined,
+        entryFeeGogold: editEntryFee.trim() ? parseInt(editEntryFee, 10) : 0,
+        prize: editPrize.trim() || undefined,
+      });
+      setShowEdit(false);
+      await load();
+    } catch (e: any) {
+      Alert.alert('Impossible de modifier', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -302,16 +376,120 @@ export const TournamentBracketScreen: React.FC = () => {
             <View style={[styles.regProgressTrack, { backgroundColor: colors.divider }]}>
               <View style={[styles.regProgressFill, { width: `${Math.min(100, (participants.length / tournament.format) * 100)}%` }]} />
             </View>
-            {isOrganizer && participants.length >= 2 && (
-              <TouchableOpacity activeOpacity={0.85} onPress={handleGenerateBracket}>
-                <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.regBtn}>
-                  <Icon name="play" size={14} color="#fff" />
-                  <Text style={styles.regBtnText}>Démarrer le tournoi maintenant</Text>
+
+            {!isOrganizer && !myParticipant && participants.length < tournament.format && (
+              <TouchableOpacity activeOpacity={0.85} onPress={handleOpenJoin}>
+                <LinearGradient colors={['#10B981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.regBtn}>
+                  <Icon name="user-plus" size={14} color="#fff" />
+                  <Text style={styles.regBtnText}>
+                    Rejoindre{tournament.entry_fee_gogold > 0 ? ` (${tournament.entry_fee_gogold} GoGold)` : ''}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}
+
+            {isOrganizer && (
+              <View style={styles.regOrganizerRow}>
+                <TouchableOpacity
+                  style={[styles.regEditBtn, { borderColor: colors.border }]}
+                  onPress={handleOpenEdit}
+                >
+                  <Icon name="settings" size={14} color={colors.textPrimary} />
+                  <Text style={[styles.regEditBtnText, { color: colors.textPrimary }]}>Modifier</Text>
+                </TouchableOpacity>
+                {participants.length >= 2 && (
+                  <TouchableOpacity activeOpacity={0.85} onPress={handleGenerateBracket} style={{ flex: 1 }}>
+                    <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.regBtn}>
+                      <Icon name="play" size={14} color="#fff" />
+                      <Text style={styles.regBtnText}>Démarrer maintenant</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </Animated.View>
         )}
+
+        <Animated.View
+          entering={FadeInDown.duration(400).delay(140).springify()}
+          style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <Text style={[styles.aboutTitle, { color: colors.textPrimary }]}>À propos de ce tournoi</Text>
+
+          {tournament.description && (
+            <Text style={[styles.aboutText, { color: colors.textSecondary }]}>{tournament.description}</Text>
+          )}
+
+          <View style={styles.aboutRow}>
+            <Icon name="users" size={14} color={colors.textTertiary} />
+            <Text style={[styles.aboutRowText, { color: colors.textSecondary }]}>
+              {REGISTRATION_MODE_LABELS[tournament.registration_mode]}
+            </Text>
+          </View>
+
+          {tournament.has_password && (
+            <View style={styles.aboutRow}>
+              <Icon name="lock" size={14} color={colors.textTertiary} />
+              <Text style={[styles.aboutRowText, { color: colors.textSecondary }]}>Tournoi privé — mot de passe requis</Text>
+            </View>
+          )}
+
+          {tournament.entry_fee_gogold > 0 && (
+            <View style={styles.aboutRow}>
+              <Icon name="credit-card" size={14} color={colors.textTertiary} />
+              <Text style={[styles.aboutRowText, { color: colors.textSecondary }]}>
+                Frais d'inscription : {tournament.entry_fee_gogold} GoGold
+              </Text>
+            </View>
+          )}
+
+          {tournament.scheduled_start_at && (
+            <View style={styles.aboutRow}>
+              <Icon name="calendar" size={14} color={colors.textTertiary} />
+              <Text style={[styles.aboutRowText, { color: colors.textSecondary }]}>
+                Début prévu : {new Date(tournament.scheduled_start_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
+              </Text>
+            </View>
+          )}
+
+          {tournament.registration_closes_at && (
+            <View style={styles.aboutRow}>
+              <Icon name="clock" size={14} color={colors.textTertiary} />
+              <Text style={[styles.aboutRowText, { color: colors.textSecondary }]}>
+                Clôture des inscriptions : {new Date(tournament.registration_closes_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
+              </Text>
+            </View>
+          )}
+
+          {(tournament.allowed_countries?.length || tournament.allowed_languages?.length) ? (
+            <View style={styles.aboutRow}>
+              <Icon name="globe" size={14} color={colors.textTertiary} />
+              <Text style={[styles.aboutRowText, { color: colors.textSecondary }]}>
+                {tournament.allowed_countries?.length ? `Pays : ${tournament.allowed_countries.join(', ')}` : ''}
+                {tournament.allowed_countries?.length && tournament.allowed_languages?.length ? ' · ' : ''}
+                {tournament.allowed_languages?.length ? `Langues : ${tournament.allowed_languages.join(', ')}` : ''}
+              </Text>
+            </View>
+          ) : null}
+
+          {tournament.sponsor_name && (
+            <View style={styles.aboutSponsorRow}>
+              {tournament.sponsor_logo_url ? (
+                <Image source={{ uri: tournament.sponsor_logo_url }} style={styles.aboutSponsorLogo} />
+              ) : (
+                <Icon name="award" size={14} color={colors.textTertiary} />
+              )}
+              <Text style={[styles.aboutRowText, { color: colors.textSecondary }]}>Sponsorisé par {tournament.sponsor_name}</Text>
+            </View>
+          )}
+
+          {tournament.rules && (
+            <View style={styles.aboutRulesBox}>
+              <Text style={[styles.aboutRulesTitle, { color: colors.textPrimary }]}>Règlement</Text>
+              <Text style={[styles.aboutRulesText, { color: colors.textSecondary }]}>{tournament.rules}</Text>
+            </View>
+          )}
+        </Animated.View>
 
         {liveMatches.length > 0 && (
           <Animated.View entering={FadeInDown.duration(400).delay(160).springify()} style={styles.liveCenterSection}>
@@ -458,6 +636,114 @@ export const TournamentBracketScreen: React.FC = () => {
           ))}
         </ScrollView>
       </ScrollView>
+
+      <Modal visible={showJoin} transparent animationType="fade" onRequestClose={() => setShowJoin(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Rejoindre le tournoi</Text>
+            {tournament.has_password && (
+              <TextInput
+                style={[styles.modalInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="Mot de passe"
+                placeholderTextColor={colors.textTertiary}
+                secureTextEntry
+                value={joinPassword}
+                onChangeText={setJoinPassword}
+              />
+            )}
+            {tournament.registration_mode === 'invite_only' && (
+              <TextInput
+                style={[styles.modalInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="Code d'invitation"
+                placeholderTextColor={colors.textTertiary}
+                autoCapitalize="characters"
+                value={joinInviteCode}
+                onChangeText={setJoinInviteCode}
+              />
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowJoin(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textTertiary }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.85} onPress={handleJoin} disabled={joining}>
+                <LinearGradient colors={['#10B981', '#059669']} style={styles.modalSendBtn}>
+                  {joining ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSendText}>Rejoindre</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={showEdit} transparent animationType="fade" onRequestClose={() => setShowEdit(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled">
+            <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Modifier le tournoi</Text>
+              <Text style={[styles.modalSub, { color: colors.textTertiary }]}>Possible tant que les inscriptions sont ouvertes</Text>
+
+              <Text style={[styles.modalFieldLabel, { color: colors.textSecondary }]}>Description</Text>
+              <TextInput
+                style={[styles.modalInput, styles.modalInputMultiline, { color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="Description du tournoi"
+                placeholderTextColor={colors.textTertiary}
+                multiline
+                value={editDescription}
+                onChangeText={setEditDescription}
+              />
+
+              <Text style={[styles.modalFieldLabel, { color: colors.textSecondary }]}>Récompense (texte libre)</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="Ex : 500 GoGold + trophée"
+                placeholderTextColor={colors.textTertiary}
+                value={editPrize}
+                onChangeText={setEditPrize}
+              />
+
+              <Text style={[styles.modalFieldLabel, { color: colors.textSecondary }]}>Frais d'inscription (GoGold)</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="0"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="number-pad"
+                value={editEntryFee}
+                onChangeText={setEditEntryFee}
+              />
+
+              <Text style={[styles.modalFieldLabel, { color: colors.textSecondary }]}>Sponsor</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="Nom du sponsor"
+                placeholderTextColor={colors.textTertiary}
+                value={editSponsorName}
+                onChangeText={setEditSponsorName}
+              />
+
+              <Text style={[styles.modalFieldLabel, { color: colors.textSecondary }]}>Règlement</Text>
+              <TextInput
+                style={[styles.modalInput, styles.modalInputMultiline, { color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="Règles du tournoi"
+                placeholderTextColor={colors.textTertiary}
+                multiline
+                value={editRules}
+                onChangeText={setEditRules}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowEdit(false)}>
+                  <Text style={[styles.modalCancelText, { color: colors.textTertiary }]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.85} onPress={handleSaveEdit} disabled={saving}>
+                  <LinearGradient colors={['#9B65F5', '#7B3FF2']} style={styles.modalSendBtn}>
+                    {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSendText}>Enregistrer</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -511,6 +797,36 @@ const styles = StyleSheet.create({
   regProgressFill: { height: '100%', backgroundColor: '#7B3FF2', borderRadius: 3 },
   regBtn: { flexDirection: 'row', gap: 8, borderRadius: 13, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
   regBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  regOrganizerRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  regEditBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 13, borderWidth: 1,
+    paddingVertical: 13, paddingHorizontal: 16, justifyContent: 'center',
+  },
+  regEditBtnText: { fontSize: 13, fontWeight: '700' },
+
+  aboutCard: { marginHorizontal: 16, marginTop: 12, borderRadius: 18, borderWidth: 1, padding: 16, gap: 10 },
+  aboutTitle: { fontSize: 15, fontWeight: '800' },
+  aboutText: { fontSize: 13, lineHeight: 19 },
+  aboutRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  aboutRowText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  aboutSponsorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  aboutSponsorLogo: { width: 20, height: 20, borderRadius: 4 },
+  aboutRulesBox: { marginTop: 4, gap: 4 },
+  aboutRulesTitle: { fontSize: 13, fontWeight: '800' },
+  aboutRulesText: { fontSize: 12, lineHeight: 18 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: { width: '100%', borderRadius: 20, padding: 20, gap: 10 },
+  modalTitle: { fontSize: 16, fontWeight: '800' },
+  modalSub: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  modalFieldLabel: { fontSize: 12, fontWeight: '700', marginTop: 6 },
+  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  modalInputMultiline: { minHeight: 70, textAlignVertical: 'top' },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 },
+  modalCancelBtn: { paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center' },
+  modalCancelText: { fontSize: 14, fontWeight: '700' },
+  modalSendBtn: { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
+  modalSendText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
   myMatchCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 4, borderRadius: 16, padding: 14 },
   myMatchIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(123,63,242,0.18)', alignItems: 'center', justifyContent: 'center' },
