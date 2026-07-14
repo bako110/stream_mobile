@@ -13,6 +13,13 @@ import type { EligibleCreator } from '../../services/battleService';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 
+const DURATIONS: { value: number; label: string }[] = [
+  { value: 90,  label: '1min30' },
+  { value: 180, label: '3min' },
+  { value: 300, label: '5min' },
+  { value: 600, label: '10min' },
+];
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -31,6 +38,7 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
   const [pendingBattleId, setPendingBattleId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [search, setSearch]       = useState('');
+  const [duration, setDuration]   = useState(180);
 
   useEffect(() => {
     if (!visible) return;
@@ -86,7 +94,7 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
     if (inviting || pendingBattleId) return;
     setInviting(creator.live_id);
     try {
-      const battle = await battleService.invite(liveId, creator.live_id);
+      const battle = await battleService.invite(liveId, creator.live_id, duration);
       setSentTo(creator.live_id);
       setPendingBattleId(battle.id);
     } catch {
@@ -120,6 +128,24 @@ export const BattleChallengeSheet: React.FC<Props> = ({ visible, onClose, liveId
                 <Text style={s.title}>Défier un créateur</Text>
               </View>
               <Text style={s.sub}>Choisis un créateur actuellement en direct pour lui envoyer une invitation de battle.</Text>
+
+              <Text style={s.durationLabel}>DURÉE DU MATCH</Text>
+              <View style={s.durationRow}>
+                {DURATIONS.map(d => (
+                  <TouchableOpacity
+                    key={d.value}
+                    onPress={() => setDuration(d.value)}
+                    disabled={!!pendingBattleId}
+                    style={[
+                      s.durationChip,
+                      duration === d.value && s.durationChipActive,
+                      !!pendingBattleId && { opacity: 0.5 },
+                    ]}
+                  >
+                    <Text style={[s.durationChipText, duration === d.value && s.durationChipTextActive]}>{d.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
               {!loading && creators.length > 0 && (
                 <View style={s.searchWrap}>
@@ -218,6 +244,15 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   title: { color: '#fff', fontSize: 16, fontWeight: '800' },
   sub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 18, marginBottom: 12 },
+  durationLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
+  durationRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  durationChip: {
+    flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  durationChipActive: { borderColor: '#7B3FF2', backgroundColor: 'rgba(123,63,242,0.18)' },
+  durationChipText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '700' },
+  durationChipTextActive: { color: '#9B65F5' },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14,

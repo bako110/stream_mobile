@@ -110,9 +110,9 @@ async function listActive(page = 1, limit = 20): Promise<ActiveBattlesPage> {
   return r.data ?? { items: [], page, has_more: false };
 }
 
-async function invite(liveAId: string, liveBId: string): Promise<Battle> {
+async function invite(liveAId: string, liveBId: string, durationSeconds = 180): Promise<Battle> {
   const r = await apiClient.post<Battle>(Endpoints.battles.invite, {
-    live_a_id: liveAId, live_b_id: liveBId,
+    live_a_id: liveAId, live_b_id: liveBId, duration_seconds: durationSeconds,
   });
   return r.data;
 }
