@@ -312,6 +312,7 @@ export const BattleScreen: React.FC = () => {
   const [hostAvatarB, setHostAvatarB] = useState<string | null>(null);
 
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoEndTriggeredRef = useRef(false);
   const chatRef   = useRef<FlatList<ChatMsg>>(null);
   const giftOverlayA = useRef<LiveGiftOverlayRef>(null);
   const giftOverlayB = useRef<LiveGiftOverlayRef>(null);
@@ -489,21 +490,31 @@ export const BattleScreen: React.FC = () => {
   useRoomSocket('live', battle?.live_a_id ?? null, useMemo(() => onLiveMessage('a'), [onLiveMessage]));
   useRoomSocket('live', battle?.live_b_id ?? null, useMemo(() => onLiveMessage('b'), [onLiveMessage]));
 
-  // Countdown local — recale sur started_at/duration_seconds a chaque changement de battle
+  // Countdown local — recale sur started_at/duration_seconds a chaque changement de battle.
+  // Des que le temps est ecoule, on ne se contente plus d'attendre le WS "battle_ended"
+  // (envoye par la tache serveur qui ne tourne qu'une fois par minute, jusqu'a 59s de
+  // retard) : le premier host dont l'app atteint 0 declenche lui-meme la cloture cote
+  // serveur — le match coupe immediatement et affiche le vainqueur sans attendre.
   useEffect(() => {
     if (!battle?.started_at || battle.status !== 'active') {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
+    autoEndTriggeredRef.current = false;
     const startedAt = new Date(battle.started_at).getTime();
     const tick = () => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      setRemaining(Math.max(0, battle.duration_seconds - elapsed));
+      const left = Math.max(0, battle.duration_seconds - elapsed);
+      setRemaining(left);
+      if (left === 0 && isHost && !autoEndTriggeredRef.current) {
+        autoEndTriggeredRef.current = true;
+        battleService.end(battleId).catch(() => {});
+      }
     };
     tick();
     timerRef.current = setInterval(tick, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [battle?.started_at, battle?.status, battle?.duration_seconds]);
+  }, [battle?.started_at, battle?.status, battle?.duration_seconds, isHost, battleId]);
 
   const handleReact = useCallback((side: 'a' | 'b') => {
     battleService.react(battleId, side).catch(() => {});
