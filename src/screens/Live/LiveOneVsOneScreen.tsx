@@ -93,7 +93,7 @@ export const LiveOneVsOneScreen: React.FC = () => {
 
   return (
     <View style={st.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <LinearGradient colors={['#1C1033', '#0B0812', '#0B0812']} style={StyleSheet.absoluteFill} />
 
       <View style={st.header}>
