@@ -207,7 +207,7 @@ export type MainStackParamList = {
   LiveViewer:        { concertId: string };
   SimpleLiveList:    undefined;
   GoLive:            undefined;
-  SimpleLiveStream:  { liveId: string; publisherToken?: string; livekitUrl?: string; userId?: string; isPrivate?: boolean };
+  SimpleLiveStream:  { liveId: string; publisherToken?: string; livekitUrl?: string; userId?: string; isPrivate?: boolean; tournamentMatchId?: string; opponentName?: string };
   SimpleLiveViewer:  { liveId: string };
   BattleScreen:      { battleId: string; followedHostId?: string };
   TournamentList:    undefined;

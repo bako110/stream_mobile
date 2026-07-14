@@ -61,6 +61,8 @@ import { BattleChallengeSheet } from '../../components/live/BattleChallengeSheet
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 import type { LiveStream } from '../../services/liveService';
 import { markLiveEnteringBattle, isLiveEnteringBattle } from '../../utils/battleTransitionFlags';
+import { useWs } from '../../context/WebSocketContext';
+import type { WsPayload } from '../../context/WebSocketContext';
 
 // ── LiveKit quality config ─────────────────────────────────────────────────────
 
@@ -309,7 +311,10 @@ const JoinToast: React.FC<{ name: string }> = ({ name }) => (
 
 // ── Contenu principal ─────────────────────────────────────────────────────────
 
-const StreamContent: React.FC<{ liveId: string; onEnd: () => void; onBattleStarted: () => void; isPrivate?: boolean }> = ({ liveId, onEnd, onBattleStarted, isPrivate = false }) => {
+const StreamContent: React.FC<{
+  liveId: string; onEnd: () => void; onBattleStarted: () => void; isPrivate?: boolean;
+  tournamentMatchId?: string; opponentName?: string;
+}> = ({ liveId, onEnd, onBattleStarted, isPrivate = false, tournamentMatchId, opponentName }) => {
   const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
   const room                 = useRoomContext();
   const allParticipants      = useParticipants();
@@ -784,6 +789,16 @@ const StreamContent: React.FC<{ liveId: string; onEnd: () => void; onBattleStart
         </Animated.View>
       )}
 
+      {/* ── BANDEAU MATCH DE TOURNOI : en attente de l'adversaire ────── */}
+      {tournamentMatchId && (
+        <Animated.View entering={FadeIn.duration(400)} style={st.tournamentWaitBanner} pointerEvents="none">
+          <View style={st.tournamentWaitDot} />
+          <Text style={st.tournamentWaitTxt} numberOfLines={1}>
+            {opponentName ? `En attente de ${opponentName}…` : "En attente de ton adversaire…"}
+          </Text>
+        </Animated.View>
+      )}
+
       {/* ── TOASTS arrivées ──────────────────────────────────────────── */}
       <View style={st.toastsContainer} pointerEvents="none">
         {joinToasts.map(t => <JoinToast key={t.id} name={t.name} />)}
@@ -1140,9 +1155,26 @@ export const SimpleLiveStreamScreen: React.FC = () => {
   useKeepAwake();
   const nav   = useNavigation<Nav>();
   const route = useRoute<RouteT>();
-  const { liveId, publisherToken: initialToken, livekitUrl: initialUrl, isPrivate = false } = route.params;
+  const { liveId, publisherToken: initialToken, livekitUrl: initialUrl, isPrivate = false, tournamentMatchId, opponentName } = route.params;
+  const { addListener, removeListener } = useWs();
 
   useEffect(() => { configureLiveAudioSession(); }, []);
+
+  // ── Match de tournoi : en attente que l'adversaire confirme etre pret aussi.
+  // "tournament_match_started" arrive sur le WS global (pas la comment-room de ce
+  // live) des que le second participant appelle mark_ready — a ce moment le vrai
+  // Battle est cree, on bascule automatiquement dessus.
+  useEffect(() => {
+    if (!tournamentMatchId) return;
+    const handler = (payload: WsPayload) => {
+      if (payload.type === 'tournament_match_started' && payload.id === tournamentMatchId && payload.battle_id) {
+        markLiveEnteringBattle(liveId);
+        nav.replace('BattleScreen', { battleId: payload.battle_id });
+      }
+    };
+    addListener(handler);
+    return () => removeListener(handler);
+  }, [tournamentMatchId, liveId, addListener, removeListener, nav]);
 
   const [token,  setToken]  = useState<string | null>(initialToken ?? null);
   const [wsUrl,  setWsUrl]  = useState<string | null>(initialUrl  ?? null);
@@ -1188,6 +1220,8 @@ export const SimpleLiveStreamScreen: React.FC = () => {
         onEnd={handleEnd}
         onBattleStarted={() => { endedRef.current = true; }}
         isPrivate={isPrivate}
+        tournamentMatchId={tournamentMatchId}
+        opponentName={opponentName}
       />
     </LiveKitRoom>
   );
@@ -1374,6 +1408,19 @@ const st = StyleSheet.create({
   },
   launchDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
   launchTxt: { color: '#fff', fontSize: 14, fontWeight: '800', flex: 1 },
+
+  tournamentWaitBanner: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 160 : 136,
+    left: 20, right: 20, zIndex: 98,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#7B3FF2',
+    borderRadius: 14, paddingVertical: 11, paddingHorizontal: 16,
+    shadowColor: '#7B3FF2', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    elevation: 9,
+  },
+  tournamentWaitDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
+  tournamentWaitTxt: { color: '#fff', fontSize: 13, fontWeight: '800', flex: 1 },
 
   // ── Toasts ────────────────────────────────────────────────────────────────────
   toastsContainer:   { position: 'absolute', top: Platform.OS === 'ios' ? 116 : 92, left: 14, zIndex: 30, gap: 4 },

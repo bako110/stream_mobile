@@ -437,6 +437,7 @@ export const Endpoints = {
     reward:             (id: string) => `${V1}/tournaments/${id}/reward`,
     cancel:             (id: string) => `${V1}/tournaments/${id}/cancel`,
     matchReady:         (matchId: string) => `${V1}/tournaments/matches/${matchId}/ready`,
+    matchForfeit:       (matchId: string) => `${V1}/tournaments/matches/${matchId}/forfeit`,
   },
 
   // ── Système ───────────────────────────────────────────────────────────────

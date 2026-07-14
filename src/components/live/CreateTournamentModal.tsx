@@ -22,6 +22,13 @@ import type { Tournament, TournamentType, TournamentRegistrationMode } from '../
 
 const FORMATS: Array<8 | 16 | 32 | 64> = [8, 16, 32, 64];
 
+const DURATIONS: { value: number; label: string }[] = [
+  { value: 90,  label: '1min30' },
+  { value: 180, label: '3min' },
+  { value: 300, label: '5min' },
+  { value: 600, label: '10min' },
+];
+
 const TYPES: { value: TournamentType; label: string; hint: string }[] = [
   { value: 'single_elimination', label: 'Élimination directe', hint: 'Une défaite = éliminé' },
   { value: 'double_elimination', label: 'Double élimination', hint: 'Deux défaites pour être éliminé' },
@@ -51,6 +58,7 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [tournamentType, setTournamentType] = useState<TournamentType>('single_elimination');
   const [format, setFormat] = useState<8 | 16 | 32 | 64>(8);
+  const [battleDurationSeconds, setBattleDurationSeconds] = useState(180);
   const [prize, setPrize] = useState('');
 
   const [isPrivate, setIsPrivate] = useState(false);
@@ -72,7 +80,7 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
 
   const reset = () => {
     setStep(0); setName(''); setDescription(''); setImageUrl(null);
-    setTournamentType('single_elimination'); setFormat(8); setPrize('');
+    setTournamentType('single_elimination'); setFormat(8); setBattleDurationSeconds(180); setPrize('');
     setIsPrivate(false); setPassword(''); setRegistrationMode('open');
     setAllowedCountries([]); setAllowedLanguages([]);
     setTimezone(''); setScheduledStartAt(null); setRegistrationClosesAt(null);
@@ -92,6 +100,7 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
       const t = await tournamentService.create({
         name: name.trim(),
         format,
+        battleDurationSeconds,
         imageUrl: imageUrl ?? undefined,
         prize: prize.trim() || undefined,
         tournamentType,
@@ -211,6 +220,22 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
                       ]}
                     >
                       <Text style={{ color: format === f ? '#9B65F5' : colors.textSecondary, fontWeight: '700' }}>{f}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[s.fieldLabel, { color: colors.textTertiary }]}>DURÉE DE CHAQUE MATCH</Text>
+                <View style={s.formatRow}>
+                  {DURATIONS.map(d => (
+                    <TouchableOpacity
+                      key={d.value}
+                      onPress={() => setBattleDurationSeconds(d.value)}
+                      style={[
+                        s.formatChip,
+                        { borderColor: battleDurationSeconds === d.value ? '#9B65F5' : colors.border, backgroundColor: battleDurationSeconds === d.value ? '#9B65F522' : colors.backgroundSecondary },
+                      ]}
+                    >
+                      <Text style={{ color: battleDurationSeconds === d.value ? '#9B65F5' : colors.textSecondary, fontWeight: '700' }}>{d.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

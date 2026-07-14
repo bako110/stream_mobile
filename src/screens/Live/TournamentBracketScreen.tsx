@@ -92,6 +92,7 @@ export const TournamentBracketScreen: React.FC = () => {
 
   const [generating, setGenerating] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<TournamentMatch | null>(null);
+  const [decidingForfeit, setDecidingForfeit] = useState(false);
 
   const [showEdit, setShowEdit] = useState(false);
   const [editDescription, setEditDescription] = useState('');
@@ -226,13 +227,44 @@ export const TournamentBracketScreen: React.FC = () => {
         // en parallele de celui du battle.
         nav.replace('BattleScreen', { battleId: updated.battle_id });
       } else {
-        nav.navigate('SimpleLiveStream', { liveId: live.id, publisherToken: token, livekitUrl: livekit_url });
+        const opponentParticipantId = match.participant_a_id === myParticipant?.id ? match.participant_b_id : match.participant_a_id;
+        const opponentName = bracket?.participants.find(p => p.id === opponentParticipantId)?.display_name ?? undefined;
+        nav.navigate('SimpleLiveStream', {
+          liveId: live.id, publisherToken: token, livekitUrl: livekit_url,
+          tournamentMatchId: match.id, opponentName,
+        });
       }
     } catch (e: any) {
       Alert.alert('Erreur', e?.message || "Impossible de démarrer le match.");
     } finally {
       setStartingMatch(null);
     }
+  };
+
+  const handleForfeit = (winnerParticipantId: string, winnerName: string) => {
+    if (!selectedMatch || decidingForfeit) return;
+    Alert.alert(
+      'Déclarer un forfait',
+      `Déclarer ${winnerName} vainqueur par forfait de ce match ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Confirmer', style: 'destructive',
+          onPress: async () => {
+            setDecidingForfeit(true);
+            try {
+              await tournamentService.declareForfeit(selectedMatch.id, winnerParticipantId);
+              setSelectedMatch(null);
+              await load();
+            } catch (e: any) {
+              Alert.alert('Impossible de déclarer ce forfait', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
+            } finally {
+              setDecidingForfeit(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const rounds = bracket ? Array.from(new Set(bracket.matches.map(m => m.round))) : [];
@@ -845,6 +877,8 @@ export const TournamentBracketScreen: React.FC = () => {
               const partB = participants.find(p => p.id === selectedMatch.participant_b_id);
               const isLive = selectedMatch.status === 'live';
               const isCompleted = selectedMatch.status === 'completed' || selectedMatch.status === 'bye';
+              const canForfeit = isOrganizer && (selectedMatch.status === 'ready' || selectedMatch.status === 'live')
+                && !!selectedMatch.participant_a_id && !!selectedMatch.participant_b_id;
               return (
                 <>
                   <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{ROUND_LABELS[selectedMatch.round]}</Text>
@@ -874,6 +908,34 @@ export const TournamentBracketScreen: React.FC = () => {
                       <Text style={[styles.matchDetailReadyText, { color: colors.textSecondary }]}>{partA?.display_name ?? '—'}</Text>
                       <Icon name={selectedMatch.b_ready ? 'check-circle' : 'clock'} size={14} color={selectedMatch.b_ready ? '#10B981' : colors.textTertiary} style={{ marginLeft: 16 }} />
                       <Text style={[styles.matchDetailReadyText, { color: colors.textSecondary }]}>{partB?.display_name ?? '—'}</Text>
+                    </View>
+                  )}
+
+                  {canForfeit && (
+                    <View style={styles.forfeitBox}>
+                      <Text style={[styles.forfeitTitle, { color: colors.textSecondary }]}>
+                        Adversaire absent ? Déclare un vainqueur par forfait :
+                      </Text>
+                      <View style={styles.forfeitBtnsRow}>
+                        <TouchableOpacity
+                          style={[styles.forfeitBtn, { borderColor: colors.border }]}
+                          disabled={decidingForfeit}
+                          onPress={() => handleForfeit(selectedMatch.participant_a_id!, partA?.display_name ?? 'Joueur A')}
+                        >
+                          <Text style={[styles.forfeitBtnText, { color: colors.textPrimary }]} numberOfLines={1}>
+                            {partA?.display_name ?? 'Joueur A'} gagne
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.forfeitBtn, { borderColor: colors.border }]}
+                          disabled={decidingForfeit}
+                          onPress={() => handleForfeit(selectedMatch.participant_b_id!, partB?.display_name ?? 'Joueur B')}
+                        >
+                          <Text style={[styles.forfeitBtnText, { color: colors.textPrimary }]} numberOfLines={1}>
+                            {partB?.display_name ?? 'Joueur B'} gagne
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   )}
 
@@ -1084,4 +1146,10 @@ const styles = StyleSheet.create({
   matchDetailVs: { fontSize: 12, fontWeight: '800' },
   matchDetailReadyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, marginBottom: 8 },
   matchDetailReadyText: { fontSize: 11, fontWeight: '600', marginLeft: 5 },
+
+  forfeitBox: { marginTop: 14, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(120,120,120,0.25)', paddingTop: 14 },
+  forfeitTitle: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  forfeitBtnsRow: { flexDirection: 'row', gap: 8 },
+  forfeitBtn: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center' },
+  forfeitBtnText: { fontSize: 12, fontWeight: '700' },
 });

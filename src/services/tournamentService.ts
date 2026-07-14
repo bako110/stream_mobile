@@ -300,6 +300,13 @@ async function markMatchReady(matchId: string, liveId: string): Promise<Tourname
   return r.data;
 }
 
+async function declareForfeit(matchId: string, winnerParticipantId: string): Promise<TournamentMatch> {
+  const r = await apiClient.post<TournamentMatch>(Endpoints.tournaments.matchForfeit(matchId), {
+    winner_participant_id: winnerParticipantId,
+  });
+  return r.data;
+}
+
 async function getFinanceReport(tournamentId: string): Promise<TournamentFinanceReport> {
   const r = await apiClient.get<TournamentFinanceReport>(Endpoints.tournaments.finance(tournamentId));
   return r.data;
@@ -327,6 +334,7 @@ export const tournamentService = {
   getStandings,
   cancel,
   markMatchReady,
+  declareForfeit,
   getFinanceReport,
   rewardParticipant,
 };
