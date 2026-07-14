@@ -6,6 +6,7 @@ export interface Reel {
   id: string;
   user_id: string;
   caption: string | null;
+  category: string | null;
   hls_url: string | null;
   thumbnail_url: string | null;
   duration_sec: number | null;

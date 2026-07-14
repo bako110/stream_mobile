@@ -10,6 +10,8 @@ export { CountryMultiSelect } from './CountryMultiSelect';
 export { LanguageMultiSelect } from './LanguageMultiSelect';
 export { TimezoneSelect } from './TimezoneSelect';
 export { DateTimeField } from './DateTimeField';
+export { CategorySelector, CONTENT_CATEGORIES } from './CategorySelector';
+export type { ContentCategory } from './CategorySelector';
 export { SocialAuthButton }  from './SocialAuthButton';
 export { AppHeader, BackButton } from './AppHeader';
 export { AppTabBar }         from './AppTabBar';

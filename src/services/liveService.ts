@@ -8,6 +8,7 @@ export interface LiveStream {
   user_id: string;
   title: string;
   description?: string | null;
+  category?: string | null;
   thumbnail_url?: string | null;
   status: 'active' | 'ended';
   room_name?: string | null;
@@ -84,6 +85,7 @@ async function getById(id: string): Promise<LiveStream> {
 async function startLive(payload: {
   title: string;
   description?: string;
+  category?: string;
   is_private?: boolean;
   is_monetized?: boolean;
   monetization_type?: MonetizationType;

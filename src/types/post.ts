@@ -13,6 +13,7 @@ export interface Post {
   user_id: string;
   body?: string | null;
   caption?: string | null;
+  category?: string | null;
   image_url?: string | null;
   image_urls?: string[] | null;
   media_urls?: string[] | null;
@@ -40,6 +41,7 @@ export interface Post {
 
 export interface PostCreate {
   body?: string;
+  category?: string;
   image_url?: string;
   image_urls?: string[];
   video_url?: string;

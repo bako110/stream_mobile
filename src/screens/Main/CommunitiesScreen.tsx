@@ -7,7 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { BackButton } from '../../components/common';
+import { BackButton, CategorySelector } from '../../components/common';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -270,6 +270,7 @@ export const CommunitiesScreen: React.FC = () => {
   const [step,             setStep]             = useState<'info' | 'settings'>('info');
   const [createName,       setCreateName]       = useState('');
   const [createDesc,       setCreateDesc]       = useState('');
+  const [createCategory,   setCreateCategory]   = useState<string | null>(null);
   const [createPrivate,    setCreatePrivate]    = useState(false);
   const [createInviteOnly,          setCreateInviteOnly]          = useState(false);
   const [createMembersHiddenPublic, setCreateMembersHiddenPublic] = useState(true);
@@ -285,6 +286,7 @@ export const CommunitiesScreen: React.FC = () => {
     setStep('info');
     setCreateName('');
     setCreateDesc('');
+    setCreateCategory(null);
     setCreatePrivate(false);
     setCreateInviteOnly(false);
     setCreateMembersHiddenPublic(true);
@@ -491,6 +493,7 @@ export const CommunitiesScreen: React.FC = () => {
       const payload: CreateCommunityPayload & { template?: string } = {
         name:                        createName.trim(),
         description:                 createDesc.trim() || undefined,
+        category:                    createCategory ?? undefined,
         is_private:                  createPrivate,
         requires_approval:           createInviteOnly,
         members_list_hidden_public:  createMembersHiddenPublic,
@@ -836,6 +839,10 @@ export const CommunitiesScreen: React.FC = () => {
           <Text style={[S.counter, { color: colors.textTertiary }]}>
             {createDesc.length}/300
           </Text>
+        </View>
+
+        <View>
+          <CategorySelector value={createCategory} onChange={setCreateCategory} label="Catégorie (optionnel)" />
         </View>
       </View>
 

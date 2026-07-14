@@ -14,6 +14,7 @@ import { postService } from '../../services/postService';
 import { uploadImageFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { MentionInput } from '../../components/common/MentionInput';
+import { CategorySelector } from '../../components/common/CategorySelector';
 
 const { width: W } = Dimensions.get('window');
 const MAX_IMAGES   = 6;
@@ -36,6 +37,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const insets          = useSafeAreaInsets();
 
   const [body,          setBody]          = useState('');
+  const [category,      setCategory]      = useState<string | null>(null);
   const [mentionIds,    setMentionIds]    = useState<string[]>([]);
   const [feeling,       setFeeling]       = useState<string | undefined>();
   const [localUris,     setLocalUris]     = useState<string[]>([]);
@@ -106,10 +108,11 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
     if (!canPost || posting) return;
     setPosting(true);
 
-    const capturedBody    = body.trim();
-    const capturedFeeling = feeling;
-    const capturedVideo   = videoUri;
-    const capturedImages  = [...localUris];
+    const capturedBody     = body.trim();
+    const capturedFeeling  = feeling;
+    const capturedCategory = category ?? undefined;
+    const capturedVideo    = videoUri;
+    const capturedImages   = [...localUris];
 
     // Fermer l'écran immédiatement dans tous les cas
     onPostCreated();
@@ -137,6 +140,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             image_url,
             image_urls,
             feeling: capturedFeeling,
+            category: capturedCategory,
             mention_ids: mentionIds.length ? mentionIds : undefined,
           });
         } catch (err: any) {
@@ -159,6 +163,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           await postService.create({
             body:          capturedBody || undefined,
             feeling:       capturedFeeling,
+            category:      capturedCategory,
             video_url:     result.videoUrl,
             thumbnail_url: result.thumbnailUrl,
             video_width:   result.videoWidth,
@@ -179,6 +184,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           await postService.create({
             body:          capturedBody || undefined,
             feeling:       capturedFeeling,
+            category:      capturedCategory,
             video_url:     result.videoUrl,
             thumbnail_url: result.thumbnailUrl,
             video_width:   result.videoWidth,
@@ -320,6 +326,10 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             maxLength={2000}
             inputStyle={s.input}
           />
+        </View>
+
+        <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
+          <CategorySelector value={category} onChange={setCategory} label="Catégorie (optionnel)" />
         </View>
 
         {/* Aperçu vidéo */}

@@ -6,6 +6,7 @@ export interface CommunityData {
   id: string;
   name: string;
   description: string | null;
+  category?: string | null;
   avatar_url: string | null;
   banner_url: string | null;
   is_private: boolean;
@@ -55,6 +56,7 @@ export interface CommunityMemberData {
 export interface CreateCommunityPayload {
   name: string;
   description?: string;
+  category?: string;
   is_private?: boolean;
   requires_approval?: boolean;
   members_only_chat?: boolean;

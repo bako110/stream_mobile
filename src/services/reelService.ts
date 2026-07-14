@@ -85,6 +85,7 @@ export const reelService = {
     hls_url:         string;
     mp4_url?:        string;
     caption?:        string;
+    category?:       string;
     thumbnail_url?:  string;
     duration_sec?:   number;
     ref_concert_id?: string;

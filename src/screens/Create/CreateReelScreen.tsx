@@ -23,6 +23,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { reelService } from '../../services';
 import { MentionInput } from '../../components/common/MentionInput';
+import { CategorySelector } from '../../components/common/CategorySelector';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { ReelEditorScreen, type ReelEditResult, type FilterKey, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from './ReelEditorScreen';
 import Sound from 'react-native-sound';
@@ -259,6 +260,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   const insets = useSafeAreaInsets();
 
   const [caption,           setCaption]           = useState('');
+  const [category,          setCategory]          = useState<string | null>(null);
   const [captionMentionIds, setCaptionMentionIds] = useState<string[]>([]);
   const [videoUri,          setVideoUri]          = useState<string | null>(sourceReelUrl ?? null);
   const [videoThumb,        setVideoThumb]        = useState<string | null>(null);
@@ -329,7 +331,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   }, [sourceReelUrl]);
 
   const publishRef = useRef<{
-    uri: string; cap: string; mentionIds: string[];
+    uri: string; cap: string; category?: string; mentionIds: string[];
     edit: ReelEditResult | null; dur: number;
   } | null>(null);
 
@@ -438,6 +440,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
     publishRef.current = {
       uri:        freshTrimmedUri ?? videoUri,
       cap:        caption.trim(),
+      category:   category ?? undefined,
       mentionIds: [...captionMentionIds],
       edit:       freshEdit,
       dur:        hasTrim && freshEdit ? freshEdit.endSec - freshEdit.startSec : videoDuration,
@@ -476,6 +479,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
             hls_url:       result.hls_url,
             mp4_url:       result.mp4_url,
             caption:       snap.cap || undefined,
+            category:      snap.category,
             thumbnail_url: result.thumbnail_url,
             duration_sec:  5,
             mention_ids:   snap.mentionIds.length ? snap.mentionIds : undefined,
@@ -514,7 +518,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
           );
           return;
         }
-        const { edit, dur, cap, mentionIds } = snap;
+        const { edit, dur, cap, category: snapCategory, mentionIds } = snap;
         try {
           // Upload l'audio local vers R2 si présent
           let musicPublicUrl: string | undefined;
@@ -534,6 +538,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
             hls_url:       playUrl,
             mp4_url:       result.mp4Url ?? undefined,
             caption:       cap || undefined,
+            category:      snapCategory,
             thumbnail_url: result.thumbnailUrl,
             duration_sec:  result.durationSec ? Math.round(result.durationSec) : Math.round(dur),
             mention_ids:   mentionIds.length ? mentionIds : undefined,
@@ -716,6 +721,8 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
                 <Text style={[s.charCount, { color: colors.textTertiary }]}>{caption.length}/300</Text>
               </View>
             </View>
+
+            <CategorySelector value={category} onChange={setCategory} label="Catégorie (optionnel)" />
           </View>
 
           {/* ══ MUSIQUE SÉLECTIONNÉE ══ */}

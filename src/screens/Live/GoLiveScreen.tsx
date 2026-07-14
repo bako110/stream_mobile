@@ -13,6 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 import { LiveThumbnailBackground } from '../../components/common/LiveThumbnailBackground';
+import { CategorySelector } from '../../components/common/CategorySelector';
 import { liveService } from '../../services/liveService';
 import type { MonetizationType, LiveStream } from '../../services/liveService';
 import { apiClient } from '../../api/client';
@@ -43,6 +44,7 @@ export const GoLiveScreen: React.FC = () => {
   // Form
   const [title,       setTitle]       = useState('');
   const [description, setDescription] = useState('');
+  const [category,    setCategory]    = useState<string | null>(null);
   const [isPrivate,   setIsPrivate]   = useState(false);
   const [starting,    setStarting]    = useState(false);
 
@@ -153,6 +155,7 @@ export const GoLiveScreen: React.FC = () => {
       const payload: Parameters<typeof liveService.startLive>[0] = {
         title: t,
         description: description.trim() || undefined,
+        category: category ?? undefined,
         is_private: isPrivate,
         is_monetized: isMonetized,
         monetization_type:     isMonetized ? monetType! : undefined,
@@ -288,6 +291,9 @@ export const GoLiveScreen: React.FC = () => {
                   numberOfLines={3}
                   maxLength={300}
                 />
+              </View>
+              <View style={{ marginTop: 10 }}>
+                <CategorySelector value={category} onChange={setCategory} label="Catégorie (optionnel)" />
               </View>
             </View>
           )}
