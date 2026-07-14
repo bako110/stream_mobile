@@ -113,6 +113,7 @@ export interface ShareCreate {
   content_id?: string;
   concert_id?: string;
   event_id?: string;
+  live_id?: string;
 }
 
 export interface ShareCounts {

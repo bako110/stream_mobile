@@ -13,8 +13,10 @@ import Share from 'react-native-share';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { userService } from '../../services/userService';
+import { socialService } from '../../services/socialService';
 import { useUser } from '../../context/UserContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { ReportModal } from '../common/ReportModal';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -38,6 +40,7 @@ export const LiveMoreMenu: React.FC<Props> = ({
   const nav = useNavigation<Nav>();
   const [isFollowed, setIsFollowed] = useState<boolean | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     if (isHost || !hostId || !visible) return;
@@ -72,6 +75,10 @@ export const LiveMoreMenu: React.FC<Props> = ({
         url: shareUrl,
         failOnCancel: false,
       }).catch(() => {});
+      // Enregistrement du partage en base (compteur + intérêts) — le sheet natif OS
+      // ne fait qu'ouvrir la fenêtre de partage, il ne remonte rien côté serveur.
+      // Best-effort : un échec réseau ici ne doit jamais bloquer le partage lui-même.
+      socialService.share({ platform: 'external', live_id: liveId }).catch(() => {});
     });
   };
 
@@ -80,9 +87,8 @@ export const LiveMoreMenu: React.FC<Props> = ({
   };
 
   const handleReport = () => {
-    run(() => {
-      Alert.alert('Signaler ce live', 'Merci, notre équipe va examiner ce signalement.');
-    });
+    onClose();
+    setTimeout(() => setShowReport(true), 200);
   };
 
   const handleStop = () => {
@@ -106,6 +112,7 @@ export const LiveMoreMenu: React.FC<Props> = ({
   const showFollow = !isHost && hostId && String(hostId) !== String(currentUser?.id ?? '');
 
   return (
+    <>
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={onClose}>
         <Animated.View entering={SlideInDown.duration(220)} exiting={SlideOutDown.duration(180)}>
@@ -201,6 +208,14 @@ export const LiveMoreMenu: React.FC<Props> = ({
         </Animated.View>
       </TouchableOpacity>
     </Modal>
+
+    <ReportModal
+      visible={showReport}
+      contentType="live"
+      contentId={liveId}
+      onClose={() => setShowReport(false)}
+    />
+    </>
   );
 };
 
