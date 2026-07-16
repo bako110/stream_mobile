@@ -7,7 +7,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
-import { AppHeader, SkeletonSubscriptions } from '../../components/common';
+import { AppHeader, SkeletonSubscriptions, PriceWithLocal } from '../../components/common';
 import { subscriptionService, WalletCheck } from '../../services/subscriptionService';
 import type { Subscription, PlanType } from '../../types';
 import { PLAN_CONFIG } from '../../types/subscription';
@@ -92,7 +92,7 @@ const ActiveCard: React.FC<{
           <View>
             <Text style={s.cardLabel}>Plan actuel</Text>
             <Text style={s.cardPlan}>{PLAN_LABELS[plan] ?? plan}</Text>
-            <Text style={s.cardPrice}>{PLAN_PRICES[plan] ?? ''}</Text>
+            <PriceWithLocal amountEur={PLAN_CONFIG[plan as PlanType]?.price ?? 0} suffix="/mois" style={s.cardPrice} />
           </View>
           <View style={[s.statusBadge, { backgroundColor: isCancelled ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.22)' }]}>
             <Text style={s.statusBadgeText}>{statusLabel(sub.status)}</Text>
@@ -179,7 +179,7 @@ const ConfirmModal: React.FC<{
           {/* Header plan */}
           <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.modalHeader}>
             <Text style={s.modalPlanName}>{PLAN_LABELS[plan]}</Text>
-            <Text style={s.modalPlanPrice}>{PLAN_PRICES[plan]}</Text>
+            <PriceWithLocal amountEur={PLAN_CONFIG[plan].price} suffix="/mois" style={s.modalPlanPrice} />
           </LinearGradient>
 
           {/* Solde wallet */}
@@ -280,7 +280,7 @@ const PlanPicker: React.FC<{
                 <View style={s.planCardTop}>
                   <Text style={[s.planCardName, { color: grad[0] }]}>{PLAN_LABELS[p]}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={[s.planCardPrice, { color: grad[0] }]}>{PLAN_PRICES[p]}</Text>
+                    <PriceWithLocal amountEur={PLAN_CONFIG[p].price} suffix="/mois" style={[s.planCardPrice, { color: grad[0] }]} />
                     <Text style={[s.planCardGoGold, { color: grad[0] + 'AA' }]}>
                       ({PLAN_COINS[p]} GoGold)
                     </Text>

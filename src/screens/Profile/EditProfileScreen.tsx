@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton, SkeletonEditProfile } from '../../components/common';
 import { useUser } from '../../context/UserContext';
@@ -28,6 +29,7 @@ interface Props {
 export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const { refreshUser, setCurrentUser } = useUser();
 
   const [user, setUser]             = useState<User | null>(null);
@@ -183,7 +185,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Modifier le profil</Text>
         <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.headerBtn}>
@@ -374,7 +376,7 @@ const Field: React.FC<FieldProps> = ({ label, value, onChange, colors, placehold
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 48, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700' },

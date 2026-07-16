@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -567,7 +567,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                     <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '900' }}>
                       {req.gogold_amount.toLocaleString('fr-FR')} <Text style={{ fontSize: 13, fontWeight: '400' }}>GoGold</Text>
                     </Text>
-                    <Text style={{ color: colors.textTertiary, fontSize: 12 }}>≈ {req.eur_amount.toFixed(2)} €</Text>
+                    <Text style={{ color: colors.textTertiary, fontSize: 12 }}>≈ <PriceWithLocal amountEur={req.eur_amount} style={{ color: colors.textTertiary, fontSize: 12 }} /></Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                     backgroundColor: cfg.color + '15', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 }}>
@@ -740,7 +740,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                       Solde communautaire : {communityBalance.toLocaleString('fr-FR')} GoGold
                     </Text>
                     <Text style={{ color: '#10B981', fontSize: 11, opacity: 0.8 }}>
-                      ≈ {(communityBalance / 100).toFixed(2)} € disponibles
+                      ≈ <PriceWithLocal amountEur={communityBalance / 100} style={{ color: '#10B981', fontSize: 11, opacity: 0.8 }} /> disponibles
                     </Text>
                   </View>
                 </View>
@@ -770,7 +770,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                   />
                   {formAmount ? (
                     <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
-                      ≈ {(parseInt(formAmount || '0') / 100).toFixed(2)} €
+                      ≈ <PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textTertiary, fontSize: 12 }} />
                     </Text>
                   ) : null}
                 </View>

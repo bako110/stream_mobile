@@ -4,6 +4,7 @@ import {
   ScrollView, Linking, Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 
@@ -48,6 +49,7 @@ const FAQ = [
 export const SupportScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = React.useState<number | null>(null);
 
   const handleOption = (opt: typeof SUPPORT_OPTIONS[number]) => {
@@ -64,7 +66,7 @@ export const SupportScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 14 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Assistance</Text>
         <View style={{ width: 40 }} />
@@ -169,7 +171,7 @@ export const SupportScreen: React.FC<Props> = ({ navigation }) => {
 
 const s = StyleSheet.create({
   root:         { flex: 1 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle:  { fontSize: 18, fontWeight: '800' },
 
   hero:         { margin: 16, borderRadius: 20, padding: 24, alignItems: 'center', gap: 10 },

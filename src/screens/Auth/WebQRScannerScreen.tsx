@@ -16,6 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 import { apiClient } from '../../api/client';
@@ -41,6 +42,7 @@ function extractToken(raw: string): string | null {
 export const WebQRScannerScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { theme: { colors } } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [phase,       setPhase]       = useState<Phase>('scanning');
   const [errorMsg,    setErrorMsg]    = useState('');
@@ -109,7 +111,7 @@ export const WebQRScannerScreen: React.FC = () => {
         </View>
 
         {/* Barre haute */}
-        <View style={st.topBar}>
+        <View style={[st.topBar, { paddingTop: insets.top + 16 }]}>
           <BackButton onPress={() => navigation.goBack()} transparent />
           <Text style={st.topTitle}>Scanner le QR web</Text>
           <View style={{ width: 40 }} />
@@ -260,7 +262,7 @@ const st = StyleSheet.create({
   topBar:   {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 52, paddingHorizontal: 20, paddingBottom: 16,
+    paddingHorizontal: 20, paddingBottom: 16,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   topTitle:     { color: '#fff', fontSize: 17, fontWeight: '700' },

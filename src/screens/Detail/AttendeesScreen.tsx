@@ -14,12 +14,13 @@ const TIER_LABELS: Record<string, string> = {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { eventService } from '../../services';
 import { Endpoints, getAuthToken } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
 import type { EventAttendee } from '../../types/event';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 
 interface Props {
   eventId:    string;
@@ -33,6 +34,7 @@ const getInitials = (name: string | null | undefined) =>
 
 export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, onScan }) => {
   const { theme: { colors } } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [attendees,  setAttendees]  = useState<EventAttendee[]>([]);
   const [filtered,   setFiltered]   = useState<EventAttendee[]>([]);
@@ -128,9 +130,15 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
               </View>
             );
           })()}
-          <Text style={[at.price, { color: colors.textTertiary }]}>
-            {(Number(item.price_paid) || 0) === 0 ? 'Gratuit' : `${(Number(item.price_paid)).toFixed(2)} €`}
-          </Text>
+          {(Number(item.price_paid) || 0) === 0 ? (
+            <Text style={[at.price, { color: colors.textTertiary }]}>Gratuit</Text>
+          ) : (
+            <PriceWithLocal
+              amountEur={Number(item.price_paid)}
+              style={[at.price, { color: colors.textTertiary }]}
+              localStyle={{ color: colors.textTertiary }}
+            />
+          )}
           <Text style={[at.date, { color: colors.textTertiary }]}>
             · {new Date(item.registered_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
           </Text>
@@ -158,7 +166,7 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
       {/* Header */}
       <LinearGradient
         colors={[colors.gradientStart, colors.gradientEnd]}
-        style={[at.header, { paddingTop: Platform.OS === 'ios' ? 56 : 42 }]}
+        style={[at.header, { paddingTop: insets.top + 16 }]}
       >
         <BackButton onPress={onBack} transparent />
         <View style={{ flex: 1, marginLeft: 12 }}>
@@ -204,9 +212,11 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
         </View>
         <View style={[at.statDiv, { backgroundColor: colors.divider }]} />
         <View style={at.statItem}>
-          <Text style={[at.statNum, { color: colors.textPrimary }]}>
-            {attendees.reduce((s, a) => s + (Number(a.price_paid) || 0), 0).toFixed(0)} €
-          </Text>
+          <PriceWithLocal
+            amountEur={attendees.reduce((s, a) => s + (Number(a.price_paid) || 0), 0)}
+            style={[at.statNum, { color: colors.textPrimary }]}
+            localStyle={{ color: colors.textTertiary }}
+          />
           <Text style={[at.statLbl, { color: colors.textTertiary }]}>Revenus</Text>
         </View>
       </View>

@@ -1774,7 +1774,7 @@ export const ChatScreen: React.FC = () => {
       >
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <StatusBar hidden />
-          <View style={CP.header}>
+          <View style={[CP.header, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity
               onPress={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -1845,7 +1845,7 @@ export const ChatScreen: React.FC = () => {
           <StatusBar hidden />
 
           {/* Header */}
-          <View style={CP.header}>
+          <View style={[CP.header, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity
               onPress={() => { if (!imgUploading) { setImgPreviewOpen(false); setImgPreviewUri(null); setImgCaption(''); } }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -2357,7 +2357,7 @@ const styles = StyleSheet.create({
 const CP = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
   },
   headerClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },

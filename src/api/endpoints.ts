@@ -520,6 +520,11 @@ export const Endpoints = {
     version: `${V1}/app/version`,
   },
 
+  currencies: {
+    list: `${V1}/currencies`,
+    get:  (code: string) => `${V1}/currencies/${code}`,
+  },
+
   sounds: {
     list:    `${V1}/sounds`,
     popular: `${V1}/sounds/popular`,

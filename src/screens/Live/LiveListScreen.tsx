@@ -11,6 +11,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonLiveList, BackButton } from '../../components/common';
 import { concertService } from '../../services';
@@ -27,6 +28,7 @@ export const LiveListScreen: React.FC = () => {
   const { colors } = theme;
   const nav = useNavigation<Nav>();
   const { currentUser } = useUser();
+  const insets = useSafeAreaInsets();
 
   const [liveConcerts, setLiveConcerts] = useState<Concert[]>([]);
   const [upcomingConcerts, setUpcomingConcerts] = useState<Concert[]>([]);
@@ -196,7 +198,7 @@ export const LiveListScreen: React.FC = () => {
     return (
       <View style={[st.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <View style={[st.header, { backgroundColor: colors.surface }]}>
+        <View style={[st.header, { backgroundColor: colors.surface, paddingTop: insets.top + 12 }]}>
           <BackButton onPress={() => nav.goBack()} />
           <Text style={[st.headerTitle, { color: colors.textPrimary }]}>En direct</Text>
           <View style={{ width: 38 }} />
@@ -299,7 +301,6 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 44 : 56,
     paddingBottom: 12,
   },
   headerTitle: { fontSize: 18, fontWeight: '800' },

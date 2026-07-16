@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, Alert, RefreshControl,
@@ -7,6 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService } from '../../services/subscriptionService';
 import type { Subscription, SubscriptionStatus } from '../../types';
@@ -37,6 +38,7 @@ export default function MySubscriptionScreen() {
   const nav               = useNavigation<any>();
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
+  const insets            = useSafeAreaInsets();
 
   const [current,    setCurrent]    = useState<Subscription | null>(null);
   const [history,    setHistory]    = useState<Subscription[]>([]);
@@ -102,7 +104,7 @@ export default function MySubscriptionScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Mon abonnement</Text>
         <View style={{ width: 38 }} />
@@ -124,7 +126,7 @@ export default function MySubscriptionScreen() {
               <View style={s.currentTop}>
                 <View>
                   <Text style={s.currentPlan}>Plan {PLAN_LABELS[current.plan]}</Text>
-                  <Text style={s.currentPrice}>{PLAN_CONFIG[current.plan].price.toFixed(2)} €/mois</Text>
+                  <PriceWithLocal amountEur={PLAN_CONFIG[current.plan].price} suffix="/mois" style={s.currentPrice} localStyle={{ color: 'rgba(255,255,255,0.75)' }} />
                 </View>
                 <View style={[s.statusPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                   <Icon name={STATUS_CONFIG[current.status].icon} size={12} color="#fff" />
@@ -267,7 +269,7 @@ export default function MySubscriptionScreen() {
 }
 
 const s = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 17, fontWeight: '700' },
   scroll:       { padding: 16 },

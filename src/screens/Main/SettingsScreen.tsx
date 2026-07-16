@@ -6,6 +6,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
+import { useCurrency } from '../../hooks/useCurrency';
 import { AppHeader } from '../../components/common';
 import { authService } from '../../services/authService';
 import { notificationService } from '../../services/notificationService';
@@ -31,6 +32,7 @@ interface Props { onLogout?: () => void; }
 export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const { selected: selectedCurrency } = useCurrency();
   const nav = useNavigation<any>();
   const isDark = theme.isDark;
 
@@ -83,6 +85,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
       sub: unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : undefined,
       onPress: () => nav.navigate('SettingsNotifications') },
     { key: 'lecture',      icon: 'play-circle',    label: 'Lecture',            color: '#10B981', onPress: () => nav.navigate('SettingsLecture') },
+    { key: 'devise',       icon: 'dollar-sign',    label: 'Devise',             color: '#F59E0B', sub: selectedCurrency ? `${selectedCurrency.code}` : 'Euro (EUR)', onPress: () => nav.navigate('SettingsDevise') },
     { key: 'compte',       icon: 'user',           label: 'Compte',             color: '#7B3FF2', onPress: () => nav.navigate('SettingsCompte') },
     { key: 'contenu',      icon: 'film',           label: 'Contenu',            color: '#E0389A', onPress: () => nav.navigate('SettingsContenu') },
     { key: 'apropos',      icon: 'info',           label: 'À propos',           color: '#6366F1', onPress: () => nav.navigate('SettingsAPropos') },

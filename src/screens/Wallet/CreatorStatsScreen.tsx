@@ -8,6 +8,7 @@ import Svg, { Rect, Text as SvgText, G, Line } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { AppColors } from '../../theme';
 import { apiClient } from '../../api/client';
@@ -308,6 +309,7 @@ function ContentDetailScreen({ detail, colors, onBack }: {
   detail: ContentDetail; colors: AppColors; onBack: () => void;
 }) {
   const { isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const accent =
     detail.type === 'reel' ? '#7B3FF2' :
     detail.type === 'post' ? '#10B981' :
@@ -377,7 +379,7 @@ function ContentDetailScreen({ detail, colors, onBack }: {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={onBack} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           {detail.type.charAt(0).toUpperCase() + detail.type.slice(1)} — stats
@@ -446,6 +448,7 @@ export function CreatorStatsScreen() {
   const nav = useNavigation<any>();
   const { theme, isDark } = useTheme();
   const colors = theme.colors;
+  const insets = useSafeAreaInsets();
 
   const [stats, setStats] = useState<CreatorStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -532,7 +535,7 @@ export function CreatorStatsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Mes statistiques</Text>
         <View style={{ width: 38 }} />
@@ -667,7 +670,7 @@ const styles = StyleSheet.create({
   errorText:    { fontSize: 14, textAlign: 'center', marginTop: 8 },
   retryBtn:     { marginTop: 8, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#7B3FF2', borderRadius: 20 },
   retryTxt:     { color: '#fff', fontWeight: '600' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle:  { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
   scroll:       { paddingHorizontal: 16, paddingTop: 16 },
   hero:         { borderRadius: 16, borderWidth: 1, padding: 20, marginBottom: 20 },

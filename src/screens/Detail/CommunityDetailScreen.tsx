@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 
 const { width: VIEWER_W, height: VIEWER_H } = Dimensions.get('window');
@@ -868,7 +868,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             >
               <Icon name="award" size={15} color="#7B3FF2" />
               <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 12 }}>PRO</Text>
-              <Text style={{ color: '#7B3FF2', fontSize: 10, opacity: 0.8 }}>9.99€/mois</Text>
+              <PriceWithLocal amountEur={9.99} suffix="/mois" style={{ color: '#7B3FF2', fontSize: 10, opacity: 0.8 }} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleUpgradeTier('elite')}
@@ -877,7 +877,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             >
               <Icon name="star" size={15} color="#F59E0B" />
               <Text style={{ color: '#FF7A2F', fontWeight: '800', fontSize: 12 }}>ELITE</Text>
-              <Text style={{ color: colors.warning, fontSize: 10, opacity: 0.8 }}>24.99€/mois</Text>
+              <PriceWithLocal amountEur={24.99} suffix="/mois" style={{ color: colors.warning, fontSize: 10, opacity: 0.8 }} />
             </TouchableOpacity>
           </View>
         )}

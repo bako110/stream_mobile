@@ -9,7 +9,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -68,7 +68,7 @@ const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
           <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 13, width: 70 }}>{row.label}</Text>
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-              {row.cpm}€ · <Text style={{ color: row.color, fontWeight: '700' }}>{row.GoGold} GoGold</Text> / 1 000 imp.
+              <PriceWithLocal amountEur={row.cpm} style={{ color: colors.textSecondary, fontSize: 12 }} /> · <Text style={{ color: row.color, fontWeight: '700' }}>{row.GoGold} GoGold</Text> / 1 000 imp.
             </Text>
           </View>
           <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{row.reach} imp/€</Text>
@@ -141,7 +141,7 @@ const AdCard: React.FC<{
             {goGoldSpent.toLocaleString('fr-FR')} dépensés · {goGoldTotal.toLocaleString('fr-FR')} total
           </Text>
           <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
-            = {item.spent_eur.toFixed(2)}€ / {item.budget_eur.toFixed(2)}€
+            = <PriceWithLocal amountEur={item.spent_eur} style={{ color: colors.textTertiary, fontSize: 11 }} /> / <PriceWithLocal amountEur={item.budget_eur} style={{ color: colors.textTertiary, fontSize: 11 }} />
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -150,7 +150,7 @@ const AdCard: React.FC<{
             <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>
               1 000 imp = {cpmGoGold} GoGold
             </Text>
-            <Text style={{ color: colors.textTertiary, fontSize: 9 }}>= {(item.cpm_eur ?? 2).toFixed(2)}€</Text>
+            <Text style={{ color: colors.textTertiary, fontSize: 9 }}>= <PriceWithLocal amountEur={item.cpm_eur ?? 2} style={{ color: colors.textTertiary, fontSize: 9 }} /></Text>
           </View>
         </View>
       </View>
@@ -287,10 +287,10 @@ export const AdsScreen: React.FC = () => {
       {/* Ligne 1 : Budget total + Dépensé + Impressions + CTR */}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {[
-          { lbl: 'Budget total',  val: `${totalBudgetGoGold.toLocaleString('fr-FR')} c`,      sub: `${totalBudget.toFixed(0)}€`,  color: '#7B3FF2' },
-          { lbl: 'Dépensé',       val: `${eur2coins(totalSpent).toLocaleString('fr-FR')} c`, sub: `${totalSpent.toFixed(0)}€`,   color: '#E0389A' },
-          { lbl: 'Impressions',   val: totalImpressions.toLocaleString('fr-FR'),              sub: 'vues réelles',                color: '#3B82F6' },
-          { lbl: 'CTR moyen',     val: `${globalCtr}%`,                                       sub: 'taux clic',                   color: '#F59E0B' },
+          { lbl: 'Budget total',  val: `${totalBudgetGoGold.toLocaleString('fr-FR')} c`,      sub: <PriceWithLocal amountEur={totalBudget} style={{ fontSize: 9, color: '#7B3FF2AA', fontWeight: '600' }} />,  color: '#7B3FF2' },
+          { lbl: 'Dépensé',       val: `${eur2coins(totalSpent).toLocaleString('fr-FR')} c`, sub: <PriceWithLocal amountEur={totalSpent} style={{ fontSize: 9, color: '#E0389AAA', fontWeight: '600' }} />,   color: '#E0389A' },
+          { lbl: 'Impressions',   val: totalImpressions.toLocaleString('fr-FR'),              sub: 'vues réelles' as React.ReactNode,                color: '#3B82F6' },
+          { lbl: 'CTR moyen',     val: `${globalCtr}%`,                                       sub: 'taux clic' as React.ReactNode,                   color: '#F59E0B' },
         ].map(g => (
           <View key={g.lbl} style={[s.gStat, { backgroundColor: g.color + '12', borderRadius: 12, padding: 10 }]}>
             <Text style={[s.gVal, { color: g.color }]}>{g.val}</Text>

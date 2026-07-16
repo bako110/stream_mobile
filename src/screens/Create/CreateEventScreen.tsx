@@ -13,7 +13,7 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { AppHeader, ImagePickerSection, VideoPickerField } from '../../components/common';
+import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal } from '../../components/common';
 import { eventService } from '../../services';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { apiClient } from '../../api';
@@ -516,7 +516,11 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                           </View>
                           {valMap[tier.key] ? (
                             <View style={{ backgroundColor: tier.color + '22', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: tier.color }}>{valMap[tier.key]} €</Text>
+                              <PriceWithLocal
+                                amountEur={parseFloat(valMap[tier.key]) || 0}
+                                style={{ fontSize: 13, fontWeight: '800', color: tier.color }}
+                                localStyle={{ color: tier.color, opacity: 0.7 }}
+                              />
                             </View>
                           ) : (
                             <Text style={{ fontSize: 11, color: colors.textDisabled }}>Non proposé</Text>
@@ -705,7 +709,11 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                             <Icon name={tier.icon} size={13} color={tier.color} />
                           </View>
                           <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{tier.label}</Text>
-                          <Text style={{ fontSize: 14, fontWeight: '800', color: tier.color }}>{valMap[tier.key]} €</Text>
+                          <PriceWithLocal
+                            amountEur={parseFloat(valMap[tier.key]) || 0}
+                            style={{ fontSize: 14, fontWeight: '800', color: tier.color }}
+                            localStyle={{ color: colors.textTertiary }}
+                          />
                         </View>
                       );
                     })}

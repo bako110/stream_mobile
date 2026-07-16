@@ -4,6 +4,7 @@ import {
   PermissionsAndroid, Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 
@@ -19,6 +20,7 @@ interface Props {
 
 export const ImageViewerScreen: React.FC<Props> = ({ route, navigation }) => {
   const { url, label, isMine } = route.params;
+  const insets = useSafeAreaInsets();
   const [downloading, setDownloading] = useState(false);
   const [progress,    setProgress]    = useState(0);
 
@@ -77,7 +79,7 @@ export const ImageViewerScreen: React.FC<Props> = ({ route, navigation }) => {
       <ZoomableImage uri={url} width={SW} height={SH} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => navigation.goBack()} transparent />
         {label ? <Text style={s.label}>{label}</Text> : null}
         {!isMine && (
@@ -110,7 +112,7 @@ const s = StyleSheet.create({
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center',
-    paddingTop: 50, paddingBottom: 12, paddingHorizontal: 16,
+    paddingBottom: 12, paddingHorizontal: 16,
   },
   label: {
     color: '#fff', fontSize: 15, fontWeight: '600', marginLeft: 14, flex: 1,

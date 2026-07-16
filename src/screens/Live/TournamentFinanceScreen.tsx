@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { BackButton } from '../../components/common';
 import { tournamentService } from '../../services/tournamentService';
@@ -33,6 +34,7 @@ const ROUND_LABELS: Record<TournamentRound, string> = {
 export const TournamentFinanceScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const route = useRoute();
+  const insets = useSafeAreaInsets();
   const { tournamentId } = route.params as RouteParams;
 
   const [report, setReport] = useState<TournamentFinanceReport | null>(null);
@@ -84,7 +86,7 @@ export const TournamentFinanceScreen: React.FC = () => {
       <StatusBar barStyle="light-content" />
       <LinearGradient colors={['#2A1F0A', '#0B0812', '#0B0812']} style={StyleSheet.absoluteFill} />
 
-      <View style={st.header}>
+      <View style={[st.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => nav.goBack()} color="#fff" transparent />
         <Text style={st.headerTitle}>Finances du tournoi</Text>
         <View style={{ width: 38 }} />
@@ -180,7 +182,7 @@ const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0B0812' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16,
+    paddingBottom: 16, paddingHorizontal: 16,
     borderBottomWidth: 1, borderBottomColor: 'rgba(245,158,11,0.25)',
     backgroundColor: 'rgba(42,31,10,0.55)',
   },

@@ -2183,7 +2183,7 @@ export const CommunityChatScreen: React.FC = () => {
       >
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <StatusBar hidden />
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12 }}>
             <TouchableOpacity
               onPress={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -2427,7 +2427,7 @@ export const CommunityChatScreen: React.FC = () => {
           <StatusBar hidden />
 
           {/* Header */}
-          <View style={MP.header}>
+          <View style={[MP.header, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity
               onPress={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); setMediaCaption(''); } }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -2784,7 +2784,7 @@ const S = StyleSheet.create({
 const MP = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
   },
   headerClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },

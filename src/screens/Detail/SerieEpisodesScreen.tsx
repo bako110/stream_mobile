@@ -13,7 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 import { contentService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -387,7 +387,15 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
             >
               <Icon name={hasAccess ? 'check-circle' : 'zap'} size={10} color={hasAccess ? '#10b981' : '#fff'} />
               <Text style={[fh.premTxt, { color: hasAccess ? '#10b981' : '#fff' }]}>
-                {hasAccess ? 'ACCÈS' : `PREMIUM${item.price ? ` · ${item.price}€` : ''}`}
+                {hasAccess ? (
+                  'ACCÈS'
+                ) : item.price ? (
+                  <>
+                    PREMIUM · <PriceWithLocal amountEur={item.price} style={[fh.premTxt, { color: '#fff' }]} localStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+                  </>
+                ) : (
+                  'PREMIUM'
+                )}
               </Text>
             </Animated.View>
           )}
@@ -425,7 +433,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={pw2.bannerIcon}><Icon name="lock" size={14} color="#fff" /></View>
               <View style={{ flex: 1 }}>
                 <Text style={pw2.bannerTitle}>Déverrouiller toute la série</Text>
-                <Text style={pw2.bannerSub}>{goGoldRequired} GoGold · {item.price} €</Text>
+                <Text style={pw2.bannerSub}>{goGoldRequired} GoGold · <PriceWithLocal amountEur={item.price ?? 0} style={pw2.bannerSub} localStyle={{ color: 'rgba(255,255,255,0.6)' }} /></Text>
               </View>
               <Icon name="chevron-right" size={18} color="rgba(255,255,255,0.8)" />
             </LinearGradient>
@@ -565,7 +573,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={[pw.cardValue, { color: colors.textPrimary }]}>{goGoldRequired} GoGold</Text>
-                  <Text style={[pw.cardSub, { color: colors.textTertiary }]}>{item.price} €</Text>
+                  <PriceWithLocal amountEur={item.price ?? 0} style={[pw.cardSub, { color: colors.textTertiary }]} localStyle={{ color: colors.textTertiary }} />
                 </View>
               </View>
               <View style={[pw.divider, { backgroundColor: colors.border }]} />

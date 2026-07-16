@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 
@@ -51,8 +52,9 @@ export const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export const PageHeader: React.FC<{ title: string; onBack: () => void }> = ({ title, onBack }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   return (
-    <View style={[sh.header, { borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
+    <View style={[sh.header, { borderBottomColor: colors.divider, backgroundColor: colors.background, paddingTop: insets.top + 14 }]}>
       <BackButton onPress={onBack} />
       <Text style={[sh.title, { color: colors.textPrimary }]}>{title}</Text>
       <View style={{ width: 40 }} />
@@ -64,7 +66,7 @@ const sh = StyleSheet.create({
   row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
   iconWrap:{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   card:    { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, paddingTop: 56 },
+  header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   backBtn: { width: 44, alignItems: 'flex-start' },
   title:   { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
 });

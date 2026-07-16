@@ -12,7 +12,7 @@ import type { EventTicket } from '../../types/event';
 import { getAuthToken } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
 import { Endpoints } from '../../api/endpoints';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -264,9 +264,15 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
                 <View style={[st.footDiv, { backgroundColor: colors.divider }]} />
                 <View style={st.footItem}>
                   <Text style={[st.footLbl, { color: colors.textTertiary }]}>PRIX</Text>
-                  <Text style={[st.footVal, { color: colors.textPrimary }]}>
-                    {(Number(ticket.price_paid) || 0) === 0 ? 'Gratuit' : `${(Number(ticket.price_paid)).toFixed(0)} €`}
-                  </Text>
+                  {(Number(ticket.price_paid) || 0) === 0 ? (
+                    <Text style={[st.footVal, { color: colors.textPrimary }]}>Gratuit</Text>
+                  ) : (
+                    <PriceWithLocal
+                      amountEur={Number(ticket.price_paid)}
+                      style={[st.footVal, { color: colors.textPrimary }]}
+                      localStyle={{ color: colors.textTertiary }}
+                    />
+                  )}
                 </View>
                 <View style={[st.footDiv, { backgroundColor: colors.divider }]} />
                 <View style={st.footItem}>

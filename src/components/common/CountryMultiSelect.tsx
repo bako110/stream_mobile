@@ -8,6 +8,7 @@ import {
   View, Text, TouchableOpacity, TextInput, Modal, FlatList, StyleSheet,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { COUNTRIES } from './PhoneInput';
 import type { Country } from './PhoneInput';
@@ -21,6 +22,7 @@ interface Props {
 export const CountryMultiSelect: React.FC<Props> = ({ selectedCodes, onChange, placeholder }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const [modal, setModal] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -55,7 +57,7 @@ export const CountryMultiSelect: React.FC<Props> = ({ selectedCodes, onChange, p
 
       <Modal visible={modal} animationType="slide" onRequestClose={() => setModal(false)}>
         <View style={[st.modalRoot, { backgroundColor: colors.background }]}>
-          <View style={[st.modalHeader, { borderBottomColor: colors.divider }]}>
+          <View style={[st.modalHeader, { borderBottomColor: colors.divider, paddingTop: insets.top + 14 }]}>
             <Text style={[st.modalTitle, { color: colors.textPrimary }]}>Pays autorisés</Text>
             <TouchableOpacity onPress={() => setModal(false)}>
               <Icon name="x" size={22} color={colors.textPrimary} />
@@ -120,7 +122,7 @@ const st = StyleSheet.create({
   modalRoot: { flex: 1 },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   modalTitle: { fontSize: 17, fontWeight: '800' },
 

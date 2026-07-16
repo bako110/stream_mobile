@@ -11,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { CachedImage } from '../../components/common';
@@ -28,12 +29,13 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const { currentUser } = useUser();
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
 
       {/* Header */}
-      <View style={[mnu.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: 52 }]}>
+      <View style={[mnu.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 14 }]}>
         <Text style={[mnu.headerTitle, { color: colors.textPrimary }]}>Explorer</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {onLogout && (

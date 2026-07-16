@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
   ActivityIndicator, Alert, ScrollView,
@@ -7,6 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService, type WalletCheck } from '../../services/subscriptionService';
 import type { PlanType } from '../../types';
@@ -29,6 +30,7 @@ export default function SubscriptionPaymentScreen() {
   const route             = useRoute<any>();
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
+  const insets            = useSafeAreaInsets();
 
   const plan: PlanType         = route.params?.plan ?? 'basic';
   const walletCheck: WalletCheck = route.params?.walletCheck;
@@ -79,7 +81,7 @@ export default function SubscriptionPaymentScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Paiement</Text>
         <View style={{ width: 38 }} />
@@ -90,7 +92,7 @@ export default function SubscriptionPaymentScreen() {
         {/* Plan summary card */}
         <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.planCard}>
           <Text style={s.planCardLabel}>Plan {PLAN_LABELS[plan]}</Text>
-          <Text style={s.planCardPrice}>{cfg.price.toFixed(2)} €/mois</Text>
+          <PriceWithLocal amountEur={cfg.price} suffix="/mois" style={s.planCardPrice} localStyle={{ color: 'rgba(255,255,255,0.75)' }} />
           <View style={s.planCardSpecs}>
             <Text style={s.planCardSpec}>{cfg.screens} écran{cfg.screens > 1 ? 's' : ''}</Text>
             <Text style={s.planCardDot}>·</Text>
@@ -174,9 +176,11 @@ export default function SubscriptionPaymentScreen() {
           </View>
           <View style={[s.recapRow, s.recapTotal]}>
             <Text style={[s.recapLabel, { color: colors.textPrimary, fontWeight: '700' }]}>Total</Text>
-            <Text style={[s.recapVal, { color: colors.primary, fontWeight: '800', fontSize: 18 }]}>
-              {cfg.price.toFixed(2)} €
-            </Text>
+            <PriceWithLocal
+              amountEur={cfg.price}
+              style={[s.recapVal, { color: colors.primary, fontWeight: '800', fontSize: 18 }]}
+              localStyle={{ color: colors.textTertiary }}
+            />
           </View>
         </View>
 
@@ -215,7 +219,7 @@ export default function SubscriptionPaymentScreen() {
 }
 
 const s = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 17, fontWeight: '700' },
   scroll:       { padding: 16 },

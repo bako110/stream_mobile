@@ -962,7 +962,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       >
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <StatusBar hidden />
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12 }}>
             <TouchableOpacity
               onPress={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -1099,7 +1099,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
         onRequestClose={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); } }}>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <StatusBar hidden />
-          <View style={MP.header}>
+          <View style={[MP.header, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity onPress={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); } }} style={MP.closeBtn}>
               <Icon name="x" size={22} color="#fff" />
             </TouchableOpacity>
@@ -1263,7 +1263,7 @@ const C = StyleSheet.create({
 });
 
 const MP = StyleSheet.create({
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12 },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12 },
   closeBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   title:      { color: '#fff', fontSize: 15, fontWeight: '700' },
   bottomBar:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingBottom: 28, paddingTop: 10, backgroundColor: 'rgba(0,0,0,0.6)', gap: 10 },

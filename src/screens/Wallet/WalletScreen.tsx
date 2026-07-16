@@ -30,7 +30,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useWsEvents } from '../../hooks/useWsEvents';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface WalletBalance {
@@ -175,9 +175,9 @@ const TxList: React.FC<{
           <>
             <View style={{ width: '100%', marginTop: 8, gap: 8 }}>
               {[
-                { label: 'Solde actuel',        value: `${(balance?.gogold_balance ?? 0).toLocaleString('fr-FR')} GoGold`, color: '#7B3FF2' },
-                { label: 'Equivalent EUR',       value: `${(((balance?.gogold_balance ?? 0) / 100) * 0.35).toFixed(2)} EUR`, color: colors.textPrimary },
-                { label: 'Taux de conversion',   value: '100 GoGold = 0,35 EUR', color: colors.textPrimary },
+                { label: 'Solde actuel',        value: `${(balance?.gogold_balance ?? 0).toLocaleString('fr-FR')} GoGold` as React.ReactNode, color: '#7B3FF2' },
+                { label: 'Equivalent EUR',       value: <PriceWithLocal amountEur={((balance?.gogold_balance ?? 0) / 100) * 0.35} style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }} />, color: colors.textPrimary },
+                { label: 'Taux de conversion',   value: '100 GoGold = 0,35 EUR' as React.ReactNode, color: colors.textPrimary },
               ].map(row => (
                 <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
                   <Text style={{ fontSize: 13, color: colors.textSecondary }}>{row.label}</Text>
@@ -433,7 +433,11 @@ const WalletScreen: React.FC = () => {
           <Text style={s.balanceSub}>GoGold</Text>
           <View style={s.eurRow}>
             <MaterialCommunityIcons name="currency-eur" size={14} color="rgba(255,255,255,0.75)" />
-            <Text style={s.eurText}>{goGoldToEur(balance?.gogold_balance ?? 0)} EUR</Text>
+            <PriceWithLocal
+              amountEur={parseFloat(goGoldToEur(balance?.gogold_balance ?? 0))}
+              style={s.eurText}
+              localStyle={{ color: 'rgba(255,255,255,0.7)' }}
+            />
           </View>
         </LinearGradient>
 

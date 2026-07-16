@@ -13,7 +13,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFolyXLoader, FriendsWhoLiked } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFolyXLoader, FriendsWhoLiked, PriceWithLocal } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { concertService, socialService, authService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
@@ -239,9 +239,11 @@ const TierCard: React.FC<{
         )}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
-        <Text style={{ fontSize: 17, fontWeight: '900', color: active ? tier.color : colors.textPrimary }}>
-          {tier.price.toLocaleString('fr')} €
-        </Text>
+        <PriceWithLocal
+          amountEur={tier.price}
+          style={{ fontSize: 17, fontWeight: '900', color: active ? tier.color : colors.textPrimary }}
+          localStyle={{ color: colors.textTertiary }}
+        />
         <Text style={{ fontSize: 10, color: colors.textTertiary, fontWeight: '500' }}>
           + {fees.toLocaleString('fr')} frais
         </Text>
@@ -698,9 +700,11 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               </Text>
               {!isRegistered && activeTier?.price != null && (
                 <View style={{ marginLeft: 'auto' as any, alignItems: 'flex-end', gap: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}>
-                    {(activeTier.price + Math.round(activeTier.price * FEES_RATE)).toLocaleString('fr')} €
-                  </Text>
+                  <PriceWithLocal
+                    amountEur={activeTier.price + Math.round(activeTier.price * FEES_RATE)}
+                    style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}
+                    localStyle={{ color: 'rgba(255,255,255,0.65)' }}
+                  />
                   <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>frais inclus</Text>
                 </View>
               )}

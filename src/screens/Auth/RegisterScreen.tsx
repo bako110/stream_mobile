@@ -11,6 +11,7 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
@@ -352,6 +353,7 @@ const Step3: React.FC<{
 export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   const [step, setStep]       = useState(1);
   const [loading, setLoading] = useState(false);
@@ -451,11 +453,11 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
         <View style={[s.heroCircle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
 
         {/* Bouton retour */}
-        <TouchableOpacity onPress={goBack} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={goBack} style={[s.backBtn, { top: insets.top + 12 }]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
 
-        <Animated.View entering={FadeInDown.delay(80).springify()} style={s.heroContent}>
+        <Animated.View entering={FadeInDown.delay(80).springify()} style={[s.heroContent, { paddingTop: insets.top + 12 }]}>
           <Text style={s.heroTitle}>Inscription</Text>
           <Text style={s.heroSub}>Étape {step} sur {STEPS} — {stepLabels[step - 1]}</Text>
         </Animated.View>
@@ -509,8 +511,8 @@ const s = StyleSheet.create({
   hero:        { width: '100%', overflow: 'visible' },
   heroCircle1: { position: 'absolute', width: 160, height: 160, borderRadius: 80, top: -30, right: -30 },
   heroCircle2: { position: 'absolute', width: 100, height: 100, borderRadius: 50, bottom: 20, left: -20 },
-  backBtn:     { position: 'absolute', top: 52, left: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
-  heroContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 30, paddingTop: 52 },
+  backBtn:     { position: 'absolute', left: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  heroContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 30 },
   heroTitle:   { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
   heroSub:     { fontSize: 13, color: 'rgba(255,255,255,0.80)', marginTop: 6, fontWeight: '400' },
 

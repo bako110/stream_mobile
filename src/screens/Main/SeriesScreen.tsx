@@ -21,7 +21,7 @@ import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { FilmItem } from './FilmsScreen';
 import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 
 type NavProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -216,7 +216,14 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
             {isPremiumUnpaid ? (
               <LinearGradient colors={['#E8501A', '#c43e14']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={hs.btnGrad}>
                 <Icon name="lock" size={15} color="#fff" />
-                <Text style={[hs.btnWatchText, { color: '#fff' }]}>Acheter · {item.price ?? ''}€</Text>
+                <Text style={[hs.btnWatchText, { color: '#fff' }]}>
+                  Acheter ·{' '}
+                  <PriceWithLocal
+                    amountEur={item.price ?? 0}
+                    style={[hs.btnWatchText, { color: '#fff' }]}
+                    localStyle={{ color: 'rgba(255,255,255,0.7)' }}
+                  />
+                </Text>
               </LinearGradient>
             ) : (
               <LinearGradient colors={[PURPLE, PURPLE_DARK]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={hs.btnGrad}>

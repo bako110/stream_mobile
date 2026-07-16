@@ -12,7 +12,8 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { AppHeader, ImagePickerSection, VideoPickerField } from '../../components/common';
+import { useCurrency } from '../../hooks/useCurrency';
+import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal } from '../../components/common';
 import { concertService } from '../../services';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { apiClient } from '../../api';
@@ -52,7 +53,18 @@ interface Props { onBack?: () => void; concertId?: string; }
 export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const { selected: selectedCurrency, convertFromEur } = useCurrency();
   const isEditing = !!concertId;
+
+  // Formatte un prix EUR pour ReviewRow (qui n'accepte qu'une string) — ajoute
+  // la conversion en devise locale à côté si l'utilisateur en a choisi une.
+  const priceLabel = (raw: string): string => {
+    const eur = parseFloat(raw) || 0;
+    const local = convertFromEur(eur);
+    return local !== null && selectedCurrency
+      ? `${eur} € · ${Math.round(local).toLocaleString('fr-FR')} ${selectedCurrency.symbol}`
+      : `${eur} €`;
+  };
 
   const [step, setStep] = useState(0);
 
@@ -573,7 +585,11 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
                               backgroundColor: tier.color + '22', borderRadius: 8,
                               paddingHorizontal: 10, paddingVertical: 4,
                             }}>
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: tier.color }}>{val} €</Text>
+                              <PriceWithLocal
+                                amountEur={parseFloat(val) || 0}
+                                style={{ fontSize: 13, fontWeight: '800', color: tier.color }}
+                                localStyle={{ color: tier.color, opacity: 0.7 }}
+                              />
                             </View>
                           ) : null}
                         </View>
@@ -754,14 +770,14 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
                 <ReviewRow label="Accès" value={ACCESS_TYPES.find(a => a.type === accessType)?.label ?? accessType} colors={colors} />
                 {accessType === 'ticket' && (
                   <>
-                    {priceSimple ? <ReviewRow label="Simple" value={`${priceSimple} €`} colors={colors} /> : null}
-                    {priceVip    ? <ReviewRow label="VIP"    value={`${priceVip} €`}    colors={colors} /> : null}
-                    {priceVvip   ? <ReviewRow label="VVIP"   value={`${priceVvip} €`}   colors={colors} /> : null}
-                    {priceVvvip  ? <ReviewRow label="VVVIP"  value={`${priceVvvip} €`}  colors={colors} /> : null}
+                    {priceSimple ? <ReviewRow label="Simple" value={priceLabel(priceSimple)} colors={colors} /> : null}
+                    {priceVip    ? <ReviewRow label="VIP"    value={priceLabel(priceVip)}    colors={colors} /> : null}
+                    {priceVvip   ? <ReviewRow label="VVIP"   value={priceLabel(priceVvip)}   colors={colors} /> : null}
+                    {priceVvvip  ? <ReviewRow label="VVVIP"  value={priceLabel(priceVvvip)}  colors={colors} /> : null}
                   </>
                 )}
                 {accessType === 'ppv' && priceSimple ? (
-                  <ReviewRow label="PPV" value={`${priceSimple} €`} colors={colors} />
+                  <ReviewRow label="PPV" value={priceLabel(priceSimple)} colors={colors} />
                 ) : null}
               </ReviewBlock>
 

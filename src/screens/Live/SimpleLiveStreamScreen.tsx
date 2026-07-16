@@ -47,10 +47,13 @@ import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
+import { LiveGiftBar } from '../../components/wallet/LiveGiftBar';
 import { participantAvatarUrl } from '../../utils/livekitParticipant';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
+import { LiveHeartsOverlay } from '../../components/live/LiveHeartsOverlay';
+import type { LiveHeartsOverlayRef } from '../../components/live/LiveHeartsOverlay';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
 import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
@@ -335,6 +338,7 @@ const StreamContent: React.FC<{
   const [giftHistory,  setGiftHistory]  = useState<GiftTick[]>([]);
   const [likeCount,    setLikeCount]    = useState(0);
   const likeRef             = useRef<LiveLikeButtonRef>(null);
+  const heartsOverlayRef    = useRef<LiveHeartsOverlayRef>(null);
   const { floaters, spawn } = useReactionFloaters();
   const reactionThrottle    = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Modération
@@ -354,10 +358,31 @@ const StreamContent: React.FC<{
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showLaunchBanner, setShowLaunchBanner] = useState(true);
   const giftRef  = useRef<LiveGiftOverlayRef>(null);
+  // Destinataire de la barre de cadeaux — l'hôte n'a personne par défaut (il ne
+  // s'envoie pas de cadeau à lui-même), seulement quand il tapote un participant
+  // sur scène pour le remercier.
+  const [giftReceiver, setGiftReceiver] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     liveService.getById(liveId)
-      .then((l: LiveStream) => setLiveData(l))
+      .then((l: LiveStream) => {
+        setLiveData(l);
+        setLikeCount(l.like_count ?? 0);
+      })
+      .catch(() => {});
+    // Historique des commentaires — sans ça, revenir sur son propre live en cours
+    // (app relancee, retour en arriere) repartait d'un chat vide.
+    apiClient.get<any[]>(`${Endpoints.social.comments}?live_id=${liveId}&limit=50`)
+      .then(res => {
+        const history = (res.data ?? []).slice().reverse().map((c: any) => ({
+          id:     c.id,
+          user:   c.author?.display_name ?? c.author?.username ?? 'Anonyme',
+          userId: c.author?.id ? String(c.author.id) : undefined,
+          avatar: c.author?.avatar_url ?? null,
+          text:   c.body ?? '',
+        }));
+        if (history.length) setMessages(prev => [...history, ...prev]);
+      })
       .catch(() => {});
   }, [liveId]);
 
@@ -495,10 +520,12 @@ const StreamContent: React.FC<{
         // ── Likes
         if (d.type === 'like_added') {
           const count = d.count ?? 1;
-          setLikeCount(c => c + count);
-          for (let i = 0; i < Math.min(count, 3); i++) {
-            setTimeout(() => likeRef.current?.triggerRemote(), i * 120);
-          }
+          // total = source de vérité serveur — s'y aligner plutôt qu'accumuler des
+          // deltas locaux (desynchronise si un message WS est rate).
+          if (typeof d.total === 'number') setLikeCount(d.total);
+          else setLikeCount(c => c + count);
+          likeRef.current?.triggerRemote();
+          heartsOverlayRef.current?.spawn(count);
         }
 
         // ── Réactions emoji des viewers
@@ -754,7 +781,7 @@ const StreamContent: React.FC<{
         hostName={currentUser?.display_name ?? currentUser?.username ?? 'Toi'}
         hostAvatarUrl={currentUser?.avatar_url}
         onStage={onStage}
-        onGift={(id, name) => giftRef.current?.openGift(id, name)}
+        onGift={(id, name) => setGiftReceiver({ id, name })}
         onDemote={handleDemote}
         onBan={handleBan}
         isMuted={!isMicrophoneEnabled}
@@ -775,6 +802,9 @@ const StreamContent: React.FC<{
 
       {/* ── EMOJIS FLOTTANTS ─────────────────────────────────────────── */}
       <ReactionFloaters floaters={floaters} />
+
+      {/* Coeurs montants bas-droite, style TikTok — ancrage independant du compteur */}
+      <LiveHeartsOverlay ref={heartsOverlayRef} />
 
       {/* ── BANNER LANCEMENT ─────────────────────────────────────────── */}
       {showLaunchBanner && (
@@ -1020,6 +1050,20 @@ const StreamContent: React.FC<{
           contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingTop: 6 }}
         />
 
+        {/* Rangée cadeaux — visible seulement si l'hôte a tapoté un participant
+            sur scène pour le remercier (l'hôte ne s'envoie pas de cadeau à lui-même) */}
+        {giftReceiver && (
+          <>
+            <View style={st.giftTargetPill}>
+              <Text style={st.giftTargetText} numberOfLines={1}>Pour {giftReceiver.name}</Text>
+              <TouchableOpacity onPress={() => setGiftReceiver(null)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <Icon name="x" size={12} color="rgba(255,255,255,0.7)" />
+              </TouchableOpacity>
+            </View>
+            <LiveGiftBar liveId={liveId} receiverId={giftReceiver.id} onGiftSent={(emoji) => giftRef.current?.notifySent(emoji)} />
+          </>
+        )}
+
         {/* Barre saisie — emoji intégré à l'input, cam/micro séparés à droite */}
         <View style={st.inputBarRow}>
           <View style={st.inputBar}>
@@ -1214,7 +1258,7 @@ export const SimpleLiveStreamScreen: React.FC = () => {
   }
 
   return (
-    <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={CREATOR_ROOM_OPTIONS}>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect options={CREATOR_ROOM_OPTIONS}>
       <StreamContent
         liveId={liveId}
         onEnd={handleEnd}
@@ -1499,6 +1543,15 @@ const st = StyleSheet.create({
   sysText:     { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
   giftMsg:     { backgroundColor: 'rgba(255,215,0,0.16)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, alignSelf: 'flex-start' },
   giftMsgText: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
+
+  giftTargetPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start', marginLeft: 12, marginBottom: 4,
+    backgroundColor: 'rgba(255,215,0,0.15)', borderRadius: 12,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
+  },
+  giftTargetText: { color: '#FFD700', fontSize: 11, fontWeight: '700', maxWidth: 160 },
 
   inputBarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
   inputBar: { flex: 1 },

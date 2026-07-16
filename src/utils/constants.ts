@@ -39,6 +39,7 @@ export const STORAGE_KEYS = {
   ONBOARDING_DONE:'gofolyx_onboarding_done',
   LAST_USER_ID:   'gofolyx_last_user_id',
   CACHED_USER:    'gofolyx_cached_user',
+  CURRENCY_CODE:  'gofolyx_currency_code',
 } as const;
 
 // ── Durées (ms) ────────────────────────────────────────────────────────────

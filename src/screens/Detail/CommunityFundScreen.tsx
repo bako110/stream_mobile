@@ -10,7 +10,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -423,7 +423,7 @@ export const CommunityFundScreen: React.FC = () => {
                 </View>
                 {formAmount ? (
                   <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>
-                    = {(parseInt(formAmount || '0') / 100).toFixed(2)} € par membre
+                    = <PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textTertiary, fontSize: 11 }} /> par membre
                   </Text>
                 ) : null}
               </View>
@@ -474,7 +474,7 @@ export const CommunityFundScreen: React.FC = () => {
                   <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 13 }}>Aperçu</Text>
                   <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
                     Chaque membre paiera <Text style={{ fontWeight: '800', color: colors.textPrimary }}>{formAmount} GoGold</Text>
-                    {' '}({(parseInt(formAmount || '0') / 100).toFixed(2)} €)
+                    {' '}(<PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textSecondary, fontSize: 13 }} />)
                   </Text>
                   <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
                     Le total collecté dépend du nombre de membres présents au lancement.

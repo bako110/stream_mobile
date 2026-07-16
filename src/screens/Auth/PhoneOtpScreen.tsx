@@ -19,6 +19,7 @@ import {
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, BackButton, Button, PhoneInput, Input, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
@@ -53,6 +54,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
 }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   const [step,        setStep]        = useState<Step>('phone');
   const [country,     setCountry]     = useState<Country>(DEFAULT_COUNTRY);
@@ -174,7 +176,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
         {/* Header */}
-        <Animated.View entering={FadeInDown.duration(400)} style={st.header}>
+        <Animated.View entering={FadeInDown.duration(400)} style={[st.header, { paddingTop: insets.top + 8 }]}>
           <BackButton onPress={goBackStep} />
           <AppLogo size="sm" />
         </Animated.View>
@@ -331,7 +333,7 @@ const ErrorBox: React.FC<{ msg: string; color: string }> = ({ msg, color }) => (
 );
 
 const st = StyleSheet.create({
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingHorizontal: 20, paddingBottom: 8 },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8 },
   card:       { margin: 20, borderRadius: 20, padding: 24, gap: 16, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
   title:      { fontSize: 22, fontWeight: '700' },
   subtitle:   { fontSize: 14, lineHeight: 20 },

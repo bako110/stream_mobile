@@ -7,6 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
@@ -31,6 +32,7 @@ export default function MonetisationRequestScreen() {
   const nav               = useNavigation<any>();
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
+  const insets            = useSafeAreaInsets();
 
   const [bio,          setBio]          = useState('');
   const [payoutEmail,  setPayoutEmail]  = useState('');
@@ -110,7 +112,7 @@ export default function MonetisationRequestScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Demande de monétisation</Text>
         <View style={{ width: 38 }} />
@@ -259,7 +261,7 @@ export default function MonetisationRequestScreen() {
 }
 
 const s = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 16, fontWeight: '700' },
   scroll:       { padding: 16 },

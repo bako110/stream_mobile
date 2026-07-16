@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -132,20 +132,20 @@ export const CommunityTreasuryScreen: React.FC = () => {
                   <Text style={{ fontSize: 16, fontWeight: '400' }}> GoGold</Text>
                 </Text>
                 <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 2 }}>
-                  ≈ {wallet?.eur_balance?.toFixed(2) ?? '0.00'} €
+                  ≈ <PriceWithLocal amountEur={wallet?.eur_balance ?? 0} style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }} localStyle={{ color: 'rgba(255,255,255,0.6)' }} />
                 </Text>
 
                 {/* Stats bas */}
                 <View style={{ flexDirection: 'row', marginTop: 18, gap: 8 }}>
                   {[
-                    { lbl: 'Total collecté', val: `${(wallet?.total_received ?? 0).toLocaleString('fr-FR')} GoGold`, sub: `${wallet?.eur_received?.toFixed(2) ?? '0.00'} €` },
-                    { lbl: 'Total retiré',   val: `${(wallet?.total_withdrawn ?? 0).toLocaleString('fr-FR')} GoGold`, sub: `${((wallet?.total_withdrawn ?? 0) / 100).toFixed(2)} €` },
+                    { lbl: 'Total collecté', val: `${(wallet?.total_received ?? 0).toLocaleString('fr-FR')} GoGold`, subEur: wallet?.eur_received ?? 0 },
+                    { lbl: 'Total retiré',   val: `${(wallet?.total_withdrawn ?? 0).toLocaleString('fr-FR')} GoGold`, subEur: (wallet?.total_withdrawn ?? 0) / 100 },
                   ].map(s => (
                     <View key={s.lbl} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.12)',
                       borderRadius: 14, padding: 12 }}>
                       <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, marginBottom: 4 }}>{s.lbl}</Text>
                       <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>{s.val}</Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>{s.sub}</Text>
+                      <PriceWithLocal amountEur={s.subEur} style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }} localStyle={{ color: 'rgba(255,255,255,0.5)' }} />
                     </View>
                   ))}
                 </View>

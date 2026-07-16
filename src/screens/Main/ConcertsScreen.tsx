@@ -9,7 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
-import { AppHeader, SkeletonFeed } from '../../components/common';
+import { AppHeader, SkeletonFeed, PriceWithLocal } from '../../components/common';
 import { concertService } from '../../services';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
@@ -257,9 +257,15 @@ const ConcertCard: React.FC<ConcertCardProps> = ({ concert, colors, onPress, onD
 
           {concert.ticket_price != null && (
             <View style={[s.pricePill, { backgroundColor: isFree ? colors.accentGreen + '22' : colors.primary + '18' }]}>
-              <Text style={[s.priceText, { color: isFree ? colors.accentGreen : colors.primary }]}>
-                {isFree || concert.ticket_price === 0 ? 'Gratuit' : `${concert.ticket_price} €`}
-              </Text>
+              {isFree || concert.ticket_price === 0 ? (
+                <Text style={[s.priceText, { color: colors.accentGreen }]}>Gratuit</Text>
+              ) : (
+                <PriceWithLocal
+                  amountEur={concert.ticket_price}
+                  style={[s.priceText, { color: colors.primary }]}
+                  localStyle={{ color: colors.primary + 'AA' }}
+                />
+              )}
             </View>
           )}
         </View>

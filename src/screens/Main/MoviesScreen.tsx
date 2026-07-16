@@ -21,7 +21,7 @@ import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { FilmItem } from './FilmsScreen';
 import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 
 type NavProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -153,7 +153,7 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
           {item.is_premium && (
             purchased
               ? <View style={hs.accessBadge}><Icon name="check-circle" size={9} color="#10b981" /><Text style={hs.accessText}>ACCÈS</Text></View>
-              : <View style={hs.premiumBadge}><Icon name="zap" size={9} color="#fff" /><Text style={hs.premiumText}>PREMIUM{item.price ? ` · ${item.price}€` : ''}</Text></View>
+              : <View style={hs.premiumBadge}><Icon name="zap" size={9} color="#fff" /><Text style={hs.premiumText}>PREMIUM{item.price ? (<>{' · '}<PriceWithLocal amountEur={item.price} style={hs.premiumText} localStyle={{ color: 'rgba(255,255,255,0.7)' }} /></>) : ''}</Text></View>
           )}
           {item.year ? <Text style={hs.yearTag}>{item.year}</Text> : null}
           {item.language ? <Text style={hs.langTag}>{item.language.toUpperCase()}</Text> : null}
@@ -177,7 +177,16 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
             >
               <Icon name={isPremiumUnpaid ? 'lock' : 'play'} size={15} color={isPremiumUnpaid ? '#fff' : '#000'} />
               <Text style={[hs.btnWatchText, isPremiumUnpaid && { color: '#fff' }]}>
-                {isPremiumUnpaid ? `Acheter · ${item.price ?? ''}€` : 'Regarder'}
+                {isPremiumUnpaid ? (
+                  <>
+                    Acheter ·{' '}
+                    <PriceWithLocal
+                      amountEur={item.price ?? 0}
+                      style={[hs.btnWatchText, { color: '#fff' }]}
+                      localStyle={{ color: 'rgba(255,255,255,0.7)' }}
+                    />
+                  </>
+                ) : 'Regarder'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>

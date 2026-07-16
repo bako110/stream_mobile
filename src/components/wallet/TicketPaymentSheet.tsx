@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { apiClient, getAuthToken } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { API_BASE_URL } from '../../utils/constants';
+import { PriceWithLocal } from '../common';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -223,9 +224,10 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                         <Text style={{ fontSize: 12, fontWeight: '800', color: active ? tier.color : colors.textSecondary }}>
                           {tier.label}
                         </Text>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: active ? tier.color : colors.textTertiary }}>
-                          {fmtEur(tier.price)}
-                        </Text>
+                        <PriceWithLocal
+                          amountEur={tier.price}
+                          style={{ fontSize: 12, fontWeight: '700', color: active ? tier.color : colors.textTertiary }}
+                        />
                       </TouchableOpacity>
                     );
                   })}
@@ -260,7 +262,9 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                         {fmtGoGold(balance ?? 0)}{' '}
                         <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textTertiary }}>GoGold</Text>
                         {'  '}
-                        <Text style={{ fontSize: 13, color: colors.textTertiary }}>≈ {fmtEur(goGoldToEur(balance ?? 0))}</Text>
+                        <Text style={{ fontSize: 13, color: colors.textTertiary }}>
+                          ≈ <PriceWithLocal amountEur={goGoldToEur(balance ?? 0)} style={{ fontSize: 13, color: colors.textTertiary }} />
+                        </Text>
                       </Text>
                     )}
                   </View>
@@ -285,15 +289,15 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                   {/* Lignes de décomposition */}
                   <View style={sh.priceRow}>
                     <Text style={[sh.priceLabel, { color: colors.textSecondary }]}>Prix du billet</Text>
-                    <Text style={[sh.priceVal, { color: colors.textPrimary }]}>{fmtEur(priceEur)}</Text>
+                    <PriceWithLocal amountEur={priceEur} style={[sh.priceVal, { color: colors.textPrimary }]} />
                   </View>
                   <View style={sh.priceRow}>
                     <Text style={[sh.priceLabel, { color: colors.textSecondary }]}>Frais de service (10%)</Text>
-                    <Text style={[sh.priceVal, { color: colors.textSecondary }]}>{fmtEur(feesEur)}</Text>
+                    <PriceWithLocal amountEur={feesEur} style={[sh.priceVal, { color: colors.textSecondary }]} />
                   </View>
                   <View style={[sh.priceRow, sh.totalRow, { borderTopColor: colors.divider }]}>
                     <Text style={[sh.totalLabel, { color: colors.textPrimary }]}>Total</Text>
-                    <Text style={[sh.totalVal, { color: activeTier.color }]}>{fmtEur(totalEur)}</Text>
+                    <PriceWithLocal amountEur={totalEur} style={[sh.totalVal, { color: activeTier.color }]} />
                   </View>
                   <View style={[sh.priceRow, { marginTop: 2 }]}>
                     <Text style={[sh.priceLabel, { color: colors.textTertiary }]}>Équivalent GoGold</Text>
@@ -316,7 +320,7 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                     <View style={{ flex: 1 }}>
                       <Text style={sh.insuffTitle}>Pas assez de GoGold</Text>
                       <Text style={sh.insuffSub}>
-                        Il te manque {fmtGoGold(missing)} GoGold (≈ {fmtEur(missingEur)}). Recharge en 30 secondes !
+                        Il te manque {fmtGoGold(missing)} GoGold (≈ <PriceWithLocal amountEur={missingEur} style={sh.insuffSub} />). Recharge en 30 secondes !
                       </Text>
                     </View>
                   </View>

@@ -7,7 +7,7 @@ import { Camera, CameraType } from 'react-native-camera-kit';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 import { eventService } from '../../services/eventService';
 import type { TicketScanResult } from '../../types';
 
@@ -218,9 +218,21 @@ export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBa
               <View style={[st.card, { backgroundColor: colors.surface }]}>
                 <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Billet</Text>
                 <InfoRow icon="hash" label="Référence" value={result.access_code.slice(0, 12).toUpperCase()} colors={colors} />
-                <InfoRow icon="tag" label="Prix payé"
-                  value={(Number(result.price_paid) || 0) === 0 ? 'Gratuit' : `${(Number(result.price_paid) || 0).toFixed(2)} €`}
-                  colors={colors} />
+                {(Number(result.price_paid) || 0) === 0 ? (
+                  <InfoRow icon="tag" label="Prix payé" value="Gratuit" colors={colors} />
+                ) : (
+                  <View style={st.infoRow}>
+                    <Icon name="tag" size={14} color={colors.primary} style={{ marginTop: 1 }} />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={[st.infoLabel, { color: colors.textTertiary }]}>Prix payé</Text>
+                      <PriceWithLocal
+                        amountEur={Number(result.price_paid) || 0}
+                        style={[st.infoValue, { color: colors.textPrimary }]}
+                        localStyle={{ color: colors.textTertiary }}
+                      />
+                    </View>
+                  </View>
+                )}
                 <InfoRow icon="calendar" label="Acheté le"
                   value={new Date(result.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                   colors={colors} />

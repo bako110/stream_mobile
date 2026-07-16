@@ -10,6 +10,7 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonFeed } from '../../components/common';
 import { activityService } from '../../services/activityService';
@@ -82,6 +83,7 @@ export const ActivityScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { clearUnreadActivity } = useWs();
 
   const [items,      setItems]      = useState<ActivityItem[]>([]);
@@ -173,7 +175,7 @@ export const ActivityScreen: React.FC = () => {
       {/* ── Header ── */}
       <LinearGradient
         colors={[colors.surface, colors.background]}
-        style={s.header}
+        style={[s.header, { paddingTop: insets.top + 12 }]}
       >
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Activité</Text>
         {unreadCount > 0 && (
@@ -366,7 +368,7 @@ const s = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, gap: 10,
+    paddingHorizontal: 20, paddingBottom: 12, gap: 10,
   },
   headerTitle: { fontSize: 26, fontWeight: '800', flex: 1 },
   unreadBadge: {

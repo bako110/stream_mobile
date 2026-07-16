@@ -5,8 +5,9 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -26,6 +27,7 @@ export default function TransferScreen() {
   const { theme: { colors } } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<TransferRouteParams, 'Transfer'>>();
+  const insets = useSafeAreaInsets();
 
   const prefilled = route.params?.recipientId
     ? {
@@ -96,14 +98,14 @@ export default function TransferScreen() {
   };
 
   const GoGold = parseInt(amount, 10) || 0;
-  const eur   = ((GoGold / 100) * 0.35).toFixed(2); // 100 GoGold = 0.35 €
+  const eur   = (GoGold / 100) * 0.35; // 100 GoGold = 0.35 €
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.title, { color: colors.textPrimary }]}>Transférer des GoGold</Text>
         {balance !== null && (
@@ -181,7 +183,9 @@ export default function TransferScreen() {
             value={amount}
             onChangeText={setAmount}
           />
-          <Text style={[s.eurLabel, { color: colors.textSecondary }]}>≈ {eur} €</Text>
+          <Text style={[s.eurLabel, { color: colors.textSecondary }]}>
+            ≈ <PriceWithLocal amountEur={eur} style={s.eurLabel} />
+          </Text>
         </View>
 
         {/* Raccourcis montant */}
@@ -239,7 +243,7 @@ export default function TransferScreen() {
 
 const s = StyleSheet.create({
   root:       { flex: 1 },
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 16, gap: 12 },
+  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, gap: 12 },
   backBtn:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title:      { flex: 1, fontSize: 18, fontWeight: '700' },
   balancePill:{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },

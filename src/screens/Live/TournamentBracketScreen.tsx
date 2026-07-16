@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
@@ -75,6 +76,7 @@ export const TournamentBracketScreen: React.FC = () => {
   const { tournamentId } = route.params as RouteParams;
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const { currentUser } = useUser();
   const { addListener, removeListener } = useWs();
 
@@ -334,7 +336,7 @@ export const TournamentBracketScreen: React.FC = () => {
   if (loadError || !bracket) {
     return (
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
           <BackButton onPress={() => nav.goBack()} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tournoi</Text>
           <View style={{ width: 38 }} />
@@ -406,7 +408,7 @@ export const TournamentBracketScreen: React.FC = () => {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{tournament.name}</Text>
         {isOrganizer && tournament.status !== 'registration' ? (
@@ -990,7 +992,7 @@ const MatchSlot: React.FC<{ name: string; avatar?: string | null; isWinner: bool
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
   financeBtn: {
     width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',

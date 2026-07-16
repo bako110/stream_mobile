@@ -48,8 +48,10 @@ import { useWs } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
+import { LiveGiftBar } from '../../components/wallet/LiveGiftBar';
 import { LiveLikeButton } from '../../components/live/LiveLikeButton';
 import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
+import { LiveHeartsOverlay } from '../../components/live/LiveHeartsOverlay';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
 import { BackButton } from '../../components/common';
@@ -109,8 +111,7 @@ const StageAccessSheet: React.FC<{
   identity:      string;
   onRequested:   () => void;
   onClose:       () => void;
-  onOpenGift:    (receiverId: string, receiverName: string) => void;
-}> = ({ live, liveId, identity, onRequested, onClose, onOpenGift }) => {
+}> = ({ live, liveId, identity, onRequested, onClose }) => {
   const navigation = useNavigation<any>();
   const [myBalance,      setMyBalance]      = useState<number>(-1);
   const [balanceLoading, setBalanceLoading] = useState(true);
@@ -153,9 +154,10 @@ const StageAccessSheet: React.FC<{
 
   const handlePay = async () => {
     if (isGift) {
-      // Pour les cadeaux : ouvrir l'overlay cadeau avec le host comme destinataire
+      // Pour les cadeaux : la rangée de cadeaux permanente (LiveGiftBar) est
+      // toujours visible au-dessus de la barre de commentaire — plus besoin
+      // d'ouvrir un overlay dédié, l'utilisateur tape directement le cadeau requis.
       onClose();
-      onOpenGift(hostId, hostName);
       return;
     }
     if (balanceLoading || insufficientFunds) return;
@@ -527,6 +529,7 @@ const RoomContent: React.FC<{
   likeCount:    number;
   onLike:       () => void;
   likeRef:      React.RefObject<LiveLikeButtonRef | null>;
+  heartsOverlayRef: React.RefObject<import('../../components/live/LiveHeartsOverlay').LiveHeartsOverlayRef | null>;
   reactionSpawnRef: React.RefObject<((emoji: string) => void) | null>;
   onReact:      (emoji: string) => void;
   elapsed:      number;
@@ -539,7 +542,7 @@ const RoomContent: React.FC<{
 }> = ({
   live, liveId, myIdentity, myName, myAvatarUrl, isHost, viewerCount, messages, chatInput, setChatInput,
   sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, onDeleteMsg, onEditMsg,
-  giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike, likeRef,
+  giftNotifs, onGiftNotifShown, giftTicker, giftHistory, likeCount, onLike, likeRef, heartsOverlayRef,
   reactionSpawnRef, onReact,
   elapsed, goOnStageRef, leaveStageRef,
   handRequests, onHandDismiss, onLiveUpdated, onStopLive,
@@ -567,6 +570,11 @@ const RoomContent: React.FC<{
 
   const hostId   = live?.user_id ?? '';
   const hostName = live?.user?.display_name ?? live?.user?.username ?? 'Host';
+
+  // Destinataire actuel de la barre de cadeaux — l'hôte par défaut, mais tapoter
+  // un participant monté sur scène le cible spécifiquement à la place.
+  const [giftReceiver, setGiftReceiver] = useState<{ id: string; name: string } | null>(null);
+  const effectiveGiftReceiver = giftReceiver ?? { id: hostId, name: hostName };
 
   // Monter sur scène : activer cam + micro
   const goOnStage = useCallback(async () => {
@@ -666,7 +674,7 @@ const RoomContent: React.FC<{
         myAvatarUrl={myAvatarUrl}
         myName={myName}
         onStage={onStage}
-        onGift={(id, name) => giftRef.current?.openGift(id, name)}
+        onGift={(id, name) => setGiftReceiver({ id, name })}
         onTap={() => likeRef.current?.trigger()}
       />
 
@@ -677,6 +685,9 @@ const RoomContent: React.FC<{
 
       {/* Floaters réactions */}
       <ReactionFloaters floaters={floaters} />
+
+      {/* Coeurs montants bas-droite, style TikTok — ancrage independant du compteur */}
+      <LiveHeartsOverlay ref={heartsOverlayRef} />
 
       {/* ── GRADIENTS PREMIUM ─────────────────────────────────────────── */}
       <LinearGradient
@@ -696,11 +707,7 @@ const RoomContent: React.FC<{
         <BackButton onPress={onLeave} transparent />
 
         {/* Host info : avatar (point live pulsant) + nom + timer en dessous */}
-        <TouchableOpacity
-          style={st.hostInfo}
-          onPress={() => giftRef.current?.openGift(hostId, hostName)}
-          activeOpacity={0.85}
-        >
+        <View style={st.hostInfo}>
           <View style={st.hostAvatarWrap}>
             {live?.user?.avatar_url
               ? <Image source={{ uri: live.user.avatar_url }} style={st.hostAvatar} />
@@ -715,7 +722,7 @@ const RoomContent: React.FC<{
               <Text style={st.timerText}>{fmt(elapsed)}</Text>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
 
         <View style={{ flex: 1 }} />
 
@@ -878,6 +885,18 @@ const RoomContent: React.FC<{
           />
         </View>
 
+        {/* Rangée cadeaux — toujours visible, un tap envoie immédiatement.
+            Cible l'hôte par défaut, ou le participant sur scène tapoté. */}
+        {effectiveGiftReceiver.id !== hostId && (
+          <View style={st.giftTargetPill}>
+            <Text style={st.giftTargetText} numberOfLines={1}>Pour {effectiveGiftReceiver.name}</Text>
+            <TouchableOpacity onPress={() => setGiftReceiver(null)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Icon name="x" size={12} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          </View>
+        )}
+        <LiveGiftBar liveId={liveId} receiverId={effectiveGiftReceiver.id} onGiftSent={(emoji) => giftRef.current?.notifySent(emoji)} />
+
         {/* ── BARRE D'ACTIONS ───────────────────────────────────────── */}
         <View style={st.actionBar}>
           {/* Input / placeholder — emoji intégré à l'intérieur */}
@@ -929,13 +948,6 @@ const RoomContent: React.FC<{
               </>
             )}
           </View>
-
-          {/* Cadeau */}
-          <TouchableOpacity style={st.actionIconWrap} onPress={() => giftRef.current?.openGift(hostId, hostName)} activeOpacity={0.8}>
-            <LinearGradient colors={['rgba(255,215,0,0.25)', 'rgba(255,165,0,0.15)']} style={st.actionIconCircle}>
-              <Text style={{ fontSize: 16 }}>🎁</Text>
-            </LinearGradient>
-          </TouchableOpacity>
 
           {/* Contrôles scène */}
           {onStage ? (
@@ -1011,11 +1023,6 @@ const RoomContent: React.FC<{
           identity={myIdentity}
           onRequested={() => { setShowStageGate(false); setFreshLiveForGate(null); setHandRaised(true); }}
           onClose={() => { setShowStageGate(false); setFreshLiveForGate(null); }}
-          onOpenGift={(receiverId, receiverName) => {
-            setShowStageGate(false);
-            setFreshLiveForGate(null);
-            giftRef.current?.openGift(receiverId, receiverName);
-          }}
         />
       )}
 
@@ -1107,6 +1114,8 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const leaveStageRef     = useRef<((notifyServer?: boolean) => void) | null>(null);
   // Ref vers le bouton coeur pour déclencher l'animation depuis le WS
   const remoteLikeRef     = useRef<import('../../components/live/LiveLikeButton').LiveLikeButtonRef | null>(null);
+  // Coeurs montants bas-droite (effet TikTok), independants du compteur en haut
+  const heartsOverlayRef  = useRef<import('../../components/live/LiveHeartsOverlay').LiveHeartsOverlayRef | null>(null);
   const reactionSpawnRef  = useRef<((emoji: string) => void) | null>(null);
   const reactionThrottle  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1127,6 +1136,22 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         setLive(l);
         if (l.status !== 'active') { setEnded(true); setLoading(false); return; }
         setViewerCount(l.current_viewers + 1);
+        setLikeCount(l.like_count ?? 0);
+
+        // Historique des commentaires — sans ça, quitter puis revenir sur le live
+        // repartait d'un chat vide (le WS ne livre que les nouveaux messages après
+        // connexion, jamais l'existant).
+        try {
+          const res = await apiClient.get<any[]>(`${Endpoints.social.comments}?live_id=${liveId}&limit=50`);
+          const history = (res.data ?? []).slice().reverse().map((c: any) => ({
+            id:     c.id,
+            user:   c.author?.display_name ?? c.author?.username ?? 'Anonyme',
+            userId: c.author?.id ? String(c.author.id) : undefined,
+            avatar: c.author?.avatar_url ?? null,
+            text:   c.body ?? '',
+          }));
+          if (history.length) setMessages(prev => [...history, ...prev]);
+        } catch { /* pas bloquant — le live reste utilisable sans historique */ }
 
         // Le host de ce live est peut-etre deja en plein battle (rejoint apres le debut
         // du match, donc apres l'emission de l'evenement WS "battle_started" — sans ce
@@ -1260,13 +1285,18 @@ export const SimpleLiveViewerScreen: React.FC = () => {
 
         if (d.type === 'like_added') {
           const count = d.count ?? 1;
-          // Déduire les likes qu'on a déjà comptés localement (optimiste)
-          const ownPending = Math.min(pendingLikes.current, count);
-          pendingLikes.current = Math.max(0, pendingLikes.current - ownPending);
-          const netCount = count - ownPending;
-          if (netCount > 0) setLikeCount(c => c + netCount);
-          for (let i = 0; i < Math.min(count, 3); i++) {
-            setTimeout(() => remoteLikeRef.current?.triggerRemote(), i * 120);
+          const isOwnEcho = d.from_user_id && myIdentity && d.from_user_id === myIdentity;
+          // total = source de vérité serveur — toujours s'aligner dessus plutôt que
+          // d'accumuler des deltas locaux (avant : chaque client repartait de 0 et
+          // divergeait selon qui recevait quels messages WS).
+          if (typeof d.total === 'number') {
+            setLikeCount(d.total);
+          } else if (!isOwnEcho) {
+            setLikeCount(c => c + count);
+          }
+          if (!isOwnEcho) {
+            remoteLikeRef.current?.triggerRemote();
+            heartsOverlayRef.current?.spawn(count);
           }
         }
 
@@ -1428,6 +1458,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const handleLike = useCallback(() => {
     pendingLikes.current += 1;
     setLikeCount(c => c + 1);
+    heartsOverlayRef.current?.spawn(1);
     if (likeThrottle.current) return;
     likeThrottle.current = setTimeout(async () => {
       const batch = pendingLikes.current;
@@ -1520,7 +1551,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   }
 
   return (
-    <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={VIEWER_ROOM_OPTIONS}>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect options={VIEWER_ROOM_OPTIONS}>
       <RoomContent
         live={live}
         liveId={liveId}
@@ -1547,6 +1578,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         likeCount={likeCount}
         onLike={handleLike}
         likeRef={remoteLikeRef}
+        heartsOverlayRef={heartsOverlayRef}
         reactionSpawnRef={reactionSpawnRef}
         onReact={handleReact}
         elapsed={elapsed}
@@ -1711,6 +1743,16 @@ const st = StyleSheet.create({
   modRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.12)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   modBtnText: { color: '#F0365A', fontSize: 9, fontWeight: '700' as const },
+
+  // ── Cible cadeau (quand ≠ hôte) ──────────────────────────────────────────
+  giftTargetPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start', marginLeft: 12, marginBottom: 4,
+    backgroundColor: 'rgba(255,215,0,0.15)', borderRadius: 12,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
+  },
+  giftTargetText: { color: '#FFD700', fontSize: 11, fontWeight: '700', maxWidth: 160 },
 
   // ── Barre d'actions ──────────────────────────────────────────────────────
   actionBar: {

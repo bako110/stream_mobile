@@ -60,3 +60,4 @@ export { FriendsWhoLiked }       from './FriendsWhoLiked';
 export { GoFolyXLoader } from './GoFolyXLoader';
 export { CachedImage } from './CachedImage';
 export { HeartRain, RecentLikersAvatars, LikeNamesFeed } from './HeartRain';
+export { PriceWithLocal } from './PriceWithLocal';

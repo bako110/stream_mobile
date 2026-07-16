@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { BackButton, SkeletonUserProfile, VerifiedBadge } from '../../components/common';
@@ -46,6 +47,7 @@ interface Props {
 export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const { userId } = route.params;
   const { currentUser } = useUser();
   const { lastPresenceUpdate, liveUserIds } = useWs();
@@ -308,7 +310,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           </TouchableOpacity>
           <View style={styles.headerOverlay}>
             {/* Haut : bouton retour */}
-            <View style={{ flexDirection: 'row', paddingTop: 48, paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: 'row', paddingTop: insets.top + 8, paddingHorizontal: 16 }}>
               <BackButton onPress={() => navigation.goBack()} />
             </View>
             {/* Bas : nom sur degrade */}

@@ -1,217 +1,56 @@
 ﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, Image, Modal,
+  View, Text, TouchableOpacity, Image, Modal,
   StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput,
   ScrollView, KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { BackButton, CategorySelector } from '../../components/common';
+import { BackButton, CategorySelector, CONTENT_CATEGORIES } from '../../components/common';
+import { CommunityCard } from '../../components/communities/CommunityCard';
+import { CommunityGridCard } from '../../components/communities/CommunityGridCard';
+import { CommunitySkeletonCard } from '../../components/communities/CommunitySkeleton';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_BAR_HEIGHT } from '../../styles/layout';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
-import type { CommunityData, CreateCommunityPayload, JoinStatus } from '../../services/communityService';
+import type { CommunityData, CreateCommunityPayload } from '../../services/communityService';
 import { apiClient, Endpoints } from '../../api';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-// Icones Feather/MCIcon par template id
+// Icones Feather/MCIcon par template id — alignés sur CONTENT_CATEGORIES
+// (voir components/common/CategorySelector.tsx et backend content_category.py)
 const TEMPLATE_ICONS: Record<string, { lib: 'feather' | 'mc'; name: string }> = {
-  tontine:     { lib: 'mc',      name: 'piggy-bank-outline' },
-  association: { lib: 'feather', name: 'users' },
-  religion:    { lib: 'mc',      name: 'hands-pray' },
-  sport:       { lib: 'mc',      name: 'soccer' },
-  school:      { lib: 'feather', name: 'book-open' },
-  family:      { lib: 'mc',      name: 'home-heart' },
-  business:    { lib: 'feather', name: 'briefcase' },
-  free:        { lib: 'feather', name: 'star' },
+  musique:      { lib: 'feather', name: 'music' },
+  sport:        { lib: 'mc',      name: 'soccer' },
+  gaming:       { lib: 'mc',      name: 'controller-classic-outline' },
+  humour:       { lib: 'mc',      name: 'emoticon-happy-outline' },
+  danse:        { lib: 'mc',      name: 'human' },
+  cuisine:      { lib: 'feather', name: 'coffee' },
+  mode:         { lib: 'mc',      name: 'tshirt-crew-outline' },
+  beaute:       { lib: 'mc',      name: 'lipstick' },
+  tech:         { lib: 'feather', name: 'cpu' },
+  education:    { lib: 'feather', name: 'book-open' },
+  lifestyle:    { lib: 'feather', name: 'star' },
+  art:          { lib: 'feather', name: 'image' },
+  voyage:       { lib: 'feather', name: 'send' },
+  business:     { lib: 'feather', name: 'briefcase' },
+  actualite:    { lib: 'feather', name: 'file-text' },
+  spiritualite: { lib: 'mc',      name: 'hands-pray' },
+  famille:      { lib: 'mc',      name: 'home-heart' },
+  sante:        { lib: 'feather', name: 'heart' },
+  free:         { lib: 'feather', name: 'star' },
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-function fmtCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
-}
 
 function gradientFor(_name: string): [string, string] {
   return ['#7B3FF2', '#9B65F5'];
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SkeletonPulse — bloc gris animé
-// ─────────────────────────────────────────────────────────────────────────────
-const SkeletonPulse: React.FC<{ style?: object }> = ({ style }) => {
-  const anim = useRef(new Animated.Value(0.4)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0.4, duration: 750, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [anim]);
-
-  return (
-    <Animated.View
-      style={[{ backgroundColor: '#2A2A3A', borderRadius: 10, opacity: anim }, style]}
-    />
-  );
-};
-
-const SkeletonCard: React.FC = () => (
-  <View style={SK.card}>
-    <SkeletonPulse style={SK.banner} />
-    <View style={SK.body}>
-      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-        <SkeletonPulse style={SK.avatar} />
-        <View style={{ flex: 1, gap: 6 }}>
-          <SkeletonPulse style={SK.line1} />
-          <SkeletonPulse style={SK.line2} />
-        </View>
-      </View>
-      <SkeletonPulse style={SK.btn} />
-    </View>
-  </View>
-);
-
-const SK = StyleSheet.create({
-  card: {
-    backgroundColor: '#1A1A2E',
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginBottom: 14,
-  },
-  banner: { height: 120, borderRadius: 0 },
-  body: { padding: 14 },
-  avatar: { width: 52, height: 52, borderRadius: 14 },
-  line1: { height: 14, width: '60%' },
-  line2: { height: 11, width: '40%' },
-  btn: { height: 40, borderRadius: 12 },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CommunityCard
-// ─────────────────────────────────────────────────────────────────────────────
-const CommunityCard = React.memo(function CommunityCard({
-  item,
-  isMine,
-  colors,
-  onPress,
-  onJoin,
-  onLeave,
-  onCancelRequest,
-}: {
-  item: CommunityData;
-  isMine: boolean;
-  colors: any;
-  onPress: () => void;
-  onJoin: () => void;
-  onLeave: () => void;
-  onCancelRequest: () => void;
-}) {
-  const joinStatus: JoinStatus = isMine ? 'member' : (item.join_status ?? 'none');
-  const isPrivateOrApproval = item.is_private || item.requires_approval;
-  const price = item.entry_price_gogold ?? 0;
-
-  const subline = (() => {
-    if (item.description) return item.description;
-    const parts: string[] = [];
-    if (item.is_private) parts.push('Privee');
-    else parts.push('Publique');
-    if (isPrivateOrApproval) parts.push('sur invitation');
-    if (price > 0) parts.push(`${price} GoGold`);
-    return parts.join(' · ');
-  })();
-
-  const renderRight = () => {
-    if (joinStatus === 'member') {
-      return (
-        <View style={CS.rightMeta}>
-          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-        </View>
-      );
-    }
-    if (joinStatus === 'pending') {
-      return (
-        <TouchableOpacity onPress={onCancelRequest} activeOpacity={0.8} style={CS.pillPending}>
-          <Text style={CS.pillPendingTxt}>En attente</Text>
-        </TouchableOpacity>
-      );
-    }
-    return (
-      <TouchableOpacity onPress={onJoin} activeOpacity={0.8} style={CS.pillJoin}>
-        <Text style={CS.pillJoinTxt}>
-          {isPrivateOrApproval ? 'Demander' : price > 0 ? `${price} GoGold` : 'Rejoindre'}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.65}
-      onPress={onPress}
-      style={[CS.row, { backgroundColor: colors.background }]}
-    >
-      {/* Avatar */}
-      <View style={CS.avatarWrap}>
-        {item.avatar_url ? (
-          <Image source={{ uri: item.avatar_url }} style={CS.avatar} />
-        ) : (
-          <LinearGradient colors={gradientFor(item.name)} style={CS.avatarGrad}>
-            <Text style={CS.avatarLetter}>{(item.name[0] ?? '?').toUpperCase()}</Text>
-          </LinearGradient>
-        )}
-        {item.is_verified && (
-          <View style={CS.verifiedDot}>
-            <Icon name="check" size={8} color="#fff" />
-          </View>
-        )}
-      </View>
-
-      {/* Contenu + separateur indenté */}
-      <View style={[CS.inner, { borderBottomColor: colors.divider }]}>
-        {/* Ligne 1 : nom + badges + membres */}
-        <View style={CS.row1}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
-            <Text style={[CS.name, { color: colors.textPrimary }]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            {item.is_verified && <Icon name="check-circle" size={12} color="#3B82F6" />}
-            {(item as any).tier === 'pro' && (
-              <View style={CS.badgePro}><Text style={CS.badgeProTxt}>PRO</Text></View>
-            )}
-            {(item as any).tier === 'elite' && (
-              <View style={CS.badgeElite}><Text style={CS.badgeEliteTxt}>ELITE</Text></View>
-            )}
-          </View>
-          <Text style={[CS.membersCount, { color: colors.textTertiary }]}>
-            {fmtCount(item.members_count ?? 0)}
-          </Text>
-        </View>
-
-        {/* Ligne 2 : description / sous-titre */}
-        <View style={CS.row2}>
-          <Text style={[CS.subline, { color: colors.textTertiary }]} numberOfLines={1}>
-            {subline}
-          </Text>
-          {renderRight()}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Toggle custom (sans Switch natif)
@@ -253,9 +92,11 @@ export const CommunitiesScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
 
-  const [tab,            setTab]            = useState<'discover' | 'mine'>('discover');
-  const [all,            setAll]            = useState<CommunityData[]>([]);
+  const [mine,           setMine]           = useState<CommunityData[]>([]);
   const [query,          setQuery]          = useState('');
+  const [sortBy,         setSortBy]         = useState<'recent' | 'alpha' | 'members'>('recent');
+  const [sortOpen,       setSortOpen]       = useState(false);
+  const [viewMode,       setViewMode]       = useState<'list' | 'grid'>('list');
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
   const [createOpen,     setCreateOpen]     = useState(false);
@@ -308,11 +149,14 @@ export const CommunitiesScreen: React.FC = () => {
 
   useEffect(() => { loadTemplates(); }, [loadTemplates]);
 
-  // Appliquer un template au formulaire
+  // Appliquer un template au formulaire — le template.id est désormais une
+  // vraie valeur de CONTENT_CATEGORIES (musique, sport...), donc le choisir
+  // fixe aussi la catégorie stockée (sauf "free", qui n'est pas une catégorie).
   const applyTemplate = (t: any) => {
     setSelectedTemplate(t);
     setCreatePrivate(t.default_settings?.is_private ?? false);
     setCreateInviteOnly(t.default_settings?.requires_approval ?? false);
+    if (t.id !== 'free') setCreateCategory(t.id);
     if (t.suggested_description && !createDesc.trim()) setCreateDesc(t.suggested_description);
     setTemplateOpen(false);
     setCreateOpen(true);
@@ -357,93 +201,36 @@ export const CommunitiesScreen: React.FC = () => {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = tab === 'mine'
-        ? await communityService.mine()
-        : await communityService.discover();
-      setAll(Array.isArray(data) ? data : []);
+      const data = await communityService.mine();
+      setMine(Array.isArray(data) ? data : []);
     } catch { /**/ }
     finally { setLoading(false); setRefreshing(false); }
-  }, [tab]);
+  }, []);
 
-  // Rechargement complet au changement de tab
   useEffect(() => { load(); }, [load]);
 
   // Refresh silencieux au retour sur l'écran (pas de skeleton)
   useEffect(() => { if (isFocused) load(true); }, [isFocused]);
 
-  // On the discover tab, exclude communities the user already joined so they only
-  // appear under "Mes communautés". On the mine tab keep all items as-is since
-  // the /mine endpoint already returns only the user's own communities.
-  const filtered = tab === 'discover'
-    ? all.filter(c => c.join_status !== 'member')
-    : all;
-
-  const communities = query.trim()
-    ? filtered.filter(c =>
+  const searched = query.trim()
+    ? mine.filter(c =>
         c.name.toLowerCase().includes(query.toLowerCase()) ||
         c.description?.toLowerCase().includes(query.toLowerCase()),
       )
-    : filtered;
+    : mine;
+
+  const communities = [...searched].sort((a, b) => {
+    if (sortBy === 'alpha') return a.name.localeCompare(b.name);
+    if (sortBy === 'members') return (b.members_count ?? 0) - (a.members_count ?? 0);
+    // 'recent' — l'API /me retourne déjà les communautés triées par adhésion récente
+    return 0;
+  });
+
+  const handleCategoryPress = (categoryValue: string | null) => {
+    nav.navigate('CommunitiesDiscover', { initialCategory: categoryValue });
+  };
 
   // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleJoin = (item: CommunityData) => {
-    const price = item.entry_price_gogold ?? 0;
-    const needsApproval = item.is_private || item.requires_approval;
-    if (price > 0) {
-      const label = `${price} GoGold`;
-      const note = needsApproval
-        ? '\n\nVotre demande sera examinée par l\'admin. Les GoGold sont remboursés en cas de refus.'
-        : '';
-      Alert.alert('Accès payant', `Rejoindre "${item.name}" coûte ${label}.${note}`, [
-        { text: 'Annuler', style: 'cancel' },
-        { text: `Payer ${label}`, onPress: () => _doJoin(item) },
-      ]);
-      return;
-    }
-    _doJoin(item);
-  };
-
-  const _doJoin = async (item: CommunityData) => {
-    try {
-      const res = await communityService.join(item.id);
-      if (res.pending) {
-        Alert.alert(
-          'Demande envoyée',
-          `Ta demande pour rejoindre "${item.name}" est en attente d'approbation. Tu seras notifié dès que l'admin accepte.`,
-        );
-      } else if (res.joined) {
-        Alert.alert('Bienvenue !', `Tu as rejoint "${item.name}".`);
-      }
-      load();
-    } catch (e: any) {
-      const detail: string = e?.response?.data?.detail ?? '';
-      const status: number = e?.response?.status ?? 0;
-      if (status === 402 || detail.toLowerCase().includes('gogold')) {
-        Alert.alert('GoGold insuffisants', `Il te faut ${item.entry_price_gogold ?? '?'} GoGold pour rejoindre cette communauté.`);
-      } else if (status === 403) {
-        Alert.alert('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
-      } else if (status === 404) {
-        Alert.alert('Introuvable', 'Cette communauté n\'existe plus.');
-      } else {
-        Alert.alert('Erreur', detail || 'Impossible de rejoindre cette communauté.');
-      }
-    }
-  };
-
-  const handleCancelRequest = (item: CommunityData) => {
-    Alert.alert('Annuler la demande', `Annuler votre demande pour "${item.name}" ?`, [
-      { text: 'Non', style: 'cancel' },
-      {
-        text: 'Annuler la demande',
-        style: 'destructive',
-        onPress: async () => {
-          try { await communityService.cancelJoinRequest(item.id); load(); }
-          catch { Alert.alert('Erreur', 'Impossible d\'annuler la demande.'); }
-        },
-      },
-    ]);
-  };
-
   const handleLeave = (id: string) => {
     Alert.alert('Quitter', 'Quitter cette communauté ?', [
       { text: 'Annuler', style: 'cancel' },
@@ -514,134 +301,177 @@ export const CommunitiesScreen: React.FC = () => {
     } finally { setCreating(false); }
   };
 
-  // ── Hero banner — tab Découvrir ──────────────────────────────────────────────
-  const renderHero = () => {
-    if (tab !== 'discover' || query.trim()) return null;
-
-    const hasData = communities.length > 0;
-
-    // Version compacte si données présentes — juste les boutons actions
-    if (hasData) {
-      return (
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={S.heroCompact}
-        >
-          <View style={S.heroCompactLeft}>
-            <Icon name="users" size={16} color="rgba(255,255,255,0.9)" />
-            <Text style={S.heroCompactLabel}>
-              {communities.length} communauté{communities.length > 1 ? 's' : ''}
-            </Text>
-          </View>
-          <View style={S.heroCompactActions}>
-            <TouchableOpacity
-              onPress={() => { resetForm(); setCreateOpen(true); }}
-              style={S.heroBtnPrimary}
-              activeOpacity={0.85}
-            >
-              <Icon name="plus" size={13} color="#7B3FF2" />
-              <Text style={S.heroBtnPrimaryText}>Créer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setJoinOpen(true)}
-              style={S.heroBtnSecondary}
-              activeOpacity={0.85}
-            >
-              <Icon name="key" size={13} color="#fff" />
-              <Text style={S.heroBtnSecondaryText}>Code</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      );
-    }
-
-    // Version pleine si pas encore de données
-    return (
-      <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={S.hero}
-      >
-        <View style={S.heroCircle1} />
-        <View style={S.heroCircle2} />
-        <View style={S.heroContent}>
-          <Text style={S.heroTitle}>Rejoins ta communauté</Text>
-          <Text style={S.heroSub}>
-            Découvre des espaces qui te ressemblent — musique, sport, culture et plus encore.
-          </Text>
-          <View style={S.heroActions}>
-            <TouchableOpacity
-              onPress={() => { resetForm(); setCreateOpen(true); }}
-              style={S.heroBtnPrimary}
-              activeOpacity={0.85}
-            >
-              <Icon name="plus" size={14} color="#7B3FF2" />
-              <Text style={S.heroBtnPrimaryText}>Créer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setJoinOpen(true)}
-              style={S.heroBtnSecondary}
-              activeOpacity={0.85}
-            >
-              <Icon name="key" size={14} color="#fff" />
-              <Text style={S.heroBtnSecondaryText}>Code d'invitation</Text>
-            </TouchableOpacity>
-          </View>
+  // ── Hero banner ───────────────────────────────────────────────────────────
+  const renderHero = () => (
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={S.hero}
+    >
+      <View style={S.heroCircle1} />
+      <View style={S.heroCircle2} />
+      <View style={S.heroContent}>
+        <Text style={S.heroTitle}>Rejoins ta communauté</Text>
+        <Text style={S.heroSub}>
+          Découvre des espaces qui te ressemblent — musique, sport, culture et plus encore.
+        </Text>
+        <View style={S.heroActions}>
+          <TouchableOpacity
+            onPress={() => { resetForm(); setCreateOpen(true); }}
+            style={S.heroBtnPrimary}
+            activeOpacity={0.85}
+          >
+            <Icon name="plus" size={14} color="#7B3FF2" />
+            <Text style={S.heroBtnPrimaryText}>Créer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setJoinOpen(true)}
+            style={S.heroBtnSecondary}
+            activeOpacity={0.85}
+          >
+            <Icon name="key" size={14} color="#fff" />
+            <Text style={S.heroBtnSecondaryText}>Code d'invitation</Text>
+          </TouchableOpacity>
         </View>
-      </LinearGradient>
-    );
-  };
-
-  // ── En-tête section liste ─────────────────────────────────────────────────
-  const renderSectionHeader = () => {
-    const count = communities.length;
-    const label = tab === 'discover' ? 'Toutes les communautés' : 'Mes communautés';
-    return (
-      <View style={S.sectionHeader}>
-        <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>{label}</Text>
-        {count > 0 && (
-          <View style={[S.sectionCount, { backgroundColor: colors.primary + '20' }]}>
-            <Text style={[S.sectionCountText, { color: colors.primary }]}>{count}</Text>
-          </View>
-        )}
       </View>
-    );
-  };
+    </LinearGradient>
+  );
 
-  // ── Rendu liste ──────────────────────────────────────────────────────────────
+  // ── Catégories populaires — toujours visible, navigue vers Découvrir ───────
+  const renderCategories = () => (
+    <View style={{ marginBottom: 8 }}>
+      <View style={S.categoriesHeaderRow}>
+        <Text style={[S.categoriesTitle, { color: colors.textPrimary }]}>Catégories populaires</Text>
+        <TouchableOpacity onPress={() => handleCategoryPress(null)} style={S.seeAllBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <Text style={[S.seeAllText, { color: colors.primary }]}>Voir tout</Text>
+          <Icon name="chevron-right" size={14} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.categoriesScroll} contentContainerStyle={S.categoriesRow}>
+        {CONTENT_CATEGORIES.filter(c => c.value !== 'autre').map(cat => (
+          <TouchableOpacity
+            key={cat.value}
+            onPress={() => handleCategoryPress(cat.value)}
+            activeOpacity={0.8}
+            style={S.categoryItem}
+          >
+            <View style={[S.categoryIconWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+              <Text style={S.categoryEmoji}>{cat.emoji}</Text>
+            </View>
+            <Text style={[S.categoryLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+              {cat.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  // ── En-tête section "Mes communautés" — tri + vue ──────────────────────────
+  const SORT_LABELS: Record<typeof sortBy, string> = {
+    recent: 'Récentes', alpha: 'Alphabétique', members: 'Popularité',
+  };
+  const renderSectionHeader = () => (
+    <View style={S.sectionHeader}>
+      <View style={S.sectionTitleRow}>
+        <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>Mes communautés</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => setSortOpen(v => !v)}
+            style={[S.sortBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+            activeOpacity={0.8}
+          >
+            <Text style={[S.sortBtnText, { color: colors.textSecondary }]}>{SORT_LABELS[sortBy]}</Text>
+            <Icon name={sortOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textTertiary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setViewMode(v => (v === 'list' ? 'grid' : 'list'))}
+            style={[S.viewBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+            activeOpacity={0.8}
+          >
+            <Icon name={viewMode === 'list' ? 'grid' : 'list'} size={15} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {sortOpen && (
+        <View style={[S.sortMenu, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          {(['recent', 'alpha', 'members'] as const).map(opt => (
+            <TouchableOpacity
+              key={opt}
+              onPress={() => { setSortBy(opt); setSortOpen(false); }}
+              style={S.sortMenuItem}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: sortBy === opt ? colors.primary : colors.textSecondary, fontWeight: sortBy === opt ? '800' : '600', fontSize: 13 }}>
+                {SORT_LABELS[opt]}
+              </Text>
+              {sortBy === opt && <Icon name="check" size={14} color={colors.primary} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+
+  // ── Rendu empty state "Mes communautés" ─────────────────────────────────────
+  const renderEmpty = () => (
+    <View style={{ alignItems: 'center', gap: 16, paddingTop: 24 }}>
+      <LinearGradient colors={['#7B3FF230', '#E0389A20']} style={S.emptyIcon}>
+        <Icon name="users" size={36} color="#7B3FF2" />
+      </LinearGradient>
+      <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>
+        {query ? 'Aucun résultat' : 'Aucune communauté'}
+      </Text>
+      <Text style={[S.emptySub, { color: colors.textTertiary }]}>
+        {query
+          ? `Aucun résultat pour "${query}"`
+          : 'Soyez le premier à créer ou rejoindre une communauté !'}
+      </Text>
+      {!query && (
+        <>
+          <TouchableOpacity
+            onPress={() => { resetForm(); setCreateOpen(true); }}
+            style={{ borderRadius: 14, overflow: 'hidden', marginTop: 4 }}
+          >
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={S.emptyBtn}
+            >
+              <Icon name="plus" size={16} color="#fff" />
+              <Text style={S.emptyBtnText}>Créer une communauté</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setJoinOpen(true)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <Text style={[S.emptyLinkText, { color: colors.primary }]}>Utiliser un code d'invitation</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  );
+
+  // ── Rendu liste — un seul ScrollView vertical, tout empilé simplement ────────
   const renderList = () => {
-    if (loading && all.length === 0) {
+    if (loading && mine.length === 0) {
       return (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16 }}
           showsVerticalScrollIndicator={false}
         >
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
+          <CommunitySkeletonCard />
+          <CommunitySkeletonCard />
+          <CommunitySkeletonCard />
         </ScrollView>
       );
     }
 
     return (
-      <FlatList
-        data={communities}
-        keyExtractor={c => c.id}
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          communities.length === 0
-            ? S.emptyContainer
-            : { paddingBottom: 32 }
-        }
-        ListHeaderComponent={
-          <>
-            {renderHero()}
-            {communities.length > 0 && renderSectionHeader()}
-          </>
-        }
+        contentContainerStyle={{ paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -649,58 +479,39 @@ export const CommunitiesScreen: React.FC = () => {
             tintColor={colors.primary}
           />
         }
-        renderItem={({ item }) => (
-          <CommunityCard
-            item={item}
-            isMine={tab === 'mine' || item.join_status === 'member'}
-            colors={colors}
-            onPress={() => nav.navigate('CommunityDetail', { communityId: item.id })}
-            onJoin={() => handleJoin(item)}
-            onLeave={() => handleLeave(item.id)}
-            onCancelRequest={() => handleCancelRequest(item)}
-          />
-        )}
-        ListEmptyComponent={
-          <View style={{ alignItems: 'center', gap: 16 }}>
-            <LinearGradient
-              colors={['#7B3FF230', '#E0389A20']}
-              style={S.emptyIcon}
-            >
-              <Icon name="users" size={36} color="#7B3FF2" />
-            </LinearGradient>
-            <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>
-              {tab === 'mine'
-                ? 'Aucune communauté'
-                : query
-                ? 'Aucun résultat'
-                : 'Aucune communauté'}
-            </Text>
-            <Text style={[S.emptySub, { color: colors.textTertiary }]}>
-              {tab === 'mine'
-                ? 'Créez ou rejoignez une communauté pour commencer'
-                : query
-                ? `Aucun résultat pour "${query}"`
-                : 'Soyez le premier à créer une communauté !'}
-            </Text>
-            {tab === 'mine' && (
-              <TouchableOpacity
-                onPress={() => { resetForm(); setCreateOpen(true); }}
-                style={{ borderRadius: 14, overflow: 'hidden', marginTop: 4 }}
-              >
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={S.emptyBtn}
-                >
-                  <Icon name="plus" size={16} color="#fff" />
-                  <Text style={S.emptyBtnText}>Créer une communauté</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+      >
+        {renderHero()}
+        {renderCategories()}
+        {renderSectionHeader()}
+
+        {communities.length === 0 ? (
+          renderEmpty()
+        ) : viewMode === 'grid' ? (
+          <View style={S.gridWrap}>
+            {communities.map(item => (
+              <CommunityGridCard
+                key={item.id}
+                item={item}
+                colors={colors}
+                onPress={() => nav.navigate('CommunityDetail', { communityId: item.id })}
+              />
+            ))}
           </View>
-        }
-      />
+        ) : (
+          communities.map(item => (
+            <CommunityCard
+              key={item.id}
+              item={item}
+              isMine
+              colors={colors}
+              onPress={() => nav.navigate('CommunityDetail', { communityId: item.id })}
+              onJoin={() => {}}
+              onLeave={() => handleLeave(item.id)}
+              onCancelRequest={() => {}}
+            />
+          ))
+        )}
+      </ScrollView>
     );
   };
 
@@ -776,7 +587,10 @@ export const CommunitiesScreen: React.FC = () => {
                     if (!active) {
                       if (t.default_settings?.is_private !== undefined) setCreatePrivate(t.default_settings.is_private);
                       if (t.default_settings?.requires_approval !== undefined) setCreateInviteOnly(t.default_settings.requires_approval);
+                      if (t.id !== 'free') setCreateCategory(t.id);
                       if (t.suggested_description && !createDesc.trim()) setCreateDesc(t.suggested_description);
+                    } else {
+                      setCreateCategory(null);
                     }
                   }}
                   activeOpacity={0.8}
@@ -1101,10 +915,15 @@ export const CommunitiesScreen: React.FC = () => {
         paddingTop: insets.top + 10,
         borderBottomColor: colors.divider,
       }]}>
-        {/* Titre + boutons */}
+        {/* Titre + sous-titre + bouton créer */}
         <View style={S.headerRow}>
           <BackButton onPress={() => nav.goBack()} />
-          <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Communautés</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Communautés</Text>
+            <Text style={[S.headerSubtitle, { color: colors.textTertiary }]}>
+              Connecte-toi, partage et grandis ensemble
+            </Text>
+          </View>
           <TouchableOpacity
             onPress={() => { resetForm(); setCreateOpen(true); }}
             style={[S.createBtn, { backgroundColor: colors.primary }]}
@@ -1114,7 +933,7 @@ export const CommunitiesScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Barre de recherche */}
+        {/* Barre de recherche + filtre */}
         <View style={[S.searchWrap, {
           backgroundColor: colors.backgroundSecondary,
           borderColor: colors.divider,
@@ -1128,41 +947,22 @@ export const CommunitiesScreen: React.FC = () => {
             onChangeText={setQuery}
             returnKeyType="search"
           />
-          {query.length > 0 && (
+          {query.length > 0 ? (
             <TouchableOpacity
               onPress={() => setQuery('')}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Icon name="x" size={14} color={colors.textTertiary} />
             </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={() => nav.navigate('CommunitiesDiscover', undefined)}
+              style={[S.filterBtn, { backgroundColor: colors.background }]}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Icon name="sliders" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
           )}
-        </View>
-
-        {/* Segmented control tabs */}
-        <View style={[S.segmented, { backgroundColor: colors.backgroundSecondary }]}>
-          {(['discover', 'mine'] as const).map(t => {
-            const active = tab === t;
-            return (
-              <TouchableOpacity
-                key={t}
-                onPress={() => { setTab(t); setLoading(true); }}
-                activeOpacity={0.85}
-                style={[
-                  S.segment,
-                  active && [S.segmentActive, { backgroundColor: colors.background }],
-                ]}
-              >
-                <Icon
-                  name={t === 'discover' ? 'compass' : 'home'}
-                  size={13}
-                  color={active ? colors.primary : colors.textTertiary}
-                />
-                <Text style={[S.segmentText, { color: active ? colors.primary : colors.textTertiary }]}>
-                  {t === 'discover' ? 'Découvrir' : 'Mes communautés'}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
         </View>
       </View>
 
@@ -1329,13 +1129,6 @@ export const CommunitiesScreen: React.FC = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
   root: { flex: 1 },
-  emptyContainer: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 36,
-    paddingTop: 60,
-  },
 
   // Header
   header: { borderBottomWidth: StyleSheet.hairlineWidth },
@@ -1347,6 +1140,7 @@ const S = StyleSheet.create({
     paddingBottom: 14,
   },
   headerTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.6 },
+  headerSubtitle: { fontSize: 13, fontWeight: '500', marginTop: 2 },
   backBtn: {
     width: 36,
     height: 36,
@@ -1368,75 +1162,48 @@ const S = StyleSheet.create({
     alignItems: 'center',
     gap: 9,
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     paddingHorizontal: 14,
     paddingVertical: 11,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
-
-  // Segmented control
-  segmented: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 14,
-    borderRadius: 14,
-    padding: 4,
-  },
-  segment: {
-    flex: 1,
-    flexDirection: 'row',
+  filterBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: 11,
   },
-  segmentActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+
+  // Catégories populaires
+  categoriesHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginHorizontal: 16, marginBottom: 10,
   },
-  segmentText: { fontSize: 13, fontWeight: '700' },
+  categoriesTitle: { fontSize: 15, fontWeight: '800' },
+  seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  seeAllText: { fontSize: 13, fontWeight: '700' },
+  categoriesScroll: { height: 88 },
+  categoriesRow: { paddingHorizontal: 16, gap: 14 },
+  categoryItem: { alignItems: 'center', width: 60, gap: 6 },
+  categoryIconWrap: {
+    width: 52, height: 52, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  categoryEmoji: { fontSize: 22 },
+  categoryLabel: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
 
   // Hero banner
   hero: {
     marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 4,
+    marginTop: 4,
+    marginBottom: 20,
     borderRadius: 20,
     overflow: 'hidden',
     minHeight: 148,
-  },
-  heroCompact: {
-    marginHorizontal: 16,
-    marginTop: 14,
-    marginBottom: 4,
-    borderRadius: 16,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  heroCompactLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  heroCompactLabel: {
-    color: 'rgba(255,255,255,0.95)',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  heroCompactActions: {
-    flexDirection: 'row',
-    gap: 8,
   },
   heroCircle1: {
     position: 'absolute', top: -30, right: -30,
@@ -1468,14 +1235,34 @@ const S = StyleSheet.create({
   },
   heroBtnSecondaryText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  // Section header
+  // Section header — Mes communautés (tri + vue)
   sectionHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 2, paddingTop: 20, paddingBottom: 12,
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '800', flex: 1 },
-  sectionCount: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10 },
-  sectionCountText: { fontSize: 12, fontWeight: '700' },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: 17, fontWeight: '800' },
+  sortBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
+  },
+  sortBtnText: { fontSize: 12, fontWeight: '700' },
+  viewBtn: {
+    width: 32, height: 32, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  sortMenu: {
+    marginTop: 8, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 4, alignSelf: 'flex-end',
+  },
+  sortMenuItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 20,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
+
+  // Grille "Mes communautés" (viewMode grid)
+  gridWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 8 },
 
   // Empty
   emptyIcon: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center' },
@@ -1489,6 +1276,7 @@ const S = StyleSheet.create({
     paddingVertical: 14,
   },
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  emptyLinkText: { fontSize: 14, fontWeight: '700', marginTop: 4 },
 
   // Modal
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)' },
@@ -1648,74 +1436,3 @@ const S = StyleSheet.create({
   footerBtnPrimaryTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles card communauté
-// ─────────────────────────────────────────────────────────────────────────────
-const CS = StyleSheet.create({
-  // Ligne WhatsApp-style : avatar a gauche, contenu avec separateur indenté
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 16,
-  },
-
-  // Avatar
-  avatarWrap: { position: 'relative', marginRight: 14 },
-  avatar:     { width: 52, height: 52, borderRadius: 26 },
-  avatarGrad: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 20 },
-  verifiedDot: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#3B82F6',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#fff',
-  },
-
-  // Zone droite avec le séparateur qui ne touche pas le bord gauche
-  inner: {
-    flex: 1,
-    paddingVertical: 13,
-    paddingRight: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 3,
-  },
-
-  // Ligne 1 : nom + membres
-  row1: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2, flexShrink: 1 },
-  membersCount: { fontSize: 12, fontWeight: '500', marginLeft: 6 },
-
-  // Ligne 2 : sous-titre + action
-  row2: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  subline: { fontSize: 13, flex: 1, marginRight: 8 },
-
-  // Chevron membre
-  rightMeta: { paddingLeft: 4 },
-
-  // Pilule "Rejoindre"
-  pillJoin: {
-    backgroundColor: '#7B3FF2',
-    paddingHorizontal: 13,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  pillJoinTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
-
-  // Pilule "En attente"
-  pillPending: {
-    backgroundColor: '#F59E0B18',
-    borderWidth: 1,
-    borderColor: '#F59E0B60',
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  pillPendingTxt: { color: '#F59E0B', fontSize: 12, fontWeight: '600' },
-
-  // Badges tier
-  badgePro:      { backgroundColor: '#7B3FF222', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
-  badgeProTxt:   { color: '#7B3FF2', fontSize: 9, fontWeight: '800' },
-  badgeElite:    { backgroundColor: '#F59E0B22', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
-  badgeEliteTxt: { color: '#F59E0B', fontSize: 9, fontWeight: '800' },
-});

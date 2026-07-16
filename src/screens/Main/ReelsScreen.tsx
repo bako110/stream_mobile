@@ -66,6 +66,10 @@ const formatCount = (n: number): string => {
 
 // ─── ReelsScreen ─────────────────────────────────────────────────────────────
 
+// Feed reels avec pub injectee toutes les AD_INTERVAL reels — voir feedWithAds
+// et toRenderedIndex (conversion d'index reels → index liste rendue).
+const AD_INTERVAL = 5;
+
 export const ReelsScreen: React.FC = () => {
   useKeepAwake();
   const isWifi = useIsWifi();
@@ -132,6 +136,9 @@ export const ReelsScreen: React.FC = () => {
   const [reels,         setReels]         = useState<Reel[]>(seedReel.length > 0 ? seedReel : []);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
   const [reelAd,        setReelAd]        = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; advertiser_id?: string } | null>(null);
+  // reelAdRef — toujours à jour, lisible depuis useFocusEffect (closure figée sur [])
+  const reelAdRef = useRef(reelAd);
+  reelAdRef.current = reelAd;
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
   const [editCaption,   setEditCaption]   = useState('');
@@ -160,6 +167,15 @@ export const ReelsScreen: React.FC = () => {
   const scrollLockTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { reelsRef.current = reels; }, [reels]);
   useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
+  // toRenderedIndex — convertit un index dans `reels` en index dans la liste
+  // RENDUE par la FlatList (feedWithAds, qui insère une pub toutes les AD_INTERVAL
+  // reels). Sans cette conversion, scrollToOffset visait le mauvais item dès qu'une
+  // pub précédait le reel cible. Lit reelAdRef (pas reelAd) pour rester correct même
+  // appelé depuis useFocusEffect, dont la closure est figée au montage.
+  const toRenderedIndex = useCallback((idx: number) => {
+    if (userMode || !reelAdRef.current) return idx;
+    return idx + Math.floor(idx / AD_INTERVAL);
+  }, [userMode]);
 
   // Quand la liste change, tenter de résoudre pendingTarget si onLayout l'a manqué
   useEffect(() => {
@@ -168,13 +184,16 @@ export const ReelsScreen: React.FC = () => {
     const idx = reels.findIndex(r => r.id === target.id);
     if (idx < 0) return; // pas encore là — attendre le prochain update
     pendingTargetRef.current = null;
+    // Offset basé sur l'index dans la liste RENDUE (avec pubs) — sinon on scrolle
+    // vers le mauvais item dès qu'une pub précède le reel cible.
+    const scrollIdx = toRenderedIndex(idx);
     currentIdxRef.current = idx;
     setCurrentIndex(idx);
     isScrollingRef.current = true;
     if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
     scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
-    listRef.current?.scrollToOffset({ offset: SCREEN_H * idx, animated: false });
-  }, [reels, SCREEN_H]);
+    listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
+  }, [reels, SCREEN_H, toRenderedIndex]);
 
   const toggleMute = useCallback(() => setMuted(v => !v), []);
 
@@ -428,13 +447,15 @@ export const ReelsScreen: React.FC = () => {
 
       const existingIdx = reelsRef.current.findIndex(r => r.id === targetId);
       if (existingIdx >= 0) {
-        // Reel déjà dans la liste → scroll direct
+        // Reel déjà dans la liste → scroll direct, mais l'offset doit se baser sur
+        // l'index dans la liste RENDUE (avec pubs), pas sur l'index dans reels seul.
+        const scrollIdx = toRenderedIndex(existingIdx);
         currentIdxRef.current = existingIdx;
         setCurrentIndex(existingIdx);
         isScrollingRef.current = true;
         if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
         scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
-        listRef.current?.scrollToOffset({ offset: SCREEN_H * existingIdx, animated: false });
+        listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
       } else if (targetReel?.hls_url) {
         // Reel absent mais on a l'objet → injecter en tête
         const injected = [targetReel, ...reelsRef.current.filter(r => r.id !== targetId)];
@@ -600,8 +621,6 @@ export const ReelsScreen: React.FC = () => {
   // ── Callbacks stables ─────────────────────────────────────────────────────
   const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
 
-  // Feed reels avec pub injectee toutes les 5 reels
-  const AD_INTERVAL = 5;
   const feedWithAds = useMemo(() => {
     if (userMode || !reelAd) return reels;
     const result: (Reel | { _isAd: true; id: string; ad: typeof reelAd })[] = [];
@@ -695,7 +714,7 @@ export const ReelsScreen: React.FC = () => {
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-        <View style={[s.mineHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={[s.mineHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border, paddingTop: insets.top + 14 }]}>
           <BackButton onPress={() => setTab('feed')} />
           <View style={{ flex: 1 }}>
             <Text style={[s.mineHeaderTitle, { color: colors.primary }]}>Mes Reels</Text>
@@ -920,13 +939,16 @@ export const ReelsScreen: React.FC = () => {
           const idx  = list.findIndex(r => r.id === target.id);
 
           if (idx >= 0) {
-            // Reel trouvé — scroll direct avec verrou
+            // Reel trouvé — scroll direct avec verrou. Offset basé sur l'index dans
+            // la liste RENDUE (avec pubs), sinon on scrolle vers le mauvais item dès
+            // qu'une pub précède le reel cible.
+            const scrollIdx = toRenderedIndex(idx);
             currentIdxRef.current = idx;
             setCurrentIndex(idx);
             isScrollingRef.current = true;
             if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
             scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
-            listRef.current?.scrollToOffset({ offset: SCREEN_H * idx, animated: false });
+            listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
           } else if (target.reel?.hls_url) {
             // Reel pas encore chargé — injecter en tête et afficher
             const injected = [target.reel, ...list.filter(r => r.id !== target.id)];
@@ -2544,7 +2566,7 @@ const s = StyleSheet.create({
   commentBarInput:     { flex: 1, fontSize: 12, color: '#fff', padding: 0, maxHeight: 60 },
   commentBarSend:      { width: 27, height: 27, borderRadius: 14, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
-  mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingBottom: 14, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   mineHeaderSub:     { fontSize: 12, fontWeight: '400', marginTop: 1 },
   mineCreateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },

@@ -14,6 +14,7 @@ export interface LiveStream {
   room_name?: string | null;
   current_viewers: number;
   peak_viewers: number;
+  like_count?: number;
   is_featured: boolean;
   is_private: boolean;
   started_at: string;

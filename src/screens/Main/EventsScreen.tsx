@@ -8,7 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
-import { AppHeader, SkeletonFeed, AvatarWithBadge } from '../../components/common';
+import { AppHeader, SkeletonFeed, AvatarWithBadge, PriceWithLocal } from '../../components/common';
 import { eventService } from '../../services';
 import type { Event, EventType } from '../../types';
 import type { AppColors } from '../../theme/colors';
@@ -284,7 +284,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, colors, onPress, onDelete 
 
         {event.ticket_price != null && event.access_type !== 'free' && (
           <Text style={[s.price, { color: colors.primary }]}>
-            À partir de {event.ticket_price} €
+            À partir de <PriceWithLocal amountEur={event.ticket_price} style={[s.price, { color: colors.primary }]} />
           </Text>
         )}
 

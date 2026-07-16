@@ -8,6 +8,7 @@ import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated'
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
@@ -49,38 +50,41 @@ const Hero: React.FC<{
   title: string; subtitle: string; icon: string;
   colors: any; bgColor: string;
   onBack: () => void;
-}> = ({ title, subtitle, icon, colors, bgColor, onBack }) => (
-  <View style={[hero.wrap, { height: HERO_H }]}>
-    <LinearGradient
-      colors={[colors.gradientStart, colors.gradientEnd, colors.primary + 'CC']}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-      style={StyleSheet.absoluteFill}
-    />
-    <View style={[hero.circle1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
-    <View style={[hero.circle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
+}> = ({ title, subtitle, icon, colors, bgColor, onBack }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[hero.wrap, { height: HERO_H }]}>
+      <LinearGradient
+        colors={[colors.gradientStart, colors.gradientEnd, colors.primary + 'CC']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[hero.circle1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
+      <View style={[hero.circle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
 
-    <TouchableOpacity onPress={onBack} style={hero.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-      <Icon name="arrow-left" size={22} color="#fff" />
-    </TouchableOpacity>
+      <TouchableOpacity onPress={onBack} style={[hero.backBtn, { top: insets.top + 12 }]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <Icon name="arrow-left" size={22} color="#fff" />
+      </TouchableOpacity>
 
-    <Animated.View entering={FadeInDown.delay(80).springify()} style={hero.content}>
-      <View style={hero.iconCircle}>
-        <Icon name={icon} size={28} color="#fff" />
-      </View>
-      <Text style={hero.title}>{title}</Text>
-      <Text style={hero.subtitle}>{subtitle}</Text>
-    </Animated.View>
+      <Animated.View entering={FadeInDown.delay(80).springify()} style={[hero.content, { paddingTop: insets.top + 12 }]}>
+        <View style={hero.iconCircle}>
+          <Icon name={icon} size={28} color="#fff" />
+        </View>
+        <Text style={hero.title}>{title}</Text>
+        <Text style={hero.subtitle}>{subtitle}</Text>
+      </Animated.View>
 
-    <WaveBottom color={bgColor} />
-  </View>
-);
+      <WaveBottom color={bgColor} />
+    </View>
+  );
+};
 
 const hero = StyleSheet.create({
   wrap:      { width: '100%', overflow: 'visible' },
   circle1:   { position: 'absolute', width: 160, height: 160, borderRadius: 80, top: -30, right: -30 },
   circle2:   { position: 'absolute', width: 100, height: 100, borderRadius: 50, bottom: 20, left: -20 },
-  backBtn:   { position: 'absolute', top: 52, left: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
-  content:   { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 28, paddingTop: 52, gap: 6 },
+  backBtn:   { position: 'absolute', left: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  content:   { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 28, gap: 6 },
   iconCircle:{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   title:     { fontSize: 24, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
   subtitle:  { fontSize: 13, color: 'rgba(255,255,255,0.80)', fontWeight: '400', textAlign: 'center', paddingHorizontal: 24 },

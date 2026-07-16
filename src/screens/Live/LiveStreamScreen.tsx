@@ -267,7 +267,7 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
   if (isLive && token && wsUrl) {
     return (
-      <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={CREATOR_ROOM_OPTIONS}>
+      <LiveKitRoom serverUrl={wsUrl} token={token} connect options={CREATOR_ROOM_OPTIONS}>
         <StreamControls concert={concert} concertId={concertId} onEnd={handleEnd} />
       </LiveKitRoom>
     );

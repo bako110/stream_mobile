@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
@@ -187,7 +187,7 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
                 ) : minPrice != null ? (
                   <View>
                     <Text style={[st.priceLabel, { color: colors.textTertiary }]}>À partir de</Text>
-                    <Text style={[st.priceValue, { color: colors.primary }]}>{minPrice.toLocaleString('fr')} €</Text>
+                    <PriceWithLocal amountEur={minPrice} style={[st.priceValue, { color: colors.primary }]} />
                   </View>
                 ) : null}
               </View>

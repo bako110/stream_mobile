@@ -4,6 +4,7 @@ import {
   ScrollView, TextInput, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 import { feedbackService } from '../../services/feedbackService';
@@ -28,6 +29,7 @@ const STATUS_LABEL: Record<Feedback['status'], { label: string; color: string }>
 export const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   const [category, setCategory] = useState<FeedbackCategory | null>(null);
   const [message,  setMessage]  = useState('');
@@ -74,7 +76,7 @@ export const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 14 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Donner mon avis</Text>
         <View style={{ width: 40 }} />
@@ -198,7 +200,7 @@ const s = StyleSheet.create({
   root:   { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 52, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: { fontSize: 17, fontWeight: '700' },
 

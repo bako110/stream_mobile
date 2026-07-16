@@ -210,7 +210,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   }
 
   return (
-    <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={VIEWER_ROOM_OPTIONS}>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect options={VIEWER_ROOM_OPTIONS}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

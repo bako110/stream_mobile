@@ -9,6 +9,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -19,12 +20,13 @@ export const LiveMatchesHubScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={[st.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 14 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Live Matchs</Text>
         <View style={{ width: 38 }} />
@@ -63,7 +65,7 @@ export const LiveMatchesHubScreen: React.FC = () => {
 
 const st = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 18, fontWeight: '800' },
   body: { flex: 1, padding: 16, gap: 16 },
   cardWrap: { flex: 1 },

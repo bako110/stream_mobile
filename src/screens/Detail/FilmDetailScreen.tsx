@@ -7,7 +7,7 @@ import {
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, ShareBottomSheet } from '../../components/common';
+import { BackButton, ShareBottomSheet, PriceWithLocal } from '../../components/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
@@ -273,7 +273,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <Text style={[s.premText, hasAccess && { color: '#10b981' }]}>
                 {hasAccess ? 'ACCÈS DÉBLOQUÉ' : 'PREMIUM'}
               </Text>
-              {!hasAccess && item.price != null && <Text style={s.premPrice}>{item.price} €</Text>}
+              {!hasAccess && item.price != null && <PriceWithLocal amountEur={item.price} style={s.premPrice} localStyle={{ color: 'rgba(255,255,255,0.7)' }} />}
             </Animated.View>
           )}
         </View>
@@ -371,19 +371,25 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                     size={17} color="#fff"
                   />
                 )}
-                <Text style={s.ctaPrimaryText}>
-                  {accessLoading || launching
-                    ? 'Chargement…'
-                    : item.is_premium && !hasAccess
-                    ? `Acheter — ${goGoldRequired} GoGold (${item.price} €)`
-                    : isSerie
-                    ? 'Voir les épisodes'
-                    : videosLoading
-                    ? 'Chargement…'
-                    : hasVideo
-                    ? 'Regarder maintenant'
-                    : 'Vidéo non disponible'}
-                </Text>
+                {!(accessLoading || launching) && item.is_premium && !hasAccess ? (
+                  <Text style={s.ctaPrimaryText}>
+                    Acheter — {goGoldRequired} GoGold (
+                    <PriceWithLocal amountEur={item.price!} style={s.ctaPrimaryText} localStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+                    )
+                  </Text>
+                ) : (
+                  <Text style={s.ctaPrimaryText}>
+                    {accessLoading || launching
+                      ? 'Chargement…'
+                      : isSerie
+                      ? 'Voir les épisodes'
+                      : videosLoading
+                      ? 'Chargement…'
+                      : hasVideo
+                      ? 'Regarder maintenant'
+                      : 'Vidéo non disponible'}
+                  </Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 
@@ -523,7 +529,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <Text style={[pw.priceLabel, { color: colors.textTertiary }]}>Prix d'accès</Text>
                 <Text style={[pw.priceValue, { color: colors.textPrimary }]}>
                   {goGoldRequired} GoGold
-                  <Text style={[pw.priceEur, { color: colors.textSecondary }]}> ({item.price} €)</Text>
+                  <Text style={[pw.priceEur, { color: colors.textSecondary }]}> (<PriceWithLocal amountEur={item.price!} style={[pw.priceEur, { color: colors.textSecondary }]} localStyle={{ color: colors.textTertiary }} />)</Text>
                 </Text>
               </View>
               <Icon name="zap" size={22} color="#F59E0B" />

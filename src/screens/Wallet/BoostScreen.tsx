@@ -9,6 +9,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { apiClient } from '../../api/client';
@@ -542,6 +543,7 @@ const ContentPicker: React.FC<{
   colors: any;
   userId: string;
 }> = ({ contentType, targetLabel, g1, selected, onSelect, colors, userId }) => {
+  const insets = useSafeAreaInsets();
   const [open,    setOpen]    = useState(false);
   const [query,   setQuery]   = useState('');
   const [results, setResults] = useState<TargetContent[]>([]);
@@ -600,7 +602,7 @@ const ContentPicker: React.FC<{
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={[cp.modal, { backgroundColor: colors.background }]}>
-          <View style={[cp.header, { borderBottomColor: colors.border }]}>
+          <View style={[cp.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
             <TouchableOpacity onPress={() => setOpen(false)} style={{ padding: 4 }}>
               <Icon name="arrow-left" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
@@ -762,6 +764,7 @@ const SuggestionCard: React.FC<{
 export default function BoostScreen() {
   const { theme: { colors }, isDark } = useTheme();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? '';
 
@@ -959,7 +962,7 @@ export default function BoostScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <View style={{ flex: 1 }}>
           <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Booster</Text>
@@ -1427,7 +1430,7 @@ const cp = StyleSheet.create({
   trigger:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12 },
   triggerText: { fontSize: 13, fontWeight: '600' },
   modal:       { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingTop: 52, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   input:       { flex: 1, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
   resultRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12 },
   thumbWrap:   { position: 'relative', width: 44, height: 44 },
@@ -1438,7 +1441,7 @@ const cp = StyleSheet.create({
 
 const s = StyleSheet.create({
   root:        { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:      { flexDirection: 'row', alignItems: 'center', paddingBottom: 16, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 20, fontWeight: '800' },
   headerSub:   { fontSize: 11, marginTop: 2 },
   balancePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },

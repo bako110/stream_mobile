@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  StatusBar, Platform, ActivityIndicator, TextInput, FlatList,
+  StatusBar, ActivityIndicator, TextInput, FlatList,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Sound from 'react-native-sound';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import type { AppColors } from '../../theme/colors';
@@ -62,6 +63,7 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const soundRef = useRef<Sound | null>(null);
+  const insets = useSafeAreaInsets();
 
   const stopPreview = useCallback(() => {
     if (soundRef.current) {
@@ -131,7 +133,7 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
   return (
     <View style={[sp.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="dark-content" />
-      <View style={[sp.header, { paddingTop: Platform.OS === 'android' ? 48 : 56, borderBottomColor: colors.border ?? '#eee' }]}>
+      <View style={[sp.header, { paddingTop: insets.top + 14, borderBottomColor: colors.border ?? '#eee' }]}>
         <TouchableOpacity onPress={onGoBack} style={sp.headerBtn}>
           <Icon name="arrow-left" size={20} color={colors.textPrimary} />
         </TouchableOpacity>

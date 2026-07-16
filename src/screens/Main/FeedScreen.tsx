@@ -21,9 +21,10 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
@@ -604,6 +605,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated, lastPresenceUpdate } = useWs();
   const { currentUser } = useUser();
   // false — ne demande pas la permission localisation des l'arrivee sur le feed,
@@ -1794,7 +1796,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
       />
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <View style={[s.header, { backgroundColor: colors.surface }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, paddingTop: insets.top }]}>
         <View style={s.headerRow}>
           {/* Gauche : avatar + nom tronqué — masqué si recherche ouverte */}
           {!searchOpen && (
@@ -2409,7 +2411,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
           scrollEnabled={feedScrollEnabled}
           onViewableItemsChanged={onFeedViewableChanged}
           viewabilityConfig={feedViewabilityConfig}
-          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
           onScroll={handleFeedScroll}
           scrollEventThrottle={100}
           onEndReached={loadMoreFeed}
@@ -3596,7 +3597,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           {!isFree && price != null && price > 0 && (
             <View style={[fc.chipBadge, { backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }]}>
               <Icon name="tag" size={9} color="#fff" />
-              <Text style={fc.chipBadgeText}>dès {price} €</Text>
+              <Text style={fc.chipBadgeText}>dès <PriceWithLocal amountEur={price!} style={fc.chipBadgeText} localStyle={{ color: 'rgba(255,255,255,0.7)' }} /></Text>
             </View>
           )}
         </View>

@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, Alert,
@@ -7,6 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService } from '../../services/subscriptionService';
 import type { PlanType, Subscription } from '../../types';
@@ -83,6 +84,7 @@ export default function SubscriptionPlansScreen() {
   const nav               = useNavigation<any>();
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
+  const insets            = useSafeAreaInsets();
 
   const [current,   setCurrent]   = useState<Subscription | null>(null);
   const [checking,  setChecking]  = useState<PlanType | null>(null);
@@ -135,7 +137,7 @@ export default function SubscriptionPlansScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Abonnements</Text>
         {current?.status === 'active' ? (
@@ -186,9 +188,11 @@ export default function SubscriptionPlansScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.planLabel}>{plan.label}</Text>
-                    <Text style={s.planPrice}>
-                      {cfg.price === 0 ? 'Gratuit' : `${cfg.price.toFixed(2)} €/mois`}
-                    </Text>
+                    {cfg.price === 0 ? (
+                      <Text style={s.planPrice}>Gratuit</Text>
+                    ) : (
+                      <PriceWithLocal amountEur={cfg.price} suffix="/mois" style={s.planPrice} localStyle={{ color: 'rgba(255,255,255,0.75)' }} />
+                    )}
                   </View>
                   {isActive && (
                     <View style={s.activePill}>
@@ -268,7 +272,7 @@ function SpecChip({ icon, label }: { icon: string; label: string }) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 17, fontWeight: '700' },
   mySubBtn:     { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },

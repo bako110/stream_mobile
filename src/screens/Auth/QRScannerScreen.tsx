@@ -7,6 +7,7 @@ import {
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { Camera, CameraType } from 'react-native-camera-kit';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services';
 import { BackButton } from '../../components/common';
@@ -21,6 +22,7 @@ type Phase = 'scanning' | 'verifying' | 'success' | 'error' | 'manual';
 export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   const [phase,       setPhase]       = useState<Phase>('scanning');
   const [errorMsg,    setErrorMsg]    = useState('');
@@ -90,7 +92,7 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
         </View>
 
         {/* Barre haute */}
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { paddingTop: insets.top + 16 }]}>
           <BackButton onPress={onClose} transparent />
           <Text style={styles.headerTitle}>Scanner le QR</Text>
           <View style={{ width: 40 }} />
@@ -214,7 +216,7 @@ const styles = StyleSheet.create({
   topBar:    {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 52, paddingHorizontal: 20, paddingBottom: 16,
+    paddingHorizontal: 20, paddingBottom: 16,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   headerTitle:    { color: '#fff', fontSize: 17, fontWeight: '700' },

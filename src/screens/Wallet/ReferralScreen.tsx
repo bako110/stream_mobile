@@ -8,6 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GoFolyXLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -34,6 +35,7 @@ export const ReferralScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const [stats,      setStats]      = useState<ReferralStats | null>(null);
   const [users,      setUsers]      = useState<ReferredUser[]>([]);
@@ -85,7 +87,7 @@ export const ReferralScreen: React.FC = () => {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Parrainage</Text>
         <View style={{ width: 40 }} />
@@ -248,7 +250,7 @@ export const ReferralScreen: React.FC = () => {
 const s = StyleSheet.create({
   root:         { flex: 1 },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16 },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16 },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 18, fontWeight: '700' },
   scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40, gap: 16 },

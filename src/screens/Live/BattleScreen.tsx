@@ -23,6 +23,7 @@ import {
 import { Track, VideoPresets, ConnectionState, RemoteTrackPublication } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { battleService } from '../../services/battleService';
 import type { Battle, BattleGoal, BattleRanking } from '../../services/battleService';
@@ -36,6 +37,7 @@ import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
+import { LiveGiftBar } from '../../components/wallet/LiveGiftBar';
 import { clearLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
@@ -573,7 +575,7 @@ export const BattleScreen: React.FC = () => {
   }
 
   return (
-    <LiveKitRoom serverUrl={wsUrl} token={token} connect roomOptions={BATTLE_ROOM_OPTIONS}>
+    <LiveKitRoom serverUrl={wsUrl} token={token} connect options={BATTLE_ROOM_OPTIONS}>
       <BattleContent
         battle={battle}
         remaining={remaining}
@@ -666,7 +668,10 @@ const BattleContent: React.FC<{
   const { localParticipant } = useLocalParticipant();
   const connectionState = useConnectionState();
   const roomParticipants = useParticipants();
+  const insets = useSafeAreaInsets();
   const [showParticipants, setShowParticipants] = useState(false);
+  // Destinataire actuel de la rangée de cadeaux — quel camp (A ou B) tapoté
+  const [giftSide, setGiftSide] = useState<'a' | 'b' | null>(null);
 
   // Viewer qui ne suit qu'un camp : coupe l'audio de l'adversaire cote reception, sans
   // toucher a la publication (les hosts, eux, doivent toujours s'entendre l'un l'autre).
@@ -725,7 +730,7 @@ const BattleContent: React.FC<{
       <StatusBar barStyle="light-content" />
 
       {/* Header — 15% de l'ecran : fermer, countdown, score, objectif/effets, top supporter */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8} disabled={leaving}>
             {leaving ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="x" size={20} color="#fff" />}
@@ -946,11 +951,12 @@ const BattleContent: React.FC<{
           />
         )}
 
-        {/* Envoyer un cadeau — une carte par competiteur, cote a cote, sans ambiguite sur le destinataire */}
+        {/* Envoyer un cadeau — une carte par competiteur, cote a cote, sans ambiguite sur le destinataire.
+            Tapoter bascule l'affichage de la rangée de cadeaux (tap sur un cadeau = envoi immédiat). */}
         <View style={styles.giftRow}>
           <TouchableOpacity
-            style={[styles.giftCard, styles.giftCardA]}
-            onPress={() => battle && giftOverlayA.current?.openGift(battle.host_a_id, hostNameA)}
+            style={[styles.giftCard, styles.giftCardA, giftSide === 'a' && styles.giftCardActive]}
+            onPress={() => setGiftSide(prev => (prev === 'a' ? null : 'a'))}
             activeOpacity={0.85}
           >
             {hostAvatarA
@@ -962,8 +968,8 @@ const BattleContent: React.FC<{
             </View>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.giftCard, styles.giftCardB]}
-            onPress={() => battle && giftOverlayB.current?.openGift(battle.host_b_id, hostNameB)}
+            style={[styles.giftCard, styles.giftCardB, giftSide === 'b' && styles.giftCardActive]}
+            onPress={() => setGiftSide(prev => (prev === 'b' ? null : 'b'))}
             activeOpacity={0.85}
           >
             <View style={styles.giftCardIconWrap}>
@@ -975,6 +981,14 @@ const BattleContent: React.FC<{
               : <View style={[styles.giftCardAvatar, styles.giftCardAvatarFallback]}><Icon name="user" size={10} color="#fff" /></View>}
           </TouchableOpacity>
         </View>
+
+        {giftSide && battle && (
+          <LiveGiftBar
+            liveId={giftSide === 'a' ? battle.live_a_id : battle.live_b_id}
+            receiverId={giftSide === 'a' ? battle.host_a_id : battle.host_b_id}
+            onGiftSent={(emoji) => (giftSide === 'a' ? giftOverlayA : giftOverlayB).current?.notifySent(emoji)}
+          />
+        )}
 
         <View style={styles.actionsRow}>
           <TouchableOpacity style={[styles.reactBtn, styles.reactBtnA]} onPress={() => onReact('a')} activeOpacity={0.8}>
@@ -1210,7 +1224,7 @@ const styles = StyleSheet.create({
   // Header — 15% de l'ecran : fermer, countdown, score, objectif/effets, top supporter
   header: {
     width: '100%', height: HEADER_H, backgroundColor: 'rgba(11,8,18,0.92)',
-    paddingTop: 46, paddingHorizontal: 14, paddingBottom: 10,
+    paddingHorizontal: 14, paddingBottom: 10,
     borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
     borderBottomWidth: 1, borderBottomColor: 'rgba(155,101,245,0.35)',
   },
@@ -1305,6 +1319,7 @@ const styles = StyleSheet.create({
   },
   giftCardA: { backgroundColor: 'rgba(123,63,242,0.14)', borderColor: 'rgba(123,63,242,0.4)' },
   giftCardB: { backgroundColor: 'rgba(240,54,90,0.14)', borderColor: 'rgba(240,54,90,0.4)' },
+  giftCardActive: { borderWidth: 2, opacity: 1 },
   giftCardAvatar: { width: 19, height: 19, borderRadius: 10 },
   giftCardAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   giftCardName: { flex: 1, color: '#fff', fontSize: 11, fontWeight: '700' },

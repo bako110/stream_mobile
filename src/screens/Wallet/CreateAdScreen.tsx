@@ -8,7 +8,7 @@ import {
   ScrollView, Alert, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -278,7 +278,7 @@ export const CreateAdScreen: React.FC = () => {
               ~{estimatedImpressions.toLocaleString('fr-FR')} impressions estimées
             </Text>
             <Text style={{ color: '#7B3FF2', fontSize: 12, opacity: 0.8 }}>
-              Coût : {(budget * 100).toLocaleString('fr-FR')} GoGold ({budget.toFixed(2)}€)
+              Coût : {(budget * 100).toLocaleString('fr-FR')} GoGold (<PriceWithLocal amountEur={budget} style={{ color: '#7B3FF2', fontSize: 12, opacity: 0.8 }} />)
             </Text>
             <Text style={{ color: '#7B3FF2', fontSize: 11, opacity: 0.7, marginTop: 1 }}>
               Coût : {(cpmEur / 1000 * 100).toFixed(3)} GoGold/impression
@@ -453,9 +453,10 @@ export const CreateAdScreen: React.FC = () => {
                   backgroundColor: cpmEur === c.value ? '#7B3FF222' : colors.backgroundSecondary }]}
                 onPress={() => setCpmEur(c.value)}
               >
-                <Text style={{ color: cpmEur === c.value ? '#7B3FF2' : colors.textPrimary, fontWeight: '800', fontSize: 13 }}>
-                  {c.label}
-                </Text>
+                <PriceWithLocal
+                  amountEur={c.value}
+                  style={{ color: cpmEur === c.value ? '#7B3FF2' : colors.textPrimary, fontWeight: '800', fontSize: 13 }}
+                />
                 <Text style={{ color: colors.textTertiary, fontSize: 10 }}>{c.desc}</Text>
               </TouchableOpacity>
             ))}
@@ -473,7 +474,7 @@ export const CreateAdScreen: React.FC = () => {
             keyboardType="decimal-pad"
           />
           <Text style={[s.hint, { color: colors.textTertiary }]}>
-            Minimum 1 € · La campagne s'arrête quand le budget est épuisé
+            Minimum <PriceWithLocal amountEur={1} style={[s.hint, { color: colors.textTertiary }]} /> · La campagne s'arrête quand le budget est épuisé
           </Text>
         </Field>
 

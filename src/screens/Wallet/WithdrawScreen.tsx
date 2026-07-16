@@ -4,6 +4,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { BackButton } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 
 const CONTACT_EMAIL = 'contact@gofolyx.com';
@@ -12,12 +13,13 @@ const WithdrawScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
 
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Retirer des fonds</Text>
         <View style={{ width: 40 }} />
@@ -67,7 +69,6 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 56,
     paddingBottom: 12,
   },
   headerTitle: {

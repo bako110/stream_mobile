@@ -23,7 +23,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { localCache } from '../../utils/storage';
 import { useWs } from '../../context/WebSocketContext';
-import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, AvatarWithBadge, FriendsWhoLiked, LiveThumbnailBackground } from '../../components/common';
+import { SkeletonFeed, CommentsBottomSheet, PeopleSuggestions, AvatarWithBadge, FriendsWhoLiked, LiveThumbnailBackground, PriceWithLocal } from '../../components/common';
 import {
   concertService, eventService, authService, searchService,
   socialService,
@@ -1358,7 +1358,8 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
             <View style={[s.postBadge, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
               <Icon name="tag" size={8} color="#fff" />
               <Text style={s.postBadgeText}>
-                {hasTiers ? `dès ${minPrice} €` : `${minPrice} €`}
+                {hasTiers && 'dès '}
+                <PriceWithLocal amountEur={minPrice} style={s.postBadgeText} localStyle={{ color: 'rgba(255,255,255,0.7)' }} />
               </Text>
             </View>
           )}

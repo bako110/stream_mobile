@@ -17,7 +17,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
-import { BackButton } from '../../components/common';
+import { BackButton, PriceWithLocal } from '../../components/common';
 
 type NavProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -201,7 +201,15 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
           ) : (
             <View style={hs.premiumBadge}>
               <Icon name="lock" size={9} color="#fff" />
-              <Text style={hs.premiumText}>PREMIUM{item.price ? ` · ${item.price}€` : ''}</Text>
+              <Text style={hs.premiumText}>
+                PREMIUM
+                {item.price ? (
+                  <>
+                    {' · '}
+                    <PriceWithLocal amountEur={item.price} style={hs.premiumText} localStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+                  </>
+                ) : ''}
+              </Text>
             </View>
           )
         )}
@@ -233,7 +241,16 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
           >
             <Icon name={isPremiumUnpaid ? 'lock' : 'play'} size={15} color={isPremiumUnpaid ? '#fff' : '#000'} />
             <Text style={[hs.btnWatchText, isPremiumUnpaid && { color: '#fff' }]}>
-              {isPremiumUnpaid ? `Acheter · ${item.price ?? ''}€` : 'Regarder'}
+              {isPremiumUnpaid ? (
+                <>
+                  Acheter ·{' '}
+                  <PriceWithLocal
+                    amountEur={item.price ?? 0}
+                    style={[hs.btnWatchText, { color: '#fff' }]}
+                    localStyle={{ color: 'rgba(255,255,255,0.7)' }}
+                  />
+                </>
+              ) : 'Regarder'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={hs.btnMore} onPress={onPress} activeOpacity={0.88}>
@@ -381,9 +398,11 @@ const Card: React.FC<{
             ) : (
               <View style={card.premBadge}>
                 <Icon name="lock" size={8} color="#fff" />
-                <Text style={card.premBadgeTxt}>
-                  {item.price ? `${item.price}€` : 'PPV'}
-                </Text>
+                {item.price ? (
+                  <PriceWithLocal amountEur={item.price} style={card.premBadgeTxt} localStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+                ) : (
+                  <Text style={card.premBadgeTxt}>PPV</Text>
+                )}
               </View>
             )
           )}

@@ -25,8 +25,9 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -82,8 +83,8 @@ const StatCard: React.FC<{
   icon: string;
   iconLib?: 'feather' | 'mci';
   label: string;
-  value: string;
-  sub?: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
   color: string;
   colors: any;
 }> = ({ icon, iconLib = 'feather', label, value, sub, color, colors }) => {
@@ -144,6 +145,7 @@ const CreatorDashboardScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
@@ -228,7 +230,7 @@ const CreatorDashboardScreen: React.FC = () => {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={s.headerTitle}>Monétisation</Text>
         <View style={{ width: 40 }} />
@@ -285,12 +287,12 @@ const CreatorDashboardScreen: React.FC = () => {
               <StatCard
                 icon="bitcoin" iconLib="mci" label="GoGold gagnés"
                 value={fmtNum(stats.total_gogold_earned)}
-                sub={`≈ ${goGoldToEur(stats.total_gogold_earned)} €`}
+                sub={<>≈ <PriceWithLocal amountEur={parseFloat(goGoldToEur(stats.total_gogold_earned))} style={statStyles(colors).sub} /></>}
                 color="#FFD700" colors={colors}
               />
               <StatCard
                 icon="trending-up" label="Ce mois"
-                value={`${parseFloat(String(stats.monthly_earnings_eur ?? 0)).toFixed(2)} €`}
+                value={<PriceWithLocal amountEur={parseFloat(String(stats.monthly_earnings_eur ?? 0))} style={statStyles(colors).value} />}
                 color="#3FEDB6" colors={colors}
               />
             </View>
@@ -379,7 +381,7 @@ const CreatorDashboardScreen: React.FC = () => {
             </Text>
             <Text style={s.withdrawCoinsLabel}>GoGold disponibles</Text>
             <Text style={s.withdrawEur}>
-              ≈ {goGoldToEur(stats?.available_balance ?? 0)} EUR
+              ≈ <PriceWithLocal amountEur={parseFloat(goGoldToEur(stats?.available_balance ?? 0))} style={s.withdrawEur} />
             </Text>
           </View>
           <TouchableOpacity
@@ -405,7 +407,7 @@ const CreatorDashboardScreen: React.FC = () => {
           </TouchableOpacity>
           {(stats?.available_balance ?? 0) < 1000 && (
             <Text style={s.withdrawMin}>
-              Minimum 500 GoGold ({goGoldToEur(500)} €) requis
+              Minimum 500 GoGold (<PriceWithLocal amountEur={parseFloat(goGoldToEur(500))} style={s.withdrawMin} />) requis
             </Text>
           )}
         </View>
@@ -479,7 +481,6 @@ const styles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 56,
     paddingBottom: 12,
   },
   backBtn: {

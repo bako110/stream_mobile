@@ -14,6 +14,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../components/common';
 import { BattleCard } from '../../components/live/LiveMatchCards';
 import { battleService } from '../../services/battleService';
@@ -27,6 +28,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 export const LiveOneVsOneScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const { addListener, removeListener } = useWs();
+  const insets = useSafeAreaInsets();
 
   const [battles, setBattles] = useState<ActiveBattle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,7 @@ export const LiveOneVsOneScreen: React.FC = () => {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <LinearGradient colors={['#1C1033', '#0B0812', '#0B0812']} style={StyleSheet.absoluteFill} />
 
-      <View style={st.header}>
+      <View style={[st.header, { paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => nav.goBack()} color="#fff" transparent />
         <Text style={st.headerTitle}>1 vs 1</Text>
         <View style={{ width: 38 }} />
@@ -155,7 +157,7 @@ const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0B0812' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16,
+    paddingBottom: 16, paddingHorizontal: 16,
     borderBottomWidth: 1, borderBottomColor: 'rgba(155,101,245,0.25)',
     backgroundColor: 'rgba(28,16,51,0.55)',
   },

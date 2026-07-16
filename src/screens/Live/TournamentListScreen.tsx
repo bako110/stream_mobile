@@ -8,6 +8,7 @@ import {
   RefreshControl, ActivityIndicator, Modal, TextInput, Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
@@ -25,6 +26,7 @@ export const TournamentListScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const { currentUser } = useUser();
 
   const [tournaments, setTournaments] = useState<OpenTournament[]>([]);
@@ -116,7 +118,7 @@ export const TournamentListScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tournois</Text>
         <TouchableOpacity onPress={() => setShowCreate(true)} style={styles.createBtn}>
@@ -195,7 +197,7 @@ export const TournamentListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 17, fontWeight: '700' },
   createBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 60 },

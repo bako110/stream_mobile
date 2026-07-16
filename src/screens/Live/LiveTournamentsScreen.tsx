@@ -13,6 +13,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BackButton } from '../../components/common';
@@ -28,6 +29,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 export const LiveTournamentsScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const { addListener, removeListener } = useWs();
 
   const [tournaments, setTournaments] = useState<ActiveTournament[]>([]);
@@ -102,7 +104,7 @@ export const LiveTournamentsScreen: React.FC = () => {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <LinearGradient colors={['#2A1F0A', '#0B0812', '#0B0812']} style={StyleSheet.absoluteFill} />
 
-      <View style={st.header}>
+      <View style={[st.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => nav.goBack()} color="#fff" transparent />
         <Text style={st.headerTitle}>Tournois</Text>
         <TouchableOpacity onPress={() => setShowCreate(true)} style={st.createBtn}>
@@ -172,7 +174,7 @@ const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0B0812' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16,
+    paddingBottom: 16, paddingHorizontal: 16,
     borderBottomWidth: 1, borderBottomColor: 'rgba(245,158,11,0.25)',
     backgroundColor: 'rgba(42,31,10,0.55)',
   },

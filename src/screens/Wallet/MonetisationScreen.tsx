@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
@@ -59,6 +60,7 @@ export function MonetisationScreen() {
   const nav = useNavigation<any>();
   const { theme, isDark } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   const [monetStatus, setMonetStatus] = useState<MonetStatus | null>(null);
   const [adminNote, setAdminNote] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export function MonetisationScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
           <BackButton onPress={() => nav.goBack()} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monetisation</Text>
           <View style={{ width: 38 }} />
@@ -121,7 +123,7 @@ export function MonetisationScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monétisation</Text>
         <View style={{ width: 38 }} />
@@ -176,7 +178,7 @@ const gateStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle:  { fontSize: 17, fontWeight: '700' },
   scroll:       { padding: 16 },
   section:      { marginBottom: 8 },

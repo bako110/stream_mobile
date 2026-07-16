@@ -8,7 +8,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { updateService, AppVersionInfo } from '../../services/updateService';
 
 // Doit correspondre à versionCode dans android/app/build.gradle
-const CURRENT_VERSION_CODE = 21;
+const CURRENT_VERSION_CODE = 34;
 
 export const UpdateBanner: React.FC = () => {
   const { theme }  = useTheme();

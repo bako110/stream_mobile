@@ -58,42 +58,26 @@ export const LiveLikeButton = forwardRef<LiveLikeButtonRef, Props>(({ total, onL
   const trigger = useCallback(() => {
     counterAnim.setValue(1.4);
     Animated.spring(counterAnim, { toValue: 1, friction: 4, useNativeDriver: true }).start();
-    spawnHeart();
+    // En mode compact, les coeurs montent depuis LiveHeartsOverlay (ancrage
+    // bas-droite independant), pas depuis ce bouton — voir l'appelant.
+    if (!compact) spawnHeart();
     onLike();
-  }, [spawnHeart, onLike, counterAnim]);
+  }, [spawnHeart, onLike, counterAnim, compact]);
 
   const triggerRemote = useCallback(() => {
     counterAnim.setValue(1.3);
     Animated.spring(counterAnim, { toValue: 1, friction: 4, useNativeDriver: true }).start();
-    spawnHeart();
-  }, [spawnHeart, counterAnim]);
+    if (!compact) spawnHeart();
+  }, [spawnHeart, counterAnim, compact]);
 
   useImperativeHandle(ref, () => ({ trigger, triggerRemote }), [trigger, triggerRemote]);
 
   if (compact) {
+    // Pas de coeurs volants ici — le compteur reste dans la barre du haut, les
+    // coeurs montent depuis un point fixe en bas-droite via LiveHeartsOverlay
+    // (ancrage independant, effet TikTok), pilote par le meme trigger/triggerRemote.
     return (
       <View style={st.rootCompact} pointerEvents="box-none">
-        {hearts.map(h => (
-          <Animated.Text
-            key={h.id}
-            style={[
-              st.floatHeart,
-              {
-                fontSize: h.size * 0.7,
-                color: COLORS[h.id % COLORS.length],
-                transform: [
-                  { translateX: h.x },
-                  { translateY: h.y },
-                  { scale: h.scale },
-                ],
-                opacity: h.opacity,
-              },
-            ]}
-          >
-            {HEARTS[h.id % HEARTS.length]}
-          </Animated.Text>
-        ))}
-
         <Animated.Text style={[st.countCompact, { transform: [{ scale: counterAnim }] }]}>
           {formatCount(total)}
         </Animated.Text>

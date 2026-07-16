@@ -43,6 +43,7 @@ import { NewConversationScreen } from '../screens/Main/NewConversationScreen';
 import { NewCallScreen }         from '../screens/Main/NewCallScreen';
 import { FollowingScreen }       from '../screens/Main/FollowingScreen';
 import { CommunitiesScreen }     from '../screens/Main/CommunitiesScreen';
+import { CommunitiesDiscoverScreen } from '../screens/Main/CommunitiesDiscoverScreen';
 import { CommunityChatScreen }   from '../screens/Main/CommunityChatScreen';
 import { CallScreen }            from '../screens/Main/CallScreen';
 import { EventsScreen }          from '../screens/Main/EventsScreen';
@@ -122,6 +123,7 @@ import { SettingsAbonnementScreen }    from '../screens/Settings/SettingsAbonnem
 import { SettingsApparenceScreen }     from '../screens/Settings/SettingsApparenceScreen';
 import { SettingsNotificationsScreen } from '../screens/Settings/SettingsNotificationsScreen';
 import { SettingsLectureScreen }       from '../screens/Settings/SettingsLectureScreen';
+import { SettingsDeviseScreen }        from '../screens/Settings/SettingsDeviseScreen';
 import { SettingsCompteScreen }        from '../screens/Settings/SettingsCompteScreen';
 import { SettingsContenuScreen }       from '../screens/Settings/SettingsContenuScreen';
 import { SettingsAProposScreen }       from '../screens/Settings/SettingsAProposScreen';
@@ -182,6 +184,7 @@ export type MainStackParamList = {
   Following:       { userId?: string; tab?: 'followers' | 'following' } | undefined;
   CommunityChat:           { communityId: string; communityName: string };
   Communities:             undefined;
+  CommunitiesDiscover:     { initialCategory?: string | null } | undefined;
   CommunityDetail:         { communityId: string; autoEnter?: boolean };
   CommunityMembers:        { communityId: string; communityName: string; myRole?: string | null; membersListHiddenPublic?: boolean; membersListHiddenMembers?: boolean };
   CommunityStats:          { communityId: string; communityName: string };
@@ -248,6 +251,7 @@ export type MainStackParamList = {
   SettingsApparence:         undefined;
   SettingsNotifications:     undefined;
   SettingsLecture:           undefined;
+  SettingsDevise:            undefined;
   SettingsCompte:            undefined;
   SettingsContenu:           undefined;
   SettingsAPropos:           undefined;
@@ -463,6 +467,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="CommunityChat"  component={CommunityChatScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Following"      component={FollowingScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Communities"    component={CommunitiesScreen}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CommunitiesDiscover" component={CommunitiesDiscoverScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Planning"       component={PlanningScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityDetail" component={CommunityDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Events"         component={EventsScreen}          options={{ animation: 'slide_from_right' }} />
@@ -539,6 +544,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="SettingsApparence"     component={SettingsApparenceScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsNotifications" component={SettingsNotificationsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsLecture"       component={SettingsLectureScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsDevise"        component={SettingsDeviseScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsCompte"        component={SettingsCompteScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsContenu"       component={SettingsContenuScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsAPropos"       component={SettingsAProposScreen}       options={{ animation: 'slide_from_right' }} />
