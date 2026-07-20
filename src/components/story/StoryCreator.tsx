@@ -1285,7 +1285,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           {showAudienceSheet && (
             <>
               <TouchableOpacity style={s.audOverlay} activeOpacity={1} onPress={()=>{setShowAudienceSheet(false);setContactSearch('');}} />
-              <Animated.View entering={FadeInDown.duration(220)} style={s.audSheet}>
+              <Animated.View entering={FadeInDown.duration(220)} style={[s.audSheet, { paddingBottom: (Platform.OS === 'ios' ? 34 : 20) + insets.bottom }]}>
                 <View style={s.audHandle} />
                 <Text style={s.audSheetTitle}>Qui peut voir cette story ?</Text>
                 <View style={s.audOptions}>
@@ -1487,7 +1487,7 @@ const s = StyleSheet.create({
 
   // ── Audience ──────────────────────────────────────────────────────────────
   audOverlay: { ...StyleSheet.absoluteFill,backgroundColor:'rgba(0,0,0,0.45)',zIndex:10 },
-  audSheet: { position:'absolute',left:0,right:0,bottom:0,backgroundColor:'#1A1A2E',borderTopLeftRadius:24,borderTopRightRadius:24,paddingBottom:Platform.OS==='ios'?34:20,zIndex:11,maxHeight:H*0.75 },
+  audSheet: { position:'absolute',left:0,right:0,bottom:0,backgroundColor:'#1A1A2E',borderTopLeftRadius:24,borderTopRightRadius:24,zIndex:11,maxHeight:H*0.75 },
   audHandle: { width:36,height:4,borderRadius:2,backgroundColor:'rgba(255,255,255,0.2)',alignSelf:'center',marginTop:10,marginBottom:14 },
   audSheetTitle: { fontSize:15,fontWeight:'700',color:'#fff',paddingHorizontal:20,marginBottom:12 },
   audOptions: { paddingHorizontal:14,gap:8 },

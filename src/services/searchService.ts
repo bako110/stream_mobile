@@ -19,11 +19,13 @@ export const searchService = {
     return res.data;
   },
 
-  async getFeed(page = 1, limit = 20): Promise<FeedResult> {
-    const query = new URLSearchParams({
+  async getFeed(page = 1, limit = 20, followingOnly = false): Promise<FeedResult> {
+    const params: Record<string, string> = {
       page:  String(page),
       limit: String(limit),
-    }).toString();
+    };
+    if (followingOnly) params.following_only = 'true';
+    const query = new URLSearchParams(params).toString();
     const res = await apiClient.get<FeedResult>(`${Endpoints.search.feed}?${query}`);
     return res.data;
   },

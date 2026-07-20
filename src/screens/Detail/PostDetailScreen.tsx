@@ -57,8 +57,7 @@ const ImageGrid: React.FC<{ urls: string[]; onPress: (i: number) => void }> = ({
   if (n === 1) return (
     <ImgTile
       uri={urls[0]}
-      style={{ width: '100%', aspectRatio: 4 / 3 }}
-      radius={{ tl: RADIUS_G, tr: RADIUS_G, bl: RADIUS_G, br: RADIUS_G }}
+      style={{ width: '100%', aspectRatio: 4 / 5 }}
       onPress={() => onPress(0)}
     />
   );
@@ -184,7 +183,7 @@ interface Props {
 }
 
 export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack, onAuthorPress, navigation }) => {
-  const { theme: { colors } } = useTheme();
+  const { theme: { colors, isDark } } = useTheme();
   const { currentUser }       = useUser();
   const insets                = useSafeAreaInsets();
 
@@ -358,7 +357,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   if (loading) {
     return (
       <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
         <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
           <BackButton onPress={onBack} />
           <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
@@ -598,63 +597,30 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           </View>
         )}
 
-        {/* Images */}
+        {/* Images — pleine largeur, pas de marge horizontale ni d'arrondi qui
+            grignoterait la largeur réelle occupée par l'image. */}
         {allUrls.length > 0 && (
-          <View style={{ marginHorizontal: 16, marginBottom: 12, borderRadius: 14, overflow: 'hidden' }}>
+          <View style={{ marginBottom: 12 }}>
             <ImageGrid urls={allUrls} onPress={i => navigation?.navigate('ImageGallery', { urls: allUrls, initialIndex: i })} />
           </View>
         )}
 
-        {/* ── Ligne compteurs cliquables ── */}
-        {(likeCount > 0 || commentCount > 0) && (
-          <View style={[s.countersRow, { borderTopColor: colors.divider }]}>
-            {likeCount > 0 && (
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                onPress={() => setLikersOpen(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[s.countDot, { backgroundColor: colors.primary }]}>
-                  <MCIcon name="heart" size={10} color="#fff" />
-                </View>
-                <Text style={[s.countTxt, { color: colors.textTertiary }]}>{fmtN(likeCount)}</Text>
-              </TouchableOpacity>
-            )}
-            {likeCount > 0 && commentCount > 0 && (
-              <View style={{ width: StyleSheet.hairlineWidth, height: 14, backgroundColor: colors.divider }} />
-            )}
-            {!post?.comments_disabled && commentCount > 0 && (
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                onPress={() => setCommentsOpen(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[s.countDot, { backgroundColor: colors.primary }]}>
-                  <MCIcon name="comment-outline" size={10} color="#fff" />
-                </View>
-                <Text style={[s.countTxt, { color: colors.textTertiary }]}>
-                  {commentCount} commentaire{commentCount > 1 ? 's' : ''}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* ── Barre 3 boutons ── */}
+        {/* ── Barre 3 boutons — compteurs déjà affichés à côté des icônes,
+            plus besoin d'une ligne séparée au-dessus ── */}
         <View style={[s.actionBar, { borderTopColor: colors.divider }]}>
 
-          {/* J'aime */}
+          {/* J'aime — icône seule + compteur, pas de texte */}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleLike}
             style={s.actionBtn}
           >
             <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={19} color={liked ? colors.primary : colors.textSecondary} />
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? colors.primary : colors.textSecondary} />
             </Animated.View>
-            <Text style={[s.actionBtnTxt, { color: liked ? colors.primary : colors.textSecondary, fontWeight: liked ? '700' : '500' }]}>
-              {likeCount > 0 ? `J'aime\n${fmtN(likeCount)}` : "J'aime"}
-            </Text>
+            {likeCount > 0 && (
+              <Text style={[s.actionBtnTxt, { color: liked ? colors.primary : colors.textSecondary }]}>{fmtN(likeCount)}</Text>
+            )}
           </TouchableOpacity>
 
           <View style={[s.actionSep, { backgroundColor: colors.divider }]} />
@@ -665,12 +631,12 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setCommentsOpen(true)}
-                style={[s.actionBtn, commentCount > 0 && { backgroundColor: colors.primary + '14' }]}
+                style={s.actionBtn}
               >
-                <MCIcon name="comment-outline" size={19} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
-                <Text style={[s.actionBtnTxt, { color: commentCount > 0 ? colors.primary : colors.textSecondary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-                  {commentCount > 0 ? `Commenter\n${fmtN(commentCount)}` : 'Commenter'}
-                </Text>
+                <MCIcon name="comment-outline" size={20} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
+                {commentCount > 0 && (
+                  <Text style={[s.actionBtnTxt, { color: colors.primary }]}>{fmtN(commentCount)}</Text>
+                )}
               </TouchableOpacity>
               <View style={[s.actionSep, { backgroundColor: colors.divider }]} />
             </>
@@ -682,8 +648,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             onPress={handleShare}
             style={s.actionBtn}
           >
-            <MCIcon name="share-outline" size={19} color={colors.textSecondary} />
-            <Text style={[s.actionBtnTxt, { color: colors.textSecondary }]}>Partager</Text>
+            <MCIcon name="share-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
         </View>
@@ -732,7 +697,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
   return (
     <View style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       {/* Top bar */}
       <View style={[s.topBar, { backgroundColor: colors.background, borderBottomColor: 'transparent' }]}>
@@ -869,9 +834,9 @@ const s = StyleSheet.create({
   },
   actionBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 7, paddingVertical: 13,
+    gap: 6, paddingVertical: 9,
   },
-  actionBtnTxt: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  actionBtnTxt: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
   actionSep:    { width: StyleSheet.hairlineWidth, height: 32 },
 
   // Menu contextuel ···

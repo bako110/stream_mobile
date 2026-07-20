@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 
@@ -26,6 +27,7 @@ interface Props {
 
 export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverName, onClose }) => {
   const { theme: { colors } } = useTheme();
+  const insets = useSafeAreaInsets();
   const [gifts,    setGifts]    = useState<GiftType[]>([]);
   const [selected, setSelected] = useState<GiftType | null>(null);
   const [balance,  setBalance]  = useState(0);
@@ -76,7 +78,7 @@ export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverN
       <View style={s.overlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View style={[s.sheet, { backgroundColor: colors.surface ?? '#1A1A2E' }]}>
+        <View style={[s.sheet, { backgroundColor: colors.surface ?? '#1A1A2E', paddingBottom: 32 + insets.bottom }]}>
           {/* Handle */}
           <View style={s.handle} />
 
@@ -149,7 +151,7 @@ export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverN
 
 const s = StyleSheet.create({
   overlay:   { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet:     { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 },
+  sheet:     { borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   handle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   title:     { fontSize: 15, fontWeight: '700', flex: 1 },

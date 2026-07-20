@@ -8,12 +8,8 @@ interface FloatingHeart {
   opacity: Animated.Value;
   scale: Animated.Value;
   size: number;
-  colorIdx: number;
-  emojiIdx: number;
 }
 
-const COLORS = ['#FF2D55', '#FF6B6B', '#FF4081', '#FF8A80', '#F06292', '#E91E63'];
-const HEARTS = ['❤️', '🧡', '💛', '💜', '💙', '🩷'];
 const { height: SCREEN_H } = Dimensions.get('window');
 
 export interface LiveHeartsOverlayRef {
@@ -41,10 +37,8 @@ export const LiveHeartsOverlay = forwardRef<LiveHeartsOverlayRef>((_props, ref) 
     const heart: FloatingHeart = {
       id, x, y, opacity, scale,
       size: 22 + Math.random() * 12,
-      colorIdx: id % COLORS.length,
-      emojiIdx: id % HEARTS.length,
     };
-    setHearts(prev => [...prev.slice(-24), heart]);
+    setHearts(prev => [...prev.slice(-8), heart]);
 
     Animated.sequence([
       Animated.delay(delay),
@@ -71,7 +65,7 @@ export const LiveHeartsOverlay = forwardRef<LiveHeartsOverlayRef>((_props, ref) 
   }, []);
 
   const spawn = useCallback((count: number = 1) => {
-    const n = Math.min(count, 8);
+    const n = Math.min(count, 3);
     for (let i = 0; i < n; i++) spawnOne(i * 90);
   }, [spawnOne]);
 
@@ -86,7 +80,6 @@ export const LiveHeartsOverlay = forwardRef<LiveHeartsOverlayRef>((_props, ref) 
             st.heart,
             {
               fontSize: h.size,
-              color: COLORS[h.colorIdx],
               transform: [
                 { translateX: h.x },
                 { translateY: h.y },
@@ -96,7 +89,7 @@ export const LiveHeartsOverlay = forwardRef<LiveHeartsOverlayRef>((_props, ref) 
             },
           ]}
         >
-          {HEARTS[h.emojiIdx]}
+          💗
         </Animated.Text>
       ))}
     </View>
@@ -110,9 +103,17 @@ const st = StyleSheet.create({
     right: 24,
     width: 10,
     height: 10,
+    overflow: 'visible',
   },
   heart: {
     position: 'absolute',
+    left: -18,
+    top: -18,
+    width: 36,
+    height: 36,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
     zIndex: 60,
   },
 });

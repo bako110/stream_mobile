@@ -4,6 +4,7 @@ import {
   TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { reportService } from '../../services/reportService';
 import type { ReportContentType, ReportReason } from '../../services/reportService';
 import { useTheme } from '../../hooks/useTheme';
@@ -27,6 +28,7 @@ interface Props {
 export const ReportModal: React.FC<Props> = ({ visible, contentType, contentId, onClose }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState<ReportReason | null>(null);
   const [details, setDetails]   = useState('');
   const [loading, setLoading]   = useState(false);
@@ -55,7 +57,7 @@ export const ReportModal: React.FC<Props> = ({ visible, contentType, contentId, 
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={st.overlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose} />
-        <View style={[st.sheet, { backgroundColor: colors.surface }]}>
+        <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 34 + insets.bottom }]}>
           {/* Header */}
           <View style={st.header}>
             <Text style={[st.title, { color: colors.textPrimary }]}>Signaler ce contenu</Text>
@@ -114,7 +116,7 @@ export const ReportModal: React.FC<Props> = ({ visible, contentType, contentId, 
 
 const st = StyleSheet.create({
   overlay:   { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet:     { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 },
+  sheet:     { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
   header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   title:     { fontSize: 16, fontWeight: '700' },
   subtitle:  { fontSize: 13, marginBottom: 16 },

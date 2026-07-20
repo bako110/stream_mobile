@@ -544,53 +544,60 @@ const FeedHeaderBadges: React.FC<{
   onMenu: () => void;
   onFavorites: () => void;
   onLive: () => void;
+  onFriends: () => void;
   colors: AppColors;
-}> = React.memo(({ onMessages, onNotifs, onFavorites, onLive, colors }) => {
+}> = React.memo(({ onMessages, onNotifs, onFavorites, onLive, onFriends, colors }) => {
   const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
   const totalNotifs = unreadNotifications + unreadActivity;
-  const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 40, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
+  const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 22, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
   return (
-    <View style={{ paddingBottom: 10, marginHorizontal: -16 }}>
+    <View style={{ paddingBottom: 6, marginHorizontal: -16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden' }}>
+        {/* Mes amis — filtre le fil aux posts des comptes suivis (filter='following') */}
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onFriends} activeOpacity={0.8}>
+          <MCIcon name="account-heart-outline" size={20} color={colors.textPrimary} />
+          <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Mes amis</Text>
+        </TouchableOpacity>
+        {sep}
         {/* Messages & Appels */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onMessages} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
-            <MCIcon name="forum" size={22} color={colors.textPrimary} />
+            <MCIcon name="forum" size={19} color={colors.textPrimary} />
             {unreadMessages > 0 && (
               <View style={[badgeS.badge, { borderColor: colors.backgroundSecondary }]}>
                 <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
               </View>
             )}
           </View>
-          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '500' }}>Messages</Text>
+          <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Messages</Text>
         </TouchableOpacity>
         {sep}
         {/* Notifications */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onNotifs} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
-            <Icon name="bell" size={22} color={colors.textPrimary} />
+            <Icon name="bell" size={19} color={colors.textPrimary} />
             {totalNotifs > 0 && (
               <View style={[badgeS.badge, { borderColor: colors.backgroundSecondary, backgroundColor: colors.primary }]}>
                 <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
               </View>
             )}
           </View>
-          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '500' }}>Notifications</Text>
+          <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Notifications</Text>
         </TouchableOpacity>
         {sep}
         {/* Enregistrés */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onFavorites} activeOpacity={0.8}>
-          <MCIcon name="bookmark-outline" size={23} color={colors.textPrimary} />
-          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '500' }}>Enregistrés</Text>
+          <MCIcon name="bookmark-outline" size={20} color={colors.textPrimary} />
+          <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Enregistrés</Text>
         </TouchableOpacity>
         {sep}
         {/* En direct */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onLive} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
-            <MCIcon name="video-outline" size={24} color="#F0365A" />
+            <MCIcon name="video-outline" size={21} color="#F0365A" />
             <View style={{ position: 'absolute', top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: colors.backgroundSecondary }} />
           </View>
-          <Text style={{ fontSize: 11, color: '#F0365A', marginTop: 4, fontWeight: '600' }}>En direct</Text>
+          <Text style={{ fontSize: 10.5, color: '#F0365A', marginTop: 2, fontWeight: '600' }}>En direct</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -652,7 +659,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const commExhaustedRef     = useRef(false);
   const commFetchingRef      = useRef(false);
   const feedListRef     = useRef<FlatList>(null);
-  const [fabOpen,        setFabOpen]        = useState(false);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
   const [nearbyEvents,    setNearbyEvents]    = useState<Event[]>([]);
@@ -1092,36 +1098,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
         const reelsLimit = onWifi ? 20 : 10;
         const postsLimit = onWifi ? 20 : 10;
 
-        // Chargement progressif : les posts (contenu principal, requête la plus rapide et la
-        // plus utile) sont attendus seuls en premier — dès qu'ils répondent, on affiche l'écran
-        // (setLoading(false) + items partiels) au lieu d'attendre les 5 autres endpoints
-        // (reels, events/concerts, communautés, lives) via un seul Promise.all bloquant. Si un
-        // de ces 5 tombe sur un cold start ou une requête lente, l'utilisateur voit déjà son
-        // feed au lieu de fixer un skeleton. Les 5 autres sont lancés juste après en arrière-
-        // plan et fusionnés silencieusement dès qu'ils sont prêts (voir plus bas).
-        const postsPage = await postService.getFeed(postsLimit, false, null)
-          .catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null }));
-        const postsResult = postsPage.items;
-        postCursorRef.current = postsPage.next_cursor;
-        postsHasMoreRef.current = postsPage.has_more;
-
-        if (!silent) {
-          const earlyPostItems: FeedItem[] = postsResult
-            .filter((p: Post) => p.id)
-            .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
-          if (earlyPostItems.length > 0) {
-            setItems(earlyPostItems);
-            setLoading(false);
-          }
-        }
-
-        const [feedResult, reelsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
+        // Tout est chargé ensemble avant le premier rendu — un affichage partiel
+        // (posts seuls, puis remplacés par la liste complète avec events/concerts/
+        // reels/pubs injectés) faisait "clignoter" le feed : les items déjà visibles
+        // changeaient de position dès que le reste arrivait, et les events/concerts
+        // semblaient absents du feed puisqu'ils n'apparaissaient jamais dans ce
+        // premier rendu partiel. Un seul skeleton jusqu'à ce que tout soit prêt.
+        const [postsPage, feedResult, reelsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
+          postService.getFeed(postsLimit, false, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null })),
           searchService.getFeed(1, feedLimit).catch(() => ({ items: [] })),
           reelService.getFeed({ limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: 1 })),
           communityService.list(1, 8).catch(() => []),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
         ]);
+        const postsResult = postsPage.items;
+        postCursorRef.current = postsPage.next_cursor;
+        postsHasMoreRef.current = postsPage.has_more;
         setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
         setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
         const commData: CommunityData[] = Array.isArray(commResult)
@@ -1263,17 +1256,39 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
         // Tire une campagne distincte pour chaque nouvel emplacement pub de cette page
         if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
       } else if (f === 'following') {
-        // Onglet Suivis — uniquement les posts des comptes suivis, triés par date
-        const postsPage = await postService.getFeed(50, true, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null }));
+        // "Mes amis" — posts + events/concerts + reels des comptes suivis UNIQUEMENT
+        // (exclusion stricte côté backend via following_only, pas juste un boost de
+        // score comme le fil principal). Pas d'injection pub/suggestions/communautés :
+        // contenu pur des amis, sans bruit de découverte. Tri chronologique — un fil
+        // "amis" doit rester lisible dans l'ordre des publications, pas mélangé.
+        const [postsPage, feedResult, reelsResult] = await Promise.all([
+          postService.getFeed(50, true, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null })),
+          searchService.getFeed(1, 30, true).catch(() => ({ items: [] })),
+          reelService.getFeed({ limit: 20, followingOnly: true }).catch(() => ({ items: [], has_more: false, page: 1 })),
+        ]);
         const postItems: FeedItem[] = postsPage.items
           .filter((p: Post) => p.id)
           .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
-        postItems.sort((a, b) => {
-          const da = a.data?.created_at ?? '';
-          const db2 = b.data?.created_at ?? '';
+        const feedItems: FeedItem[] = (feedResult.items ?? [])
+          .filter((item: any) => item.kind !== 'reel' && item.id)
+          .map((item: any) => ({ kind: item.kind as 'event' | 'concert', id: item.id, data: item }));
+        const reelItems: FeedItem[] = (Array.isArray(reelsResult?.items) ? reelsResult.items : [])
+          .filter((r: any) => r?.id)
+          .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
+
+        const seen = new Set<string>();
+        const merged = [...postItems, ...feedItems, ...reelItems].filter(item => {
+          const key = `${item.kind}-${item.id}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        merged.sort((a, b) => {
+          const da = a.data?.created_at ?? a.data?.starts_at ?? a.data?.scheduled_at ?? '';
+          const db2 = b.data?.created_at ?? b.data?.starts_at ?? b.data?.scheduled_at ?? '';
           return new Date(db2).getTime() - new Date(da).getTime();
         });
-        setItems(postItems);
+        setItems(merged);
       } else if (f === 'live') {
         // Onglet En direct — concerts live + lives spontanés comme feed items
         const [concerts, spont] = await Promise.all([
@@ -1907,6 +1922,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
               onMenu={openMenu}
               onFavorites={() => nav.navigate('Favorites')}
               onLive={() => nav.navigate('GoLive')}
+              onFriends={() => { setFilter('following'); load('following'); }}
               colors={colors}
             />
           </View>
@@ -2464,60 +2480,16 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
             )
           }
           renderItem={renderItem}
-          removeClippedSubviews
+          // removeClippedSubviews=false : sinon les rangées de reels (CachedImage) sont
+          // démontées puis remontées de zéro à chaque scroll rapide qui les fait sortir/
+          // rentrer de la fenêtre de rendu — flash de rechargement visible ("disparaît et
+          // réapparaît"). windowSize plus large pour absorber les scrolls rapides sans
+          // recréer les composants.
+          removeClippedSubviews={false}
           maxToRenderPerBatch={4}
-          windowSize={7}
+          windowSize={12}
           initialNumToRender={5}
         />
-      )}
-
-      {/* ── FAB Créer ──────────────────────────────────────────────────── */}
-      {!searchOpen && (
-        <>
-          {/* Overlay pour fermer le menu */}
-          {fabOpen && (
-            <TouchableOpacity
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-              activeOpacity={1}
-              onPress={() => setFabOpen(false)}
-            />
-          )}
-
-          {/* Options du menu FAB */}
-          {fabOpen && (
-            <View style={{ position: 'absolute', bottom: 85, right: 18, alignItems: 'flex-end', gap: 10 }}>
-              {([
-                { icon: 'film',     label: 'Reel',       color: '#E0389A', screen: 'CreateReel'    },
-                { icon: 'edit-2',   label: 'Post',       color: colors.primary, screen: 'CreatePost' },
-                { icon: 'music',    label: 'Concert',    color: '#7B3FF2', screen: 'CreateConcert' },
-                { icon: 'calendar', label: 'Événement',  color: '#0EA5E9', screen: 'CreateEvent'   },
-              ] as const).map(item => (
-                <TouchableOpacity
-                  key={item.label}
-                  onPress={() => { setFabOpen(false); (nav as any).navigate(item.screen); }}
-                  activeOpacity={0.85}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
-                >
-                  <View style={{ backgroundColor: colors.surface, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>{item.label}</Text>
-                  </View>
-                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: item.color, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
-                    <Icon name={item.icon} size={18} color="#fff" />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Bouton FAB principal */}
-          <TouchableOpacity
-            style={{ position: 'absolute', bottom: 25, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: fabOpen ? colors.textSecondary : colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
-            onPress={() => setFabOpen(o => !o)}
-            activeOpacity={0.85}
-          >
-            <Icon name={fabOpen ? 'x' : 'edit-2'} size={22} color="#fff" />
-          </TouchableOpacity>
-        </>
       )}
 
       {/* ── Sheet commentaires ──────────────────────────────────────────── */}
@@ -3252,6 +3224,7 @@ const CardContextMenu: React.FC<CardMenuProps> = ({
   item, colors, isSaved, isFollowing, isOwnContent, authorName,
   onClose, onSave, onShare, onFollow, onReport, onHide, onRemind, hasReminder,
 }) => {
+  const insets    = useSafeAreaInsets();
   const isEvent   = item.kind === 'event';
   const isConcert = item.kind === 'concert';
   const isPost    = item.kind === 'post';
@@ -3344,7 +3317,7 @@ const CardContextMenu: React.FC<CardMenuProps> = ({
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={cm.overlay} activeOpacity={1} onPress={onClose}>
-        <View style={[cm.sheet, { backgroundColor: colors.surface }]}>
+        <View style={[cm.sheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 36 : 20) + insets.bottom }]}>
           <View style={[cm.handle, { backgroundColor: colors.divider }]} />
 
           {/* Titre de la carte */}
@@ -3388,7 +3361,7 @@ const CardContextMenu: React.FC<CardMenuProps> = ({
 
 const cm = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet:      { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: Platform.OS === 'ios' ? 36 : 20, paddingTop: 10, paddingHorizontal: 12, gap: 8 },
+  sheet:      { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 10, paddingHorizontal: 12, gap: 8 },
   handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
   titleRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 4 },
   sheetTitle: { fontSize: 12, fontWeight: '600' },
@@ -3530,102 +3503,29 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const isOwnContent = !!(currentUserId && authorId && currentUserId === authorId);
   const showFollowBtn = !isOwnContent && !!authorId;
   const publishedAt  = isEvent ? (event?.published_at ?? event?.created_at) : (concert?.published_at ?? concert?.created_at);
+  // Relatif tant que < 24h (instant/min/h), puis date complète au-delà.
   const timeAgo = (() => {
     if (!publishedAt) return '';
     const parsed = new Date(publishedAt);
     if (isNaN(parsed.getTime())) return '';
     const diff = (Date.now() - parsed.getTime()) / 1000;
-    if (diff < 60)   return 'À l\'instant';
-    if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+    if (diff < 60)    return 'À l\'instant';
+    if (diff < 3600)  return `${Math.floor(diff / 60)} min`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
-    return `${Math.floor(diff / 86400)} j`;
+    return parsed.toLocaleDateString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
   })();
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const BANNER_H = Math.round(SW * 0.58);
+  // 0.58 → 0.8 (ratio 4/5) : hero plus haut/impactant, cohérent avec PostCard.
+  const BANNER_H = Math.round(SW * 0.8);
 
   return (
     <View style={[fc.card, { backgroundColor: colors.surface }]}>
 
-      {/* ── Hero banner — vidéo lue sur place, reste de la carte cliquable ── */}
-      <View style={{ height: BANNER_H, backgroundColor: '#0d0d1a', overflow: 'hidden', position: 'relative' }}>
-        {videoUrl ? (
-          <InlineVideoPlayer
-            uri={videoUrl}
-            thumbnailUri={thumbUrl}
-            aspectRatio={SW / BANNER_H}
-            borderRadius={0}
-            muted
-            autoPlay={false}
-            isActive={false}
-          />
-        ) : thumbUrl ? (
-          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
-            <CachedImage uri={thumbUrl} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
-            <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={cardIcon} size={60} color="rgba(255,255,255,0.18)" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-
-        {/* Gradient bas */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
-          locations={[0.3, 0.65, 1]}
-          style={[StyleSheet.absoluteFill, { top: '20%' }]}
-          pointerEvents="none"
-        />
-
-        {/* Badges haut gauche */}
-        <View style={{ position: 'absolute', top: 12, left: 12, flexDirection: 'row', gap: 6 }} pointerEvents="none">
-          {isLive && (
-            <View style={fc.liveBadge}>
-              <View style={fc.liveDot} />
-              <Text style={fc.liveBadgeText}>LIVE</Text>
-            </View>
-          )}
-          {isFree && (
-            <View style={[fc.chipBadge, { backgroundColor: '#10B981EE' }]}>
-              <Text style={fc.chipBadgeText}>GRATUIT</Text>
-            </View>
-          )}
-          {!isFree && price != null && price > 0 && (
-            <View style={[fc.chipBadge, { backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }]}>
-              <Icon name="tag" size={9} color="#fff" />
-              <Text style={fc.chipBadgeText}>dès <PriceWithLocal amountEur={price!} style={fc.chipBadgeText} localStyle={{ color: 'rgba(255,255,255,0.7)' }} /></Text>
-            </View>
-          )}
-        </View>
-
-        {/* Badge type haut droite */}
-        <View style={[fc.typeBadge, { backgroundColor: accent + 'EE' }]} pointerEvents="none">
-          <Icon name={cardIcon} size={9} color="#fff" />
-          <Text style={fc.typeBadgeText}>{typeLabel}</Text>
-        </View>
-
-        {/* Infos bas du hero — cliquable pour naviguer même sur une vidéo */}
-        <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={fc.heroBottom}>
-          <Text style={fc.heroTitle} numberOfLines={2}>{title}</Text>
-          <View style={fc.heroMeta}>
-            <Icon name="calendar" size={11} color="rgba(255,255,255,0.8)" />
-            <Text style={fc.heroMetaText}>{formatDate(date)}</Text>
-            {city ? (
-              <>
-                <Text style={fc.heroMetaDot}>·</Text>
-                <Icon name="map-pin" size={11} color="rgba(255,255,255,0.8)" />
-                <Text style={fc.heroMetaText} numberOfLines={1}>{city}</Text>
-              </>
-            ) : null}
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Header auteur ───────────────────────────────────────────────── */}
+      {/* ── Header auteur — en haut, façon Facebook ──────────────────────── */}
       <View style={fc.header}>
         <TouchableOpacity style={fc.headerLeft} activeOpacity={0.7} onPress={onAuthorPress}>
           <AvatarWithBadge
@@ -3655,6 +3555,46 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </View>
       </View>
 
+      {/* ── Titre + date/lieu — sorti de l'image, façon Facebook ─────────── */}
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={fc.titleWrap}>
+        <Text style={[fc.heroTitle, { color: colors.textPrimary }]} numberOfLines={2}>{title}</Text>
+        <View style={fc.heroMeta}>
+          <Icon name="calendar" size={11} color={colors.textTertiary} />
+          <Text style={[fc.heroMetaText, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
+          {city ? (
+            <>
+              <Text style={[fc.heroMetaDot, { color: colors.textTertiary }]}>·</Text>
+              <Icon name="map-pin" size={11} color={colors.textTertiary} />
+              <Text style={[fc.heroMetaText, { color: colors.textSecondary }]} numberOfLines={1}>{city}</Text>
+            </>
+          ) : null}
+        </View>
+        {/* Badges — type, gratuit/prix — petits, sous le titre plutôt que sur l'image */}
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+          <View style={[fc.chipBadge, { backgroundColor: accent + '15' }]}>
+            <Icon name={cardIcon} size={9} color={accent} />
+            <Text style={[fc.typeBadgeText, { color: accent }]}>{typeLabel}</Text>
+          </View>
+          {isLive && (
+            <View style={[fc.chipBadge, { backgroundColor: '#EF444422' }]}>
+              <View style={fc.liveDot} />
+              <Text style={[fc.chipBadgeText, { color: '#EF4444' }]}>LIVE</Text>
+            </View>
+          )}
+          {isFree && (
+            <View style={[fc.chipBadge, { backgroundColor: '#10B98122' }]}>
+              <Text style={[fc.chipBadgeText, { color: '#0F9D6E' }]}>GRATUIT</Text>
+            </View>
+          )}
+          {!isFree && price != null && price > 0 && (
+            <View style={[fc.chipBadge, { backgroundColor: colors.backgroundSecondary }]}>
+              <Icon name="tag" size={9} color={colors.textSecondary} />
+              <Text style={[fc.chipBadgeText, { color: colors.textSecondary }]}>dès <PriceWithLocal amountEur={price!} style={[fc.chipBadgeText, { color: colors.textSecondary }]} localStyle={{ color: colors.textTertiary }} /></Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+
       {/* ── Description ─────────────────────────────────────────────────── */}
       {desc ? (
         <View style={fc.descWrap}>
@@ -3662,8 +3602,35 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </View>
       ) : null}
 
-      {/* ── Compteurs ───────────────────────────────────────────────────── */}
-      {(likeCount > 0 || commentCount > 0 || shareCount > 0) && (
+      {/* ── Media — image/vidéo, sous le texte, façon Facebook ───────────── */}
+      <View style={{ height: BANNER_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
+        {videoUrl ? (
+          <InlineVideoPlayer
+            uri={videoUrl}
+            thumbnailUri={thumbUrl}
+            aspectRatio={SW / BANNER_H}
+            borderRadius={0}
+            muted
+            autoPlay={false}
+            isActive={false}
+          />
+        ) : thumbUrl ? (
+          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
+            <CachedImage uri={thumbUrl} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
+            <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={cardIcon} size={60} color="rgba(255,255,255,0.18)" />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* ── Compteurs — noms d'amis qui ont aimé (si likes) + nb de commentaires */}
+      {(likeCount > 0 || (!commentsDisabled && commentCount > 0)) && (
         <View style={[fc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -3676,69 +3643,48 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
             </View>
           )}
           {!commentsDisabled && commentCount > 0 && (
-            <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={fc.countChip}>
+            <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={[fc.countChip, { marginLeft: 'auto' as any }]}>
               <View style={fc.commentIcon}><MCIcon name="comment-outline" size={11} color="#fff" /></View>
               <Text style={[fc.countText, { color: colors.textTertiary }]}>{commentCount.toLocaleString('fr')}</Text>
             </TouchableOpacity>
           )}
-          {shareCount > 0 && (
-            <View style={[fc.countChip, { marginLeft: 'auto' as any }]}>
-              <View style={fc.shareIcon}><MCIcon name="share-outline" size={11} color="#fff" /></View>
-              <Text style={[fc.countText, { color: colors.textTertiary }]}>{shareCount.toLocaleString('fr')}</Text>
-            </View>
-          )}
         </View>
       )}
 
-      {/* ── Barre d'actions ─────────────────────────────────────────────── */}
+      {/* ── Barre d'actions — icônes seules, pas de texte (compteurs déjà visibles
+          dans countsRow au-dessus) ─────────────────────────────────────────── */}
       <View style={[fc.actionBar, { borderTopColor: colors.divider }]}>
         <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.8}>
-          <View style={[fc.actionPill,
-            liked
-              ? { backgroundColor: '#7B3FF218', borderColor: '#7B3FF240' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-          ]}>
+          <View style={fc.actionPillRow}>
             <Animated.View style={heartStyle}>
               <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textTertiary} />
             </Animated.View>
-            <Text style={[fc.actionText, { color: liked ? '#7B3FF2' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
-              {likeCount > 0 ? fmtN(likeCount) : 'J\'aime'}
-            </Text>
+            {likeCount > 0 && (
+              <Text style={[fc.actionCount, { color: liked ? '#7B3FF2' : colors.textTertiary }]}>{fmtN(likeCount)}</Text>
+            )}
           </View>
         </TouchableOpacity>
 
         {!commentsDisabled && <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.8}>
-          <View style={[fc.actionPill,
-            commentCount > 0
-              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-          ]}>
+          <View style={fc.actionPillRow}>
             <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-            <Text style={[fc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-              {commentCount > 0 ? fmtN(commentCount) : 'Comm…'}
-            </Text>
+            {commentCount > 0 && (
+              <Text style={[fc.actionCount, { color: colors.primary }]}>{fmtN(commentCount)}</Text>
+            )}
           </View>
         </TouchableOpacity>}
 
         <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.8}>
-          <View style={[fc.actionPill,
-            shareCount > 0
-              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-          ]}>
+          <View style={fc.actionPillRow}>
             <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
-            <Text style={[fc.actionText, { color: shareCount > 0 ? colors.primary : colors.textTertiary, fontWeight: shareCount > 0 ? '700' : '500' }]}>
-              {shareCount > 0 ? fmtN(shareCount) : 'Partager'}
-            </Text>
+            {shareCount > 0 && (
+              <Text style={[fc.actionCount, { color: colors.primary }]}>{fmtN(shareCount)}</Text>
+            )}
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity style={[fc.actionBtn, { flex: 0, paddingHorizontal: 10 }]} onPress={handleSave} activeOpacity={0.8}>
-          <View style={[fc.actionPill,
-            saved
-              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-          ]}>
+          <View style={fc.actionPill}>
             <Animated.View style={saveStyle}>
               <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? colors.primary : colors.textTertiary} />
             </Animated.View>
@@ -3777,44 +3723,46 @@ const fmtN = (n: number): string => {
 
 // ── FeedCard styles ───────────────────────────────────────────────────────────
 const fc = StyleSheet.create({
-  card:           { backgroundColor: '#fff', marginBottom: 8 },
+  card:           { backgroundColor: '#fff', marginHorizontal: 6, marginBottom: 6, borderRadius: 12, overflow: 'hidden' },
   // Hero
   liveBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   liveDot:        { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
   liveBadgeText:  { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
   chipBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  chipBadgeText:  { fontSize: 9, fontWeight: '800', color: '#fff' },
-  typeBadge:      { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  typeBadgeText:  { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  heroBottom:     { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 },
-  heroTitle:      { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: -0.3, lineHeight: 24, marginBottom: 6 },
+  chipBadgeText:  { fontSize: 9, fontWeight: '800' },
+  typeBadgeText:  { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  titleWrap:      { paddingHorizontal: 12, paddingTop: 2, paddingBottom: 8 },
+  heroTitle:      { fontSize: 16, fontWeight: '800', letterSpacing: -0.2, lineHeight: 21, marginBottom: 4 },
   heroMeta:       { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
-  heroMetaText:   { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
-  heroMetaDot:    { fontSize: 11, color: 'rgba(255,255,255,0.4)' },
+  heroMetaText:   { fontSize: 12, fontWeight: '500' },
+  heroMetaDot:    { fontSize: 11 },
   // Header auteur
-  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, gap: 10 },
-  headerLeft:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
+  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  headerLeft:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
   authorName:     { fontSize: 13, fontWeight: '700', letterSpacing: -0.1 },
   timeAgo:        { fontSize: 11, fontWeight: '500', marginTop: 1 },
-  followChip:     { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  followChip:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
   // Description
-  descWrap:       { paddingHorizontal: 14, paddingBottom: 10 },
+  descWrap:       { paddingHorizontal: 12, paddingBottom: 8 },
   desc:           { fontSize: 14, lineHeight: 21 },
   // Compteurs
-  countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   countChip:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
   countText:    { fontSize: 12, fontWeight: '500' },
-  likeIcon:     { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  commentIcon:  { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  shareIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#6B7280', alignItems: 'center', justifyContent: 'center' },
+  likeIcon:     { width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  commentIcon:  { width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  shareIcon:    { width: 18, height: 18, borderRadius: 9, backgroundColor: '#6B7280', alignItems: 'center', justifyContent: 'center' },
   // Actions
-  actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 6, gap: 4 },
+  actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 3, gap: 4 },
   actionBtn:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
   actionPill:     {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 7,
-    borderRadius: 20, borderWidth: 1,
+    width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
   },
+  actionPillRow:  {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 36, paddingHorizontal: 4,
+  },
+  actionCount:    { fontSize: 12, fontWeight: '600' },
   actionText:     { fontSize: 12, fontWeight: '600' },
 });
 

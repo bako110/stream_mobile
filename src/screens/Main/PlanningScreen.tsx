@@ -5,6 +5,7 @@ import {
   Modal, TextInput, ScrollView, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -132,6 +133,7 @@ interface ContactPickerProps {
 }
 
 const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onToggle, onClose, colors }) => {
+  const insets = useSafeAreaInsets();
   const [query, setQuery]             = useState('');
   const [results, setResults]         = useState<UserPublic[]>([]);
   const [suggestions, setSuggestions] = useState<UserPublic[]>([]);
@@ -201,7 +203,7 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={[cp.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-        <View style={[cp.sheet, { backgroundColor: colors.surface }]}>
+        <View style={[cp.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + insets.bottom }]}>
           <View style={cp.handle} />
           <View style={cp.header}>
             <Text style={[cp.title, { color: colors.textPrimary }]}>Inviter des contacts</Text>
@@ -265,7 +267,7 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
 
 const cp = StyleSheet.create({
   overlay:      { flex: 1, justifyContent: 'flex-end' },
-  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%', paddingBottom: 30 },
+  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%' },
   handle:       { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   title:        { fontSize: 17, fontWeight: '700' },

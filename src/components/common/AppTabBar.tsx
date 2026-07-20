@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, memo } from 'react';
+import React, { useCallback, useEffect, useState, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import Animated, {
-  useAnimatedStyle, withSpring, useSharedValue,
+  useAnimatedStyle, withSpring, withTiming, useSharedValue,
   interpolate,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -25,11 +25,19 @@ const TABS: TabConfig[] = [
   { name: 'Profile',     icon: 'user',        label: 'Profil'      },
 ];
 
+const CREATE_OPTIONS = [
+  { icon: 'film',     label: 'Reel',       screen: 'CreateReel'    },
+  { icon: 'edit-2',   label: 'Post',       screen: 'CreatePost'    },
+  { icon: 'music',    label: 'Concert',    screen: 'CreateConcert' },
+  { icon: 'calendar', label: 'Événement',  screen: 'CreateEvent'   },
+] as const;
+
 export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
   const { missedCallCount } = useWs();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const focusedRoute = state.routes[state.index];
   const focusedOptions = descriptors[focusedRoute.key]?.options as any;
@@ -42,41 +50,117 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
     : insets.bottom;
   const barHeight = TAB_BAR_HEIGHT + bottomPad;
 
+  const navigateToCreate = (screen: string) => {
+    setCreateOpen(false);
+    (navigation as any).navigate(screen);
+  };
+
   return (
-    <View style={[
-      styles.container,
-      { backgroundColor: colors.surface, borderTopColor: colors.divider, height: barHeight, paddingBottom: bottomPad },
-    ]}>
-      <LinearGradient
-        colors={[colors.primary + '30', colors.gradientEnd + '15', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.topLine}
-        pointerEvents="none"
-      />
+    <>
+      <View style={[
+        styles.container,
+        { backgroundColor: colors.surface, borderTopColor: colors.divider, height: barHeight, paddingBottom: bottomPad },
+      ]}>
+        <LinearGradient
+          colors={[colors.primary + '30', colors.gradientEnd + '15', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.topLine}
+          pointerEvents="none"
+        />
 
-      {TABS.map((tab) => {
-        const route     = state.routes.find(r => r.name === tab.name);
-        const isFocused = !!route && state.routes[state.index]?.name === tab.name;
-        const badge     = tab.name === 'Profile' ? missedCallCount : 0;
+        {TABS.map((tab, index) => {
+          const route     = state.routes.find(r => r.name === tab.name);
+          const isFocused = !!route && state.routes[state.index]?.name === tab.name;
+          const badge     = tab.name === 'Profile' ? missedCallCount : 0;
 
-        return (
-          <TabItem
-            key={tab.name}
-            config={tab}
-            routeKey={route?.key}
-            isFocused={isFocused}
-            navigation={navigation}
-            activeColor={colors.primary}
-            inactiveColor={colors.textTertiary}
-            gradientColors={[colors.gradientStart, colors.gradientEnd]}
-            badge={badge}
-          />
-        );
-      })}
-    </View>
+          return (
+            <React.Fragment key={tab.name}>
+              <TabItem
+                config={tab}
+                routeKey={route?.key}
+                isFocused={isFocused}
+                navigation={navigation}
+                activeColor={colors.primary}
+                inactiveColor={colors.textTertiary}
+                badge={badge}
+              />
+              {/* Bouton Créer — entre Communautés (index 1) et Reels (index 2) */}
+              {index === 1 && (
+                <CreateTabButton
+                  open={createOpen}
+                  onToggle={() => setCreateOpen(o => !o)}
+                  onSelect={navigateToCreate}
+                  colors={colors}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </View>
+    </>
   );
 };
+
+interface CreateTabButtonProps {
+  open:     boolean;
+  onToggle: () => void;
+  onSelect: (screen: string) => void;
+  colors:   any;
+}
+
+const CreateTabButton: React.FC<CreateTabButtonProps> = memo(({ open, onToggle, onSelect, colors }) => {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(open ? 1 : 0, { duration: 200 });
+  }, [open]);
+
+  const iconRotateStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${interpolate(progress.value, [0, 1], [0, 45])}deg` }],
+  }));
+
+  const menuStyle = useAnimatedStyle(() => ({
+    opacity:   progress.value,
+    transform: [
+      { translateY: interpolate(progress.value, [0, 1], [12, 0]) },
+      { scale:      interpolate(progress.value, [0, 1], [0.9, 1]) },
+    ],
+  }));
+
+  return (
+    <View style={styles.createWrap} pointerEvents="box-none">
+      {open && (
+        <Animated.View style={[styles.createMenu, { backgroundColor: colors.surface, borderColor: colors.divider }, menuStyle]}>
+          {CREATE_OPTIONS.map((opt, i) => (
+            <React.Fragment key={opt.label}>
+              {i > 0 && <View style={[styles.createMenuDivider, { backgroundColor: colors.divider }]} />}
+              <TouchableOpacity
+                onPress={() => onSelect(opt.screen)}
+                activeOpacity={0.7}
+                style={styles.createMenuItem}
+              >
+                <Icon name={opt.icon} size={16} color={colors.textSecondary} />
+                <Text style={[styles.createMenuLabel, { color: colors.textPrimary }]}>{opt.label}</Text>
+              </TouchableOpacity>
+            </React.Fragment>
+          ))}
+        </Animated.View>
+      )}
+
+      <TouchableOpacity onPress={onToggle} style={styles.createBtnTouchable} activeOpacity={0.75}>
+        <View style={[
+          styles.createBtn,
+          { backgroundColor: colors.background, borderColor: open ? colors.textPrimary : colors.divider },
+        ]}>
+          <Animated.View style={iconRotateStyle}>
+            <Icon name="plus" size={20} color={colors.textPrimary} />
+          </Animated.View>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+});
 
 interface TabItemProps {
   config:         TabConfig;
@@ -85,13 +169,12 @@ interface TabItemProps {
   navigation:     BottomTabBarProps['navigation'];
   activeColor:    string;
   inactiveColor:  string;
-  gradientColors: [string, string];
   badge?:         number;
 }
 
 const TabItem: React.FC<TabItemProps> = memo(({
   config, routeKey, isFocused, navigation,
-  activeColor, inactiveColor, gradientColors, badge,
+  activeColor, inactiveColor, badge,
 }) => {
   const progress = useSharedValue(isFocused ? 1 : 0);
 
@@ -100,15 +183,14 @@ const TabItem: React.FC<TabItemProps> = memo(({
   }, [isFocused]);
 
   const iconStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale:      interpolate(progress.value, [0, 1], [1, 1.15]) },
-      { translateY: interpolate(progress.value, [0, 1], [0, -3])   },
-    ],
+    transform: [{ translateY: interpolate(progress.value, [0, 1], [0, -2]) }],
   }));
 
-  const pillStyle = useAnimatedStyle(() => ({
+  // Cercle de fond derrière l'icône active — même langage visuel que le bouton
+  // Créer (cercle avec fond + bordure), au lieu du simple trait dégradé d'avant.
+  const bubbleStyle = useAnimatedStyle(() => ({
     opacity:   progress.value,
-    transform: [{ scaleX: interpolate(progress.value, [0, 1], [0.4, 1]) }],
+    transform: [{ scale: interpolate(progress.value, [0, 1], [0.5, 1]) }],
   }));
 
   const onPress = useCallback(() => {
@@ -124,25 +206,20 @@ const TabItem: React.FC<TabItemProps> = memo(({
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.tab} activeOpacity={0.75}>
-      <Animated.View style={[styles.pill, pillStyle]}>
-        <LinearGradient
-          colors={gradientColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
+      <View style={styles.iconSlot}>
+        <Animated.View style={[styles.iconBubble, { backgroundColor: activeColor + '18', borderColor: activeColor + '35' }, bubbleStyle]} />
 
-      <Animated.View style={iconStyle}>
-        <Icon name={config.icon} size={22} color={isFocused ? activeColor : inactiveColor} />
-        {!!badge && badge > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-          </View>
-        )}
-      </Animated.View>
+        <Animated.View style={iconStyle}>
+          <Icon name={config.icon} size={20} color={isFocused ? activeColor : inactiveColor} />
+          {!!badge && badge > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+            </View>
+          )}
+        </Animated.View>
+      </View>
 
-      <Text style={[styles.label, { color: isFocused ? activeColor : inactiveColor }]}>
+      <Text style={[styles.label, { color: isFocused ? activeColor : inactiveColor, fontWeight: isFocused ? '700' : '500' }]}>
         {config.label}
       </Text>
     </TouchableOpacity>
@@ -170,20 +247,24 @@ const styles = StyleSheet.create({
     flex:           1,
     alignItems:     'center',
     justifyContent: 'center',
-    gap:            3,
+    gap:            4,
     paddingTop:     6,
   },
-  pill: {
+  iconSlot: {
+    width:          36,
+    height:         36,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  iconBubble: {
     position:     'absolute',
-    top:          4,
-    width:        40,
-    height:       4,
-    borderRadius: 2,
-    overflow:     'hidden',
+    width:         36,
+    height:        36,
+    borderRadius:  18,
+    borderWidth:   1,
   },
   label: {
-    fontSize:      10,
-    fontWeight:    '600',
+    fontSize:      10.5,
     letterSpacing: 0.2,
   },
   badge: {
@@ -195,5 +276,58 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#fff', fontSize: 9, fontWeight: '700',
+  },
+
+  createWrap: {
+    alignItems:     'center',
+    justifyContent: 'center',
+    width:          56,
+  },
+  createBtnTouchable: {
+    alignItems:     'center',
+    justifyContent: 'center',
+    marginTop:      -16, // dépasse légèrement au-dessus de la barre, sans FAB flottant décalé
+  },
+  createBtn: {
+    width:          46,
+    height:         46,
+    borderRadius:   23,
+    borderWidth:    1.5,
+    alignItems:     'center',
+    justifyContent: 'center',
+    shadowColor:    '#000',
+    shadowOpacity:  0.12,
+    shadowRadius:   6,
+    shadowOffset:   { width: 0, height: 2 },
+    elevation:      3,
+  },
+  createMenu: {
+    position:     'absolute',
+    bottom:       58,
+    left:         '50%',
+    marginLeft:   -75, // moitié de minWidth (150) — centre le menu sur le bouton parent
+    borderRadius: 16,
+    borderWidth:  StyleSheet.hairlineWidth,
+    overflow:     'hidden',
+    shadowColor:  '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation:    8,
+    minWidth:     150,
+  },
+  createMenuItem: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               10,
+    paddingHorizontal: 16,
+    paddingVertical:   12,
+  },
+  createMenuDivider: {
+    height: StyleSheet.hairlineWidth,
+  },
+  createMenuLabel: {
+    fontSize:   13,
+    fontWeight: '600',
   },
 });

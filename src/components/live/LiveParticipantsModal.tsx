@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Image, TextInput } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface LiveParticipantInfo {
   identity:   string;
@@ -26,6 +27,7 @@ export const LiveParticipantsModal: React.FC<{
   participants: LiveParticipantInfo[];
 }> = ({ visible, onClose, participants }) => {
   const [search, setSearch] = useState('');
+  const insets = useSafeAreaInsets();
 
   // Hote en premier, puis le reste — recherche par nom appliquee par-dessus.
   const sorted = useMemo(
@@ -43,7 +45,7 @@ export const LiveParticipantsModal: React.FC<{
       <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={onClose}>
         <Animated.View entering={SlideInDown.duration(220)} exiting={SlideOutDown.duration(180)}>
           <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-            <View style={s.sheet}>
+            <View style={[s.sheet, { paddingBottom: 20 + insets.bottom }]}>
               <View style={s.handle} />
 
               <View style={s.header}>
@@ -114,7 +116,7 @@ const s = StyleSheet.create({
     width: '100%',
     backgroundColor: '#14101f',
     borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    paddingTop: 10, paddingBottom: 20, paddingHorizontal: 18,
+    paddingTop: 10, paddingHorizontal: 18,
     height: '65%',
     borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.08)',
   },

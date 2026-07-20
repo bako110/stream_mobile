@@ -8,6 +8,8 @@ interface CurrencyContextValue {
   currencies: CurrencyInfo[];
   selected: CurrencyInfo | null; // null = EUR uniquement, pas de devise locale choisie
   loading: boolean;
+  error: string | null;
+  reload: () => void;
   setCurrencyCode: (code: string | null) => void;
   convertFromEur: (amountEur: number) => number | null;
 }
@@ -18,13 +20,20 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [currencies, setCurrencies] = useState<CurrencyInfo[]>([]);
   const [code, setCode] = useState<string | null>(() => storage.getItem(STORAGE_KEYS.CURRENCY_CODE) ?? null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     currencyService.list()
       .then(res => setCurrencies(res.currencies))
-      .catch(() => {})
+      .catch(err => setError(err?.message ?? 'Erreur de chargement des devises'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const setCurrencyCode = useCallback((newCode: string | null) => {
     if (newCode) storage.setItem(STORAGE_KEYS.CURRENCY_CODE, newCode);
@@ -43,8 +52,8 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 
   const value = useMemo(
-    () => ({ currencies, selected, loading, setCurrencyCode, convertFromEur }),
-    [currencies, selected, loading, setCurrencyCode, convertFromEur],
+    () => ({ currencies, selected, loading, error, reload: load, setCurrencyCode, convertFromEur }),
+    [currencies, selected, loading, error, load, setCurrencyCode, convertFromEur],
   );
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;

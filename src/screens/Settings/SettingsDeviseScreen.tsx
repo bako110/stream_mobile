@@ -10,7 +10,7 @@ export const SettingsDeviseScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const { theme } = useTheme();
   const { colors } = theme;
-  const { currencies, selected, loading, setCurrencyCode } = useCurrency();
+  const { currencies, selected, loading, error, reload, setCurrencyCode } = useCurrency();
 
   const renderOption = (code: string | null, label: string, sub: string, last: boolean) => {
     const active = selected?.code === code;
@@ -41,6 +41,15 @@ export const SettingsDeviseScreen: React.FC = () => {
 
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
+        ) : error ? (
+          <View style={{ alignItems: 'center', marginTop: 24, gap: 10 }}>
+            <Text style={{ color: colors.textTertiary, fontSize: 13, textAlign: 'center' }}>
+              Impossible de charger les devises.{'\n'}{error}
+            </Text>
+            <TouchableOpacity onPress={reload} style={[st.retryBtn, { borderColor: colors.primary }]}>
+              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Réessayer</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <Card>
             {renderOption(null, 'Euro uniquement', 'Aucune conversion affichée', false)}
@@ -58,4 +67,5 @@ const st = StyleSheet.create({
   scroll: { padding: 16 },
   hint:   { fontSize: 12, lineHeight: 17, marginBottom: 14, paddingHorizontal: 4 },
   row:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
+  retryBtn: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8 },
 });

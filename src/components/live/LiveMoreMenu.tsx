@@ -12,6 +12,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import Share from 'react-native-share';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userService } from '../../services/userService';
 import { socialService } from '../../services/socialService';
 import { useUser } from '../../context/UserContext';
@@ -38,6 +39,7 @@ export const LiveMoreMenu: React.FC<Props> = ({
 }) => {
   const { currentUser } = useUser();
   const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const [isFollowed, setIsFollowed] = useState<boolean | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -117,7 +119,7 @@ export const LiveMoreMenu: React.FC<Props> = ({
       <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={onClose}>
         <Animated.View entering={SlideInDown.duration(220)} exiting={SlideOutDown.duration(180)}>
           <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-            <View style={s.sheet}>
+            <View style={[s.sheet, { paddingBottom: 30 + insets.bottom }]}>
               <View style={s.handle} />
 
               {showFollow && (
@@ -224,7 +226,7 @@ const s = StyleSheet.create({
   sheet: {
     backgroundColor: '#14101f',
     borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    paddingTop: 10, paddingBottom: 30, paddingHorizontal: 18,
+    paddingTop: 10, paddingHorizontal: 18,
     borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.08)',
   },
   handle: {

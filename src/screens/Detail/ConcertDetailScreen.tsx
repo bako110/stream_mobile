@@ -22,6 +22,7 @@ import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SW } = Dimensions.get('window');
 const HERO_H = SW * 0.72;
@@ -298,6 +299,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const insets = useSafeAreaInsets();
 
   const [concert,      setConcert]      = useState<Concert | null>(null);
   const [loading,      setLoading]      = useState(true);
@@ -659,7 +661,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
       </ScrollView>
 
       {/* ── CTA flottant ─────────────────────────────────────────────── */}
-      <View style={[ds.ctaBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+      <View style={[ds.ctaBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: (Platform.OS === 'ios' ? 32 : 16) + insets.bottom }]}>
         {isOwner ? (
           <View style={{ flexDirection: 'row', gap: 10 }}>
             {(concert.status === 'published' || concert.status === 'live') && (
@@ -764,7 +766,6 @@ const ds = StyleSheet.create({
   ctaBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: 16, paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   ctaGradient: {

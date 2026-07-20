@@ -26,6 +26,7 @@ import {
   VideoTrack,
 } from '@livekit/react-native';
 import { Track, VideoPresets } from 'livekit-client';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -44,6 +45,7 @@ import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
+import { enableBeautyFilter } from '../../utils/beautyFilter';
 import { useWs } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
@@ -113,6 +115,7 @@ const StageAccessSheet: React.FC<{
   onClose:       () => void;
 }> = ({ live, liveId, identity, onRequested, onClose }) => {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [myBalance,      setMyBalance]      = useState<number>(-1);
   const [balanceLoading, setBalanceLoading] = useState(true);
   const [loading,        setLoading]        = useState(false);
@@ -188,7 +191,7 @@ const StageAccessSheet: React.FC<{
   return (
     <View style={sas.overlay}>
       <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
-      <Animated.View entering={SlideInDown.springify().damping(22).stiffness(200)} style={sas.sheet}>
+      <Animated.View entering={SlideInDown.springify().damping(22).stiffness(200)} style={[sas.sheet, { paddingBottom: (Platform.OS === 'ios' ? 46 : 28) + insets.bottom }]}>
         <View style={sas.handle} />
 
         {/* Titre */}
@@ -291,7 +294,7 @@ const sas = StyleSheet.create({
   sheet: {
     backgroundColor: '#0D0820',
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingHorizontal: 22, paddingBottom: Platform.OS === 'ios' ? 46 : 28, paddingTop: 16,
+    paddingHorizontal: 22, paddingTop: 16,
     borderWidth: 1, borderBottomWidth: 0,
     borderColor: 'rgba(155,101,245,0.3)',
   },
@@ -550,6 +553,7 @@ const RoomContent: React.FC<{
   const { localParticipant } = useLocalParticipant();
   const roomParticipants     = useParticipants();
   const { floaters, spawn }  = useReactionFloaters();
+  const insets = useSafeAreaInsets();
 
   // Exposer spawn au parent pour les réactions WS des autres
   React.useEffect(() => { reactionSpawnRef.current = spawn; }, [spawn, reactionSpawnRef]);
@@ -580,6 +584,7 @@ const RoomContent: React.FC<{
   const goOnStage = useCallback(async () => {
     try {
       await localParticipant.setCameraEnabled(true);
+      enableBeautyFilter(localParticipant);
       await localParticipant.setMicrophoneEnabled(true);
       setCamOn(true); setMicOn(true);
       setOnStage(true);
@@ -621,7 +626,7 @@ const RoomContent: React.FC<{
       if (next === 'background' || next === 'inactive') {
         localParticipant.setCameraEnabled(false).catch(() => {});
       } else if (next === 'active') {
-        localParticipant.setCameraEnabled(true).catch(() => {});
+        localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
       }
     };
     const sub = AppState.addEventListener('change', handleAppState);
@@ -816,7 +821,7 @@ const RoomContent: React.FC<{
       )}
 
       {/* ── ZONE CHAT + BARRE ACTIONS ─────────────────────────────────── */}
-      <View style={st.bottomZone}>
+      <View style={[st.bottomZone, { paddingBottom: (Platform.OS === 'ios' ? 28 : 14) + insets.bottom }]}>
 
         {/* Chat flottant */}
         <View style={st.chatZone}>
@@ -981,7 +986,7 @@ const RoomContent: React.FC<{
         <TouchableWithoutFeedback onPress={() => setShowStageMenu(false)}>
           <View style={sm.backdrop}>
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={sm.sheet}>
+              <View style={[sm.sheet, { paddingBottom: (Platform.OS === 'ios' ? 40 : 24) + insets.bottom }]}>
                 <View style={sm.handle} />
                 <Text style={sm.title}>Sur scène</Text>
 
@@ -1722,9 +1727,10 @@ const st = StyleSheet.create({
   onStageText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
 
   // ── Zone bas (chat + barre actions) ─────────────────────────────────────
+  // paddingBottom réel appliqué inline (base + insets.bottom, voir usage)
   bottomZone: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    zIndex: 15, paddingBottom: Platform.OS === 'ios' ? 28 : 14,
+    zIndex: 15,
   },
   chatZone:  { paddingHorizontal: 12, paddingRight: 10 },
   chatList:  { flexGrow: 0, maxHeight: 200, marginBottom: 10 },
@@ -1833,7 +1839,6 @@ const sm = StyleSheet.create({
     backgroundColor: '#0D0820',
     borderTopLeftRadius: 26, borderTopRightRadius: 26,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     paddingTop: 14,
     borderWidth: 1, borderBottomWidth: 0,
     borderColor: 'rgba(63,237,182,0.25)',

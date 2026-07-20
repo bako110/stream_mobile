@@ -32,6 +32,7 @@ import {
   VideoTrack,
 } from '@livekit/react-native';
 import { Track, RoomEvent, RemoteParticipant, Room, VideoPresets } from 'livekit-client';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -45,6 +46,7 @@ import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
+import { enableBeautyFilter } from '../../utils/beautyFilter';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import { LiveGiftBar } from '../../components/wallet/LiveGiftBar';
@@ -323,6 +325,7 @@ const StreamContent: React.FC<{
   const allParticipants      = useParticipants();
   const { currentUser }      = useUser();
   const nav                  = useNavigation<Nav>();
+  const insets                = useSafeAreaInsets();
   const remoteParticipants   = allParticipants.filter(p => !p.isLocal);
 
   const [videoOff,     setVideoOff]     = useState(false); // used only to optimistically flip icon; real truth = isCameraEnabled
@@ -395,7 +398,7 @@ const StreamContent: React.FC<{
 
   // Démarrer cam + mic
   useEffect(() => {
-    localParticipant.setCameraEnabled(true).catch(() => {});
+    localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
@@ -406,7 +409,7 @@ const StreamContent: React.FC<{
       if (next === 'background' || next === 'inactive') {
         localParticipant.setCameraEnabled(false).catch(() => {});
       } else if (next === 'active') {
-        if (!videoOff) localParticipant.setCameraEnabled(true).catch(() => {});
+        if (!videoOff) localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
       }
     };
     const sub = AppState.addEventListener('change', handleAppState);
@@ -965,7 +968,7 @@ const StreamContent: React.FC<{
       {/* ══════════════════════════════════════════════════════════════ */}
       {/* ── ZONE BAS — chat + barre saisie ────────────────────────── */}
       {/* ══════════════════════════════════════════════════════════════ */}
-      <View style={st.bottomZone}>
+      <View style={[st.bottomZone, { paddingBottom: (Platform.OS === 'ios' ? 38 : 22) + insets.bottom }]}>
         {/* Messages */}
         <FlatList
           ref={chatRef}
@@ -1527,7 +1530,6 @@ const st = StyleSheet.create({
   // ── Zone bas (chat + input) ───────────────────────────────────────────────────
   bottomZone: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingBottom: Platform.OS === 'ios' ? 38 : 22,
     paddingHorizontal: 12, zIndex: 20,
   },
   chatList: { maxHeight: 230, marginBottom: 8 },

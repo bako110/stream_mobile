@@ -13,6 +13,7 @@ import {
   useTracks,
 } from '@livekit/react-native';
 import { Track, VideoPresets } from 'livekit-client';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -81,6 +82,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   useKeepAwake();
   useEffect(() => { configureLiveAudioSession(); }, []);
   const nav = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const [concert, setConcert] = useState<Concert | null>(null);
   const [loading, setLoading] = useState(true);
@@ -238,7 +240,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
         {/* Chat */}
         {showChat && (
-          <View style={styles.chatContainer}>
+          <View style={[styles.chatContainer, { paddingBottom: (Platform.OS === 'ios' ? 34 : 16) + insets.bottom }]}>
             <FlatList
               ref={chatListRef}
               data={chatMessages}
@@ -310,7 +312,6 @@ const styles = StyleSheet.create({
   chatContainer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     maxHeight: '45%', paddingHorizontal: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
   },
   chatList: { flexGrow: 0, maxHeight: 250, marginBottom: 8 },
   chatBubble: {

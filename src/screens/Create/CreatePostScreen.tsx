@@ -14,7 +14,6 @@ import { postService } from '../../services/postService';
 import { uploadImageFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { MentionInput } from '../../components/common/MentionInput';
-import { CategorySelector } from '../../components/common/CategorySelector';
 
 const { width: W } = Dimensions.get('window');
 const MAX_IMAGES   = 6;
@@ -326,10 +325,6 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             maxLength={2000}
             inputStyle={s.input}
           />
-        </View>
-
-        <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
-          <CategorySelector value={category} onChange={setCategory} label="Catégorie (optionnel)" />
         </View>
 
         {/* Aperçu vidéo */}

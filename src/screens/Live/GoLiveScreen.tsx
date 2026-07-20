@@ -13,7 +13,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 import { LiveThumbnailBackground } from '../../components/common/LiveThumbnailBackground';
-import { CategorySelector } from '../../components/common/CategorySelector';
 import { liveService } from '../../services/liveService';
 import type { MonetizationType, LiveStream } from '../../services/liveService';
 import { apiClient } from '../../api/client';
@@ -291,9 +290,6 @@ export const GoLiveScreen: React.FC = () => {
                   numberOfLines={3}
                   maxLength={300}
                 />
-              </View>
-              <View style={{ marginTop: 10 }}>
-                <CategorySelector value={category} onChange={setCategory} label="Catégorie (optionnel)" />
               </View>
             </View>
           )}

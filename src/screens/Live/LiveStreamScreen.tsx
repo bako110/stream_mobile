@@ -13,12 +13,14 @@ import {
   VideoTrack,
 } from '@livekit/react-native';
 import { Track, VideoPresets } from 'livekit-client';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { concertService } from '../../services';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
+import { enableBeautyFilter } from '../../utils/beautyFilter';
 import type { Concert } from '../../types';
 
 interface Props {
@@ -65,6 +67,7 @@ const StreamControls: React.FC<{
   onEnd: () => void;
 }> = ({ concert, concertId, onEnd }) => {
   const { localParticipant } = useLocalParticipant();
+  const insets = useSafeAreaInsets();
   const [muted,       setMuted]       = useState(false);
   const [videoOff,    setVideoOff]    = useState(false);
   const [cameraFront, setCameraFront] = useState(true);
@@ -85,7 +88,7 @@ const StreamControls: React.FC<{
   }, []);
 
   useEffect(() => {
-    localParticipant.setCameraEnabled(true).catch(() => {});
+    localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
 
     const start = Date.now();
@@ -188,7 +191,7 @@ const StreamControls: React.FC<{
       )}
 
       {/* Bottom controls */}
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.bottomOverlay}>
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={[styles.bottomOverlay, { paddingBottom: (Platform.OS === 'ios' ? 40 : 24) + insets.bottom }]}>
         <View style={styles.controls}>
           <TouchableOpacity onPress={toggleMute} style={styles.controlBtn}>
             <Icon name={muted ? 'mic-off' : 'mic'} size={22} color="#fff" />
@@ -346,7 +349,6 @@ const styles = StyleSheet.create({
   concertTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   bottomOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     paddingTop: 40, paddingHorizontal: 16, zIndex: 10,
   },
   controls:     { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },

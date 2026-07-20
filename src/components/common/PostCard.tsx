@@ -134,12 +134,18 @@ const ImageGrid: React.FC<{ urls: string[]; onPressImage: (i: number) => void }>
 };
 
 // ── timeAgo ───────────────────────────────────────────────────────────────────
+// Relatif tant que < 24h (instant/min/h), puis date complète au-delà — pas de
+// palier intermédiaire en jours ("3 j") qui devenait illisible passé un mois.
 function timeAgo(iso: string): string {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  const date = new Date(iso);
+  const diff = (Date.now() - date.getTime()) / 1000;
   if (diff < 60)    return 'À l\'instant';
   if (diff < 3600)  return `${Math.floor(diff / 60)} min`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
-  return `${Math.floor(diff / 86400)} j`;
+  return date.toLocaleDateString('fr-FR', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
 // ── VideoFsModal ──────────────────────────────────────────────────────────────
@@ -272,90 +278,23 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
   const hasMedia = images.length > 0 || !!(post.hls_url ?? post.video_url);
 
-  // Calcul du ratio depuis les dimensions stockees, clamp portrait/paysage
+  // Calcul du ratio depuis les dimensions stockees, clamp portrait/paysage — plancher
+  // 3/4 (au lieu de 4/5) pour des hero plus hauts/impactants sur les images portrait.
   const videoAspectRatio = (() => {
     if (post.video_width && post.video_height && post.video_width > 0 && post.video_height > 0) {
       const raw = post.video_width / post.video_height;
-      return Math.min(Math.max(raw, 4 / 5), 16 / 9);
+      return Math.min(Math.max(raw, 3 / 4), 16 / 9);
     }
-    return 16 / 9;
+    // Pas de dimensions stockées (image sans métadonnées) — 4/5 par défaut,
+    // plus haut/impactant que 16/9 pour un rendu feed plus dense et professionnel.
+    return 4 / 5;
   })();
   const HERO_H = Math.round(SW / videoAspectRatio);
 
   return (
     <View style={[pc.card, { backgroundColor: colors.surface }]}>
 
-      {/* ── Hero media (vidéo = lecture sur place ; image = cliquable vers le détail) ── */}
-      {hasMedia && (
-        (post.hls_url ?? post.video_url) && images.length === 0 ? (
-          <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden', position: 'relative' }}>
-            <InlineVideoPlayer
-              uri={(post.hls_url ?? post.video_url)!}
-              thumbnailUri={post.thumbnail_url}
-              aspectRatio={videoAspectRatio}
-              borderRadius={0}
-              muted
-              autoPlay={false}
-              isActive={false}
-            />
-            {post.feeling && (
-              <View style={{ position: 'absolute', top: 12, left: 12,
-                backgroundColor: colors.primary + 'DD', borderRadius: 8,
-                paddingHorizontal: 8, paddingVertical: 4 }}
-                pointerEvents="none">
-                <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>
-                  {post.feeling.toUpperCase()}
-                </Text>
-              </View>
-            )}
-          </View>
-        ) : (
-          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={{ position: 'relative' }}>
-            <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
-              {images.length === 1 ? (
-                <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-              ) : (
-                <ImageGrid
-                  urls={images}
-                  onPressImage={i => nav.navigate('ImageGallery', { urls: images, initialIndex: i })}
-                />
-              )}
-
-              {/* Dégradé bas pour lire le texte overlay */}
-              {images.length === 1 && (
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.85)']}
-                  locations={[0.35, 0.7, 1]}
-                  style={[StyleSheet.absoluteFill, { top: '20%' }]}
-                  pointerEvents="none"
-                />
-              )}
-
-              {/* Feeling badge haut gauche */}
-              {post.feeling && (
-                <View style={{ position: 'absolute', top: 12, left: 12,
-                  backgroundColor: colors.primary + 'DD', borderRadius: 8,
-                  paddingHorizontal: 8, paddingVertical: 4 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>
-                    {post.feeling.toUpperCase()}
-                  </Text>
-                </View>
-              )}
-
-              {/* Corps du post en overlay bas (si 1 image) */}
-              {images.length === 1 && post.body ? (
-                <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff', lineHeight: 20 }} numberOfLines={2}>
-                    {post.body}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-        )
-      )}
-
-      {/* ── Header auteur (sous le media, comme FeedCard) ───────────────────── */}
+      {/* ── Header auteur — en haut, façon Facebook ──────────────────────────── */}
       <View style={pc.header}>
         <TouchableOpacity style={pc.headerLeft} activeOpacity={0.75} onPress={onAuthorPress}>
           <AvatarWithBadge
@@ -405,32 +344,21 @@ const PostCardInner: React.FC<PostCardProps> = ({
         </View>
       </View>
 
-      {/* ── Body texte (si pas d'image en overlay, ou multi-images) ────────── */}
-      {post.body && (images.length !== 1) ? (
-        <View style={pc.bodyWrap}>
+      {/* ── Body texte — toujours au même endroit, avec ou sans média ────────── */}
+      {post.body ? (
+        <TouchableOpacity
+          onPress={hasMedia ? undefined : onPress}
+          activeOpacity={hasMedia ? 1 : 0.7}
+          disabled={hasMedia}
+          style={pc.bodyWrap}
+        >
           <RichText
             text={post.body}
-            maxLines={4}
+            maxLines={hasMedia ? 4 : 6}
             textStyle={[pc.body, { color: colors.textPrimary }]}
             primaryColor={colors.primary}
             moreLabel="Lire la suite"
             lessLabel="Voir moins"
-          />
-        </View>
-      ) : null}
-
-      {/* ── Post texte seul — zone cliquable vers le détail ─────────────────── */}
-      {!hasMedia && post.body && (
-        <TouchableOpacity
-          onPress={onPress}
-          activeOpacity={0.7}
-          style={[pc.textOnlyHero, { borderLeftColor: colors.primary, backgroundColor: colors.primary + '08' }]}
-        >
-          <RichText
-            text={post.body}
-            maxLines={6}
-            textStyle={[pc.textOnlyBody, { color: colors.textPrimary }]}
-            primaryColor={colors.primary}
           />
           {post.feeling && (
             <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 6 }}>
@@ -438,6 +366,36 @@ const PostCardInner: React.FC<PostCardProps> = ({
             </Text>
           )}
         </TouchableOpacity>
+      ) : null}
+
+      {/* ── Media — image/vidéo, sous le texte, façon Facebook ───────────────── */}
+      {hasMedia && (
+        (post.hls_url ?? post.video_url) && images.length === 0 ? (
+          <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
+            <InlineVideoPlayer
+              uri={(post.hls_url ?? post.video_url)!}
+              thumbnailUri={post.thumbnail_url}
+              aspectRatio={videoAspectRatio}
+              borderRadius={0}
+              muted
+              autoPlay={false}
+              isActive={false}
+            />
+          </View>
+        ) : (
+          <TouchableOpacity onPress={onPress} activeOpacity={0.95}>
+            <View style={{ height: images.length === 1 ? HERO_H : GRID_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
+              {images.length === 1 ? (
+                <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <ImageGrid
+                  urls={images}
+                  onPressImage={i => nav.navigate('ImageGallery', { urls: images, initialIndex: i })}
+                />
+              )}
+            </View>
+          </TouchableOpacity>
+        )
       )}
 
       {/* ── Apercu lien ────────────────────────────────────────────────────── */}
@@ -447,8 +405,8 @@ const PostCardInner: React.FC<PostCardProps> = ({
         </View>
       ) : null}
 
-      {/* ── Compteurs ──────────────────────────────────────────────────────── */}
-      {(likeCount > 0 || commentCount > 0) && (
+      {/* ── Compteurs — noms d'amis qui ont aimé (si likes) + nb de commentaires */}
+      {(likeCount > 0 || (!commentsDisabledSt && commentCount > 0)) && (
         <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -471,57 +429,42 @@ const PostCardInner: React.FC<PostCardProps> = ({
         </View>
       )}
 
-      {/* ── Barre d'actions ────────────────────────────────────────────────── */}
+      {/* ── Barre d'actions — icônes seules, pas de texte (compteurs déjà visibles
+          dans countsRow au-dessus) ─────────────────────────────────────────── */}
       <View style={[pc.actionBar, { borderTopColor: colors.divider }]}>
         <TouchableOpacity style={pc.actionBtn} onPress={handleLike} activeOpacity={0.8}>
-          <View style={[pc.actionPill,
-            liked
-              ? { backgroundColor: '#7B3FF218', borderColor: '#7B3FF240' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-          ]}>
+          <View style={pc.actionPillRow}>
             <Animated.View style={heartStyle}>
               <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textTertiary} />
             </Animated.View>
-            <Text style={[pc.actionText, { color: liked ? '#7B3FF2' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
-              {likeCount > 0 ? fmtN(likeCount) : 'J\'aime'}
-            </Text>
+            {likeCount > 0 && (
+              <Text style={[pc.actionCount, { color: liked ? '#7B3FF2' : colors.textTertiary }]}>{fmtN(likeCount)}</Text>
+            )}
           </View>
         </TouchableOpacity>
 
         {!commentsDisabledSt && (
           <TouchableOpacity style={pc.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
-            <View style={[pc.actionPill,
-              commentCount > 0
-                ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
-                : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-            ]}>
+            <View style={pc.actionPillRow}>
               <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-              <Text style={[pc.actionText, { color: commentCount > 0 ? colors.primary : colors.textTertiary, fontWeight: commentCount > 0 ? '700' : '500' }]}>
-                {commentCount > 0 ? fmtN(commentCount) : 'Comm…'}
-              </Text>
+              {commentCount > 0 && (
+                <Text style={[pc.actionCount, { color: colors.primary }]}>{fmtN(commentCount)}</Text>
+              )}
             </View>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={pc.actionBtn} onPress={() => setShareOpen(true)} activeOpacity={0.8}>
-          <View style={[pc.actionPill,
-            shareCount > 0
-              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-          ]}>
+          <View style={pc.actionPillRow}>
             <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
-            <Text style={[pc.actionText, { color: shareCount > 0 ? colors.primary : colors.textTertiary, fontWeight: shareCount > 0 ? '700' : '500' }]}>
-              {shareCount > 0 ? fmtN(shareCount) : 'Partager'}
-            </Text>
+            {shareCount > 0 && (
+              <Text style={[pc.actionCount, { color: colors.primary }]}>{fmtN(shareCount)}</Text>
+            )}
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity style={[pc.actionBtn, { flex: 0, paddingHorizontal: 10 }]} onPress={handleSave} activeOpacity={0.8}>
-          <View style={[pc.actionPill,
-            saved
-              ? { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }
-          ]}>
+          <View style={pc.actionPill}>
             <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? colors.primary : colors.textTertiary} />
           </View>
         </TouchableOpacity>
@@ -530,7 +473,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {/* ── Menu contextuel ────────────────────────────────────────────────── */}
       <Modal transparent animationType="slide" visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity style={pc.overlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
-          <View style={[pc.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[pc.sheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 38 : 22) + insets.bottom }]}>
             <View style={[pc.sheetHandle, { backgroundColor: colors.divider }]} />
 
             {/* Apercu */}
@@ -677,39 +620,42 @@ export const PostCard = React.memo(PostCardInner);
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const pc = StyleSheet.create({
-  card:         { backgroundColor: '#fff', marginBottom: 8 },
+  card:         { backgroundColor: '#fff', marginHorizontal: 6, marginBottom: 6, borderRadius: 12, overflow: 'hidden' },
   // Header
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
-  headerLeft:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  headerLeft:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   avatarWrap:   { overflow: 'visible' },
-  authorName:   { fontSize: 14, fontWeight: '700', letterSpacing: -0.1 },
+  authorName:   { fontSize: 13.5, fontWeight: '700', letterSpacing: -0.1 },
   time:         { fontSize: 11, fontWeight: '500' },
   dot:          { width: 3, height: 3, borderRadius: 1.5 },
-  verifiedBadge:{ width: 15, height: 15, borderRadius: 8, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' },
-  followChip:   { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
-  moreBtn:      { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  verifiedBadge:{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' },
+  followChip:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  moreBtn:      { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   // Content
-  feeling:      { paddingHorizontal: 14, paddingBottom: 6, fontSize: 13, fontStyle: 'italic' },
-  bodyWrap:     { paddingHorizontal: 14, paddingBottom: 10, paddingTop: 2 },
-  body:         { fontSize: 15, lineHeight: 23, letterSpacing: 0.1 },
+  feeling:      { paddingHorizontal: 12, paddingBottom: 5, fontSize: 13, fontStyle: 'italic' },
+  bodyWrap:     { paddingHorizontal: 12, paddingBottom: 8, paddingTop: 1 },
+  body:         { fontSize: 14.5, lineHeight: 21, letterSpacing: 0.1 },
   // Compteurs
-  countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
+  countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   countChip:        { flexDirection: 'row', alignItems: 'center', gap: 5 },
   countText:        { fontSize: 12, fontWeight: '500' },
-  likeCountIcon:    { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  commentCountIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  likeCountIcon:    { width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  commentCountIcon: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   // Action bar
-  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 6, gap: 4 },
+  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 3, gap: 4 },
   actionBtn:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   actionPill:   {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 7,
-    borderRadius: 20, borderWidth: 1,
+    width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
   },
+  actionPillRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 36, paddingHorizontal: 4,
+  },
+  actionCount:  { fontSize: 12, fontWeight: '600' },
   actionText:   { fontSize: 12, fontWeight: '600' },
   // Menu sheet
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.48)', justifyContent: 'flex-end' },
-  sheet:        { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingBottom: Platform.OS === 'ios' ? 38 : 22, paddingTop: 10, paddingHorizontal: 14, gap: 9 },
+  sheet:        { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, paddingHorizontal: 14, gap: 9 },
   sheetHandle:  { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 6 },
   sheetTitle:   { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 2 },
   sheetTitleText:{ fontSize: 12, fontWeight: '600' },
@@ -730,10 +676,4 @@ const pc = StyleSheet.create({
   vfClose:      { position: 'absolute', top: 48, right: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   vfDetails:    { position: 'absolute', bottom: 40, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 30 },
   vfDetailsTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  textOnlyHero: {
-    marginHorizontal: 14, marginBottom: 4,
-    paddingVertical: 14, paddingHorizontal: 16,
-    borderRadius: 14, borderLeftWidth: 3,
-  },
-  textOnlyBody: { fontSize: 16, fontWeight: '600', lineHeight: 24 },
 });

@@ -19,11 +19,11 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getVideoMetaData } from 'react-native-compressor';
 import { launchImageLibrary } from 'react-native-image-picker';
+import RNBlobUtil from 'react-native-blob-util';
 
 import { useTheme } from '../../hooks/useTheme';
 import { reelService } from '../../services';
 import { MentionInput } from '../../components/common/MentionInput';
-import { CategorySelector } from '../../components/common/CategorySelector';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { ReelEditorScreen, type ReelEditResult, type FilterKey, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from './ReelEditorScreen';
 import Sound from 'react-native-sound';
@@ -262,11 +262,16 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   const [caption,           setCaption]           = useState('');
   const [category,          setCategory]          = useState<string | null>(null);
   const [captionMentionIds, setCaptionMentionIds] = useState<string[]>([]);
-  const [videoUri,          setVideoUri]          = useState<string | null>(sourceReelUrl ?? null);
+  // Remix : sourceReelUrl est une URL distante (mp4_url/hls_url) — jamais utilisée
+  // directement comme videoUri, on attend le téléchargement local (voir effect ci-dessous).
+  const isRemoteSource = !!sourceReelUrl && /^https?:\/\//.test(sourceReelUrl);
+  const [videoUri,          setVideoUri]          = useState<string | null>(isRemoteSource ? null : sourceReelUrl ?? null);
   const [videoThumb,        setVideoThumb]        = useState<string | null>(null);
   const [videoDuration,     setVideoDuration]     = useState(0);
   const [loadingMeta,       setLoadingMeta]       = useState(false);
-  const [showEditor,        setShowEditor]        = useState(!!sourceReelUrl);
+  const [showEditor,        setShowEditor]        = useState(!!sourceReelUrl && !isRemoteSource);
+  const [downloadingSource, setDownloadingSource] = useState(isRemoteSource);
+  const [downloadError,     setDownloadError]     = useState<string | null>(null);
   const [editResult,        setEditResult]        = useState<ReelEditResult | null>(null);
   const [trimmedVideoUri,   setTrimmedVideoUri]   = useState<string | null>(null);
   const [isTrimming,        setIsTrimming]        = useState(false);
@@ -329,6 +334,39 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       .then(meta => setVideoDuration(meta.duration ?? 60))
       .catch(() => setVideoDuration(60));
   }, [sourceReelUrl]);
+
+  // Remix : télécharge la vidéo source en local avant d'ouvrir l'éditeur — les filtres/trim
+  // et l'upload final manipulent un fichier local, jamais un flux/URL distante directement
+  // (c'était la cause du remix qui n'appliquait pas les filtres et échouait à l'upload).
+  useEffect(() => {
+    if (!isRemoteSource || !sourceReelUrl) return;
+    let cancelled = false;
+    setDownloadingSource(true);
+    setDownloadError(null);
+
+    (async () => {
+      try {
+        const ext      = sourceReelUrl.includes('.m3u8') ? 'm3u8' : 'mp4';
+        const destPath = `${RNBlobUtil.fs.dirs.CacheDir}/remix_${Date.now()}.${ext}`;
+        await RNBlobUtil.config({ path: destPath, overwrite: true, timeout: 30000 }).fetch('GET', sourceReelUrl);
+        const stat = await RNBlobUtil.fs.stat(destPath).catch(() => null);
+        if (!stat || parseInt(String(stat.size), 10) === 0) throw new Error('Fichier vide');
+        if (cancelled) return;
+
+        const localUri = `file://${destPath}`;
+        setVideoUri(localUri);
+        setVideoThumb(localUri);
+        setShowEditor(true);
+      } catch (e: any) {
+        if (cancelled) return;
+        setDownloadError(e?.message ?? 'Impossible de télécharger la vidéo source.');
+      } finally {
+        if (!cancelled) setDownloadingSource(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isRemoteSource, sourceReelUrl]);
 
   const publishRef = useRef<{
     uri: string; cap: string; category?: string; mentionIds: string[];
@@ -572,6 +610,33 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
     });
   }, [videoUri, caption, captionMentionIds, editResult, videoDuration, onBack, sourceReelId, isPhotoReel]);
 
+  // ── Téléchargement de la vidéo source (remix) — avant même l'éditeur ────────
+  if (downloadingSource) {
+    return (
+      <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.textSecondary, marginTop: 16, fontSize: 14 }}>Préparation de la vidéo…</Text>
+      </View>
+    );
+  }
+
+  if (downloadError) {
+    return (
+      <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <Icon name="alert-triangle" size={40} color={colors.error ?? '#EF4444'} />
+        <Text style={{ color: colors.textPrimary, marginTop: 16, fontSize: 15, textAlign: 'center', fontWeight: '600' }}>
+          Impossible de préparer la vidéo
+        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 6, fontSize: 13, textAlign: 'center' }}>{downloadError}</Text>
+        <TouchableOpacity onPress={onBack} style={{ marginTop: 20, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: colors.primary }}>
+          <Text style={{ color: '#fff', fontWeight: '600' }}>Retour</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   // ── ÉDITEUR — branch exclusive, aucun player dans ce composant quand rendu ─
   if (showEditor && videoUri) {
     return (
@@ -721,8 +786,6 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
                 <Text style={[s.charCount, { color: colors.textTertiary }]}>{caption.length}/300</Text>
               </View>
             </View>
-
-            <CategorySelector value={category} onChange={setCategory} label="Catégorie (optionnel)" />
           </View>
 
           {/* ══ MUSIQUE SÉLECTIONNÉE ══ */}

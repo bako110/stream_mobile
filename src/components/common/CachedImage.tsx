@@ -14,16 +14,25 @@ interface CachedImageProps extends Omit<ImageProps, 'source'> {
 
 export const CachedImage: React.FC<CachedImageProps> = ({ uri, ...rest }) => {
   const [localUri, setLocalUri] = useState<string | null>(() => (uri ? getCachedUri(uri) : null));
+  // Trace l'uri distante représentée par le localUri actuel — permet de distinguer un
+  // vrai changement d'image (reset nécessaire) d'un simple remontage du composant avec
+  // la MÊME uri (scroll rapide qui le fait sortir/rentrer de la fenêtre de rendu FlatList).
+  const resolvedForUriRef = React.useRef<string | null>(uri ?? null);
 
   useEffect(() => {
-    if (!uri) { setLocalUri(null); return; }
-    const cached = getCachedUri(uri);
-    if (cached) { setLocalUri(cached); return; }
+    if (!uri) { setLocalUri(null); resolvedForUriRef.current = null; return; }
 
-    setLocalUri(null);
+    const cached = getCachedUri(uri);
+    if (cached) { setLocalUri(cached); resolvedForUriRef.current = uri; return; }
+
+    // Uri différente de celle déjà résolue → vraie nouvelle image, reset nécessaire.
+    // Uri identique (remontage) → on garde l'affichage courant, pas de flash "vide" pendant
+    // que cacheImage() re-vérifie le disque.
+    if (resolvedForUriRef.current !== uri) { setLocalUri(null); resolvedForUriRef.current = uri; }
+
     let cancelled = false;
     cacheImage(uri).then(path => {
-      if (!cancelled && path) setLocalUri(path);
+      if (!cancelled && path) { setLocalUri(path); resolvedForUriRef.current = uri; }
     });
     return () => { cancelled = true; };
   }, [uri]);

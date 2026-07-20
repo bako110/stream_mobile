@@ -351,6 +351,7 @@ const ActiveBoostCard: React.FC<{
   colors: any;
   onCancelled: (id: string, refund: number, newBalance: number) => void;
 }> = ({ boost, colors, onCancelled }) => {
+  const insets = useSafeAreaInsets();
   const [showStop, setShowStop] = useState(false);
   const [stopping, setStopping] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -504,7 +505,7 @@ const ActiveBoostCard: React.FC<{
 
       <Modal visible={showStop} transparent animationType="slide" onRequestClose={() => setShowStop(false)}>
         <View style={ms.overlay}>
-          <View style={[ms.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[ms.sheet, { backgroundColor: colors.surface, paddingBottom: 44 + insets.bottom }]}>
             <View style={[ms.handle, { backgroundColor: colors.border }]} />
             <Text style={[ms.title, { color: colors.textPrimary }]}>Arrêter le boost ?</Text>
             <Text style={[ms.sub, { color: colors.textSecondary }]}>
@@ -1311,7 +1312,7 @@ export default function BoostScreen() {
       {/* Modal confirmation achat */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => !purchasing && setShowModal(false)}>
         <View style={ms.overlay}>
-          <View style={[ms.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[ms.sheet, { backgroundColor: colors.surface, paddingBottom: 44 + insets.bottom }]}>
             <View style={[ms.handle, { backgroundColor: colors.border }]} />
             <Text style={[ms.title, { color: colors.textPrimary }]}>Confirmer le boost</Text>
 
@@ -1414,7 +1415,7 @@ const abc = StyleSheet.create({
 
 const ms = StyleSheet.create({
   overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet:           { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 44, gap: 14 },
+  sheet:           { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14 },
   handle:          { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
   title:           { fontSize: 18, fontWeight: '800', textAlign: 'center' },
   sub:             { fontSize: 13, lineHeight: 20, textAlign: 'center' },

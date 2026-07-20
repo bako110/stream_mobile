@@ -510,7 +510,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       <Modal visible={showPaywall} transparent animationType="slide" onRequestClose={() => setShowPaywall(false)}>
         <View style={pw.overlay}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowPaywall(false)} />
-          <View style={[pw.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[pw.sheet, { backgroundColor: colors.surface, paddingBottom: 36 + insets.bottom }]}>
 
             {/* En-tête */}
             <View style={pw.header}>
@@ -642,7 +642,7 @@ const s = StyleSheet.create({
 
 const pw = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36, gap: 14 },
+  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 14 },
 
   header:       { alignItems: 'center', gap: 10, marginBottom: 4 },
   lockCircle:   { width: 60, height: 60, borderRadius: 30, backgroundColor: '#E8501A', alignItems: 'center', justifyContent: 'center' },

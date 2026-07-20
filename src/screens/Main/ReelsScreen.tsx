@@ -1249,6 +1249,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const controlsTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressValue     = useSharedValue(0);
   const durationRef       = useRef(0);
+  const progressBarWidthRef = useRef(0);
   const [liked,        setLiked]        = useState(reel.user_reaction === 'like');
   const [likes,        setLikes]        = useState(reel.like_count ?? 0);
   const [heartLikeAction, setHeartLikeAction] = useState(true);
@@ -1858,6 +1859,39 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const tapGesture = Gesture.Exclusive(doubleTap, singleTap);
   const hPanFail   = Gesture.Pan().activeOffsetX([-10, 10]).failOffsetY([-10, 10]).minDistance(10);
 
+  // Scrubbing de la barre de progression — poser le doigt seek déjà à cette position, puis
+  // glisser met à jour le ratio en continu. wasPlayingBeforeScrubRef retient l'état de lecture
+  // d'avant le drag pour ne reprendre la lecture au relâchement que si elle jouait déjà.
+  const wasPlayingBeforeScrubRef = useRef(false);
+  const seekToRatio = useCallback((x: number) => {
+    const dur = durationRef.current;
+    const width = progressBarWidthRef.current;
+    if (!dur || dur <= 0 || !width) return;
+    const ratio = Math.min(1, Math.max(0, x / width));
+    progressValue.value = ratio;
+    try { player.seekTo(ratio * dur); } catch {}
+  }, [player, progressValue]);
+  const scrubGesture = Gesture.Pan()
+    .runOnJS(true)
+    .minDistance(0)          // se déclenche dès le 1er toucher, pas seulement après un mouvement
+    .maxPointers(1)
+    .onTouchesDown((e) => {
+      wasPlayingBeforeScrubRef.current = !pausedRef.current;
+      try { player.pause(); } catch {}
+      seekToRatio(e.allTouches[0].x);
+    })
+    .onUpdate((e) => {
+      seekToRatio(e.x);
+    })
+    .onEnd((e) => {
+      seekToRatio(e.x);
+    })
+    .onFinalize(() => {
+      // Couvre la fin normale (onEnd) ET une annulation système du geste — la lecture
+      // ne doit jamais rester bloquée en pause si le geste est interrompu.
+      if (wasPlayingBeforeScrubRef.current) { try { player.play(); } catch {} }
+    });
+
   const safeBottom    = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
   // 6 paddingV wrap top + 6 bottom + 26 avatar height + 6 paddingV inner × 2 = 56 → 66 pour marge
   const COMMENT_BAR_H = 66;
@@ -1983,13 +2017,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         } catch { return null; }
       })() : null}
 
-      {/* Barre de progression — tout en haut, sous le header */}
-      {isActive && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', zIndex: 20 }}>
-          <Animated.View style={[{ height: 3, backgroundColor: '#fff', borderRadius: 2 }, progressBarAnim]} />
-        </View>
-      )}
-
       {/* Spinner uniquement si vrai stall réseau (>1.5s sans lecture) */}
       {isStalling && (
         <ActivityIndicator
@@ -2014,26 +2041,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       <GestureDetector gesture={Gesture.Simultaneous(hPanFail, tapGesture)}>
         <View style={{ position: 'absolute', top: 0, left: 0, right: 80, bottom: safeBottom + COMMENT_BAR_H }} />
       </GestureDetector>
-
-      {/* Boutons prev/next visibles au 1er tap — disparaissent après 3s */}
-      {showControls && (
-        <View pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 80, bottom: safeBottom + COMMENT_BAR_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, zIndex: 8 }}>
-          <TouchableOpacity
-            onPress={() => { doSkipAnim(-10); triggerShowControls(); }}
-            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
-            activeOpacity={0.8}
-          >
-            <Icon name="rewind" size={26} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => { doSkipAnim(10); triggerShowControls(); }}
-            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
-            activeOpacity={0.8}
-          >
-            <Icon name="fast-forward" size={26} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      )}
 
       <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleLeft,  skipLeftAnim]}><Text style={s.skipRippleTxt}>{skipLeftLabel}</Text></Animated.View>
       <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleRight, skipRightAnim]}><Text style={s.skipRippleTxt}>{skipRightLabel}</Text></Animated.View>
@@ -2447,6 +2454,27 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         )}
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : undefined} style={[s.commentBarWrap, { bottom: safeBottom }]} keyboardVerticalOffset={0}>
+          {/* Barre de progression — juste au-dessus de la barre de commentaire, dans le même
+              KeyboardAvoidingView pour rester synchronisée avec elle quand le clavier s'ouvre.
+              Scrubbing complet façon TikTok : poser le doigt seek déjà à cette position, puis
+              glisser met à jour le ratio en continu (pas juste un tap ponctuel) ; la vidéo est
+              mise en pause pendant le drag pour un contrôle net, et reprend au relâchement si
+              elle n'était pas déjà en pause avant. */}
+          {isActive && (
+            <View
+              onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
+              style={{ height: 20, justifyContent: 'center', paddingHorizontal: 10 }}
+            >
+              <GestureDetector gesture={scrubGesture}>
+                <View style={{ height: 20, justifyContent: 'center' }}>
+                  <View style={{ height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)' }}>
+                    <Animated.View style={[{ height: 3, backgroundColor: '#fff', borderRadius: 2 }, progressBarAnim]} />
+                  </View>
+                </View>
+              </GestureDetector>
+            </View>
+          )}
+
           {/* Tout dans une seule barre : avatar + input + send */}
           <View style={[s.commentBar, { backgroundColor: barFocused ? 'rgba(0,0,0,0.88)' : 'rgba(255,255,255,0.12)', borderColor: barFocused ? 'rgba(255,255,255,0.3)' : 'transparent' }]}>
             <TouchableOpacity activeOpacity={0.8} onPress={() => currentUserId && onAuthorPress(currentUserId)}>

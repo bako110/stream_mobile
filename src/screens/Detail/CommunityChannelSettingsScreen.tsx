@@ -448,7 +448,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
       {/* Menu action membre */}
       <Modal visible={!!menuMember} transparent animationType="fade" onRequestClose={() => setMenuMember(null)}>
         <Pressable style={S.overlay} onPress={() => setMenuMember(null)}>
-          <View style={[S.menuSheet, { backgroundColor: colors.surface }]}>
+          <View style={[S.menuSheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 36 : 20) + insets.bottom }]}>
             {/* Apercu */}
             <View style={[S.menuPreview, { borderBottomColor: colors.divider }]}>
               {menuMember?.avatar_url
@@ -504,7 +504,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
       {/* Bottom sheet — ajouter un membre */}
       <Modal visible={showAddSheet} transparent animationType="slide" onRequestClose={() => setShowAddSheet(false)}>
         <Pressable style={S.overlay} onPress={() => setShowAddSheet(false)}>
-          <Pressable style={[S.addSheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
+          <Pressable style={[S.addSheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 36 : 20) + insets.bottom }]} onPress={() => {}}>
             <View style={[S.addSheetHandle, { backgroundColor: colors.divider }]} />
             <Text style={[S.addSheetTitle, { color: colors.textPrimary }]}>Ajouter un membre</Text>
 
@@ -629,14 +629,14 @@ const S = StyleSheet.create({
 
   addMemberBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, marginBottom: 0, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center' },
   addMemberBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  addSheet:         { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
+  addSheet:         { borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   addSheetHandle:   { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   addSheetTitle:    { fontSize: 16, fontWeight: '800', paddingHorizontal: 18, paddingVertical: 10 },
   addSearch:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
   addMemberRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
 
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
+  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   menuPreview:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   menuItem:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
   menuItemIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

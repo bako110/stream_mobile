@@ -992,7 +992,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
             )}
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', backgroundColor: '#111', paddingHorizontal: 16, paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', backgroundColor: '#111', paddingHorizontal: 16, paddingVertical: 12, paddingBottom: (Platform.OS === 'ios' ? 28 : 12) + insets.bottom, gap: 10 }}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#2a2a2a', borderRadius: 24, paddingHorizontal: 14, paddingVertical: 8, gap: 8 }}>
               <Icon name="edit-3" size={16} color="rgba(255,255,255,0.4)" />
               <TextInput
@@ -1052,7 +1052,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       {/* Context menu message */}
       <Modal visible={!!menuMsg} transparent animationType="fade" onRequestClose={() => setMenuMsg(null)}>
         <Pressable style={C.overlay} onPress={() => setMenuMsg(null)}>
-          <View style={[C.menuSheet, { backgroundColor: colors.surface }]}>
+          <View style={[C.menuSheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 36 : 20) + insets.bottom }]}>
             {menuMsg?.message_type === 'text' && (
               <View style={[C.emojiRow, { borderBottomColor: colors.divider }]}>
                 {QUICK_EMOJIS.map(e => (
@@ -1113,7 +1113,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
               </View>
             ))}
           </ScrollView>
-          <View style={MP.bottomBar}>
+          <View style={[MP.bottomBar, { paddingBottom: 28 + insets.bottom }]}>
             <View style={MP.captionRow}>
               <Icon name="edit-3" size={16} color="rgba(255,255,255,0.5)" />
               <TextInput style={MP.captionInput} placeholder="Ajouter une légende…" placeholderTextColor="rgba(255,255,255,0.4)"
@@ -1245,7 +1245,7 @@ const C = StyleSheet.create({
   sendBtn:     { width: 44, height: 44, borderRadius: 22, overflow: 'hidden' },
 
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
+  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   emojiRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   emojiBtn:  { padding: 4 },
   menuPreview:    { paddingHorizontal: 18, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
@@ -1266,7 +1266,7 @@ const MP = StyleSheet.create({
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12 },
   closeBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   title:      { color: '#fff', fontSize: 15, fontWeight: '700' },
-  bottomBar:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingBottom: 28, paddingTop: 10, backgroundColor: 'rgba(0,0,0,0.6)', gap: 10 },
+  bottomBar:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, backgroundColor: 'rgba(0,0,0,0.6)', gap: 10 },
   captionRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 24, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
   captionInput: { flex: 1, color: '#fff', fontSize: 15, maxHeight: 100, paddingVertical: 0 },
   sendBtn:    { width: 48, height: 48, borderRadius: 24, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center' },

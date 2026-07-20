@@ -14,6 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
@@ -42,6 +43,7 @@ export const LiveAccessGate: React.FC<Props> = ({
   const { theme } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   const isGift  = live.monetization_type === 'gift';
   const isGoGold = live.monetization_type === 'gogold';
@@ -162,7 +164,7 @@ export const LiveAccessGate: React.FC<Props> = ({
       </View>
 
       {/* Carte d'acces */}
-      <View style={[s.gateCard, { backgroundColor: colors.surface }]}>
+      <View style={[s.gateCard, { backgroundColor: colors.surface, paddingBottom: 40 + insets.bottom }]}>
         {/* Icone verrou */}
         <View style={s.lockIconWrap}>
           <LinearGradient colors={['#F59E0B', '#F97316']} style={s.lockIconGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
@@ -281,7 +283,7 @@ const s = StyleSheet.create({
   gateCard: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 24, paddingBottom: 40,
+    padding: 24,
     alignItems: 'center',
   },
   lockIconWrap: { marginBottom: 14 },

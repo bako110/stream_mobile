@@ -10,7 +10,6 @@ import { StoryCreator } from './StoryCreator';
 import { VerifiedBadge, CachedImage } from '../common';
 import { storyService, getViewedStories } from '../../services/storyService';
 import { storyUploadState } from '../../services/storyUploadState';
-import { cacheInBackground } from '../../services/videoCacheService';
 import { networkService } from '../../services/networkService';
 import { useWs } from '../../context/WebSocketContext';
 import type { Story } from '../../types/story';
@@ -79,7 +78,11 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
       }
 
       setGroups(data);
-      // Précharger thumbnails + images des premiers groupes — réduit hors wifi
+      // Précharger uniquement les thumbnails (petites images, coût négligeable) des
+      // premiers groupes pour que la barre s'affiche déjà avec ses miniatures. Les
+      // vidéos ne sont JAMAIS téléchargées ici — StoryViewer s'en charge lui-même,
+      // uniquement pour la story réellement ouverte (+ la suivante en avance), pas
+      // pour tout le feed juste parce qu'il est affiché.
       const onWifi = networkService.isWifi();
       const prefetchGroups = onWifi ? 10 : 3;
       data.slice(0, prefetchGroups).forEach(g => {
@@ -88,18 +91,6 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           else if (st.media_url && st.media_type === 'image') Image.prefetch(st.media_url).catch(() => {});
         });
       });
-      // Télécharger les vidéos des premiers groupes en cache local (offline ready)
-      // HLS (.m3u8) ignoré par cacheInBackground — seuls les MP4 directs sont cachés
-      // Désactivé hors wifi : ce sont des vidéos complètes, coûteux en 4G
-      if (onWifi) {
-        data.slice(0, 5).forEach(g => {
-          g.stories.forEach(st => {
-            if (st.media_type === 'video' && st.media_url) {
-              cacheInBackground(st.media_url).catch(() => {});
-            }
-          });
-        });
-      }
     } catch (e) {
       __DEV__ && console.error('[StoryBar] getFeed error:', e);
     } finally { setLoading(false); }

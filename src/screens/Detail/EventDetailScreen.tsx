@@ -88,12 +88,11 @@ const VideoModal: React.FC<{ uri: string; onClose: () => void }> = ({ uri, onClo
 // ── HeroCarousel ──────────────────────────────────────────────────────────────
 
 const HeroCarousel: React.FC<{
-  images: string[]; fallbackIcon: string; accent: string;
-  title: string; eventType: string; isFree: boolean; isOnline: boolean;
-  organizerName?: string; organizerAvatar?: string; hasVideo: boolean; onVideoPress: () => void;
+  images: string[]; fallbackIcon: string;
+  hasVideo: boolean; onVideoPress: () => void;
   colors: AppColors;
-}> = ({ images, fallbackIcon, accent, title, eventType, isFree, isOnline,
-        organizerName, organizerAvatar, hasVideo, onVideoPress, colors }) => {
+  onIndexChange?: (i: number) => void;
+}> = ({ images, fallbackIcon, hasVideo, onVideoPress, colors, onIndexChange }) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const flatRef = useRef<FlatList>(null);
 
@@ -103,6 +102,7 @@ const HeroCarousel: React.FC<{
       setActiveIdx(prev => {
         const next = (prev + 1) % images.length;
         flatRef.current?.scrollToIndex({ index: next, animated: true });
+        onIndexChange?.(next);
         return next;
       });
     }, 4000);
@@ -116,8 +116,11 @@ const HeroCarousel: React.FC<{
           ref={flatRef} horizontal pagingEnabled data={images}
           keyExtractor={(u, i) => u + i}
           showsHorizontalScrollIndicator={false}
-          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) =>
-            setActiveIdx(Math.round(e.nativeEvent.contentOffset.x / SW))}
+          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
+            setActiveIdx(idx);
+            onIndexChange?.(idx);
+          }}
           scrollEventThrottle={16}
           renderItem={({ item: url }) => (
             <Image source={{ uri: url }} style={{ width: SW, height: HERO_H }} resizeMode="cover" />
@@ -129,34 +132,18 @@ const HeroCarousel: React.FC<{
         </View>
       )}
 
-      {/* Dégradé profond bas → titre */}
+      {/* Dégradé léger bas — juste pour la lisibilité de la pagination */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.65)', 'rgba(0,0,0,0.88)']}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HERO_H * 0.7 }}
+        colors={['transparent', 'rgba(0,0,0,0.25)']}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HERO_H * 0.35 }}
         pointerEvents="none"
       />
 
-      {/* Badges haut */}
-      <View style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, left: 64, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-        <View style={{ backgroundColor: accent + 'EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-          <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>{eventType.toUpperCase()}</Text>
-        </View>
-        {isFree && (
-          <View style={{ backgroundColor: '#36D9A0EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>GRATUIT</Text>
-          </View>
-        )}
-        {isOnline && (
-          <View style={{ backgroundColor: '#3B82F6EE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>EN LIGNE</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Bouton vidéo */}
+      {/* Bouton vidéo — seul élément flottant restant sur l'image. Plus besoin de
+          compenser la status bar (réservée séparément au-dessus), petit offset fixe. */}
       {hasVideo && (
         <TouchableOpacity onPress={onVideoPress}
-          style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, right: 16,
+          style={{ position: 'absolute', top: 12, right: 16,
             flexDirection: 'row', alignItems: 'center', gap: 5,
             backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 }}>
           <Icon name="play-circle" size={14} color="#fff" />
@@ -164,39 +151,64 @@ const HeroCarousel: React.FC<{
         </TouchableOpacity>
       )}
 
-      {/* Titre + organisateur en bas du hero */}
-      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 20, gap: 8 }}>
-        <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', lineHeight: 32, letterSpacing: -0.3 }} numberOfLines={2}>
-          {title}
-        </Text>
-        {organizerName && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ width: 30, height: 30, borderRadius: 15, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' }}>
-              {organizerAvatar ? (
-                <Image source={{ uri: organizerAvatar }} style={{ width: 30, height: 30 }} resizeMode="cover" />
-              ) : (
-                <LinearGradient colors={[accent, accent + '88']} style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 10, fontWeight: '900', color: '#fff' }}>{getInitials(organizerName)}</Text>
-                </LinearGradient>
-              )}
-            </View>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>{organizerName}</Text>
-          </View>
-        )}
-        {images.length > 1 && (
-          <View style={{ flexDirection: 'row', gap: 4 }}>
-            {images.map((_, i) => (
-              <View key={i} style={{
-                width: i === activeIdx ? 16 : 5, height: 4, borderRadius: 2,
-                backgroundColor: i === activeIdx ? '#fff' : 'rgba(255,255,255,0.35)',
-              }} />
-            ))}
-          </View>
-        )}
-      </View>
+      {/* Pagination — reste sur l'image, discrète, en bas */}
+      {images.length > 1 && (
+        <View style={{ position: 'absolute', bottom: 12, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 4 }}>
+          {images.map((_, i) => (
+            <View key={i} style={{
+              width: i === activeIdx ? 16 : 5, height: 4, borderRadius: 2,
+              backgroundColor: i === activeIdx ? '#fff' : 'rgba(255,255,255,0.5)',
+            }} />
+          ))}
+        </View>
+      )}
     </View>
   );
 };
+
+// ── HeroInfoCard — titre + organisateur + badges, dans une vraie section sous
+// le hero, pas en overlay sur l'image ─────────────────────────────────────────
+const HeroInfoCard: React.FC<{
+  title: string; accent: string; eventType: string; isFree: boolean; isOnline: boolean;
+  organizerName?: string; organizerAvatar?: string;
+  colors: AppColors;
+}> = ({ title, accent, eventType, isFree, isOnline, organizerName, organizerAvatar, colors }) => (
+  <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, gap: 8 }}>
+    <Text style={{ fontSize: 17, fontWeight: '800', color: colors.textPrimary, lineHeight: 22, letterSpacing: -0.2 }}>
+      {title}
+    </Text>
+    {organizerName && (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ width: 24, height: 24, borderRadius: 12, overflow: 'hidden' }}>
+          {organizerAvatar ? (
+            <Image source={{ uri: organizerAvatar }} style={{ width: 24, height: 24 }} resizeMode="cover" />
+          ) : (
+            <LinearGradient colors={[accent, accent + '88']} style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 9, fontWeight: '900', color: '#fff' }}>{getInitials(organizerName)}</Text>
+            </LinearGradient>
+          )}
+        </View>
+        <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.textSecondary }}>{organizerName}</Text>
+      </View>
+    )}
+    {/* Badges — petits, discrets, sous le titre plutôt que sur l'image */}
+    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+      <View style={{ backgroundColor: accent + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+        <Text style={{ fontSize: 9, fontWeight: '800', color: accent, letterSpacing: 0.4 }}>{eventType.toUpperCase()}</Text>
+      </View>
+      {isFree && (
+        <View style={{ backgroundColor: '#36D9A022', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+          <Text style={{ fontSize: 9, fontWeight: '800', color: '#1F9D6E', letterSpacing: 0.4 }}>GRATUIT</Text>
+        </View>
+      )}
+      {isOnline && (
+        <View style={{ backgroundColor: '#3B82F622', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+          <Text style={{ fontSize: 9, fontWeight: '800', color: '#3B82F6', letterSpacing: 0.4 }}>EN LIGNE</Text>
+        </View>
+      )}
+    </View>
+  </View>
+);
 
 // ── SectionHeader ─────────────────────────────────────────────────────────────
 
@@ -556,17 +568,27 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar translucent={false} backgroundColor={colors.background} barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+
+      {/* Zone de statut réservée — l'heure/batterie/réseau ne sont plus superposées
+          sur l'image du hero, qui commence maintenant en dessous. */}
+      <View style={{ height: insets.top, backgroundColor: colors.background }} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 
         {/* ── Hero ─────────────────────────────────────────────────── */}
         <HeroCarousel
-          images={galleryImages} fallbackIcon={cfg.icon} accent={accent}
-          title={event.title} eventType={cfg.label}
-          isFree={isFree} isOnline={!!event.is_online}
-          organizerName={organizerName ?? undefined} organizerAvatar={organizerAvatar} hasVideo={hasVideo}
+          images={galleryImages} fallbackIcon={cfg.icon}
+          hasVideo={hasVideo}
           onVideoPress={() => setShowVideo(true)}
+          colors={colors}
+        />
+
+        {/* ── Titre + organisateur + badges — section séparée, pas sur l'image ─── */}
+        <HeroInfoCard
+          title={event.title} accent={accent}
+          eventType={cfg.label} isFree={isFree} isOnline={!!event.is_online}
+          organizerName={organizerName ?? undefined} organizerAvatar={organizerAvatar}
           colors={colors}
         />
 
@@ -759,13 +781,14 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
 
       </ScrollView>
 
-      {/* Bouton retour flottant — superposé sur le hero */}
-      <View style={{ position: 'absolute', top: insets.top + 8, left: 14, zIndex: 20 }} pointerEvents="box-none">
+      {/* Bouton retour flottant — superposé sur le hero, sous la zone de statut réservée
+          (insets.top saute la bande de statut, +12 place le bouton sur l'image) */}
+      <View style={{ position: 'absolute', top: insets.top + 12, left: 14, zIndex: 20 }} pointerEvents="box-none">
         <BackButton onPress={onBack ?? (() => {})} transparent color="#fff" />
       </View>
 
       {/* ── CTA flottant ─────────────────────────────────────────────── */}
-      <View style={[ds.ctaBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+      <View style={[ds.ctaBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: (Platform.OS === 'ios' ? 32 : 16) + insets.bottom }]}>
         {isOwner ? (
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
@@ -878,7 +901,6 @@ const ds = StyleSheet.create({
   ctaBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: 16, paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   ctaGradient: {

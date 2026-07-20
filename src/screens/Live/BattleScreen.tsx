@@ -42,6 +42,7 @@ import { clearLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import { participantAvatarUrl } from '../../utils/livekitParticipant';
+import { enableBeautyFilter } from '../../utils/beautyFilter';
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -692,7 +693,7 @@ const BattleContent: React.FC<{
   // l'erreur) et ne se rattrapait jamais tant que l'ecran n'etait pas remonte (hot-reload).
   useEffect(() => {
     if (!myHostSide || connectionState !== ConnectionState.Connected) return;
-    localParticipant.setCameraEnabled(true).catch(() => {});
+    localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     return () => {
       localParticipant.setCameraEnabled(false).catch(() => {});
@@ -1002,7 +1003,7 @@ const BattleContent: React.FC<{
           </TouchableOpacity>
         </View>
 
-        <View style={styles.chatInputRow}>
+        <View style={[styles.chatInputRow, { paddingBottom: 10 + insets.bottom }]}>
           <TextInput
             value={chatInput}
             onChangeText={setChatInput}
@@ -1022,7 +1023,7 @@ const BattleContent: React.FC<{
       {showRanking && (
         <View style={styles.rankingOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowRanking(false)} />
-          <Animated.View entering={SlideInDown.duration(220)} exiting={SlideOutDown.duration(180)} style={styles.rankingSheet}>
+          <Animated.View entering={SlideInDown.duration(220)} exiting={SlideOutDown.duration(180)} style={[styles.rankingSheet, { paddingBottom: 30 + insets.bottom }]}>
             <View style={styles.rankingHandle} />
             <Text style={styles.rankingTitle}>🏆 Classement des supporters</Text>
             {!ranking || ranking.top_10.length === 0 ? (
@@ -1411,13 +1412,13 @@ const styles = StyleSheet.create({
   chatUser: { fontWeight: '800' },
   chatUserA: { color: '#C4B5FD' },
   chatUserB: { color: '#FCA5C5' },
-  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingBottom: 10, paddingTop: 2 },
+  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingTop: 2 },
   chatInput: { flex: 1, minWidth: 0, color: '#fff', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
   chatSendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   // Panneau classement
   rankingOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 60 },
-  rankingSheet: { backgroundColor: '#14101f', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, paddingBottom: 30, gap: 10 },
+  rankingSheet: { backgroundColor: '#14101f', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, gap: 10 },
   rankingHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center' },
   rankingTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
   rankingEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center', paddingVertical: 20 },

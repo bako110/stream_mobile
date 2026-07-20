@@ -39,11 +39,14 @@ interface FilmProps    extends BaseProps { type: 'film' | 'serie'; film: FilmIte
 type Props = PostProps | EventProps | ConcertProps | ReelProps | FilmProps;
 
 function timeAgo(iso: string) {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  const date = new Date(iso);
+  const diff = (Date.now() - date.getTime()) / 1000;
   if (diff < 60)    return "à l'instant";
   if (diff < 3600)  return `${Math.floor(diff / 60)} min`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
-  return `${Math.floor(diff / 86400)} j`;
+  if (diff < 30 * 86400) return `${Math.floor(diff / 86400)} j`;
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString('fr-FR', sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function getShareUrl(type: ContentType, id: string): string {

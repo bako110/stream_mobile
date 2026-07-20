@@ -2064,7 +2064,7 @@ export const CommunityChatScreen: React.FC = () => {
       {/* ── Context menu ── */}
       <Modal visible={!!menuMsg} transparent animationType="fade" onRequestClose={() => setMenuMsg(null)}>
         <Pressable style={S.overlay} onPress={() => setMenuMsg(null)}>
-          <View style={[S.menuSheet, { backgroundColor: colors.surface }]}>
+          <View style={[S.menuSheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 36 : 20) + insets.bottom }]}>
 
             {/* Aperçu du message */}
             <View style={[S.menuPreview, { borderBottomColor: colors.divider }]}>
@@ -2213,7 +2213,7 @@ export const CommunityChatScreen: React.FC = () => {
             )}
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', backgroundColor: '#111', paddingHorizontal: 16, paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', backgroundColor: '#111', paddingHorizontal: 16, paddingVertical: 12, paddingBottom: (Platform.OS === 'ios' ? 28 : 12) + insets.bottom, gap: 10 }}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#2a2a2a', borderRadius: 24, paddingHorizontal: 14, paddingVertical: 8, gap: 8 }}>
               <Icon name="edit-3" size={16} color="rgba(255,255,255,0.4)" />
               <TextInput
@@ -2473,7 +2473,7 @@ export const CommunityChatScreen: React.FC = () => {
           )}
 
           {/* Barre légende + envoyer */}
-          <View style={MP.bottomBar}>
+          <View style={[MP.bottomBar, { paddingBottom: 28 + insets.bottom }]}>
             <View style={MP.captionRow}>
               <Icon name="edit-3" size={16} color="rgba(255,255,255,0.5)" style={{ marginLeft: 4 }} />
               <TextInput
@@ -2665,7 +2665,7 @@ const S = StyleSheet.create({
 
   // Context menu
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
-  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 20, position: 'absolute', bottom: 0, left: 0, right: 0 },
+  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, position: 'absolute', bottom: 0, left: 0, right: 0 },
   emojiRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   emojiBtn: { padding: 4 },
   emojiBig: { fontSize: 26 },
@@ -2796,7 +2796,7 @@ const MP = StyleSheet.create({
 
   bottomBar: {
     flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: 12, paddingBottom: 28, paddingTop: 10,
+    paddingHorizontal: 12, paddingTop: 10,
     backgroundColor: 'rgba(0,0,0,0.6)', gap: 10,
   },
   captionRow: {

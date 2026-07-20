@@ -27,15 +27,6 @@ const PLAN_LABELS: Record<string, string> = {
   family:  'Family',
 };
 
-// Prix dérivés de PLAN_CONFIG (types/subscription.ts) — source unique partagée
-// avec le reste de l'app, jamais de prix dupliqué en dur ici.
-const PLAN_PRICES: Record<string, string> = Object.fromEntries(
-  Object.entries(PLAN_CONFIG).map(([plan, cfg]) => [
-    plan,
-    cfg.price === 0 ? '0 €/mois' : `${cfg.price.toFixed(2).replace('.', ',')} €/mois`,
-  ]),
-);
-
 const PLAN_FEATURES: Record<string, string[]> = {
   free:    ['480p', '1 écran', '1 profil', 'Sans téléchargement'],
   basic:   ['HD 720p', '1 écran', '1 profil', 'Sans téléchargement'],

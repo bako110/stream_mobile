@@ -6,6 +6,7 @@ import {
   FlatList, ActivityIndicator, Easing, Linking,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { TextLayer, DrawPath, MaskRect, StickerLayer } from './StoryMediaEditor';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import type { VideoPlayerStatus } from 'react-native-video';
@@ -566,6 +567,7 @@ export const StoryViewer: React.FC<Props> = ({
 }) => {
   const { addListener, removeListener } = useWs();
   const isWifi = useIsWifi();
+  const insets  = useSafeAreaInsets();
 
   const [groupIdx,    setGroupIdx]    = useState(initialGroupIndex);
   const [storyIdx,    setStoryIdx]    = useState(initialStoryIndex ?? 0);
@@ -1349,7 +1351,7 @@ export const StoryViewer: React.FC<Props> = ({
           <TouchableWithoutFeedback onPress={closeViewers}>
             <View style={s.sheetOverlay}>
               <TouchableWithoutFeedback>
-                <View style={s.viewersPanel}>
+                <View style={[s.viewersPanel, { paddingBottom: 36 + insets.bottom }]}>
                   <View style={s.panelHandle} />
 
                   {/* Onglets */}
@@ -1508,7 +1510,7 @@ export const StoryViewer: React.FC<Props> = ({
         {menuOpen && (
           <TouchableWithoutFeedback onPress={() => { setMenuOpen(false); setPaused(false); }}>
             <View style={s.sheetOverlay}>
-              <View style={s.menuSheet}>
+              <View style={[s.menuSheet, { paddingBottom: 34 + insets.bottom }]}>
                 <View style={s.panelHandle} />
                 <TouchableOpacity style={s.menuItem} onPress={handleEditOpen}>
                   <View style={[s.menuIconBox, { backgroundColor: '#7B3FF226' }]}>
@@ -1535,7 +1537,7 @@ export const StoryViewer: React.FC<Props> = ({
         {/* ── Modal edition caption ──────────────────────────────────────── */}
         <Modal visible={editMode} transparent animationType="slide">
           <View style={s.editOverlay}>
-            <View style={s.editSheet}>
+            <View style={[s.editSheet, { paddingBottom: 36 + insets.bottom }]}>
               <View style={s.panelHandle} />
               <Text style={s.editTitle}>Modifier la legende</Text>
               <TextInput
@@ -1706,7 +1708,7 @@ const s = StyleSheet.create({
   // ── Viewers panel ─────────────────────────────────────────────────────────────
   viewersPanel: {
     backgroundColor: '#12121E', borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    paddingBottom: 36, maxHeight: H * 0.75,
+    maxHeight: H * 0.75,
   },
   viewersPanelHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1756,7 +1758,6 @@ const s = StyleSheet.create({
   // ── Menu actions ──────────────────────────────────────────────────────────────
   menuSheet: {
     backgroundColor: '#12121E', borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    paddingBottom: 34,
   },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
@@ -1769,7 +1770,7 @@ const s = StyleSheet.create({
 
   // ── Edit modal ────────────────────────────────────────────────────────────────
   editOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  editSheet:   { backgroundColor: '#12121E', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 36 },
+  editSheet:   { backgroundColor: '#12121E', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20 },
   editTitle:   { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 16 },
   editInput:   {
     backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14,

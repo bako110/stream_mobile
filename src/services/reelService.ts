@@ -19,14 +19,17 @@ export const reelService = {
   async getFeed(params?: {
     page?:  number;
     limit?: number;
+    followingOnly?: boolean;
   }): Promise<ReelFeedResponse> {
     const page  = params?.page  ?? 1;
     const limit = params?.limit ?? REELS_PAGE_LIMIT;
 
-    const query = new URLSearchParams({
+    const queryParams: Record<string, string> = {
       page:  String(page),
       limit: String(limit),
-    }).toString();
+    };
+    if (params?.followingOnly) queryParams.following_only = 'true';
+    const query = new URLSearchParams(queryParams).toString();
 
     const res  = await apiClient.get<any>(`${Endpoints.reels.feed}?${query}`);
     const data = res.data ?? res;

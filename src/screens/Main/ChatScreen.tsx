@@ -1804,7 +1804,7 @@ export const ChatScreen: React.FC = () => {
           </View>
 
           {/* Barre commentaire + envoyer */}
-          <View style={CP.bottomBar}>
+          <View style={[CP.bottomBar, { paddingBottom: 28 + insets.bottom }]}>
             <View style={CP.captionRow}>
               <Icon name="edit-3" size={16} color="rgba(255,255,255,0.5)" />
               <TextInput
@@ -1865,7 +1865,7 @@ export const ChatScreen: React.FC = () => {
           </View>
 
           {/* Barre légende + envoyer */}
-          <View style={CP.bottomBar}>
+          <View style={[CP.bottomBar, { paddingBottom: 28 + insets.bottom }]}>
             <View style={CP.captionRow}>
               <Icon name="edit-3" size={16} color="rgba(255,255,255,0.5)" />
               <TextInput
@@ -2363,7 +2363,7 @@ const CP = StyleSheet.create({
   headerTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
   bottomBar: {
     flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: 12, paddingBottom: 28, paddingTop: 10,
+    paddingHorizontal: 12, paddingTop: 10,
     backgroundColor: 'rgba(0,0,0,0.6)', gap: 10,
   },
   captionRow: {

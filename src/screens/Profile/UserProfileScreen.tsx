@@ -17,7 +17,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
-import { BackButton, SkeletonUserProfile, VerifiedBadge } from '../../components/common';
+import { BackButton, SkeletonUserProfile, VerifiedBadge, PriceWithLocal } from '../../components/common';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { postService } from '../../services/postService';
@@ -764,9 +764,16 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                               {item.ticket_price != null ? (
                                 <View style={styles.pubMetaItem}>
                                   <Icon name="tag" size={10} color={accent} />
-                                  <Text style={[styles.pubMetaText, { color: accent, fontWeight: '700' }]}>
-                                    {item.ticket_price === 0 ? 'Gratuit' : `${item.ticket_price} GoGold`}
-                                  </Text>
+                                  {item.ticket_price === 0 ? (
+                                    <Text style={[styles.pubMetaText, { color: accent, fontWeight: '700' }]}>
+                                      Gratuit
+                                    </Text>
+                                  ) : (
+                                    <PriceWithLocal
+                                      amountEur={item.ticket_price}
+                                      style={[styles.pubMetaText, { color: accent, fontWeight: '700' }]}
+                                    />
+                                  )}
                                 </View>
                               ) : null}
                             </View>
@@ -1057,32 +1064,34 @@ const styles = StyleSheet.create({
   emptyContent: { alignItems: 'center', paddingVertical: 48, gap: 10 },
   emptyText: { fontSize: 14 },
 
-  // Publication grid (2 colonnes adaptatives)
+  // Publication grid (2 colonnes adaptatives) — compacte : gap/padding resserres,
+  // thumbnail legerement plus bas (4/5 au lieu de 3/4) pour plus de densite sans
+  // sacrifier la lisibilite du titre/date/lieu affiches sous chaque carte.
   pubGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
-    paddingHorizontal: 12, gap: 10, marginBottom: 8,
+    paddingHorizontal: 12, gap: 8, marginBottom: 6,
   },
   pubGridCard: {
-    width: (W - 24 - 10) / 2, borderRadius: 12, overflow: 'hidden',
+    width: (W - 24 - 8) / 2, borderRadius: 10, overflow: 'hidden',
   },
-  pubGridThumb: { width: '100%', aspectRatio: 3 / 4 },
-  pubGridBody: { padding: 10, gap: 5 },
-  pubGridTitle: { fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  pubGridThumb: { width: '100%', aspectRatio: 4 / 5 },
+  pubGridBody: { padding: 8, gap: 4 },
+  pubGridTitle: { fontSize: 12.5, fontWeight: '700', lineHeight: 16 },
   pubTypeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
   },
-  pubTypeText: { fontSize: 10, fontWeight: '800' },
+  pubTypeText: { fontSize: 9.5, fontWeight: '800' },
   pubMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  pubMetaText: { fontSize: 11 },
+  pubMetaText: { fontSize: 10.5 },
 
   // Reels / Posts grid
   reelsGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
-    paddingHorizontal: 14, gap: 6,
+    paddingHorizontal: 12, gap: 5,
   },
   reelCard: {
-    width: (W - 28 - 12) / 3, borderRadius: 8, overflow: 'hidden', marginBottom: 4,
+    width: (W - 24 - 10) / 3, borderRadius: 8, overflow: 'hidden', marginBottom: 4,
   },
   reelThumb: { width: '100%', aspectRatio: 9 / 16 },
   gridOverlay: {

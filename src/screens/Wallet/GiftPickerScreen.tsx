@@ -20,6 +20,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { GoFolyXLoader } from '../../components/common';
 import { apiClient } from '../../api/client';
@@ -188,6 +189,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   const [gifts, setGifts]         = useState<GiftType[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -341,7 +343,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
       )}
 
       {/* Send button */}
-      <View style={s.footer}>
+      <View style={[s.footer, { paddingBottom: 34 + insets.bottom }]}>
         <TouchableOpacity
           onPress={handleSend}
           disabled={!selected || !canAfford(selected) || sending}
@@ -481,7 +483,6 @@ const styles = (colors: any) => StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 20,
-    paddingBottom: 34,
     paddingTop: 8,
   },
   sendBtnWrapper: {

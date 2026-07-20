@@ -542,7 +542,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
       <Modal visible={showPaywall} animationType="slide" transparent onRequestClose={() => setShowPaywall(false)}>
         <View style={pw.backdrop}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowPaywall(false)} />
-          <View style={[pw.sheet, { backgroundColor: colors.backgroundSecondary }]}>
+          <View style={[pw.sheet, { backgroundColor: colors.backgroundSecondary, paddingBottom: 36 + insets.bottom }]}>
 
             {/* Poignée */}
             <View style={pw.handle} />
@@ -693,7 +693,7 @@ const sc = StyleSheet.create({
 
 const pw = StyleSheet.create({
   backdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  sheet:       { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12 },
+  sheet:       { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12 },
   handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.4)', alignSelf: 'center', marginBottom: 20 },
   lockHero:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 16, position: 'relative' },
   lockCircle:  { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },

@@ -3,6 +3,15 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
+// Le plugin com.facebook.react reconfigure repositories{} au niveau projet apres
+// l'evaluation de settings.gradle (voir DependencyUtils.configureRepositories dans
+// @react-native/gradle-plugin) — un repo declare uniquement dans
+// dependencyResolutionManagement (settings.gradle) n'est jamais consulte pour les
+// dependances du module :app. Il faut le redeclarer ici.
+repositories {
+    maven { url "https://sdk.developer.deepar.ai/maven-android-repository/releases/" }
+}
+
 project.ext.vectoricons = [
     iconFontNames: [ 'Feather.ttf', 'MaterialCommunityIcons.ttf' ]
 ]
@@ -78,6 +87,13 @@ def enableProguardInReleaseBuilds = true
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// local.properties — jamais commité, contient les clés sensibles (SDK Android, DeepAR...)
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -88,18 +104,23 @@ android {
         abortOnError false
     }
 
+    buildFeatures {
+        buildConfig true
+    }
+
     namespace "com.gofolyx.mobile"
     defaultConfig {
         applicationId "com.gofolyx.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 35
-        versionName "1.0.1.9"
+        versionCode 38
+        versionName "1.0.2.2"
 
         ndk {
             abiFilters "arm64-v8a", "armeabi-v7a"
         }
         manifestPlaceholders = [usesCleartextTraffic: "true"]
+        buildConfigField "String", "DEEPAR_LICENSE_KEY", "\"${localProperties.getProperty('deepar.licenseKey', '')}\""
     }
     signingConfigs {
         debug {
@@ -161,4 +182,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // DeepAR — filtres beauté temps réel appliqués au flux caméra avant publication
+    // LiveKit (voir DeepArVideoFrameProcessor). Vérifier sur le Maven DeepAR si une
+    // version plus récente que 5.6.4 est disponible avant un build de prod.
+    implementation "ai.deepar.ar:DeepAR:5.6.4"
 }
