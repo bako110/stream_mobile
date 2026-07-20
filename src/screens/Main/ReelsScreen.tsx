@@ -27,7 +27,7 @@ import { useIsWifi } from '../../hooks/useIsWifi';
 import { useGuidedTour } from '../../context/GuidedTourContext';
 import { RichText } from '../../components/common/RichText';
 import { apiClient, Endpoints } from '../../api';
-import { reelService, socialService, authService } from '../../services';
+import { reelService, socialService, authService, searchService } from '../../services';
 import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
@@ -160,6 +160,13 @@ export const ReelsScreen: React.FC = () => {
   const [searchQuery,   setSearchQuery]   = useState('');
   const [searchResults, setSearchResults] = useState<Reel[]>([]);
   const [searching,     setSearching]     = useState(false);
+  // Reels tendance affichés par défaut à l'ouverture de la recherche (avant toute
+  // frappe) — distincts de searchResults pour ne jamais les mélanger avec de vrais
+  // résultats de recherche. Chargés une fois par ouverture, restent affichés
+  // pendant la frappe jusqu'à ce que runSearch() renvoie de vrais résultats (jamais
+  // d'écran vide entre "tendances" et "résultats" pendant la saisie).
+  const [trendingReels,   setTrendingReels]   = useState<Reel[]>([]);
+  const [loadingTrending, setLoadingTrending] = useState(false);
 
   // Signale au tour guidé que l'écran Reels principal (pas "reels d'un autre
   // utilisateur") est bien monté/focus — TourSpotlight n'affiche l'étape
@@ -384,6 +391,18 @@ export const ReelsScreen: React.FC = () => {
     setSearchQuery('');
     setSearchResults([]);
     setTimeout(() => searchInputRef.current?.focus(), 100);
+
+    // Charge les reels tendance une seule fois par ouverture — affichés par défaut
+    // avant toute frappe, et gardés visibles PENDANT la frappe (voir le rendu plus
+    // bas) jusqu'à ce que de vrais résultats de recherche arrivent. L'API tendance
+    // ne renvoie pas hls_url/author complets (contrat différent de la recherche) —
+    // filtré aux champs sûrs pour l'affichage en grille ; le clic (pickSearchResult)
+    // refetch l'objet complet via getById avant de lancer la lecture.
+    setLoadingTrending(true);
+    searchService.getTrendingReels()
+      .then(items => setTrendingReels(Array.isArray(items) ? items : []))
+      .catch(() => setTrendingReels([]))
+      .finally(() => setLoadingTrending(false));
   }, []);
 
   const closeSearch = useCallback(() => {
@@ -399,18 +418,25 @@ export const ReelsScreen: React.FC = () => {
     nav.navigate('ReelPlayer', { reel: r });
   }, [nav]);
 
-  const pickSearchResult = useCallback((r: Reel) => {
+  const pickSearchResult = useCallback(async (r: Reel) => {
     closeSearch();
     const idx = reelsRef.current.findIndex(x => x.id === r.id);
     if (idx >= 0) {
       currentIdxRef.current = idx;
       setCurrentIndex(idx);
       setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
-    } else {
-      setReels(prev => [r, ...prev.filter(x => x.id !== r.id)]);
-      currentIdxRef.current = 0;
-      setCurrentIndex(0);
+      return;
     }
+    // Les reels tendance (getTrendingReels) n'ont pas hls_url/author complets —
+    // refetch l'objet complet avant de le jouer pour ne jamais lancer une lecture
+    // avec un flux vidéo manquant.
+    let full = r;
+    if (!r.hls_url) {
+      try { full = await reelService.getById(r.id); } catch { /* joue r tel quel, best-effort */ }
+    }
+    setReels(prev => [full, ...prev.filter(x => x.id !== full.id)]);
+    currentIdxRef.current = 0;
+    setCurrentIndex(0);
   }, [closeSearch]);
 
   // ── BackHandler : retour depuis "mes reels" → feed au lieu de quitter ─────
@@ -1019,7 +1045,7 @@ export const ReelsScreen: React.FC = () => {
       {searchOpen && (
         <View style={[s.searchOverlay, { paddingTop: insets.top }]}>
           <View style={s.searchTopBar}>
-            <BackButton onPress={closeSearch} transparent />
+            <BackButton onPress={closeSearch} transparent color="#fff" />
             <View style={s.searchInputWrap}>
               <Icon name="search" size={15} color="rgba(255,255,255,0.4)" style={{ marginLeft: 12 }} />
               <TextInput
@@ -1042,65 +1068,91 @@ export const ReelsScreen: React.FC = () => {
             </View>
           </View>
 
-          {searching ? (
-            <View style={s.searchCenterState}>
-              <ActivityIndicator color="#fff" size="large" />
-              <Text style={s.searchStateText}>Recherche en cours…</Text>
-            </View>
-          ) : searchResults.length > 0 ? (
-            <FlatList
-              key="search-grid"
-              data={searchResults}
-              keyExtractor={r => r.id}
-              numColumns={2}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={s.searchGrid}
-              columnWrapperStyle={s.searchGridRow}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={s.searchCard} onPress={() => pickSearchResult(item)} activeOpacity={0.9}>
-                  {item.thumbnail_url
-                    ? <Image source={{ uri: item.thumbnail_url }} style={s.searchThumb} resizeMode="cover" />
-                    : <View style={s.searchThumbFallback}><Icon name="film" size={32} color="rgba(255,255,255,0.15)" /></View>
-                  }
-                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.92)']} locations={[0.3, 0.6, 1]} style={s.searchCardGrad} />
-                  <View style={s.searchPlayBadge}><Icon name="play" size={10} color="#fff" /></View>
-                  <View style={s.searchViewBadge}>
-                    <Icon name="eye" size={10} color="#fff" />
-                    <Text style={s.searchBadgeText}>{formatCount(item.view_count)}</Text>
-                  </View>
-                  <View style={s.searchCardInfo}>
-                    <View style={s.searchCardAuthorRow}>
-                      {item.author?.avatar_url
-                        ? <Image source={{ uri: item.author.avatar_url }} style={s.searchAvatar} />
-                        : <View style={[s.searchAvatar, s.searchAvatarFallback]}>
-                            <Text style={s.searchAvatarText}>{(item.author?.display_name || item.author?.username || '?')[0].toUpperCase()}</Text>
-                          </View>
+          {(() => {
+            // Grille affichée pour de vrais résultats de recherche OU, par défaut,
+            // pour les tendances — même rendu, source différente. Les tendances
+            // restent visibles PENDANT la frappe (tant qu'aucun vrai résultat n'est
+            // encore arrivé) : jamais d'écran vide entre "tendances" et "résultats".
+            const hasRealResults = searchResults.length > 0;
+            const showTrending = !hasRealResults && searchQuery.trim().length === 0 && trendingReels.length > 0;
+            const gridData = hasRealResults ? searchResults : showTrending ? trendingReels : null;
+
+            if (searching && !showTrending) {
+              return (
+                <View style={s.searchCenterState}>
+                  <ActivityIndicator color="#fff" size="large" />
+                  <Text style={s.searchStateText}>Recherche en cours…</Text>
+                </View>
+              );
+            }
+            if (gridData) {
+              return (
+                <FlatList
+                  key="search-grid"
+                  data={gridData}
+                  keyExtractor={r => r.id}
+                  numColumns={2}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={s.searchGrid}
+                  columnWrapperStyle={s.searchGridRow}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity style={s.searchCard} onPress={() => pickSearchResult(item)} activeOpacity={0.9}>
+                      {item.thumbnail_url
+                        ? <Image source={{ uri: item.thumbnail_url }} style={s.searchThumb} resizeMode="cover" />
+                        : <View style={s.searchThumbFallback}><Icon name="film" size={32} color="rgba(255,255,255,0.15)" /></View>
                       }
-                      <Text style={s.searchCardAuthor} numberOfLines={1}>{item.author?.display_name || item.author?.username || ''}</Text>
-                    </View>
-                    {item.caption ? <Text style={s.searchCardCaption} numberOfLines={2}>{item.caption}</Text> : null}
-                    <View style={s.searchCardStats}>
-                      <MCIcon name="heart" size={10} color="#E0389A" />
-                      <Text style={s.searchCardStat}>{formatCount(item.like_count)}</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-          ) : searchQuery.length > 0 ? (
-            <View style={s.searchCenterState}>
-              <View style={s.searchEmptyIcon}><Icon name="search" size={28} color="rgba(255,255,255,0.4)" /></View>
-              <Text style={s.searchStateTitle}>Aucun résultat</Text>
-              <Text style={s.searchStateText}>Essaie un autre mot-clé ou nom d'auteur</Text>
-            </View>
-          ) : (
-            <View style={s.searchCenterState}>
-              <View style={s.searchEmptyIcon}><Icon name="trending-up" size={28} color="rgba(255,255,255,0.4)" /></View>
-              <Text style={s.searchStateTitle}>Découvre des reels</Text>
-              <Text style={s.searchStateText}>Tape le nom d'un auteur ou un mot-clé</Text>
-            </View>
-          )}
+                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.92)']} locations={[0.3, 0.6, 1]} style={s.searchCardGrad} />
+                      <View style={s.searchPlayBadge}><Icon name="play" size={10} color="#fff" /></View>
+                      <View style={s.searchViewBadge}>
+                        <Icon name="eye" size={10} color="#fff" />
+                        <Text style={s.searchBadgeText}>{formatCount(item.view_count)}</Text>
+                      </View>
+                      <View style={s.searchCardInfo}>
+                        <View style={s.searchCardAuthorRow}>
+                          {item.author?.avatar_url
+                            ? <Image source={{ uri: item.author.avatar_url }} style={s.searchAvatar} />
+                            : <View style={[s.searchAvatar, s.searchAvatarFallback]}>
+                                <Text style={s.searchAvatarText}>{(item.author?.display_name || item.author?.username || '?')[0]?.toUpperCase() ?? '?'}</Text>
+                              </View>
+                          }
+                          <Text style={s.searchCardAuthor} numberOfLines={1}>{item.author?.display_name || item.author?.username || ''}</Text>
+                        </View>
+                        {item.caption ? <Text style={s.searchCardCaption} numberOfLines={2}>{item.caption}</Text> : null}
+                        <View style={s.searchCardStats}>
+                          <MCIcon name="heart" size={10} color="#E0389A" />
+                          <Text style={s.searchCardStat}>{formatCount(item.like_count)}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                />
+              );
+            }
+            if (searchQuery.trim().length > 0) {
+              return (
+                <View style={s.searchCenterState}>
+                  <View style={s.searchEmptyIcon}><Icon name="search" size={28} color="rgba(255,255,255,0.4)" /></View>
+                  <Text style={s.searchStateTitle}>Aucun résultat</Text>
+                  <Text style={s.searchStateText}>Essaie un autre mot-clé ou nom d'auteur</Text>
+                </View>
+              );
+            }
+            if (loadingTrending) {
+              return (
+                <View style={s.searchCenterState}>
+                  <ActivityIndicator color="#fff" size="large" />
+                </View>
+              );
+            }
+            return (
+              <View style={s.searchCenterState}>
+                <View style={s.searchEmptyIcon}><Icon name="trending-up" size={28} color="rgba(255,255,255,0.4)" /></View>
+                <Text style={s.searchStateTitle}>Découvre des reels</Text>
+                <Text style={s.searchStateText}>Tape le nom d'un auteur ou un mot-clé</Text>
+              </View>
+            );
+          })()}
         </View>
       )}
 
