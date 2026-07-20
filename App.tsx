@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { CurrencyProvider } from './src/context/CurrencyContext';
+import { GuidedTourProvider } from './src/context/GuidedTourContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
 export default function App() {
@@ -11,7 +12,9 @@ export default function App() {
       <SafeAreaProvider>
         <ThemeProvider>
           <CurrencyProvider>
-            <RootNavigator />
+            <GuidedTourProvider>
+              <RootNavigator />
+            </GuidedTourProvider>
           </CurrencyProvider>
         </ThemeProvider>
       </SafeAreaProvider>

@@ -20,6 +20,8 @@ import { decodeId }         from '../utils/slugId';
 import { setupFCM, resumePendingCallAccept } from '../services/fcmService';
 import { callConnectionService } from '../services/callConnectionService';
 import { UpdateBanner } from '../components/common/UpdateBanner';
+import { TourSpotlight } from '../components/common/TourSpotlight';
+import { useGuidedTour } from '../context/GuidedTourContext';
 
 
 type AppState = 'splash' | 'onboarding' | 'auth' | 'main';
@@ -56,6 +58,21 @@ export const RootNavigator: React.FC = () => {
   const [legalOverlay, setLegalOverlay] = useState<'cgu' | 'privacy' | null>(null);
   const [blockedInfo, setBlockedInfo] = useState<{ reason?: string; contact?: string; blockedAt?: string } | null>(null);
   const pendingUrlRef = useRef<string | null>(null);
+  const { markFirstLaunchIfNeeded, activateTourIfPending } = useGuidedTour();
+
+  // Détecte le tout premier lancement JAMAIS de l'app sur cet appareil — marque
+  // "un tour est dû" sans encore l'activer (le bouton Créer n'existe pas avant
+  // connexion). Si l'app a déjà tourné avant (flag déjà présent, true ou false),
+  // ne fait rien — jamais de redéclenchement.
+  useEffect(() => {
+    markFirstLaunchIfNeeded();
+  }, [markFirstLaunchIfNeeded]);
+
+  // Active le tour dès que l'utilisateur atteint réellement l'écran principal —
+  // seulement s'il a été marqué comme dû au montage ci-dessus.
+  useEffect(() => {
+    if (appState === 'main') activateTourIfPending();
+  }, [appState, activateTourIfPending]);
 
   // Capturer le deep link reçu avant que l'app soit prête
   useEffect(() => {
@@ -277,6 +294,7 @@ export const RootNavigator: React.FC = () => {
             }}>
               <MainNavigator onLogout={handleLogout} />
               <UpdateBanner />
+              <TourSpotlight />
             </WebSocketProvider>
           </UserProvider>
         )

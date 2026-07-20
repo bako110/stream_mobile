@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useIsWifi } from '../../hooks/useIsWifi';
+import { useGuidedTour } from '../../context/GuidedTourContext';
 import { RichText } from '../../components/common/RichText';
 import { apiClient, Endpoints } from '../../api';
 import { reelService, socialService, authService } from '../../services';
@@ -85,6 +86,7 @@ export const ReelsScreen: React.FC = () => {
   const HEADER_H = insets.top + 54;
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
+  const { currentStep: tourStep, advance: advanceTour, setScreenPresence } = useGuidedTour();
   const nav    = useNavigation<Nav>();
   const route  = useRoute();
   const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean; userId?: string; initialReels?: Reel[] };
@@ -158,6 +160,16 @@ export const ReelsScreen: React.FC = () => {
   const [searchQuery,   setSearchQuery]   = useState('');
   const [searchResults, setSearchResults] = useState<Reel[]>([]);
   const [searching,     setSearching]     = useState(false);
+
+  // Signale au tour guidé que l'écran Reels principal (pas "reels d'un autre
+  // utilisateur") est bien monté/focus — TourSpotlight n'affiche l'étape
+  // 'reels_swipe' que si cette présence est vraie, pour ne jamais l'afficher par
+  // erreur pendant que l'utilisateur navigue encore sur un autre écran.
+  useEffect(() => {
+    if (userModeRef.current) return; // pas sur ce mode-là
+    setScreenPresence('reels_swipe', screenFocused);
+    return () => setScreenPresence('reels_swipe', false);
+  }, [screenFocused, setScreenPresence]);
 
   // Refs stables pour éviter les closures stales
   const reelsRef        = useRef<Reel[]>(seedReel.length > 0 ? seedReel : []);
@@ -611,12 +623,16 @@ export const ReelsScreen: React.FC = () => {
     currentIdxRef.current = bounded;
     setCurrentIndex(bounded);
 
+    // Vrai swipe détecté — si le tour guidé attend ce geste (étape 'reels_swipe'),
+    // le geste réel EST la validation, pas besoin d'un bouton "Compris" séparé.
+    if (tourStep === 'reels_swipe') advanceTour();
+
     sendViewForCurrent();
     const cur = reelsRef.current[bounded];
     if (cur) currentReelRef.current = { id: cur.id, startTime: Date.now() };
 
     if (bounded >= reelsRef.current.length - 3) loadMoreRef.current();
-  }, [SCREEN_H, sendViewForCurrent]);
+  }, [SCREEN_H, sendViewForCurrent, tourStep, advanceTour]);
 
   // ── Callbacks stables ─────────────────────────────────────────────────────
   const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);

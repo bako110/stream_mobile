@@ -15,6 +15,7 @@ export type { ContentCategory } from './CategorySelector';
 export { SocialAuthButton }  from './SocialAuthButton';
 export { AppHeader, BackButton } from './AppHeader';
 export { AppTabBar }         from './AppTabBar';
+export { TourSpotlight }     from './TourSpotlight';
 export {
   SkeletonBox,
   SkeletonCard,

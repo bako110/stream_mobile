@@ -14,7 +14,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence, withTiming, withRepeat,
-  interpolate, runOnJS, FadeInDown,
+  interpolate, FadeInDown,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -545,18 +545,24 @@ const FeedHeaderBadges: React.FC<{
   onFavorites: () => void;
   onLive: () => void;
   onFriends: () => void;
+  friendsActive: boolean;
   colors: AppColors;
-}> = React.memo(({ onMessages, onNotifs, onFavorites, onLive, onFriends, colors }) => {
+}> = React.memo(({ onMessages, onNotifs, onFavorites, onLive, onFriends, friendsActive, colors }) => {
   const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
   const totalNotifs = unreadNotifications + unreadActivity;
   const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 22, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
   return (
     <View style={{ paddingBottom: 6, marginHorizontal: -16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden' }}>
-        {/* Mes amis — filtre le fil aux posts des comptes suivis (filter='following') */}
+        {/* Mes amis / Général — bascule entre le fil normal et le filtre "amis"
+            (posts/events/concerts/reels des comptes suivis uniquement). Icône ET
+            libellé changent selon l'état : "Mes amis" pour y entrer, "Général"
+            pour en sortir — pas juste une couleur qui change sur le même texte. */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onFriends} activeOpacity={0.8}>
-          <MCIcon name="account-heart-outline" size={20} color={colors.textPrimary} />
-          <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Mes amis</Text>
+          <MCIcon name={friendsActive ? 'account-group' : 'account-heart-outline'} size={20} color={friendsActive ? colors.primary : colors.textPrimary} />
+          <Text style={{ fontSize: 10.5, color: friendsActive ? colors.primary : colors.textSecondary, marginTop: 2, fontWeight: friendsActive ? '700' : '500' }}>
+            {friendsActive ? 'Général' : 'Mes amis'}
+          </Text>
         </TouchableOpacity>
         {sep}
         {/* Messages & Appels */}
@@ -1317,7 +1323,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const itemsRef = useRef<FeedItem[]>(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
 
+  // handleToggleFriends (bascule Général ↔ Mes amis) gère lui-même load() dans un
+  // flux linéaire pour pouvoir attendre sa fin avant de repivoter l'animation —
+  // pose ce flag à true juste avant son propre setFilter pour empêcher CET effect
+  // de relancer un 2e appel à load() en double sur le même changement de filtre.
+  const skipNextFilterLoadRef = useRef(false);
+
   useEffect(() => {
+    if (skipNextFilterLoadRef.current) {
+      skipNextFilterLoadRef.current = false;
+      return;
+    }
     if (itemsRef.current.length === 0) setLoading(true);
     load(filter);
   }, [filter]);
@@ -1550,6 +1566,36 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
 
   const goToMessages = useCallback(() => nav.navigate('Messages' as any), [nav]);
   const goToNotifs   = useCallback(() => nav.navigate('Notifications' as any), [nav]);
+
+  // Bascule Général ↔ Mes amis — flux linéaire unique, aucune animation de
+  // transform (les essais précédents avec flip 3D ou fondu laissaient l'ancien/
+  // nouveau contenu se chevaucher ou disparaître pendant le chargement réseau).
+  const flipInProgressRef = useRef(false);
+
+  // switchingFilter affiche le skeleton (déjà utilisé pour le 1er chargement) PENDANT
+  // toute la durée du rechargement — le nouveau contenu (posts+events+concerts+reels,
+  // 6 requêtes en parallèle pour "Général") n'est jamais révélé avant d'être
+  // complètement prêt. Un simple fondu laissait l'utilisateur face à un écran vide
+  // sans aucun retour visuel pendant les quelques secondes du chargement réseau —
+  // ça donnait l'impression d'un bug ("page blanche qui ne reprend jamais") alors
+  // que les données arrivaient simplement après coup, sans indicateur pour patienter.
+  const [switchingFilter, setSwitchingFilter] = useState(false);
+
+  const handleToggleFriends = useCallback(async () => {
+    if (flipInProgressRef.current) return; // évite un double-tap pendant le chargement
+    flipInProgressRef.current = true;
+    const next = filter === 'following' ? 'all' : 'following';
+
+    setSwitchingFilter(true);
+    try {
+      skipNextFilterLoadRef.current = true;
+      setFilter(next);
+      await load(next);
+    } finally {
+      setSwitchingFilter(false);
+      flipInProgressRef.current = false;
+    }
+  }, [filter, load]);
   const openMenu     = useCallback(() => (nav as any).navigate('ExplorerMenu'), [nav]);
 
   // ── Callbacks stables pour FeedListHeader ──────────────────────────────────
@@ -1922,7 +1968,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
               onMenu={openMenu}
               onFavorites={() => nav.navigate('Favorites')}
               onLive={() => nav.navigate('GoLive')}
-              onFriends={() => { setFilter('following'); load('following'); }}
+              onFriends={handleToggleFriends}
+              friendsActive={filter === 'following'}
               colors={colors}
             />
           </View>
@@ -2414,7 +2461,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
             );
           })()}
         </Animated.View>
-      ) : loading ? (
+      ) : (loading || switchingFilter) ? (
         <SkeletonFeedScreen />
       ) : (
         <FlatList
@@ -2464,7 +2511,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                   Les personnes que tu suis n'ont pas encore publié de post. Suis plus de gens ou reviens plus tard.
                 </Text>
                 <TouchableOpacity
-                  onPress={() => { setFilter('all'); load('all'); }}
+                  onPress={handleToggleFriends}
                   style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 24 }}
                 >
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Découvrir du contenu</Text>

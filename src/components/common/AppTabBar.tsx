@@ -10,6 +10,7 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useWs } from '../../context/WebSocketContext';
+import { useGuidedTour, useTourTarget } from '../../context/GuidedTourContext';
 import { TAB_BAR_HEIGHT } from '../../styles';
 
 interface TabConfig {
@@ -111,10 +112,18 @@ interface CreateTabButtonProps {
 
 const CreateTabButton: React.FC<CreateTabButtonProps> = memo(({ open, onToggle, onSelect, colors }) => {
   const progress = useSharedValue(0);
+  const { currentStep, advance } = useGuidedTour();
+  const { viewRef, onLayout } = useTourTarget('feed_create_button');
+  const isTourTarget = currentStep === 'feed_create_button';
 
   useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, { duration: 200 });
   }, [open]);
+
+  const handlePress = () => {
+    if (isTourTarget) advance();
+    onToggle();
+  };
 
   const iconRotateStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${interpolate(progress.value, [0, 1], [0, 45])}deg` }],
@@ -148,7 +157,13 @@ const CreateTabButton: React.FC<CreateTabButtonProps> = memo(({ open, onToggle, 
         </Animated.View>
       )}
 
-      <TouchableOpacity onPress={onToggle} style={styles.createBtnTouchable} activeOpacity={0.75}>
+      <TouchableOpacity
+        ref={viewRef}
+        onLayout={onLayout}
+        onPress={handlePress}
+        style={styles.createBtnTouchable}
+        activeOpacity={0.75}
+      >
         <View style={[
           styles.createBtn,
           { backgroundColor: colors.background, borderColor: open ? colors.textPrimary : colors.divider },

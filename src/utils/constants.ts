@@ -40,6 +40,9 @@ export const STORAGE_KEYS = {
   LAST_USER_ID:   'gofolyx_last_user_id',
   CACHED_USER:    'gofolyx_cached_user',
   CURRENCY_CODE:  'gofolyx_currency_code',
+  // Tour guidé post-connexion (main animée sur les écrans clés) — distinct de
+  // ONBOARDING_DONE (le splash marketing "Rejoindre GoFolyX" avant connexion).
+  GUIDED_TOUR_DONE: 'gofolyx_guided_tour_done',
 } as const;
 
 // ── Durées (ms) ────────────────────────────────────────────────────────────

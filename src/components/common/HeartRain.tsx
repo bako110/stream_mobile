@@ -1,14 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Image, Text, StyleSheet, Dimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
-import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-// ── Pluie de cœurs — se déclenche une fois à l'arrivée sur un contenu très aimé ──
-export const HEART_RAIN_THRESHOLD = 1;
+// ── Pluie de cœurs — se déclenche une fois le contenu passé 1000 likes, effet
+// spectaculaire réservé aux contenus vraiment viraux (pas dès le 1er like).
+// RecentLikersAvatars/LikeNamesFeed (plus bas) gardent leur propre seuil à 1 —
+// ces indicateurs sociaux discrets restent utiles bien avant 1000 likes.
+export const HEART_RAIN_THRESHOLD = 1000;
+export const SOCIAL_INDICATOR_THRESHOLD = 1;
 const HEART_RAIN_COUNT  = 100;
 const HEART_RAIN_COLORS = ['#7B3FF2', '#E0389A', '#F0365A', '#A855F7'];
 
@@ -41,7 +45,7 @@ function FallingHeart({ drop }: { drop: Drop }) {
 
   return (
     <Animated.View style={[{ position: 'absolute', left: drop.left, top: -40 }, style]}>
-      <Icon name="heart" size={drop.size} color={drop.color} />
+      <MCIcon name="heart" size={drop.size} color={drop.color} />
     </Animated.View>
   );
 }
@@ -86,7 +90,7 @@ export function RecentLikersAvatars({ active, likeCount, contentId, kind }: {
   const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (!active || likeCount < HEART_RAIN_THRESHOLD || fetchedRef.current) return;
+    if (!active || likeCount < SOCIAL_INDICATOR_THRESHOLD || fetchedRef.current) return;
     fetchedRef.current = true;
     const url = kind === 'reel'
       ? `${Endpoints.social.reactionUsers}?reel_id=${contentId}&limit=3`
@@ -151,7 +155,7 @@ function RisingName({ liker }: { liker: RecentLiker }) {
 
   return (
     <Animated.View style={[nameS.bubble, style]}>
-      <Icon name="heart" size={11} color="#E0389A" />
+      <MCIcon name="heart" size={11} color="#E0389A" />
       <Text style={nameS.label} numberOfLines={1}>{liker.display_name ?? liker.username ?? 'Quelqu\'un'}</Text>
     </Animated.View>
   );
@@ -167,7 +171,7 @@ export function LikeNamesFeed({ active, likeCount, contentId, kind }: {
   const seqRef = useRef(0);
 
   useEffect(() => {
-    if (!active || likeCount < HEART_RAIN_THRESHOLD || fetchedRef.current) return;
+    if (!active || likeCount < SOCIAL_INDICATOR_THRESHOLD || fetchedRef.current) return;
     fetchedRef.current = true;
     const url = kind === 'reel'
       ? `${Endpoints.social.reactionUsers}?reel_id=${contentId}&limit=10`

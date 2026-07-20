@@ -3,12 +3,10 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Linking,
   Animated, Platform, Alert,
 } from 'react-native';
+import DeviceInfo from 'react-native-device-info';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { updateService, AppVersionInfo } from '../../services/updateService';
-
-// Doit correspondre à versionCode dans android/app/build.gradle
-const CURRENT_VERSION_CODE = 34;
 
 export const UpdateBanner: React.FC = () => {
   const { theme }  = useTheme();
@@ -18,9 +16,16 @@ export const UpdateBanner: React.FC = () => {
   const slideY = useRef(new Animated.Value(140)).current;
 
   useEffect(() => {
+    // Lu depuis le binaire réellement installé (getBuildNumber() = versionCode
+    // Android / build number iOS) plutôt qu'une constante à maintenir manuellement
+    // en synchro avec android/app/build.gradle à chaque bump — une désynchronisation
+    // ici affiche "mise à jour disponible" en boucle même sur la dernière version.
+    const currentVersionCode = parseInt(DeviceInfo.getBuildNumber(), 10);
+    if (!Number.isFinite(currentVersionCode)) return;
+
     updateService.checkForUpdate()
       .then(v => {
-        if (v.version_code > CURRENT_VERSION_CODE && v.apk_url) {
+        if (v.version_code > currentVersionCode && v.apk_url) {
           setInfo(v);
           Animated.spring(slideY, {
             toValue: 0,
