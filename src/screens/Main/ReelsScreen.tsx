@@ -437,6 +437,13 @@ export const ReelsScreen: React.FC = () => {
     setReels(prev => [full, ...prev.filter(x => x.id !== full.id)]);
     currentIdxRef.current = 0;
     setCurrentIndex(0);
+    // Sans ce scroll, le reel est bien injecté en tête de `reels` mais la FlatList
+    // reste visuellement à la position de scroll où l'utilisateur était avant
+    // d'ouvrir la recherche — currentIndex changeait déjà côté état React, mais
+    // rien ne faisait bouger l'écran affiché (c'était le bug : le reel choisi
+    // n'apparaissait jamais). setTimeout laisse le nouvel item être rendu par la
+    // FlatList (après le setReels ci-dessus) avant de tenter le scroll vers lui.
+    setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }), 50);
   }, [closeSearch]);
 
   // ── BackHandler : retour depuis "mes reels" → feed au lieu de quitter ─────
