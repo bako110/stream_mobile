@@ -7,7 +7,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl, Share, Image,
+  ActivityIndicator, Alert, RefreshControl, Share, Image, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -52,7 +52,8 @@ const STATUS_CFG = {
 };
 
 export const CommunityFundDetailScreen: React.FC = () => {
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const insets = useSafeAreaInsets();
@@ -145,6 +146,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
         <GoFolyXLoader />
       </View>
     );
@@ -153,6 +155,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
   if (!cotisation) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
         <Icon name="alert-circle" size={40} color={colors.textTertiary} />
         <Text style={{ color: colors.textTertiary, marginTop: 12 }}>Cotisation introuvable</Text>
       </View>
@@ -164,6 +167,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
         <BackButton onPress={() => nav.goBack()} />

@@ -51,8 +51,14 @@ async function normalizeUri(uri: string): Promise<string> {
   if (!uri) throw new Error('URI image invalide');
   if (Platform.OS !== 'android' || !uri.startsWith('content://')) return uri;
   const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload_${Date.now()}.jpg`;
-  const b64  = await ReactNativeBlobUtil.fetch('GET', uri).then(r => r.base64());
-  await ReactNativeBlobUtil.fs.writeFile(dest, b64, 'base64');
+  try {
+    // cp gère nativement les content:// URIs Android (SAF, Google Photos, etc.) — plus fiable
+    // que le fetch+base64 ci-dessous, qui échoue sur certains providers de fichiers streamés.
+    await ReactNativeBlobUtil.fs.cp(uri, dest);
+  } catch {
+    const b64 = await ReactNativeBlobUtil.fetch('GET', uri).then(r => r.base64());
+    await ReactNativeBlobUtil.fs.writeFile(dest, b64, 'base64');
+  }
   return `file://${dest}`;
 }
 

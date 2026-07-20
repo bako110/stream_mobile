@@ -23,6 +23,8 @@ import type { ConversationSummary } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BackButton } from '../../components/common';
+import { StoryBar } from '../../components/story';
+import { useUser } from '../../context/UserContext';
 
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -89,6 +91,21 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const [loading,       setLoading]       = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
   const [search,        setSearch]        = useState('');
+  // Barre de recherche masquée par défaut — remplacée par la barre de stories tant
+  // qu'on ne clique pas sur l'icône recherche (à la place de l'ancien bouton
+  // "nouveau message"). Se referme et vide le texte au clic sur la croix.
+  const [searchOpen,    setSearchOpen]    = useState(false);
+  const { currentUser } = useUser();
+
+  // Callbacks pour StoryBar/StoryViewer — même signature attendue par le composant
+  // partagé avec FeedScreen ("Répondre"/"Appeler" depuis une story ouvre le chat/
+  // appel directement, cohérent avec le fait d'être déjà dans l'écran messagerie).
+  const onStoryNavigateToChat = useCallback((partnerId: string, partnerName: string, avatarUrl?: string) => {
+    nav.navigate('Chat' as any, { partnerId, partnerName, avatarUrl });
+  }, [nav]);
+  const onStoryNavigateToCall = useCallback((partnerId: string, partnerName: string, callType: 'voice' | 'video') => {
+    nav.navigate('Call' as any, { partnerId, partnerName, callType, isIncoming: false });
+  }, [nav]);
 
 
   const load = useCallback(async () => {
@@ -393,9 +410,12 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
               {activeTab === 'messages' ? (
                 <TouchableOpacity
                   style={[styles.iconBtn, { backgroundColor: colors.primary + '18' }]}
-                  onPress={() => nav.navigate('NewConversation' as any)}
+                  onPress={() => {
+                    setSearchOpen(o => !o);
+                    setSearch(''); // la recherche disparaît vidée, jamais de texte résiduel au ré-ouvrir
+                  }}
                 >
-                  <Icon name="edit" size={18} color={colors.primary} />
+                  <Icon name={searchOpen ? 'x' : 'search'} size={18} color={colors.primary} />
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
@@ -438,23 +458,34 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Barre de recherche — seulement onglet messages */}
+        {/* Onglet messages : barre de recherche (apparaît au clic sur l'icône
+            loupe du header) OU barre de stories par défaut, jamais les deux. */}
         {activeTab === 'messages' && (
-          <View style={[styles.searchBar, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary }]}>
-            <Icon name="search" size={15} color={colors.textTertiary} />
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Rechercher une conversation…"
-              placeholderTextColor={colors.textDisabled}
-              style={[styles.searchInput, { color: colors.textPrimary }]}
+          searchOpen ? (
+            <View style={[styles.searchBar, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary }]}>
+              <Icon name="search" size={15} color={colors.textTertiary} />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Rechercher une conversation…"
+                placeholderTextColor={colors.textDisabled}
+                style={[styles.searchInput, { color: colors.textPrimary }]}
+                autoFocus
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')}>
+                  <Icon name="x" size={14} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <StoryBar
+              currentUser={currentUser}
+              colors={colors}
+              onNavigateToChat={onStoryNavigateToChat}
+              onNavigateToCall={onStoryNavigateToCall}
             />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Icon name="x" size={14} color={colors.textTertiary} />
-              </TouchableOpacity>
-            )}
-          </View>
+          )
         )}
       </View>
 

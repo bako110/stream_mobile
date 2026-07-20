@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, TextInput, Modal, Pressable,
-  Image, ScrollView, Platform, KeyboardAvoidingView,
+  Image, ScrollView, Platform, KeyboardAvoidingView, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
@@ -227,6 +227,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={[S.root, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -234,6 +235,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
 
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <LinearGradient colors={[colors.surface, colors.surface]}
         style={[S.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}

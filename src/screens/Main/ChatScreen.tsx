@@ -523,6 +523,11 @@ export const ChatScreen: React.FC = () => {
   const pickImage = async () => {
     setShowAttach(false);
     const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 as any });
+    if (result.didCancel) return;
+    if (result.errorCode) {
+      Alert.alert('Erreur', result.errorMessage ?? "Impossible d'accéder à la galerie.");
+      return;
+    }
     const asset = result.assets?.[0];
     if (!asset?.uri) return;
     if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
@@ -555,7 +560,8 @@ export const ChatScreen: React.FC = () => {
         { width: uploaded.width, height: uploaded.height },
       );
       setMessages(prev => [msg, ...prev]);
-    } catch {
+    } catch (err) {
+      console.warn('[ChatScreen] envoi image échoué:', err);
       Alert.alert('Erreur', "Impossible d'envoyer l'image");
     } finally {
       setImgUploading(false);

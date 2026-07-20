@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useIsWifi } from '../../hooks/useIsWifi';
+import { useMediaDownload } from '../../hooks/useMediaDownload';
 import { useGuidedTour } from '../../context/GuidedTourContext';
 import { RichText } from '../../components/common/RichText';
 import { apiClient, Endpoints } from '../../api';
@@ -1345,6 +1346,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [skipLeftLabel,  setSkipLeftLabel]  = useState('');
   const [skipRightLabel, setSkipRightLabel] = useState('');
   const [showOwnerMenu,      setShowOwnerMenu]      = useState(false);
+  const { get: getDl, download: startDl } = useMediaDownload();
+  const reelDl = getDl(reel.id);
+  const handleDownloadReel = useCallback(() => {
+    const url = reel.hls_url ?? reel.mp4_url;
+    if (!url) { Alert.alert('Indisponible', 'Vidéo introuvable pour ce reel.'); return; }
+    startDl(reel.id, url, true);
+  }, [reel.id, reel.hls_url, reel.mp4_url, startDl]);
   const [commentsDisabledSt, setCommentsDisabledSt] = useState(reel.comments_disabled ?? false);
   const [togglingComments,   setTogglingComments]   = useState(false);
   const [showRemix,          setShowRemix]          = useState(false);
@@ -1492,9 +1500,15 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   }, [hasMusic, muted]); // eslint-disable-line
 
   // ── Musique associée au reel ────────────────────────────────────────────────
-  const musicSoundRef    = useRef<Sound | null>(null);
-  const musicTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const musicProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Coordination stricte avec la vidéo : quand hasMusic, c'est CE bloc qui pilote play()/pause()
+  // sur le player vidéo (silencieux, en boucle) — jamais l'effet play/pause générique plus bas,
+  // qui se contente d'ignorer le player si hasMusic est vrai. Un seul chef d'orchestre à la fois.
+  const musicSoundRef     = useRef<Sound | null>(null);
+  const musicTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const musicProgressRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const musicRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const musicRetryCountRef = useRef(0);
+  const MUSIC_MAX_RETRIES = 2;
   // Refs stables pour startMusic (isActiveRef/onEndRef déclarés plus bas mais les refs existent dès le mount)
   const musicIsActiveRef = useRef(isActive);
   const musicOnEndRef    = useRef(onEnd);
@@ -1506,25 +1520,49 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   // ou le reel est redevenu inactif pendant le chargement réseau du fichier audio).
   const musicLoadTokenRef = useRef(0);
 
-  const stopMusic = useCallback(() => {
+  const stopMusic = useCallback((keepRetryCount = false) => {
     musicLoadTokenRef.current++;
-    if (musicTimerRef.current)    { clearTimeout(musicTimerRef.current);      musicTimerRef.current    = null; }
-    if (musicProgressRef.current) { clearInterval(musicProgressRef.current);  musicProgressRef.current = null; }
+    if (musicTimerRef.current)      { clearTimeout(musicTimerRef.current);       musicTimerRef.current      = null; }
+    if (musicProgressRef.current)   { clearInterval(musicProgressRef.current);   musicProgressRef.current   = null; }
+    if (musicRetryTimerRef.current) { clearTimeout(musicRetryTimerRef.current);  musicRetryTimerRef.current = null; }
+    if (!keepRetryCount) musicRetryCountRef.current = 0;
     if (musicSoundRef.current) {
       musicSoundRef.current.stop();
       musicSoundRef.current.release();
       musicSoundRef.current = null;
     }
-  }, []);
+    try { player.pause(); } catch {}
+  }, [player]);
+
+  // Arme la progression + le timer de fin sur la position RÉELLE du son (interrogée via
+  // getCurrentTime), jamais un chrono JS déconnecté — résiste aux pauses/reprises d'arrière-plan
+  // et aux petits retards de scheduling du setInterval.
+  const armMusicClip = useCallback((snd: Sound, startSec: number, clipDur: number) => {
+    progressValue.value = 0;
+    musicProgressRef.current = setInterval(() => {
+      snd.getCurrentTime(pos => {
+        const elapsed = Math.max(0, pos - startSec);
+        progressValue.value = clipDur > 0 ? Math.min(elapsed / clipDur, 1) : 0;
+        if (clipDur > 0 && elapsed >= clipDur) {
+          stopMusic();
+          if (mountedRef.current && musicIsActiveRef.current) {
+            endedRef.current = true;
+            setEnded(true);
+            musicOnEndRef.current();
+          }
+        }
+      });
+    }, 150);
+  }, [progressValue, stopMusic]);
 
   const startMusic = useCallback(() => {
     const url      = reel.music_url;
     if (!url) return;
     const startSec = reel.music_start_sec ?? 0;
     const endSec   = reel.music_end_sec   ?? 0;
-    const clipDur  = endSec > startSec ? endSec - startSec : 0;
+    let   clipDur  = endSec > startSec ? endSec - startSec : 0;
 
-    stopMusic();
+    stopMusic(true);
     const myToken = ++musicLoadTokenRef.current;
     Sound.setCategory('Playback');
     const isRemote = url.startsWith('http://') || url.startsWith('https://');
@@ -1532,38 +1570,43 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       // Ce chargement a été invalidé entre-temps (stopMusic()/nouveau startMusic() appelé
       // pendant le chargement réseau) : ne jamais jouer un son devenu obsolète.
       if (myToken !== musicLoadTokenRef.current) { snd.release(); return; }
-      if (err) { console.warn('[ReelMusic] load error:', err); snd.release(); return; }
+      if (err) {
+        console.warn('[ReelMusic] load error:', err);
+        snd.release();
+        if (musicRetryCountRef.current < MUSIC_MAX_RETRIES && mountedRef.current) {
+          musicRetryCountRef.current += 1;
+          musicRetryTimerRef.current = setTimeout(() => {
+            if (mountedRef.current && musicIsActiveRef.current && !pausedRef.current) startMusicRef.current();
+          }, Math.pow(2, musicRetryCountRef.current) * 1000);
+        }
+        return;
+      }
       if (!mountedRef.current) { snd.release(); return; }
+      musicRetryCountRef.current = 0;
       if (startSec > 0) snd.setCurrentTime(startSec);
       musicSoundRef.current = snd;
 
-      // Progression basée sur la durée du clip musical
-      if (clipDur > 0) {
-        const started = Date.now();
-        progressValue.value = 0;
-        musicProgressRef.current = setInterval(() => {
-          const elapsed = (Date.now() - started) / 1000;
-          progressValue.value = Math.min(elapsed / clipDur, 1);
-        }, 100);
-
-        // Couper le son et passer au reel suivant à music_end_sec
-        musicTimerRef.current = setTimeout(() => {
-          stopMusic();
-          if (mountedRef.current && musicIsActiveRef.current) {
-            endedRef.current = true;
-            setEnded(true);
-            musicOnEndRef.current();
-          }
-        }, clipDur * 1000);
+      // clip mal renseigné (music_end_sec <= music_start_sec) : se rabattre sur la durée réelle
+      // du fichier plutôt que de jouer sans jamais s'arrêter ni progresser.
+      if (clipDur <= 0) {
+        const d = snd.getDuration();
+        clipDur = d > startSec ? d - startSec : d;
       }
+      armMusicClip(snd, startSec, clipDur);
 
+      // Démarrage synchronisé : le son ET la vidéo (boucle silencieuse) partent ensemble,
+      // seulement une fois le fichier audio réellement prêt — jamais la vidéo seule en avance.
       snd.play(success => {
         if (!success) console.warn('[ReelMusic] playback failed for', url);
         musicSoundRef.current = null;
         snd.release();
       });
+      if (musicIsActiveRef.current && !pausedRef.current) { try { player.play(); } catch {} }
     });
-  }, [reel.music_url, reel.music_start_sec, reel.music_end_sec, stopMusic, progressValue]);
+  }, [reel.music_url, reel.music_start_sec, reel.music_end_sec, stopMusic, armMusicClip, player]);
+
+  const startMusicRef = useRef(startMusic);
+  useEffect(() => { startMusicRef.current = startMusic; }, [startMusic]);
 
   // Démarrer/stopper la musique selon isActive et paused
   useEffect(() => {
@@ -1574,6 +1617,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     }
     return () => { stopMusic(); };
   }, [isActive, paused, reel.music_url, startMusic, stopMusic]);
+
+  // Resynchronisation au retour d'arrière-plan : repositionner le son (et la vidéo en boucle)
+  // sur base de la position réelle plutôt que de simplement relancer play() à l'aveugle.
+  const resyncMusicOnForeground = useCallback(() => {
+    const snd = musicSoundRef.current;
+    if (!snd || !hasMusic) return;
+    snd.play(success => {
+      if (!success) console.warn('[ReelMusic] resync playback failed');
+    });
+    try { player.play(); } catch {}
+  }, [hasMusic, player]);
+
+  const resyncMusicOnForegroundRef = useRef(resyncMusicOnForeground);
+  useEffect(() => { resyncMusicOnForegroundRef.current = resyncMusicOnForeground; }, [resyncMusicOnForeground]);
 
   const clearAllTimers = useCallback(() => {
     if (retryTimerRef.current)   { clearTimeout(retryTimerRef.current);   retryTimerRef.current   = null; }
@@ -1595,7 +1652,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         if (isActiveRef.current && !pausedRef.current && mountedRef.current) {
           setTimeout(() => {
             if (isActiveRef.current && !pausedRef.current && mountedRef.current) {
-              try { player.play(); } catch {}
+              if (hasMusic) resyncMusicOnForegroundRef.current();
+              else { try { player.play(); } catch {} }
             }
           }, 200);
         }
@@ -1674,12 +1732,18 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     const subLoad  = player.addEventListener('onLoad', (data: any) => {
       if (!mountedRef.current) return;
       setVideoLoaded(true); setVideoError(false); retryCountRef.current = 0; clearStall();
-      if (data?.duration && data.duration > 0) { durationRef.current = data.duration; progressValue.value = 0; }
+      if (data?.duration && data.duration > 0) { durationRef.current = data.duration; if (!hasMusic) progressValue.value = 0; }
       if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
-      if (isActiveRef.current && !pausedRef.current) player.play();
+      // hasMusic : la vidéo (boucle silencieuse) ne doit jamais démarrer seule ici — c'est
+      // startMusic() qui déclenche player.play() une fois le fichier audio réellement chargé,
+      // pour que le son et l'image partent synchronisés.
+      if (!hasMusic && isActiveRef.current && !pausedRef.current) player.play();
     });
     const subProgress = player.addEventListener('onProgress', (data: any) => {
-      if (!mountedRef.current || !isActiveRef.current) return;
+      // hasMusic : la progression affichée vient exclusivement de la position du son
+      // (armMusicClip), jamais de cet event vidéo natif — sinon les deux se disputent
+      // l'écriture de progressValue et la barre saccade.
+      if (hasMusic || !mountedRef.current || !isActiveRef.current) return;
       const dur = durationRef.current;
       if (dur > 0) progressValue.value = Math.min(data.currentTime / dur, 1);
     });
@@ -1719,10 +1783,16 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         endedRef.current = false;
         if (mountedRef.current) setEnded(false);
         progressValue.value = 0;
-        try { player.seekTo(0); setTimeout(() => { try { player.play(); } catch {} }, 30); } catch {}
-      } else {
+        // hasMusic : ne pas relancer la vidéo ici — startMusic() (effet dédié plus haut, qui
+        // se redéclenche aussi sur `isActive`) s'occupe de recharger/relancer le son ET la
+        // vidéo ensemble. Seek à 0 seul évite une image figée en attendant.
+        try { player.seekTo(0); } catch {}
+        if (!hasMusic) setTimeout(() => { try { player.play(); } catch {} }, 30);
+      } else if (!hasMusic) {
         try { player.play(); } catch {}
       }
+      // hasMusic && !endedRef.current : rien à faire ici, startMusic() gère play() lui-même
+      // dès que le son est chargé (cf. effet [isActive, paused, reel.music_url]).
     } else {
       // Préchargement (isPreload) ou hors fenêtre : toujours pause + son coupé, jamais l'inverse.
       if (audioOwnerRef && (audioOwnerRef as any).current === reel.id) (audioOwnerRef as any).current = null;
@@ -2295,6 +2365,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Stats du reel</Text>
                 </TouchableOpacity>
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
+                <TouchableOpacity
+                  style={s.menuItem}
+                  disabled={reelDl.downloading}
+                  onPress={() => { setShowOwnerMenu(false); handleDownloadReel(); }}
+                >
+                  {reelDl.downloading
+                    ? <ActivityIndicator size="small" color={colors.textPrimary} />
+                    : <Icon name={reelDl.localUri ? 'check' : 'download'} size={20} color={colors.textPrimary} />
+                  }
+                  <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
+                    {reelDl.downloading ? `Téléchargement… ${reelDl.progress}%` : reelDl.localUri ? 'Enregistré dans Téléchargements' : 'Télécharger'}
+                  </Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
                 <TouchableOpacity style={s.menuItem} onPress={handleDeleteReel}>
                   <Icon name="trash-2" size={20} color="#ef4444" />
                   <Text style={[s.menuItemText, { color: '#ef4444' }]}>Supprimer</Text>
@@ -2468,6 +2552,23 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                     <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
                   </>
                 )}
+
+                {/* ── Télécharger ── */}
+                <TouchableOpacity
+                  style={s.menuItem}
+                  disabled={reelDl.downloading}
+                  onPress={() => { setShowRemix(false); handleDownloadReel(); }}
+                >
+                  <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                    {reelDl.downloading
+                      ? <ActivityIndicator size="small" color={colors.textPrimary} />
+                      : <Icon name={reelDl.localUri ? 'check' : 'download'} size={20} color={colors.textPrimary} />
+                    }
+                  </View>
+                  <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
+                    {reelDl.downloading ? `Téléchargement… ${reelDl.progress}%` : reelDl.localUri ? 'Enregistré dans Téléchargements' : 'Télécharger'}
+                  </Text>
+                </TouchableOpacity>
 
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
 

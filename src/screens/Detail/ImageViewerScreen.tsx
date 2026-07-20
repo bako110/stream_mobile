@@ -1,17 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  View, Text, StatusBar, StyleSheet, TouchableOpacity, Alert, Platform,
-  PermissionsAndroid, Dimensions,
+  View, Text, StatusBar, StyleSheet, TouchableOpacity, Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
+import { useMediaDownload } from '../../hooks/useMediaDownload';
 
 const { width: SW, height: SH } = Dimensions.get('window');
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const RNBlobUtil = require('react-native-blob-util').default;
 
 interface Props {
   route: { params: { url: string; label?: string; isMine?: boolean } };
@@ -21,57 +18,12 @@ interface Props {
 export const ImageViewerScreen: React.FC<Props> = ({ route, navigation }) => {
   const { url, label, isMine } = route.params;
   const insets = useSafeAreaInsets();
-  const [downloading, setDownloading] = useState(false);
-  const [progress,    setProgress]    = useState(0);
+  const { get: getDl, download: startDl } = useMediaDownload();
+  const dl = getDl(url);
+  const downloading = dl.downloading;
+  const progress = dl.progress;
 
-  const handleDownload = async () => {
-    if (downloading) return;
-
-    if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-        { title: 'Permission requise', message: 'Autoriser la sauvegarde dans vos téléchargements.', buttonPositive: 'Autoriser', buttonNegative: 'Refuser' },
-      );
-      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission refusée', 'Impossible de sauvegarder sans permission.');
-        return;
-      }
-    }
-
-    const ext = url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
-    const filename = `image_${Date.now()}.${ext}`;
-    const mimeMap: Record<string, string> = {
-      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-      gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
-    };
-    const mime = mimeMap[ext] ?? 'image/jpeg';
-    const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
-
-    setDownloading(true);
-    setProgress(0);
-    try {
-      await RNBlobUtil.config({
-        path: destPath,
-        addAndroidDownloads: {
-          useDownloadManager: true,
-          notification: true,
-          title: label ?? filename,
-          description: 'Téléchargement en cours…',
-          mime,
-        },
-      })
-        .fetch('GET', url)
-        .progress((received: number, total: number) => {
-          setProgress(Math.round((Number(received) / Number(total)) * 100));
-        });
-      Alert.alert('Téléchargement terminé', 'Image sauvegardée dans vos téléchargements.');
-    } catch {
-      Alert.alert('Erreur', 'Le téléchargement a échoué. Réessaie plus tard.');
-    } finally {
-      setDownloading(false);
-      setProgress(0);
-    }
-  };
+  const handleDownload = () => startDl(url, url, false);
 
   return (
     <View style={s.root}>

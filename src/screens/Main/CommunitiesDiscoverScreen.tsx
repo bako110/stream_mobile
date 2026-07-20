@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, Alert, TextInput, ScrollView,
+  ActivityIndicator, RefreshControl, Alert, TextInput, ScrollView, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -136,6 +136,7 @@ export const CommunitiesDiscoverScreen: React.FC = () => {
 
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       <View style={[S.header, { backgroundColor: colors.surface, paddingTop: insets.top + 10, borderBottomColor: colors.divider }]}>
         <View style={S.headerRow}>
           <BackButton onPress={() => nav.goBack()} />

@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Alert, Image,
+  StatusBar, ActivityIndicator, Image,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
-import RNBlobUtil from 'react-native-blob-util';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { useMediaDownload } from '../../hooks/useMediaDownload';
 
 interface Props {
   route: {
@@ -32,8 +32,8 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
   useKeepAwake();
   const { url, title, videoId, contentId, episodeId, contentType, thumbnailUrl, totalSeconds } = route.params;
   const insets = useSafeAreaInsets();
-  const [downloading, setDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  const { get: getDl, download: startDl } = useMediaDownload();
+  const dl = getDl(videoId ?? contentId ?? episodeId ?? url);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSavedSec = useRef(0);
 
@@ -89,43 +89,7 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
     return () => { if (progressTimer.current) clearInterval(progressTimer.current); };
   }, [videoId, contentId, episodeId, contentType, title, thumbnailUrl, totalSeconds]);
 
-  const handleDownload = async () => {
-    const ext = url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'mp4';
-    const filename = `${title.replace(/[^a-z0-9]/gi, '_')}.${ext}`;
-    const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
-    const mimeMap: Record<string, string> = {
-      mp4: 'video/mp4', mov: 'video/quicktime', avi: 'video/x-msvideo',
-      mkv: 'video/x-matroska', webm: 'video/webm', flv: 'video/x-flv',
-      wmv: 'video/x-ms-wmv', mpg: 'video/mpeg', mpeg: 'video/mpeg',
-      '3gp': 'video/3gpp',
-    };
-    const mime = mimeMap[ext] ?? 'video/mp4';
-
-    setDownloading(true);
-    setDownloadProgress(0);
-    try {
-      await RNBlobUtil.config({
-        path: destPath,
-        addAndroidDownloads: {
-          useDownloadManager: true,
-          notification: true,
-          title,
-          description: 'Téléchargement en cours…',
-          mime,
-        },
-      })
-        .fetch('GET', url)
-        .progress((received, total) => {
-          setDownloadProgress(Math.round((Number(received) / Number(total)) * 100));
-        });
-      Alert.alert('Téléchargement terminé', `"${title}" a été sauvegardé dans vos téléchargements.`);
-    } catch {
-      Alert.alert('Erreur', 'Le téléchargement a échoué. Réessaie plus tard.');
-    } finally {
-      setDownloading(false);
-      setDownloadProgress(0);
-    }
-  };
+  const handleDownload = () => startDl(videoId ?? contentId ?? episodeId ?? url, url, true);
 
   return (
     <View style={s.container}>
@@ -163,16 +127,16 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
 
         <Text style={s.titleText} numberOfLines={1}>{title}</Text>
 
-        <TouchableOpacity onPress={handleDownload} disabled={downloading} style={s.downloadBtn}>
-          {downloading ? (
+        <TouchableOpacity onPress={handleDownload} disabled={dl.downloading || !!dl.localUri} style={s.downloadBtn}>
+          {dl.downloading ? (
             <View style={s.row}>
               <ActivityIndicator size="small" color="#fff" />
-              <Text style={s.downloadText}>{downloadProgress}%</Text>
+              <Text style={s.downloadText}>{dl.progress}%</Text>
             </View>
           ) : (
             <View style={s.row}>
-              <Icon name="download" size={16} color="#fff" />
-              <Text style={s.downloadText}>Télécharger</Text>
+              <Icon name={dl.localUri ? 'check' : 'download'} size={16} color="#fff" />
+              <Text style={s.downloadText}>{dl.localUri ? 'Enregistré' : 'Télécharger'}</Text>
             </View>
           )}
         </TouchableOpacity>

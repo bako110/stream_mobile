@@ -45,7 +45,6 @@ import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
-import { enableBeautyFilter } from '../../utils/beautyFilter';
 import { useWs } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
@@ -584,7 +583,6 @@ const RoomContent: React.FC<{
   const goOnStage = useCallback(async () => {
     try {
       await localParticipant.setCameraEnabled(true);
-      enableBeautyFilter(localParticipant);
       await localParticipant.setMicrophoneEnabled(true);
       setCamOn(true); setMicOn(true);
       setOnStage(true);
@@ -626,7 +624,7 @@ const RoomContent: React.FC<{
       if (next === 'background' || next === 'inactive') {
         localParticipant.setCameraEnabled(false).catch(() => {});
       } else if (next === 'active') {
-        localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
+        localParticipant.setCameraEnabled(true).catch(() => {});
       }
     };
     const sub = AppState.addEventListener('change', handleAppState);

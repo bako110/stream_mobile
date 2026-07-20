@@ -8,7 +8,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, RefreshControl, Modal,
-  TextInput, ScrollView, KeyboardAvoidingView, Platform, Image,
+  TextInput, ScrollView, KeyboardAvoidingView, Platform, Image, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -56,7 +56,8 @@ const STATUS_CFG: Record<string, { color: string; label: string; icon: string }>
 };
 
 export const CommunityTreasurerScreen: React.FC = () => {
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const insets = useSafeAreaInsets();
@@ -286,6 +287,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
         <GoFolyXLoader />
       </View>
     );
@@ -293,6 +295,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
         <BackButton onPress={() => nav.goBack()} />

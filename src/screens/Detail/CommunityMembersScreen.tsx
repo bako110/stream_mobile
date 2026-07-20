@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, ActivityIndicator, RefreshControl, Image, ScrollView, Animated,
+  StyleSheet, ActivityIndicator, RefreshControl, Image, ScrollView, Animated, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -200,7 +200,8 @@ export default function CommunityMembersScreen({ route }: Props) {
   // Contrôle d'accès
   const blockedForPublic  = !isMember && membersListHiddenPublic;
   const blockedForMembers = isMember && !isAdmin && !isMod && membersListHiddenMembers;
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
 
@@ -252,6 +253,7 @@ export default function CommunityMembersScreen({ route }: Props) {
   if (blockedForPublic || blockedForMembers) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', gap: 12, paddingHorizontal: 32 }}>
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
         <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="lock" size={28} color={colors.textTertiary} />
         </View>
@@ -276,6 +278,7 @@ export default function CommunityMembersScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
         <GoFolyXLoader />
       </View>
     );
@@ -283,6 +286,7 @@ export default function CommunityMembersScreen({ route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <LinearGradient
         colors={[colors.surface, colors.surface]}

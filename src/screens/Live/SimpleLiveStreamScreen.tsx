@@ -46,7 +46,6 @@ import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
-import { enableBeautyFilter } from '../../utils/beautyFilter';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import { LiveGiftBar } from '../../components/wallet/LiveGiftBar';
@@ -398,7 +397,7 @@ const StreamContent: React.FC<{
 
   // Démarrer cam + mic
   useEffect(() => {
-    localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
+    localParticipant.setCameraEnabled(true).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
@@ -409,7 +408,7 @@ const StreamContent: React.FC<{
       if (next === 'background' || next === 'inactive') {
         localParticipant.setCameraEnabled(false).catch(() => {});
       } else if (next === 'active') {
-        if (!videoOff) localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
+        if (!videoOff) localParticipant.setCameraEnabled(true).catch(() => {});
       }
     };
     const sub = AppState.addEventListener('change', handleAppState);

@@ -20,7 +20,6 @@ import { useNavigation } from '@react-navigation/native';
 import { concertService } from '../../services';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
-import { enableBeautyFilter } from '../../utils/beautyFilter';
 import type { Concert } from '../../types';
 
 interface Props {
@@ -88,7 +87,7 @@ const StreamControls: React.FC<{
   }, []);
 
   useEffect(() => {
-    localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
+    localParticipant.setCameraEnabled(true).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
 
     const start = Date.now();

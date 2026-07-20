@@ -28,8 +28,23 @@ import { backgroundUploadService } from '../../services/backgroundUploadService'
 import { ReelEditorScreen, type ReelEditResult, type FilterKey, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from './ReelEditorScreen';
 import Sound from 'react-native-sound';
 
-const { width: W } = Dimensions.get('window');
-const PREVIEW_H = Math.round(W * 16 / 9);
+const { width: W, height: SCREEN_H } = Dimensions.get('window');
+// Hauteur de l'aperçu vidéo/picker — plus l'espace réservé au reste de la page
+// (header, carte détails, marges) ne dépasse jamais SCREEN_H, pour que toute la
+// page tienne sur un seul écran sans jamais avoir besoin de scroller. Un ratio
+// 16:9 plein largeur (l'ancien calcul) dépassait largement l'écran disponible
+// une fois le header et la carte détails ajoutés — d'où le scroll qu'on retire ici.
+// header (~60) + carte détails avec champ 72px (~110) + carte musique quand
+// présente (~70) + marges — pris au plus large pour ne jamais déborder, que la
+// musique soit sélectionnée ou non.
+const RESERVED_FOR_REST = 300;
+const PREVIEW_H = Math.min(Math.round(W * 16 / 9), SCREEN_H - RESERVED_FOR_REST);
+
+// Limites d'upload — mêmes valeurs sur Android et iOS (le fichier source, avant trim/édition ;
+// ReelEditorScreen limite ensuite le clip final à 90s via MAX_TRIM, mais la source elle-même
+// doit déjà être rejetée avant tout traitement pour ne pas gaspiller réseau/mémoire pour rien).
+const MAX_VIDEO_DURATION_SEC = 10 * 60;
+const MAX_VIDEO_SIZE_BYTES   = 500 * 1024 * 1024;
 
 interface Props {
   onBack: () => void;
@@ -406,6 +421,23 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       }
       if (!dur) dur = 30;
 
+      if (dur > MAX_VIDEO_DURATION_SEC) {
+        setLoadingMeta(false);
+        Alert.alert(
+          'Vidéo trop longue',
+          `La vidéo dure ${Math.round(dur / 60)} min. La durée maximale autorisée est de 10 minutes.`,
+        );
+        return;
+      }
+      if ((asset.fileSize ?? 0) > MAX_VIDEO_SIZE_BYTES) {
+        setLoadingMeta(false);
+        Alert.alert(
+          'Fichier trop volumineux',
+          `Cette vidéo pèse ${(asset.fileSize! / (1024 * 1024)).toFixed(0)} Mo. La taille maximale autorisée est de ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)} Mo.`,
+        );
+        return;
+      }
+
       setVideoUri(asset.uri);
       setVideoThumb(asset.uri);
       setVideoDuration(dur);
@@ -681,8 +713,12 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         </TouchableOpacity>
       </View>
 
+      {/* Page fixe, non scrollable — PREVIEW_H est calculé pour que le reste
+          (carte détails + marges) tienne toujours dans l'espace restant.
+          KeyboardAvoidingView reste utile pour ne pas laisser le clavier
+          recouvrir le champ description sans pour autant introduire de scroll. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <View style={s.page}>
 
           {/* ══ ZONE VIDÉO ══ */}
           <View style={s.videoSection}>
@@ -775,13 +811,16 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
             <View style={s.fieldRow}>
               <View style={s.fieldIcon}><Icon name="align-left" size={15} color={colors.textSecondary} /></View>
               <View style={{ flex: 1 }}>
+                {/* maxHeight plafonne la croissance du champ multiline — sans ça,
+                    un texte long ferait grandir la carte et déborder la page fixe
+                    (voir RESERVED_FOR_REST plus haut, calculé pour cette hauteur). */}
                 <MentionInput
                   value={caption}
                   onChangeText={(text, ids) => { setCaption(text); setCaptionMentionIds(ids); }}
                   colors={colors}
                   placeholder="Décris ton reel… #hashtag @mention"
                   maxLength={300}
-                  inputStyle={{ fontSize: 14, lineHeight: 21, minHeight: 72 }}
+                  inputStyle={{ fontSize: 14, lineHeight: 21, minHeight: 72, maxHeight: 72 }}
                 />
                 <Text style={[s.charCount, { color: colors.textTertiary }]}>{caption.length}/300</Text>
               </View>
@@ -808,22 +847,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
             </View>
           ) : null}
 
-          {/* ══ BOUTON PUBLIER ══ */}
-          {videoUri && (
-            <TouchableOpacity
-              style={[s.publishBtnFull, { opacity: canPublish ? 1 : 0.4 }]}
-              onPress={handlePublish}
-              disabled={!canPublish}
-              activeOpacity={0.85}
-            >
-              <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.publishBtnFullInner}>
-                <Icon name="send" size={16} color="#fff" />
-                <Text style={s.publishBtnFullTxt}>Publier le Reel</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
 
       {isTrimming && (
@@ -841,8 +865,8 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 // ─────────────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  root:   { flex: 1 },
-  scroll: { paddingBottom: 40 },
+  root: { flex: 1 },
+  page: { flex: 1 },
 
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, gap: 12 },
   headerClose: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
@@ -898,8 +922,4 @@ const s = StyleSheet.create({
   musicCardLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 1 },
   musicCardName: { fontSize: 13, fontWeight: '700' },
   musicCardEdit: { padding: 6 },
-
-  publishBtnFull: { marginHorizontal: 16, marginTop: 20, borderRadius: 26, overflow: 'hidden' },
-  publishBtnFullInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-  publishBtnFullTxt: { color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 0.3 },
 });

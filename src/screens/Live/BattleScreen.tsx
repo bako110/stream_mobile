@@ -42,7 +42,6 @@ import { clearLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import { participantAvatarUrl } from '../../utils/livekitParticipant';
-import { enableBeautyFilter } from '../../utils/beautyFilter';
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -693,7 +692,7 @@ const BattleContent: React.FC<{
   // l'erreur) et ne se rattrapait jamais tant que l'ecran n'etait pas remonte (hot-reload).
   useEffect(() => {
     if (!myHostSide || connectionState !== ConnectionState.Connected) return;
-    localParticipant.setCameraEnabled(true).then(() => enableBeautyFilter(localParticipant)).catch(() => {});
+    localParticipant.setCameraEnabled(true).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
     return () => {
       localParticipant.setCameraEnabled(false).catch(() => {});

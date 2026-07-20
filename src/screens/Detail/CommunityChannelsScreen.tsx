@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, TextInput, Modal, Pressable,
-  KeyboardAvoidingView, Platform, ScrollView, Image,
+  KeyboardAvoidingView, Platform, ScrollView, Image, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
@@ -296,6 +296,7 @@ export const CommunityChannelsScreen: React.FC = () => {
 
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <View style={[S.header, { backgroundColor: colors.surface, paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
         <BackButton onPress={() => nav.goBack()} />

@@ -9,6 +9,11 @@ export const Images = {
   chatBackgroundLight: require('./images/ligth_backround.png'),
   chatBackgroundDark:  require('./images/dark_backround.png'),
 
+  // Illustrations Live Matchs — cartes "1 vs 1" (boxeurs face à face) et
+  // "Tournois" (bracket de compétition), affichées dans LiveMatchesHubScreen.
+  liveMatches1v1:        require('./images/1vs1.jpeg'),
+  liveMatchesTournament: require('./images/competition.jpeg'),
+
   // Placeholders
   // thumbPlaceholder: require('./images/thumb_placeholder.png'),
   // avatarPlaceholder: require('./images/avatar_placeholder.png'),

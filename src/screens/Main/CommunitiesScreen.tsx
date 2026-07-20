@@ -2,7 +2,7 @@
 import {
   View, Text, TouchableOpacity, Image, Modal,
   StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput,
-  ScrollView, KeyboardAvoidingView, Platform, Animated,
+  ScrollView, KeyboardAvoidingView, Platform, Animated, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -908,6 +908,7 @@ export const CommunitiesScreen: React.FC = () => {
   // ── Rendu principal ──────────────────────────────────────────────────────────
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
       {/* ── Header ── */}
       <View style={[S.header, {

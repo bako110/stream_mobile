@@ -10,6 +10,5 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven { url "https://raw.githubusercontent.com/arthenica/ffmpeg-kit/android/android/maven" }
-        maven { url "https://sdk.developer.deepar.ai/maven-android-repository/releases/" }
     }
 }

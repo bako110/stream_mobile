@@ -1,9 +1,8 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
-  ActivityIndicator, Alert, StatusBar, Dimensions, Platform,
+  ActivityIndicator, Alert, StatusBar, Dimensions,
 } from 'react-native';
-import RNBlobUtil from 'react-native-blob-util';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +19,7 @@ import { CommentsBottomSheet, ShareBottomSheet, SkeletonPostDetail, LikersBottom
 import { RichText } from '../../components/common/RichText';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { LinkPreviewCard } from '../../components/common/LinkPreviewCard';
+import { useMediaDownload } from '../../hooks/useMediaDownload';
 import type { Post } from '../../types/post';
 
 const { width: W } = Dimensions.get('window');
@@ -198,6 +198,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   const [shareOpen,     setShareOpen]     = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [downloading,   setDownloading]   = useState(false);
+  const { download: startDl } = useMediaDownload();
   const [authorPosts,   setAuthorPosts]   = useState<Post[]>([]);
   const [authorPage,    setAuthorPage]    = useState(1);
   const [authorLoading, setAuthorLoading] = useState(false);
@@ -307,51 +308,37 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
   const handleDownloadAll = useCallback(async () => {
     setMenuOpen(false);
-    const urls = post?.image_urls?.length
+    const imageUrls = post?.image_urls?.length
       ? post.image_urls
       : post?.image_url
         ? [post.image_url]
         : [];
-    if (urls.length === 0) {
+    // La vidéo du post n'est jamais stockée en MP4 côté serveur — hls_url est reconstruit
+    // à la volée par le hook (même mécanisme que reels/messages), video_url en fallback.
+    const videoUrl = post?.hls_url ?? post?.video_url ?? null;
+    if (imageUrls.length === 0 && !videoUrl) {
       Alert.alert('Rien à télécharger', 'Ce post ne contient pas de média.');
       return;
     }
     setDownloading(true);
     try {
-      const dirs = RNBlobUtil.fs.dirs;
-      await Promise.all(urls.map(async (url, i) => {
-        const ext  = url.match(/\.(mp4|mov|webm)/i) ? 'mp4' : 'jpg';
-        const dest = Platform.OS === 'android'
-          ? `${dirs.DownloadDir}/GoFolyX_${Date.now()}_${i}.${ext}`
-          : `${dirs.DocumentDir}/GoFolyX_${Date.now()}_${i}.${ext}`;
-        await RNBlobUtil.config({
-          fileCache: true,
-          path: dest,
-          addAndroidDownloads: {
-            useDownloadManager: true,
-            notification: true,
-            title: `GoFolyX — fichier ${i + 1}/${urls.length}`,
-            description: 'Téléchargement GoFolyX',
-            mime: ext === 'mp4' ? 'video/mp4' : 'image/jpeg',
-            mediaScannable: true,
-          },
-        }).fetch('GET', url);
-        if (Platform.OS === 'ios') {
-          RNBlobUtil.ios.previewDocument(dest);
-        }
-      }));
+      await Promise.all([
+        ...imageUrls.map((url, i) => startDl(`${postId}_img_${i}`, url, false)),
+        ...(videoUrl ? [startDl(`${postId}_video`, videoUrl, true)] : []),
+      ]);
+      const count = imageUrls.length + (videoUrl ? 1 : 0);
       Alert.alert(
         'Téléchargé',
-        urls.length === 1
+        count === 1
           ? 'Le fichier a été enregistré dans tes téléchargements.'
-          : `${urls.length} fichiers enregistrés dans tes téléchargements.`,
+          : `${count} fichiers enregistrés dans tes téléchargements.`,
       );
     } catch {
       Alert.alert('Erreur', 'Impossible de télécharger les fichiers.');
     } finally {
       setDownloading(false);
     }
-  }, [post]);
+  }, [post, postId, startDl]);
 
   // ── Loading skeleton ───────────────────────────────────────────────────────
   if (loading) {

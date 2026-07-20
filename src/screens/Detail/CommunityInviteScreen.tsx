@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Share, Alert,
-  ActivityIndicator, Linking, ScrollView,
+  ActivityIndicator, Linking, ScrollView, StatusBar,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import LinearGradient from 'react-native-linear-gradient';
@@ -15,7 +15,8 @@ import { apiClient } from '../../api/client';
 const SHARE_BASE = 'https://gofolyx.com/join';
 
 export const CommunityInviteScreen: React.FC = () => {
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const insets = useSafeAreaInsets();
@@ -113,6 +114,7 @@ export const CommunityInviteScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <View style={[st.header, {
         paddingTop: insets.top + 8,

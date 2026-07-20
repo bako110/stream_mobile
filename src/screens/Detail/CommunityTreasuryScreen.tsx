@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl,
+  RefreshControl, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -45,7 +45,8 @@ const TX_ICONS: Record<string, { icon: string; color: string }> = {
 };
 
 export const CommunityTreasuryScreen: React.FC = () => {
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const insets = useSafeAreaInsets();
@@ -75,6 +76,7 @@ export const CommunityTreasuryScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
         <BackButton onPress={() => nav.goBack()} />

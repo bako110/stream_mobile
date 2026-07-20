@@ -197,8 +197,8 @@ export const LiveListScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={[st.root, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <View style={[st.header, { backgroundColor: colors.surface, paddingTop: insets.top + 12 }]}>
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+        <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
           <BackButton onPress={() => nav.goBack()} />
           <Text style={[st.headerTitle, { color: colors.textPrimary }]}>En direct</Text>
           <View style={{ width: 38 }} />
@@ -210,10 +210,10 @@ export const LiveListScreen: React.FC = () => {
 
   return (
     <View style={[st.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[st.header, { backgroundColor: colors.surface }]}>
+      <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="radio" size={20} color="#EF4444" />
@@ -302,6 +302,7 @@ const st = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: { fontSize: 18, fontWeight: '800' },
 
