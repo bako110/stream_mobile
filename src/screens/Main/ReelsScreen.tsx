@@ -1929,10 +1929,33 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const doPause = useCallback(() => {
     const next = !pausedRef.current;
     pausedRef.current = next;
-    try { if (next) player.pause(); else player.play(); } catch {}
+    // Quand hasMusic, l'effet [isActive, paused, ...] (plus haut) est le seul chef
+    // d'orchestre du play()/pause() du player vidéo — il redémarre proprement startMusic()
+    // (chargement du Sound + resync vidéo/son) ou l'arrête via stopMusic(). Appeler
+    // player.play()/pause() ici en plus créait une course avec ce chargement async :
+    // le replay pouvait ne jamais reprendre si le Sound précédent était déjà arrêté.
+    if (!hasMusic) {
+      try {
+        if (next) {
+          player.pause();
+        } else {
+          // Si la vidéo était arrivée à sa fin naturelle avant la pause manuelle, le
+          // player reste positionné en fin de flux — un simple play() ne redémarre rien
+          // visuellement. Revenir au début avant de relancer, comme le fait déjà l'effet
+          // play/pause générique au moment de l'activation d'un slide.
+          if (endedRef.current) {
+            endedRef.current = false;
+            if (mountedRef.current) setEnded(false);
+            progressValue.value = 0;
+            player.seekTo(0);
+          }
+          player.play();
+        }
+      } catch {}
+    }
     if (mountedRef.current) setPaused(next);
     showPlayIconAnim();
-  }, [player, showPlayIconAnim]);
+  }, [player, hasMusic, showPlayIconAnim, progressValue]);
 
   const triggerShowControls = useCallback(() => {
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
@@ -2715,6 +2738,17 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           </View>
         </KeyboardAvoidingView>
 
+        {/* Toast de progression du téléchargement — flotte au-dessus de la barre de
+            commentaire, reste visible même après fermeture du menu qui a déclenché le
+            téléchargement (avant, le pourcentage n'était affiché que dans le menu lui-même,
+            donc invisible dès qu'on le fermait). */}
+        {reelDl.downloading && (
+          <View style={[s.dlToast, { bottom: safeBottom + COMMENT_BAR_H + 14 }]} pointerEvents="none">
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={s.dlToastText}>Téléchargement… {reelDl.progress}%</Text>
+          </View>
+        )}
+
         <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} reelId={reel.id} commentsDisabled={commentsDisabledSt} onCommentAdded={() => setCommentCount(v => v + 1)} onCommentCountChange={delta => setCommentCount(v => v + delta)} />
       </View>
     </View>
@@ -2886,4 +2920,13 @@ const s = StyleSheet.create({
 
   modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   ownerMenuCard: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, minWidth: 220, overflow: 'hidden' },
+
+  dlToast: {
+    position: 'absolute', left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(20,18,30,0.88)', borderRadius: 22,
+    paddingVertical: 10, paddingHorizontal: 16,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  dlToastText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });
