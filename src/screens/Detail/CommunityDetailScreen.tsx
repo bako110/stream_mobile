@@ -34,6 +34,17 @@ interface Props { route: { params: { communityId: string; autoEnter?: boolean } 
 
 type SettingsTab = 'info' | 'members' | 'security';
 
+type BadgePlan = 'monthly' | 'quarterly' | 'yearly';
+
+// Même grille tarifaire que le badge vérifié utilisateur — abonnement récurrent,
+// débité automatiquement au wallet du créateur à chaque échéance (voir
+// app/db/postgres/models/community.py:COMMUNITY_VERIFICATION_PLAN_CONFIG).
+const BADGE_PLAN_INFO: Record<BadgePlan, { label: string; priceEur: number; months: number; badge?: string }> = {
+  monthly:   { label: 'Mensuel', priceEur: 9,     months: 1 },
+  quarterly: { label: '3 mois',  priceEur: 24.30, months: 3, badge: '-10%' },
+  yearly:    { label: 'Annuel',  priceEur: 81,    months: 12, badge: '-25%' },
+};
+
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   moderator: 'Modérateur',
@@ -80,6 +91,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   const [vrLoading,      setVrLoading]      = useState(false);
   const [vrModalOpen,    setVrModalOpen]    = useState(false);
   const [vrReason,       setVrReason]       = useState('');
+  const [vrPlan,         setVrPlan]         = useState<BadgePlan>('monthly');
   const [pendingCount,   setPendingCount]   = useState(0);
   const [viewerUrl,      setViewerUrl]      = useState<string | null>(null);
   const [communitySaved, setCommunitySaved] = useState(false);
@@ -634,7 +646,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   async function handleSubmitVerificationRequest() {
     setVrLoading(true);
     try {
-      await communityService.requestVerification(communityId, vrReason.trim() || undefined);
+      await communityService.requestVerification(communityId, vrReason.trim() || undefined, vrPlan);
       setMyGoGold(prev => prev !== null ? prev - 500 : null);
       setVrStatus('pending');
       setVrModalOpen(false);
@@ -2109,6 +2121,40 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 {vrReason.length}/300
               </Text>
 
+              {/* Choix de la durée d'abonnement au badge — récurrent, débité au wallet
+                  de l'admin qui fait la demande à chaque échéance une fois approuvé */}
+              <Text style={[s.fieldLabel, { color: colors.textTertiary, marginTop: 10, marginBottom: 8 }]}>
+                DURÉE DE L'ABONNEMENT AU BADGE
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {(Object.keys(BADGE_PLAN_INFO) as BadgePlan[]).map(key => {
+                  const info = BADGE_PLAN_INFO[key];
+                  const selected = vrPlan === key;
+                  const perMonth = info.priceEur / info.months;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      onPress={() => setVrPlan(key)}
+                      style={[s.vrPlanCard, {
+                        backgroundColor: selected ? '#1D9BF015' : colors.backgroundSecondary,
+                        borderColor: selected ? '#1D9BF0' : colors.divider,
+                        borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+                      }]}
+                      activeOpacity={0.8}
+                    >
+                      {info.badge && (
+                        <View style={s.vrPlanBadge}>
+                          <Text style={s.vrPlanBadgeText}>{info.badge}</Text>
+                        </View>
+                      )}
+                      <Text style={[s.vrPlanLabel, { color: selected ? '#1D9BF0' : colors.textPrimary }]}>{info.label}</Text>
+                      <Text style={[s.vrPlanPrice, { color: colors.textPrimary }]}>{info.priceEur.toFixed(2)} €</Text>
+                      <Text style={{ fontSize: 10, color: colors.textTertiary }}>{perMonth.toFixed(2)} €/mois</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               {/* Boite frais */}
               {(() => {
                 const fee = 500;
@@ -2142,6 +2188,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     )}
                     <Text style={{ fontSize: 10, color: colors.success, marginTop: 6 }}>
                       Remboursement automatique si la demande est refusée
+                    </Text>
+                    <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 4 }}>
+                      Une fois approuvée, l'abonnement {BADGE_PLAN_INFO[vrPlan].label.toLowerCase()} ({BADGE_PLAN_INFO[vrPlan].priceEur.toFixed(2)} €) démarre et se renouvelle automatiquement tous les {BADGE_PLAN_INFO[vrPlan].months} mois — débité de ton wallet en tant qu'admin.
                     </Text>
                   </View>
                 );
@@ -2529,6 +2578,15 @@ const s = StyleSheet.create({
   // VR box
   vrBox: { marginHorizontal: 20, borderRadius: 22, padding: 20 },
   vrFeeBox: { borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 12 },
+  vrPlanCard: { flex: 1, borderRadius: 14, padding: 10, alignItems: 'center', gap: 3, position: 'relative' },
+  vrPlanBadge: {
+    position: 'absolute', top: -6, right: -6,
+    backgroundColor: '#22C55E', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  vrPlanBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+  vrPlanLabel: { fontSize: 12, fontWeight: '700' },
+  vrPlanPrice: { fontSize: 15, fontWeight: '800' },
 
   // Settings sheet
   settingsSheet: {

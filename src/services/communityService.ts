@@ -15,6 +15,9 @@ export interface CommunityData {
   entry_price_gogold: number;
   is_verified: boolean;
   verified_at: string | null;
+  verification_plan?: 'monthly' | 'quarterly' | 'yearly' | null;
+  verification_expires_at?: string | null;
+  verification_failed_months?: number;
   members_count: number;
   creator_id: string;
   join_status: JoinStatus;
@@ -109,6 +112,7 @@ export interface CommunityMessageData {
 export interface VerificationRequest {
   id: string;
   status: 'pending' | 'approved' | 'rejected';
+  plan: 'monthly' | 'quarterly' | 'yearly' | null;
   reason: string | null;
   review_note: string | null;
   created_at: string | null;
@@ -433,10 +437,10 @@ export const communityService = {
     return res.data;
   },
 
-  async requestVerification(id: string, reason?: string): Promise<VerificationRequest> {
+  async requestVerification(id: string, reason?: string, plan: string = 'monthly'): Promise<VerificationRequest> {
     const res = await apiClient.post<VerificationRequest>(
       `/api/v1/communities/${id}/verification-request`,
-      { reason: reason ?? null },
+      { reason: reason ?? null, plan },
     );
     return res.data;
   },
