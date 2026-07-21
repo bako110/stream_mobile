@@ -155,8 +155,8 @@ const AdVideoCreative: React.FC<{ uri: string; thumbnailUri?: string; isVisible:
       <VideoView
         player={player}
         style={adSt.image}
-        contentFit="cover"
-        nativeControls={false}
+        resizeMode="cover"
+        controls={false}
       />
       <TouchableOpacity
         onPress={toggleMute}

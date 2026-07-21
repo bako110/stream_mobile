@@ -58,7 +58,12 @@ export function useMediaDownload() {
       : url;
     const token = getToken();
 
-    if (Platform.OS === 'android') {
+    // WRITE_EXTERNAL_STORAGE n'existe plus au-delà d'Android 9 (API 29) — déclarée avec
+    // maxSdkVersion="29" dans le Manifest, donc PermissionsAndroid.request() la refuse
+    // systématiquement sur Android 10+ (scoped storage), peu importe le choix utilisateur.
+    // Le dossier public Téléchargements (RNBlobUtil.fs.dirs.DownloadDir) est déjà accessible
+    // en écriture sans permission depuis Android 10+ : ne demander qu'en dessous.
+    if (Platform.OS === 'android' && Platform.Version < 29) {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
         {
@@ -76,7 +81,9 @@ export function useMediaDownload() {
 
     const ext = isHls ? 'mp4' : (url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? (isVideo ? 'mp4' : 'jpg'));
     const mime = mimeForExt(ext, isVideo);
-    const filename = `${isVideo ? 'video' : 'image'}_${id}.${ext}`;
+    // Nom lisible pour l'utilisateur — l'id technique (UUID/hash) ne doit jamais apparaître
+    // dans le fichier téléchargé, seulement servir de clé interne pour suivre la progression.
+    const filename = `GoFolyX_${isVideo ? 'video' : 'image'}_${Date.now()}.${ext}`;
     const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
 
     setStates(prev => ({ ...prev, [id]: { progress: 0, localUri: null, downloading: true } }));

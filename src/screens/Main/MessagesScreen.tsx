@@ -23,7 +23,7 @@ import type { ConversationSummary } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BackButton } from '../../components/common';
-import { StoryBar } from '../../components/story';
+import { ConversationStoryBar } from '../../components/story';
 import { useUser } from '../../context/UserContext';
 
 function getInitials(name: string): string {
@@ -479,7 +479,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
               )}
             </View>
           ) : (
-            <StoryBar
+            <ConversationStoryBar
               currentUser={currentUser}
               colors={colors}
               onNavigateToChat={onStoryNavigateToChat}

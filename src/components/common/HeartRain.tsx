@@ -153,8 +153,17 @@ function RisingName({ liker }: { liker: RecentLiker }) {
     opacity: progress.value < 0.12 ? progress.value / 0.12 : progress.value > 0.75 ? (1 - progress.value) / 0.25 : 1,
   }));
 
+  const initial = (liker.display_name ?? liker.username ?? '?')[0]?.toUpperCase();
+
   return (
     <Animated.View style={[nameS.bubble, style]}>
+      {liker.avatar_url ? (
+        <Image source={{ uri: liker.avatar_url }} style={nameS.avatar} />
+      ) : (
+        <View style={nameS.avatarFallback}>
+          <Text style={nameS.avatarInitial}>{initial}</Text>
+        </View>
+      )}
       <MCIcon name="heart" size={11} color="#E0389A" />
       <Text style={nameS.label} numberOfLines={1}>{liker.display_name ?? liker.username ?? 'Quelqu\'un'}</Text>
     </Animated.View>
@@ -215,5 +224,12 @@ const nameS = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: 14,
   },
+  avatar: { width: 18, height: 18, borderRadius: 9 },
+  avatarFallback: {
+    width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#7B3FF2',
+  },
+  avatarInitial: { color: '#fff', fontSize: 9, fontWeight: '800' },
   label: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 150 },
 });

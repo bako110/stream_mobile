@@ -15,6 +15,7 @@ export interface NotifItem {
   body:              string;
   ref_id:            string | null;
   ref_type:          string | null;
+  image_url:         string | null;
   is_read:           boolean;
   created_at:        string;
   actor:             NotifActor | null;

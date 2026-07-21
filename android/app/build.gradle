@@ -93,8 +93,8 @@ android {
         applicationId "com.gofolyx.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 42
-        versionName "1.0.2.6"
+        versionCode 49
+        versionName "1.0.1.3"
 
         ndk {
             abiFilters "arm64-v8a", "armeabi-v7a"
@@ -128,15 +128,13 @@ android {
         }
     }
 
-    // Support des tailles de page mémoire 16 Ko (exigence Play Store depuis nov.
-    // 2025) — packaging non compressé des .so pour que l'alignement 16KB des
-    // segments ELF (deja garanti par NDK r27+) soit preserve tel quel dans l'APK/
-    // AAB final, au lieu d'etre recompresse par l'ancien packaging legacy.
-    packagingOptions {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-    }
+    // useLegacyPackaging avait ete force a true pour compenser les .so mal alignes
+    // (16KB) de DeepAR — DeepAR est desormais retire du projet. NDK r27+ garantit
+    // deja l'alignement 16KB pour les libs restantes (MMKV, Hermes, LiveKit...) ;
+    // laisser useLegacyPackaging=true force un packaging compresse legacy sur TOUTES
+    // les libs natives, ce qui peut perturber leur chargement en release sur des
+    // appareils recents. Retire — a reactiver seulement si une nouvelle dependance
+    // mal alignee est identifiee.
 }
 
 configurations.all {

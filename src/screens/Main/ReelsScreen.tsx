@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle,
-  withSequence, withTiming, withSpring,
+  withSequence, withTiming, withSpring, withRepeat,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
@@ -25,7 +25,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useIsWifi } from '../../hooks/useIsWifi';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
-import { useGuidedTour } from '../../context/GuidedTourContext';
 import { RichText } from '../../components/common/RichText';
 import { apiClient, Endpoints } from '../../api';
 import { reelService, socialService, authService, searchService } from '../../services';
@@ -87,7 +86,6 @@ export const ReelsScreen: React.FC = () => {
   const HEADER_H = insets.top + 54;
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
-  const { currentStep: tourStep, advance: advanceTour, setScreenPresence } = useGuidedTour();
   const nav    = useNavigation<Nav>();
   const route  = useRoute();
   const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean; userId?: string; initialReels?: Reel[] };
@@ -168,16 +166,6 @@ export const ReelsScreen: React.FC = () => {
   // d'écran vide entre "tendances" et "résultats" pendant la saisie).
   const [trendingReels,   setTrendingReels]   = useState<Reel[]>([]);
   const [loadingTrending, setLoadingTrending] = useState(false);
-
-  // Signale au tour guidé que l'écran Reels principal (pas "reels d'un autre
-  // utilisateur") est bien monté/focus — TourSpotlight n'affiche l'étape
-  // 'reels_swipe' que si cette présence est vraie, pour ne jamais l'afficher par
-  // erreur pendant que l'utilisateur navigue encore sur un autre écran.
-  useEffect(() => {
-    if (userModeRef.current) return; // pas sur ce mode-là
-    setScreenPresence('reels_swipe', screenFocused);
-    return () => setScreenPresence('reels_swipe', false);
-  }, [screenFocused, setScreenPresence]);
 
   // Refs stables pour éviter les closures stales
   const reelsRef        = useRef<Reel[]>(seedReel.length > 0 ? seedReel : []);
@@ -657,16 +645,12 @@ export const ReelsScreen: React.FC = () => {
     currentIdxRef.current = bounded;
     setCurrentIndex(bounded);
 
-    // Vrai swipe détecté — si le tour guidé attend ce geste (étape 'reels_swipe'),
-    // le geste réel EST la validation, pas besoin d'un bouton "Compris" séparé.
-    if (tourStep === 'reels_swipe') advanceTour();
-
     sendViewForCurrent();
     const cur = reelsRef.current[bounded];
     if (cur) currentReelRef.current = { id: cur.id, startTime: Date.now() };
 
     if (bounded >= reelsRef.current.length - 3) loadMoreRef.current();
-  }, [SCREEN_H, sendViewForCurrent, tourStep, advanceTour]);
+  }, [SCREEN_H, sendViewForCurrent]);
 
   // ── Callbacks stables ─────────────────────────────────────────────────────
   const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
@@ -1215,6 +1199,12 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
     if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
   };
 
+  const badgePulse = useSharedValue(1);
+  useEffect(() => {
+    badgePulse.value = withRepeat(withSequence(withTiming(0.4, { duration: 700 }), withTiming(1, { duration: 700 })), -1, true);
+  }, [badgePulse]);
+  const badgeDotStyle = useAnimatedStyle(() => ({ opacity: badgePulse.value }));
+
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
 
@@ -1227,61 +1217,77 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         <LinearGradient colors={['#1a0533', '#0d1b4b', '#0a2a1a']} style={{ position: 'absolute', width: screenW, height: screenH }} />
       )}
 
-      {/* ── Gradient bas ── */}
+      {/* ── Voile léger en haut pour lisibilité du badge, quel que soit le média ── */}
       <LinearGradient
-        colors={['transparent', '#00000080', '#000000EB']}
-        locations={[0, 0.5, 1]}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.6 }}
+        colors={['#00000070', 'transparent']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120 }}
+        pointerEvents="none"
+      />
+
+      {/* ── Badge "Sponsorisé" — haut gauche, pastille pulsante + icône, style TikTok ── */}
+      <View style={{ position: 'absolute', top: insetBottom > 0 ? 54 : 44, left: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,18,30,0.62)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' }}>
+        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#E0389A' }, badgeDotStyle]} />
+        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>Sponsorisé</Text>
+      </View>
+
+      {/* ── Gradient bas — plus profond pour porter le bloc CTA sans écraser le média ── */}
+      <LinearGradient
+        colors={['transparent', '#00000090', '#000000F2']}
+        locations={[0, 0.45, 1]}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.62 }}
         pointerEvents="none"
       />
 
       {/* ── Contenu bas — même position que les reels normaux (au-dessus de la barre de
-          commentaire), ordre annonceur → description → CTA, de haut en bas ── */}
-      <View style={{ position: 'absolute', bottom: safeBottom + 90, left: 0, right: 82, paddingHorizontal: 14, gap: 8 }}>
+          commentaire), ordre annonceur → description → CTA, de haut en bas. AdSlide n'a pas
+          de colonne d'actions à droite (pas de mute/like superposé) — tout reste plein largeur. ── */}
+      <View style={{ position: 'absolute', bottom: safeBottom + 88, left: 0, right: 0, paddingHorizontal: 16, gap: 12 }}>
 
         {/* Annonceur row — cliquable vers le profil de l'annonceur (advertiser_id = User.id) */}
         <TouchableOpacity
           activeOpacity={0.8}
           disabled={!ad.advertiser_id}
           onPress={() => ad.advertiser_id && onAuthorPress(ad.advertiser_id)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
         >
-          <View style={{ width: 30, height: 30, borderRadius: 15, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(0,0,0,0.45)' }}>
-            {ad.thumbnail_url ? (
-              <Image source={{ uri: ad.thumbnail_url }} style={{ width: 30, height: 30 }} resizeMode="cover" />
-            ) : (
-              <View style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="zap" size={14} color="#fff" />
-              </View>
-            )}
-          </View>
+          <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 38, height: 38, borderRadius: 19, padding: 2 }}>
+            <View style={{ flex: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#1a1a2e' }}>
+              {ad.thumbnail_url ? (
+                <Image source={{ uri: ad.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="zap" size={15} color="#fff" />
+                </View>
+              )}
+            </View>
+          </LinearGradient>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={1}>{ad.title}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '500', marginTop: 1 }}>Publicité</Text>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={1}>{ad.title}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11.5, fontWeight: '600', marginTop: 1 }}>Sponsorisé · Annonce</Text>
           </View>
         </TouchableOpacity>
 
         {/* Description */}
         {ad.description ? (
-          <Text style={{ color: '#fff', fontSize: 12, lineHeight: 17, fontWeight: '400', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 }} numberOfLines={3}>
+          <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 18, fontWeight: '400', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 }} numberOfLines={3}>
             {ad.description}
           </Text>
         ) : null}
-      </View>
 
-      {/* ── Colonne d'actions à droite — même position que les vrais reels ── */}
-      {ad.cta_url ? (
-        <View style={{ position: 'absolute', right: 8, bottom: safeBottom + 90, alignItems: 'center', gap: 4 }}>
-          <TouchableOpacity activeOpacity={0.85} onPress={handleCta} style={{ alignItems: 'center', gap: 3 }}>
-            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)' }}>
-              <MCIcon name="arrow-right" size={16} color="#fff" />
-            </View>
-            <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, maxWidth: 60, textAlign: 'center' }} numberOfLines={2}>
-              {ad.cta_text || 'En savoir plus'}
-            </Text>
+        {/* CTA — vrai bouton plein largeur en dégradé de marque, jamais une simple icône */}
+        {ad.cta_url ? (
+          <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={{ marginTop: 2, shadowColor: '#7B3FF2', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
+            <LinearGradient
+              colors={['#7B3FF2', '#C044E8', '#E0389A']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ borderRadius: 14, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: 0.2 }}>{ad.cta_text || 'En savoir plus'}</Text>
+              <Icon name="arrow-right" size={16} color="#fff" />
+            </LinearGradient>
           </TouchableOpacity>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
     </View>
   );
 });
@@ -1998,9 +2004,15 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
   const retryLoad = useCallback(() => { retryCountRef.current = 0; doRetry(); }, [doRetry]);
 
-  // Gestes — 1 tap = controls, 2 taps = like/unlike
+  // Gestes — 1 tap = pause/controls, 2 taps = like/unlike. Exclusive seul ne suffit pas
+  // toujours à garantir que le simple tap attende l'échec du double tap (le simple tap
+  // et le "like" pouvaient se déclencher ensemble) — requireExternalGestureToFail force
+  // explicitement cette dépendance : le singleTap ne se résout qu'après que le
+  // reconnaisseur ait confirmé qu'aucun deuxième tap n'arrive.
   const doubleTap  = Gesture.Tap().numberOfTaps(2).maxDuration(300).runOnJS(true).onEnd(e => doLike(e.x, e.y));
-  const singleTap  = Gesture.Tap().maxDuration(300).runOnJS(true).onEnd(() => { triggerShowControls(); doPause(); });
+  const singleTap  = Gesture.Tap().maxDuration(300).runOnJS(true)
+    .requireExternalGestureToFail(doubleTap)
+    .onEnd(() => { triggerShowControls(); doPause(); });
   const tapGesture = Gesture.Exclusive(doubleTap, singleTap);
   const hPanFail   = Gesture.Pan().activeOffsetX([-10, 10]).failOffsetY([-10, 10]).minDistance(10);
 

@@ -18,6 +18,18 @@ export const API_TIMEOUT = 30_000; // 30s (Fly.dev cold start)
 export const APP_NAME    = 'GoFolyX';
 export const APP_VERSION = '1.0.0';
 
+// ── Stores — utilisés par la notification admin "app_update" (bouton "Mettre à jour")
+// et par tout autre écran qui doit rediriger vers la fiche store. Mêmes URLs que côté
+// backend (app/routers/app_version.py) — dupliquées volontairement pour que le mobile
+// ouvre toujours le store de SA plateforme réelle (Platform.OS), pas celle ciblée par
+// l'admin (ref_id ne sert qu'au filtrage serveur des destinataires).
+export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.gofolyx.mobile';
+export const APP_STORE_URL: string | null = null; // à renseigner une fois publié sur l'App Store
+
+export function getStoreUrl(): string | null {
+  return Platform.OS === 'ios' ? APP_STORE_URL : PLAY_STORE_URL;
+}
+
 // ── Pagination ─────────────────────────────────────────────────────────────
 export const DEFAULT_PAGE_LIMIT  = 20;
 export const REELS_PAGE_LIMIT    = 20;
@@ -40,9 +52,6 @@ export const STORAGE_KEYS = {
   LAST_USER_ID:   'gofolyx_last_user_id',
   CACHED_USER:    'gofolyx_cached_user',
   CURRENCY_CODE:  'gofolyx_currency_code',
-  // Tour guidé post-connexion (main animée sur les écrans clés) — distinct de
-  // ONBOARDING_DONE (le splash marketing "Rejoindre GoFolyX" avant connexion).
-  GUIDED_TOUR_DONE: 'gofolyx_guided_tour_done',
 } as const;
 
 // ── Durées (ms) ────────────────────────────────────────────────────────────

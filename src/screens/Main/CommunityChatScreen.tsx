@@ -23,7 +23,7 @@ import Geolocation from '@react-native-community/geolocation';
 import { uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
-import { BackButton } from '../../components/common';
+import { BackButton, CachedImage } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
@@ -138,6 +138,7 @@ export const CommunityChatScreen: React.FC = () => {
   const [showPinned,     setShowPinned]     = useState(false);
   const [communityTitle,      setCommunityTitle]      = useState(communityName);
   const [communityVerified,   setCommunityVerified]   = useState(false);
+  const [communityAvatarUrl,  setCommunityAvatarUrl]  = useState<string | null>(null);
   const [membersOnlyChat,     setMembersOnlyChat]     = useState(false);
   const [activeCotisation,    setActiveCotisation]    = useState<{
     id: string; title: string; amount_per_member: number;
@@ -383,6 +384,7 @@ export const CommunityChatScreen: React.FC = () => {
 
     communityService.getById(communityId).then(c => {
       setCommunityVerified(c.is_verified);
+      setCommunityAvatarUrl(c.avatar_url);
       setMembersOnlyChat(!!(c as any).members_only_chat);
     }).catch(() => {});
     apiClient.get(`/api/v1/communities/${communityId}/cotisations?status=active`)
@@ -845,7 +847,10 @@ export const CommunityChatScreen: React.FC = () => {
     const url = imgViewerList[imgViewerIdx];
     if (!url) return;
 
-    if (Platform.OS === 'android') {
+    // WRITE_EXTERNAL_STORAGE n'existe plus au-delà d'Android 9 (API 29) — le système la
+    // refuse systématiquement sur Android 10+ (scoped storage) peu importe le choix
+    // utilisateur. Le dossier public Téléchargements y est déjà accessible sans permission.
+    if (Platform.OS === 'android' && Platform.Version < 29) {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
         { title: 'Permission requise', message: 'Autoriser la sauvegarde dans vos téléchargements.', buttonPositive: 'Autoriser', buttonNegative: 'Refuser' },
@@ -862,7 +867,7 @@ export const CommunityChatScreen: React.FC = () => {
       gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
     };
     const mime = mimeMap[ext] ?? 'image/jpeg';
-    const filename = `image_${Date.now()}.${ext}`;
+    const filename = `GoFolyX_image_${Date.now()}.${ext}`;
     const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
 
     setDlBusy(true);
@@ -897,7 +902,7 @@ export const CommunityChatScreen: React.FC = () => {
   const Avatar = ({ msg, size = 32 }: { msg: CommunityMessage; size?: number }) => (
     <TouchableOpacity onPress={() => nav.navigate('UserProfile', { userId: msg.sender_id })} style={{ marginRight: 8, alignSelf: 'flex-end' }}>
       {msg.sender_avatar_url ? (
-        <Image source={{ uri: msg.sender_avatar_url }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        <CachedImage uri={msg.sender_avatar_url} style={{ width: size, height: size, borderRadius: size / 2 }} />
       ) : (
         <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: colors.primary, fontWeight: '800', fontSize: size * 0.38 }}>
@@ -1634,11 +1639,15 @@ export const CommunityChatScreen: React.FC = () => {
         >
           {/* Avatar communauté */}
           <View style={S.headerAvatar}>
-            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>
-                {(communityTitle || '?')[0].toUpperCase()}
-              </Text>
-            </LinearGradient>
+            {communityAvatarUrl ? (
+              <CachedImage uri={communityAvatarUrl} style={{ flex: 1 }} />
+            ) : (
+              <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>
+                  {(communityTitle || '?')[0].toUpperCase()}
+                </Text>
+              </LinearGradient>
+            )}
             {/* Dot connecté */}
             <View style={[S.headerAvatarDot, { backgroundColor: isConnected ? '#22C55E' : '#94A3B8' }]} />
           </View>

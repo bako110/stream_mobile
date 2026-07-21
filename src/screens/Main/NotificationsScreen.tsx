@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, RefreshControl, Image, Alert,
+  StyleSheet, RefreshControl, Image, Alert, Linking,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle, useSharedValue,
@@ -16,6 +16,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { SkeletonFeed, BackButton } from '../../components/common';
 import { notificationService, NotifItem } from '../../services/notificationService';
 import { useWs } from '../../context/WebSocketContext';
+import { getStoreUrl } from '../../utils/constants';
 
 // ── Config visuelle ────────────────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ const CFG: Record<string, { icon: string; grad: [string, string] }> = {
   planning_invite_response:  { icon: 'check-circle',   grad: ['#10B981', '#34D399'] },
   planning_reminder:         { icon: 'clock',          grad: ['#F59E0B', '#FBBF24'] },
   planning_cancelled:        { icon: 'x-circle',       grad: ['#EF4444', '#F87171'] },
+  content_removed:           { icon: 'alert-triangle', grad: ['#EF4444', '#F97316'] },
+  app_update:                { icon: 'download',       grad: ['#7B3FF2', '#E0389A'] },
 };
 const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
 
@@ -120,6 +123,7 @@ export const NotificationsScreen: React.FC = () => {
         body:              payload.body  ?? '',
         ref_id:            payload.ref_id   ?? null,
         ref_type:          payload.ref_type ?? null,
+        image_url:         payload.image_url ?? null,
         is_read:           false,
         created_at:        payload.created_at ?? new Date().toISOString(),
         actor:             payload.actor ?? null,
@@ -163,6 +167,15 @@ export const NotificationsScreen: React.FC = () => {
       item.notification_type === 'planning_cancelled'
     ) {
       nav.navigate('Planning');
+      return;
+    }
+
+    // Mise à jour app — ouvre toujours le store de LA PLATEFORME RÉELLE de l'appareil
+    // (Platform.OS), jamais celle ciblée par l'admin (item.ref_id ne sert qu'au filtrage
+    // serveur des destinataires, pas à choisir quel store ouvrir sur ce device précis).
+    if (item.notification_type === 'app_update') {
+      const url = getStoreUrl();
+      if (url) Linking.openURL(url).catch(() => {});
       return;
     }
 
@@ -395,15 +408,15 @@ const SWIPE_THRESHOLD = -80;
 const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, selectMode, selected, onPress, onDelete, onMarkRead }) => {
   const cfg    = CFG[item.notification_type] ?? DEFAULT_CFG;
   const isRead = item.is_read;
+  const [expanded, setExpanded]   = useState(false);
+  const [truncated, setTruncated] = useState(false);
 
   const translateX = useSharedValue(0);
-  const height     = useSharedValue(72);
   const opacity    = useSharedValue(1);
 
   const doDelete = useCallback(() => {
-    height.value  = withTiming(0,  { duration: 250 });
-    opacity.value = withTiming(0,  { duration: 200 }, () => runOnJS(onDelete)());
-  }, [onDelete]);
+    opacity.value = withTiming(0, { duration: 200 }, () => runOnJS(onDelete)());
+  }, [onDelete, opacity]);
 
   const pan = Gesture.Pan()
     .activeOffsetX([-10, 10])
@@ -412,17 +425,19 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
     })
     .onEnd(e => {
       if (e.translationX < SWIPE_THRESHOLD) {
-        translateX.value = withTiming(-300, { duration: 200 }, () => runOnJS(doDelete)());
+        translateX.value = withTiming(-300, { duration: 200 }, () => doDelete());
       } else {
         translateX.value = withSpring(0);
       }
     });
 
+  // Plus de hauteur figée à 72 — le corps du message peut s'étendre sur plusieurs lignes
+  // une fois "Voir plus" cliqué, la carte doit pouvoir grandir librement. La suppression
+  // se fait par glissement + fondu (translateX + opacity), pas par effondrement de hauteur —
+  // l'item disparaît de la liste dès que le state parent le retire après le fondu.
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
-    height:    height.value,
     opacity:   opacity.value,
-    overflow:  'hidden',
   }));
 
   // Indicateur rouge "Supprimer" derrière la carte
@@ -469,8 +484,15 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
               </View>
             )}
 
-            {/* Avatar acteur ou icône type */}
-            {item.actor?.avatar_url ? (
+            {/* Miniature du contenu (ex: contenu supprimé) > avatar acteur > icône type */}
+            {item.image_url ? (
+              <View style={s.avatarWrap}>
+                <Image source={{ uri: item.image_url }} style={[s.avatar, { borderRadius: 10 }]} />
+                <LinearGradient colors={cfg.grad as [string, string]} style={s.typeBadge}>
+                  <Icon name={cfg.icon} size={9} color="#fff" />
+                </LinearGradient>
+              </View>
+            ) : item.actor?.avatar_url ? (
               <View style={s.avatarWrap}>
                 <Image source={{ uri: item.actor.avatar_url }} style={s.avatar} />
                 <LinearGradient colors={cfg.grad as [string, string]} style={s.typeBadge}>
@@ -493,21 +515,44 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
               </Text>
               <Text
                 style={{ fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: 16 }}
-                numberOfLines={2}
+                numberOfLines={expanded ? undefined : 2}
+                onTextLayout={e => {
+                  if (!expanded && e.nativeEvent.lines.length >= 2) setTruncated(true);
+                }}
               >
                 {item.body}
               </Text>
+              {truncated && (
+                <TouchableOpacity
+                  onPress={() => setExpanded(v => !v)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700', marginTop: 1 }}>
+                    {expanded ? 'Voir moins' : 'Voir plus'}
+                  </Text>
+                </TouchableOpacity>
+              )}
               <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }}>
                 {timeAgo(item.created_at)}
               </Text>
             </View>
 
-            {/* Chevron si navigable */}
-            {!!item.ref_id && (
+            {/* Bouton "Mettre à jour" — dédié, jamais un simple chevron générique */}
+            {item.notification_type === 'app_update' ? (
+              <TouchableOpacity
+                onPress={() => { const url = getStoreUrl(); if (url) Linking.openURL(url).catch(() => {}); }}
+                style={[s.updateBtn, { backgroundColor: colors.primary }]}
+                activeOpacity={0.85}
+              >
+                <Icon name="download" size={13} color="#fff" />
+                <Text style={s.updateBtnText}>Mettre à jour</Text>
+              </TouchableOpacity>
+            ) : !!item.ref_id ? (
               <View style={[s.chevron, { backgroundColor: colors.backgroundSecondary }]}>
                 <Icon name="chevron-right" size={14} color={colors.textTertiary} />
               </View>
-            )}
+            ) : null}
           </TouchableOpacity>
         </Animated.View>
       </GestureDetector>
@@ -571,6 +616,11 @@ const s = StyleSheet.create({
   iconWrap: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
 
   chevron: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  updateBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16,
+  },
+  updateBtnText: { color: '#fff', fontSize: 11.5, fontWeight: '700' },
 
   deleteBack: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
