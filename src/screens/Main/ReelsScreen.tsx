@@ -2738,16 +2738,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           </View>
         </KeyboardAvoidingView>
 
-        {/* Toast de progression du téléchargement — flotte au-dessus de la barre de
-            commentaire, reste visible même après fermeture du menu qui a déclenché le
-            téléchargement (avant, le pourcentage n'était affiché que dans le menu lui-même,
-            donc invisible dès qu'on le fermait). */}
-        {reelDl.downloading && (
-          <View style={[s.dlToast, { bottom: safeBottom + COMMENT_BAR_H + 14 }]} pointerEvents="none">
-            <ActivityIndicator size="small" color="#fff" />
-            <Text style={s.dlToastText}>Téléchargement… {reelDl.progress}%</Text>
-          </View>
-        )}
+        {/* Progression du téléchargement affichée par le toast global (DownloadToast,
+            rendu une fois au niveau racine dans RootNavigator) — visible sur n'importe
+            quel écran, pas seulement Reels, et disparaît seul une fois terminé. */}
 
         <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} reelId={reel.id} commentsDisabled={commentsDisabledSt} onCommentAdded={() => setCommentCount(v => v + 1)} onCommentCountChange={delta => setCommentCount(v => v + delta)} />
       </View>
@@ -2920,13 +2913,4 @@ const s = StyleSheet.create({
 
   modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   ownerMenuCard: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, minWidth: 220, overflow: 'hidden' },
-
-  dlToast: {
-    position: 'absolute', left: 16, right: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: 'rgba(20,18,30,0.88)', borderRadius: 22,
-    paddingVertical: 10, paddingHorizontal: 16,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-  },
-  dlToastText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });

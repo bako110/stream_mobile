@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import { API_BASE_URL, STORAGE_KEYS } from '../utils/constants';
 import { storage } from '../utils/storage';
+import { downloadToastService } from '../services/downloadToastService';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const RNBlobUtil = require('react-native-blob-util').default;
@@ -87,6 +88,9 @@ export function useMediaDownload() {
     const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
 
     setStates(prev => ({ ...prev, [id]: { progress: 0, localUri: null, downloading: true } }));
+    // Toast global — visible sur n'importe quel écran, pas seulement celui qui a lancé le
+    // téléchargement, et disparaît automatiquement une fois terminé.
+    downloadToastService.start(id);
 
     try {
       await RNBlobUtil.config({
@@ -106,15 +110,18 @@ export function useMediaDownload() {
         .progress((received: number, total: number) => {
           const pct = Math.round((Number(received) / Number(total)) * 100);
           setStates(prev => ({ ...prev, [id]: { progress: pct, localUri: null, downloading: true } }));
+          downloadToastService.update(id, pct);
         });
 
       setStates(prev => ({
         ...prev,
         [id]: { progress: 100, localUri: `file://${destPath}`, downloading: false },
       }));
+      downloadToastService.finish(id);
     } catch {
       Alert.alert('Erreur', 'Le téléchargement a échoué. Réessaie plus tard.');
       setStates(prev => ({ ...prev, [id]: { progress: 0, localUri: null, downloading: false } }));
+      downloadToastService.fail(id);
     }
   }, [states]);
 

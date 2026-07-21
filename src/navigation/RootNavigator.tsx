@@ -20,6 +20,7 @@ import { decodeId }         from '../utils/slugId';
 import { setupFCM, resumePendingCallAccept } from '../services/fcmService';
 import { callConnectionService } from '../services/callConnectionService';
 import { UpdateBanner } from '../components/common/UpdateBanner';
+import { DownloadToast } from '../components/common/DownloadToast';
 import { cleanupImageCache } from '../services/imageCacheService';
 import { cleanup as cleanupVideoCache } from '../services/videoCacheService';
 
@@ -287,6 +288,7 @@ export const RootNavigator: React.FC = () => {
             }}>
               <MainNavigator onLogout={handleLogout} />
               <UpdateBanner />
+              <DownloadToast />
             </WebSocketProvider>
           </UserProvider>
         )
