@@ -13,6 +13,16 @@ import { Row, Card, PageHeader } from './_shared';
 
 type VerifStatus = 'none' | 'pending' | 'approved' | 'rejected';
 type AccountType = 'artist' | 'creator' | 'public_figure' | 'brand' | 'journalist' | 'other';
+type BadgePlan = 'monthly' | 'quarterly' | 'yearly';
+
+// Grille tarifaire du badge — abonnement récurrent, débité automatiquement à chaque
+// échéance (même montants que app/db/postgres/models/user.py:VERIFICATION_PLAN_CONFIG).
+const PLAN_INFO: Record<BadgePlan, { label: string; priceEur: number; months: number; badge?: string }> = {
+  monthly:   { label: 'Mensuel',      priceEur: 9,    months: 1 },
+  quarterly: { label: '3 mois',       priceEur: 24.30, months: 3, badge: '-10%' },
+  yearly:    { label: 'Annuel',       priceEur: 81,   months: 12, badge: '-25%' },
+};
+const EUR_TO_GOGOLD_RATE = 100; // même taux que côté backend (wallet_service.py)
 
 const ACCOUNT_TYPES: { key: AccountType; icon: string; label: string; sub: string }[] = [
   { key: 'artist',        icon: 'music',     label: 'Artiste',               sub: 'Musicien, chanteur, groupe' },
@@ -44,6 +54,8 @@ export const SettingsVerificationScreen: React.FC = () => {
   const [links,       setLinks]       = useState('');
   const [loading,     setLoading]     = useState(false);
   const [myGoGold,     setMyGoGold]     = useState<number | null>(null);
+  const [plan,         setPlan]         = useState<BadgePlan>('monthly');
+  const [subInfo,      setSubInfo]      = useState<{ plan: BadgePlan | null; expiresAt: string | null; failedMonths: number } | null>(null);
 
   const canGoStep2 = !!accountType;
   const canGoStep3 = fullName.trim().length >= 2 && bio.trim().length >= 20;
@@ -51,11 +63,16 @@ export const SettingsVerificationScreen: React.FC = () => {
   const fetchStatus = async () => {
     try {
       const [verifRes, walletRes] = await Promise.all([
-        apiClient.get<{ status: VerifStatus; is_verified: boolean }>(Endpoints.users.verificationStatus),
+        apiClient.get<{ status: VerifStatus; is_verified: boolean; plan?: string; expires_at?: string; failed_months?: number }>(Endpoints.users.verificationStatus),
         apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance),
       ]);
       setStatus(verifRes.data.status);
       setMyGoGold(walletRes.data?.gogold_balance ?? 0);
+      setSubInfo({
+        plan: (verifRes.data.plan as BadgePlan) ?? null,
+        expiresAt: verifRes.data.expires_at ?? null,
+        failedMonths: verifRes.data.failed_months ?? 0,
+      });
       if (verifRes.data.is_verified || verifRes.data.status === 'approved') await refreshUser();
     } catch {}
     finally { setFetching(false); }
@@ -82,7 +99,7 @@ export const SettingsVerificationScreen: React.FC = () => {
     setLoading(true);
     try {
       const note = [`Type: ${accountType}`, `Nom: ${fullName.trim()}`, `Bio: ${bio.trim()}`, links.trim() ? `Liens: ${links.trim()}` : ''].filter(Boolean).join('\n');
-      await apiClient.post(Endpoints.users.verifyRequest, { note });
+      await apiClient.post(Endpoints.users.verifyRequest, { note, plan });
       setMyGoGold(prev => prev !== null ? prev - VERIFICATION_FEE : null);
       setStatus('pending');
       setStep(0);
@@ -120,6 +137,36 @@ export const SettingsVerificationScreen: React.FC = () => {
         <Icon name={cfg.icon} size={40} color={cfg.color} />
         <Text style={[vs.statusTitle, { color: cfg.color }]}>{cfg.title}</Text>
         <Text style={[vs.statusSub, { color: colors.textSecondary }]}>{cfg.sub}</Text>
+
+        {status === 'approved' && subInfo && (
+          <View style={{ width: '100%', gap: 8, marginTop: 4 }}>
+            {subInfo.plan && (
+              <View style={[vs.subRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                <Icon name="repeat" size={14} color={colors.textSecondary} />
+                <Text style={{ fontSize: 12, color: colors.textSecondary, flex: 1 }}>
+                  Abonnement {PLAN_INFO[subInfo.plan].label.toLowerCase()} · {PLAN_INFO[subInfo.plan].priceEur.toFixed(2)} € / {PLAN_INFO[subInfo.plan].months} mois
+                </Text>
+              </View>
+            )}
+            {subInfo.expiresAt && (
+              <View style={[vs.subRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                <Icon name="calendar" size={14} color={colors.textSecondary} />
+                <Text style={{ fontSize: 12, color: colors.textSecondary, flex: 1 }}>
+                  Prochain renouvellement : {new Date(subInfo.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+              </View>
+            )}
+            {subInfo.failedMonths > 0 && (
+              <View style={[vs.subRow, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B40' }]}>
+                <Icon name="alert-triangle" size={14} color="#F59E0B" />
+                <Text style={{ fontSize: 12, color: '#F59E0B', flex: 1, fontWeight: '600' }}>
+                  Solde insuffisant lors du dernier renouvellement — recharge ton wallet avant le prochain prélèvement pour ne pas perdre le badge.
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {status === 'rejected' && (
           <TouchableOpacity style={[vs.primaryBtn, { backgroundColor: BLUE, marginTop: 8 }]} onPress={() => setStep(1)}>
             <Icon name="refresh-cw" size={16} color="#fff" />
@@ -245,6 +292,34 @@ export const SettingsVerificationScreen: React.FC = () => {
       <View style={{ gap: 14 }}>
         <Text style={[vs.stepTitle, { color: colors.textPrimary }]}>Vérifiez votre demande</Text>
 
+        {/* Choix de la durée d'abonnement — le badge est un abonnement récurrent, débité
+            automatiquement à chaque échéance (voir bloc paiement plus bas) */}
+        <Text style={[vs.fieldLabel, { color: colors.textTertiary }]}>DURÉE DE L'ABONNEMENT AU BADGE</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {(Object.keys(PLAN_INFO) as BadgePlan[]).map(key => {
+            const info = PLAN_INFO[key];
+            const selected = plan === key;
+            const perMonth = info.priceEur / info.months;
+            return (
+              <TouchableOpacity
+                key={key}
+                onPress={() => setPlan(key)}
+                style={[vs.planCard, { backgroundColor: selected ? BLUE + '15' : colors.surface, borderColor: selected ? BLUE : colors.divider, borderWidth: selected ? 2 : StyleSheet.hairlineWidth }]}
+                activeOpacity={0.8}
+              >
+                {info.badge && (
+                  <View style={[vs.planBadge, { backgroundColor: '#22C55E' }]}>
+                    <Text style={vs.planBadgeText}>{info.badge}</Text>
+                  </View>
+                )}
+                <Text style={[vs.planLabel, { color: selected ? BLUE : colors.textPrimary }]}>{info.label}</Text>
+                <Text style={[vs.planPrice, { color: colors.textPrimary }]}>{info.priceEur.toFixed(2)} €</Text>
+                <Text style={{ fontSize: 10, color: colors.textTertiary }}>{perMonth.toFixed(2)} €/mois</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         {/* Recap demande */}
         <View style={[vs.summaryCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
           {[
@@ -274,6 +349,9 @@ export const SettingsVerificationScreen: React.FC = () => {
               {canAfford && soldeApres !== null ? `  →  ${soldeApres.toLocaleString('fr-FR')} GoGold après` : ''}
             </Text>
           )}
+          <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
+            Une fois approuvée, l'abonnement {PLAN_INFO[plan].label.toLowerCase()} ({PLAN_INFO[plan].priceEur.toFixed(2)} € ≈ {Math.round(PLAN_INFO[plan].priceEur * EUR_TO_GOGOLD_RATE)} GoGold) démarre et se renouvelle automatiquement tous les {PLAN_INFO[plan].months} mois.
+          </Text>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
             <Icon name="rotate-ccw" size={12} color="#22C55E" style={{ marginTop: 2 }} />
             <Text style={{ fontSize: 12, color: '#22C55E', flex: 1, lineHeight: 17 }}>
@@ -384,4 +462,10 @@ const vs = StyleSheet.create({
   progressLabel:  { fontSize: 10, fontWeight: '600' },
   progressLine:   { flex: 1, height: 2, marginBottom: 14 },
   feeBox:         { borderRadius: 16, borderWidth: 1, padding: 14 },
+  planCard:       { flex: 1, borderRadius: 14, padding: 10, alignItems: 'center', gap: 3, position: 'relative' },
+  planBadge:      { position: 'absolute', top: -8, right: -6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  planBadgeText:  { color: '#fff', fontSize: 9, fontWeight: '800' },
+  planLabel:      { fontSize: 12, fontWeight: '700', marginTop: 4 },
+  planPrice:      { fontSize: 16, fontWeight: '800' },
+  subRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 9 },
 });

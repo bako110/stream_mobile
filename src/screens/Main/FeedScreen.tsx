@@ -669,6 +669,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
   const [nearbyEvents,    setNearbyEvents]    = useState<Event[]>([]);
   const [trendingComm,    setTrendingComm]    = useState<CommunityData[]>([]);
+  // IDs des communautés dont l'utilisateur est déjà membre — comme Facebook, jamais
+  // resuggérer une communauté déjà rejointe. join_status venant de /communities (liste
+  // générique en cache Redis, non personnalisée par utilisateur) vaut toujours "none",
+  // donc ce filtre-ci est la seule source fiable.
+  const myCommIdsRef = useRef<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searching, setSearching] = useState(false);
@@ -1110,19 +1115,21 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
         // changeaient de position dès que le reste arrivait, et les events/concerts
         // semblaient absents du feed puisqu'ils n'apparaissaient jamais dans ce
         // premier rendu partiel. Un seul skeleton jusqu'à ce que tout soit prêt.
-        const [postsPage, feedResult, reelsResult, commResult, liveConcerts, spontLivesResult] = await Promise.all([
+        const [postsPage, feedResult, reelsResult, commResult, liveConcerts, spontLivesResult, myComms] = await Promise.all([
           postService.getFeed(postsLimit, false, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null })),
           searchService.getFeed(1, feedLimit).catch(() => ({ items: [] })),
           reelService.getFeed({ limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: 1 })),
           communityService.list(1, 8).catch(() => []),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
+          communityService.mine().catch(() => [] as CommunityData[]),
         ]);
         const postsResult = postsPage.items;
         postCursorRef.current = postsPage.next_cursor;
         postsHasMoreRef.current = postsPage.has_more;
         setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
         setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
+        myCommIdsRef.current = new Set((Array.isArray(myComms) ? myComms : []).map(c => String(c.id)));
         const commData: CommunityData[] = Array.isArray(commResult)
           ? commResult.slice(0, 5)
           : Array.isArray((commResult as any)?.items) && (commResult as any).items !== null
@@ -1691,9 +1698,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
       // fetchMoreCommunities enrichit le pool en arrière-plan (voir sliceForCommBlock).
       const commBlockNum = parseInt(item.id.split('__communities__')[1] ?? '1', 10) || 1;
       const allComms: CommunityData[] = sliceForCommBlock(commBlockNum);
-      const myCommIds = new Set<string>();
       const JOINED = new Set(['member', 'admin', 'moderator']);
-      const comms = allComms.filter(c => !myCommIds.has(String(c.id)) && !JOINED.has(c.join_status as string));
+      const comms = allComms.filter(c =>
+        !myCommIdsRef.current.has(String(c.id)) && !JOINED.has(c.join_status as string)
+      );
       if (!comms.length) return null;
       const gradFor = (_name: string): [string, string] =>
         [colors.primary, colors.primaryLight];

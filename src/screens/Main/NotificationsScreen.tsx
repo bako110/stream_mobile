@@ -45,6 +45,9 @@ const CFG: Record<string, { icon: string; grad: [string, string] }> = {
   planning_cancelled:        { icon: 'x-circle',       grad: ['#EF4444', '#F87171'] },
   content_removed:           { icon: 'alert-triangle', grad: ['#EF4444', '#F97316'] },
   app_update:                { icon: 'download',       grad: ['#7B3FF2', '#E0389A'] },
+  verification_renewed:      { icon: 'check-circle',   grad: ['#1D9BF0', '#60A5FA'] },
+  verification_payment_failed: { icon: 'alert-triangle', grad: ['#F59E0B', '#FBBF24'] },
+  verification_revoked:      { icon: 'shield-off',     grad: ['#EF4444', '#F87171'] },
 };
 const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
 
