@@ -1194,9 +1194,19 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
     }
   }, [isActive, ad.id]);
 
+  // cta_url peut contenir soit un lien web, soit un numéro de téléphone brut (l'admin
+  // saisit l'un ou l'autre sans distinction de champ côté backend) — on détecte le
+  // type pour adapter le CTA affiché ("En savoir plus" vs "Contactez-nous") et le
+  // schéma d'ouverture (tel: pour composer, http(s) sinon).
+  const rawCta   = (ad.cta_url ?? '').trim();
+  const isPhone  = !!rawCta && !/^https?:\/\//i.test(rawCta) && /^[+()\d\s.-]{6,}$/.test(rawCta.replace(/^tel:/i, ''));
+  const ctaPhone = isPhone ? rawCta.replace(/^tel:/i, '') : null;
+
   const handleCta = () => {
     apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
-    if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
+    if (!rawCta) return;
+    const target = isPhone ? `tel:${ctaPhone}` : rawCta;
+    Linking.openURL(target).catch(() => {});
   };
 
   const badgePulse = useSharedValue(1);
@@ -1217,15 +1227,17 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         <LinearGradient colors={['#1a0533', '#0d1b4b', '#0a2a1a']} style={{ position: 'absolute', width: screenW, height: screenH }} />
       )}
 
-      {/* ── Voile léger en haut pour lisibilité du badge, quel que soit le média ── */}
+      {/* ── Voile léger en haut pour lisibilité du header, quel que soit le média ── */}
       <LinearGradient
         colors={['#00000070', 'transparent']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140 }}
         pointerEvents="none"
       />
 
-      {/* ── Badge "Sponsorisé" — haut gauche, pastille pulsante + icône, style TikTok ── */}
-      <View style={{ position: 'absolute', top: insetBottom > 0 ? 54 : 44, left: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,18,30,0.62)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' }}>
+      {/* ── Badge "Sponsorisé" — sous le header flottant (bouton retour + titre "Reels"),
+          jamais à la même hauteur pour éviter tout chevauchement. Aligné à droite pour
+          rester lisible même quand le header est en mode recherche/mes reels. ── */}
+      <View style={{ position: 'absolute', top: insetBottom > 0 ? 96 : 86, right: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,18,30,0.68)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' }}>
         <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#E0389A' }, badgeDotStyle]} />
         <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>Sponsorisé</Text>
       </View>
@@ -1274,16 +1286,25 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
           </Text>
         ) : null}
 
-        {/* CTA — vrai bouton plein largeur en dégradé de marque, jamais une simple icône */}
-        {ad.cta_url ? (
+        {/* CTA — vrai bouton plein largeur en dégradé de marque, adapté au type de
+            contact : numéro de téléphone → "Contactez-nous" + icône téléphone (compose
+            l'appel), lien web → "En savoir plus" + flèche (ouvre le navigateur). */}
+        {rawCta ? (
           <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={{ marginTop: 2, shadowColor: '#7B3FF2', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
             <LinearGradient
               colors={['#7B3FF2', '#C044E8', '#E0389A']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={{ borderRadius: 14, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }}
             >
-              <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: 0.2 }}>{ad.cta_text || 'En savoir plus'}</Text>
-              <Icon name="arrow-right" size={16} color="#fff" />
+              <Icon name={isPhone ? 'phone' : 'globe'} size={15} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: 0.2 }}>
+                {ad.cta_text || (isPhone ? 'Contactez-nous' : 'En savoir plus')}
+              </Text>
+              {isPhone ? (
+                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' }}>· {ctaPhone}</Text>
+              ) : (
+                <Icon name="arrow-right" size={16} color="#fff" />
+              )}
             </LinearGradient>
           </TouchableOpacity>
         ) : null}
