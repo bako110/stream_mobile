@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Image, type ImageProps, type ImageStyle, type StyleProp } from 'react-native';
-import { getCachedUri, cacheImage } from '../../services/imageCacheService';
+import { getCachedUri, getCachedUriAsync, cacheImage } from '../../services/imageCacheService';
 
 interface CachedImageProps extends Omit<ImageProps, 'source'> {
   uri: string | undefined | null;
@@ -23,14 +23,31 @@ export const CachedImage: React.FC<CachedImageProps> = ({ uri, ...rest }) => {
     if (!uri) { setLocalUri(null); resolvedForUriRef.current = null; return; }
 
     const cached = getCachedUri(uri);
-    if (cached) { setLocalUri(cached); resolvedForUriRef.current = uri; return; }
-
     // Uri différente de celle déjà résolue → vraie nouvelle image, reset nécessaire.
     // Uri identique (remontage) → on garde l'affichage courant, pas de flash "vide" pendant
-    // que cacheImage() re-vérifie le disque.
-    if (resolvedForUriRef.current !== uri) { setLocalUri(null); resolvedForUriRef.current = uri; }
+    // qu'on re-vérifie le disque.
+    if (!cached && resolvedForUriRef.current !== uri) {
+      setLocalUri(null);
+      resolvedForUriRef.current = uri;
+    }
 
     let cancelled = false;
+
+    if (cached) {
+      // Affichage optimiste immédiat, puis vérification disque en tâche de fond :
+      // si le fichier a disparu (zombie), getCachedUriAsync nettoie l'index et
+      // cacheImage() re-télécharge.
+      setLocalUri(cached);
+      resolvedForUriRef.current = uri;
+      getCachedUriAsync(uri).then(verified => {
+        if (cancelled || verified) return;
+        cacheImage(uri).then(path => {
+          if (!cancelled && path) { setLocalUri(path); resolvedForUriRef.current = uri; }
+        });
+      });
+      return () => { cancelled = true; };
+    }
+
     cacheImage(uri).then(path => {
       if (!cancelled && path) { setLocalUri(path); resolvedForUriRef.current = uri; }
     });

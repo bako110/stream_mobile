@@ -20,6 +20,8 @@ import { decodeId }         from '../utils/slugId';
 import { setupFCM, resumePendingCallAccept } from '../services/fcmService';
 import { callConnectionService } from '../services/callConnectionService';
 import { UpdateBanner } from '../components/common/UpdateBanner';
+import { cleanupImageCache } from '../services/imageCacheService';
+import { cleanup as cleanupVideoCache } from '../services/videoCacheService';
 
 
 type AppState = 'splash' | 'onboarding' | 'auth' | 'main';
@@ -149,6 +151,10 @@ export const RootNavigator: React.FC = () => {
       setTimeout(() => {
         setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       }, 500);
+      setTimeout(() => {
+        cleanupImageCache().catch(() => {});
+        cleanupVideoCache().catch(() => {});
+      }, 1000);
       navigatePendingUrl();
     };
 
@@ -193,6 +199,10 @@ export const RootNavigator: React.FC = () => {
     setTimeout(() => {
       setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
     }, 500);
+    setTimeout(() => {
+      cleanupImageCache().catch(() => {});
+      cleanupVideoCache().catch(() => {});
+    }, 1000);
     navigatePendingUrl();
   };
   const handleLogout = () => {

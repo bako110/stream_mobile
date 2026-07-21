@@ -64,13 +64,39 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-/** Retourne file:// si déjà en cache sur disque, sinon null (fallback : url distante). */
+/**
+ * Version synchrone — retourne depuis l'index sans vérifier le disque.
+ * Utiliser pour un affichage immédiat (pas de flash) ; les zombies éventuels sont
+ * rattrapés par getCachedUriAsync/cacheImage qui vérifient le disque.
+ */
 export function getCachedUri(url: string): string | null {
   if (!url) return null;
   const key   = normalizeUrl(url);
   const entry = getIndex()[key];
   if (!entry) return null;
   if (Date.now() - entry.ts > MAX_AGE_MS) return null;
+  return `file://${entry.path}`;
+}
+
+/**
+ * Retourne file:// si le fichier est en cache ET existe réellement sur disque.
+ * Supprime l'entrée zombie de l'index si le fichier a disparu.
+ */
+export async function getCachedUriAsync(url: string): Promise<string | null> {
+  if (!url) return null;
+  const key   = normalizeUrl(url);
+  const entry = getIndex()[key];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > MAX_AGE_MS) return null;
+
+  const exists = await fileExists(entry.path);
+  if (!exists) {
+    const idx = getIndex();
+    delete idx[key];
+    _index = idx;
+    saveIndex(idx);
+    return null;
+  }
   return `file://${entry.path}`;
 }
 

@@ -724,7 +724,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const PREFETCH_ITEMS_REMAINING = 6;
   // Nombre d'items à l'avance dont on précharge l'image sur disque — évite l'écran noir/flash
   // au scroll rapide (CachedImage ne télécharge sinon qu'une fois le composant réellement monté).
-  const IMAGE_PREFETCH_AHEAD = 4;
+  // Réduit hors wifi (data mobile facturée), même prudence que StoryBar/ConversationStoryBar.
+  const getImagePrefetchAhead = () => (networkService.isWifi() ? 4 : 2);
   const prefetchedImagesRef = useRef<Set<string>>(new Set());
 
   // Retourne les images visuelles "de base" d'un item — limité aux médias propres à l'item
@@ -760,7 +761,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
 
   const prefetchUpcomingImages = (fromIndex: number) => {
     const list = itemsRef.current;
-    for (let i = fromIndex; i < Math.min(fromIndex + IMAGE_PREFETCH_AHEAD, list.length); i++) {
+    const ahead = getImagePrefetchAhead();
+    for (let i = fromIndex; i < Math.min(fromIndex + ahead, list.length); i++) {
       for (const url of extractItemImageUrls(list[i])) {
         if (url && !prefetchedImagesRef.current.has(url)) {
           prefetchedImagesRef.current.add(url);
