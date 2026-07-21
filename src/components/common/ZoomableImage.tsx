@@ -3,7 +3,7 @@
  * double-tap pour zoomer/dézoomer rapidement. À utiliser dans toutes les visionneuses
  * plein écran (posts, chat, bannières/avatars) pour un comportement uniforme.
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -32,8 +32,13 @@ export const ZoomableImage: React.FC<ZoomableImageProps> = ({ uri, width, height
   const translateY = useSharedValue(0);
   const savedX     = useSharedValue(0);
   const savedY     = useSharedValue(0);
+  // Le Pan doit rester desactive tant que l'image n'est pas zoomee, sinon il
+  // "gagne" le geste devant le swipe horizontal du carrousel parent (FlatList)
+  // des le premier pixel de mouvement, meme s'il ne deplace rien lui-meme.
+  const [panEnabled, setPanEnabled] = useState(false);
 
   const handleZoomChange = useCallback((zoomed: boolean) => {
+    setPanEnabled(zoomed);
     onZoomChange?.(zoomed);
   }, [onZoomChange]);
 
@@ -66,6 +71,7 @@ export const ZoomableImage: React.FC<ZoomableImageProps> = ({ uri, width, height
     });
 
   const panGesture = Gesture.Pan()
+    .enabled(panEnabled)
     .averageTouches(true)
     .onUpdate((e) => {
       'worklet';
