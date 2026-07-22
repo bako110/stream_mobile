@@ -136,10 +136,43 @@ export const ReelsScreen: React.FC = () => {
 
   const [reels,         setReels]         = useState<Reel[]>(seedReel.length > 0 ? seedReel : []);
   const [myReels,       setMyReels]       = useState<Reel[]>([]);
-  const [reelAd,        setReelAd]        = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; advertiser_id?: string } | null>(null);
-  // reelAdRef — toujours à jour, lisible depuis useFocusEffect (closure figée sur [])
-  const reelAdRef = useRef(reelAd);
-  reelAdRef.current = reelAd;
+  type AdData0 = { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; advertiser_id?: string };
+  // Une ad par EMPLACEMENT (clé = index du slot, ex: 0, 1, 2... pour le 1er/2e/3e
+  // emplacement pub inséré tous les AD_INTERVAL reels) — avant, une seule ad était
+  // chargée pour tout le feed et réutilisée partout, donc toujours la même pub quel
+  // que soit le nombre de reels scrollés.
+  const [adSlots, setAdSlots] = useState<Map<number, AdData0>>(new Map());
+  const adSlotsRef = useRef(adSlots);
+  adSlotsRef.current = adSlots;
+  const servedAdIdsRef = useRef<Set<string>>(new Set());
+  const loadingAdSlotsRef = useRef<Set<number>>(new Set());
+  // reelAdRef — reflète juste "au moins une ad a déjà été chargée" (utilisé par
+  // toRenderedIndex pour savoir si des slots pub existent dans le flux rendu).
+  const reelAdRef = useRef(false);
+  reelAdRef.current = adSlots.size > 0;
+
+  const loadAdForSlot = useCallback((slotIdx: number) => {
+    if (loadingAdSlotsRef.current.has(slotIdx) || adSlotsRef.current.has(slotIdx)) return;
+    loadingAdSlotsRef.current.add(slotIdx);
+    // Bornage défensif — au-delà d'une vingtaine d'ads distinctes déjà servies dans la
+    // même session, on recommence à autoriser les répétitions plutôt que d'envoyer une
+    // liste d'exclusion qui grossirait indéfiniment sur un scroll très long.
+    const recentExcluded = Array.from(servedAdIdsRef.current).slice(-20);
+    const excludeIds = recentExcluded.join(',');
+    const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
+    apiClient.get<AdData0 | null>(`/api/v1/ads/feed/next?placement=reels${qs}`)
+      .then(r => {
+        loadingAdSlotsRef.current.delete(slotIdx);
+        if (!r.data || !mountedRef.current) return;
+        servedAdIdsRef.current.add(r.data.id);
+        setAdSlots(prev => {
+          const next = new Map(prev);
+          next.set(slotIdx, r.data as AdData0);
+          return next;
+        });
+      })
+      .catch(() => { loadingAdSlotsRef.current.delete(slotIdx); });
+  }, []);
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
   const [editCaption,   setEditCaption]   = useState('');
@@ -303,10 +336,10 @@ export const ReelsScreen: React.FC = () => {
           setReels(merged);
         }
       }
-      // Charger la pub reels en arriere-plan
-      apiClient.get<{ id: string; title: string; advertiser_id?: string } | null>('/api/v1/ads/feed/next?placement=reels')
-        .then(r => { if (r.data && mountedRef.current) setReelAd(r.data as any); })
-        .catch(() => {});
+      // Charger la pub du premier emplacement en arrière-plan — les emplacements suivants
+      // sont chargés à la demande (voir loadAdForSlot / useEffect[reels]) pour ne jamais
+      // répéter la même ad partout dans le feed.
+      loadAdForSlot(0);
 
       // Charger myId + mes reels en parallèle sans bloquer l'affichage
       authService.getMe().then(me => {
@@ -656,16 +689,35 @@ export const ReelsScreen: React.FC = () => {
   const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
 
   const feedWithAds = useMemo(() => {
-    if (userMode || !reelAd) return reels;
-    const result: (Reel | { _isAd: true; id: string; ad: typeof reelAd })[] = [];
+    if (userMode || adSlots.size === 0) return reels;
+    const result: (Reel | { _isAd: true; id: string; ad: AdData0 })[] = [];
+    let slotIdx = 0;
     reels.forEach((r, i) => {
       result.push(r);
       if ((i + 1) % AD_INTERVAL === 0) {
-        result.push({ _isAd: true, id: `ad-${reelAd.id}-${i}`, ad: reelAd });
+        // slotIdx = rang de cet emplacement (0, 1, 2...), indépendant de reelAd —
+        // chaque emplacement a potentiellement sa PROPRE ad chargée séparément.
+        const ad = adSlots.get(slotIdx);
+        if (ad) result.push({ _isAd: true, id: `ad-${ad.id}-${i}`, ad });
+        slotIdx++;
       }
     });
     return result;
-  }, [reels, reelAd]);
+  }, [reels, adSlots, userMode]);
+
+  // Précharge l'ad du prochain emplacement dès qu'on approche du dernier slot déjà
+  // rempli — pour qu'elle soit prête avant que l'utilisateur y arrive en scrollant,
+  // sans jamais réutiliser la même ad que les emplacements précédents.
+  useEffect(() => {
+    if (userMode) return;
+    const totalSlots = Math.floor(reels.length / AD_INTERVAL);
+    for (let s = 0; s < totalSlots; s++) {
+      if (!adSlotsRef.current.has(s) && !loadingAdSlotsRef.current.has(s)) {
+        loadAdForSlot(s);
+        break; // un seul chargement à la fois, dans l'ordre — pas une rafale
+      }
+    }
+  }, [reels.length, userMode, loadAdForSlot]);
 
   const renderVideoSlide = useCallback(({ item, index }: { item: any; index: number }) => {
     if (item._isAd) {
@@ -706,7 +758,7 @@ export const ReelsScreen: React.FC = () => {
         audioOwnerRef={audioOwnerRef}
       />
     );
-  }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, reelAd, SCREEN_W, SCREEN_H, isWifi]);
+  }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
