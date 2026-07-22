@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Animated, {
   useAnimatedStyle, useSharedValue,
-  withTiming, runOnJS, withSpring,
+  withTiming, runOnJS, withSpring, interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
@@ -422,7 +422,12 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
   }, [onDelete, opacity]);
 
   const pan = Gesture.Pan()
-    .activeOffsetX([-10, 10])
+    // Seule la gauche déclenche la suppression — activeOffsetX([-10, Infinity]) laisse le
+    // scroll vertical de la FlatList gagner sur un geste vers la droite ou vertical, au
+    // lieu d'attendre un mouvement dans N'IMPORTE QUELLE direction avant de s'activer
+    // (activeOffsetX([-10, 10]) précédent), ce qui donnait une sensation de démarrage lent.
+    .activeOffsetX([-10, Number.POSITIVE_INFINITY])
+    .failOffsetY([-10, 10])
     .onUpdate(e => {
       if (e.translationX < 0) translateX.value = e.translationX;
     })
@@ -447,9 +452,12 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
     opacity:   opacity.value,
   }));
 
-  // Indicateur rouge "Supprimer" derrière la carte
+  // Indicateur rouge "Supprimer" derrière la carte — opacité interpolée directement sur
+  // translateX (suit le doigt à chaque frame, sans latence) plutôt que withTiming
+  // relancé à chaque changement de côté du seuil, qui faisait saccader le glissement en
+  // superposant des animations de 250ms jamais terminées les unes sur les autres.
   const deleteReveal = useAnimatedStyle(() => ({
-    opacity: translateX.value < -20 ? withTiming(1) : withTiming(0),
+    opacity: interpolate(translateX.value, [-20, -60], [0, 1], Extrapolation.CLAMP),
   }));
 
   return (
