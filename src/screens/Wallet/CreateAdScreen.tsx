@@ -194,6 +194,12 @@ export const CreateAdScreen: React.FC = () => {
     if (budget < 1)     { Alert.alert('Erreur', 'Budget minimum : 1 €'); return; }
     if (uploading) { Alert.alert('Patiente', 'Le fichier est encore en cours d\'upload.'); return; }
     if (localMedia && !creativeUrl) { Alert.alert('Patiente', 'La conversion HLS est en cours, réessaie dans quelques secondes.'); return; }
+    // Une campagne sans image ni vidéo s'affiche comme un emplacement vide (icône
+    // grisée) partout où elle est servie — jamais un cas voulu, toujours un oubli.
+    if (!creativeUrl.trim()) {
+      Alert.alert('Créatif requis', 'Ajoute une image ou une vidéo — une pub sans média ne s\'affiche pas correctement.');
+      return;
+    }
     // Le champ CTA accepte soit un lien web, soit un numéro de téléphone (même détection
     // que côté affichage dans ReelsScreen.tsx AdSlide, qui choisit "Contactez-nous" +
     // ouverture du composeur d'appel si un numéro est détecté).
