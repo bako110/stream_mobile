@@ -572,10 +572,38 @@ export const StoryViewer: React.FC<Props> = ({
   const [groupIdx,    setGroupIdx]    = useState(initialGroupIndex);
   const [storyIdx,    setStoryIdx]    = useState(initialStoryIndex ?? 0);
   const [paused,      setPaused]      = useState(false);
-  const [storyAd,     setStoryAd]     = useState<{ id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string } | null>(null);
+  type StoryAdInfo = { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string };
+  // Une ad par TRANSITION entre groupes (clé = groupIdx qu'on quitte), pas une ad unique
+  // réutilisée à chaque changement de créateur — avant, la même pub apparaissait à
+  // chaque transition, quel que soit le nombre de stories vues.
+  const [adSlots,     setAdSlots]     = useState<Map<number, StoryAdInfo>>(new Map());
+  const adSlotsRef    = useRef(adSlots);
+  adSlotsRef.current = adSlots;
+  const servedStoryAdIdsRef = useRef<Set<string>>(new Set());
+  const loadingStoryAdSlotsRef = useRef<Set<number>>(new Set());
+  const storyAd = adSlots.get(groupIdx) ?? null;
   const [showStoryAd, setShowStoryAd] = useState(false);
   const storyAdTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextGroupIdxRef               = useRef<number>(0); // groupe cible apres la pub
+
+  const loadStoryAdForSlot = useCallback((slotIdx: number) => {
+    if (loadingStoryAdSlotsRef.current.has(slotIdx) || adSlotsRef.current.has(slotIdx)) return;
+    loadingStoryAdSlotsRef.current.add(slotIdx);
+    const excludeIds = Array.from(servedStoryAdIdsRef.current).slice(-20).join(',');
+    const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
+    apiClient.get<StoryAdInfo | null>(`/api/v1/ads/feed/next?placement=stories${qs}`)
+      .then(r => {
+        loadingStoryAdSlotsRef.current.delete(slotIdx);
+        if (!r?.data?.id) return;
+        servedStoryAdIdsRef.current.add(r.data.id);
+        setAdSlots(prev => {
+          const next = new Map(prev);
+          next.set(slotIdx, r.data as StoryAdInfo);
+          return next;
+        });
+      })
+      .catch(() => { loadingStoryAdSlotsRef.current.delete(slotIdx); });
+  }, []);
   const [menuOpen,    setMenuOpen]    = useState(false);
   const [editMode,    setEditMode]    = useState(false);
   const [editCaption, setEditCaption] = useState('');
@@ -647,15 +675,13 @@ export const StoryViewer: React.FC<Props> = ({
     urls.forEach(url => { Image.prefetch(url).catch(() => {}); });
   }, [storyIdx, groupIdx, isWifi]);
 
-  // ── Charger pub stories une seule fois au montage ─────────────────────────
+  // ── Charger la pub du groupe courant, et précharger celle du suivant en avance
+  // pour qu'elle soit prête avant la transition (jamais la même pub deux fois). ────
   useEffect(() => {
-    try {
-      apiClient.get<{ id: string; title: string } | null>('/api/v1/ads/feed/next?placement=stories')
-        .then(r => { if (r?.data?.id) setStoryAd(r.data as any); })
-        .catch(() => {});
-    } catch {}
+    loadStoryAdForSlot(groupIdx);
+    loadStoryAdForSlot(groupIdx + 1);
     return () => { if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current); };
-  }, []);
+  }, [groupIdx, loadStoryAdForSlot]);
 
   // ── Mark viewed ────────────────────────────────────────────────────────────
 

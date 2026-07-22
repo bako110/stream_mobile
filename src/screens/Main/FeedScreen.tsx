@@ -680,6 +680,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState<'all'|'users'|'events'|'concerts'|'reels'|'films'>('all');
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  // Pub dédiée au placement "search" — une seule par recherche effectuée (pas de scroll
+  // infini dans les résultats, contrairement au feed principal, donc pas besoin de
+  // rotation par emplacement). Rechargée à chaque nouveau terme recherché.
+  const [searchAd, setSearchAd] = useState<AdData | null>(null);
+  const searchAdReqRef = useRef('');
   const [popularContent, setPopularContent] = useState<any[]>([]);
   const [popularLoading, setPopularLoading] = useState(false);
   const popularLoadedRef = useRef(false);
@@ -829,7 +834,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     const term = query.trim();
     searchReqRef.current = term;
-    if (!term) { setSearchResults(null); setSearching(false); return; }
+    if (!term) { setSearchResults(null); setSearchAd(null); setSearching(false); return; }
     searchTimerRef.current = setTimeout(async () => {
       setSearching(true);
       try {
@@ -838,6 +843,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
         if (searchReqRef.current === term) setSearchResults(results);
       } catch { /* silencieux */ }
       finally { if (searchReqRef.current === term) setSearching(false); }
+
+      // Pub search — indépendante de searchAll, ne bloque jamais l'affichage des résultats
+      // si elle échoue ou tarde.
+      if (searchAdReqRef.current === term) return;
+      searchAdReqRef.current = term;
+      apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=search')
+        .then(r => { if (searchAdReqRef.current === term) setSearchAd(r.data ?? null); })
+        .catch(() => {});
     }, 300);
   }, []);
 
@@ -875,6 +888,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
     setTimeout(() => setSearchOpen(false), 180);
     setSearchQuery('');
     setSearchResults(null);
+    setSearchAd(null);
+    searchAdReqRef.current = '';
     setSearchFilter('all');
   }, []);
 
@@ -1941,6 +1956,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                     if (searchReqRef.current === term) setSearchResults(results);
                   } catch { /* silencieux */ }
                   finally { if (searchReqRef.current === term) setSearching(false); }
+                  if (searchAdReqRef.current !== term) {
+                    searchAdReqRef.current = term;
+                    apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=search')
+                      .then(r => { if (searchAdReqRef.current === term) setSearchAd(r.data ?? null); })
+                      .catch(() => {});
+                  }
                 }}
               />
               {searching && <ActivityIndicator size="small" color={colors.primary} />}
@@ -2336,6 +2357,20 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                 </View>
 
                 <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                  {/* Pub — placement "search", une seule en tête des résultats, seulement
+                      quand tous les types sont affichés (pas sur une recherche déjà filtrée). */}
+                  {searchAd && searchFilter === 'all' && (
+                    <View style={{ paddingHorizontal: 12, paddingTop: 10 }}>
+                      <AdCard
+                        ad={searchAd}
+                        colors={colors}
+                        isVisible={searchOpen}
+                        onImpression={handleAdImpression}
+                        onPress={handleAdPress}
+                      />
+                    </View>
+                  )}
+
                   {/* Utilisateurs */}
                   {(searchFilter === 'all' || searchFilter === 'users') && (searchResults!.users?.length ?? 0) > 0 && (
                     <View>
