@@ -9,9 +9,11 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
   ActivityIndicator, Image, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform,
+  Dimensions,
 } from 'react-native';
 import Animated, {
-  FadeInDown, FadeInRight, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing,
+  FadeInDown, FadeInRight, FadeIn, BounceIn, ZoomIn, withDelay,
+  useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -31,6 +33,35 @@ import { BackButton } from '../../components/common';
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 interface RouteParams { tournamentId: string; }
+
+const { height: SCREEN_H } = Dimensions.get('window');
+
+// Fleur/confetti dore qui tombe en tournoyant depuis le haut de l'ecran de
+// victoire — meme composant que BattleScreen.tsx, pour que le spectateur qui
+// suit un match depuis le bracket voie exactement le meme ecran champion que
+// celui vu par le vainqueur lui-meme en direct.
+const PETALS = ['🌸', '🌼', '✨', '🌟', '🎉'];
+
+function FallingPetal({ left, delay, duration, emoji }: { left: number; delay: number; duration: number; emoji: string }) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withDelay(delay, withTiming(1, { duration, easing: Easing.linear }));
+  }, []); // eslint-disable-line
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: progress.value * (SCREEN_H * 0.55) },
+      { translateX: Math.sin(progress.value * Math.PI * 2) * 18 },
+      { rotate: `${progress.value * 360}deg` },
+    ],
+    opacity: progress.value < 0.05 ? progress.value / 0.05 : progress.value > 0.85 ? (1 - progress.value) / 0.15 : 1,
+  }));
+
+  return (
+    <Animated.Text pointerEvents="none" style={[styles.fallingPetal, { left }, style]}>{emoji}</Animated.Text>
+  );
+}
 
 const ROUND_LABELS: Record<TournamentRound, string> = {
   qualifications: 'Qualifications',
@@ -107,7 +138,10 @@ export const TournamentBracketScreen: React.FC = () => {
   // complet pour qui regarde le live en direct, mais un participant resté sur ce
   // bracket (ou revenu en arrière avant la fin) ne voyait jamais qui avait gagné,
   // seulement le bracket qui se met à jour silencieusement en arrière-plan.
-  const [matchResult, setMatchResult] = useState<{ isDraw: boolean; winnerName: string; loserName: string; viewerRole: 'won' | 'lost' | 'spectator' } | null>(null);
+  const [matchResult, setMatchResult] = useState<{
+    isDraw: boolean; winnerName: string; loserName: string; winnerAvatar: string | null;
+    scoreA: number; scoreB: number; viewerRole: 'won' | 'lost' | 'spectator';
+  } | null>(null);
   const bracketRef = useRef(bracket);
   bracketRef.current = bracket;
   const currentUserIdRef = useRef(currentUser?.id);
@@ -160,6 +194,9 @@ export const TournamentBracketScreen: React.FC = () => {
             isDraw,
             winnerName: winner?.display_name ?? 'Le vainqueur',
             loserName:  loser?.display_name ?? 'Son adversaire',
+            winnerAvatar: winner?.avatar_url ?? null,
+            scoreA: Number(payload.score_a ?? 0),
+            scoreB: Number(payload.score_b ?? 0),
             viewerRole,
           });
         }
@@ -1007,43 +1044,106 @@ export const TournamentBracketScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Résultat d'un match — annonce active a TOUT LE MONDE present sur ce bracket
-          (les 2 joueurs ET les spectateurs), pas juste une mise a jour silencieuse
-          de la carte, pour qui n'a pas suivi le direct jusqu'au bout. */}
-      <Modal visible={!!matchResult} transparent animationType="fade" onRequestClose={() => setMatchResult(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.resultCard, matchResult?.isDraw ? styles.resultCardDraw : matchResult?.viewerRole === 'won' ? styles.resultCardWin : styles.resultCardLoss]}>
-            <View style={styles.resultIconWrap}>
-              <LinearGradient
-                colors={matchResult?.isDraw ? ['#9CA3AF', '#6B7280'] : matchResult?.viewerRole === 'lost' ? ['#4B5563', '#1F2937'] : ['#FFD34D', '#F59E0B']}
-                style={styles.resultIconCircle}
-              >
-                <Icon name={matchResult?.isDraw ? 'minus' : matchResult?.viewerRole === 'lost' ? 'flag' : 'award'} size={30} color="#fff" />
-              </LinearGradient>
-            </View>
-            <Text style={styles.resultTitle}>
-              {matchResult?.isDraw ? 'Match nul !' : matchResult?.viewerRole === 'lost' ? 'Défaite' : matchResult?.viewerRole === 'won' ? 'Victoire !' : `${matchResult?.winnerName} gagne !`}
-            </Text>
-            <Text style={styles.resultSubtitle}>
-              {matchResult?.isDraw
-                ? `Le match entre ${matchResult.winnerName} et ${matchResult.loserName} s'est terminé à égalité.`
-                : matchResult?.viewerRole === 'won'
-                  ? `Tu as battu ${matchResult?.loserName}. Bravo !`
-                  : matchResult?.viewerRole === 'lost'
-                    ? `${matchResult?.winnerName} l'emporte cette fois — ce n'est que partie remise.`
-                    : `${matchResult?.winnerName} bat ${matchResult?.loserName} et poursuit le tournoi.`}
-            </Text>
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setMatchResult(null)} style={styles.resultCloseBtn}>
-              <LinearGradient
-                colors={matchResult?.viewerRole === 'lost' ? ['#9B65F5', '#7B3FF2'] : ['#FFD34D', '#F59E0B']}
-                style={styles.resultCloseBtnInner}
-              >
-                <Text style={styles.resultCloseBtnText}>Voir le bracket</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Résultat d'un match — annonce active à TOUT LE MONDE présent sur ce bracket
+          (les 2 joueurs ET les spectateurs), pas juste une mise à jour silencieuse
+          de la carte. Mêmes 3 écrans que BattleScreen.tsx (champion doré à pétales /
+          réconfort du perdant / match nul neutre) — le spectateur voit exactement le
+          même écran champion que celui vu par le vainqueur lui-même en direct. */}
+      {matchResult && (() => {
+        if (matchResult.isDraw) {
+          return (
+            <Modal visible transparent animationType="fade" onRequestClose={() => setMatchResult(null)}>
+              <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
+                <Animated.View entering={BounceIn.duration(700).delay(150)}>
+                  <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.endedCard}>
+                    <Animated.View entering={ZoomIn.duration(500).delay(400)}>
+                      <Icon name="award" size={48} color="#FFD700" />
+                    </Animated.View>
+                    <Text style={styles.endedTitle}>Match nul !</Text>
+                    <Text style={styles.endedScore}>{matchResult.scoreA} — {matchResult.scoreB}</Text>
+                    <Text style={styles.comfortSubtitle}>{matchResult.winnerName} et {matchResult.loserName} terminent à égalité.</Text>
+                    <TouchableOpacity style={styles.endedBtn} onPress={() => setMatchResult(null)}>
+                      <Text style={styles.endedBtnText}>Fermer</Text>
+                    </TouchableOpacity>
+                  </LinearGradient>
+                </Animated.View>
+              </Animated.View>
+            </Modal>
+          );
+        }
+
+        if (matchResult.viewerRole === 'lost') {
+          return (
+            <Modal visible transparent animationType="fade" onRequestClose={() => setMatchResult(null)}>
+              <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
+                <Animated.View entering={FadeIn.duration(700).delay(150)}>
+                  <LinearGradient colors={['#3A3F52', '#20232F']} style={styles.comfortCard}>
+                    <Animated.View entering={ZoomIn.duration(500).delay(300)}>
+                      <Text style={styles.comfortEmoji}>💙</Text>
+                    </Animated.View>
+                    <Text style={styles.comfortTitle}>Ce n'est que partie remise</Text>
+                    <Text style={styles.comfortSubtitle}>
+                      {matchResult.winnerName} remporte ce match, mais chaque champion a connu la défaite avant de gagner.
+                    </Text>
+                    <Text style={styles.comfortScore}>{matchResult.scoreA} — {matchResult.scoreB}</Text>
+                    <View style={styles.comfortEncourageBox}>
+                      <Icon name="trending-up" size={16} color="#9B65F5" />
+                      <Text style={styles.comfortEncourageText}>La prochaine victoire est pour toi. Reviens plus fort !</Text>
+                    </View>
+                    <TouchableOpacity style={styles.comfortBtn} onPress={() => setMatchResult(null)}>
+                      <Text style={styles.comfortBtnText}>Fermer</Text>
+                    </TouchableOpacity>
+                  </LinearGradient>
+                </Animated.View>
+              </Animated.View>
+            </Modal>
+          );
+        }
+
+        // Champion — vainqueur ET spectateurs voient ce même écran doré à pétales
+        return (
+          <Modal visible transparent animationType="fade" onRequestClose={() => setMatchResult(null)}>
+            <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
+              {Array.from({ length: 18 }).map((_, i) => (
+                <FallingPetal
+                  key={i}
+                  left={Math.random() * (Dimensions.get('window').width - 24)}
+                  delay={i * 140}
+                  duration={2600 + Math.random() * 1400}
+                  emoji={PETALS[i % PETALS.length]}
+                />
+              ))}
+              <Animated.View entering={BounceIn.duration(800).delay(150)}>
+                <LinearGradient colors={['#FFD700', '#FFA000', '#B8860B']} style={styles.championCard}>
+                  <View style={styles.championInnerBorder}>
+                    <Animated.View entering={ZoomIn.duration(600).delay(400)}>
+                      <Text style={styles.championCrown}>👑</Text>
+                    </Animated.View>
+
+                    <Text style={styles.championTitle}>
+                      {matchResult.viewerRole === 'won' ? 'CHAMPION DU MATCH' : `${matchResult.winnerName.toUpperCase()} GAGNE LE MATCH`}
+                    </Text>
+
+                    <Animated.View entering={ZoomIn.duration(500).delay(550)} style={styles.championAvatarWrap}>
+                      {matchResult.winnerAvatar
+                        ? <Image source={{ uri: matchResult.winnerAvatar }} style={styles.championAvatar} />
+                        : <View style={[styles.championAvatar, styles.championAvatarFallback]}><Icon name="user" size={30} color="#fff" /></View>}
+                      <Text style={styles.championCrownOnAvatar}>👑</Text>
+                    </Animated.View>
+
+                    <Text style={styles.championName} numberOfLines={1}>{matchResult.winnerName}</Text>
+                    <Text style={styles.championScore}>{matchResult.scoreA} — {matchResult.scoreB}</Text>
+
+                    <TouchableOpacity style={styles.championBtn} onPress={() => setMatchResult(null)}>
+                      <Text style={styles.championBtnText}>Fermer</Text>
+                    </TouchableOpacity>
+                  </View>
+                </LinearGradient>
+              </Animated.View>
+            </Animated.View>
+          </Modal>
+        );
+      })()}
     </View>
   );
 };
@@ -1138,24 +1238,50 @@ const styles = StyleSheet.create({
   modalSendBtn: { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
   modalSendText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
-  // ── Modal résultat de mon match ──────────────────────────────────────────
-  resultCard: {
-    width: '100%', maxWidth: 340, borderRadius: 24, padding: 28, alignItems: 'center', gap: 6,
-    backgroundColor: '#151220', borderWidth: 1,
+  // ── Modal résultat de match — mêmes 3 écrans que BattleScreen.tsx ──────────
+  endedOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 70 },
+  endedCard: { width: '80%', borderRadius: 28, padding: 28, alignItems: 'center', gap: 12 },
+  endedTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  endedScore: { color: 'rgba(255,255,255,0.9)', fontSize: 28, fontWeight: '900' },
+  endedBtn: { marginTop: 8, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
+  endedBtnText: { color: '#4C1D95', fontSize: 14, fontWeight: '800' },
+
+  comfortCard: { width: '84%', borderRadius: 28, padding: 26, alignItems: 'center', gap: 10 },
+  comfortEmoji: { fontSize: 40, marginBottom: 2 },
+  comfortTitle: { color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  comfortSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', textAlign: 'center', lineHeight: 19 },
+  comfortScore: { color: 'rgba(255,255,255,0.85)', fontSize: 24, fontWeight: '900', marginTop: 4 },
+  comfortEncourageBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(155,101,245,0.15)',
+    borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14, marginTop: 6,
+    borderWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
   },
-  resultCardWin:  { borderColor: 'rgba(255,211,77,0.45)' },
-  resultCardLoss: { borderColor: 'rgba(255,255,255,0.1)' },
-  resultCardDraw: { borderColor: 'rgba(156,163,175,0.35)' },
-  resultIconWrap: { marginBottom: 6 },
-  resultIconCircle: {
-    width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#FFD34D', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 10,
+  comfortEncourageText: { color: '#C4A8FA', fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  comfortBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
+  comfortBtnText: { color: '#3A3F52', fontSize: 14, fontWeight: '800' },
+
+  fallingPetal: { position: 'absolute', top: -20, fontSize: 22, zIndex: 71 },
+  championCard: { width: '86%', borderRadius: 32, padding: 4 },
+  championInnerBorder: {
+    borderRadius: 28, paddingVertical: 30, paddingHorizontal: 24, alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(20,14,4,0.55)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)',
   },
-  resultTitle: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: 0.3 },
-  resultSubtitle: { color: 'rgba(255,255,255,0.68)', fontSize: 13, textAlign: 'center', lineHeight: 19, marginTop: 2, marginBottom: 8 },
-  resultCloseBtn: { width: '100%' },
-  resultCloseBtnInner: { borderRadius: 14, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
-  resultCloseBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  championCrown: { fontSize: 40, marginBottom: 2 },
+  championTitle: {
+    color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 1.5, textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 },
+  },
+  championAvatarWrap: { marginTop: 8, position: 'relative' },
+  championAvatar: {
+    width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: '#FFD700',
+    shadowColor: '#FFD700', shadowOpacity: 0.9, shadowRadius: 16, elevation: 12,
+  },
+  championAvatarFallback: { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  championCrownOnAvatar: { position: 'absolute', top: -22, alignSelf: 'center', fontSize: 30 },
+  championName: { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 4 },
+  championScore: { color: 'rgba(255,255,255,0.85)', fontSize: 16, fontWeight: '700', marginTop: 4 },
+  championBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 32 },
+  championBtnText: { color: '#B8860B', fontSize: 14, fontWeight: '900' },
 
   myMatchCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 4, borderRadius: 16, padding: 14 },
   myMatchIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(123,63,242,0.18)', alignItems: 'center', justifyContent: 'center' },
