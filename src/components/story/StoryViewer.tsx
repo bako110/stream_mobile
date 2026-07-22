@@ -586,15 +586,21 @@ export const StoryViewer: React.FC<Props> = ({
   const storyAdTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextGroupIdxRef               = useRef<number>(0); // groupe cible apres la pub
 
-  const loadStoryAdForSlot = useCallback((slotIdx: number) => {
+  const loadStoryAdForSlot = useCallback((slotIdx: number, allowRepeat = false) => {
     if (loadingStoryAdSlotsRef.current.has(slotIdx) || adSlotsRef.current.has(slotIdx)) return;
     loadingStoryAdSlotsRef.current.add(slotIdx);
-    const excludeIds = Array.from(servedStoryAdIdsRef.current).slice(-20).join(',');
+    const excludeIds = allowRepeat ? '' : Array.from(servedStoryAdIdsRef.current).slice(-20).join(',');
     const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
     apiClient.get<StoryAdInfo | null>(`/api/v1/ads/feed/next?placement=stories${qs}`)
       .then(r => {
         loadingStoryAdSlotsRef.current.delete(slotIdx);
-        if (!r?.data?.id) return;
+        // Stock de pubs actives épuisé pour cette session — recommence le cycle sans
+        // exclusion plutôt que de ne plus jamais afficher de pub après épuisement
+        // (même raisonnement que ReelsScreen.tsx loadAdForSlot).
+        if (!r?.data?.id) {
+          if (excludeIds) loadStoryAdForSlot(slotIdx, true);
+          return;
+        }
         servedStoryAdIdsRef.current.add(r.data.id);
         setAdSlots(prev => {
           const next = new Map(prev);

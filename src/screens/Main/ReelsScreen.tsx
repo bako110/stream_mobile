@@ -151,19 +151,27 @@ export const ReelsScreen: React.FC = () => {
   const reelAdRef = useRef(false);
   reelAdRef.current = adSlots.size > 0;
 
-  const loadAdForSlot = useCallback((slotIdx: number) => {
+  const loadAdForSlot = useCallback((slotIdx: number, allowRepeat = false) => {
     if (loadingAdSlotsRef.current.has(slotIdx) || adSlotsRef.current.has(slotIdx)) return;
     loadingAdSlotsRef.current.add(slotIdx);
     // Bornage défensif — au-delà d'une vingtaine d'ads distinctes déjà servies dans la
     // même session, on recommence à autoriser les répétitions plutôt que d'envoyer une
     // liste d'exclusion qui grossirait indéfiniment sur un scroll très long.
-    const recentExcluded = Array.from(servedAdIdsRef.current).slice(-20);
+    const recentExcluded = allowRepeat ? [] : Array.from(servedAdIdsRef.current).slice(-20);
     const excludeIds = recentExcluded.join(',');
     const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
     apiClient.get<AdData0 | null>(`/api/v1/ads/feed/next?placement=reels${qs}`)
       .then(r => {
         loadingAdSlotsRef.current.delete(slotIdx);
-        if (!r.data || !mountedRef.current) return;
+        if (!mountedRef.current) return;
+        // Aucune campagne restante hors exclusion (stock de pubs actives épuisé pour
+        // cette session) — plutôt que de laisser le slot vide en permanence, on
+        // recommence le cycle sans exclusion : mieux vaut revoir une pub déjà vue
+        // que ne plus jamais afficher aucune publicité après quelques scrolls.
+        if (!r.data) {
+          if (excludeIds) loadAdForSlot(slotIdx, true);
+          return;
+        }
         servedAdIdsRef.current.add(r.data.id);
         setAdSlots(prev => {
           const next = new Map(prev);
