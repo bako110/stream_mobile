@@ -1242,20 +1242,22 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>Sponsorisé</Text>
       </View>
 
-      {/* ── Gradient bas — plus profond pour porter le bloc CTA sans écraser le média ── */}
+      {/* ── Gradient bas — plus profond pour porter le bloc CTA sans écraser le média,
+          et suffisamment opaque en bas pour rester lisible même par-dessus un média qui
+          a lui-même du texte incrusté jusqu'au bord (ex: sous-titres brûlés dans la vidéo). ── */}
       <LinearGradient
-        colors={['transparent', '#00000090', '#000000F2']}
-        locations={[0, 0.45, 1]}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.62 }}
+        colors={['transparent', '#00000095', '#000000FA']}
+        locations={[0, 0.4, 1]}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.66 }}
         pointerEvents="none"
       />
 
-      {/* ── Contenu bas — carrément en bas de l'écran (AdSlide n'a pas de barre de
-          commentaire ni de colonne d'actions à droite, contrairement aux reels normaux,
-          donc pas besoin de leur réserver de la place) ; s'adapte à ce qui est réellement
-          présent (description/CTA optionnels) au lieu d'un espacement fixe qui laisserait
-          un vide si l'un des deux manque. ── */}
-      <View style={{ position: 'absolute', bottom: safeBottom + 16, left: 0, right: 0, paddingHorizontal: 16, gap: ad.description || rawCta ? 12 : 0 }}>
+      {/* ── Contenu bas — carrément collé au bas de l'écran, juste au-dessus de la zone
+          système (AdSlide n'a pas de barre de commentaire ni de colonne d'actions à droite,
+          contrairement aux reels normaux, donc rien à leur réserver) ; s'adapte à ce qui est
+          réellement présent (description/CTA optionnels) au lieu d'un espacement fixe qui
+          laisserait un vide sous le bouton quand tout est déjà affiché. ── */}
+      <View style={{ position: 'absolute', bottom: Math.max(insetBottom, 8) + 6, left: 0, right: 0, paddingHorizontal: 16, gap: ad.description || rawCta ? 10 : 0 }}>
 
         {/* Annonceur row — cliquable vers le profil de l'annonceur (advertiser_id = User.id) */}
         <TouchableOpacity
