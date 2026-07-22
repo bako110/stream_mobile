@@ -428,7 +428,11 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
     })
     .onEnd(e => {
       if (e.translationX < SWIPE_THRESHOLD) {
-        translateX.value = withTiming(-300, { duration: 200 }, () => doDelete());
+        // doDelete() est une fonction JS normale (pas un worklet) — l'appeler directement
+        // depuis ce callback, exécuté sur le thread UI, plantait avec "Tried to
+        // synchronously call a non-worklet function on the UI thread". runOnJS renvoie
+        // l'appel sur le thread JS, seul endroit où doDelete peut s'exécuter.
+        translateX.value = withTiming(-300, { duration: 200 }, () => { runOnJS(doDelete)(); });
       } else {
         translateX.value = withSpring(0);
       }
