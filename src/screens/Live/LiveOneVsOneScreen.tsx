@@ -4,7 +4,7 @@
  * ecrans separes, navigables independamment). Design haut de gamme : fond
  * degrade sombre, header a bordure lumineuse, box de resume en tete de liste.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   ActivityIndicator, StatusBar, RefreshControl,
@@ -17,10 +17,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../components/common';
 import { BattleCard } from '../../components/live/LiveMatchCards';
+import { MatchResultModal, type MatchResultData } from '../../components/live/MatchResultModal';
 import { battleService } from '../../services/battleService';
 import type { ActiveBattle } from '../../services/battleService';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
+import { useUser } from '../../context/UserContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -29,8 +31,15 @@ export const LiveOneVsOneScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const { addListener, removeListener } = useWs();
   const insets = useSafeAreaInsets();
+  const { currentUser } = useUser();
 
   const [battles, setBattles] = useState<ActiveBattle[]>([]);
+  // Résultat annoncé à qui reste sur cette liste (n'a pas ouvert BattleScreen) au
+  // moment où un match se termine — avant, battle_ended_broadcast ne faisait que
+  // retirer la carte, sans jamais dire qui avait gagné.
+  const [matchResult, setMatchResult] = useState<MatchResultData | null>(null);
+  const battlesRef = useRef(battles);
+  battlesRef.current = battles;
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -61,6 +70,31 @@ export const LiveOneVsOneScreen: React.FC = () => {
       if (p.type === 'battle_started_broadcast') {
         loadBattles();
       } else if (p.type === 'battle_ended_broadcast') {
+        // Annonce active pour qui est resté sur cette liste (n'a pas ouvert
+        // BattleScreen) — avant, la carte disparaissait juste sans jamais dire
+        // qui avait gagné.
+        const battle = battlesRef.current.find(b => b.id === p.battle_id);
+        if (battle) {
+          const winnerId: string | null = p.winner_id ?? null;
+          const isDraw = winnerId === null;
+          const winnerIsA = winnerId === battle.host_a_id;
+          const myId = currentUser?.id ? String(currentUser.id) : null;
+          const viewerRole: 'won' | 'lost' | 'spectator' =
+            isDraw || !myId ? 'spectator'
+            : myId === battle.host_a_id ? (winnerIsA ? 'won' : 'lost')
+            : myId === battle.host_b_id ? (winnerIsA ? 'lost' : 'won')
+            : 'spectator';
+          setMatchResult({
+            isDraw,
+            viewerRole,
+            winnerName: isDraw ? '' : (winnerIsA ? battle.host_a_name : battle.host_b_name) ?? 'Créateur',
+            loserName:  isDraw ? '' : (winnerIsA ? battle.host_b_name : battle.host_a_name) ?? 'Créateur',
+            winnerAvatar: isDraw ? null : (winnerIsA ? battle.host_a_avatar : battle.host_b_avatar) ?? null,
+            scoreA: Number(p.score_a ?? battle.score_a ?? 0),
+            scoreB: Number(p.score_b ?? battle.score_b ?? 0),
+            winnerGoGold: isDraw ? null : (winnerIsA ? p.score_a : p.score_b) ?? null,
+          });
+        }
         setBattles(prev => prev.filter(b => b.id !== p.battle_id));
       } else if (p.type === 'battle_score_update_broadcast') {
         setBattles(prev => prev.map(b => b.id === p.battle_id ? { ...b, score_a: p.score_a, score_b: p.score_b } : b));
@@ -149,6 +183,7 @@ export const LiveOneVsOneScreen: React.FC = () => {
           }
         />
       )}
+      <MatchResultModal result={matchResult} onClose={() => setMatchResult(null)} />
     </View>
   );
 };

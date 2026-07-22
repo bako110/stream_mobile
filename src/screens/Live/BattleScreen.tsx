@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import Animated, {
   FadeIn, FadeOut, SlideInDown, SlideOutDown, SlideInUp, ZoomIn, BounceIn, LinearTransition,
-  useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring, withSequence, withDelay, Easing,
+  useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring, withSequence, Easing,
 } from 'react-native-reanimated';
 import {
   LiveKitRoom, useTracks, useLocalParticipant, useConnectionState, useParticipants, VideoTrack,
@@ -25,6 +25,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { MatchResultModal } from '../../components/live/MatchResultModal';
 import { battleService } from '../../services/battleService';
 import type { Battle, BattleGoal, BattleRanking } from '../../services/battleService';
 import { useWs } from '../../context/WebSocketContext';
@@ -142,31 +143,6 @@ function CrownPop() {
     <Animated.View pointerEvents="none" style={[styles.crownPop, style]}>
       <Text style={styles.crownPopEmoji}>👑</Text>
     </Animated.View>
-  );
-}
-
-// Fleur/confetti doré qui tombe en tournoyant depuis le haut de l'ecran de
-// victoire — purement decoratif, une nuee de petales façon "arrosage" du champion.
-const PETALS = ['🌸', '🌼', '✨', '🌟', '🎉'];
-
-function FallingPetal({ left, delay, duration, emoji }: { left: number; delay: number; duration: number; emoji: string }) {
-  const progress = useSharedValue(0);
-
-  useEffect(() => {
-    progress.value = withDelay(delay, withTiming(1, { duration, easing: Easing.linear }));
-  }, []); // eslint-disable-line
-
-  const style = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: progress.value * (SCREEN_H * 0.55) },
-      { translateX: Math.sin(progress.value * Math.PI * 2) * 18 },
-      { rotate: `${progress.value * 360}deg` },
-    ],
-    opacity: progress.value < 0.05 ? progress.value / 0.05 : progress.value > 0.85 ? (1 - progress.value) / 0.15 : 1,
-  }));
-
-  return (
-    <Animated.Text pointerEvents="none" style={[styles.fallingPetal, { left }, style]}>{emoji}</Animated.Text>
   );
 }
 
@@ -1090,123 +1066,34 @@ const BattleContent: React.FC<{
         </Animated.View>
       )}
 
-      {/* Ecran de fin */}
+      {/* Ecran de fin — composant partagé (même design que TournamentBracketScreen/
+          LiveOneVsOneScreen), pour que le résultat soit identique quel que soit
+          l'écran d'où on le voit. */}
       {ended && (() => {
         const iWon = ended.winner_id !== null && ended.winner_id === myId;
         const winnerName = ended.winner_id === battle?.host_a_id ? hostNameA : hostNameB;
+        const loserName  = ended.winner_id === battle?.host_a_id ? hostNameB : hostNameA;
         const winnerAvatar = ended.winner_id === battle?.host_a_id ? hostAvatarA : hostAvatarB;
         const winnerGoGold = ended.winner_id === battle?.host_a_id ? ended.score_a : ended.score_b;
+        const viewerRole: 'won' | 'lost' | 'spectator' =
+          ended.winner_id === null ? 'spectator' : iWon ? 'won' : ended.winner_id === myId ? 'spectator' : 'lost';
 
-        const iLost = ended.winner_id !== null && !iWon;
-
-        // ── Match nul — ecran neutre inchange ──────────────────────────────────
-        if (ended.winner_id === null) {
-          return (
-            <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
-              <Animated.View entering={BounceIn.duration(700).delay(150)}>
-                <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.endedCard}>
-                  <Animated.View entering={ZoomIn.duration(500).delay(400)}>
-                    <Icon name="award" size={48} color="#FFD700" />
-                  </Animated.View>
-                  <Text style={styles.endedTitle}>Match nul !</Text>
-                  <Text style={styles.endedScore}>{ended.score_a} — {ended.score_b}</Text>
-                  <TouchableOpacity style={styles.endedBtn} onPress={onClose}>
-                    <Text style={styles.endedBtnText}>Fermer</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </Animated.View>
-            </Animated.View>
-          );
-        }
-
-        // ── Ecran perdant — decouragement doux + reconfort/encouragement ───────
-        if (iLost) {
-          return (
-            <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
-              <Animated.View entering={FadeIn.duration(700).delay(150)}>
-                <LinearGradient colors={['#3A3F52', '#20232F']} style={styles.comfortCard}>
-                  <Animated.View entering={ZoomIn.duration(500).delay(300)}>
-                    <Text style={styles.comfortEmoji}>💙</Text>
-                  </Animated.View>
-                  <Text style={styles.comfortTitle}>Ce n'est que partie remise</Text>
-                  <Text style={styles.comfortSubtitle}>
-                    {winnerName} remporte ce round, mais chaque champion a connu la défaite avant de gagner.
-                  </Text>
-                  <Text style={styles.comfortScore}>{ended.score_a} — {ended.score_b}</Text>
-                  {!!ended.forfeitPenalty && ended.forfeitBy === myId && (
-                    <View style={styles.comfortPenaltyBox}>
-                      <Icon name="arrow-up-right" size={14} color="#F0365A" />
-                      <Text style={styles.comfortPenaltyText}>
-                        {ended.forfeitPenalty.toLocaleString('fr-FR')} GoGold reversés à ton adversaire pour avoir quitté en menant
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.comfortEncourageBox}>
-                    <Icon name="trending-up" size={16} color="#9B65F5" />
-                    <Text style={styles.comfortEncourageText}>La prochaine victoire est pour toi. Reviens plus fort !</Text>
-                  </View>
-                  <TouchableOpacity style={styles.comfortBtn} onPress={onClose}>
-                    <Text style={styles.comfortBtnText}>Fermer</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </Animated.View>
-            </Animated.View>
-          );
-        }
-
-        // ── Ecran champion — decor dore/floral, uniquement pour le vainqueur ──────
         return (
-          <Animated.View entering={FadeIn.duration(300)} style={styles.endedOverlay}>
-            {Array.from({ length: 18 }).map((_, i) => (
-              <FallingPetal
-                key={i}
-                left={Math.random() * (Dimensions.get('window').width - 24)}
-                delay={i * 140}
-                duration={2600 + Math.random() * 1400}
-                emoji={PETALS[i % PETALS.length]}
-              />
-            ))}
-            <Animated.View entering={BounceIn.duration(800).delay(150)}>
-              <LinearGradient colors={['#FFD700', '#FFA000', '#B8860B']} style={styles.championCard}>
-                <View style={styles.championInnerBorder}>
-                  <Animated.View entering={ZoomIn.duration(600).delay(400)}>
-                    <Text style={styles.championCrown}>👑</Text>
-                  </Animated.View>
-
-                  <Text style={styles.championTitle}>CHAMPION DU MATCH</Text>
-
-                  <Animated.View entering={ZoomIn.duration(500).delay(550)} style={styles.championAvatarWrap}>
-                    {winnerAvatar
-                      ? <Image source={{ uri: winnerAvatar }} style={styles.championAvatar} />
-                      : <View style={[styles.championAvatar, styles.championAvatarFallback]}><Icon name="user" size={30} color="#fff" /></View>}
-                    <Text style={styles.championCrownOnAvatar}>👑</Text>
-                  </Animated.View>
-
-                  <Text style={styles.championName} numberOfLines={1}>{winnerName}</Text>
-
-                  <View style={styles.championGogoldRow}>
-                    <Text style={styles.championGogoldEmoji}>🪙</Text>
-                    <Text style={styles.championGogoldText}>{winnerGoGold.toLocaleString('fr-FR')} GoGold</Text>
-                  </View>
-
-                  {!!ended.forfeitPenalty && ended.forfeitBy && ended.forfeitBy !== myId && (
-                    <View style={styles.championBonusBox}>
-                      <Icon name="gift" size={13} color="#fff" />
-                      <Text style={styles.championBonusText}>
-                        +{ended.forfeitPenalty.toLocaleString('fr-FR')} GoGold bonus — l'adversaire a abandonné en menant
-                      </Text>
-                    </View>
-                  )}
-
-                  <Text style={styles.championScore}>{ended.score_a} — {ended.score_b}</Text>
-
-                  <TouchableOpacity style={styles.championBtn} onPress={onClose}>
-                    <Text style={styles.championBtnText}>Fermer</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-            </Animated.View>
-          </Animated.View>
+          <MatchResultModal
+            result={{
+              isDraw: ended.winner_id === null,
+              viewerRole,
+              winnerName,
+              loserName,
+              winnerAvatar,
+              scoreA: ended.score_a,
+              scoreB: ended.score_b,
+              winnerGoGold,
+              forfeitPenalty: ended.forfeitPenalty ?? null,
+              forfeitByMe: ended.forfeitBy === myId,
+            }}
+            onClose={onClose}
+          />
         );
       })()}
     </View>
@@ -1454,66 +1341,4 @@ const styles = StyleSheet.create({
   },
   bigGiftGogoldText: { color: '#FFD700', fontSize: 14, fontWeight: '800' },
 
-  endedOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 70 },
-  endedCard: { width: '80%', borderRadius: 28, padding: 28, alignItems: 'center', gap: 12 },
-  endedTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  endedScore: { color: 'rgba(255,255,255,0.9)', fontSize: 28, fontWeight: '900' },
-  endedBtn: { marginTop: 8, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
-  endedBtnText: { color: '#4C1D95', fontSize: 14, fontWeight: '800' },
-
-  // ── Ecran perdant — decouragement doux + reconfort ─────────────────────────
-  comfortCard: { width: '84%', borderRadius: 28, padding: 26, alignItems: 'center', gap: 10 },
-  comfortEmoji: { fontSize: 40, marginBottom: 2 },
-  comfortTitle: { color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  comfortSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', textAlign: 'center', lineHeight: 19 },
-  comfortScore: { color: 'rgba(255,255,255,0.85)', fontSize: 24, fontWeight: '900', marginTop: 4 },
-  comfortEncourageBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(155,101,245,0.15)',
-    borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14, marginTop: 6,
-    borderWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
-  },
-  comfortEncourageText: { color: '#C4A8FA', fontSize: 12, fontWeight: '700', flexShrink: 1 },
-  comfortPenaltyBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(240,54,90,0.12)',
-    borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginTop: 2,
-    borderWidth: 1, borderColor: 'rgba(240,54,90,0.3)',
-  },
-  comfortPenaltyText: { color: '#F0365A', fontSize: 11, fontWeight: '700', flexShrink: 1 },
-  comfortBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
-  comfortBtnText: { color: '#3A3F52', fontSize: 14, fontWeight: '800' },
-
-  // ── Ecran champion (vainqueur) — decor dore/floral ─────────────────────────
-  fallingPetal: { position: 'absolute', top: -20, fontSize: 22, zIndex: 71 },
-  championCard: { width: '86%', borderRadius: 32, padding: 4 },
-  championInnerBorder: {
-    borderRadius: 28, paddingVertical: 30, paddingHorizontal: 24, alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(20,14,4,0.55)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)',
-  },
-  championCrown: { fontSize: 40, marginBottom: 2 },
-  championTitle: {
-    color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 1.5,
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 },
-  },
-  championAvatarWrap: { marginTop: 8, position: 'relative' },
-  championAvatar: {
-    width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: '#FFD700',
-    shadowColor: '#FFD700', shadowOpacity: 0.9, shadowRadius: 16, elevation: 12,
-  },
-  championAvatarFallback: { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  championCrownOnAvatar: { position: 'absolute', top: -22, alignSelf: 'center', fontSize: 30 },
-  championName: { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 4 },
-  championGogoldRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 16, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4,
-  },
-  championGogoldEmoji: { fontSize: 16 },
-  championGogoldText: { color: '#FFD700', fontSize: 16, fontWeight: '900' },
-  championBonusBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 12, paddingVertical: 7, paddingHorizontal: 12, marginTop: 2, maxWidth: '90%',
-  },
-  championBonusText: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
-  championScore: { color: 'rgba(255,255,255,0.85)', fontSize: 16, fontWeight: '700', marginTop: 4 },
-  championBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 32 },
-  championBtnText: { color: '#B8860B', fontSize: 14, fontWeight: '900' },
 });
