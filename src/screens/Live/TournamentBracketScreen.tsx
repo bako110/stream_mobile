@@ -107,7 +107,7 @@ export const TournamentBracketScreen: React.FC = () => {
   // complet pour qui regarde le live en direct, mais un participant resté sur ce
   // bracket (ou revenu en arrière avant la fin) ne voyait jamais qui avait gagné,
   // seulement le bracket qui se met à jour silencieusement en arrière-plan.
-  const [matchResult, setMatchResult] = useState<{ won: boolean; isDraw: boolean; opponentName: string } | null>(null);
+  const [matchResult, setMatchResult] = useState<{ isDraw: boolean; winnerName: string; loserName: string; viewerRole: 'won' | 'lost' | 'spectator' } | null>(null);
   const bracketRef = useRef(bracket);
   bracketRef.current = bracket;
   const currentUserIdRef = useRef(currentUser?.id);
@@ -135,22 +135,32 @@ export const TournamentBracketScreen: React.FC = () => {
       if (payload.tournament_id !== tournamentId) return;
 
       if (payload.type === 'tournament_match_completed') {
-        // Annonce active du résultat si CE match me concernait — le bracket est
-        // rafraîchi juste après par le load() du bloc générique ci-dessous (même
-        // payload, pas de branche exclusive), donc les cartes se mettent à jour
-        // en même temps que le modal s'affiche.
+        // Annonce active du résultat à TOUT LE MONDE présent sur cet écran, pas
+        // seulement aux deux participants — un spectateur qui suit le tournoi
+        // depuis le bracket doit aussi savoir qui a gagné, pas juste voir la
+        // carte se mettre à jour silencieusement. Le bracket est rafraîchi juste
+        // après par le load() du bloc générique ci-dessous (même payload, pas de
+        // branche exclusive), donc les cartes se mettent à jour en même temps.
         const myId = currentUserIdRef.current;
         const b = bracketRef.current;
         const myPart = b?.participants.find(p => p.user_id === myId) ?? null;
-        if (myPart && (String(myPart.id) === String(payload.winner_participant_id) || String(myPart.id) === String(payload.loser_participant_id))) {
-          const opponentId = String(myPart.id) === String(payload.winner_participant_id)
-            ? payload.loser_participant_id
-            : payload.winner_participant_id;
-          const opponent = b?.participants.find(p => String(p.id) === String(opponentId)) ?? null;
+        const isDraw = !!payload.is_draw;
+        const winnerId = payload.winner_participant_id;
+        const loserId  = payload.loser_participant_id;
+
+        if (isDraw || winnerId) {
+          const winner = winnerId ? b?.participants.find(p => String(p.id) === String(winnerId)) ?? null : null;
+          const loser  = loserId  ? b?.participants.find(p => String(p.id) === String(loserId))  ?? null : null;
+          const viewerRole: 'won' | 'lost' | 'spectator' =
+            !myPart || isDraw ? 'spectator'
+            : String(myPart.id) === String(winnerId) ? 'won'
+            : String(myPart.id) === String(loserId)  ? 'lost'
+            : 'spectator';
           setMatchResult({
-            won: !payload.is_draw && String(myPart.id) === String(payload.winner_participant_id),
-            isDraw: !!payload.is_draw,
-            opponentName: opponent?.display_name ?? 'ton adversaire',
+            isDraw,
+            winnerName: winner?.display_name ?? 'Le vainqueur',
+            loserName:  loser?.display_name ?? 'Son adversaire',
+            viewerRole,
           });
         }
         load();
@@ -997,32 +1007,35 @@ export const TournamentBracketScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Résultat de mon match — annonce active (pas juste le bracket qui se met à
-          jour silencieusement) pour qui n'a pas suivi le direct jusqu'au bout. */}
+      {/* Résultat d'un match — annonce active a TOUT LE MONDE present sur ce bracket
+          (les 2 joueurs ET les spectateurs), pas juste une mise a jour silencieuse
+          de la carte, pour qui n'a pas suivi le direct jusqu'au bout. */}
       <Modal visible={!!matchResult} transparent animationType="fade" onRequestClose={() => setMatchResult(null)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.resultCard, matchResult?.isDraw ? styles.resultCardDraw : matchResult?.won ? styles.resultCardWin : styles.resultCardLoss]}>
+          <View style={[styles.resultCard, matchResult?.isDraw ? styles.resultCardDraw : matchResult?.viewerRole === 'won' ? styles.resultCardWin : styles.resultCardLoss]}>
             <View style={styles.resultIconWrap}>
               <LinearGradient
-                colors={matchResult?.isDraw ? ['#9CA3AF', '#6B7280'] : matchResult?.won ? ['#FFD34D', '#F59E0B'] : ['#4B5563', '#1F2937']}
+                colors={matchResult?.isDraw ? ['#9CA3AF', '#6B7280'] : matchResult?.viewerRole === 'lost' ? ['#4B5563', '#1F2937'] : ['#FFD34D', '#F59E0B']}
                 style={styles.resultIconCircle}
               >
-                <Icon name={matchResult?.isDraw ? 'minus' : matchResult?.won ? 'award' : 'flag'} size={30} color="#fff" />
+                <Icon name={matchResult?.isDraw ? 'minus' : matchResult?.viewerRole === 'lost' ? 'flag' : 'award'} size={30} color="#fff" />
               </LinearGradient>
             </View>
             <Text style={styles.resultTitle}>
-              {matchResult?.isDraw ? 'Match nul !' : matchResult?.won ? 'Victoire !' : 'Défaite'}
+              {matchResult?.isDraw ? 'Match nul !' : matchResult?.viewerRole === 'lost' ? 'Défaite' : matchResult?.viewerRole === 'won' ? 'Victoire !' : `${matchResult?.winnerName} gagne !`}
             </Text>
             <Text style={styles.resultSubtitle}>
               {matchResult?.isDraw
-                ? `Ton match contre ${matchResult.opponentName} s'est terminé à égalité.`
-                : matchResult?.won
-                  ? `Tu as battu ${matchResult?.opponentName}. Bravo !`
-                  : `${matchResult?.opponentName} l'emporte cette fois — ce n'est que partie remise.`}
+                ? `Le match entre ${matchResult.winnerName} et ${matchResult.loserName} s'est terminé à égalité.`
+                : matchResult?.viewerRole === 'won'
+                  ? `Tu as battu ${matchResult?.loserName}. Bravo !`
+                  : matchResult?.viewerRole === 'lost'
+                    ? `${matchResult?.winnerName} l'emporte cette fois — ce n'est que partie remise.`
+                    : `${matchResult?.winnerName} bat ${matchResult?.loserName} et poursuit le tournoi.`}
             </Text>
             <TouchableOpacity activeOpacity={0.85} onPress={() => setMatchResult(null)} style={styles.resultCloseBtn}>
               <LinearGradient
-                colors={matchResult?.won ? ['#FFD34D', '#F59E0B'] : ['#9B65F5', '#7B3FF2']}
+                colors={matchResult?.viewerRole === 'lost' ? ['#9B65F5', '#7B3FF2'] : ['#FFD34D', '#F59E0B']}
                 style={styles.resultCloseBtnInner}
               >
                 <Text style={styles.resultCloseBtnText}>Voir le bracket</Text>
