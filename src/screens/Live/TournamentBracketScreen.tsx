@@ -5,7 +5,7 @@
  * haut de gamme : degrades subtils, ombres douces, entrees animees echelonnees,
  * pulsation douce sur les elements en direct.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
   ActivityIndicator, Image, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform,
@@ -102,6 +102,16 @@ export const TournamentBracketScreen: React.FC = () => {
   const [editSponsorName, setEditSponsorName] = useState('');
   const [editEntryFee, setEditEntryFee] = useState('');
   const [editPrize, setEditPrize] = useState('');
+
+  // Résultat de MON match annoncé activement — BattleScreen affiche déjà un overlay
+  // complet pour qui regarde le live en direct, mais un participant resté sur ce
+  // bracket (ou revenu en arrière avant la fin) ne voyait jamais qui avait gagné,
+  // seulement le bracket qui se met à jour silencieusement en arrière-plan.
+  const [matchResult, setMatchResult] = useState<{ won: boolean; isDraw: boolean; opponentName: string } | null>(null);
+  const bracketRef = useRef(bracket);
+  bracketRef.current = bracket;
+  const currentUserIdRef = useRef(currentUser?.id);
+  currentUserIdRef.current = currentUser?.id;
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -123,6 +133,30 @@ export const TournamentBracketScreen: React.FC = () => {
   useEffect(() => {
     const handler = (payload: WsPayload) => {
       if (payload.tournament_id !== tournamentId) return;
+
+      if (payload.type === 'tournament_match_completed') {
+        // Annonce active du résultat si CE match me concernait — le bracket est
+        // rafraîchi juste après par le load() du bloc générique ci-dessous (même
+        // payload, pas de branche exclusive), donc les cartes se mettent à jour
+        // en même temps que le modal s'affiche.
+        const myId = currentUserIdRef.current;
+        const b = bracketRef.current;
+        const myPart = b?.participants.find(p => p.user_id === myId) ?? null;
+        if (myPart && (String(myPart.id) === String(payload.winner_participant_id) || String(myPart.id) === String(payload.loser_participant_id))) {
+          const opponentId = String(myPart.id) === String(payload.winner_participant_id)
+            ? payload.loser_participant_id
+            : payload.winner_participant_id;
+          const opponent = b?.participants.find(p => String(p.id) === String(opponentId)) ?? null;
+          setMatchResult({
+            won: !payload.is_draw && String(myPart.id) === String(payload.winner_participant_id),
+            isDraw: !!payload.is_draw,
+            opponentName: opponent?.display_name ?? 'ton adversaire',
+          });
+        }
+        load();
+        return;
+      }
+
       if (
         payload.type === 'tournament_bracket_generated' ||
         payload.type === 'tournament_round_generated' ||
@@ -962,6 +996,41 @@ export const TournamentBracketScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Résultat de mon match — annonce active (pas juste le bracket qui se met à
+          jour silencieusement) pour qui n'a pas suivi le direct jusqu'au bout. */}
+      <Modal visible={!!matchResult} transparent animationType="fade" onRequestClose={() => setMatchResult(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.resultCard, matchResult?.isDraw ? styles.resultCardDraw : matchResult?.won ? styles.resultCardWin : styles.resultCardLoss]}>
+            <View style={styles.resultIconWrap}>
+              <LinearGradient
+                colors={matchResult?.isDraw ? ['#9CA3AF', '#6B7280'] : matchResult?.won ? ['#FFD34D', '#F59E0B'] : ['#4B5563', '#1F2937']}
+                style={styles.resultIconCircle}
+              >
+                <Icon name={matchResult?.isDraw ? 'minus' : matchResult?.won ? 'award' : 'flag'} size={30} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.resultTitle}>
+              {matchResult?.isDraw ? 'Match nul !' : matchResult?.won ? 'Victoire !' : 'Défaite'}
+            </Text>
+            <Text style={styles.resultSubtitle}>
+              {matchResult?.isDraw
+                ? `Ton match contre ${matchResult.opponentName} s'est terminé à égalité.`
+                : matchResult?.won
+                  ? `Tu as battu ${matchResult?.opponentName}. Bravo !`
+                  : `${matchResult?.opponentName} l'emporte cette fois — ce n'est que partie remise.`}
+            </Text>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setMatchResult(null)} style={styles.resultCloseBtn}>
+              <LinearGradient
+                colors={matchResult?.won ? ['#FFD34D', '#F59E0B'] : ['#9B65F5', '#7B3FF2']}
+                style={styles.resultCloseBtnInner}
+              >
+                <Text style={styles.resultCloseBtnText}>Voir le bracket</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1055,6 +1124,25 @@ const styles = StyleSheet.create({
   modalCancelText: { fontSize: 14, fontWeight: '700' },
   modalSendBtn: { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
   modalSendText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+
+  // ── Modal résultat de mon match ──────────────────────────────────────────
+  resultCard: {
+    width: '100%', maxWidth: 340, borderRadius: 24, padding: 28, alignItems: 'center', gap: 6,
+    backgroundColor: '#151220', borderWidth: 1,
+  },
+  resultCardWin:  { borderColor: 'rgba(255,211,77,0.45)' },
+  resultCardLoss: { borderColor: 'rgba(255,255,255,0.1)' },
+  resultCardDraw: { borderColor: 'rgba(156,163,175,0.35)' },
+  resultIconWrap: { marginBottom: 6 },
+  resultIconCircle: {
+    width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#FFD34D', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 10,
+  },
+  resultTitle: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: 0.3 },
+  resultSubtitle: { color: 'rgba(255,255,255,0.68)', fontSize: 13, textAlign: 'center', lineHeight: 19, marginTop: 2, marginBottom: 8 },
+  resultCloseBtn: { width: '100%' },
+  resultCloseBtnInner: { borderRadius: 14, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
+  resultCloseBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
   myMatchCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 4, borderRadius: 16, padding: 14 },
   myMatchIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(123,63,242,0.18)', alignItems: 'center', justifyContent: 'center' },

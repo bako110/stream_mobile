@@ -59,29 +59,38 @@ export const BattleCard: React.FC<{ battle: ActiveBattle; onWatch: () => void }>
     return () => clearInterval(iv);
   }, []);
 
+  const leading = battle.score_a === battle.score_b ? null : battle.score_a > battle.score_b ? 'a' : 'b';
+
   return (
     <Animated.View entering={FadeIn.duration(300)} style={s.gridItem}>
       <TouchableOpacity style={s.battleCard} onPress={onWatch} activeOpacity={0.9}>
-        {/* Duel photos plein cadre — chaque moitie = un host */}
+        {/* Duel photos plein cadre — chaque moitie = un host, legerement zoomee pour
+            un effet de profondeur au lieu d'une photo plate collee au cadre. */}
         <View style={s.battleDuelRow}>
           <View style={s.battleDuelHalf}>
             {battle.host_a_avatar
-              ? <Image source={{ uri: battle.host_a_avatar }} style={s.battleDuelPhoto} />
-              : <LinearGradient colors={['#9B65F5', '#6D3FC4']} style={s.battleDuelPhoto} />}
+              ? <Image source={{ uri: battle.host_a_avatar }} style={[s.battleDuelPhoto, s.battleDuelPhotoZoom]} />
+              : <LinearGradient colors={['#7B3FF2', '#4C2696']} style={s.battleDuelPhoto} />}
+            <LinearGradient colors={['rgba(123,63,242,0.35)', 'transparent']} style={s.battleDuelTint} pointerEvents="none" />
           </View>
           <View style={s.battleDuelHalf}>
             {battle.host_b_avatar
-              ? <Image source={{ uri: battle.host_b_avatar }} style={s.battleDuelPhoto} />
-              : <LinearGradient colors={['#F0365A', '#9B1C3F']} style={s.battleDuelPhoto} />}
+              ? <Image source={{ uri: battle.host_b_avatar }} style={[s.battleDuelPhoto, s.battleDuelPhotoZoom]} />
+              : <LinearGradient colors={['#F0365A', '#7A1030']} style={s.battleDuelPhoto} />}
+            <LinearGradient colors={['rgba(240,54,90,0.35)', 'transparent']} style={s.battleDuelTint} pointerEvents="none" />
           </View>
         </View>
-        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.88)']} style={s.battleDuelGrad} />
+        {/* Trait central lumineux — separe les deux camps au lieu d'une simple jointure */}
+        <View style={s.battleDuelSeam} pointerEvents="none" />
+        <LinearGradient colors={['transparent', 'rgba(10,8,18,0.92)']} locations={[0.4, 1]} style={s.battleDuelGrad} pointerEvents="none" />
 
-        {/* VS central */}
+        {/* VS central — badge plus imposant, halo, anneau metallique */}
         <View style={s.battleVsWrap} pointerEvents="none">
-          <LinearGradient colors={['#9B65F5', '#F0365A']} style={s.battleVsBadge}>
-            <Text style={s.battleVsText}>VS</Text>
-          </LinearGradient>
+          <View style={s.battleVsRing}>
+            <LinearGradient colors={['#FFD34D', '#F0365A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.battleVsBadge}>
+              <Text style={s.battleVsText}>VS</Text>
+            </LinearGradient>
+          </View>
         </View>
 
         {/* Badge EN DIRECT + temps restant */}
@@ -98,17 +107,17 @@ export const BattleCard: React.FC<{ battle: ActiveBattle; onWatch: () => void }>
         <View style={s.battleBottom}>
           <View style={s.battleNamesRow}>
             <View style={s.battleNameCol}>
-              <Text style={s.battleName} numberOfLines={1}>{battle.host_a_name ?? 'Créateur'}</Text>
+              <Text style={[s.battleName, leading === 'a' && s.battleNameLeading]} numberOfLines={1}>{battle.host_a_name ?? 'Créateur'}</Text>
               {battle.host_a_verified && <VerifiedBadge size={10} />}
             </View>
             <View style={[s.battleNameCol, s.battleNameColRight]}>
               {battle.host_b_verified && <VerifiedBadge size={10} />}
-              <Text style={[s.battleName, s.battleNameRight]} numberOfLines={1}>{battle.host_b_name ?? 'Créateur'}</Text>
+              <Text style={[s.battleName, s.battleNameRight, leading === 'b' && s.battleNameLeading]} numberOfLines={1}>{battle.host_b_name ?? 'Créateur'}</Text>
             </View>
           </View>
 
           <View style={s.battleScoreBarTrack}>
-            <View style={[s.battleScoreBarFill, { width: `${pctA}%` }]} />
+            <LinearGradient colors={['#7B3FF2', '#FFD34D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.battleScoreBarFill, { width: `${pctA}%` }]} />
           </View>
 
           <View style={s.battleFooterRow}>
@@ -191,19 +200,37 @@ export const s = StyleSheet.create({
   gridItem: { width: '50%', padding: 6 },
 
   // ── Carte battle 1v1 ──────────────────────────────────────────────────────
-  battleCard: { aspectRatio: 0.82, borderRadius: 20, overflow: 'hidden', backgroundColor: '#14101f' },
+  battleCard: {
+    aspectRatio: 0.82, borderRadius: 20, overflow: 'hidden', backgroundColor: '#0A0812',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
   battleDuelRow: { ...StyleSheet.absoluteFill, flexDirection: 'row' },
   battleDuelHalf: { flex: 1, overflow: 'hidden' },
   battleDuelPhoto: { width: '100%', height: '100%' },
-  battleDuelGrad: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
-
-  battleVsWrap: { position: 'absolute', top: '50%', left: 0, right: 0, alignItems: 'center', marginTop: -14 },
-  battleVsBadge: {
-    width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#fff',
-    shadowColor: '#9B65F5', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 6, elevation: 8,
+  // Zoom leger (108%) — evite l'effet "photo plate collee au bord", donne du relief
+  battleDuelPhotoZoom: { transform: [{ scale: 1.08 }] },
+  battleDuelTint: { ...StyleSheet.absoluteFill },
+  // Trait central lumineux fin — separe les deux camps avec plus de caractere qu'une
+  // simple jointure de deux images cote a cote.
+  battleDuelSeam: {
+    position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1.5, marginLeft: -0.75,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
-  battleVsText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  battleDuelGrad: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '58%' },
+
+  battleVsWrap: { position: 'absolute', top: '50%', left: 0, right: 0, alignItems: 'center', marginTop: -20 },
+  // Anneau exterieur sombre — cree un vrai contraste/profondeur derriere le badge
+  // degrade, au lieu d'un simple cercle colore flottant sans assise visuelle.
+  battleVsRing: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(10,8,18,0.85)',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 6, elevation: 10,
+  },
+  battleVsBadge: {
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)',
+  },
+  battleVsText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
 
   battleLiveBadge: {
     position: 'absolute', top: 8, left: 8,
@@ -223,11 +250,14 @@ export const s = StyleSheet.create({
   battleNamesRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
   battleNameCol: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3 },
   battleNameColRight: { justifyContent: 'flex-end' },
-  battleName: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1 },
+  battleName: { color: 'rgba(255,255,255,0.82)', fontSize: 11, fontWeight: '700', flexShrink: 1 },
   battleNameRight: { textAlign: 'right' },
+  // Nom du camp actuellement en tete du score — legerement mis en avant, sans etre
+  // criard, pour donner une info de suivi en un coup d'oeil.
+  battleNameLeading: { color: '#FFD34D', fontWeight: '800' },
 
-  battleScoreBarTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(240,54,90,0.5)', overflow: 'hidden' },
-  battleScoreBarFill: { height: '100%', backgroundColor: '#9B65F5', borderRadius: 2 },
+  battleScoreBarTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden' },
+  battleScoreBarFill: { height: '100%', borderRadius: 2 },
 
   battleFooterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   battleViewersChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
