@@ -1250,10 +1250,12 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         pointerEvents="none"
       />
 
-      {/* ── Contenu bas — même position que les reels normaux (au-dessus de la barre de
-          commentaire), ordre annonceur → description → CTA, de haut en bas. AdSlide n'a pas
-          de colonne d'actions à droite (pas de mute/like superposé) — tout reste plein largeur. ── */}
-      <View style={{ position: 'absolute', bottom: safeBottom + 88, left: 0, right: 0, paddingHorizontal: 16, gap: 12 }}>
+      {/* ── Contenu bas — carrément en bas de l'écran (AdSlide n'a pas de barre de
+          commentaire ni de colonne d'actions à droite, contrairement aux reels normaux,
+          donc pas besoin de leur réserver de la place) ; s'adapte à ce qui est réellement
+          présent (description/CTA optionnels) au lieu d'un espacement fixe qui laisserait
+          un vide si l'un des deux manque. ── */}
+      <View style={{ position: 'absolute', bottom: safeBottom + 16, left: 0, right: 0, paddingHorizontal: 16, gap: ad.description || rawCta ? 12 : 0 }}>
 
         {/* Annonceur row — cliquable vers le profil de l'annonceur (advertiser_id = User.id) */}
         <TouchableOpacity

@@ -98,8 +98,13 @@ export function useMediaDownload() {
         // Reconstruction HLS→MP4 : peut prendre plusieurs secondes (téléchargement des
         // segments + remux côté serveur) avant que le premier octet de réponse arrive.
         timeout: isHls ? 120_000 : 60_000,
+        // useDownloadManager délègue la requête au DownloadManager natif Android, qui ne
+        // gère pas fiablement le header Authorization custom ni une réponse chunked sans
+        // Content-Length connu à l'avance (cas de l'endpoint HLS→MP4, streamée dynamiquement
+        // côté serveur) — la requête échouait silencieusement, restant bloquée à 0% avant de
+        // finir en erreur. RNBlobUtil gère lui-même le fetch + la notification à la place.
         addAndroidDownloads: {
-          useDownloadManager: true,
+          useDownloadManager: false,
           notification: true,
           title: filename,
           description: 'Téléchargement en cours…',
@@ -108,7 +113,15 @@ export function useMediaDownload() {
       })
         .fetch('GET', fetchUrl, token ? { Authorization: `Bearer ${token}` } : undefined)
         .progress((received: number, total: number) => {
-          const pct = Math.round((Number(received) / Number(total)) * 100);
+          // total vaut 0/NaN pour une réponse sans Content-Length (streaming HLS→MP4) —
+          // dans ce cas on ne peut pas connaître le pourcentage réel, mais on ne doit
+          // jamais figer l'affichage à 0% : on progresse quand même visuellement par
+          // paliers croissants pour montrer que le téléchargement avance réellement.
+          const tot = Number(total);
+          const rec = Number(received);
+          const pct = tot > 0
+            ? Math.min(99, Math.round((rec / tot) * 100))
+            : Math.min(95, Math.round(Math.log10(Math.max(rec, 1) / 1024 + 1) * 30));
           setStates(prev => ({ ...prev, [id]: { progress: pct, localUri: null, downloading: true } }));
           downloadToastService.update(id, pct);
         });

@@ -194,8 +194,13 @@ export const CreateAdScreen: React.FC = () => {
     if (budget < 1)     { Alert.alert('Erreur', 'Budget minimum : 1 €'); return; }
     if (uploading) { Alert.alert('Patiente', 'Le fichier est encore en cours d\'upload.'); return; }
     if (localMedia && !creativeUrl) { Alert.alert('Patiente', 'La conversion HLS est en cours, réessaie dans quelques secondes.'); return; }
-    if (ctaUrl && !ctaUrl.startsWith('http')) {
-      Alert.alert('Erreur', 'L\'URL doit commencer par http:// ou https://');
+    // Le champ CTA accepte soit un lien web, soit un numéro de téléphone (même détection
+    // que côté affichage dans ReelsScreen.tsx AdSlide, qui choisit "Contactez-nous" +
+    // ouverture du composeur d'appel si un numéro est détecté).
+    const ctaTrimmed = ctaUrl.trim();
+    const isPhoneNumber = !!ctaTrimmed && /^[+()\d\s.-]{6,}$/.test(ctaTrimmed.replace(/^tel:/i, ''));
+    if (ctaTrimmed && !ctaTrimmed.startsWith('http') && !isPhoneNumber) {
+      Alert.alert('Erreur', 'Indique un lien (http:// ou https://) ou un numéro de téléphone valide.');
       return;
     }
 
@@ -393,15 +398,19 @@ export const CreateAdScreen: React.FC = () => {
           </View>
         </View>
 
-        <Field label="URL de destination (CTA)" textColor={colors.textSecondary}>
+        <Field label="Lien ou numéro de contact (CTA)" textColor={colors.textSecondary}>
           <TextInput
             style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
             value={ctaUrl}
             onChangeText={setCtaUrl}
-            placeholder="https://ton-site.com"
+            placeholder="https://ton-site.com ou +33 6 12 34 56 78"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            keyboardType="url"
+            // "default" plutôt que "url" — le clavier url gêne la saisie de chiffres/+ sur
+            // certains claviers Android, alors que ce champ accepte aussi un numéro de
+            // téléphone (l'app détecte le format et affiche "Contactez-nous" à la place
+            // de "En savoir plus" — voir ReelsScreen.tsx AdSlide).
+            keyboardType="default"
           />
         </Field>
 

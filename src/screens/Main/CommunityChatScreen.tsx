@@ -876,7 +876,7 @@ export const CommunityChatScreen: React.FC = () => {
       await RNBlobUtil.config({
         path: destPath,
         addAndroidDownloads: {
-          useDownloadManager: true,
+          useDownloadManager: false,
           notification: true,
           title: filename,
           description: 'Téléchargement en cours…',
@@ -885,7 +885,10 @@ export const CommunityChatScreen: React.FC = () => {
       })
         .fetch('GET', url)
         .progress((received: number, total: number) => {
-          setDlProgress(Math.round((Number(received) / Number(total)) * 100));
+          const tot = Number(total);
+          const rec = Number(received);
+          const pct = tot > 0 ? Math.min(99, Math.round((rec / tot) * 100)) : 50;
+          setDlProgress(pct);
         });
       Alert.alert('Téléchargement terminé', 'Image sauvegardée dans vos téléchargements.');
     } catch {
