@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import Animated, {
   useAnimatedStyle, withSpring, withTiming, useSharedValue,
   interpolate,
@@ -38,6 +38,11 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const insets = useSafeAreaInsets();
   const { missedCallCount } = useWs();
   const [createOpen, setCreateOpen] = useState(false);
+  // Zoom d'accessibilité système — au-delà d'un certain agrandissement, les 4
+  // libellés + le bouton Créer central n'ont plus la place de tenir sur la
+  // largeur de la barre : masque les textes, garde uniquement les icônes.
+  const { fontScale } = useWindowDimensions();
+  const showLabels = fontScale < 1.15;
 
   const focusedRoute = state.routes[state.index];
   const focusedOptions = descriptors[focusedRoute.key]?.options as any;
@@ -84,6 +89,7 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
                 activeColor={colors.primary}
                 inactiveColor={colors.textTertiary}
                 badge={badge}
+                showLabel={showLabels}
               />
               {/* Bouton Créer — entre Communautés (index 1) et Reels (index 2) */}
               {index === 1 && (
@@ -174,11 +180,12 @@ interface TabItemProps {
   activeColor:    string;
   inactiveColor:  string;
   badge?:         number;
+  showLabel:      boolean;
 }
 
 const TabItem: React.FC<TabItemProps> = memo(({
   config, routeKey, isFocused, navigation,
-  activeColor, inactiveColor, badge,
+  activeColor, inactiveColor, badge, showLabel,
 }) => {
   const progress = useSharedValue(isFocused ? 1 : 0);
 
@@ -223,9 +230,11 @@ const TabItem: React.FC<TabItemProps> = memo(({
         </Animated.View>
       </View>
 
-      <Text style={[styles.label, { color: isFocused ? activeColor : inactiveColor, fontWeight: isFocused ? '700' : '500' }]}>
-        {config.label}
-      </Text>
+      {showLabel && (
+        <Text style={[styles.label, { color: isFocused ? activeColor : inactiveColor, fontWeight: isFocused ? '700' : '500' }]}>
+          {config.label}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 });

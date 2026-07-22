@@ -8,7 +8,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
-  Modal, Dimensions, Linking, InteractionManager,
+  Modal, Dimensions, Linking, InteractionManager, useWindowDimensions,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
@@ -550,7 +550,15 @@ const FeedHeaderBadges: React.FC<{
 }> = React.memo(({ onMessages, onNotifs, onFavorites, onLive, onFriends, friendsActive, colors }) => {
   const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
   const totalNotifs = unreadNotifications + unreadActivity;
+  // Zoom d'accessibilité système (taille de texte agrandie dans les réglages du
+  // téléphone) — fontScale se met à jour en direct via useWindowDimensions, pas
+  // besoin de relancer l'app. Au-delà d'un certain agrandissement, 5 libellés sur
+  // une seule rangée de largeur fixe se chevauchent/débordent : on masque le texte
+  // et ne garde que les icônes, mieux centrées, plutôt que casser la mise en page.
+  const { fontScale } = useWindowDimensions();
+  const showLabels = fontScale < 1.15;
   const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 22, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
+  const iconWrapStyle = showLabels ? undefined : { paddingVertical: 4 };
   return (
     <View style={{ paddingBottom: 6, marginHorizontal: -16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden' }}>
@@ -558,15 +566,17 @@ const FeedHeaderBadges: React.FC<{
             (posts/events/concerts/reels des comptes suivis uniquement). Icône ET
             libellé changent selon l'état : "Mes amis" pour y entrer, "Général"
             pour en sortir — pas juste une couleur qui change sur le même texte. */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onFriends} activeOpacity={0.8}>
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onFriends} activeOpacity={0.8}>
           <MCIcon name={friendsActive ? 'account-group' : 'account-heart-outline'} size={20} color={friendsActive ? colors.primary : colors.textPrimary} />
-          <Text style={{ fontSize: 10.5, color: friendsActive ? colors.primary : colors.textSecondary, marginTop: 2, fontWeight: friendsActive ? '700' : '500' }}>
-            {friendsActive ? 'Général' : 'Mes amis'}
-          </Text>
+          {showLabels && (
+            <Text style={{ fontSize: 10.5, color: friendsActive ? colors.primary : colors.textSecondary, marginTop: 2, fontWeight: friendsActive ? '700' : '500' }}>
+              {friendsActive ? 'Général' : 'Mes amis'}
+            </Text>
+          )}
         </TouchableOpacity>
         {sep}
         {/* Messages & Appels */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onMessages} activeOpacity={0.8}>
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onMessages} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
             <MCIcon name="forum" size={19} color={colors.textPrimary} />
             {unreadMessages > 0 && (
@@ -575,11 +585,11 @@ const FeedHeaderBadges: React.FC<{
               </View>
             )}
           </View>
-          <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Messages</Text>
+          {showLabels && <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Messages</Text>}
         </TouchableOpacity>
         {sep}
         {/* Notifications */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onNotifs} activeOpacity={0.8}>
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onNotifs} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
             <Icon name="bell" size={19} color={colors.textPrimary} />
             {totalNotifs > 0 && (
@@ -588,22 +598,22 @@ const FeedHeaderBadges: React.FC<{
               </View>
             )}
           </View>
-          <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Notifications</Text>
+          {showLabels && <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Notifications</Text>}
         </TouchableOpacity>
         {sep}
         {/* Enregistrés */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onFavorites} activeOpacity={0.8}>
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onFavorites} activeOpacity={0.8}>
           <MCIcon name="bookmark-outline" size={20} color={colors.textPrimary} />
-          <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Enregistrés</Text>
+          {showLabels && <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Enregistrés</Text>}
         </TouchableOpacity>
         {sep}
         {/* En direct */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }]} onPress={onLive} activeOpacity={0.8}>
+        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onLive} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
             <MCIcon name="video-outline" size={21} color="#F0365A" />
             <View style={{ position: 'absolute', top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: colors.backgroundSecondary }} />
           </View>
-          <Text style={{ fontSize: 10.5, color: '#F0365A', marginTop: 2, fontWeight: '600' }}>En direct</Text>
+          {showLabels && <Text style={{ fontSize: 10.5, color: '#F0365A', marginTop: 2, fontWeight: '600' }}>En direct</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -624,6 +634,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   // false — ne demande pas la permission localisation des l'arrivee sur le feed,
   // uniquement la section secondaire "Pres de toi" en beneficie ici.
   const userLocation = useUserLocation(false);
+  // Zoom d'accessibilité système — réduit le logo "GoFolyX" centré au-delà d'un
+  // certain agrandissement, sinon il chevauche le nom d'utilisateur (gauche) et
+  // les boutons de recherche (droite) qui grandissent aussi.
+  const { fontScale: headerFontScale } = useWindowDimensions();
+  const logoFontSize = headerFontScale >= 1.15 ? 26 / Math.min(headerFontScale, 1.6) : 26;
 
   const [filter,      setFilter]      = useState<FeedFilter>('all');
   const [items,       setItems]       = useState<FeedItem[]>([]);
@@ -1919,7 +1934,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
           {/* Centre : GoFolyX — même style que "Reels" dans ReelsScreen */}
           {!searchOpen && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-              <Text style={{ fontSize: 26, fontWeight: '900', letterSpacing: 0.2, color: colors.textPrimary }}>
+              <Text style={{ fontSize: logoFontSize, fontWeight: '900', letterSpacing: 0.2, color: colors.textPrimary }} numberOfLines={1}>
                 <Text style={{ color: colors.primary }}>G</Text>oFoly<Text style={{ color: colors.primary }}>X</Text>
               </Text>
             </View>
