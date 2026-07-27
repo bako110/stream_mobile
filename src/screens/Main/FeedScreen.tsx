@@ -2573,11 +2573,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                             onPress={() => {
                               closeSearch();
                               const authorId = r.user_id ?? r.author_id ?? r.author?.id;
-                              if (authorId) {
-                                (nav as any).navigate('UserReels', { userId: authorId, initialReelId: r.id });
-                              } else {
-                                (nav as any).navigate('ReelPlayer', { reel: r });
-                              }
+                              (nav as any).navigate('SearchReelViewer', { reel: r, reelId: r.id, authorId });
                             }} />
                         ))}
                       </SrGrid>

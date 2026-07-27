@@ -136,6 +136,7 @@ import { SupportScreen }                      from '../screens/Main/SupportScree
 import { SupportChatScreen }                  from '../screens/Main/SupportChatScreen';
 import { FeedbackScreen }                     from '../screens/Main/FeedbackScreen';
 import { ReelPlayerScreen }                  from '../screens/Main/ReelPlayerScreen';
+import { SearchReelViewerScreen }            from '../screens/Main/SearchReelViewerScreen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,7 @@ export type MainStackParamList = {
   StoryViewers:    { storyId: string; viewCount: number; myId?: string };
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
   ReelPlayer:      { reel?: any; reelId?: string };
+  SearchReelViewer: { reel?: any; reelId?: string; authorId?: string };
   PostDetail:      { postId: string; initialPost?: any };
   ImageGallery:    { urls: string[]; initialIndex?: number };
   ImageViewer:     { url: string; label?: string };
@@ -492,6 +494,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="LiveViewer"     component={LiveViewerWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserReels"      component={ReelsScreen}           options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="ReelPlayer"    component={ReelPlayerScreen}      options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="SearchReelViewer" component={SearchReelViewerScreen} options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreatePost"     component={CreatePostWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="PostDetail"     component={PostDetailWrapper}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ImageGallery"   options={{ presentation: 'fullScreenModal', animation: 'fade', headerShown: false }}>

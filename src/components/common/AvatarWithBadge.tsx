@@ -34,6 +34,11 @@ export const AvatarWithBadge: React.FC<Props> = ({
   const ringWidth = Math.max(2, Math.round(size * 0.06));
   const outerSize = isLive ? size + ringWidth * 2 : size;
   const containerSize = Math.max(size + pad, outerSize);
+  // Les badges (vérifié/online) se positionnent en bottom/right relatifs au conteneur,
+  // qui est plus grand que le cercle avatar réel (`size`) pour laisser respirer l'anneau
+  // live — sans cet offset, le badge se collait au bord du conteneur au lieu du cercle,
+  // et paraissait décalé hors de l'avatar.
+  const avatarEdgeInset = containerSize - size;
 
   const pulse = useSharedValue(1);
   useEffect(() => {
@@ -78,12 +83,13 @@ export const AvatarWithBadge: React.FC<Props> = ({
         <View style={{ position: 'absolute', top: 0, left: 0, width: size, height: size }}>{avatarInner}</View>
       )}
 
-      {/* Badge vérifié bleu — bas droite */}
+      {/* Badge vérifié bleu — chevauche le bord bas-droite du cercle avatar réel. */}
       {isVerified && (
         <View style={[s.verified, {
           width: verifiedBadgeSize, height: verifiedBadgeSize,
           borderRadius: verifiedBadgeSize / 2,
-          bottom: 0, right: 0,
+          bottom: avatarEdgeInset - verifiedBadgeSize * 0.3,
+          right:  avatarEdgeInset - verifiedBadgeSize * 0.3,
         }]}>
           <Icon name="check" size={verifiedBadgeSize * 0.6} color="#fff" />
         </View>
@@ -94,9 +100,9 @@ export const AvatarWithBadge: React.FC<Props> = ({
         <View style={[s.online, {
           width: onlineBadgeSize, height: onlineBadgeSize,
           borderRadius: onlineBadgeSize / 2,
-          bottom: 0,
-          left: isVerified ? 0 : undefined,
-          right: isVerified ? undefined : 0,
+          bottom: avatarEdgeInset - onlineBadgeSize * 0.3,
+          left:  isVerified ? avatarEdgeInset - onlineBadgeSize * 0.3 : undefined,
+          right: isVerified ? undefined : avatarEdgeInset - onlineBadgeSize * 0.3,
           backgroundColor: isOnline ? '#22C55E' : '#92400E',
         }]} />
       )}

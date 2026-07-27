@@ -9,7 +9,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
   ActivityIndicator, Image, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform,
-  Dimensions,
+  Dimensions, Share,
 } from 'react-native';
 import Animated, {
   FadeInDown, FadeInRight, FadeIn, BounceIn, ZoomIn, withDelay,
@@ -25,6 +25,7 @@ import { useUser } from '../../context/UserContext';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { tournamentService } from '../../services/tournamentService';
+import { socialService } from '../../services/socialService';
 import type { TournamentBracket, TournamentMatch, TournamentRound, TournamentStanding } from '../../services/tournamentService';
 import { liveService } from '../../services/liveService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -73,6 +74,47 @@ const LiveDot: React.FC<{ size?: number }> = ({ size = 8 }) => {
     </View>
   );
 };
+
+// Texte tronqué (3 lignes) avec bascule "Voir plus / Voir moins" — utilisé pour
+// la description et le règlement, potentiellement longs.
+const ExpandableText: React.FC<{ text: string; textStyle: any; linkColor: string; numberOfLines?: number }> = ({
+  text, textStyle, linkColor, numberOfLines = 3,
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const [truncatable, setTruncatable] = useState(false);
+
+  return (
+    <View>
+      <Text
+        style={textStyle}
+        numberOfLines={expanded ? undefined : numberOfLines}
+        onTextLayout={e => { if (e.nativeEvent.lines.length > numberOfLines) setTruncatable(true); }}
+      >
+        {text}
+      </Text>
+      {truncatable && (
+        <TouchableOpacity onPress={() => setExpanded(v => !v)} activeOpacity={0.7} style={{ marginTop: 4 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: linkColor }}>
+            {expanded ? 'Voir moins' : 'Voir plus'}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
+// En-tête de section — icône dans un badge coloré + titre, pour repérer chaque
+// bloc de détails du tournoi en un coup d'œil (description/infos/sponsor/règlement).
+const SectionHeader: React.FC<{ icon: string; label: string; color: string; textColor: string }> = ({
+  icon, label, color, textColor,
+}) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+    <View style={[styles.sectionIconWrap, { backgroundColor: color + '20' }]}>
+      <Icon name={icon} size={15} color={color} />
+    </View>
+    <Text style={[styles.aboutTitle, { color: textColor }]}>{label}</Text>
+  </View>
+);
 
 export const TournamentBracketScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
@@ -408,6 +450,16 @@ export const TournamentBracketScreen: React.FC = () => {
   const { tournament, participants } = bracket;
   const isOrganizer = tournament.created_by === currentUser?.id;
 
+  const handleShareTournament = async () => {
+    try {
+      await Share.share({
+        title: tournament.name,
+        message: `${tournament.name} — rejoins le tournoi sur GoFolyX !\nVia GoFolyX`,
+      });
+      socialService.share({ platform: 'external', tournament_id: tournamentId }).catch(() => {});
+    } catch { /* utilisateur a annulé le partage */ }
+  };
+
   const renderMatchCard = (match: TournamentMatch, matchIdx: number, fullWidth: boolean, roundIdx = 0) => {
     const partA = participants.find(p => p.id === match.participant_a_id);
     const partB = participants.find(p => p.id === match.participant_b_id);
@@ -462,16 +514,19 @@ export const TournamentBracketScreen: React.FC = () => {
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{tournament.name}</Text>
-        {isOrganizer && tournament.status !== 'registration' ? (
-          <TouchableOpacity
-            style={styles.financeBtn}
-            onPress={() => nav.navigate('TournamentFinance', { tournamentId })}
-          >
-            <Icon name="dollar-sign" size={18} color="#F59E0B" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity style={styles.headerIconBtn} onPress={handleShareTournament}>
+            <Icon name="share-2" size={18} color={colors.textPrimary} />
           </TouchableOpacity>
-        ) : (
-          <View style={{ width: 38 }} />
-        )}
+          {isOrganizer && tournament.status !== 'registration' && (
+            <TouchableOpacity
+              style={styles.financeBtn}
+              onPress={() => nav.navigate('TournamentFinance', { tournamentId })}
+            >
+              <Icon name="dollar-sign" size={18} color="#F59E0B" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -574,15 +629,27 @@ export const TournamentBracketScreen: React.FC = () => {
           </Animated.View>
         )}
 
+        {/* Description — section séparée, tronquée avec "Voir plus" si longue */}
+        {tournament.description && (
+          <Animated.View
+            entering={FadeInDown.duration(400).delay(140).springify()}
+            style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <SectionHeader icon="file-text" label="À propos de ce tournoi" color="#7B3FF2" textColor={colors.textPrimary} />
+            <ExpandableText
+              text={tournament.description}
+              textStyle={[styles.aboutText, { color: colors.textSecondary }]}
+              linkColor={colors.primary}
+            />
+          </Animated.View>
+        )}
+
+        {/* Informations pratiques — inscription, frais, dates, restrictions */}
         <Animated.View
-          entering={FadeInDown.duration(400).delay(140).springify()}
+          entering={FadeInDown.duration(400).delay(180).springify()}
           style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
-          <Text style={[styles.aboutTitle, { color: colors.textPrimary }]}>À propos de ce tournoi</Text>
-
-          {tournament.description && (
-            <Text style={[styles.aboutText, { color: colors.textSecondary }]}>{tournament.description}</Text>
-          )}
+          <SectionHeader icon="info" label="Informations pratiques" color="#0EA5E9" textColor={colors.textPrimary} />
 
           <View style={styles.aboutRow}>
             <Icon name="users" size={14} color={colors.textTertiary} />
@@ -635,25 +702,45 @@ export const TournamentBracketScreen: React.FC = () => {
               </Text>
             </View>
           ) : null}
-
-          {tournament.sponsor_name && (
-            <View style={styles.aboutSponsorRow}>
-              {tournament.sponsor_logo_url ? (
-                <Image source={{ uri: tournament.sponsor_logo_url }} style={styles.aboutSponsorLogo} />
-              ) : (
-                <Icon name="award" size={14} color={colors.textTertiary} />
-              )}
-              <Text style={[styles.aboutRowText, { color: colors.textSecondary }]}>Sponsorisé par {tournament.sponsor_name}</Text>
-            </View>
-          )}
-
-          {tournament.rules && (
-            <View style={styles.aboutRulesBox}>
-              <Text style={[styles.aboutRulesTitle, { color: colors.textPrimary }]}>Règlement</Text>
-              <Text style={[styles.aboutRulesText, { color: colors.textSecondary }]}>{tournament.rules}</Text>
-            </View>
-          )}
         </Animated.View>
+
+        {/* Sponsor — encart mis en avant (logo plus grand), sa propre section */}
+        {tournament.sponsor_name && (
+          <Animated.View
+            entering={FadeInDown.duration(400).delay(220).springify()}
+            style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <SectionHeader icon="award" label="Sponsor" color="#F59E0B" textColor={colors.textPrimary} />
+            <View style={styles.sponsorShowcase}>
+              {tournament.sponsor_logo_url ? (
+                <Image source={{ uri: tournament.sponsor_logo_url }} style={styles.sponsorShowcaseLogo} />
+              ) : (
+                <View style={[styles.sponsorShowcaseLogo, styles.sponsorShowcaseLogoFallback, { backgroundColor: '#F59E0B20' }]}>
+                  <Icon name="award" size={20} color="#F59E0B" />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sponsorShowcaseLabel, { color: colors.textTertiary }]}>Sponsorisé par</Text>
+                <Text style={[styles.sponsorShowcaseName, { color: colors.textPrimary }]} numberOfLines={1}>{tournament.sponsor_name}</Text>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Règlement — section séparée, tronqué avec "Voir plus" si long */}
+        {tournament.rules && (
+          <Animated.View
+            entering={FadeInDown.duration(400).delay(260).springify()}
+            style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <SectionHeader icon="shield" label="Règlement" color="#64748B" textColor={colors.textPrimary} />
+            <ExpandableText
+              text={tournament.rules}
+              textStyle={[styles.aboutRulesText, { color: colors.textSecondary }]}
+              linkColor={colors.primary}
+            />
+          </Animated.View>
+        )}
 
         {liveMatches.length > 0 && (
           <Animated.View entering={FadeInDown.duration(400).delay(160).springify()} style={styles.liveCenterSection}>
@@ -1056,6 +1143,10 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(245,158,11,0.15)',
   },
+  headerIconBtn: {
+    width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(128,128,128,0.15)',
+  },
 
   errorBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
   errorText: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
@@ -1092,14 +1183,16 @@ const styles = StyleSheet.create({
 
   aboutCard: { marginHorizontal: 16, marginTop: 12, borderRadius: 18, borderWidth: 1, padding: 16, gap: 10 },
   aboutTitle: { fontSize: 15, fontWeight: '800' },
-  aboutText: { fontSize: 13, lineHeight: 19 },
+  aboutText: { fontSize: 13, lineHeight: 19, marginLeft: 34 },
   aboutRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   aboutRowText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
-  aboutSponsorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  aboutSponsorLogo: { width: 20, height: 20, borderRadius: 4 },
-  aboutRulesBox: { marginTop: 4, gap: 4 },
-  aboutRulesTitle: { fontSize: 13, fontWeight: '800' },
-  aboutRulesText: { fontSize: 12, lineHeight: 18 },
+  aboutRulesText: { fontSize: 12, lineHeight: 18, marginLeft: 34 },
+  sectionIconWrap: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  sponsorShowcase: { flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 34 },
+  sponsorShowcaseLogo: { width: 44, height: 44, borderRadius: 12 },
+  sponsorShowcaseLogoFallback: { alignItems: 'center', justifyContent: 'center' },
+  sponsorShowcaseLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
+  sponsorShowcaseName: { fontSize: 15, fontWeight: '800', marginTop: 2 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   modalCard: { width: '100%', borderRadius: 20, padding: 20, gap: 10 },

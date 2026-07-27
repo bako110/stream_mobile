@@ -154,7 +154,6 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                         accentColor={colors.primary}
                         isOnline={item.is_online}
                         isLive={item.is_live || liveUserIds.has(item.id)}
-                        style={{ borderWidth: 3, borderColor: colors.background, borderRadius: (AVATAR_SZ + 6) / 2 }}
                       />
                       {joiningLiveId === item.id && (
                         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
