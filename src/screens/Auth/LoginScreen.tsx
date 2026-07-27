@@ -112,6 +112,30 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             contact: detail?.contact ?? 'support@gofolyx.app',
             blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
           });
+        } else if (e?.status === 403 && detail?.code === 'account_deactivated') {
+          const { Alert } = require('react-native');
+          Alert.alert(
+            'Compte désactivé',
+            'Votre compte est désactivé. Voulez-vous le réactiver et vous connecter ?',
+            [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Réactiver',
+                onPress: async () => {
+                  setSocialLoading('google');
+                  try {
+                    const tokens = await GoogleSignin.getTokens();
+                    await authService.reactivateGoogle(tokens.accessToken);
+                    onLoginSuccess();
+                  } catch (err: any) {
+                    setError(err?.message ?? 'Impossible de réactiver le compte.');
+                  } finally {
+                    setSocialLoading(null);
+                  }
+                },
+              },
+            ],
+          );
         } else {
           setError(e?.message ?? 'Erreur Google Sign-In');
         }

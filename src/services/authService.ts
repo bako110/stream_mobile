@@ -152,6 +152,18 @@ export const authService = {
     return res.data;
   },
 
+  async reactivateGoogle(accessToken: string): Promise<AuthToken> {
+    const res = await apiClient.post<AuthToken>(
+      Endpoints.auth.oauthGoogleReactivate,
+      { provider: 'google', access_token: accessToken },
+      { headers: getDeviceHeaders() },
+    );
+    authService._saveTokens(res.data);
+    resetFCMSessionFlag();
+    invalidateUserCache();
+    return res.data;
+  },
+
   async oauthFacebook(accessToken: string): Promise<AuthToken> {
     const res = await apiClient.post<AuthToken>(
       Endpoints.auth.oauthFacebook,

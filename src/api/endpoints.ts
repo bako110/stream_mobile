@@ -14,6 +14,7 @@ export const Endpoints = {
     deactivateSelf: `${V1}/auth/deactivate`,
     reactivate:     `${V1}/auth/reactivate`,
     oauthGoogle:    `${V1}/auth/oauth/google`,
+    oauthGoogleReactivate: `${V1}/auth/oauth/google/reactivate`,
     oauthFacebook:  `${V1}/auth/oauth/facebook`,
     forgotPassword:   `${V1}/auth/forgot-password`,
     verifyResetCode:  `${V1}/auth/verify-reset-code`,
