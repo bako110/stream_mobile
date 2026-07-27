@@ -28,4 +28,7 @@ export interface SearchParams {
   q: string;
   page?: number;
   limit?: number;
+  /** Filtre par catégorie — active la pagination cohérente sur un seul type (l'endpoint
+   * mélange les catégories en mode "tous types", pas de pagination cohérente possible). */
+  type?: 'users' | 'events' | 'concerts' | 'reels' | 'films';
 }

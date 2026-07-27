@@ -10,11 +10,13 @@ export interface FeedResult {
 
 export const searchService = {
   async searchAll(params: SearchParams): Promise<SearchResults> {
-    const query = new URLSearchParams({
+    const queryParams: Record<string, string> = {
       q:     params.q,
       page:  String(params.page  ?? 1),
       limit: String(params.limit ?? 15),
-    }).toString();
+    };
+    if (params.type) queryParams.type = params.type;
+    const query = new URLSearchParams(queryParams).toString();
     const res = await apiClient.get<SearchResults>(`${Endpoints.search.query}?${query}`);
     return res.data;
   },

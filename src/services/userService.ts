@@ -74,8 +74,9 @@ export const userService = {
     return res.data;
   },
 
-  async deleteMyAccount(): Promise<void> {
-    await apiClient.delete(Endpoints.users.me);
+  async deleteMyAccount(reason?: string): Promise<void> {
+    const query = reason ? `?${new URLSearchParams({ reason }).toString()}` : '';
+    await apiClient.delete(`${Endpoints.users.me}${query}`);
   },
 
   async deactivateMyAccount(): Promise<void> {

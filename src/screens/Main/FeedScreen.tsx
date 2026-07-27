@@ -9,6 +9,7 @@ import {
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
   Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
   Modal, Dimensions, Linking, InteractionManager, useWindowDimensions,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Animated, {
@@ -689,12 +690,20 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   // générique en cache Redis, non personnalisée par utilisateur) vaut toujours "none",
   // donc ce filtre-ci est la seule source fiable.
   const myCommIdsRef = useRef<Set<string>>(new Set());
+  // Panneau infos primaires — ouvert via le chevron du header, fermé au tap extérieur
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState<'all'|'users'|'events'|'concerts'|'reels'|'films'>('all');
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  // Scroll infini — uniquement actif sur un filtre spécifique (voir liveSearch/loadMoreSearch),
+  // "Tout" mélange les catégories et n'a pas de pagination cohérente possible côté API.
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchHasMore, setSearchHasMore] = useState(false);
+  const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
+  const SEARCH_PAGE_LIMIT = 20;
   // Pub dédiée au placement "search" — une seule par recherche effectuée (pas de scroll
   // infini dans les résultats, contrairement au feed principal, donc pas besoin de
   // rotation par emplacement). Rechargée à chaque nouveau terme recherché.
@@ -845,17 +854,25 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const commentCountLoadedRef = useRef<((count: number) => void) | null>(null);
 
   // Recherche auto avec debounce 300ms
-  const liveSearch = useCallback((query: string) => {
+  const liveSearch = useCallback((query: string, filter: typeof searchFilter = 'all') => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     const term = query.trim();
     searchReqRef.current = term;
-    if (!term) { setSearchResults(null); setSearchAd(null); setSearching(false); return; }
+    if (!term) { setSearchResults(null); setSearchAd(null); setSearching(false); setSearchHasMore(false); return; }
     searchTimerRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await searchService.searchAll({ q: term });
+        const results = await searchService.searchAll({
+          q: term, limit: SEARCH_PAGE_LIMIT,
+          type: filter === 'all' ? undefined : filter,
+        });
         // Ignore une réponse en retard (frappe rapide) qui ne correspond plus au terme actuel
-        if (searchReqRef.current === term) setSearchResults(results);
+        if (searchReqRef.current === term) {
+          setSearchResults(results);
+          setSearchPage(1);
+          const count = filter === 'all' ? 0 : (results[filter]?.length ?? 0);
+          setSearchHasMore(filter !== 'all' && count >= SEARCH_PAGE_LIMIT);
+        }
       } catch { /* silencieux */ }
       finally { if (searchReqRef.current === term) setSearching(false); }
 
@@ -868,6 +885,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
         .catch(() => {});
     }, 300);
   }, []);
+
+  // Charge la page suivante du filtre actif — scroll infini sur l'overlay recherche
+  const loadMoreSearch = useCallback(() => {
+    const term = searchQuery.trim();
+    if (!term || searchFilter === 'all' || loadingMoreSearch || !searchHasMore) return;
+    setLoadingMoreSearch(true);
+    const nextPage = searchPage + 1;
+    searchService.searchAll({ q: term, page: nextPage, limit: SEARCH_PAGE_LIMIT, type: searchFilter })
+      .then(results => {
+        const newItems = results[searchFilter] ?? [];
+        setSearchResults(prev => prev ? { ...prev, [searchFilter]: [...(prev[searchFilter] ?? []), ...newItems] } : prev);
+        setSearchPage(nextPage);
+        setSearchHasMore(newItems.length >= SEARCH_PAGE_LIMIT);
+      })
+      .catch(() => setSearchHasMore(false))
+      .finally(() => setLoadingMoreSearch(false));
+  }, [searchQuery, searchFilter, searchPage, searchHasMore, loadingMoreSearch]);
 
   const openSearch = useCallback(() => {
     setSearchOpen(true);
@@ -906,6 +940,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
     setSearchAd(null);
     searchAdReqRef.current = '';
     setSearchFilter('all');
+    setSearchPage(1);
+    setSearchHasMore(false);
   }, []);
 
   const commitSearch = useCallback((q: string) => {
@@ -1907,28 +1943,86 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                 <SkeletonBox width={60} height={12} borderRadius={6} />
               </View>
             ) : (
-              <TouchableOpacity
-                style={s.headerLeft}
-                activeOpacity={0.7}
-                onPress={() => currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id })}
-              >
-                {currentUser.avatar_url ? (
-                  <CachedImage uri={currentUser.avatar_url} style={s.avatar} />
-                ) : (
-                  <View style={[s.avatarFallback, { backgroundColor: colors.primary + '22' }]}>
-                    <Text style={[s.avatarText, { color: colors.primary }]}>{initials}</Text>
-                  </View>
-                )}
-                {displayName ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                    <Text style={[s.userName, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+              <View style={s.headerLeft}>
+                <TouchableOpacity
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}
+                  activeOpacity={0.7}
+                  onPress={() => currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id })}
+                >
+                  {currentUser.avatar_url ? (
+                    <CachedImage uri={currentUser.avatar_url} style={s.avatar} />
+                  ) : (
+                    <View style={[s.avatarFallback, { backgroundColor: colors.primary + '22' }]}>
+                      <Text style={[s.avatarText, { color: colors.primary }]}>{initials}</Text>
+                    </View>
+                  )}
+                  {displayName ? (
+                    <Text style={{ fontSize: 13, fontWeight: '700', letterSpacing: -0.1, color: colors.textPrimary, flexShrink: 1 }} numberOfLines={1} ellipsizeMode="tail">
                       {displayName.split(' ')[0]}
                     </Text>
-                    <Icon name="chevron-down" size={14} color={colors.textPrimary} />
-                  </View>
+                  ) : null}
+                </TouchableOpacity>
+                {displayName ? (
+                  <TouchableOpacity
+                    onPress={() => setShowProfilePanel(v => !v)}
+                    hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+                    style={{ paddingLeft: 2 }}
+                  >
+                    <Icon name={showProfilePanel ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textPrimary} />
+                  </TouchableOpacity>
                 ) : null}
-              </TouchableOpacity>
+              </View>
             )
+          )}
+
+          {/* ── Panneau infos primaires — s'ouvre sous le header, se ferme au tap extérieur ── */}
+          {showProfilePanel && currentUser && (
+            <>
+              <TouchableWithoutFeedback onPress={() => setShowProfilePanel(false)}>
+                <View style={StyleSheet.absoluteFill} />
+              </TouchableWithoutFeedback>
+              <View
+                style={{
+                  position: 'absolute', top: '100%', left: 12, marginTop: 6, zIndex: 50,
+                  width: 260, borderRadius: 16, padding: 16,
+                  backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.divider,
+                  shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  {currentUser.avatar_url ? (
+                    <CachedImage uri={currentUser.avatar_url} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                  ) : (
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>{initials}</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.textPrimary, flexShrink: 1 }} numberOfLines={1}>
+                        {currentUser.display_name ?? currentUser.first_name ?? currentUser.username}
+                      </Text>
+                      {currentUser.is_verified && <Icon name="check-circle" size={14} color={colors.primary} />}
+                    </View>
+                    {currentUser.username && (
+                      <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>@{currentUser.username}</Text>
+                    )}
+                  </View>
+                </View>
+                {currentUser.bio && (
+                  <Text style={{ fontSize: 12.5, color: colors.textSecondary, marginTop: 10, lineHeight: 17 }} numberOfLines={3}>
+                    {currentUser.bio}
+                  </Text>
+                )}
+                <TouchableOpacity
+                  onPress={() => { setShowProfilePanel(false); currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id }); }}
+                  activeOpacity={0.85}
+                  style={{ marginTop: 12, borderRadius: 10, paddingVertical: 9, alignItems: 'center', backgroundColor: colors.primary + '18' }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>Voir le profil</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
 
           {/* Centre : GoFolyX — même style que "Reels" dans ReelsScreen */}
@@ -1958,25 +2052,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                 style={{ flex: 1, fontSize: 14, color: colors.textPrimary, padding: 0 }}
                 returnKeyType="search"
                 value={searchQuery}
-                onChangeText={(text) => { setSearchQuery(text); liveSearch(text); }}
-                onSubmitEditing={async () => {
-                  const term = searchQuery.trim();
-                  if (!term) return;
-                  if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-                  searchReqRef.current = term;
+                onChangeText={(text) => { setSearchQuery(text); liveSearch(text, searchFilter); }}
+                onSubmitEditing={() => {
+                  if (!searchQuery.trim()) return;
                   commitSearch(searchQuery);
-                  setSearching(true);
-                  try {
-                    const results = await searchService.searchAll({ q: term });
-                    if (searchReqRef.current === term) setSearchResults(results);
-                  } catch { /* silencieux */ }
-                  finally { if (searchReqRef.current === term) setSearching(false); }
-                  if (searchAdReqRef.current !== term) {
-                    searchAdReqRef.current = term;
-                    apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=search')
-                      .then(r => { if (searchAdReqRef.current === term) setSearchAd(r.data ?? null); })
-                      .catch(() => {});
-                  }
+                  liveSearch(searchQuery, searchFilter);
                 }}
               />
               {searching && <ActivityIndicator size="small" color={colors.primary} />}
@@ -2073,6 +2153,37 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
               </View>
             );
 
+            // Card grille 9:16 — pour les résultats média (concerts, événements, reels, films, séries)
+            const SrGridCard = ({ uri, icon, accent, title, sub, onPress }: {
+              uri?: string | null; icon: string; accent: string; title: string; sub?: string; onPress: () => void;
+            }) => (
+              <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ width: '33%', padding: 4 }}>
+                <View style={{ aspectRatio: 9 / 16, borderRadius: 14, overflow: 'hidden', backgroundColor: accent + '15' }}>
+                  {uri ? (
+                    <CachedImage uri={uri} style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name={icon} size={26} color={accent} />
+                    </View>
+                  )}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.85)']}
+                    style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', justifyContent: 'flex-end', padding: 8 }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }} numberOfLines={2}>{title}</Text>
+                    {sub && <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 2 }} numberOfLines={1}>{sub}</Text>}
+                  </LinearGradient>
+                  <View style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name={icon} size={11} color="#fff" />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+
+            const SrGrid = ({ children }: { children: React.ReactNode }) => (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12 }}>{children}</View>
+            );
+
             // État idle — pas encore de query
             if (!searchQuery.trim() && !searchResults) return (
               <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -2104,7 +2215,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                           activeOpacity={0.7}
                           onPress={() => {
                             setSearchQuery(h.query);
-                            liveSearch(h.query);
+                            setSearchFilter('all');
+                            liveSearch(h.query, 'all');
                             commitSearch(h.query);
                           }}
                         >
@@ -2265,7 +2377,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                       <TouchableOpacity
                         key={h.query}
                         activeOpacity={0.7}
-                        onPress={() => { setSearchQuery(h.query); liveSearch(h.query); commitSearch(h.query); }}
+                        onPress={() => { setSearchQuery(h.query); setSearchFilter('all'); liveSearch(h.query, 'all'); commitSearch(h.query); }}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
                       >
                         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
@@ -2323,7 +2435,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                       <TouchableOpacity
                         key={h.query}
                         activeOpacity={0.7}
-                        onPress={() => { setSearchQuery(h.query); liveSearch(h.query); commitSearch(h.query); }}
+                        onPress={() => { setSearchQuery(h.query); setSearchFilter('all'); liveSearch(h.query, 'all'); commitSearch(h.query); }}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
                       >
                         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
@@ -2348,7 +2460,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                     return (
                       <TouchableOpacity
                         key={cat.key}
-                        onPress={() => setSearchFilter(cat.key)}
+                        onPress={() => { setSearchFilter(cat.key); liveSearch(searchQuery, cat.key); }}
                         activeOpacity={0.75}
                         style={{
                           flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -2371,7 +2483,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                 </ScrollView>
                 </View>
 
-                <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                  contentContainerStyle={{ paddingBottom: 120 }}
+                  showsVerticalScrollIndicator={false}
+                  onScroll={({ nativeEvent }) => {
+                    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+                    if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 300) loadMoreSearch();
+                  }}
+                  scrollEventThrottle={200}
+                >
                   {/* Pub — placement "search", une seule en tête des résultats, seulement
                       quand tous les types sont affichés (pas sur une recherche déjà filtrée). */}
                   {searchAd && searchFilter === 'all' && (
@@ -2411,110 +2531,82 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                     </View>
                   )}
 
-                  {/* Événements */}
+                  {/* Événements — grille 9:16 */}
                   {(searchFilter === 'all' || searchFilter === 'events') && (searchResults!.events?.length ?? 0) > 0 && (
                     <View>
                       <SrSection icon="calendar" label="Événements" count={searchResults!.events!.length} accent="#0EA5E9" />
-                      {searchResults!.events!.map((e: any, i: number) => (
-                        <SrRow key={e.id} onPress={() => { closeSearch(); (nav as any).navigate('EventDetail', { eventId: e.id }); }} last={i === searchResults!.events!.length - 1}>
-                          <SrThumb uri={e.thumbnail_url} icon="calendar" accent="#0EA5E9" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{e.title}</Text>
-                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>{[e.type ?? e.event_type, e.venue_city].filter(Boolean).join(' · ') || 'Événement'}</Text>
-                          </View>
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#0EA5E918', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="calendar" size={13} color="#0EA5E9" />
-                          </View>
-                        </SrRow>
-                      ))}
+                      <SrGrid>
+                        {searchResults!.events!.map((e: any) => (
+                          <SrGridCard key={e.id} uri={e.thumbnail_url} icon="calendar" accent="#0EA5E9"
+                            title={e.title}
+                            sub={[e.type ?? e.event_type, e.venue_city].filter(Boolean).join(' · ') || 'Événement'}
+                            onPress={() => { closeSearch(); (nav as any).navigate('EventDetail', { eventId: e.id }); }} />
+                        ))}
+                      </SrGrid>
                     </View>
                   )}
 
-                  {/* Concerts */}
+                  {/* Concerts — grille 9:16 */}
                   {(searchFilter === 'all' || searchFilter === 'concerts') && (searchResults!.concerts?.length ?? 0) > 0 && (
                     <View>
                       <SrSection icon="music" label="Concerts" count={searchResults!.concerts!.length} accent="#E0389A" />
-                      {searchResults!.concerts!.map((c: any, i: number) => (
-                        <SrRow key={c.id} onPress={() => { closeSearch(); (nav as any).navigate('ConcertDetail', { concertId: c.id }); }} last={i === searchResults!.concerts!.length - 1}>
-                          <SrThumb uri={c.thumbnail_url} icon="music" accent="#E0389A" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>{[c.genre, c.venue_city].filter(Boolean).join(' · ') || 'Concert'}</Text>
-                          </View>
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#E0389A18', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="music" size={13} color="#E0389A" />
-                          </View>
-                        </SrRow>
-                      ))}
+                      <SrGrid>
+                        {searchResults!.concerts!.map((c: any) => (
+                          <SrGridCard key={c.id} uri={c.thumbnail_url} icon="music" accent="#E0389A"
+                            title={c.title}
+                            sub={[c.genre, c.venue_city].filter(Boolean).join(' · ') || 'Concert'}
+                            onPress={() => { closeSearch(); (nav as any).navigate('ConcertDetail', { concertId: c.id }); }} />
+                        ))}
+                      </SrGrid>
                     </View>
                   )}
 
-                  {/* Reels */}
+                  {/* Reels — grille 9:16 */}
                   {(searchFilter === 'all' || searchFilter === 'reels') && (searchResults!.reels?.length ?? 0) > 0 && (
                     <View>
                       <SrSection icon="video" label="Reels" count={searchResults!.reels!.length} accent="#10B981" />
-                      {searchResults!.reels!.map((r: any, i: number) => {
-                        const rfKey = r.filter_name as FilterKey | undefined;
-                        const rfDef = rfKey ? FILTERS.find(f => f.key === rfKey) : null;
-                        const rfOp  = rfKey ? (FILTER_VIDEO_OPACITY[rfKey] ?? 0) : 0;
-                        return (
-                        <SrRow key={r.id} last={i === searchResults!.reels!.length - 1}>
-                          <View style={{ width: 52, height: 52, borderRadius: 12, overflow: 'hidden' }}>
-                            <SrThumb uri={r.thumbnail_url} icon="video" accent="#10B981" />
-                            {rfDef && rfOp > 0 && (
-                              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: rfDef.overlay, opacity: rfOp }]} />
-                            )}
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={2}>{r.caption ?? 'Reel'}</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                              <Icon name="eye" size={11} color={colors.textTertiary} />
-                              <Text style={{ fontSize: 12, color: colors.textTertiary }}>{(r.view_count ?? 0).toLocaleString('fr')} vues</Text>
-                            </View>
-                          </View>
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#10B98118', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="play" size={13} color="#10B981" />
-                          </View>
-                        </SrRow>
-                        );
-                      })}
+                      <SrGrid>
+                        {searchResults!.reels!.map((r: any) => (
+                          <SrGridCard key={r.id} uri={r.thumbnail_url} icon="play" accent="#10B981"
+                            title={r.caption ?? 'Reel'}
+                            sub={`${(r.view_count ?? 0).toLocaleString('fr')} vues`}
+                            onPress={() => { closeSearch(); (nav as any).navigate('Reels', { initialReelId: r.id, initialReel: r }); }} />
+                        ))}
+                      </SrGrid>
                     </View>
                   )}
 
-                  {/* Films + Séries */}
+                  {/* Films — grille 9:16 */}
                   {(searchFilter === 'all' || searchFilter === 'films') && (searchResults!.films?.length ?? 0) > 0 && (
                     <View>
                       <SrSection icon="film" label="Films" count={searchResults!.films!.length} accent="#F59E0B" />
-                      {searchResults!.films!.map((c: any, i: number) => (
-                        <SrRow key={c.id} last={i === searchResults!.films!.length - 1}>
-                          <SrThumb uri={c.thumbnail_url} icon="film" accent="#F59E0B" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.year ?? 'Film'}</Text>
-                          </View>
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#F59E0B18', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="film" size={13} color="#F59E0B" />
-                          </View>
-                        </SrRow>
-                      ))}
+                      <SrGrid>
+                        {searchResults!.films!.map((c: any) => (
+                          <SrGridCard key={c.id} uri={c.thumbnail_url} icon="film" accent="#F59E0B"
+                            title={c.title} sub={c.year ? String(c.year) : 'Film'}
+                            onPress={() => { closeSearch(); (nav as any).navigate('FilmDetail', { item: c }); }} />
+                        ))}
+                      </SrGrid>
                     </View>
                   )}
+
+                  {/* Séries — grille 9:16 */}
                   {(searchFilter === 'all' || searchFilter === 'films') && (searchResults!.series?.length ?? 0) > 0 && (
                     <View>
                       <SrSection icon="tv" label="Séries" count={searchResults!.series!.length} accent="#6366F1" />
-                      {searchResults!.series!.map((c: any, i: number) => (
-                        <SrRow key={c.id} last={i === searchResults!.series!.length - 1}>
-                          <SrThumb uri={c.thumbnail_url} icon="tv" accent="#6366F1" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{c.title}</Text>
-                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>Série{c.year ? ` · ${c.year}` : ''}</Text>
-                          </View>
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#6366F118', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="tv" size={13} color="#6366F1" />
-                          </View>
-                        </SrRow>
-                      ))}
+                      <SrGrid>
+                        {searchResults!.series!.map((c: any) => (
+                          <SrGridCard key={c.id} uri={c.thumbnail_url} icon="tv" accent="#6366F1"
+                            title={c.title} sub={`Série${c.year ? ` · ${c.year}` : ''}`}
+                            onPress={() => { closeSearch(); (nav as any).navigate('FilmDetail', { item: c }); }} />
+                        ))}
+                      </SrGrid>
                     </View>
+                  )}
+
+                  {/* Indicateur de chargement — scroll infini sur le filtre actif */}
+                  {loadingMoreSearch && (
+                    <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
                   )}
                 </ScrollView>
               </View>

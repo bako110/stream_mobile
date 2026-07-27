@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Modal, ActivityIndicator, Platform,
+  Modal, ActivityIndicator, Platform, TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -45,23 +45,30 @@ const Wizard: React.FC<WizardProps> = ({ type, onClose, onSuccess }) => {
   const { theme } = useTheme();
   const { colors } = theme;
 
-  const [step,     setStep]     = useState<Step>('reason');
-  const [selected, setSelected] = useState<number | null>(null);
-  const [loading,  setLoading]  = useState(false);
+  const [step,       setStep]       = useState<Step>('reason');
+  const [selected,   setSelected]   = useState<number | null>(null);
+  const [customText, setCustomText] = useState('');
+  const [loading,    setLoading]    = useState(false);
 
-  const isDelete = type === 'delete';
-  const reasons  = isDelete ? DELETE_REASONS : DEACTIVATE_REASONS;
-  const RED      = '#EF4444';
-  const ORANGE   = '#F59E0B';
-  const accent   = isDelete ? RED : ORANGE;
+  const isDelete   = type === 'delete';
+  const reasons    = isDelete ? DELETE_REASONS : DEACTIVATE_REASONS;
+  const otherIndex = reasons.length - 1;
+  const isOther    = selected === otherIndex;
+  const RED        = '#EF4444';
+  const ORANGE     = '#F59E0B';
+  const accent     = isDelete ? RED : ORANGE;
+
+  const finalReason = selected === null
+    ? undefined
+    : (isOther && customText.trim() ? customText.trim() : reasons[selected].label);
 
   const handleConfirm = async () => {
     setLoading(true);
     try {
       if (isDelete) {
-        await userService.deleteMyAccount();
+        await userService.deleteMyAccount(finalReason);
       } else {
-        await authService.deactivateSelf(selected !== null ? reasons[selected].label : 'Autre raison');
+        await authService.deactivateSelf(finalReason ?? 'Autre raison');
       }
       await authService.logout();
       onSuccess();
@@ -138,8 +145,30 @@ const Wizard: React.FC<WizardProps> = ({ type, onClose, onSuccess }) => {
               })}
             </View>
 
+            {isOther && (
+              <TextInput
+                style={[wz.customInput, {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.divider,
+                  color: colors.textPrimary,
+                }]}
+                placeholder="Précisez votre raison (facultatif)…"
+                placeholderTextColor={colors.textTertiary}
+                value={customText}
+                onChangeText={setCustomText}
+                multiline
+                maxLength={255}
+              />
+            )}
+
+            {selected === null && (
+              <Text style={[wz.helperTxt, { color: colors.textTertiary }]}>
+                Sélectionnez une raison ci-dessus pour continuer
+              </Text>
+            )}
+
             <TouchableOpacity
-              style={[wz.btn, { backgroundColor: selected !== null ? accent : colors.border, marginTop: 24 }]}
+              style={[wz.btn, { backgroundColor: selected !== null ? accent : colors.border, marginTop: selected === null ? 10 : 24 }]}
               onPress={() => selected !== null && setStep('confirm')}
               disabled={selected === null}
               activeOpacity={0.8}
@@ -178,7 +207,7 @@ const Wizard: React.FC<WizardProps> = ({ type, onClose, onSuccess }) => {
             </View>
 
             <Text style={[wz.confirmLabel, { color: colors.textTertiary }]}>
-              Raison sélectionnée : <Text style={{ fontWeight: '700', color: colors.textSecondary }}>{selected !== null ? reasons[selected].label : ''}</Text>
+              Raison sélectionnée : <Text style={{ fontWeight: '700', color: colors.textSecondary }}>{finalReason ?? ''}</Text>
             </Text>
 
             <TouchableOpacity
@@ -295,6 +324,8 @@ const wz = StyleSheet.create({
   reasonIcon:      { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   reasonLabel:     { fontSize: 14, fontWeight: '700' },
   reasonSub:       { fontSize: 12, marginTop: 2 },
+  customInput:     { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginTop: 10, fontSize: 14, minHeight: 60, textAlignVertical: 'top' },
+  helperTxt:       { fontSize: 12.5, textAlign: 'center', marginTop: 16 },
   btn:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 14 },
   btnText:         { color: '#fff', fontWeight: '800', fontSize: 16 },
   cancelBtn:       { height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginTop: 12 },
