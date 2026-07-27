@@ -2570,7 +2570,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                           <SrGridCard key={r.id} uri={r.thumbnail_url} icon="play" accent="#10B981"
                             title={r.caption ?? 'Reel'}
                             sub={`${(r.view_count ?? 0).toLocaleString('fr')} vues`}
-                            onPress={() => { closeSearch(); (nav as any).navigate('Reels', { initialReelId: r.id, initialReel: r }); }} />
+                            onPress={() => {
+                              closeSearch();
+                              const authorId = r.user_id ?? r.author_id ?? r.author?.id;
+                              if (authorId) {
+                                (nav as any).navigate('UserReels', { userId: authorId, initialReelId: r.id });
+                              } else {
+                                (nav as any).navigate('ReelPlayer', { reel: r });
+                              }
+                            }} />
                         ))}
                       </SrGrid>
                     </View>

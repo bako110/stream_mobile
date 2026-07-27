@@ -70,6 +70,8 @@ const formatCount = (n: number): string => {
 // Feed reels avec pub injectee toutes les AD_INTERVAL reels — voir feedWithAds
 // et toRenderedIndex (conversion d'index reels → index liste rendue).
 const AD_INTERVAL = 5;
+// Taille de page pour le mode "reels d'un utilisateur" (profil, recherche) — scroll infini.
+const USER_REELS_PAGE_LIMIT = 20;
 
 export const ReelsScreen: React.FC = () => {
   useKeepAwake();
@@ -287,14 +289,14 @@ export const ReelsScreen: React.FC = () => {
     pageRef.current = 1;
     isLoadingMoreRef.current = false;
 
-    // Mode profil : GET /users/{id}/reels — liste complète d'un coup, pas de pagination,
-    // pas de pub, pas de "mes reels" (tout ça n'a pas de sens hors du feed global).
+    // Mode profil : GET /users/{id}/reels paginé — pas de pub, pas de "mes reels"
+    // (tout ça n'a pas de sens hors du feed global).
     if (userMode) {
       try {
-        const data = await userService.getUserReels(userMode) as Reel[];
+        const data = await userService.getUserReels(userMode, 1, USER_REELS_PAGE_LIMIT) as Reel[];
         if (!mountedRef.current) return;
         const filtered = (Array.isArray(data) ? data : []).filter((r: Reel) => !!r.hls_url);
-        setHasMore(false);
+        setHasMore(filtered.length >= USER_REELS_PAGE_LIMIT);
         lastLoadedAtRef.current = Date.now();
         if (!silent) {
           currentIdxRef.current = 0;
@@ -374,7 +376,21 @@ export const ReelsScreen: React.FC = () => {
     isLoadingMoreRef.current = true;
     try {
       const nextPage = pageRef.current + 1;
-      const data     = await reelService.getFeed({ page: nextPage });
+
+      if (userMode) {
+        const data = await userService.getUserReels(userMode, nextPage, USER_REELS_PAGE_LIMIT) as Reel[];
+        if (!mountedRef.current) return;
+        const newReels = (Array.isArray(data) ? data : []).filter((r: Reel) => !!r.hls_url);
+        setReels(prev => {
+          const ids = new Set(prev.map(r => r.id));
+          return [...prev, ...newReels.filter((r: Reel) => !ids.has(r.id))];
+        });
+        pageRef.current = nextPage;
+        setHasMore(newReels.length >= USER_REELS_PAGE_LIMIT);
+        return;
+      }
+
+      const data = await reelService.getFeed({ page: nextPage });
       if (!mountedRef.current) return;
       const newReels = (data.items ?? []).filter((r: Reel) => !!r.hls_url);
       setReels(prev => {
@@ -385,7 +401,7 @@ export const ReelsScreen: React.FC = () => {
       setHasMore(data.has_more);
     } catch { /* silencieux */ }
     finally { isLoadingMoreRef.current = false; }
-  }, []);
+  }, [userMode]);
 
   const loadMoreRef = useRef(loadMore);
   useEffect(() => { loadMoreRef.current = loadMore; }, [loadMore]);

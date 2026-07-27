@@ -24,8 +24,12 @@ export const userService = {
     return res.data;
   },
 
-  async getUserReels(userId: string) {
-    const res = await apiClient.get(Endpoints.users.userReels(userId));
+  async getUserReels(userId: string, page?: number, limit?: number) {
+    const params: Record<string, string> = {};
+    if (page)  params.page  = String(page);
+    if (limit) params.limit = String(limit);
+    const query = Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
+    const res = await apiClient.get(`${Endpoints.users.userReels(userId)}${query}`);
     return res.data;
   },
 

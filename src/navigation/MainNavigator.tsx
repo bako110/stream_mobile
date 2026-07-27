@@ -223,7 +223,7 @@ export type MainStackParamList = {
   MyStories:       undefined;
   StoryViewers:    { storyId: string; viewCount: number; myId?: string };
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
-  ReelPlayer:      { reel: any };
+  ReelPlayer:      { reel?: any; reelId?: string };
   PostDetail:      { postId: string; initialPost?: any };
   ImageGallery:    { urls: string[]; initialIndex?: number };
   ImageViewer:     { url: string; label?: string };

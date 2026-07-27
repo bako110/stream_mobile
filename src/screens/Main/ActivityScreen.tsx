@@ -154,7 +154,7 @@ export const ActivityScreen: React.FC = () => {
     } else if (t === 'community_joined') {
       nav.navigate('CommunityDetail', { communityId: item.ref_id });
     } else if (t === 'reel_posted') {
-      nav.navigate('Reels', { initialReelId: item.ref_id });
+      nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: item.ref_id } });
     } else if (item.actor) {
       nav.navigate('UserProfile', { userId: item.actor.id });
     }

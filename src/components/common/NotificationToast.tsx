@@ -167,7 +167,7 @@ export const NotificationToast: React.FC = () => {
     } else if (toast.ref_type === 'event' && toast.ref_id) {
       navigate('EventDetail', { eventId: toast.ref_id });
     } else if (toast.ref_type === 'reel' && toast.ref_id) {
-      navigate('Reels', { initialReelId: toast.ref_id });
+      navigate('Tabs', { screen: 'Reels', params: { initialReelId: toast.ref_id } });
     } else {
       navigate('Notifications', undefined);
     }

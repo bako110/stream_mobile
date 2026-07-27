@@ -185,7 +185,7 @@ export const NotificationsScreen: React.FC = () => {
     if (!item.ref_id) return;
     if (item.ref_type === 'concert')         nav.navigate('ConcertDetail',   { concertId:     item.ref_id });
     else if (item.ref_type === 'event')      nav.navigate('EventDetail',     { eventId:       item.ref_id });
-    else if (item.ref_type === 'reel')       nav.navigate('Reels',           { initialReelId: item.ref_id });
+    else if (item.ref_type === 'reel')       nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: item.ref_id } });
     else if (item.ref_type === 'user')       nav.navigate('UserProfile',     { userId:        item.ref_id });
     else if (item.ref_type === 'community')  nav.navigate('CommunityDetail', { communityId:   item.ref_id });
     else if (item.ref_type === 'planning_invite' || item.ref_type === 'planning_entry') nav.navigate('Planning');
