@@ -388,62 +388,69 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           onPress={() => navigation?.push('PostDetail', { postId: item.id })}
           style={[s.pCard, { backgroundColor: colors.surface }]}
         >
-          {/* Thumbnail portrait */}
-          <View style={[s.pThumbWrap, { height: CARD_H }]}>
-            {thumb ? (
-              <>
-                <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                {/* Gradient bas */}
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.72)']}
-                  locations={[0.4, 1]}
-                  style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', padding: 9 }]}
-                >
-                  {/* Stats en overlay */}
-                  <View style={s.pStats}>
-                    <View style={s.pStat}>
-                      <MCIcon name="heart" size={12} color="#fff" />
-                      <Text style={s.pStatTxt}>{item.like_count ?? 0}</Text>
-                    </View>
-                    <View style={s.pStat}>
-                      <MCIcon name="comment-outline" size={12} color="#fff" />
-                      <Text style={s.pStatTxt}>{item.comment_count ?? 0}</Text>
-                    </View>
-                    {imgCount > 1 && (
-                      <View style={[s.pStat, s.pImgBadge]}>
-                        <Icon name="image" size={10} color="#fff" />
-                        <Text style={s.pStatTxt}>{imgCount}</Text>
-                      </View>
-                    )}
+          {/* Thumbnail portrait — uniquement réservée si une image existe : sans
+              image, ce bloc disparaît entièrement pour laisser le texte prendre
+              toute la place, plutôt qu'un carré vide avec juste une icône. */}
+          {thumb ? (
+            <View style={[s.pThumbWrap, { height: CARD_H }]}>
+              <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              {/* Gradient bas */}
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.72)']}
+                locations={[0.4, 1]}
+                style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', padding: 9 }]}
+              >
+                {/* Stats en overlay */}
+                <View style={s.pStats}>
+                  <View style={s.pStat}>
+                    <MCIcon name="heart" size={12} color="#fff" />
+                    <Text style={s.pStatTxt}>{item.like_count ?? 0}</Text>
                   </View>
-                </LinearGradient>
-                {/* Badge play si c'est une vidéo */}
-                {hasVideo && (
-                  <View style={s.pVideoBadge}>
-                    <Icon name="play" size={10} color="#fff" style={{ marginLeft: 1 }} />
+                  <View style={s.pStat}>
+                    <MCIcon name="comment-outline" size={12} color="#fff" />
+                    <Text style={s.pStatTxt}>{item.comment_count ?? 0}</Text>
                   </View>
-                )}
-              </>
-            ) : (
-              /* Pas de thumbnail — fond + texte */
-              <View style={[StyleSheet.absoluteFill, s.pNoThumb, { backgroundColor: colors.backgroundSecondary }]}>
-                <Icon name="file-text" size={24} color={colors.primary + '60'} />
-              </View>
-            )}
-          </View>
+                  {imgCount > 1 && (
+                    <View style={[s.pStat, s.pImgBadge]}>
+                      <Icon name="image" size={10} color="#fff" />
+                      <Text style={s.pStatTxt}>{imgCount}</Text>
+                    </View>
+                  )}
+                </View>
+              </LinearGradient>
+              {/* Badge play si c'est une vidéo */}
+              {hasVideo && (
+                <View style={s.pVideoBadge}>
+                  <Icon name="play" size={10} color="#fff" style={{ marginLeft: 1 }} />
+                </View>
+              )}
+            </View>
+          ) : null}
 
-          {/* Caption sous la vignette */}
+          {/* Caption — sans image, le texte s'étend et les stats passent en bas */}
           {item.body ? (
-            <View style={s.pBody}>
+            <View style={[s.pBody, !thumb && { paddingVertical: 14 }]}>
               <RichText
                 text={item.body}
-                maxLines={2}
+                maxLines={thumb ? 2 : 6}
                 primaryColor={colors.primary}
                 textStyle={[s.pBodyTxt, { color: colors.textPrimary }]}
               />
+              {!thumb && (
+                <View style={[s.pStatsLight, { marginTop: 8 }]}>
+                  <View style={s.pStat}>
+                    <MCIcon name="heart-outline" size={12} color={colors.textTertiary} />
+                    <Text style={[s.pStatTxt, { color: colors.textTertiary }]}>{item.like_count ?? 0}</Text>
+                  </View>
+                  <View style={s.pStat}>
+                    <MCIcon name="comment-outline" size={12} color={colors.textTertiary} />
+                    <Text style={[s.pStatTxt, { color: colors.textTertiary }]}>{item.comment_count ?? 0}</Text>
+                  </View>
+                </View>
+              )}
             </View>
           ) : !thumb ? (
-            /* Pas d'image ET pas de caption → stats en bas */
+            /* Pas d'image ET pas de caption → stats seules */
             <View style={s.pBody}>
               <View style={s.pStatsLight}>
                 <View style={s.pStat}>
@@ -859,7 +866,6 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 }, elevation: 3,
   },
   pThumbWrap:  { width: '100%', overflow: 'hidden', position: 'relative' },
-  pNoThumb:    { alignItems: 'center', justifyContent: 'center' },
   pStats:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pStatsLight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pStat:       { flexDirection: 'row', alignItems: 'center', gap: 3 },

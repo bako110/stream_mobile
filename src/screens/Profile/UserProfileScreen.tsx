@@ -663,10 +663,13 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                   <View style={styles.reelsGrid}>
                     {userPosts.map((post) => {
                       const p = post as any;
-                      const thumb = p.thumbnail_url ?? p.media_url ?? p.image_url ?? p.media?.[0]?.url;
+                      const thumb = p.thumbnail_url ?? p.media_url ?? p.image_url ?? p.image_urls?.[0] ?? p.media?.[0]?.url;
                       const likes  = p.likes_count  ?? p.like_count  ?? 0;
                       const cmts   = p.comments_count ?? p.comment_count ?? 0;
-                      const label  = p.title ?? p.caption ?? p.content ?? '';
+                      // body = champ réel du modèle Post pour un post texte — caption/content
+                      // n'existent pas dessus, donc sans body ici un post texte simple
+                      // n'affichait ni image ni texte, juste un carré dégradé vide.
+                      const label  = p.title ?? p.body ?? p.caption ?? p.content ?? '';
                       return (
                         <TouchableOpacity
                           key={`post-${post.id}`}
@@ -679,9 +682,13 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                           ) : (
                             <LinearGradient
                               colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
-                              style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center' }]}
+                              style={[styles.reelThumb, styles.reelThumbTextWrap]}
                             >
-                              <Icon name="image" size={24} color="rgba(255,255,255,0.6)" />
+                              {label ? (
+                                <Text style={styles.reelThumbText} numberOfLines={5}>{label}</Text>
+                              ) : (
+                                <Icon name="file-text" size={24} color="rgba(255,255,255,0.6)" />
+                              )}
                             </LinearGradient>
                           )}
                           {/* overlay meta */}
@@ -693,7 +700,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                               <Text style={styles.gridMetaText}>{cmts}</Text>
                             </View>
                           </View>
-                          {label ? (
+                          {thumb && label ? (
                             <Text style={[styles.reelCaption, { color: colors.textSecondary }]} numberOfLines={1}>
                               {label}
                             </Text>
@@ -1094,6 +1101,8 @@ const styles = StyleSheet.create({
     width: (W - 24 - 10) / 3, borderRadius: 8, overflow: 'hidden', marginBottom: 4,
   },
   reelThumb: { width: '100%', aspectRatio: 9 / 16 },
+  reelThumbTextWrap: { alignItems: 'center', justifyContent: 'center', padding: 10 },
+  reelThumbText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center', lineHeight: 16 },
   gridOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: 6, paddingVertical: 5,

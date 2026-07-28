@@ -16,7 +16,7 @@ import { BackButton } from '../../components/common';
 import { analyticsService } from '../../services/analyticsService';
 import type { AnalyticsPeriod, AnalyticsContentType, ContentStatItem } from '../../services/analyticsService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import { ContentStatsList } from '../../components/analytics/ContentStatsList';
+import { ContentStatsRow } from '../../components/analytics/ContentStatsList';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 type Rte = { params?: { period?: AnalyticsPeriod; contentType?: AnalyticsContentType } };
@@ -92,18 +92,19 @@ export const ContentAnalyticsListScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
-          data={[{ items }]}
-          keyExtractor={() => 'content-list'}
+          data={items}
+          keyExtractor={item => `${item.content_type}:${item.content_id}`}
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
           ListFooterComponent={loadingMore ? (
             <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />
           ) : null}
-          renderItem={() => (
-            <ContentStatsList
-              items={items}
-              onPressItem={(item) => (nav as any).navigate('ContentAnalyticsDetail', {
+          renderItem={({ item, index }) => (
+            <ContentStatsRow
+              item={item}
+              bordered={index < items.length - 1}
+              onPress={() => (nav as any).navigate('ContentAnalyticsDetail', {
                 contentType: item.content_type, contentId: item.content_id,
               })}
             />

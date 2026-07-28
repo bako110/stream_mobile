@@ -421,31 +421,47 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                     <Icon name="edit-3" size={28} color={colors.textTertiary} />
                     <Text style={{ fontSize: 13, color: colors.textTertiary }}>Aucun post publié</Text>
                   </View>
-                ) : myPosts.slice(0, 6).map(post => (
-                  <TouchableOpacity
-                    key={post.id}
-                    activeOpacity={0.75}
-                    onPress={() => nav.navigate('PostDetail', { postId: post.id })}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
-                  >
-                    {(post as any).image_url ? (
-                      <Image source={{ uri: (post as any).image_url }} style={{ width: 46, height: 46, borderRadius: 8 }} />
-                    ) : (
-                      <View style={{ width: 46, height: 46, borderRadius: 8, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name="file-text" size={20} color={colors.primary} />
+                ) : myPosts.slice(0, 6).map(post => {
+                  // Même résolution que PostDetailScreen/UserPostsScreen : une image
+                  // simple, un tableau d'images, ou la vignette d'une vidéo — sinon
+                  // aucune image (post texte pur), pas de carré vide forcé.
+                  const p = post as any;
+                  const thumb = p.image_urls?.[0] ?? p.image_url ?? p.thumbnail_url ?? null;
+                  return (
+                    <TouchableOpacity
+                      key={post.id}
+                      activeOpacity={0.75}
+                      onPress={() => nav.navigate('PostDetail', { postId: post.id })}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
+                    >
+                      {thumb ? (
+                        <Image source={{ uri: thumb }} style={{ width: 46, height: 46, borderRadius: 8 }} />
+                      ) : (
+                        <View style={{ width: 22, alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon name="file-text" size={18} color={colors.primary} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }} numberOfLines={thumb ? 2 : 3}>
+                          {p.body || p.content || 'Post'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
+                          {new Date(p.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                        </Text>
                       </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }} numberOfLines={2}>
-                        {(post as any).body || (post as any).content || 'Post'}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
-                        {new Date((post as any).created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                      </Text>
-                    </View>
-                    <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+                      <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                  );
+                })}
+                {myPosts.length > 6 && (
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    onPress={() => nav.navigate('UserPosts', { userId: user!.id })}
+                    style={{ alignItems: 'center', paddingVertical: 10 }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>Voir tout</Text>
                   </TouchableOpacity>
-                ))}
+                )}
               </View>
             )}
 
