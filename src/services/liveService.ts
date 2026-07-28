@@ -83,6 +83,11 @@ async function getById(id: string): Promise<LiveStream> {
   return r.data;
 }
 
+/** Capture analytics — best-effort, ne bloque jamais l'affichage si ça échoue. */
+async function recordView(id: string): Promise<void> {
+  try { await apiClient.post(Endpoints.lives.view(id)); } catch { /* silencieux */ }
+}
+
 async function startLive(payload: {
   title: string;
   description?: string;
@@ -169,7 +174,7 @@ async function getLiveCost(): Promise<{ cost_gogold: number; balance: number; su
 }
 
 export const liveService = {
-  getLives, getLivesPage, getById, startLive, stopLive, getToken, getStatus, stopAllMine,
+  getLives, getLivesPage, getById, recordView, startLive, stopLive, getToken, getStatus, stopAllMine,
   blockUserFromLives, unblockUserFromLives, listBans, unban,
   invite, demote, ban, globalBan, getLiveCost,
   sendGiftForAccess, payGoGoldForAccess, checkAccess,

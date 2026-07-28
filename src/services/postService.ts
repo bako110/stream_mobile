@@ -45,6 +45,11 @@ export const postService = {
     return res.data;
   },
 
+  /** Capture analytics — best-effort, ne bloque jamais l'affichage si ça échoue. */
+  async recordView(id: string): Promise<void> {
+    try { await apiClient.post(Endpoints.posts.view(id)); } catch { /* silencieux */ }
+  },
+
   async create(data: PostCreate): Promise<Post> {
     const res = await apiClient.post<Post>(Endpoints.posts.create, data);
     return res.data;

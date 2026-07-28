@@ -102,9 +102,10 @@ import { LiveOneVsOneScreen }      from '../screens/Live/LiveOneVsOneScreen';
 import { LiveTournamentsScreen }   from '../screens/Live/LiveTournamentsScreen';
 import WalletScreen                from '../screens/Wallet/WalletScreen';
 import BuyGoGoldScreen              from '../screens/Wallet/BuyGoGoldScreen';
-import CreatorDashboardScreen      from '../screens/Wallet/CreatorDashboardScreen';
 import { MonetisationScreen }       from '../screens/Wallet/MonetisationScreen';
-import { CreatorStatsScreen }       from '../screens/Wallet/CreatorStatsScreen';
+import { CreatorAnalyticsScreen }   from '../screens/Wallet/CreatorAnalyticsScreen';
+import { ContentAnalyticsDetailScreen } from '../screens/Wallet/ContentAnalyticsDetailScreen';
+import { ContentAnalyticsListScreen } from '../screens/Wallet/ContentAnalyticsListScreen';
 import WithdrawScreen              from '../screens/Wallet/WithdrawScreen';
 import TransferScreen              from '../screens/Wallet/TransferScreen';
 import BoostScreen                 from '../screens/Wallet/BoostScreen';
@@ -232,8 +233,9 @@ export type MainStackParamList = {
   CreatePost:      undefined;
   Wallet:          undefined;
   BuyGoGold:        { reason?: string; missingGoGold?: number; returnTo?: keyof MainStackParamList } | undefined;
-  CreatorDashboard: undefined;
-  CreatorStats:     undefined;
+  CreatorAnalytics: undefined;
+  ContentAnalyticsDetail: { contentType: 'reel' | 'post' | 'event' | 'concert' | 'live'; contentId: string };
+  ContentAnalyticsList: { period?: 'day' | 'week' | 'month' | 'year'; contentType?: 'reel' | 'post' | 'event' | 'concert' | 'live' } | undefined;
   Monetisation:     undefined;
   Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
@@ -513,8 +515,9 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="Ads"            component={AdsScreen}             options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CreateAd"       component={CreateAdScreen}        options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="BuyGoGold"       component={BuyGoGoldScreen}        options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="CreatorDashboard" component={CreatorDashboardScreen} options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="CreatorStats"     component={CreatorStatsScreen}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CreatorAnalytics" component={CreatorAnalyticsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="ContentAnalyticsDetail" component={ContentAnalyticsDetailScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="ContentAnalyticsList" component={ContentAnalyticsListScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Monetisation"    component={MonetisationScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Withdraw"       component={WithdrawScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />

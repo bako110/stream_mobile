@@ -1137,6 +1137,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
       try {
         const l = await liveService.getById(liveId);
         setLive(l);
+        liveService.recordView(liveId);
         if (l.status !== 'active') { setEnded(true); setLoading(false); return; }
         setViewerCount(l.current_viewers + 1);
         setLikeCount(l.like_count ?? 0);

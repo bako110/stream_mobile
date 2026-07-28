@@ -25,8 +25,7 @@ const SECTIONS: { title: string; accent: string; rows: RowItem[] }[] = [
     title: 'Revenus & Gains',
     accent: '#FFD700',
     rows: [
-      { icon: 'bar-chart-2',  color: '#7B3FF2', label: 'Dashboard Créateur',  sub: 'Vues, cadeaux, revenus du mois',       screen: 'CreatorDashboard' },
-      { icon: 'trending-up',  color: '#8B5CF6', label: 'Mes statistiques',    sub: 'Vues, likes, partages par contenu',    screen: 'CreatorStats' },
+      { icon: 'trending-up',  color: '#8B5CF6', label: 'Statistiques',       sub: 'Vues, audience, évolution par contenu', screen: 'CreatorAnalytics' },
       { icon: 'credit-card',  color: '#10B981', label: 'Retirer mes gains',   sub: 'Virement bancaire ou Mobile Money',    screen: 'Withdraw' },
     ],
   },

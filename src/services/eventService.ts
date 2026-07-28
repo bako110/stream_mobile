@@ -34,6 +34,11 @@ export const eventService = {
     return res.data;
   },
 
+  /** Capture analytics — best-effort, ne bloque jamais l'affichage si ça échoue. */
+  async recordView(id: string): Promise<void> {
+    try { await apiClient.post(Endpoints.events.view(id)); } catch { /* silencieux */ }
+  },
+
   // ── Création & édition ────────────────────────────────────────────────────
 
   async create(data: EventCreate): Promise<Event> {

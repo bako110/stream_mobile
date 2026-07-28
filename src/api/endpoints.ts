@@ -119,6 +119,7 @@ export const Endpoints = {
     myTickets:       `${V1}/concerts/tickets/me`,
     validateTicket:  (ticketId: string)  => `${V1}/concerts/tickets/${ticketId}/validate`,
     myTicketPdf:     (concertId: string) => `${V1}/concerts/${concertId}/tickets/me/pdf`,
+    view:            (id: string) => `${V1}/concerts/${id}/view`,
   },
 
   // ── Streaming LiveKit (prefix: /api/v1/stream) ─────────────────────────────
@@ -151,6 +152,7 @@ export const Endpoints = {
     myTicketPdf:    (eventId: string)  => `${V1}/events/${eventId}/tickets/me/pdf`,
     scanTicket:     (eventId: string, accessCode: string) => `${V1}/events/${eventId}/scan/${accessCode}`,
     validateByQr:   (eventId: string, accessCode: string) => `${V1}/events/${eventId}/scan/${accessCode}/validate`,
+    view:           (eventId: string) => `${V1}/events/${eventId}/view`,
   },
 
   // ── Reels (prefix: /api/v1/reels) ─────────────────────────────────────────
@@ -197,6 +199,7 @@ export const Endpoints = {
     react:   (id: string) => `${V1}/posts/${id}/react`,
     likers:  (id: string) => `${V1}/posts/${id}/likes`,
     update:  (id: string) => `${V1}/posts/${id}`,
+    view:    (id: string) => `${V1}/posts/${id}/view`,
   },
 
   // ── Subscriptions (prefix: /api/v1) ───────────────────────────────────────
@@ -352,6 +355,16 @@ export const Endpoints = {
     resolveFlixId: (gofolyxId: string) => `${V1}/wallet/resolve/${gofolyxId}`,
   },
 
+  // ── Analytics créateur (vues heure/jour/semaine/mois, géo, reach, évolution) ──
+  analytics: {
+    overview:      `${V1}/analytics/overview`,
+    timeseries:    `${V1}/analytics/timeseries`,
+    geo:           `${V1}/analytics/geo`,
+    reach:         `${V1}/analytics/reach`,
+    content:       `${V1}/analytics/content`,
+    contentDetail: (contentType: string, contentId: string) => `${V1}/analytics/content/${contentType}/${contentId}`,
+  },
+
   // ── Lives simples (spontanés) ─────────────────────────────────────────────
   lives: {
     list:   `${V1}/lives`,
@@ -362,6 +375,7 @@ export const Endpoints = {
     stop:   (id: string) => `${V1}/lives/${id}/stop`,
     token:  (id: string) => `${V1}/lives/${id}/token`,
     status: (id: string) => `${V1}/lives/${id}/status`,
+    view:   (id: string) => `${V1}/lives/${id}/view`,
     ban:           (id: string, identity: string) => `${V1}/lives/${id}/ban/${identity}`,
     globalBan:     (id: string, userId: string)   => `${V1}/lives/${id}/global-ban/${userId}`,
     like:          (id: string) => `${V1}/lives/${id}/like`,

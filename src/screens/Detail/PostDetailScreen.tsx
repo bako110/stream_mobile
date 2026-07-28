@@ -246,6 +246,10 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   }, [postId, loadAuthorPosts, onBack]);
 
   useEffect(() => {
+    postService.recordView(postId);
+  }, [postId]);
+
+  useEffect(() => {
     setAuthorPosts([]); setAuthorPage(1);
     setAuthorHasMore(true); authorIdRef.current = null;
 

@@ -356,6 +356,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     return () => task.cancel();
   }, [loadConcert]);
 
+  useEffect(() => {
+    concertService.recordView(concertId);
+  }, [concertId]);
+
   const handleLike = () => {
     heartScale.value = withSequence(withSpring(1.4, { damping: 5, stiffness: 300 }), withSpring(1, { damping: 10 }));
     const n = !liked;

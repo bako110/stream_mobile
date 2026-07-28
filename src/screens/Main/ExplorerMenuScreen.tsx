@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,8 +19,6 @@ import { authService } from '../../services';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
-
-const { width: SW } = Dimensions.get('window');
 
 interface Props { onLogout?: () => void; }
 
@@ -91,41 +89,45 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
           </TouchableOpacity>
         )}
 
-        {/* Grille — Découvrir */}
+        {/* Liste — Découvrir */}
         <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>DÉCOUVRIR</Text>
-        <View style={mnu.grid}>
-          {([
-            { icon: 'film',        label: 'Films',         color: '#3B82F6', screen: 'Movies'      },
-            { icon: 'tv',          label: 'Séries',        color: '#7B3FF2', screen: 'Series'      },
-            { icon: 'play-circle', label: 'Reels',         color: '#FF7A2F', screen: 'Reels'       },
-            { icon: 'radio',       label: 'Lives',         color: '#F0365A', screen: 'SimpleLiveList' },
-            { icon: 'zap',         label: 'Live Matchs',   color: '#9B65F5', screen: 'LiveMatches' },
-            { icon: 'music',       label: 'Concerts live', color: '#E0389A', screen: 'LiveList'    },
-            { icon: 'calendar',    label: 'Événements',    color: '#10B981', screen: 'Events'      },
-            { icon: 'trending-up', label: 'Tendances',     color: '#F59E0B', screen: 'Trending'    },
-          ] as const).map((item) => (
-            <TouchableOpacity
-              key={item.screen}
-              style={[mnu.gridItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              activeOpacity={0.75}
-              onPress={() => (nav as any).navigate(item.screen)}
-            >
-              <View style={[mnu.gridIcon, { backgroundColor: item.color + '20' }]}>
-                <Icon name={item.icon} size={24} color={item.color} />
-              </View>
-              <Text style={[mnu.gridLabel, { color: colors.textPrimary }]}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {([
+          { icon: 'film',        label: 'Films',         sub: 'Regarder des films en streaming',           color: '#3B82F6', screen: 'Movies'         },
+          { icon: 'tv',          label: 'Séries',        sub: 'Suivre tes séries, épisode par épisode',    color: '#7B3FF2', screen: 'Series'         },
+          { icon: 'play-circle', label: 'Reels',         sub: 'Défiler des vidéos courtes à l\'infini',    color: '#FF7A2F', screen: 'Reels'          },
+          { icon: 'radio',       label: 'Lives',         sub: 'Voir les diffusions en direct du moment',   color: '#F0365A', screen: 'SimpleLiveList' },
+          { icon: 'zap',         label: 'Live Matchs',   sub: 'Suivre des battles et tournois en direct',  color: '#9B65F5', screen: 'LiveMatches'    },
+          { icon: 'music',       label: 'Concerts live', sub: 'Assister à des concerts en streaming',      color: '#E0389A', screen: 'LiveList'       },
+          { icon: 'calendar',    label: 'Événements',    sub: 'Trouver des sorties et réserver des billets', color: '#10B981', screen: 'Events'       },
+          { icon: 'trending-up', label: 'Tendances',     sub: 'Voir ce qui buzz en ce moment',             color: '#F59E0B', screen: 'Trending'       },
+        ] as const).map((item) => (
+          <TouchableOpacity
+            key={item.screen}
+            style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            activeOpacity={0.75}
+            onPress={() => item.screen === 'Reels'
+              ? (nav as any).navigate('Tabs', { screen: 'Reels' })
+              : (nav as any).navigate(item.screen)}
+          >
+            <View style={[mnu.listIcon, { backgroundColor: item.color + '18' }]}>
+              <Icon name={item.icon} size={20} color={item.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>{item.label}</Text>
+              <Text style={[mnu.listSub, { color: colors.textTertiary }]}>{item.sub}</Text>
+            </View>
+            <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+        ))}
 
         {/* Liste — Social */}
         <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>SOCIAL</Text>
         {([
-          { icon: 'users',          label: 'Communautés',   sub: 'Rejoins des groupes',        color: '#36D9A0', screen: 'Communities'   },
-          { icon: 'user-plus',      label: 'Amis',          sub: 'Abonnements & abonnés',      color: '#10B981', screen: 'Following'      },
-          { icon: 'activity',       label: 'Activité',      sub: 'Tes interactions récentes',  color: '#E0389A', screen: 'Activity'       },
-          { icon: 'clock',          label: 'Historique',    sub: 'Vidéos regardées',           color: '#6366F1', screen: 'WatchHistory'   },
-          { icon: 'star',           label: 'Favoris',       sub: 'Contenus sauvegardés',       color: '#EAB308', screen: 'Favorites'      },
+          { icon: 'users',          label: 'Communautés',   sub: 'Rejoindre des groupes qui te ressemblent',   color: '#36D9A0', screen: 'Communities'   },
+          { icon: 'user-plus',      label: 'Amis',          sub: 'Gérer tes abonnements et tes abonnés',       color: '#10B981', screen: 'Following'      },
+          { icon: 'activity',       label: 'Activité',      sub: 'Voir tes likes, commentaires et interactions', color: '#E0389A', screen: 'Activity'     },
+          { icon: 'clock',          label: 'Historique',    sub: 'Retrouver les vidéos déjà regardées',        color: '#6366F1', screen: 'WatchHistory'   },
+          { icon: 'star',           label: 'Favoris',       sub: 'Retrouver tes contenus sauvegardés',         color: '#EAB308', screen: 'Favorites'      },
         ] as const).map((item) => (
           <TouchableOpacity
             key={item.screen}
@@ -147,13 +149,14 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
         {/* Liste — Espace personnel */}
         <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>MON ESPACE</Text>
         {([
-          { icon: 'calendar',     label: 'Planning',      sub: 'Mes événements et invitations',  color: '#7B3FF2', screen: 'Planning'             },
-          { icon: 'credit-card',  label: 'Wallet',        sub: 'Solde, achats, transferts',      color: '#F59E0B', screen: 'Wallet'              },
-          { icon: 'gift',         label: 'Parrainage',    sub: 'Inviter des amis, gagner des GoGold', color: '#10B981', screen: 'Referral'         },
-          { icon: 'bar-chart-2',  label: 'Monétisation',  sub: 'Dashboard, stats, revenus',      color: '#7B3FF2', screen: 'SettingsMonetisation' },
-          { icon: 'shield',       label: 'Vérification',  sub: 'Obtenir le badge certifié',      color: '#1D9BF0', screen: 'SettingsVerification' },
-          { icon: 'award',        label: 'Abonnement',    sub: 'Gérer ton abonnement',           color: '#14B8A6', screen: 'Subscriptions'        },
-          { icon: 'zap',          label: 'Pub',           sub: 'Créer et gérer tes campagnes',   color: '#F97316', screen: 'Ads'                  },
+          { icon: 'calendar',     label: 'Planning',      sub: 'Voir tes événements et invitations à venir',    color: '#7B3FF2', screen: 'Planning'             },
+          { icon: 'credit-card',  label: 'Wallet',        sub: 'Consulter ton solde, acheter, transférer',      color: '#F59E0B', screen: 'Wallet'              },
+          { icon: 'gift',         label: 'Parrainage',    sub: 'Inviter des amis et gagner des GoGold',         color: '#10B981', screen: 'Referral'             },
+          { icon: 'bar-chart-2',  label: 'Monétisation',  sub: 'Activer et configurer tes revenus créateur',    color: '#7B3FF2', screen: 'SettingsMonetisation' },
+          { icon: 'trending-up',  label: 'Statistiques',  sub: 'Suivre tes vues, ton audience et leur évolution', color: '#3B82F6', screen: 'CreatorAnalytics'   },
+          { icon: 'shield',       label: 'Vérification',  sub: 'Demander le badge de compte certifié',          color: '#1D9BF0', screen: 'SettingsVerification' },
+          { icon: 'award',        label: 'Abonnement',    sub: 'Gérer ou changer ton abonnement premium',       color: '#14B8A6', screen: 'Subscriptions'        },
+          { icon: 'zap',          label: 'Pub',           sub: 'Créer et suivre tes campagnes publicitaires',   color: '#F97316', screen: 'Ads'                  },
         ] as const).map((item) => (
           <TouchableOpacity
             key={item.screen}
@@ -175,7 +178,7 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
         {/* Réglages */}
         <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>RÉGLAGES</Text>
         {([
-          { icon: 'sliders',  label: 'Réglages',   sub: 'Apparence, notifications, compte', color: '#6B7280', screen: 'Settings' },
+          { icon: 'sliders',  label: 'Réglages',   sub: 'Apparence, notifications et gestion du compte', color: '#6B7280', screen: 'Settings' },
         ] as const).map((item) => (
           <TouchableOpacity
             key={item.screen}
@@ -206,7 +209,7 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>Assistance</Text>
-            <Text style={[mnu.listSub, { color: colors.textTertiary }]}>Centre d'aide GoFolyX</Text>
+            <Text style={[mnu.listSub, { color: colors.textTertiary }]}>Consulter l'aide ou contacter le support</Text>
           </View>
           <Icon name="chevron-right" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
@@ -220,7 +223,7 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>Donner mon avis</Text>
-            <Text style={[mnu.listSub, { color: colors.textTertiary }]}>Bug, suggestion ou avis général</Text>
+            <Text style={[mnu.listSub, { color: colors.textTertiary }]}>Signaler un bug ou proposer une idée</Text>
           </View>
           <Icon name="chevron-right" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
@@ -239,10 +242,6 @@ const mnu = StyleSheet.create({
   profileName:   { fontSize: 16, fontWeight: '700' },
   profileSub:    { fontSize: 13, marginTop: 2 },
   sectionTitle:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10 },
-  grid:          { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 10 },
-  gridItem:      { width: (SW - 44) / 3, borderRadius: 14, padding: 14, alignItems: 'center', gap: 10, borderWidth: StyleSheet.hairlineWidth },
-  gridIcon:      { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  gridLabel:     { fontSize: 13, fontWeight: '600', textAlign: 'center' },
   listItem:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginBottom: 8, borderRadius: 14, padding: 14, borderWidth: StyleSheet.hairlineWidth },
   listIcon:      { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   listLabel:     { fontSize: 15, fontWeight: '700' },

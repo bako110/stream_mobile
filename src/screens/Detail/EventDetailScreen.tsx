@@ -436,6 +436,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     return () => task.cancel();
   }, [loadEvent]);
 
+  useEffect(() => {
+    eventService.recordView(eventId);
+  }, [eventId]);
+
   const handleLike = () => {
     heartScale.value = withSequence(withSpring(1.4, { damping: 5, stiffness: 300 }), withSpring(1, { damping: 10 }));
     const n = !liked;

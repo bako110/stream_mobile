@@ -32,6 +32,11 @@ export const concertService = {
     return res.data;
   },
 
+  /** Capture analytics — best-effort, ne bloque jamais l'affichage si ça échoue. */
+  async recordView(id: string): Promise<void> {
+    try { await apiClient.post(Endpoints.concerts.view(id)); } catch { /* silencieux */ }
+  },
+
   async getStreamToken(concertId: string): Promise<StreamToken> {
     const res = await apiClient.get<StreamToken>(Endpoints.streaming.token(concertId));
     return res.data;

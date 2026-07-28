@@ -48,6 +48,11 @@ const CFG: Record<string, { icon: string; grad: [string, string] }> = {
   verification_renewed:      { icon: 'check-circle',   grad: ['#1D9BF0', '#60A5FA'] },
   verification_payment_failed: { icon: 'alert-triangle', grad: ['#F59E0B', '#FBBF24'] },
   verification_revoked:      { icon: 'shield-off',     grad: ['#EF4444', '#F87171'] },
+  boost_started:             { icon: 'zap',            grad: ['#9B65F5', '#C4B5FD'] },
+  boost_expiring:            { icon: 'clock',          grad: ['#F59E0B', '#FBBF24'] },
+  boost_ended:               { icon: 'check-circle',   grad: ['#6B7280', '#9CA3AF'] },
+  ad_started:                { icon: 'trending-up',    grad: ['#F97316', '#FB923C'] },
+  ad_ended:                  { icon: 'flag',           grad: ['#6B7280', '#9CA3AF'] },
 };
 const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
 
@@ -154,13 +159,17 @@ export const NotificationsScreen: React.FC = () => {
   }, []);
 
   const handlePress = useCallback((item: NotifItem) => {
-    // Naviguer immédiatement, marquer lu en arrière-plan
-    if (!item.is_read) markOneRead(item.id);
-
+    // Ouvrir un profil consomme la notif — une fois le profil visité, elle n'a plus
+    // d'utilité (contrairement à un commentaire/reel qu'on peut revouloir retrouver
+    // plus tard) : supprimée plutôt que simplement marquée lue.
     if (USER_NOTIF_TYPES.has(item.notification_type) && item.actor?.id) {
       nav.navigate('UserProfile', { userId: item.actor.id });
+      removeItem(item.id);
       return;
     }
+
+    // Naviguer immédiatement, marquer lu en arrière-plan
+    if (!item.is_read) markOneRead(item.id);
 
     // Types planning → ouvrir le planning
     if (
@@ -182,14 +191,23 @@ export const NotificationsScreen: React.FC = () => {
       return;
     }
 
+    if (item.notification_type === 'boost_started' || item.notification_type === 'boost_expiring' || item.notification_type === 'boost_ended') {
+      nav.navigate('Boost');
+      return;
+    }
+    if (item.notification_type === 'ad_started' || item.notification_type === 'ad_ended') {
+      nav.navigate('Ads');
+      return;
+    }
+
     if (!item.ref_id) return;
     if (item.ref_type === 'concert')         nav.navigate('ConcertDetail',   { concertId:     item.ref_id });
     else if (item.ref_type === 'event')      nav.navigate('EventDetail',     { eventId:       item.ref_id });
     else if (item.ref_type === 'reel')       nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: item.ref_id } });
-    else if (item.ref_type === 'user')       nav.navigate('UserProfile',     { userId:        item.ref_id });
+    else if (item.ref_type === 'user')       { nav.navigate('UserProfile',   { userId:        item.ref_id }); removeItem(item.id); }
     else if (item.ref_type === 'community')  nav.navigate('CommunityDetail', { communityId:   item.ref_id });
     else if (item.ref_type === 'planning_invite' || item.ref_type === 'planning_entry') nav.navigate('Planning');
-  }, [nav, markOneRead]);
+  }, [nav, markOneRead, removeItem]);
 
   const loadMore = useCallback(() => {
     if (loadingMore.current || !hasMore) return;
@@ -499,10 +517,12 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
               </View>
             )}
 
-            {/* Miniature du contenu (ex: contenu supprimé) > avatar acteur > icône type */}
+            {/* Miniature du contenu (ex: pub, boost, contenu supprimé) > avatar acteur > icône type —
+                priorité à l'image dès qu'une existe, présentée en carte média (pas un simple avatar rond)
+                pour se distinguer visuellement d'une notif purement sociale. */}
             {item.image_url ? (
-              <View style={s.avatarWrap}>
-                <Image source={{ uri: item.image_url }} style={[s.avatar, { borderRadius: 10 }]} />
+              <View style={s.mediaWrap}>
+                <Image source={{ uri: item.image_url }} style={s.media} />
                 <LinearGradient colors={cfg.grad as [string, string]} style={s.typeBadge}>
                   <Icon name={cfg.icon} size={9} color="#fff" />
                 </LinearGradient>
@@ -516,7 +536,7 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
               </View>
             ) : (
               <LinearGradient colors={cfg.grad as [string, string]} style={s.iconWrap}>
-                <Icon name={cfg.icon} size={18} color="#fff" />
+                <Icon name={cfg.icon} size={20} color="#fff" />
               </LinearGradient>
             )}
 
@@ -622,6 +642,8 @@ const s = StyleSheet.create({
 
   avatarWrap: { position: 'relative' },
   avatar:     { width: 46, height: 46, borderRadius: 23 },
+  mediaWrap:  { position: 'relative' },
+  media:      { width: 56, height: 56, borderRadius: 14 },
   typeBadge:  {
     position: 'absolute', bottom: -2, right: -2,
     width: 20, height: 20, borderRadius: 10,
