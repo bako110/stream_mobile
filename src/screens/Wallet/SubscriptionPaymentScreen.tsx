@@ -24,8 +24,6 @@ const PLAN_GRADIENTS: Record<PlanType, string[]> = {
   family:  ['#F59E0B', '#FF8C00'],
 };
 
-type PayMethod = 'gogold' | 'stripe';
-
 export default function SubscriptionPaymentScreen() {
   const nav               = useNavigation<any>();
   const route             = useRoute<any>();
@@ -36,20 +34,17 @@ export default function SubscriptionPaymentScreen() {
   const plan: PlanType         = route.params?.plan ?? 'basic';
   const walletCheck: WalletCheck = route.params?.walletCheck;
   const cfg                    = PLAN_CONFIG[plan];
-  const gradient               = PLAN_GRADIENTS[plan];
+  const gradient                = PLAN_GRADIENTS[plan];
 
-  const [method,     setMethod]     = useState<PayMethod>(walletCheck?.sufficient ? 'gogold' : 'stripe');
+  // Seul le paiement par solde GoGold est disponible : aucune intégration Stripe
+  // (PaymentSheet/Checkout) n'existe côté client pour confirmer un vrai paiement carte.
   const [processing, setProcessing] = useState(false);
   const [success,    setSuccess]    = useState(false);
 
   async function handleConfirm() {
     setProcessing(true);
     try {
-      if (method === 'gogold') {
-        await subscriptionService.subscribeViaWallet(plan);
-      } else {
-        await subscriptionService.subscribe(plan);
-      }
+      await subscriptionService.subscribeViaWallet(plan);
       setSuccess(true);
       setTimeout(() => {
         nav.reset({ index: 0, routes: [{ name: 'Tabs' }] });
@@ -105,15 +100,10 @@ export default function SubscriptionPaymentScreen() {
           </View>
         </LinearGradient>
 
-        {/* Payment method */}
+        {/* Payment method — GoGold uniquement (paiement carte pas encore disponible) */}
         <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>MODE DE PAIEMENT</Text>
 
-        {/* GoGold method */}
-        <TouchableOpacity
-          onPress={() => setMethod('gogold')}
-          style={[s.methodCard, { backgroundColor: colors.surface, borderColor: method === 'gogold' ? colors.primary : colors.divider }]}
-          activeOpacity={0.8}
-        >
+        <View style={[s.methodCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
           <View style={[s.methodIcon, { backgroundColor: '#FFD700' + '22' }]}>
             <Icon name="dollar-sign" size={20} color="#FFD700" />
           </View>
@@ -129,31 +119,10 @@ export default function SubscriptionPaymentScreen() {
               <Text style={[s.methodSub, { color: colors.textTertiary }]}>Déduire de votre portefeuille</Text>
             )}
           </View>
-          <View style={[s.radio, method === 'gogold' && { borderColor: colors.primary }]}>
-            {method === 'gogold' && <View style={[s.radioDot, { backgroundColor: colors.primary }]} />}
-          </View>
-        </TouchableOpacity>
-
-        {/* Stripe method */}
-        <TouchableOpacity
-          onPress={() => setMethod('stripe')}
-          style={[s.methodCard, { backgroundColor: colors.surface, borderColor: method === 'stripe' ? colors.primary : colors.divider }]}
-          activeOpacity={0.8}
-        >
-          <View style={[s.methodIcon, { backgroundColor: '#635BFF' + '22' }]}>
-            <Icon name="credit-card" size={20} color="#635BFF" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.methodLabel, { color: colors.textPrimary }]}>Carte bancaire (Stripe)</Text>
-            <Text style={[s.methodSub, { color: colors.textTertiary }]}>Paiement sécurisé Stripe</Text>
-          </View>
-          <View style={[s.radio, method === 'stripe' && { borderColor: colors.primary }]}>
-            {method === 'stripe' && <View style={[s.radioDot, { backgroundColor: colors.primary }]} />}
-          </View>
-        </TouchableOpacity>
+        </View>
 
         {/* GoGold missing — lien recharge */}
-        {method === 'gogold' && walletCheck && !walletCheck.sufficient && (
+        {walletCheck && !walletCheck.sufficient && (
           <TouchableOpacity
             onPress={() => nav.navigate('BuyGoGold', { missingGoGold: walletCheck.missing, returnTo: 'SubscriptionPayment' })}
             style={[s.rechargeBtn, { backgroundColor: '#FFD700' + '18', borderColor: '#FFD700' + '55' }]}
@@ -188,12 +157,12 @@ export default function SubscriptionPaymentScreen() {
         {/* Confirm button */}
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={processing || (method === 'gogold' && walletCheck && !walletCheck.sufficient)}
+          disabled={processing || (walletCheck && !walletCheck.sufficient)}
           style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden' }}
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={(method === 'gogold' && walletCheck && !walletCheck.sufficient)
+            colors={(walletCheck && !walletCheck.sufficient)
               ? ['#4B5563', '#374151']
               : gradient}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}

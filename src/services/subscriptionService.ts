@@ -33,11 +33,6 @@ export const subscriptionService = {
     return res.data;
   },
 
-  async subscribe(plan: PlanType): Promise<Subscription> {
-    const res = await apiClient.post<Subscription>(Endpoints.subscriptions.subscribe, { plan });
-    return res.data;
-  },
-
   async cancel(): Promise<Subscription> {
     const res = await apiClient.delete<Subscription>(Endpoints.subscriptions.cancel);
     return res.data;
