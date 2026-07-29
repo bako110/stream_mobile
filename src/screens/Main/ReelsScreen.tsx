@@ -73,6 +73,10 @@ const formatCount = (n: number): string => {
 const AD_INTERVAL = 5;
 // Taille de page pour le mode "reels d'un utilisateur" (profil, recherche) — scroll infini.
 const USER_REELS_PAGE_LIMIT = 20;
+// Grille recherche (tendances + résultats) — une pub occupe une cellule toutes les
+// SEARCH_AD_INTERVAL cartes (placement="search" côté backend, distinct de "reels").
+const SEARCH_AD_INTERVAL = 6;
+const SEARCH_PAGE_LIMIT = 20;
 
 export const ReelsScreen: React.FC = () => {
   useKeepAwake();
@@ -210,6 +214,45 @@ export const ReelsScreen: React.FC = () => {
   // d'écran vide entre "tendances" et "résultats" pendant la saisie).
   const [trendingReels,   setTrendingReels]   = useState<Reel[]>([]);
   const [loadingTrending, setLoadingTrending] = useState(false);
+  // Pagination scroll infini de la grille recherche — séparée pour tendances vs
+  // résultats de recherche texte (deux sources de données, jamais mélangées).
+  const [trendingHasMore, setTrendingHasMore] = useState(true);
+  const [searchHasMore,   setSearchHasMore]   = useState(true);
+  const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
+  const trendingPageRef = useRef(1);
+  const searchPageRef   = useRef(1);
+  // Pubs de la grille recherche (placement="search") — état séparé de `adSlots`
+  // (feed principal, placement="reels") pour ne jamais les mélanger.
+  type SearchAdData = { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string };
+  const [searchAdSlots, setSearchAdSlots] = useState<Map<number, SearchAdData>>(new Map());
+  const searchAdSlotsRef = useRef(searchAdSlots);
+  searchAdSlotsRef.current = searchAdSlots;
+  const loadingSearchAdSlotsRef = useRef<Set<number>>(new Set());
+  const servedSearchAdIdsRef = useRef<Set<string>>(new Set());
+
+  const loadSearchAdForSlot = useCallback((slotIdx: number, allowRepeat = false) => {
+    if (loadingSearchAdSlotsRef.current.has(slotIdx) || searchAdSlotsRef.current.has(slotIdx)) return;
+    loadingSearchAdSlotsRef.current.add(slotIdx);
+    const recentExcluded = allowRepeat ? [] : Array.from(servedSearchAdIdsRef.current).slice(-20);
+    const excludeIds = recentExcluded.join(',');
+    const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
+    apiClient.get<SearchAdData | null>(`/api/v1/ads/feed/next?placement=search${qs}`)
+      .then(r => {
+        loadingSearchAdSlotsRef.current.delete(slotIdx);
+        if (!mountedRef.current) return;
+        if (!r.data) {
+          if (excludeIds) loadSearchAdForSlot(slotIdx, true);
+          return;
+        }
+        servedSearchAdIdsRef.current.add(r.data.id);
+        setSearchAdSlots(prev => {
+          const next = new Map(prev);
+          next.set(slotIdx, r.data as SearchAdData);
+          return next;
+        });
+      })
+      .catch(() => { loadingSearchAdSlotsRef.current.delete(slotIdx); });
+  }, []);
 
   // Refs stables pour éviter les closures stales
   const reelsRef        = useRef<Reel[]>(seedReel.length > 0 ? seedReel : []);
@@ -411,17 +454,19 @@ export const ReelsScreen: React.FC = () => {
   const runSearch = useCallback(async (q: string) => {
     const term = q.trim();
     searchReqRef.current = term;
-    if (!term) { setSearchResults([]); return; }
+    searchPageRef.current = 1;
+    if (!term) { setSearchResults([]); setSearchHasMore(true); return; }
     if (!mountedRef.current) return;
     setSearching(true);
     try {
-      const data = await reelService.search(term, 1, 20);
+      const data = await reelService.search(term, 1, SEARCH_PAGE_LIMIT);
       // Ignore une réponse en retard (frappe rapide) qui ne correspond plus au terme actuel
       if (mountedRef.current && searchReqRef.current === term) {
         setSearchResults(data.items.filter((r: Reel) => !!r.hls_url));
+        setSearchHasMore(data.has_more);
       }
     } catch {
-      if (mountedRef.current && searchReqRef.current === term) setSearchResults([]);
+      if (mountedRef.current && searchReqRef.current === term) { setSearchResults([]); setSearchHasMore(false); }
     } finally {
       if (mountedRef.current && searchReqRef.current === term) setSearching(false);
     }
@@ -437,20 +482,31 @@ export const ReelsScreen: React.FC = () => {
     setSearchOpen(true);
     setSearchQuery('');
     setSearchResults([]);
+    setSearchAdSlots(new Map());
+    loadingSearchAdSlotsRef.current.clear();
+    trendingPageRef.current = 1;
+    searchPageRef.current = 1;
+    setTrendingHasMore(true);
+    setSearchHasMore(true);
     setTimeout(() => searchInputRef.current?.focus(), 100);
 
-    // Charge les reels tendance une seule fois par ouverture — affichés par défaut
+    // Charge le 1er lot de reels tendance à l'ouverture — affichés par défaut
     // avant toute frappe, et gardés visibles PENDANT la frappe (voir le rendu plus
     // bas) jusqu'à ce que de vrais résultats de recherche arrivent. L'API tendance
     // ne renvoie pas hls_url/author complets (contrat différent de la recherche) —
     // filtré aux champs sûrs pour l'affichage en grille ; le clic (pickSearchResult)
     // refetch l'objet complet via getById avant de lancer la lecture.
+    // Pagination scroll infini gérée par loadMoreSearchGrid (onEndReached).
     setLoadingTrending(true);
-    searchService.getTrendingReels()
-      .then(items => setTrendingReels(Array.isArray(items) ? items : []))
-      .catch(() => setTrendingReels([]))
+    searchService.getTrendingReels(1, SEARCH_PAGE_LIMIT)
+      .then(({ items, hasMore }) => { setTrendingReels(Array.isArray(items) ? items : []); setTrendingHasMore(hasMore); })
+      .catch(() => { setTrendingReels([]); setTrendingHasMore(false); })
       .finally(() => setLoadingTrending(false));
-  }, []);
+
+    // Première pub visible dès l'ouverture, sans attendre un scroll — l'utilisateur
+    // signalait justement que les pubs n'apparaissaient qu'après avoir paginé.
+    loadSearchAdForSlot(0);
+  }, [loadSearchAdForSlot]);
 
   const closeSearch = useCallback(() => {
     if (searchTimerRef.current) { clearTimeout(searchTimerRef.current); searchTimerRef.current = null; }
@@ -459,6 +515,53 @@ export const ReelsScreen: React.FC = () => {
     setSearchResults([]);
     Keyboard.dismiss();
   }, []);
+
+  // Scroll infini de la grille recherche — pagine la source actuellement affichée
+  // (résultats texte si une recherche est en cours, sinon tendances), et charge la
+  // pub du prochain emplacement dès qu'assez de cartes existent pour le remplir.
+  const loadMoreSearchGrid = useCallback(() => {
+    if (loadingMoreSearch) return;
+    const term = searchQuery.trim();
+    const isSearchMode = term.length > 0;
+    if (isSearchMode) {
+      if (!searchHasMore || searching) return;
+      setLoadingMoreSearch(true);
+      const nextPage = searchPageRef.current + 1;
+      reelService.search(term, nextPage, SEARCH_PAGE_LIMIT)
+        .then(data => {
+          if (searchReqRef.current !== term) return;
+          searchPageRef.current = nextPage;
+          setSearchResults(prev => {
+            const ids = new Set(prev.map(r => r.id));
+            const merged = [...prev, ...data.items.filter((r: Reel) => !!r.hls_url && !ids.has(r.id))];
+            const totalSlots = Math.floor(merged.length / SEARCH_AD_INTERVAL);
+            for (let s = 0; s < totalSlots; s++) loadSearchAdForSlot(s);
+            return merged;
+          });
+          setSearchHasMore(data.has_more);
+        })
+        .catch(() => setSearchHasMore(false))
+        .finally(() => setLoadingMoreSearch(false));
+    } else {
+      if (!trendingHasMore || loadingTrending) return;
+      setLoadingMoreSearch(true);
+      const nextPage = trendingPageRef.current + 1;
+      searchService.getTrendingReels(nextPage, SEARCH_PAGE_LIMIT)
+        .then(({ items, hasMore }) => {
+          trendingPageRef.current = nextPage;
+          setTrendingReels(prev => {
+            const ids = new Set(prev.map(r => r.id));
+            const merged = [...prev, ...items.filter((r: any) => !ids.has(r.id))];
+            const totalSlots = Math.floor(merged.length / SEARCH_AD_INTERVAL);
+            for (let s = 0; s < totalSlots; s++) loadSearchAdForSlot(s);
+            return merged;
+          });
+          setTrendingHasMore(hasMore);
+        })
+        .catch(() => setTrendingHasMore(false))
+        .finally(() => setLoadingMoreSearch(false));
+    }
+  }, [loadingMoreSearch, searchQuery, searchHasMore, searching, trendingHasMore, loadingTrending, loadSearchAdForSlot]);
 
   // Clic sur une carte "Mes Reels" → page dédiée plein écran
   const handlePlayFromMine = useCallback((r: Reel) => {
@@ -1155,46 +1258,69 @@ export const ReelsScreen: React.FC = () => {
               );
             }
             if (gridData) {
+              // Insère une carte pub toutes les SEARCH_AD_INTERVAL cartes — même logique
+              // que feedWithAds (feed principal), adaptée à une grille 2 colonnes. Le
+              // premier slot (0) est demandé dès openSearch(), donc déjà visible ici sans
+              // attendre le moindre scroll.
+              const mixed: Array<{ _kind: 'reel'; reel: any } | { _kind: 'ad'; ad: SearchAdData; slot: number }> = [];
+              let adSlotCounter = 0;
+              gridData.forEach((item, i) => {
+                mixed.push({ _kind: 'reel', reel: item });
+                if ((i + 1) % SEARCH_AD_INTERVAL === 0) {
+                  const slot = adSlotCounter++;
+                  const ad = searchAdSlots.get(slot);
+                  if (ad) mixed.push({ _kind: 'ad', ad, slot });
+                }
+              });
               return (
                 <FlatList
                   key="search-grid"
-                  data={gridData}
-                  keyExtractor={r => r.id}
+                  data={mixed}
+                  keyExtractor={(m, i) => m._kind === 'ad' ? `ad-${m.slot}` : m.reel.id ?? String(i)}
                   numColumns={2}
                   keyboardShouldPersistTaps="handled"
                   contentContainerStyle={s.searchGrid}
                   columnWrapperStyle={s.searchGridRow}
                   showsVerticalScrollIndicator={false}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity style={s.searchCard} onPress={() => pickSearchResult(item)} activeOpacity={0.9}>
-                      {item.thumbnail_url
-                        ? <Image source={{ uri: item.thumbnail_url }} style={s.searchThumb} resizeMode="cover" />
-                        : <View style={s.searchThumbFallback}><Icon name="film" size={32} color="rgba(255,255,255,0.15)" /></View>
-                      }
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.92)']} locations={[0.3, 0.6, 1]} style={s.searchCardGrad} />
-                      <View style={s.searchPlayBadge}><Icon name="play" size={10} color="#fff" /></View>
-                      <View style={s.searchViewBadge}>
-                        <Icon name="eye" size={10} color="#fff" />
-                        <Text style={s.searchBadgeText}>{formatCount(item.view_count)}</Text>
-                      </View>
-                      <View style={s.searchCardInfo}>
-                        <View style={s.searchCardAuthorRow}>
-                          {item.author?.avatar_url
-                            ? <Image source={{ uri: item.author.avatar_url }} style={s.searchAvatar} />
-                            : <View style={[s.searchAvatar, s.searchAvatarFallback]}>
-                                <Text style={s.searchAvatarText}>{(item.author?.display_name || item.author?.username || '?')[0]?.toUpperCase() ?? '?'}</Text>
-                              </View>
-                          }
-                          <Text style={s.searchCardAuthor} numberOfLines={1}>{item.author?.display_name || item.author?.username || ''}</Text>
+                  onEndReached={loadMoreSearchGrid}
+                  onEndReachedThreshold={0.6}
+                  ListFooterComponent={loadingMoreSearch ? (
+                    <View style={{ paddingVertical: 16 }}><GoFolyXLoader variant="reel" color="#ffffff" /></View>
+                  ) : null}
+                  renderItem={({ item: m }) => {
+                    if (m._kind === 'ad') return <SearchAdCard ad={m.ad} />;
+                    const item = m.reel;
+                    return (
+                      <TouchableOpacity style={s.searchCard} onPress={() => pickSearchResult(item)} activeOpacity={0.9}>
+                        {item.thumbnail_url
+                          ? <Image source={{ uri: item.thumbnail_url }} style={s.searchThumb} resizeMode="cover" />
+                          : <View style={s.searchThumbFallback}><Icon name="film" size={32} color="rgba(255,255,255,0.15)" /></View>
+                        }
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.92)']} locations={[0.3, 0.6, 1]} style={s.searchCardGrad} />
+                        <View style={s.searchPlayBadge}><Icon name="play" size={10} color="#fff" /></View>
+                        <View style={s.searchViewBadge}>
+                          <Icon name="eye" size={10} color="#fff" />
+                          <Text style={s.searchBadgeText}>{formatCount(item.view_count)}</Text>
                         </View>
-                        {item.caption ? <Text style={s.searchCardCaption} numberOfLines={2}>{item.caption}</Text> : null}
-                        <View style={s.searchCardStats}>
-                          <MCIcon name="heart" size={10} color="#E0389A" />
-                          <Text style={s.searchCardStat}>{formatCount(item.like_count)}</Text>
+                        <View style={s.searchCardInfo}>
+                          <View style={s.searchCardAuthorRow}>
+                            {item.author?.avatar_url
+                              ? <Image source={{ uri: item.author.avatar_url }} style={s.searchAvatar} />
+                              : <View style={[s.searchAvatar, s.searchAvatarFallback]}>
+                                  <Text style={s.searchAvatarText}>{(item.author?.display_name || item.author?.username || '?')[0]?.toUpperCase() ?? '?'}</Text>
+                                </View>
+                            }
+                            <Text style={s.searchCardAuthor} numberOfLines={1}>{item.author?.display_name || item.author?.username || ''}</Text>
+                          </View>
+                          {item.caption ? <Text style={s.searchCardCaption} numberOfLines={2}>{item.caption}</Text> : null}
+                          <View style={s.searchCardStats}>
+                            <MCIcon name="heart" size={10} color="#E0389A" />
+                            <Text style={s.searchCardStat}>{formatCount(item.like_count)}</Text>
+                          </View>
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  )}
+                      </TouchableOpacity>
+                    );
+                  }}
                 />
               );
             }
@@ -1392,6 +1518,61 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         ) : null}
       </View>
     </View>
+  );
+});
+
+// ─── SearchAdCard — carte pub format grille (overlay recherche, placement="search") ──
+
+interface SearchAdCardData {
+  id: string;
+  title: string;
+  description?: string;
+  cta_text?: string;
+  cta_url?: string;
+  creative_url?: string;
+  thumbnail_url?: string;
+}
+
+const SearchAdCard: React.FC<{ ad: SearchAdCardData }> = memo(({ ad }) => {
+  const impressionSent = useRef(false);
+  useEffect(() => {
+    if (!impressionSent.current) {
+      impressionSent.current = true;
+      apiClient.post(`/api/v1/ads/${ad.id}/impression`, {}).catch(() => {});
+    }
+  }, [ad.id]);
+
+  const rawCta  = (ad.cta_url ?? '').trim();
+  const isPhone = !!rawCta && !/^https?:\/\//i.test(rawCta) && /^[+()\d\s.-]{6,}$/.test(rawCta.replace(/^tel:/i, ''));
+
+  const handlePress = () => {
+    apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
+    if (!rawCta) return;
+    if (isPhone) { openPhoneMenu(rawCta.replace(/^tel:/i, '')); return; }
+    Linking.openURL(rawCta).catch(() => {});
+  };
+
+  return (
+    <TouchableOpacity style={s.searchCard} onPress={handlePress} activeOpacity={0.9}>
+      {ad.creative_url || ad.thumbnail_url
+        ? <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={s.searchThumb} resizeMode="cover" />
+        : <LinearGradient colors={['#1a0533', '#0d1b4b', '#0a2a1a']} style={s.searchThumb} />
+      }
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.94)']} locations={[0.25, 0.6, 1]} style={s.searchCardGrad} />
+      <View style={s.searchAdBadge}>
+        <Text style={s.searchAdBadgeText}>Sponsorisé</Text>
+      </View>
+      <View style={s.searchCardInfo}>
+        <Text style={s.searchCardAuthor} numberOfLines={1}>{ad.title}</Text>
+        {ad.description ? <Text style={s.searchCardCaption} numberOfLines={2}>{ad.description}</Text> : null}
+        {rawCta ? (
+          <View style={s.searchAdCtaRow}>
+            <Icon name={isPhone ? 'phone' : 'globe'} size={10} color="#fff" />
+            <Text style={s.searchAdCtaText} numberOfLines={1}>{ad.cta_text || (isPhone ? 'Contactez-nous' : 'En savoir plus')}</Text>
+          </View>
+        ) : null}
+      </View>
+    </TouchableOpacity>
   );
 });
 
@@ -2979,6 +3160,10 @@ const s = StyleSheet.create({
   searchCardCaption:    { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 15 },
   searchCardStats:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   searchCardStat:       { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' },
+  searchAdBadge:        { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(224,56,154,0.85)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  searchAdBadgeText:    { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.2 },
+  searchAdCtaRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  searchAdCtaText:      { color: '#fff', fontSize: 10, fontWeight: '700', flex: 1 },
   searchCenterState:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 60 },
   searchEmptyIcon:      { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
   searchStateTitle:     { color: '#fff', fontSize: 16, fontWeight: '700' },

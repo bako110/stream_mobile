@@ -106,6 +106,9 @@ import WalletScreen                from '../screens/Wallet/WalletScreen';
 import BuyGoGoldScreen              from '../screens/Wallet/BuyGoGoldScreen';
 import { MonetisationScreen }       from '../screens/Wallet/MonetisationScreen';
 import { CreatorAnalyticsScreen }   from '../screens/Wallet/CreatorAnalyticsScreen';
+import { RevenueDetailScreen }      from '../screens/Wallet/RevenueDetailScreen';
+import { RevenueContentListScreen } from '../screens/Wallet/RevenueContentListScreen';
+import { RevenueTransactionsScreen } from '../screens/Wallet/RevenueTransactionsScreen';
 import { ContentAnalyticsDetailScreen } from '../screens/Wallet/ContentAnalyticsDetailScreen';
 import { ContentAnalyticsListScreen } from '../screens/Wallet/ContentAnalyticsListScreen';
 import WithdrawScreen              from '../screens/Wallet/WithdrawScreen';
@@ -241,6 +244,9 @@ export type MainStackParamList = {
   CreatorAnalytics: undefined;
   ContentAnalyticsDetail: { contentType: 'reel' | 'post' | 'event' | 'concert' | 'live'; contentId: string };
   ContentAnalyticsList: { period?: 'day' | 'week' | 'month' | 'year'; contentType?: 'reel' | 'post' | 'event' | 'concert' | 'live' } | undefined;
+  RevenueDetail:       undefined;
+  RevenueContentList:  { period?: 'all' | 'month' | 'year' } | undefined;
+  RevenueTransactions: undefined;
   Monetisation:     undefined;
   Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
@@ -529,6 +535,9 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="CreatorAnalytics" component={CreatorAnalyticsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ContentAnalyticsDetail" component={ContentAnalyticsDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ContentAnalyticsList" component={ContentAnalyticsListScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="RevenueDetail"       component={RevenueDetailScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="RevenueContentList"  component={RevenueContentListScreen}  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="RevenueTransactions" component={RevenueTransactionsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Monetisation"    component={MonetisationScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Withdraw"       component={WithdrawScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />

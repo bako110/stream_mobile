@@ -37,9 +37,13 @@ export const searchService = {
     return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
   },
 
-  async getTrendingReels(): Promise<any[]> {
-    const res = await apiClient.get<any>(`${Endpoints.search.trendingReels}`);
-    return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+  async getTrendingReels(page = 1, limit = 20): Promise<{ items: any[]; hasMore: boolean }> {
+    const query = new URLSearchParams({ page: String(page), limit: String(limit) }).toString();
+    const res = await apiClient.get<any>(`${Endpoints.search.trendingReels}?${query}`);
+    const data = res.data;
+    const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+    const hasMore = Array.isArray(data) ? items.length >= limit : data?.has_more ?? items.length >= limit;
+    return { items, hasMore };
   },
 
   async getUpcomingEvents(): Promise<any[]> {

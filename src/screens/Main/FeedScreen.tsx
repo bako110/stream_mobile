@@ -933,6 +933,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const openSearch = useCallback(() => {
     setSearchOpen(true);
     refreshHistory();
+    // Précharge la pub "search" dès l'ouverture — avant, elle n'était demandée
+    // qu'à la première frappe (liveSearch), donc invisible tant que l'utilisateur
+    // n'avait rien tapé.
+    if (!searchAdReqRef.current) {
+      searchAdReqRef.current = '__initial__';
+      apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=search')
+        .then(r => setSearchAd(r.data ?? null))
+        .catch(() => {});
+    }
     if (!popularLoadedRef.current) {
       popularLoadedRef.current = true;
       setPopularLoading(true);
@@ -2276,6 +2285,20 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             if (!searchQuery.trim() && !searchResults) return (
               <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
 
+                {/* Pub — préchargée dès openSearch(), visible immédiatement à l'ouverture
+                    sans attendre la moindre frappe. */}
+                {searchAd && (
+                  <View style={{ paddingHorizontal: 12, paddingTop: 10 }}>
+                    <AdCard
+                      ad={searchAd}
+                      colors={colors}
+                      isVisible={searchOpen}
+                      onImpression={handleAdImpression}
+                      onPress={handleAdPress}
+                    />
+                  </View>
+                )}
+
                 {/* ── Historique ── */}
                 {searchHistory.length > 0 && (
                   <View style={{ paddingTop: 20, paddingBottom: 4 }}>
@@ -2455,9 +2478,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               </ScrollView>
             );
 
-            // Chargement — avec suggestions historique pendant l'attente API
+            // Chargement — avec suggestions historique pendant l'attente API. La pub déjà
+            // chargée (searchAd n'est vidée que quand le champ redevient vide, jamais entre
+            // deux frappes) reste affichée ici pour ne pas clignoter/disparaître à chaque
+            // debounce de 300ms pendant que l'utilisateur tape.
             if (searching) return (
               <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                {searchAd && searchFilter === 'all' && (
+                  <View style={{ paddingHorizontal: 12, paddingTop: 10 }}>
+                    <AdCard
+                      ad={searchAd}
+                      colors={colors}
+                      isVisible={searchOpen}
+                      onImpression={handleAdImpression}
+                      onPress={handleAdPress}
+                    />
+                  </View>
+                )}
                 {historySuggestions.length > 0 && (
                   <View style={{ paddingTop: 8, paddingBottom: 4 }}>
                     <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 6 }}>Suggestions</Text>

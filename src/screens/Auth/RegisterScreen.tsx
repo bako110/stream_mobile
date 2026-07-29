@@ -17,6 +17,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
+import { getDeviceFingerprint } from '../../utils/deviceFingerprint';
 import type { Gender } from '../../types';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -430,6 +431,10 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
   const [errors, setErrors]   = useState<FormErrors>({});
   const [globalError, setGlobalError] = useState('');
 
+  // Anti-bot : capturé au montage de l'écran, vérifié côté serveur pour détecter
+  // un remplissage anormalement rapide (voir _check_not_a_bot dans auth.py).
+  const formStartedAtRef = useRef(Date.now());
+
   const [data, setData] = useState<StepData>({
     firstName: '', lastName: '', authMethod: 'email',
     email: '', phone: '', country: DEFAULT_COUNTRY,
@@ -511,6 +516,8 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
         referral_code: data.referralCode.trim() || undefined,
         date_of_birth: data.dateOfBirth,
         gender:        data.gender as Gender,
+        form_started_at: formStartedAtRef.current,
+        device_fingerprint: await getDeviceFingerprint(),
       });
       onRegisterSuccess();
     } catch (e: any) {

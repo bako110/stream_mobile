@@ -26,6 +26,7 @@ const SECTIONS: { title: string; accent: string; rows: RowItem[] }[] = [
     accent: '#FFD700',
     rows: [
       { icon: 'trending-up',  color: '#8B5CF6', label: 'Statistiques',       sub: 'Vues, audience, évolution par contenu', screen: 'CreatorAnalytics' },
+      { icon: 'dollar-sign',  color: '#22C55E', label: 'Revenus détaillés',  sub: 'Historique, par mois, par reel',       screen: 'RevenueDetail' },
       { icon: 'credit-card',  color: '#10B981', label: 'Retirer mes gains',   sub: 'Virement bancaire ou Mobile Money',    screen: 'Withdraw' },
     ],
   },

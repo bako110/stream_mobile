@@ -56,18 +56,19 @@ export const reelService = {
   },
 
   /**
-   * Recherche de reels par mot-clé (endpoint séparé à implémenter côté backend).
-   * Fallback : filtre client-side sur le feed si l'endpoint n'existe pas.
+   * Recherche de reels par mot-clé — utilise le paramètre `search` de GET /reels
+   * (voir reels.py:25-62 côté backend), qui filtre sur caption/username/display_name
+   * et supporte la vraie pagination (has_more).
    */
   async search(query: string, page = 1, limit = 20): Promise<ReelFeedResponse> {
     try {
-      const q   = new URLSearchParams({ q: query, page: String(page), limit: String(limit) }).toString();
-      const res = await apiClient.get<any>(`${Endpoints.reels.feed}/search?${q}`);
+      const q   = new URLSearchParams({ search: query, page: String(page), limit: String(limit) }).toString();
+      const res = await apiClient.get<any>(`${Endpoints.reels.feed}?${q}`);
       const data = res.data ?? res;
       const items = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : [];
-      return { items, has_more: data.has_more ?? false, page, total: data.total ?? items.length, limit };
+      return { items, has_more: data.has_more ?? items.length >= limit, page: data.page ?? page, total: data.total ?? items.length, limit: data.limit ?? limit };
     } catch {
-      // Fallback : feed standard filtré côté client
+      // Fallback : feed standard filtré côté client (endpoint indisponible)
       const feed = await reelService.getFeed({ page, limit: 50 });
       const lower = query.toLowerCase();
       const filtered = feed.items.filter(r =>

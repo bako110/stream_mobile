@@ -49,6 +49,12 @@ export interface RegisterRequest {
   referral_code?: string;
   date_of_birth: string;
   gender:        Gender;
+  /** Anti-bot : timestamp (epoch ms) de montage du formulaire. */
+  form_started_at?: number;
+  /** Anti-bot : honeypot, doit toujours rester vide/undefined pour un humain. */
+  website_url?: string;
+  /** Anti-bot : identifiant d'appareil stable (voir utils/deviceFingerprint.ts). */
+  device_fingerprint?: string;
 }
 
 export interface OAuthLoginRequest {

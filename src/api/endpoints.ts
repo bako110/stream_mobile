@@ -353,6 +353,12 @@ export const Endpoints = {
     referralUsers: `${V1}/wallet/referral/users`,
     // GoFolyX ID
     resolveFlixId: (gofolyxId: string) => `${V1}/wallet/resolve/${gofolyxId}`,
+    // Revenus créateur (toutes sources) — même contrat que le web (revenueService.ts)
+    revenueSummary:      `${V1}/wallet/creator/revenue/summary`,
+    revenueTimeseries:   `${V1}/wallet/creator/revenue/timeseries`,
+    revenueBreakdown:    `${V1}/wallet/creator/revenue/breakdown`,
+    revenueByContent:    `${V1}/wallet/creator/revenue/by-content`,
+    revenueTransactions: `${V1}/wallet/creator/revenue/transactions`,
   },
 
   // ── Analytics créateur (vues heure/jour/semaine/mois, géo, reach, évolution) ──
