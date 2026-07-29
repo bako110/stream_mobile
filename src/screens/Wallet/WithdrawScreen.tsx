@@ -17,7 +17,7 @@ const WithdrawScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => navigation.goBack()} />

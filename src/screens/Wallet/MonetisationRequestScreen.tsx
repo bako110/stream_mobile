@@ -2,7 +2,7 @@
 import { BackButton } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Alert, TextInput,
+  StatusBar, ActivityIndicator, TextInput,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
+import { toastService } from '../../services';
 
 const CONTENT_TYPES = [
   { id: 'music',    icon: 'music',      label: 'Musique' },
@@ -58,15 +59,15 @@ export default function MonetisationRequestScreen() {
 
   async function handleSubmit() {
     if (!bio.trim() || bio.trim().length < 30) {
-      Alert.alert('Bio trop courte', 'Décrivez votre activité en au moins 30 caractères.');
+      toastService.warning('Bio trop courte', 'Décrivez votre activité en au moins 30 caractères.');
       return;
     }
     if (!payoutEmail.trim() || !payoutEmail.includes('@')) {
-      Alert.alert('Email invalide', 'Entrez une adresse email valide pour recevoir vos paiements.');
+      toastService.warning('Email invalide', 'Entrez une adresse email valide pour recevoir vos paiements.');
       return;
     }
     if (selectedTypes.length === 0) {
-      Alert.alert('Type de contenu', 'Sélectionnez au moins un type de contenu.');
+      toastService.warning('Type de contenu', 'Sélectionnez au moins un type de contenu.');
       return;
     }
 
@@ -80,7 +81,7 @@ export default function MonetisationRequestScreen() {
       });
       setSubmitted(true);
     } catch (e: any) {
-      Alert.alert('Demande refusée', e?.message || 'Impossible d\'envoyer la demande. Réessayez.');
+      toastService.error('Demande refusée', e?.message || 'Impossible d\'envoyer la demande. Réessayez.');
     } finally {
       setSubmitting(false);
     }

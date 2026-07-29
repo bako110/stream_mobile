@@ -12,7 +12,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback,
   StatusBar, Platform, FlatList, TextInput, KeyboardAvoidingView,
-  ActivityIndicator, Image, Alert, AppState, AppStateStatus, Modal,
+  ActivityIndicator, Image, AppState, AppStateStatus, Modal,
 } from 'react-native';
 import Animated, {
   FadeIn, FadeOut, SlideInUp, SlideOutDown, SlideInDown,
@@ -35,6 +35,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { liveService } from '../../services/liveService';
 import { battleService } from '../../services/battleService';
+import { toastService, showConfirm } from '../../services';
 import { participantAvatarUrl } from '../../utils/livekitParticipant';
 import type { LiveStream } from '../../services/liveService';
 import { LiveAccessGate } from '../../components/live/LiveAccessGate';
@@ -55,7 +56,7 @@ import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { LiveHeartsOverlay } from '../../components/live/LiveHeartsOverlay';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { StageTileRow } from '../../components/live/StageTileRow';
 import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
 import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
@@ -171,16 +172,17 @@ const StageAccessSheet: React.FC<{
       const status = e?.status ?? 0;
       const msg    = e?.message ?? 'Une erreur est survenue.';
       if (status === 402) {
-        Alert.alert('Solde insuffisant', msg, [
+        showConfirm('Solde insuffisant', msg, [
           { text: 'Pas maintenant', style: 'cancel' },
           { text: 'Recharger', onPress: () => { onClose(); navigation.navigate('Wallet'); } },
         ]);
       } else if (status === 409) {
-        Alert.alert('Demande déjà envoyée', msg, [{ text: 'OK', onPress: onClose }]);
+        toastService.info('Demande déjà envoyée', msg);
+        onClose();
       } else if (status === 400) {
-        Alert.alert('Impossible', msg);
+        toastService.warning('Impossible', msg);
       } else {
-        Alert.alert('Erreur', msg);
+        toastService.error('Erreur', msg);
       }
     } finally {
       setLoading(false);
@@ -373,7 +375,7 @@ const MultiVideoView: React.FC<{
   if (participants.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
-        <ActivityIndicator size="large" color="#F0365A" />
+        <GoFolyXLoader variant="reel" color="#F0365A" />
       </View>
     );
   }
@@ -850,7 +852,7 @@ const RoomContent: React.FC<{
                       activeOpacity={(isMine || canModerate) ? 0.75 : 1}
                       onLongPress={() => {
                         if (isMine) {
-                          Alert.alert('Mon message', item.text, [
+                          showConfirm('Mon message', item.text, [
                             { text: 'Annuler', style: 'cancel' },
                             { text: 'Modifier', onPress: () => { setEditTarget({ id: item.id, text: item.text }); setChatInput(item.text); setShowInput(true); } },
                             { text: 'Supprimer', style: 'destructive', onPress: () => onDeleteMsg(item.id) },
@@ -1420,19 +1422,19 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const isHost = !!live && !!currentUser && String(live.user_id) === String(currentUser.id);
 
   const handleBanUser = useCallback((identity: string, name: string) => {
-    Alert.alert(name, 'Choisir une action de bannissement', [
+    showConfirm(name, 'Choisir une action de bannissement', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Exclure du live',
         onPress: async () => {
           try { await apiClient.post(Endpoints.lives.ban(liveId, identity)); }
-          catch { Alert.alert('Erreur', 'Impossible d\'exclure ce participant.'); }
+          catch { toastService.error('Erreur', 'Impossible d\'exclure ce participant.'); }
         },
       },
       {
         text: 'Bannir de tous mes lives', style: 'destructive',
         onPress: () => {
-          Alert.alert(
+          showConfirm(
             'Bannir de tous les lives',
             `${name} ne pourra plus rejoindre aucun de tes lives.`,
             [
@@ -1441,7 +1443,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
                 text: 'Confirmer', style: 'destructive',
                 onPress: async () => {
                   try { await apiClient.post(Endpoints.lives.globalBan(liveId, identity)); }
-                  catch { Alert.alert('Erreur', 'Impossible de bannir cet utilisateur.'); }
+                  catch { toastService.error('Erreur', 'Impossible de bannir cet utilisateur.'); }
                 },
               },
             ]
@@ -1455,7 +1457,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     try {
       await apiClient.post(Endpoints.lives.demote(liveId, identity));
     } catch {
-      Alert.alert('Erreur', 'Impossible de faire descendre ce participant.');
+      toastService.error('Erreur', 'Impossible de faire descendre ce participant.');
     }
   }, [liveId]);
 
@@ -1494,7 +1496,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   }, [liveId]);
 
   if (loading) {
-    return <View style={[st.root, st.center]}><ActivityIndicator size="large" color="#F0365A" /></View>;
+    return <View style={[st.root, st.center]}><GoFolyXLoader variant="reel" color="#F0365A" /></View>;
   }
 
   if (ended) {
@@ -1548,7 +1550,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   if (!token || !wsUrl) {
     return (
       <View style={[st.root, st.center]}>
-        <ActivityIndicator size="large" color="#F0365A" />
+        <GoFolyXLoader variant="reel" color="#F0365A" />
         <Text style={st.connectText}>Connexion...</Text>
       </View>
     );

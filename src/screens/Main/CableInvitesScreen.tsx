@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, Alert, RefreshControl, Image,
+  ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -9,9 +9,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { cableService } from '../../services/cableService';
+import { toastService, showConfirm } from '../../services';
 import type { CableInvite } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -63,7 +64,7 @@ export const CableInvitesScreen: React.FC = () => {
       const res = await cableService.listInvites(tab);
       setItems(res.items);
     } catch {
-      Alert.alert('Erreur', 'Impossible de charger les invitations Cable.');
+      toastService.error('Erreur', 'Impossible de charger les invitations Cable.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,14 +79,14 @@ export const CableInvitesScreen: React.FC = () => {
       const updated = await cableService.respondInvite(invite.id, accept);
       setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? 'Une erreur est survenue.');
+      toastService.error('Erreur', e?.response?.data?.detail ?? 'Une erreur est survenue.');
     } finally {
       setResponding(null);
     }
   }, []);
 
   const handleCancel = useCallback(async (invite: CableInvite) => {
-    Alert.alert('Annuler l\'invitation ?', undefined, [
+    showConfirm('Annuler l\'invitation ?', undefined, [
       { text: 'Non', style: 'cancel' },
       {
         text: 'Oui', style: 'destructive', onPress: async () => {
@@ -94,7 +95,7 @@ export const CableInvitesScreen: React.FC = () => {
             const updated = await cableService.cancelInvite(invite.id);
             setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
           } catch (e: any) {
-            Alert.alert('Erreur', e?.response?.data?.detail ?? 'Une erreur est survenue.');
+            toastService.error('Erreur', e?.response?.data?.detail ?? 'Une erreur est survenue.');
           } finally {
             setResponding(null);
           }
@@ -219,7 +220,7 @@ export const CableInvitesScreen: React.FC = () => {
       {/* Liste */}
       {loading ? (
         <View style={s.center}>
-          <ActivityIndicator size="large" color="#60A5FA" />
+          <GoFolyXLoader color="#60A5FA" />
         </View>
       ) : (
         <FlatList

@@ -1,11 +1,13 @@
 import React, { useState, useCallback } from 'react';
-import { View, ScrollView, Switch, Alert, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { View, ScrollView, Switch, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { notificationService } from '../../services/notificationService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { Row, Card, PageHeader } from './_shared';
+import { GoFolyXLoader } from '../../components/common';
+import { toastService, showConfirm } from '../../services';
 
 interface NotifPrefs {
   notif_push_enabled:  boolean;
@@ -80,7 +82,7 @@ export const SettingsNotificationsScreen: React.FC = () => {
       await apiClient.put(Endpoints.notifications.preferences, { [field]: newVal });
     } catch {
       setPrefs(prev => ({ ...prev, [field]: !newVal }));
-      Alert.alert('Erreur', 'Impossible de sauvegarder la préférence.');
+      toastService.error('Erreur', 'Impossible de sauvegarder la préférence.');
     } finally {
       setSaving(null);
     }
@@ -91,12 +93,12 @@ export const SettingsNotificationsScreen: React.FC = () => {
       await notificationService.markAllRead();
       setUnreadCount(0);
     } catch {
-      Alert.alert('Erreur', 'Impossible de marquer les notifications comme lues.');
+      toastService.error('Erreur', 'Impossible de marquer les notifications comme lues.');
     }
   }, []);
 
   const handleClearNotifs = useCallback(() => {
-    Alert.alert(
+    showConfirm(
       'Effacer les notifications',
       'Supprimer toutes vos notifications ?',
       [
@@ -108,7 +110,7 @@ export const SettingsNotificationsScreen: React.FC = () => {
               await notificationService.deleteAll();
               setUnreadCount(0);
             } catch {
-              Alert.alert('Erreur', 'Impossible d\'effacer les notifications.');
+              toastService.error('Erreur', 'Impossible d\'effacer les notifications.');
             }
           },
         },
@@ -133,9 +135,7 @@ export const SettingsNotificationsScreen: React.FC = () => {
       <PageHeader title="Notifications" onBack={() => nav.goBack()} />
 
       {loading ? (
-        <View style={st.centered}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
+        <GoFolyXLoader fullScreen color={colors.primary} />
       ) : error ? (
         <View style={st.centered}>
           <Text style={[st.errorText, { color: colors.textTertiary }]}>

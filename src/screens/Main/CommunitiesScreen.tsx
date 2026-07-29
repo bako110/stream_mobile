@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, Image, Modal,
-  StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput,
+  StyleSheet, ActivityIndicator, RefreshControl, TextInput,
   ScrollView, KeyboardAvoidingView, Platform, Animated, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -20,6 +20,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import type { CommunityData, CreateCommunityPayload } from '../../services/communityService';
 import { apiClient, Endpoints } from '../../api';
+import { toastService, showConfirm } from '../../services';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -165,7 +166,7 @@ export const CommunitiesScreen: React.FC = () => {
   // Rejoindre par code
   const handleJoinByCode = async () => {
     const code = joinCode.trim().toUpperCase();
-    if (!code) { Alert.alert('Erreur', 'Entre un code d\'invitation.'); return; }
+    if (!code) { toastService.error('Erreur', 'Entre un code d\'invitation.'); return; }
     setJoining(true);
     try {
       const res = await apiClient.post<any>(`/api/v1/communities/join/${code}`);
@@ -173,27 +174,27 @@ export const CommunitiesScreen: React.FC = () => {
       setJoinCode('');
       load();
       if (res.data?.joined) {
-        Alert.alert('Bienvenue !', `Tu as rejoint la communauté.`, [
+        showConfirm('Bienvenue !', `Tu as rejoint la communauté.`, [
           { text: 'OK', onPress: () => nav.navigate('CommunityDetail', { communityId: res.data.community_id, autoEnter: true }) },
         ]);
       } else if (res.data?.pending) {
-        Alert.alert('Demande envoyée', 'Ta demande est en cours d\'examen. Tu seras notifié dès que l\'admin accepte.');
+        toastService.info('Demande envoyée', 'Ta demande est en cours d\'examen. Tu seras notifié dès que l\'admin accepte.');
       } else if (res.data?.error === 'already_member') {
-        Alert.alert('Déjà membre', 'Tu es déjà membre de cette communauté.');
+        toastService.warning('Déjà membre', 'Tu es déjà membre de cette communauté.');
       } else if (res.data?.error === 'already_pending') {
-        Alert.alert('Demande en cours', 'Ta demande est déjà en cours d\'examen.');
+        toastService.warning('Demande en cours', 'Ta demande est déjà en cours d\'examen.');
       }
     } catch (e: any) {
       const detail: string = e?.response?.data?.detail ?? '';
       const status: number = e?.response?.status ?? 0;
       if (status === 404) {
-        Alert.alert('Code invalide', 'Ce code d\'invitation n\'existe pas ou a expiré.');
+        toastService.error('Code invalide', 'Ce code d\'invitation n\'existe pas ou a expiré.');
       } else if (status === 402 || detail.toLowerCase().includes('gogold')) {
-        Alert.alert('GoGold insuffisants', 'Tu n\'as pas assez de GoGold pour rejoindre cette communauté.');
+        toastService.error('GoGold insuffisants', 'Tu n\'as pas assez de GoGold pour rejoindre cette communauté.');
       } else if (status === 403) {
-        Alert.alert('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
+        toastService.error('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
       } else {
-        Alert.alert('Erreur', detail || 'Impossible de rejoindre avec ce code.');
+        toastService.error('Erreur', detail || 'Impossible de rejoindre avec ce code.');
       }
     } finally { setJoining(false); }
   };
@@ -232,14 +233,14 @@ export const CommunitiesScreen: React.FC = () => {
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleLeave = (id: string) => {
-    Alert.alert('Quitter', 'Quitter cette communauté ?', [
+    showConfirm('Quitter', 'Quitter cette communauté ?', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Quitter',
         style: 'destructive',
         onPress: async () => {
           try { await communityService.leave(id); load(); }
-          catch { Alert.alert('Erreur', 'Impossible de quitter.'); }
+          catch { toastService.error('Erreur', 'Impossible de quitter.'); }
         },
       },
     ]);
@@ -270,7 +271,7 @@ export const CommunitiesScreen: React.FC = () => {
   };
 
   const handleCreate = async () => {
-    if (!createName.trim()) { Alert.alert('Erreur', 'Le nom est requis.'); return; }
+    if (!createName.trim()) { toastService.error('Erreur', 'Le nom est requis.'); return; }
     setCreating(true);
     try {
       const [avatarUrl, bannerUrl] = await Promise.all([
@@ -297,7 +298,7 @@ export const CommunitiesScreen: React.FC = () => {
       load();
       nav.navigate('CommunityDetail', { communityId: created.id, autoEnter: true });
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de créer la communauté.');
+      toastService.error('Erreur', e?.message ?? 'Impossible de créer la communauté.');
     } finally { setCreating(false); }
   };
 
@@ -671,7 +672,7 @@ export const CommunitiesScreen: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => {
-            if (!createName.trim()) { Alert.alert('Erreur', 'Le nom est requis.'); return; }
+            if (!createName.trim()) { toastService.error('Erreur', 'Le nom est requis.'); return; }
             setStep('settings');
           }}
           style={{ flex: 1, borderRadius: 14, overflow: 'hidden' }}

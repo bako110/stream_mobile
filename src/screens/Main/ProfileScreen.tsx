@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  ActivityIndicator, StyleSheet, ToastAndroid, Platform, Alert,
+  ActivityIndicator, StyleSheet, ToastAndroid, Platform,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import LinearGradient from 'react-native-linear-gradient';
@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AppHeader, SkeletonProfile } from '../../components/common';
-import { userService, eventService, concertService, reelService, postService } from '../../services';
+import { userService, eventService, concertService, reelService, postService, toastService } from '../../services';
 import { apiClient, Endpoints } from '../../api';
 import type { User } from '../../types';
 import type { Event } from '../../types/event';
@@ -369,7 +369,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   if (Platform.OS === 'android') {
                     ToastAndroid.show('GoFolyX ID copié !', ToastAndroid.SHORT);
                   } else {
-                    Alert.alert('Copié', 'GoFolyX ID copié dans le presse-papier.');
+                    toastService.success('Copié', 'GoFolyX ID copié dans le presse-papier.');
                   }
                 }}
               >

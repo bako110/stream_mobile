@@ -16,13 +16,14 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
-  Platform, Alert, ActivityIndicator, FlatList, TextInput,
+  Platform, FlatList, TextInput,
   Image, ScrollView, AppState, AppStateStatus,
 } from 'react-native';
 import Animated, {
   FadeIn, FadeOut, SlideInRight, SlideOutRight,
   useAnimatedStyle, useSharedValue, withRepeat, withTiming,
 } from 'react-native-reanimated';
+import { GoFolyXLoader } from '../../components/common';
 import {
   LiveKitRoom,
   useLocalParticipant,
@@ -40,6 +41,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { liveService } from '../../services/liveService';
+import { toastService, showConfirm } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
@@ -160,7 +162,7 @@ const HostVideoView: React.FC<{
   if (!localParticipant.sid && allTracks.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
-        <ActivityIndicator size="large" color="#F0365A" />
+        <GoFolyXLoader variant="reel" color="#F0365A" />
       </View>
     );
   }
@@ -248,7 +250,7 @@ const HostVideoView: React.FC<{
             const t = thumbnailTracks.find(rt => rt.participant.identity === identity);
             const tName = t?.participant.name || identity;
             const isOnStage = onStage.has(identity);
-            Alert.alert(tName, 'Que veux-tu faire ?', [
+            showConfirm(tName, 'Que veux-tu faire ?', [
               { text: 'Annuler', style: 'cancel' },
               { text: 'Envoyer un cadeau', onPress: () => onGift(identity, tName) },
               ...(isOnStage ? [{ text: 'Faire descendre', onPress: () => onDemote(identity, tName) }] : []),
@@ -596,7 +598,7 @@ const StreamContent: React.FC<{
       setHandRequests(prev => prev.filter(r => r.identity !== req.identity));
       if (handRequests.length <= 1) setShowRequests(false);
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'inviter ce participant.');
+      toastService.error('Erreur', 'Impossible d\'inviter ce participant.');
     }
   }, [liveId, handRequests.length]);
 
@@ -611,12 +613,12 @@ const StreamContent: React.FC<{
       setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
       addSysMsg(`${name} a été redescendu de scène`);
     } catch {
-      Alert.alert('Erreur', 'Impossible de faire descendre ce participant.');
+      toastService.error('Erreur', 'Impossible de faire descendre ce participant.');
     }
   }, [liveId, addSysMsg]);
 
   const handleBan = useCallback((identity: string, name: string) => {
-    Alert.alert(name, 'Que veux-tu faire ?', [
+    showConfirm(name, 'Que veux-tu faire ?', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Exclure du live',
@@ -627,14 +629,14 @@ const StreamContent: React.FC<{
             setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
             addSysMsg(`${name} a été exclu du live`);
           } catch {
-            Alert.alert('Erreur', 'Impossible d\'exclure ce participant.');
+            toastService.error('Erreur', 'Impossible d\'exclure ce participant.');
           }
         },
       },
       {
         text: 'Bloquer de tous mes lives',
         onPress: () => {
-          Alert.alert(
+          showConfirm(
             'Bloquer des lives',
             `${name} ne pourra plus voir aucun de tes lives (actuel et futurs).`,
             [
@@ -648,7 +650,7 @@ const StreamContent: React.FC<{
                     setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
                     addSysMsg(`${name} a été bloqué de tous tes lives`);
                   } catch {
-                    Alert.alert('Erreur', 'Impossible de bloquer cet utilisateur.');
+                    toastService.error('Erreur', 'Impossible de bloquer cet utilisateur.');
                   }
                 },
               },
@@ -659,7 +661,7 @@ const StreamContent: React.FC<{
       {
         text: 'Bannir (ce live uniquement)', style: 'destructive',
         onPress: () => {
-          Alert.alert(
+          showConfirm(
             'Bannir de ce live',
             `${name} ne pourra plus rejoindre ce live.`,
             [
@@ -673,7 +675,7 @@ const StreamContent: React.FC<{
                     setOnStage(prev => { const next = new Set(prev); next.delete(identity); return next; });
                     addSysMsg(`${name} a été banni de tous tes lives`);
                   } catch {
-                    Alert.alert('Erreur', 'Impossible de bannir cet utilisateur.');
+                    toastService.error('Erreur', 'Impossible de bannir cet utilisateur.');
                   }
                 },
               },
@@ -762,7 +764,7 @@ const StreamContent: React.FC<{
   }, [liveId]);
 
   const askEnd = useCallback(() => {
-    Alert.alert('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
+    showConfirm('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Terminer', style: 'destructive', onPress: onEnd },
     ]);
@@ -1019,20 +1021,20 @@ const StreamContent: React.FC<{
                         style={st.modBtn}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         onPress={() => {
-                          Alert.alert(item.user, 'Choisir une action', [
+                          showConfirm(item.user, 'Choisir une action', [
                             { text: 'Annuler', style: 'cancel' },
                             {
                               text: 'Exclure du live',
                               onPress: async () => {
                                 try { await apiClient.post(Endpoints.lives.ban(liveId, item.userId!)); }
-                                catch { Alert.alert('Erreur', 'Impossible d\'exclure.'); }
+                                catch { toastService.error('Erreur', 'Impossible d\'exclure.'); }
                               },
                             },
                             {
                               text: 'Bannir définitivement', style: 'destructive',
                               onPress: async () => {
                                 try { await apiClient.post(Endpoints.lives.globalBan(liveId, item.userId!)); }
-                                catch { Alert.alert('Erreur', 'Impossible de bannir.'); }
+                                catch { toastService.error('Erreur', 'Impossible de bannir.'); }
                               },
                             },
                           ]);
@@ -1254,7 +1256,7 @@ export const SimpleLiveStreamScreen: React.FC = () => {
   if (loadingToken || !token || !wsUrl) {
     return (
       <View style={[st.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#F0365A" />
+        <GoFolyXLoader variant="reel" color="#F0365A" />
       </View>
     );
   }

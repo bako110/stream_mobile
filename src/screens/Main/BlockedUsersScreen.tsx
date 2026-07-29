@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  Image, StyleSheet, Alert, ActivityIndicator, Platform,
+  Image, StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { SkeletonUserList, BackButton } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
 import { userService } from '../../services/userService';
+import { toastService, showConfirm } from '../../services';
 
 interface BlockedUser {
   id: string;
@@ -34,7 +35,7 @@ export const BlockedUsersScreen: React.FC = () => {
       const res = await apiClient.get<BlockedUser[]>(Endpoints.users.blocked);
       setUsers(Array.isArray(res.data) ? res.data : []);
     } catch {
-      Alert.alert('Erreur', 'Impossible de charger la liste des utilisateurs bloqués.');
+      toastService.error('Erreur', 'Impossible de charger la liste des utilisateurs bloqués.');
     } finally {
       setLoading(false);
     }
@@ -43,7 +44,7 @@ export const BlockedUsersScreen: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const handleUnblock = (user: BlockedUser) => {
-    Alert.alert(
+    showConfirm(
       'Débloquer',
       `Débloquer @${user.username} ? Il pourra à nouveau vous suivre et vous envoyer des messages.`,
       [
@@ -57,7 +58,7 @@ export const BlockedUsersScreen: React.FC = () => {
               await userService.unblockUser(user.id);
               setUsers(prev => prev.filter(u => u.id !== user.id));
             } catch {
-              Alert.alert('Erreur', 'Impossible de débloquer cet utilisateur.');
+              toastService.error('Erreur', 'Impossible de débloquer cet utilisateur.');
             } finally {
               setUnblocking(null);
             }

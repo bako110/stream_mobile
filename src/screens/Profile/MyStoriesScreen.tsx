@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Image,
-  StyleSheet, Alert, RefreshControl, Platform,
+  StyleSheet, RefreshControl, Platform,
   FlatList, Modal, Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -12,6 +12,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '../../hooks/useTheme';
 import { StoryViewer } from '../../components/story/StoryViewer';
 import { StoryCreator } from '../../components/story/StoryCreator';
+import { toastService, showConfirm } from '../../services';
 import { storyService } from '../../services/storyService';
 import { authService } from '../../services/authService';
 import { cacheInBackground } from '../../services/videoCacheService';
@@ -202,7 +203,7 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
   }, [stories]);
 
   const handleDelete = useCallback((story: Story) => {
-    Alert.alert(
+    showConfirm(
       'Supprimer ce statut ?',
       'Il sera définitivement supprimé.',
       [
@@ -214,7 +215,7 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
               await storyService.delete(story.id);
               setStories(prev => prev.filter(s => s.id !== story.id));
             } catch {
-              Alert.alert('Erreur', 'Impossible de supprimer ce statut.');
+              toastService.error('Erreur', 'Impossible de supprimer ce statut.');
             }
           },
         },

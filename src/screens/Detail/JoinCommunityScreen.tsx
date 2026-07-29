@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Alert, ScrollView,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, ScrollView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -8,6 +8,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
+import { GoFolyXLoader } from '../../components/common';
+import { toastService, showConfirm } from '../../services';
 
 export const JoinCommunityScreen: React.FC = () => {
   const { theme: { colors } } = useTheme();
@@ -46,7 +48,7 @@ export const JoinCommunityScreen: React.FC = () => {
 
     const price: number = community.entry_price_gogold ?? 0;
     if (price > 0) {
-      Alert.alert(
+      showConfirm(
         'Adhésion payante',
         `Cette communauté coûte ${price} GoGold pour rejoindre. Continuer ?`,
         [
@@ -67,17 +69,17 @@ export const JoinCommunityScreen: React.FC = () => {
       if (res.data?.joined) {
         nav.replace('CommunityChat', { communityId: res.data.community_id, communityName: community.name });
       } else if (res.data?.pending) {
-        Alert.alert(
+        showConfirm(
           'Demande envoyee',
           "L'admin doit approuver ta demande. Tu seras notifie des que tu auras acces.",
           [{ text: 'OK', onPress: () => nav.goBack() }],
         );
       } else if (res.data?.error === 'insufficient_gogold') {
-        Alert.alert('GoGold insuffisants', `Il te faut ${community.entry_price_gogold} GoGold pour rejoindre cette communaute.`);
+        toastService.error('GoGold insuffisants', `Il te faut ${community.entry_price_gogold} GoGold pour rejoindre cette communaute.`);
       }
     } catch (e: any) {
       const detail = e?.response?.data?.detail ?? 'Impossible de rejoindre.';
-      Alert.alert('Erreur', detail);
+      toastService.error('Erreur', detail);
     } finally { setJoining(false); }
   };
 
@@ -85,7 +87,7 @@ export const JoinCommunityScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#7B3FF2" size="large" />
+        <GoFolyXLoader color="#7B3FF2" />
         <Text style={{ color: colors.textTertiary, marginTop: 12, fontSize: 14 }}>
           Chargement de la communaute...
         </Text>

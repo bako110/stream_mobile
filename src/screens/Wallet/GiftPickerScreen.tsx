@@ -25,6 +25,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { GoFolyXLoader } from '../../components/common';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { toastService } from '../../services/toastService';
 
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -220,8 +221,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
       setBalance(prev => prev - selected.cost_gogold);
       setFlying(selected.emoji);
     } catch (e: any) {
-      const { Alert } = require('react-native');
-      Alert.alert('Erreur', e?.message ?? 'Envoi échoué');
+      toastService.error('Erreur', e?.message ?? 'Envoi échoué');
       setSending(false);
     }
   };

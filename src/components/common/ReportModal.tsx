@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import {
   Modal, View, Text, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { reportService } from '../../services/reportService';
 import type { ReportContentType, ReportReason } from '../../services/reportService';
 import { useTheme } from '../../hooks/useTheme';
+import { toastService } from '../../services/toastService';
 
 const REASONS: { value: ReportReason; label: string }[] = [
   { value: 'spam',           label: 'Spam' },
@@ -44,10 +45,10 @@ export const ReportModal: React.FC<Props> = ({ visible, contentType, contentId, 
       await reportService.create({ content_type: contentType, content_id: contentId, reason: selected, details: details.trim() || undefined });
       reset();
       onClose();
-      Alert.alert('Signalement envoyé', 'Merci, nous allons examiner ce contenu.');
+      toastService.success('Signalement envoyé', 'Merci, nous allons examiner ce contenu.');
     } catch (e: any) {
       const msg = e?.response?.data?.detail || 'Une erreur est survenue.';
-      Alert.alert('Erreur', msg);
+      toastService.error('Erreur', msg);
     } finally {
       setLoading(false);
     }

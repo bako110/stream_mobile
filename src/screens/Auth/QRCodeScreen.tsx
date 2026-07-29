@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity,
   Modal, ScrollView,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import QRCode from 'react-native-qrcode-svg';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services';
+import { GoFolyXLoader } from '../../components/common';
 
 interface Props {
   visible: boolean;
@@ -100,7 +101,7 @@ export const QRCodeScreen: React.FC<Props> = ({ visible, onClose }) => {
 
               {phase === 'loading' && (
                 <Animated.View entering={FadeIn} style={s.center}>
-                  <ActivityIndicator size="large" color={colors.primary} />
+                  <GoFolyXLoader color={colors.primary} />
                   <Text style={[s.statusSub, { color: colors.textSecondary, marginTop: 14 }]}>
                     Génération du code…
                   </Text>

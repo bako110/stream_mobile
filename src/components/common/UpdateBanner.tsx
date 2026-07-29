@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Linking,
-  Animated, Platform, Alert,
+  Animated, Platform,
 } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { updateService, AppVersionInfo } from '../../services/updateService';
+import { toastService } from '../../services/toastService';
 
 export const UpdateBanner: React.FC = () => {
   const { theme }  = useTheme();
@@ -48,7 +49,7 @@ export const UpdateBanner: React.FC = () => {
   const handleInstall = () => {
     if (!info?.apk_url) return;
     Linking.openURL(info.apk_url).catch(() => {
-      Alert.alert('Erreur', "Impossible d'ouvrir le lien de téléchargement.");
+      toastService.error('Erreur', "Impossible d'ouvrir le lien de téléchargement.");
     });
   };
 

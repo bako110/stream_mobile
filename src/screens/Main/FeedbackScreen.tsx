@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, TextInput, ActivityIndicator, Alert, RefreshControl,
+  ScrollView, TextInput, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
+import { toastService } from '../../services';
 import { feedbackService } from '../../services/feedbackService';
 import type { Feedback, FeedbackCategory } from '../../services/feedbackService';
 
@@ -64,10 +65,10 @@ export const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       setCategory(null);
       setMessage('');
       await loadHistory();
-      Alert.alert('Merci !', 'Ton retour a bien été envoyé à notre équipe.');
+      toastService.success('Merci !', 'Ton retour a bien été envoyé à notre équipe.');
     } catch (e: any) {
       const msg = e?.response?.data?.detail || 'Une erreur est survenue.';
-      Alert.alert('Erreur', msg);
+      toastService.error('Erreur', msg);
     } finally {
       setSending(false);
     }

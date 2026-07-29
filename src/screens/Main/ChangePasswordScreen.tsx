@@ -1,13 +1,14 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, ActivityIndicator,
   KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services/authService';
+import { toastService } from '../../services';
 import { BackButton } from '../../components/common';
 
 interface Props { navigation: any; }
@@ -51,22 +52,21 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
   // Étape 2 — enregistrer le nouveau mot de passe
   const handleSave = async () => {
     if (newPwd.length < 8) {
-      Alert.alert('Erreur', 'Le nouveau mot de passe doit faire au moins 8 caractères.');
+      toastService.error('Erreur', 'Le nouveau mot de passe doit faire au moins 8 caractères.');
       return;
     }
     if (newPwd !== confirm) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas.');
+      toastService.error('Erreur', 'Les mots de passe ne correspondent pas.');
       return;
     }
     setSaving(true);
     try {
       await authService.changePassword({ current_password: current, new_password: newPwd });
-      Alert.alert('Succès', 'Votre mot de passe a été changé.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      toastService.success('Succès', 'Votre mot de passe a été changé.');
+      navigation.goBack();
     } catch (e: any) {
       const msg = e?.response?.data?.detail ?? e?.message ?? 'Erreur lors du changement.';
-      Alert.alert('Erreur', msg);
+      toastService.error('Erreur', msg);
     } finally {
       setSaving(false);
     }

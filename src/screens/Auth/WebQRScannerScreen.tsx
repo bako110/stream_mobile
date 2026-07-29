@@ -8,7 +8,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Vibration, TextInput,
+  Vibration, TextInput,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
@@ -18,7 +18,7 @@ import { Camera, CameraType } from 'react-native-camera-kit';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 
@@ -201,7 +201,7 @@ export const WebQRScannerScreen: React.FC = () => {
 
       {phase === 'verifying' && (
         <Animated.View entering={FadeIn} style={{ alignItems: 'center', gap: 20 }}>
-          <ActivityIndicator size="large" color="#7B3FF2" />
+          <GoFolyXLoader color="#7B3FF2" />
           <Text style={st.hint}>Connexion en cours…</Text>
         </Animated.View>
       )}

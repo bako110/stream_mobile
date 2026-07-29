@@ -2,7 +2,7 @@
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   FlatList, ActivityIndicator,
-  Share, Alert, Platform, Linking,
+  Share, Platform, Linking,
   Modal, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBar, InteractionManager,
 } from 'react-native';
 
@@ -20,7 +20,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFolyXLoader, FriendsWhoLiked, PriceWithLocal } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
-import { eventService, socialService, authService } from '../../services';
+import { eventService, socialService, authService, toastService, showConfirm } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
 import type { Event } from '../../types/event';
 import type { AppColors } from '../../theme/colors';
@@ -505,7 +505,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const handleBuyTicket = () => {
     if (!event) return;
     if (event.access_type === 'invite_only') {
-      Alert.alert('Accès sur invitation', 'Contactez l\'organisateur pour obtenir une invitation.');
+      toastService.info('Accès sur invitation', 'Contactez l\'organisateur pour obtenir une invitation.');
       return;
     }
     setPaySheetOpen(true);
@@ -513,11 +513,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
 
   const handleEdit   = () => nav.navigate('CreateEvent' as any, { eventId });
   const handleDelete = () => {
-    Alert.alert('Supprimer', 'Cette action est irréversible.', [
+    showConfirm('Supprimer', 'Cette action est irréversible.', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try { await eventService.delete(eventId); onBack?.(); }
-        catch (e: any) { Alert.alert('Erreur', e?.message ?? 'Impossible de supprimer.'); }
+        catch (e: any) { toastService.error('Erreur', e?.message ?? 'Impossible de supprimer.'); }
       }},
     ]);
   };

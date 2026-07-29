@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, FlatList,
   TouchableOpacity, KeyboardAvoidingView, Platform, Image,
-  Animated, Pressable, Dimensions, Alert, TextInput,
+  Animated, Pressable, Dimensions, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
@@ -13,7 +13,7 @@ import { storage } from '../../utils/storage';
 import { STORAGE_KEYS } from '../../utils/constants';
 import { useCommentsWebSocket } from '../../hooks/useCommentsWebSocket';
 import type { CommentWsEvent } from '../../hooks/useCommentsWebSocket';
-import { socialService } from '../../services';
+import { socialService, toastService, showConfirm } from '../../services';
 import { VerifiedBadge } from './VerifiedBadge';
 import { GoFolyXLoader } from './GoFolyXLoader';
 import { RichText } from './RichText';
@@ -188,11 +188,11 @@ const CommentRow: React.FC<RowProps> = ({
 
   const showMenu = () => {
     if (!isOwn) return;
-    Alert.alert('Votre commentaire', undefined, [
+    showConfirm('Votre commentaire', undefined, [
       { text: 'Modifier', onPress: () => onEdit(item) },
       {
         text: 'Supprimer', style: 'destructive', onPress: () =>
-          Alert.alert('Supprimer', 'Supprimer ce commentaire ?', [
+          showConfirm('Supprimer', 'Supprimer ce commentaire ?', [
             { text: 'Annuler', style: 'cancel' },
             { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(item.id) },
           ]),
@@ -577,7 +577,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       }
       setText('');
       setMentionIds([]);
-    } catch { Alert.alert('Erreur', "Impossible d'envoyer le commentaire."); }
+    } catch { toastService.error('Erreur', "Impossible d'envoyer le commentaire."); }
     finally { setSending(false); }
   };
 
@@ -644,7 +644,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       setComments(prev => prev.map(apply));
       setEditingId(null);
       setEditText('');
-    } catch { Alert.alert('Erreur', 'Impossible de modifier.'); }
+    } catch { toastService.error('Erreur', 'Impossible de modifier.'); }
     finally { setEditSaving(false); }
   };
 
@@ -661,7 +661,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
         }))
       );
       setTotalCount(t => Math.max(0, t - 1));
-    } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+    } catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
   };
 
   const isEditMode = !!editingId;

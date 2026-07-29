@@ -7,7 +7,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl, Modal,
+  ActivityIndicator, RefreshControl, Modal,
   TextInput, ScrollView, KeyboardAvoidingView, Platform, Image, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -17,6 +17,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
+import { toastService, showConfirm } from '../../services';
 
 interface Treasurer {
   id: string; user_id: string; username?: string;
@@ -123,37 +124,37 @@ export const CommunityTreasurerScreen: React.FC = () => {
     try {
       const res = await apiClient.get<any[]>(`${BASE}/members`);
       setMembers((res.data ?? []).filter((m: any) => m.user_id !== myId));
-    } catch { Alert.alert('Erreur', 'Impossible de charger les membres.'); setPickOpen(false); }
+    } catch { toastService.error('Erreur', 'Impossible de charger les membres.'); setPickOpen(false); }
     finally { setPickLoading(false); }
   };
 
   const handleAppoint = async (userId: string, name: string) => {
     setPickOpen(false);
-    Alert.alert('Nommer trésorier', `Nommer ${name} comme trésorier ?`, [
+    showConfirm('Nommer trésorier', `Nommer ${name} comme trésorier ?`, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Confirmer', onPress: async () => {
         try {
           await apiClient.post(`${BASE}/treasurer`, { user_id: userId });
           load();
-        } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+        } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
       }},
     ]);
   };
 
   const handleRemoveTreasurer = () => {
-    Alert.alert('Retirer le trésorier', 'Retirer le trésorier actuel ?', [
+    showConfirm('Retirer le trésorier', 'Retirer le trésorier actuel ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Retirer', style: 'destructive', onPress: async () => {
         try {
           await apiClient.delete(`${BASE}/treasurer`);
           load();
-        } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+        } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
       }},
     ]);
   };
 
   const handleLaunchElection = async () => {
-    Alert.alert(
+    showConfirm(
       'Lancer un vote',
       'Lancer un vote pour que les membres élisent le trésorier ?',
       [
@@ -163,7 +164,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
           try {
             await apiClient.post(`${BASE}/treasurer-elections`);
             load();
-          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+          } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
           finally { setLaunching(false); }
         }},
       ],
@@ -174,7 +175,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
     if (!election) return;
     const name = candidate.display_name || candidate.username || 'ce membre';
     const isChanging = !!election.my_vote;
-    Alert.alert(
+    showConfirm(
       isChanging ? 'Changer mon vote' : 'Voter',
       `${isChanging ? 'Changer votre vote pour' : 'Voter pour'} ${name} ?`,
       [
@@ -184,7 +185,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
           try {
             await apiClient.post(`${BASE}/treasurer-elections/${election.id}/vote`, { candidate_id: candidate.user_id });
             load();
-          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de voter.'); }
+          } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible de voter.'); }
           finally { setVoteLoading(null); }
         }},
       ],
@@ -193,9 +194,9 @@ export const CommunityTreasurerScreen: React.FC = () => {
 
   const handleCloseElection = () => {
     if (!election) return;
-    if (election.total_votes === 0) { Alert.alert('Impossible', 'Aucun vote enregistré.'); return; }
+    if (election.total_votes === 0) { toastService.warning('Impossible', 'Aucun vote enregistré.'); return; }
     const leader = election.results[0];
-    Alert.alert(
+    showConfirm(
       'Clôturer le vote',
       `Élire ${leader.display_name || leader.username} comme trésorier ?\n${leader.votes} vote${leader.votes > 1 ? 's' : ''} (${leader.pct}%)`,
       [
@@ -204,7 +205,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
           try {
             await apiClient.post(`${BASE}/treasurer-elections/${election.id}/close`);
             load();
-          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+          } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
         }},
       ],
     );
@@ -212,9 +213,9 @@ export const CommunityTreasurerScreen: React.FC = () => {
 
   const handleCreateRequest = async () => {
     const amount = parseInt(formAmount, 10);
-    if (!amount || amount < 1) { Alert.alert('Erreur', 'Montant invalide.'); return; }
+    if (!amount || amount < 1) { toastService.error('Erreur', 'Montant invalide.'); return; }
     if (communityBalance !== null && amount > communityBalance) {
-      Alert.alert(
+      toastService.error(
         'Solde insuffisant',
         `Le solde communautaire est de ${communityBalance.toLocaleString('fr-FR')} GoGold.\nVous ne pouvez pas retirer plus.`,
       );
@@ -230,16 +231,16 @@ export const CommunityTreasurerScreen: React.FC = () => {
       setFormAmount(''); setFormDesc('');
       load();
       if (res.data?.executed_immediately) {
-        Alert.alert('Retrait exécuté', `${amount} GoGold ont été transférés vers votre wallet.\n(Aucun trésorier — approbation automatique)`);
+        toastService.success('Retrait exécuté', `${amount} GoGold ont été transférés vers votre wallet.\n(Aucun trésorier — approbation automatique)`);
       } else {
-        Alert.alert('Demande créée', 'Le trésorier doit maintenant approuver le retrait.');
+        toastService.success('Demande créée', 'Le trésorier doit maintenant approuver le retrait.');
       }
-    } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+    } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
     finally { setFormSaving(false); }
   };
 
   const handleApprove = (req: WithdrawalRequest) => {
-    Alert.alert(
+    showConfirm(
       'Approuver le retrait',
       `Approuver le retrait de ${req.gogold_amount.toLocaleString('fr-FR')} GoGold (${req.eur_amount.toFixed(2)} €) ?\n\n${req.description ?? ''}`,
       [
@@ -249,7 +250,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
           try {
             await apiClient.post(`${BASE}/withdrawal-requests/${req.id}/approve`);
             load();
-          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+          } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
           finally { setActionLoading(null); }
         }},
       ],
@@ -257,7 +258,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
   };
 
   const handleReject = (req: WithdrawalRequest) => {
-    Alert.alert(
+    showConfirm(
       'Rejeter le retrait',
       `Rejeter la demande de ${req.gogold_amount.toLocaleString('fr-FR')} GoGold ?`,
       [
@@ -267,7 +268,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
           try {
             await apiClient.post(`${BASE}/withdrawal-requests/${req.id}/reject`);
             load();
-          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+          } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
           finally { setActionLoading(null); }
         }},
       ],

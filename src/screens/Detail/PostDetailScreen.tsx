@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
-  ActivityIndicator, Alert, StatusBar, Dimensions,
+  ActivityIndicator, StatusBar, Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
 import { socialService } from '../../services/socialService';
+import { toastService, showConfirm } from '../../services';
 import { CommentsBottomSheet, ShareBottomSheet, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
 import { RichText } from '../../components/common/RichText';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
@@ -238,7 +239,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         loadAuthorPosts(String(res.author.id), 1, true);
       }
     } catch {
-      Alert.alert('Erreur', 'Impossible de charger le post.');
+      toastService.error('Erreur', 'Impossible de charger le post.');
       onBack();
     } finally {
       setLoading(false);
@@ -291,7 +292,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   }, []);
 
   const handleDelete = useCallback(() => {
-    Alert.alert('Supprimer', 'Supprimer ce post définitivement ?', [
+    showConfirm('Supprimer', 'Supprimer ce post définitivement ?', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Supprimer', style: 'destructive',
@@ -299,7 +300,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           try {
             await postService.delete(postId);
             onBack();
-          } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+          } catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
         },
       },
     ]);
@@ -307,7 +308,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
   const handleReport = useCallback(() => {
     setMenuOpen(false);
-    Alert.alert('Signaler', 'Ce post a été signalé. Merci pour ton retour.');
+    toastService.info('Signaler', 'Ce post a été signalé. Merci pour ton retour.');
   }, []);
 
   const handleDownloadAll = useCallback(async () => {
@@ -321,7 +322,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
     // à la volée par le hook (même mécanisme que reels/messages), video_url en fallback.
     const videoUrl = post?.hls_url ?? post?.video_url ?? null;
     if (imageUrls.length === 0 && !videoUrl) {
-      Alert.alert('Rien à télécharger', 'Ce post ne contient pas de média.');
+      toastService.warning('Rien à télécharger', 'Ce post ne contient pas de média.');
       return;
     }
     setDownloading(true);
@@ -331,14 +332,14 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         ...(videoUrl ? [startDl(`${postId}_video`, videoUrl, true)] : []),
       ]);
       const count = imageUrls.length + (videoUrl ? 1 : 0);
-      Alert.alert(
+      toastService.success(
         'Téléchargé',
         count === 1
           ? 'Le fichier a été enregistré dans tes téléchargements.'
           : `${count} fichiers enregistrés dans tes téléchargements.`,
       );
     } catch {
-      Alert.alert('Erreur', 'Impossible de télécharger les fichiers.');
+      toastService.error('Erreur', 'Impossible de télécharger les fichiers.');
     } finally {
       setDownloading(false);
     }

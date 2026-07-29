@@ -10,8 +10,8 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
-  ScrollView, Alert, Platform, StatusBar,
-  Dimensions, KeyboardAvoidingView, ActivityIndicator,
+  ScrollView, Platform, StatusBar,
+  Dimensions, KeyboardAvoidingView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -22,8 +22,9 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import RNBlobUtil from 'react-native-blob-util';
 
 import { useTheme } from '../../hooks/useTheme';
-import { reelService } from '../../services';
+import { reelService, toastService, showConfirm } from '../../services';
 import { MentionInput } from '../../components/common/MentionInput';
+import { GoFolyXLoader } from '../../components/common';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { ReelEditorScreen, type ReelEditResult, type FilterKey, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from './ReelEditorScreen';
 import Sound from 'react-native-sound';
@@ -393,7 +394,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
     launchImageLibrary({ mediaType: 'mixed', selectionLimit: 1 }, async res => {
       if (res.didCancel) return;
       if (res.errorCode) {
-        Alert.alert('Erreur', res.errorMessage ?? 'Impossible de sélectionner la vidéo.');
+        toastService.error('Erreur', res.errorMessage ?? 'Impossible de sélectionner la vidéo.');
         return;
       }
       const asset = res.assets?.[0];
@@ -423,7 +424,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
       if (dur > MAX_VIDEO_DURATION_SEC) {
         setLoadingMeta(false);
-        Alert.alert(
+        toastService.error(
           'Vidéo trop longue',
           `La vidéo dure ${Math.round(dur / 60)} min. La durée maximale autorisée est de 10 minutes.`,
         );
@@ -431,7 +432,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       }
       if ((asset.fileSize ?? 0) > MAX_VIDEO_SIZE_BYTES) {
         setLoadingMeta(false);
-        Alert.alert(
+        toastService.error(
           'Fichier trop volumineux',
           `Cette vidéo pèse ${(asset.fileSize! / (1024 * 1024)).toFixed(0)} Mo. La taille maximale autorisée est de ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)} Mo.`,
         );
@@ -448,7 +449,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   }, []);
 
   const handleRemove = useCallback(() => {
-    Alert.alert('Retirer la vidéo ?', undefined, [
+    showConfirm('Retirer la vidéo ?', undefined, [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Retirer', style: 'destructive', onPress: () => {
@@ -479,7 +480,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         setTrimmedVideoUri(cutUri);
       } catch (e: any) {
         console.error('[trimVideo] ERREUR:', e?.message ?? e);
-        Alert.alert('Erreur trim', e?.message ?? 'Impossible de découper la vidéo.');
+        toastService.error('Erreur trim', e?.message ?? 'Impossible de découper la vidéo.');
       } finally {
         setIsTrimming(false);
       }
@@ -526,7 +527,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       const { uploadImageAsReel, uploadLocalAudio } = require('../../services/uploadService');
       uploadImageAsReel(snap.uri, 5).then(async (result: any) => {
         if (!result.hls_url) {
-          Alert.alert('Publication echouee', 'La conversion image→video a echoue. Reessaie.');
+          toastService.error('Publication echouee', 'La conversion image→video a echoue. Reessaie.');
           return;
         }
         try {
@@ -566,10 +567,10 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
             } : {}),
           });
         } catch (err: any) {
-          Alert.alert('Publication echouee', err?.message ?? 'Erreur inconnue.');
+          toastService.error('Publication echouee', err?.message ?? 'Erreur inconnue.');
         }
       }).catch((err: any) => {
-        Alert.alert('Publication echouee', 'La conversion de l\'image a echoue. Reessaie dans quelques secondes.');
+        toastService.error('Publication echouee', 'La conversion de l\'image a echoue. Reessaie dans quelques secondes.');
       });
       return;
     }
@@ -582,7 +583,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
       onDone: async (result) => {
         const playUrl = result.hlsUrl ?? result.videoUrl;
         if (!playUrl) {
-          Alert.alert(
+          toastService.error(
             'Publication echouee',
             'La video a ete uploadee mais le lien de lecture est manquant. Reessaie dans quelques minutes.',
           );
@@ -627,14 +628,14 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
             ...(sourceReelId ? { source_reel_id: sourceReelId, remix_type: 'remix' as const } : {}),
           });
         } catch (err: any) {
-          Alert.alert(
+          toastService.error(
             'Publication echouee',
             err?.message ?? 'Erreur inconnue lors de la creation du reel.',
           );
         }
       },
       onError: (err) => {
-        Alert.alert(
+        toastService.error(
           'Upload echoue',
           err?.message ?? 'Erreur inconnue lors de l\'upload de la video.',
         );
@@ -647,7 +648,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
     return (
       <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <ActivityIndicator size="large" color={colors.primary} />
+        <GoFolyXLoader color={colors.primary} />
         <Text style={{ color: colors.textSecondary, marginTop: 16, fontSize: 14 }}>Préparation de la vidéo…</Text>
       </View>
     );
@@ -780,7 +781,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
                 {loadingMeta ? (
                   <View style={s.pickerInner}>
-                    <ActivityIndicator size="large" color="#fff" />
+                    <GoFolyXLoader variant="reel" color="#ffffff" />
                     <Text style={[s.pickerLabel, { color: 'rgba(255,255,255,0.6)' }]}>Lecture des informations…</Text>
                   </View>
                 ) : (
@@ -852,7 +853,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
       {isTrimming && (
         <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <ActivityIndicator size="large" color="#7B3FF2" />
+          <GoFolyXLoader variant="reel" color="#7B3FF2" />
           <Text style={{ color: '#fff', marginTop: 12, fontWeight: '600', fontSize: 15 }}>Découpage en cours…</Text>
         </View>
       )}

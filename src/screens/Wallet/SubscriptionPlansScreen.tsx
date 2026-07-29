@@ -2,7 +2,7 @@
 import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Alert,
+  StatusBar, ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -10,6 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService } from '../../services/subscriptionService';
+import { toastService } from '../../services/toastService';
 import type { PlanType, Subscription } from '../../types';
 import { PLAN_CONFIG } from '../../types/subscription';
 
@@ -106,7 +107,7 @@ export default function SubscriptionPlansScreen() {
 
   async function handleSelectPlan(plan: PlanType) {
     if (plan === 'free') {
-      Alert.alert('Plan gratuit', 'Vous utilisez déjà le plan gratuit.');
+      toastService.info('Plan gratuit', 'Vous utilisez déjà le plan gratuit.');
       return;
     }
     if (current?.plan === plan && current?.status === 'active') {
@@ -118,7 +119,7 @@ export default function SubscriptionPlansScreen() {
       const check = await subscriptionService.walletCheck(plan);
       nav.navigate('SubscriptionPayment', { plan, walletCheck: check });
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de vérifier le solde');
+      toastService.error('Erreur', e?.message ?? 'Impossible de vérifier le solde');
     } finally {
       setChecking(null);
     }

@@ -11,7 +11,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
   ActivityIndicator, Image, Dimensions, FlatList, TextInput,
-  Alert, KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Animated, {
   FadeIn, FadeOut, SlideInDown, SlideOutDown, SlideInUp, ZoomIn, BounceIn, LinearTransition,
@@ -26,8 +26,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MatchResultModal } from '../../components/live/MatchResultModal';
+import { GoFolyXLoader } from '../../components/common';
 import { battleService } from '../../services/battleService';
 import type { Battle, BattleGoal, BattleRanking } from '../../services/battleService';
+import { showConfirm } from '../../services';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
@@ -517,7 +519,7 @@ export const BattleScreen: React.FC = () => {
     const isLeading    = myScore > otherScore;
     const halfGogold   = Math.floor(myScore / 2);
 
-    Alert.alert(
+    showConfirm(
       'Quitter le battle ?',
       isLeading && halfGogold > 0
         ? `Tu es en tête, mais si tu abandonnes maintenant tu perds automatiquement ce match ET tu reverses la moitié de tes GoGold gagnés (${halfGogold} GoGold) à ton adversaire.`
@@ -545,7 +547,7 @@ export const BattleScreen: React.FC = () => {
     return (
       <View style={[styles.root, styles.center, { backgroundColor: '#000' }]}>
         <StatusBar barStyle="light-content" />
-        <ActivityIndicator size="large" color="#7B3FF2" />
+        <GoFolyXLoader variant="reel" color="#7B3FF2" />
       </View>
     );
   }

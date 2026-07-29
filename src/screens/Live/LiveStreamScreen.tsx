@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
-  Platform, PermissionsAndroid, Alert, ActivityIndicator, Animated,
+  Platform, PermissionsAndroid, ActivityIndicator, Animated,
 } from 'react-native';
 import {
   LiveKitRoom,
@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { concertService } from '../../services';
+import { concertService, toastService, showConfirm } from '../../services';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import type { Concert } from '../../types';
@@ -132,7 +132,7 @@ const StreamControls: React.FC<{
   }, [cameraFront, localParticipant]);
 
   const handleEndLive = useCallback(() => {
-    Alert.alert('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
+    showConfirm('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Terminer', style: 'destructive', onPress: onEnd },
     ]);
@@ -254,7 +254,7 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
       setWsUrl(result.livekit_url);
       setIsLive(true);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail || 'Impossible de démarrer le live');
+      toastService.error('Erreur', e?.response?.data?.detail || 'Impossible de démarrer le live');
     } finally {
       setStarting(false);
     }

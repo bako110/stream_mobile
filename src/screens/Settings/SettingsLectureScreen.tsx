@@ -1,11 +1,13 @@
 import React, { useState, useCallback } from 'react';
-import { View, ScrollView, Switch, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, ScrollView, Switch, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { storage } from '../../utils/storage';
 import { Row, Card, PageHeader } from './_shared';
+import { GoFolyXLoader } from '../../components/common';
+import { toastService } from '../../services';
 
 interface PlaybackPrefs {
   autoplay:     boolean;
@@ -61,7 +63,7 @@ export const SettingsLectureScreen: React.FC = () => {
     } catch {
       setPrefs(prefs);
       storage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-      Alert.alert('Erreur', 'Impossible de sauvegarder la préférence.');
+      toastService.error('Erreur', 'Impossible de sauvegarder la préférence.');
     } finally {
       setSaving(null);
     }
@@ -82,9 +84,7 @@ export const SettingsLectureScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <PageHeader title="Lecture" onBack={() => nav.goBack()} />
       {loading ? (
-        <View style={st.centered}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
+        <GoFolyXLoader fullScreen color={colors.primary} />
       ) : (
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
           <Card>

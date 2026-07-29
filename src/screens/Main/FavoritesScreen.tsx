@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  Image, StyleSheet, StatusBar, ActivityIndicator,
+  Image, StyleSheet, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { favoriteService } from '../../services/favoriteService';
 import type { FavoriteType } from '../../services/favoriteService';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 
 type Tab = 'events' | 'concerts' | 'reels' | 'posts' | 'communities' | 'films' | 'series';
 
@@ -175,7 +175,7 @@ export const FavoritesScreen: React.FC = () => {
       {/* Liste */}
       {loading ? (
         <View style={styles.empty}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <GoFolyXLoader color={colors.primary} />
         </View>
       ) : null}
       <FlatList

@@ -4,13 +4,13 @@
  * Ouvert depuis ContentStatsList (tap sur un item de CreatorAnalyticsScreen).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, StatusBar, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, StatusBar, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { analyticsService } from '../../services/analyticsService';
 import type { ContentDetailStats, AnalyticsContentType } from '../../services/analyticsService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -67,9 +67,7 @@ export const ContentAnalyticsDetailScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
+        <GoFolyXLoader fullScreen color={colors.primary} />
       ) : !detail ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 32 }}>
           <Icon name="alert-triangle" size={28} color={colors.textTertiary} />

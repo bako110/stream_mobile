@@ -4,7 +4,7 @@
  */
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert,
+  View, Text, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Platform, StatusBar,
   RefreshControl, ActivityIndicator, Image,
 } from 'react-native';
@@ -25,6 +25,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { BackButton } from '../../components/common';
 import { ConversationStoryBar } from '../../components/story';
 import { useUser } from '../../context/UserContext';
+import { showConfirm } from '../../services';
 
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -255,7 +256,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
   const deleteSelected = useCallback(() => {
     const count = selectedIds.size;
-    Alert.alert(
+    showConfirm(
       'Supprimer',
       `Supprimer ${count} appel${count > 1 ? 's' : ''} ?`,
       [
@@ -293,7 +294,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
   const deleteConvsSelected = useCallback(() => {
     const count = convSelectedIds.size;
-    Alert.alert(
+    showConfirm(
       'Supprimer',
       `Supprimer ${count} conversation${count > 1 ? 's' : ''} ?`,
       [

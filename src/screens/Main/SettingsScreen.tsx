@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator, Image,
+  StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { useCurrency } from '../../hooks/useCurrency';
 import { AppHeader } from '../../components/common';
+import { showConfirm } from '../../services';
 import { authService } from '../../services/authService';
 import { notificationService } from '../../services/notificationService';
 import { useNavigation } from '@react-navigation/native';
@@ -56,7 +57,7 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   useEffect(() => { loadData(); }, []);
 
   const handleLogout = () => {
-    Alert.alert('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
+    showConfirm('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Déconnecter', style: 'destructive', onPress: () => {
         authService._clearTokens();

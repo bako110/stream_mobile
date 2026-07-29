@@ -411,11 +411,11 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
           {/* Avatar gauche (agent bot ou staff) */}
           {!isUser && (
             isStaff ? (
-              <View style={[s.agentAvt, { backgroundColor: '#7B3FF2' + '33', alignItems: 'center', justifyContent: 'center' }]}>
-                <Icon name="user" size={13} color="#7B3FF2" />
+              <View style={[s.agentAvt, { backgroundColor: colors.primary + '33', alignItems: 'center', justifyContent: 'center' }]}>
+                <Icon name="user" size={13} color={colors.primary} />
               </View>
             ) : (
-              <LinearGradient colors={[colors.primary, '#E0389A']} style={s.agentAvt}>
+              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={s.agentAvt}>
                 <Icon name="life-buoy" size={13} color="#fff" />
               </LinearGradient>
             )
@@ -424,7 +424,7 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
           <View style={{ maxWidth: '78%', gap: 3 }}>
             {/* Nom du staff */}
             {isStaff && item.staffName && (
-              <Text style={[s.staffName, { color: '#7B3FF2' }]}>{item.staffName} · Support</Text>
+              <Text style={[s.staffName, { color: colors.primary }]}>{item.staffName} · Support</Text>
             )}
 
             {/* Bulle */}
@@ -433,7 +433,7 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
               isUser
                 ? { backgroundColor: colors.primary, borderBottomRightRadius: 4 }
                 : isStaff
-                  ? { backgroundColor: '#7B3FF2' + '18', borderColor: '#7B3FF2' + '40', borderWidth: 1, borderBottomLeftRadius: 4 }
+                  ? { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40', borderWidth: 1, borderBottomLeftRadius: 4 }
                   : { backgroundColor: colors.surface, borderColor: colors.divider, borderWidth: StyleSheet.hairlineWidth, borderBottomLeftRadius: 4 },
             ]}>
               <Text style={[s.bubbleTxt, { color: isUser ? '#fff' : colors.textPrimary }]}>
@@ -487,34 +487,32 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" />
+      {/* Header plat, cohérent avec le reste de l'app (Transfer/CreatorAnalytics/...)
+          plutôt qu'un dégradé isolé — s'adapte au thème clair/sombre. */}
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
 
       {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, '#9B5CF6']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={[s.header, { paddingTop: insets.top + 6 }]}
-      >
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 6 }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <View style={s.headerMid}>
-          <View style={s.headerAvtWrap}>
-            <Icon name={phase === 'agent' ? 'headphones' : 'life-buoy'} size={17} color="#fff" />
+          <View style={[s.headerAvtWrap, { backgroundColor: colors.primary + '18' }]}>
+            <Icon name={phase === 'agent' ? 'headphones' : 'life-buoy'} size={17} color={colors.primary} />
           </View>
           <View>
-            <Text style={s.headerName}>Support GoFolyX</Text>
+            <Text style={[s.headerName, { color: colors.textPrimary }]}>Support GoFolyX</Text>
             <View style={s.onlineRow}>
               <View style={[s.onlineDot, { backgroundColor: phase === 'agent' && loadingAgent ? '#FBBF24' : '#4ADE80' }]} />
-              <Text style={s.onlineTxt}>{headerSubtitle}</Text>
+              <Text style={[s.onlineTxt, { color: colors.textSecondary }]}>{headerSubtitle}</Text>
             </View>
           </View>
         </View>
         <TouchableOpacity
-          style={s.callBtn}
+          style={[s.callBtn, { backgroundColor: colors.primary + '18' }]}
           onPress={() => Linking.openURL('tel:+22670000000')}
         >
-          <Icon name="phone" size={18} color="#fff" />
+          <Icon name="phone" size={18} color={colors.primary} />
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -530,7 +528,7 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
           onLayout={scrollBottom}
           ListFooterComponent={(typing || loadingAgent) ? (
             <View style={[s.msgRow, s.rowAgent, { marginBottom: 4 }]}>
-              <LinearGradient colors={[colors.primary, '#E0389A']} style={s.agentAvt}>
+              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={s.agentAvt}>
                 <Icon name="life-buoy" size={13} color="#fff" />
               </LinearGradient>
               <View style={[s.bubble, { backgroundColor: colors.surface, borderColor: colors.divider, borderWidth: StyleSheet.hairlineWidth, borderBottomLeftRadius: 4 }]}>

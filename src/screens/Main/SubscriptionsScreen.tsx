@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Modal,
-  StyleSheet, RefreshControl, ActivityIndicator, Alert,
+  StyleSheet, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonSubscriptions, PriceWithLocal } from '../../components/common';
+import { toastService, showConfirm } from '../../services';
 import { subscriptionService, WalletCheck } from '../../services/subscriptionService';
 import type { Subscription, PlanType } from '../../types';
 import { PLAN_CONFIG } from '../../types/subscription';
@@ -327,7 +328,7 @@ export const SubscriptionsScreen: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const handleCancel = () => {
-    Alert.alert(
+    showConfirm(
       'Résilier l\'abonnement',
       'Vous garderez l\'accès jusqu\'à la fin de la période payée. Confirmer ?',
       [
@@ -338,7 +339,7 @@ export const SubscriptionsScreen: React.FC = () => {
             await subscriptionService.cancel();
             await load(true);
           } catch {
-            Alert.alert('Erreur', 'Impossible de résilier. Réessayez plus tard.');
+            toastService.error('Erreur', 'Impossible de résilier. Réessayez plus tard.');
           } finally {
             setCancelling(false);
           }
@@ -356,7 +357,7 @@ export const SubscriptionsScreen: React.FC = () => {
       setWalletCheck(check);
     } catch {
       setModalPlan(null);
-      Alert.alert('Erreur', 'Impossible de vérifier votre solde. Réessayez.');
+      toastService.error('Erreur', 'Impossible de vérifier votre solde. Réessayez.');
     } finally {
       setLoadingPlan(null);
     }
@@ -378,7 +379,7 @@ export const SubscriptionsScreen: React.FC = () => {
         setWalletCheck(prev => prev ? { ...prev, sufficient: false, missing: detail.missing } : prev);
       } else {
         setModalPlan(null);
-        Alert.alert('Erreur', 'Abonnement impossible. Réessayez plus tard.');
+        toastService.error('Erreur', 'Abonnement impossible. Réessayez plus tard.');
       }
     } finally {
       setConfirming(false);

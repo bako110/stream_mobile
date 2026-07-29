@@ -5,13 +5,14 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { toastService, showConfirm } from '../../services';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -48,7 +49,7 @@ export const LiveGiftBar: React.FC<Props> = ({ liveId, receiverId, onGiftSent })
   const handleTap = useCallback(async (gift: GiftType) => {
     if (sendingId) return;
     if (balance < gift.gogold_cost) {
-      Alert.alert(
+      showConfirm(
         'GoGold insuffisants',
         `Il te faut ${gift.gogold_cost} 🪙 mais tu en as ${balance}.\nRecharger ton wallet ?`,
         [
@@ -68,7 +69,7 @@ export const LiveGiftBar: React.FC<Props> = ({ liveId, receiverId, onGiftSent })
       setBalance(b => b - gift.gogold_cost);
       onGiftSent(gift.emoji);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible d\'envoyer le cadeau');
+      toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible d\'envoyer le cadeau');
     } finally {
       setSendingId(null);
     }

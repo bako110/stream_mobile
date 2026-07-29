@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, Dimensions, StatusBar, ActivityIndicator, InteractionManager,
-  Modal, Alert,
+  Modal,
 } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -10,7 +10,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, ShareBottomSheet, PriceWithLocal } from '../../components/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { contentService } from '../../services';
+import { contentService, toastService, showConfirm } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { VideoMeta } from '../../types';
@@ -130,11 +130,11 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setHasAccess(true);
       setWalletGoGold(res.data.new_balance);
       setShowPaywall(false);
-      Alert.alert('Acces accordé', `Vous pouvez maintenant regarder "${item.title}".`);
+      toastService.success('Acces accordé', `Vous pouvez maintenant regarder "${item.title}".`);
     } catch (e: any) {
       const detail = e?.response?.data?.detail ?? e?.message ?? 'Erreur inconnue';
       if (detail.includes('insuffisant')) {
-        Alert.alert(
+        showConfirm(
           'Solde insuffisant',
           `Il vous manque des GoGold. Rechargez votre wallet pour continuer.`,
           [
@@ -143,7 +143,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           ],
         );
       } else {
-        Alert.alert('Erreur', detail);
+        toastService.error('Erreur', detail);
       }
     } finally {
       setPurchasing(false);
@@ -190,7 +190,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         setIsSaved(true);
       }
     } catch {
-      Alert.alert('Erreur', 'Impossible de modifier les favoris.');
+      toastService.error('Erreur', 'Impossible de modifier les favoris.');
     } finally {
       setSavingFav(false);
     }

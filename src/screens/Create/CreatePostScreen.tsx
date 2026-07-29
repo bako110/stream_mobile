@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Image,
-  StyleSheet, Alert, ScrollView,
+  StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, StatusBar, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { postService } from '../../services/postService';
 import { uploadImageFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { MentionInput } from '../../components/common/MentionInput';
+import { toastService } from '../../services';
 
 const { width: W } = Dimensions.get('window');
 const MAX_IMAGES   = 6;
@@ -65,12 +66,12 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
 
   const handlePickImages = () => {
     if (videoUri) {
-      Alert.alert('Vidéo déjà sélectionnée', 'Retire la vidéo pour ajouter des photos.');
+      toastService.warning('Vidéo déjà sélectionnée', 'Retire la vidéo pour ajouter des photos.');
       return;
     }
     const remaining = MAX_IMAGES - localUris.length;
     if (remaining <= 0) {
-      Alert.alert('Maximum', `Tu peux ajouter jusqu'à ${MAX_IMAGES} images.`);
+      toastService.warning('Maximum', `Tu peux ajouter jusqu'à ${MAX_IMAGES} images.`);
       return;
     }
     launchImageLibrary(
@@ -85,7 +86,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
 
   const handlePickVideo = () => {
     if (localUris.length > 0) {
-      Alert.alert('Photos déjà sélectionnées', 'Retire les photos pour ajouter une vidéo.');
+      toastService.warning('Photos déjà sélectionnées', 'Retire les photos pour ajouter une vidéo.');
       return;
     }
     launchImageLibrary(

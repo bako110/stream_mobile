@@ -7,7 +7,6 @@ import {
   StyleSheet,
   StatusBar,
   Animated,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Modal,
@@ -25,6 +24,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { ExpandableText, GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityEvent } from '../../services/communityService';
+import { toastService, showConfirm } from '../../services';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
@@ -333,11 +333,11 @@ function EventFormModal({ visible, initial, onClose, onSave, colors, insets }: E
   }, [visible, initial]);
 
   const handleSave = async () => {
-    if (!title.trim()) { Alert.alert('Erreur', 'Le titre est requis.'); return; }
+    if (!title.trim()) { toastService.error('Erreur', 'Le titre est requis.'); return; }
     const starts = parseInputToISO(startsAt);
-    if (!starts) { Alert.alert('Erreur', 'Date de début invalide. Format : AAAA-MM-JJTHH:MM'); return; }
+    if (!starts) { toastService.error('Erreur', 'Date de début invalide. Format : AAAA-MM-JJTHH:MM'); return; }
     const ends = endsAt.trim() ? parseInputToISO(endsAt) : undefined;
-    if (endsAt.trim() && !ends) { Alert.alert('Erreur', 'Date de fin invalide. Format : AAAA-MM-JJTHH:MM'); return; }
+    if (endsAt.trim() && !ends) { toastService.error('Erreur', 'Date de fin invalide. Format : AAAA-MM-JJTHH:MM'); return; }
 
     setSaving(true);
     try {
@@ -352,7 +352,7 @@ function EventFormModal({ visible, initial, onClose, onSave, colors, insets }: E
       });
       onClose();
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
+      toastService.error('Erreur', e?.message ?? 'Impossible de sauvegarder.');
     } finally {
       setSaving(false);
     }
@@ -569,7 +569,7 @@ export function CommunityEventsScreen({ route }: Props) {
       setEvents(evs => evs.map(e => e.id === id ? { ...e, going_count: updated.going_count, maybe_count: updated.maybe_count } : e));
     } catch {
       setRsvpMap(m => ({ ...m, [id]: prev }));
-      Alert.alert('Erreur', 'Impossible de mettre à jour votre participation.');
+      toastService.error('Erreur', 'Impossible de mettre à jour votre participation.');
     }
   };
 
@@ -595,7 +595,7 @@ export function CommunityEventsScreen({ route }: Props) {
   };
 
   const handleCancel = (event: CommunityEvent) => {
-    Alert.alert(
+    showConfirm(
       'Annuler l\'événement',
       `Annuler "${event.title}" ? Les participants seront informés.`,
       [
@@ -608,7 +608,7 @@ export function CommunityEventsScreen({ route }: Props) {
               const updated = await communityService.cancelEvent(communityId, event.id);
               setEvents(evs => evs.map(e => e.id === updated.id ? updated : e));
             } catch {
-              Alert.alert('Erreur', 'Impossible d\'annuler l\'événement.');
+              toastService.error('Erreur', 'Impossible d\'annuler l\'événement.');
             }
           },
         },
@@ -617,7 +617,7 @@ export function CommunityEventsScreen({ route }: Props) {
   };
 
   const handleDelete = (event: CommunityEvent) => {
-    Alert.alert(
+    showConfirm(
       'Supprimer l\'événement',
       `Supprimer "${event.title}" définitivement ?`,
       [
@@ -630,7 +630,7 @@ export function CommunityEventsScreen({ route }: Props) {
               await communityService.deleteEvent(communityId, event.id);
               setEvents(evs => evs.filter(e => e.id !== event.id));
             } catch {
-              Alert.alert('Erreur', 'Impossible de supprimer l\'événement.');
+              toastService.error('Erreur', 'Impossible de supprimer l\'événement.');
             }
           },
         },

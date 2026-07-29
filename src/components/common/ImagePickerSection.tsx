@@ -20,7 +20,7 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, Image,
-  ActivityIndicator, StyleSheet, ScrollView, Alert,
+  ActivityIndicator, StyleSheet, ScrollView,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import type { Asset } from 'react-native-image-picker';
@@ -30,6 +30,7 @@ import type { UploadFolder, UploadedImage } from '../../services/uploadService';
 import { API_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
 import { storage } from '../../utils/storage';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { toastService } from '../../services/toastService';
 
 interface ImagePickerSectionProps {
   folder:          UploadFolder;
@@ -65,7 +66,7 @@ export const ImagePickerSection: React.FC<ImagePickerSectionProps> = ({
 
   const handlePick = () => {
     if (!canAdd) {
-      Alert.alert('Maximum atteint', `Vous pouvez ajouter au maximum ${maxImages} images.`);
+      toastService.warning('Maximum atteint', `Vous pouvez ajouter au maximum ${maxImages} images.`);
       return;
     }
     if (pickingRef.current) return;
@@ -79,7 +80,7 @@ export const ImagePickerSection: React.FC<ImagePickerSectionProps> = ({
         pickingRef.current = false;
         if (response.didCancel || !response.assets?.length) return;
         if (response.errorCode) {
-          Alert.alert('Erreur', response.errorMessage ?? 'Impossible d\'accéder à la galerie');
+          toastService.error('Erreur', response.errorMessage ?? 'Impossible d\'accéder à la galerie');
           return;
         }
 
@@ -106,7 +107,7 @@ export const ImagePickerSection: React.FC<ImagePickerSectionProps> = ({
           onImagesChange((prev: string[]) => [...prev, ...results.map((r: UploadedImage) => r.url)]);
         } catch (err: any) {
           console.warn('[ImagePickerSection] upload failed:', err);
-          Alert.alert('Upload échoué', err?.message ?? "Les images n'ont pas pu être envoyées. Vérifiez votre connexion.");
+          toastService.error('Upload échoué', err?.message ?? "Les images n'ont pas pu être envoyées. Vérifiez votre connexion.");
           setLocals(prev => prev.map(l => l.uploading ? { ...l, uploading: false, error: true } : l));
         }
       },

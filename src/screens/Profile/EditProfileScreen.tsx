@@ -7,13 +7,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform,
+  StyleSheet, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, SkeletonEditProfile } from '../../components/common';
+import { BackButton, SkeletonEditProfile, GoFolyXLoader } from '../../components/common';
+import { toastService, showConfirm } from '../../services';
 import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
@@ -81,7 +82,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
               setCurrentUser(updated);
             }
           } catch (e: any) {
-            Alert.alert('Erreur', e?.message ?? 'Upload avatar');
+            toastService.error('Erreur', e?.message ?? 'Upload avatar');
           } finally { setAvatarUploading(false); }
         },
       },
@@ -97,12 +98,12 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             setUser(updated);
             setCurrentUser(updated);
           } catch (e: any) {
-            Alert.alert('Erreur', e?.message ?? 'Suppression échouée');
+            toastService.error('Erreur', e?.message ?? 'Suppression échouée');
           } finally { setAvatarUploading(false); }
         },
       });
     }
-    Alert.alert('Photo de profil', undefined, [
+    showConfirm('Photo de profil', undefined, [
       ...options,
       { text: 'Annuler', style: 'cancel', onPress: () => {} },
     ]);
@@ -122,7 +123,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
               setCurrentUser(updated);
             }
           } catch (e: any) {
-            Alert.alert('Erreur', e?.message ?? 'Upload bannière');
+            toastService.error('Erreur', e?.message ?? 'Upload bannière');
           } finally { setBannerUploading(false); }
         },
       },
@@ -138,12 +139,12 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             setUser(updated);
             setCurrentUser(updated);
           } catch (e: any) {
-            Alert.alert('Erreur', e?.message ?? 'Suppression échouée');
+            toastService.error('Erreur', e?.message ?? 'Suppression échouée');
           } finally { setBannerUploading(false); }
         },
       });
     }
-    Alert.alert('Photo de couverture', undefined, [
+    showConfirm('Photo de couverture', undefined, [
       ...options,
       { text: 'Annuler', style: 'cancel', onPress: () => {} },
     ]);
@@ -151,7 +152,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleSave = async () => {
     if (!username.trim()) {
-      Alert.alert('Erreur', 'Le username est requis');
+      toastService.error('Erreur', 'Le username est requis');
       return;
     }
     setSaving(true);
@@ -171,9 +172,9 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       await userService.updateMe(data);
       const me = await refreshUser();
       if (me) setUser(me);
-      Alert.alert('Succès', 'Profil mis à jour', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      showConfirm('Succès', 'Profil mis à jour', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Mise à jour échouée');
+      toastService.error('Erreur', e?.message ?? 'Mise à jour échouée');
     } finally { setSaving(false); }
   };
 
@@ -206,7 +207,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.bannerWrap}>
             {bannerUploading ? (
               <View style={[styles.banner, { backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <GoFolyXLoader color={colors.primary} />
               </View>
             ) : user?.banner_url ? (
               <Image source={{ uri: user.banner_url }} style={styles.banner} resizeMode="cover" />

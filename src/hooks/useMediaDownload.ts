@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
-import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 import { API_BASE_URL, STORAGE_KEYS } from '../utils/constants';
 import { storage } from '../utils/storage';
 import { downloadToastService } from '../services/downloadToastService';
+import { toastService } from '../services';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const RNBlobUtil = require('react-native-blob-util').default;
@@ -75,7 +76,7 @@ export function useMediaDownload() {
         },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission refusée', 'Impossible de sauvegarder sans permission.');
+        toastService.error('Permission refusée', 'Impossible de sauvegarder sans permission.');
         return;
       }
     }
@@ -132,7 +133,7 @@ export function useMediaDownload() {
       }));
       downloadToastService.finish(id);
     } catch {
-      Alert.alert('Erreur', 'Le téléchargement a échoué. Réessaie plus tard.');
+      toastService.error('Erreur', 'Le téléchargement a échoué. Réessaie plus tard.');
       setStates(prev => ({ ...prev, [id]: { progress: 0, localUri: null, downloading: false } }));
       downloadToastService.fail(id);
     }

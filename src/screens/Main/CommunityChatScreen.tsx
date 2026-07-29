@@ -2,7 +2,7 @@
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
-  ActivityIndicator, Image, Alert, Modal, Pressable,
+  ActivityIndicator, Image, Modal, Pressable,
   ScrollView, Dimensions, Animated, Linking, PermissionsAndroid,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
@@ -23,10 +23,11 @@ import Geolocation from '@react-native-community/geolocation';
 import { uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
-import { BackButton, CachedImage } from '../../components/common';
+import { BackButton, CachedImage, GoFolyXLoader } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
+import { toastService, showConfirm } from '../../services';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const RNBlobUtil = require('react-native-blob-util').default;
@@ -290,11 +291,10 @@ export const CommunityChatScreen: React.FC = () => {
       } else if (payload.type === 'community_member_kicked') {
         setMyId(id => {
           if (id && payload.user_id === id) {
-            Alert.alert(
+            showConfirm(
               'Exclu',
               'Vous avez été exclu de cette communauté.',
               [{ text: 'OK', onPress: () => nav.reset({ index: 0, routes: [{ name: 'Tabs' }] }) }],
-              { cancelable: false },
             );
           }
           return id;
@@ -308,7 +308,7 @@ export const CommunityChatScreen: React.FC = () => {
       } else if (payload.type === 'community_verified') {
         setCommunityVerified(payload.is_verified);
       } else if (payload.type === 'community_deleted') {
-        Alert.alert('Communauté supprimée', 'Cette communauté a été supprimée.', [{ text: 'OK', onPress: () => nav.goBack() }]);
+        showConfirm('Communauté supprimée', 'Cette communauté a été supprimée.', [{ text: 'OK', onPress: () => nav.goBack() }]);
       } else if (payload.type === 'community_cotisation_created') {
         const c = payload.cotisation;
         setActiveCotisation(c);
@@ -479,7 +479,7 @@ export const CommunityChatScreen: React.FC = () => {
       if (resp.didCancel || !resp.assets?.length) return;
       const tooBig = resp.assets.some(a => a.fileSize != null && a.fileSize > 30 * 1024 * 1024);
       if (tooBig) {
-        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo par image.');
+        toastService.error('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo par image.');
         return;
       }
       const assets = resp.assets
@@ -500,7 +500,7 @@ export const CommunityChatScreen: React.FC = () => {
       const a = resp.assets[0];
       if (!a.uri) return;
       if (a.fileSize != null && a.fileSize > 30 * 1024 * 1024) {
-        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        toastService.error('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
         return;
       }
       setMediaPreview([{ uri: a.uri, name: a.fileName ?? `photo_${Date.now()}.jpg` }]);
@@ -517,7 +517,7 @@ export const CommunityChatScreen: React.FC = () => {
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
       if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
-        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        toastService.error('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
         return;
       }
 
@@ -537,14 +537,14 @@ export const CommunityChatScreen: React.FC = () => {
             setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
             setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
           } catch {
-            Alert.alert('Erreur', "Impossible d'envoyer le message vidéo.");
+            toastService.error('Erreur', "Impossible d'envoyer le message vidéo.");
           }
         },
         onError: () => {
-          Alert.alert('Erreur', "L'upload de la vidéo a échoué. Réessaie.");
+          toastService.error('Erreur', "L'upload de la vidéo a échoué. Réessaie.");
         },
       });
-    } catch { Alert.alert('Erreur', 'Impossible de lire la vidéo sélectionnée.'); }
+    } catch { toastService.error('Erreur', 'Impossible de lire la vidéo sélectionnée.'); }
   };
 
   // ── Enregistrement vocal en temps réel ───────────────────────────────────
@@ -555,7 +555,7 @@ export const CommunityChatScreen: React.FC = () => {
         { title: 'Microphone', message: "L'app a besoin du micro pour enregistrer un vocal.", buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission', 'Microphone requis pour enregistrer un vocal');
+        toastService.warning('Permission', 'Microphone requis pour enregistrer un vocal');
         return;
       }
     }
@@ -587,7 +587,7 @@ export const CommunityChatScreen: React.FC = () => {
       const msg = await communityService.sendMessage(communityId, '', 'audio', [uploaded.url], reply_to_id, metadata);
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-    } catch { Alert.alert('Erreur', "Impossible d'envoyer le vocal"); }
+    } catch { toastService.error('Erreur', "Impossible d'envoyer le vocal"); }
     finally { setSending(false); }
   };
 
@@ -624,7 +624,7 @@ export const CommunityChatScreen: React.FC = () => {
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e: any) {
-      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', 'Impossible d\'envoyer l\'audio.');
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) toastService.error('Erreur', 'Impossible d\'envoyer l\'audio.');
     } finally { setSending(false); }
   };
 
@@ -633,14 +633,14 @@ export const CommunityChatScreen: React.FC = () => {
     try {
       const [result] = await pick({ type: [types.pdf, types.doc, types.docx, types.xls, types.xlsx, types.plainText, types.allFiles] });
       if (result.size != null && result.size > 30 * 1024 * 1024) {
-        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        toastService.error('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
         return;
       }
       setFilePreview({ uri: result.uri, name: result.name ?? 'fichier', size: result.size ?? undefined, mimeType: result.type ?? undefined });
       setFileCaption('');
       setFilePreviewOpen(true);
     } catch (e: any) {
-      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', "Impossible d'ouvrir le fichier.");
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) toastService.error('Erreur', "Impossible d'ouvrir le fichier.");
     }
   };
 
@@ -659,7 +659,7 @@ export const CommunityChatScreen: React.FC = () => {
       setFilePreviewOpen(false);
       setFilePreview(null);
       setFileCaption('');
-    } catch { Alert.alert('Erreur', "Impossible d'envoyer le fichier."); }
+    } catch { toastService.error('Erreur', "Impossible d'envoyer le fichier."); }
     finally { setFileUploading(false); }
   };
 
@@ -676,7 +676,7 @@ export const CommunityChatScreen: React.FC = () => {
         const msg = await communityService.sendMessage(communityId, '', 'location', [], reply_to_id, metadata);
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-      } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+      } catch { toastService.error('Erreur', 'Impossible d\'envoyer la localisation.'); }
     };
     Geolocation.getCurrentPosition(
       doSend,
@@ -684,7 +684,7 @@ export const CommunityChatScreen: React.FC = () => {
         // Fallback : basse précision (réseau), pas de GPS matériel requis
         Geolocation.getCurrentPosition(
           doSend,
-          (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
+          (err) => { setLocating(false); toastService.error('Erreur GPS', err.message); },
           { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
         );
       },
@@ -727,7 +727,7 @@ export const CommunityChatScreen: React.FC = () => {
       const res = await communityService.reactToMessage(communityId, msg.id, emoji);
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, reactions: res.reactions } : m));
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'ajouter une réaction.');
+      toastService.error('Erreur', 'Impossible d\'ajouter une réaction.');
     }
   };
 
@@ -739,7 +739,7 @@ export const CommunityChatScreen: React.FC = () => {
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_pinned: pin } : m));
       loadPinned();
     } catch {
-      Alert.alert('Erreur', pin ? 'Impossible d\'épingler le message.' : 'Impossible de désépingler le message.');
+      toastService.error('Erreur', pin ? 'Impossible d\'épingler le message.' : 'Impossible de désépingler le message.');
     }
   };
 
@@ -755,14 +755,14 @@ export const CommunityChatScreen: React.FC = () => {
       const res = await communityService.voteOnPoll(communityId, msg.poll.poll_id, newVotes);
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, poll: res as PollData } : m));
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'enregistrer votre vote.');
+      toastService.error('Erreur', 'Impossible d\'enregistrer votre vote.');
     }
   };
 
   // ── Créer sondage ──────────────────────────────────────────────────────────
   const handleCreatePoll = async () => {
     if (!pollQ.trim() || pollOpts.filter(o => o.trim()).length < 2) {
-      Alert.alert('Sondage invalide', 'Une question et au moins 2 options sont requises.');
+      toastService.warning('Sondage invalide', 'Une question et au moins 2 options sont requises.');
       return;
     }
     setSending(true); setPollModal(false);
@@ -773,13 +773,13 @@ export const CommunityChatScreen: React.FC = () => {
       setMessages(prev => [...prev, res as CommunityMessage]);
       setPollQ(''); setPollOpts(['', '']); setPollMulti(false);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-    } catch { Alert.alert('Erreur', 'Impossible de créer le sondage'); }
+    } catch { toastService.error('Erreur', 'Impossible de créer le sondage'); }
     finally { setSending(false); }
   };
 
   const handleDelete = (msg: CommunityMessage) => {
     setMenuMsg(null);
-    Alert.alert('Supprimer', 'Supprimer ce message ?', [
+    showConfirm('Supprimer', 'Supprimer ce message ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => {
         if (isConnected) sendWsMessage({ type: 'delete', message_id: msg.id });
@@ -813,7 +813,7 @@ export const CommunityChatScreen: React.FC = () => {
       setMessages(prev => prev.map(m => m.id === editAnnounceMsg.id
         ? { ...m, content: updated.content, edited_at: updated.edited_at } : m));
       setEditAnnounceMsg(null);
-    } catch { Alert.alert('Erreur', 'Impossible de modifier l\'annonce'); }
+    } catch { toastService.error('Erreur', 'Impossible de modifier l\'annonce'); }
     finally { setEditAnnounceSaving(false); }
   };
 
@@ -821,7 +821,7 @@ export const CommunityChatScreen: React.FC = () => {
   const handleClosePoll = async (msg: CommunityMessage) => {
     if (!msg.poll) return;
     setMenuMsg(null);
-    Alert.alert('Clore le sondage', 'Les votes seront définitivement fermés.', [
+    showConfirm('Clore le sondage', 'Les votes seront définitivement fermés.', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Clore', style: 'destructive', onPress: async () => {
         setClosePollLoading(msg.poll!.poll_id);
@@ -832,7 +832,7 @@ export const CommunityChatScreen: React.FC = () => {
           setMessages(prev => prev.map(m =>
             m.poll?.poll_id === msg.poll!.poll_id ? { ...m, poll: res.data } : m
           ));
-        } catch { Alert.alert('Erreur', 'Impossible de clore le sondage'); }
+        } catch { toastService.error('Erreur', 'Impossible de clore le sondage'); }
         finally { setClosePollLoading(null); }
       }},
     ]);
@@ -856,7 +856,7 @@ export const CommunityChatScreen: React.FC = () => {
         { title: 'Permission requise', message: 'Autoriser la sauvegarde dans vos téléchargements.', buttonPositive: 'Autoriser', buttonNegative: 'Refuser' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission refusée', 'Impossible de sauvegarder sans permission.');
+        toastService.warning('Permission refusée', 'Impossible de sauvegarder sans permission.');
         return;
       }
     }
@@ -890,9 +890,9 @@ export const CommunityChatScreen: React.FC = () => {
           const pct = tot > 0 ? Math.min(99, Math.round((rec / tot) * 100)) : 50;
           setDlProgress(pct);
         });
-      Alert.alert('Téléchargement terminé', 'Image sauvegardée dans vos téléchargements.');
+      toastService.success('Téléchargement terminé', 'Image sauvegardée dans vos téléchargements.');
     } catch {
-      Alert.alert('Erreur', 'Le téléchargement a échoué. Réessaie plus tard.');
+      toastService.error('Erreur', 'Le téléchargement a échoué. Réessaie plus tard.');
     } finally {
       setDlBusy(false);
       setDlProgress(0);
@@ -1801,7 +1801,7 @@ export const CommunityChatScreen: React.FC = () => {
                   onPress={async () => {
                     if (electionVoting) return;
                     const name = c.display_name || c.username || 'ce membre';
-                    Alert.alert(
+                    showConfirm(
                       isMyVote ? 'Changer mon vote' : 'Voter',
                       `${isMyVote ? 'Changer pour' : 'Voter pour'} ${name} ?`,
                       [
@@ -1814,7 +1814,7 @@ export const CommunityChatScreen: React.FC = () => {
                               { candidate_id: c.user_id }
                             );
                           } catch (e: any) {
-                            Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de voter.');
+                            toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible de voter.');
                           } finally { setElectionVoting(null); }
                         }},
                       ],
@@ -1875,9 +1875,7 @@ export const CommunityChatScreen: React.FC = () => {
       {/* ── Contenu principal ── */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         {loading ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <GoFolyXLoader fullScreen color={colors.primary} />
         ) : activeTab === 'media' ? renderMediaTab() : (
           <>
             {/* Bandeau upload vidéo TikTok-style */}

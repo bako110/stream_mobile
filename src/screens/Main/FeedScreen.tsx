@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
-  Share, Alert, KeyboardAvoidingView, Platform, Image, StatusBar,
+  Share, KeyboardAvoidingView, Platform, Image, StatusBar,
   Modal, Dimensions, Linking, InteractionManager, useWindowDimensions,
   TouchableWithoutFeedback,
 } from 'react-native';
@@ -25,13 +25,14 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GoFolyXLoader } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
-import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService } from '../../services';
+import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService, accountsService, toastService } from '../../services';
+import type { StoredAccount } from '../../services';
 import type { PostFeedCursor } from '../../services/postService';
 import { apiClient } from '../../api/client';
 import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
@@ -623,9 +624,12 @@ const FeedHeaderBadges: React.FC<{
 
 // ── FeedScreen ────────────────────────────────────────────────────────────────
 
-interface FeedScreenProps { onLogout?: () => void; }
+interface FeedScreenProps {
+  onLogout?: () => void;
+  onSwitchAccount?: (userId: string) => Promise<void>;
+}
 
-export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
+export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccount }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
@@ -692,18 +696,25 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
   const myCommIdsRef = useRef<Set<string>>(new Set());
   // Panneau infos primaires — ouvert via le chevron du header, fermé au tap extérieur
   const [showProfilePanel, setShowProfilePanel] = useState(false);
+  // Multi-compte — liste chargée à l'ouverture du panneau (pas au montage de l'écran,
+  // pour toujours refléter les changements faits depuis les Paramètres).
+  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState<'all'|'users'|'events'|'concerts'|'reels'|'films'>('all');
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
-  // Scroll infini — uniquement actif sur un filtre spécifique (voir liveSearch/loadMoreSearch),
-  // "Tout" mélange les catégories et n'a pas de pagination cohérente possible côté API.
+  // Scroll infini — actif à la fois sur un filtre spécifique et en mode "Tout" (voir
+  // liveSearch/loadMoreSearch) : le backend applique la même page/limit à chaque
+  // catégorie en parallèle, donc avancer la page fonctionne aussi en mode "Tout",
+  // simplement sans total/has_more par catégorie (approximé côté client).
   const [searchPage, setSearchPage] = useState(1);
   const [searchHasMore, setSearchHasMore] = useState(false);
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const SEARCH_PAGE_LIMIT = 20;
+  const SEARCH_CATEGORIES = ['users', 'films', 'series', 'concerts', 'events', 'reels'] as const;
   // Pub dédiée au placement "search" — une seule par recherche effectuée (pas de scroll
   // infini dans les résultats, contrairement au feed principal, donc pas besoin de
   // rotation par emplacement). Rechargée à chaque nouveau terme recherché.
@@ -870,8 +881,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
         if (searchReqRef.current === term) {
           setSearchResults(results);
           setSearchPage(1);
-          const count = filter === 'all' ? 0 : (results[filter]?.length ?? 0);
-          setSearchHasMore(filter !== 'all' && count >= SEARCH_PAGE_LIMIT);
+          // En mode "Tout", chaque catégorie est paginée indépendamment côté backend (même
+          // page/limit appliqués à chacune) — tant qu'AU MOINS une catégorie est encore
+          // pleine, il reste potentiellement des résultats à charger sur celle-ci.
+          const hasMore = filter === 'all'
+            ? SEARCH_CATEGORIES.some(k => (results[k]?.length ?? 0) >= SEARCH_PAGE_LIMIT)
+            : (results[filter]?.length ?? 0) >= SEARCH_PAGE_LIMIT;
+          setSearchHasMore(hasMore);
         }
       } catch { /* silencieux */ }
       finally { if (searchReqRef.current === term) setSearching(false); }
@@ -886,18 +902,29 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
     }, 300);
   }, []);
 
-  // Charge la page suivante du filtre actif — scroll infini sur l'overlay recherche
+  // Charge la page suivante — scroll infini sur l'overlay recherche, pour le filtre
+  // actif OU pour toutes les catégories en mode "Tout" (chacune avance de sa propre
+  // page en parallèle, fusionnée dans le state existant plutôt que remplacée).
   const loadMoreSearch = useCallback(() => {
     const term = searchQuery.trim();
-    if (!term || searchFilter === 'all' || loadingMoreSearch || !searchHasMore) return;
+    if (!term || loadingMoreSearch || !searchHasMore) return;
     setLoadingMoreSearch(true);
     const nextPage = searchPage + 1;
-    searchService.searchAll({ q: term, page: nextPage, limit: SEARCH_PAGE_LIMIT, type: searchFilter })
+    searchService.searchAll({
+      q: term, page: nextPage, limit: SEARCH_PAGE_LIMIT,
+      type: searchFilter === 'all' ? undefined : searchFilter,
+    })
       .then(results => {
-        const newItems = results[searchFilter] ?? [];
-        setSearchResults(prev => prev ? { ...prev, [searchFilter]: [...(prev[searchFilter] ?? []), ...newItems] } : prev);
+        const keys = searchFilter === 'all' ? SEARCH_CATEGORIES : [searchFilter];
+        setSearchResults(prev => {
+          if (!prev) return prev;
+          const next = { ...prev };
+          for (const k of keys) next[k] = [...(prev[k] ?? []), ...(results[k] ?? [])];
+          return next;
+        });
         setSearchPage(nextPage);
-        setSearchHasMore(newItems.length >= SEARCH_PAGE_LIMIT);
+        const hasMore = keys.some(k => (results[k]?.length ?? 0) >= SEARCH_PAGE_LIMIT);
+        setSearchHasMore(hasMore);
       })
       .catch(() => setSearchHasMore(false))
       .finally(() => setLoadingMoreSearch(false));
@@ -1964,7 +1991,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                 </TouchableOpacity>
                 {displayName ? (
                   <TouchableOpacity
-                    onPress={() => setShowProfilePanel(v => !v)}
+                    onPress={() => {
+                      if (!showProfilePanel) setAccounts(accountsService.listAccounts());
+                      setShowProfilePanel(v => !v);
+                    }}
                     hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
                     style={{ paddingLeft: 2 }}
                   >
@@ -2020,6 +2050,64 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                   style={{ marginTop: 12, borderRadius: 10, paddingVertical: 9, alignItems: 'center', backgroundColor: colors.primary + '18' }}
                 >
                   <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>Voir le profil</Text>
+                </TouchableOpacity>
+
+                {/* Multi-compte — bascule rapide, sans repasser par les Paramètres */}
+                {accounts.length > 1 && (
+                  <>
+                    <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginVertical: 12 }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.6, color: colors.textTertiary, marginBottom: 8 }}>
+                      MES COMPTES
+                    </Text>
+                    {accounts.map(account => {
+                      const isSwitching = switchingAccountId === account.user_id;
+                      const initial = (account.display_name || account.username || '?')[0]?.toUpperCase() ?? '?';
+                      return (
+                        <TouchableOpacity
+                          key={account.user_id}
+                          activeOpacity={account.is_active ? 1 : 0.7}
+                          disabled={account.is_active || !!switchingAccountId}
+                          onPress={async () => {
+                            if (account.is_active || !onSwitchAccount) return;
+                            setSwitchingAccountId(account.user_id);
+                            try {
+                              await onSwitchAccount(account.user_id);
+                              setShowProfilePanel(false);
+                            } catch (e: any) {
+                              toastService.error('Connexion impossible', e?.message ?? 'Ce compte ne semble plus valide.');
+                            } finally {
+                              setSwitchingAccountId(null);
+                            }
+                          }}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}
+                        >
+                          {account.avatar_url ? (
+                            <CachedImage uri={account.avatar_url} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                          ) : (
+                            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>{initial}</Text>
+                            </View>
+                          )}
+                          <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>
+                            {account.display_name || account.username}
+                          </Text>
+                          {isSwitching ? (
+                            <ActivityIndicator size="small" color={colors.primary} />
+                          ) : account.is_active ? (
+                            <Icon name="check-circle" size={16} color={colors.primary} />
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </>
+                )}
+                <TouchableOpacity
+                  onPress={() => { setShowProfilePanel(false); (nav as any).navigate('SettingsCompte'); }}
+                  activeOpacity={0.7}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: accounts.length > 1 ? 10 : 12, paddingTop: accounts.length > 1 ? 4 : 0 }}
+                >
+                  <Icon name="plus-circle" size={15} color={colors.textSecondary} />
+                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.textSecondary }}>Gérer les comptes</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -2390,7 +2478,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout }) => {
                   </View>
                 )}
                 <View style={{ alignItems: 'center', paddingTop: historySuggestions.length > 0 ? 24 : 80, gap: 12 }}>
-                  <ActivityIndicator size="large" color={colors.primary} />
+                  <GoFolyXLoader color={colors.primary} />
                   <Text style={{ fontSize: 14, color: colors.textTertiary }}>Recherche en cours...</Text>
                 </View>
               </ScrollView>
@@ -3637,12 +3725,11 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
     const title: string = item.data?.title ?? '';
     const active = await feedPreferenceService.toggleReminder(item.id, refType, title, eventDate);
     setHasReminder(active);
-    Alert.alert(
+    toastService.success(
       active ? 'Rappel activé' : 'Rappel annulé',
       active
         ? `On vous rappellera 1h avant : "${title}"`
         : 'Le rappel a été supprimé.',
-      [{ text: 'OK' }],
     );
   };
 

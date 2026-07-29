@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  Alert,
   Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -16,6 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { GoFolyXLoader, BackButton } from '../../components/common';
+import { showConfirm } from '../../services';
 import { communityService } from '../../services/communityService';
 import type { CommunityMemberProfile } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -148,7 +148,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
   };
 
   const handleSendMessage = () => {
-    Alert.alert(
+    showConfirm(
       'Message privé',
       `Ouvrir une conversation avec ${member.display_name || member.username} ?`,
       [

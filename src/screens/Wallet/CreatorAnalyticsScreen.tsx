@@ -21,7 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { analyticsService } from '../../services/analyticsService';
 import type { AnalyticsOverview, AnalyticsPeriod, AnalyticsContentType, ContentStatItem } from '../../services/analyticsService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -156,9 +156,7 @@ export const CreatorAnalyticsScreen: React.FC = () => {
       />
 
       {loading ? (
-        <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
+        <GoFolyXLoader fullScreen color={colors.primary} />
       ) : !overview ? (
         <View style={s.emptyWrap}>
           <Icon name="bar-chart-2" size={32} color={colors.textTertiary} />

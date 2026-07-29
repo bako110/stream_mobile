@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, RefreshControl, Image, Alert, Linking,
+  StyleSheet, RefreshControl, Image, Linking,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle, useSharedValue,
@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonFeed, BackButton } from '../../components/common';
+import { showConfirm } from '../../services';
 import { notificationService, NotifItem } from '../../services/notificationService';
 import { useWs } from '../../context/WebSocketContext';
 import { getStoreUrl } from '../../utils/constants';
@@ -230,7 +231,7 @@ export const NotificationsScreen: React.FC = () => {
 
   const deleteSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
-    Alert.alert(
+    showConfirm(
       'Supprimer les notifications',
       `Supprimer ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} ?`,
       [
@@ -258,7 +259,7 @@ export const NotificationsScreen: React.FC = () => {
 
   const deleteAll = useCallback(() => {
     if (items.length === 0) return;
-    Alert.alert(
+    showConfirm(
       'Supprimer toutes les notifications',
       `Supprimer ${items.length} notification${items.length > 1 ? 's' : ''} ?`,
       [

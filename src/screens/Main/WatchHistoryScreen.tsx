@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, StatusBar, ActivityIndicator,
+  StyleSheet, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 
 interface HistoryEntry {
   _id: string;
@@ -145,7 +145,7 @@ export const WatchHistoryScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
@@ -154,7 +154,7 @@ export const WatchHistoryScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} />
+        <GoFolyXLoader fullScreen color={colors.primary} />
       ) : history.length === 0 ? (
         <View style={s.empty}>
           <Icon name="clock" size={48} color={colors.textTertiary} />

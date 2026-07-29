@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, StatusBar,
-  RefreshControl, ActivityIndicator, Modal, TextInput, Alert,
+  RefreshControl, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { tournamentService } from '../../services/tournamentService';
 import type { OpenTournament } from '../../services/tournamentService';
+import { toastService } from '../../services';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { BackButton } from '../../components/common';
 
@@ -57,7 +58,7 @@ export const TournamentListScreen: React.FC = () => {
       await tournamentService.join(t.id);
       await load();
     } catch (e: any) {
-      Alert.alert('Impossible de rejoindre', e?.message || 'Une erreur est survenue.');
+      toastService.error('Impossible de rejoindre', e?.message || 'Une erreur est survenue.');
     } finally {
       setJoining(null);
     }
@@ -77,7 +78,7 @@ export const TournamentListScreen: React.FC = () => {
       await load();
       nav.navigate('TournamentBracket', { tournamentId: t.id });
     } catch (e: any) {
-      Alert.alert('Impossible de créer le tournoi', e?.message || 'Une erreur est survenue.');
+      toastService.error('Impossible de créer le tournoi', e?.message || 'Une erreur est survenue.');
     } finally {
       setCreating(false);
     }

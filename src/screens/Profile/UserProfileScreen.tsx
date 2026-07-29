@@ -9,7 +9,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, Alert, FlatList, Dimensions,
+  StyleSheet, ActivityIndicator, FlatList, Dimensions,
   InteractionManager,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { BackButton, SkeletonUserProfile, VerifiedBadge, PriceWithLocal } from '../../components/common';
+import { toastService, showConfirm } from '../../services';
+import { openPhoneMenu } from '../../utils/phoneMenu';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { postService } from '../../services/postService';
@@ -75,10 +77,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       if (live) {
         navigation.navigate('SimpleLiveViewer', { liveId: live.id });
       } else {
-        Alert.alert('Live introuvable', 'Ce live n\'est plus disponible.');
+        toastService.error('Live introuvable', 'Ce live n\'est plus disponible.');
       }
     } catch {
-      Alert.alert('Erreur', 'Impossible de rejoindre le live pour le moment.');
+      toastService.error('Erreur', 'Impossible de rejoindre le live pour le moment.');
     } finally {
       setJoiningLive(false);
     }
@@ -208,7 +210,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         followers_count: prev.is_followed ? prev.followers_count - 1 : prev.followers_count + 1,
       } : prev);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Action échouée');
+      toastService.error('Erreur', e?.message ?? 'Action échouée');
     } finally { setFollowLoading(false); }
   };
 
@@ -219,7 +221,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         await userService.unblock(userId);
         setIsBlocked(false);
       } else {
-        Alert.alert(
+        showConfirm(
           'Bloquer cet utilisateur',
           `${profile?.display_name ?? profile?.username ?? 'Cet utilisateur'} ne pourra plus voir vos activités ni vous contacter.`,
           [
@@ -232,7 +234,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                   setIsBlocked(true);
                   setProfile(prev => prev ? { ...prev, is_followed: false } : prev);
                 } catch (e: any) {
-                  Alert.alert('Erreur', e?.message ?? 'Action échouée');
+                  toastService.error('Erreur', e?.message ?? 'Action échouée');
                 } finally { setBlockLoading(false); }
               },
             },
@@ -241,7 +243,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         return;
       }
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Action échouée');
+      toastService.error('Erreur', e?.message ?? 'Action échouée');
     } finally { setBlockLoading(false); }
   };
 
@@ -412,10 +414,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
               ) : null}
               {profile.phone ? (
-                <View style={styles.detailRow}>
+                <TouchableOpacity style={styles.detailRow} onPress={() => openPhoneMenu(profile.phone!)} activeOpacity={0.7}>
                   <Icon name="phone" size={14} color={colors.textTertiary} />
-                  <Text style={[styles.detailText, { color: colors.textPrimary }]}>{profile.phone}</Text>
-                </View>
+                  <Text style={[styles.detailText, { color: colors.primary }]}>{profile.phone}</Text>
+                </TouchableOpacity>
               ) : null}
               {profile.created_at ? (
                 <View style={styles.detailRow}>
@@ -495,17 +497,18 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                style={[styles.msgBtn, { backgroundColor: '#3B82F618', borderColor: '#3B82F640' }]}
                 onPress={() => navigation.navigate('Chat', {
                   partnerId:   profile!.id,
                   partnerName: profile!.display_name || profile!.username,
                   avatarUrl:   profile!.avatar_url ?? undefined,
                 })}
               >
-                <Icon name="message-circle" size={16} color={colors.textPrimary} />
+                <Icon name="message-circle" size={16} color="#3B82F6" />
+                <Text style={[styles.msgBtnLabel, { color: '#3B82F6' }]}>Message</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.msgBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                style={[styles.msgBtn, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B40' }]}
                 onPress={() => navigation.navigate('Transfer', {
                   recipientId:     profile!.id,
                   recipientName:   profile!.display_name || profile!.username,
@@ -513,11 +516,12 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 })}
               >
                 <Text style={{ fontSize: 16 }}>🪙</Text>
+                <Text style={[styles.msgBtnLabel, { color: '#F59E0B' }]}>Envoyer</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.msgBtn, {
                   backgroundColor: isBlocked ? '#FF3B3018' : colors.surfaceElevated,
-                  borderColor: isBlocked ? '#FF3B30' : colors.border,
+                  borderColor: isBlocked ? '#FF3B3040' : colors.border,
                 }]}
                 onPress={handleBlock}
                 disabled={blockLoading}
@@ -526,6 +530,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                   ? <ActivityIndicator size="small" color="#FF3B30" />
                   : <Icon name={isBlocked ? 'slash' : 'user-x'} size={16} color={isBlocked ? '#FF3B30' : colors.textSecondary} />
                 }
+                <Text style={[styles.msgBtnLabel, { color: isBlocked ? '#FF3B30' : colors.textSecondary }]}>
+                  {isBlocked ? 'Débloquer' : 'Bloquer'}
+                </Text>
               </TouchableOpacity>
             </>
           )}
@@ -677,27 +684,33 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                           activeOpacity={0.8}
                           onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
                         >
-                          {thumb ? (
-                            <Image source={{ uri: thumb }} style={styles.reelThumb} resizeMode="cover" />
-                          ) : (
-                            <LinearGradient
-                              colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
-                              style={[styles.reelThumb, styles.reelThumbTextWrap]}
-                            >
-                              {label ? (
-                                <Text style={styles.reelThumbText} numberOfLines={5}>{label}</Text>
-                              ) : (
-                                <Icon name="file-text" size={24} color="rgba(255,255,255,0.6)" />
-                              )}
-                            </LinearGradient>
-                          )}
-                          {/* overlay meta */}
-                          <View style={styles.gridOverlay}>
-                            <View style={styles.gridMetaRow}>
-                              <Icon name="heart" size={11} color="#fff" />
-                              <Text style={styles.gridMetaText}>{likes}</Text>
-                              <Icon name="message-circle" size={11} color="#fff" />
-                              <Text style={styles.gridMetaText}>{cmts}</Text>
+                          {/* Wrapper dédié pour l'image/dégradé + son overlay de stats — gridOverlay
+                              doit se coller au bas de l'IMAGE, pas de toute la carte (qui inclut
+                              aussi la légende en dessous) : sans ce wrapper, position:absolute
+                              bottom:0 se calait par rapport à la carte entière et recouvrait le
+                              texte de la légende au lieu du bas de la vignette. */}
+                          <View style={styles.reelThumbWrap}>
+                            {thumb ? (
+                              <Image source={{ uri: thumb }} style={styles.reelThumb} resizeMode="cover" />
+                            ) : (
+                              <LinearGradient
+                                colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
+                                style={[styles.reelThumb, styles.reelThumbTextWrap]}
+                              >
+                                {label ? (
+                                  <Text style={styles.reelThumbText} numberOfLines={4}>{label}</Text>
+                                ) : (
+                                  <Icon name="file-text" size={24} color="rgba(255,255,255,0.6)" />
+                                )}
+                              </LinearGradient>
+                            )}
+                            <View style={styles.gridOverlay}>
+                              <View style={styles.gridMetaRow}>
+                                <Icon name="heart" size={11} color="#fff" />
+                                <Text style={styles.gridMetaText}>{likes}</Text>
+                                <Icon name="message-circle" size={11} color="#fff" />
+                                <Text style={styles.gridMetaText}>{cmts}</Text>
+                              </View>
                             </View>
                           </View>
                           {thumb && label ? (
@@ -865,10 +878,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
               ) : null}
               {profile.phone ? (
-                <View style={styles.aboutRow}>
+                <TouchableOpacity style={styles.aboutRow} onPress={() => openPhoneMenu(profile.phone!)} activeOpacity={0.7}>
                   <Icon name="phone" size={16} color={colors.textTertiary} />
-                  <Text style={[styles.aboutText, { color: colors.textPrimary }]}>{profile.phone}</Text>
-                </View>
+                  <Text style={[styles.aboutText, { color: colors.primary }]}>{profile.phone}</Text>
+                </TouchableOpacity>
               ) : null}
               {profile.date_of_birth ? (
                 <View style={styles.aboutRow}>
@@ -1052,8 +1065,10 @@ const styles = StyleSheet.create({
   },
   followLabel: { fontSize: 15, fontWeight: '700' },
   msgBtn: {
-    width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+    minWidth: 64, paddingHorizontal: 8, paddingVertical: 9, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, gap: 3,
   },
+  msgBtnLabel: { fontSize: 10, fontWeight: '700' },
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   tabBar: {
@@ -1100,8 +1115,9 @@ const styles = StyleSheet.create({
   reelCard: {
     width: (W - 24 - 10) / 3, borderRadius: 8, overflow: 'hidden', marginBottom: 4,
   },
+  reelThumbWrap: { position: 'relative' },
   reelThumb: { width: '100%', aspectRatio: 9 / 16 },
-  reelThumbTextWrap: { alignItems: 'center', justifyContent: 'center', padding: 10 },
+  reelThumbTextWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 10 },
   reelThumbText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center', lineHeight: 16 },
   gridOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,

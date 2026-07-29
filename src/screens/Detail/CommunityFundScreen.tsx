@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl, Modal,
+  ActivityIndicator, RefreshControl, Modal,
   TextInput, KeyboardAvoidingView, Platform, ScrollView, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
+import { toastService, showConfirm } from '../../services';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -206,9 +207,9 @@ export const CommunityFundScreen: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const handleCreate = async () => {
-    if (!formTitle.trim()) { Alert.alert('Erreur', 'Le titre est requis.'); return; }
+    if (!formTitle.trim()) { toastService.error('Erreur', 'Le titre est requis.'); return; }
     const amount = parseInt(formAmount, 10);
-    if (!amount || amount < 1) { Alert.alert('Erreur', 'Le montant doit être supérieur à 0.'); return; }
+    if (!amount || amount < 1) { toastService.error('Erreur', 'Le montant doit être supérieur à 0.'); return; }
     setSaving(true);
     try {
       await apiClient.post(BASE, {
@@ -221,12 +222,12 @@ export const CommunityFundScreen: React.FC = () => {
       setFormTitle(''); setFormDesc(''); setFormAmount(''); setFormDeadline(null);
       load();
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible de créer la cotisation.');
+      toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible de créer la cotisation.');
     } finally { setSaving(false); }
   };
 
   const handlePay = async (c: Cotisation) => {
-    Alert.alert(
+    showConfirm(
       `Payer ${c.amount_per_member} GoGold`,
       `Confirmer votre participation à "${c.title}" ?\n${c.amount_per_member} GoGold seront débités de votre wallet.`,
       [
@@ -242,7 +243,7 @@ export const CommunityFundScreen: React.FC = () => {
               const status = e?.response?.status;
               const detail = e?.response?.data?.detail ?? '';
               if (status === 402) {
-                Alert.alert(
+                showConfirm(
                   'Solde insuffisant',
                   `Il vous faut ${c.amount_per_member} GoGold pour participer à cette cotisation.\n\nRechargez votre wallet pour continuer.`,
                   [
@@ -251,7 +252,7 @@ export const CommunityFundScreen: React.FC = () => {
                   ],
                 );
               } else {
-                Alert.alert('Erreur', detail || 'Impossible de payer. Réessayez.');
+                toastService.error('Erreur', detail || 'Impossible de payer. Réessayez.');
               }
             } finally { setPaying(null); }
           },

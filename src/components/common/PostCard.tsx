@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, Image, StyleSheet, Alert,
+  View, Text, TouchableOpacity, Image, StyleSheet,
   Modal, TextInput, KeyboardAvoidingView, Platform, Dimensions,
   FlatList, StatusBar, ActivityIndicator,
 } from 'react-native';
@@ -21,6 +21,8 @@ import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
 import { favoriteService } from '../../services/favoriteService';
 import { socialService } from '../../services/socialService';
+import { toastService } from '../../services/toastService';
+import { showConfirm } from '../../services/confirmService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 import { RichText } from './RichText';
 import { ShareBottomSheet } from './ShareBottomSheet';
@@ -238,11 +240,11 @@ const PostCardInner: React.FC<PostCardProps> = ({
   }, []);
 
   const handleDelete = useCallback(() => {
-    Alert.alert('Supprimer', 'Supprimer ce post ?', [
+    showConfirm('Supprimer', 'Supprimer ce post ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try { await postService.delete(post.id); onDelete?.(post.id); }
-        catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+        catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
       }},
     ]);
   }, [post.id, onDelete]);
@@ -254,7 +256,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
       await postService.update(post.id, { body: editBody.trim() });
       post.body = editBody.trim();
       setEditOpen(false);
-    } catch { Alert.alert('Erreur', 'Impossible de modifier.'); }
+    } catch { toastService.error('Erreur', 'Impossible de modifier.'); }
     finally { setEditSaving(false); }
   }, [editBody, post.id]);
 

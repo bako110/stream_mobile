@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   Modal, View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Animated, Dimensions, Alert,
+  ScrollView, ActivityIndicator, Animated, Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
+import { toastService } from '../../services';
 
 const { width: W } = Dimensions.get('window');
 
@@ -49,7 +50,7 @@ export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverN
   const handleSend = async () => {
     if (!selected) return;
     if (balance < selected.gogold_cost) {
-      Alert.alert('GoGold insuffisants', 'Rechargez votre wallet pour envoyer ce cadeau.');
+      toastService.error('GoGold insuffisants', 'Rechargez votre wallet pour envoyer ce cadeau.');
       return;
     }
     setSending(true);
@@ -67,7 +68,7 @@ export const GiftPickerModal: React.FC<Props> = ({ reelId, receiverId, receiverN
         Animated.timing(flyOpacity, { toValue: 0,    duration: 900, useNativeDriver: true }),
       ]).start(() => setTimeout(onClose, 300));
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible d\'envoyer le cadeau');
+      toastService.error('Erreur', e?.message ?? 'Impossible d\'envoyer le cadeau');
     } finally {
       setSending(false);
     }

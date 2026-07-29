@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, TextInput, Modal, Pressable,
+  ActivityIndicator, TextInput, Modal, Pressable,
   Image, ScrollView, Platform, KeyboardAvoidingView, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -10,8 +10,9 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { communityService } from '../../services/communityService';
+import { toastService, showConfirm } from '../../services';
 import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, CommunityChannelMember, CommunityMemberData, ChannelType, UpdateChannelPayload } from '../../services/communityService';
 
@@ -111,14 +112,14 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
         const res = await apiClient.upload<{ uploaded: { url: string }[] }>(Endpoints.upload.images('communities'), fd);
         const url = res.data?.uploaded?.[0]?.url;
         if (url) setAvatarUrl(url);
-      } catch { Alert.alert('Erreur', 'Impossible de télécharger la photo.'); }
+      } catch { toastService.error('Erreur', 'Impossible de télécharger la photo.'); }
       finally { setAvatarLoading(false); }
     });
   };
 
   const handleSave = async () => {
     const name = formName.trim();
-    if (!name) { Alert.alert('Nom requis'); return; }
+    if (!name) { toastService.warning('Nom requis'); return; }
     setSaving(true);
     try {
       const payload: UpdateChannelPayload = {
@@ -134,19 +135,19 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
       setChannel(updated);
       setFormPassword('');
       setRemovePwd(false);
-      Alert.alert('Succès', 'Canal mis à jour.');
-    } catch { Alert.alert('Erreur', 'Impossible de sauvegarder.'); }
+      toastService.success('Succès', 'Canal mis à jour.');
+    } catch { toastService.error('Erreur', 'Impossible de sauvegarder.'); }
     finally { setSaving(false); }
   };
 
   const handleDeleteChannel = () => {
-    Alert.alert('Supprimer le canal', `Supprimer "${channel?.name}" ? Cette action est irréversible.`, [
+    showConfirm('Supprimer le canal', `Supprimer "${channel?.name}" ? Cette action est irréversible.`, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try {
           await communityService.deleteChannel(communityId, channelId);
           nav.goBack();
-        } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+        } catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
       }},
     ]);
   };
@@ -168,19 +169,19 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
       setMembers(prev => [...prev, added]);
       setCommunityMembers(prev => prev.filter(x => x.user_id !== m.user_id));
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible d\'ajouter ce membre.');
+      toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible d\'ajouter ce membre.');
     } finally { setAddingUser(null); }
   };
 
   const handleRemoveMember = (m: CommunityChannelMember) => {
     setMenuMember(null);
-    Alert.alert('Retirer', `Retirer ${m.display_name || m.username} du canal ?`, [
+    showConfirm('Retirer', `Retirer ${m.display_name || m.username} du canal ?`, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Retirer', style: 'destructive', onPress: async () => {
         try {
           await communityService.removeChannelMember(communityId, channelId, m.user_id);
           setMembers(prev => prev.filter(x => x.user_id !== m.user_id));
-        } catch { Alert.alert('Erreur'); }
+        } catch { toastService.error('Erreur'); }
       }},
     ]);
   };
@@ -190,7 +191,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
     try {
       const updated = await communityService.updateChannelMemberRole(communityId, channelId, m.user_id, role);
       setMembers(prev => prev.map(x => x.user_id === m.user_id ? updated : x));
-    } catch { Alert.alert('Erreur', 'Impossible de modifier le rôle.'); }
+    } catch { toastService.error('Erreur', 'Impossible de modifier le rôle.'); }
   };
 
   const renderMember = ({ item: m }: { item: CommunityChannelMember }) => (
@@ -228,7 +229,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
     return (
       <View style={[S.root, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-        <ActivityIndicator size="large" color={colors.primary} />
+        <GoFolyXLoader fullScreen color={colors.primary} />
       </View>
     );
   }

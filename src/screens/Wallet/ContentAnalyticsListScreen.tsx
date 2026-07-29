@@ -12,7 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 import { analyticsService } from '../../services/analyticsService';
 import type { AnalyticsPeriod, AnalyticsContentType, ContentStatItem } from '../../services/analyticsService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -82,9 +82,7 @@ export const ContentAnalyticsListScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
+        <GoFolyXLoader fullScreen color={colors.primary} />
       ) : items.length === 0 ? (
         <View style={s.emptyWrap}>
           <Icon name="bar-chart-2" size={32} color={colors.textTertiary} />

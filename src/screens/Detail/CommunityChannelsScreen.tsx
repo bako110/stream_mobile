@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, TextInput, Modal, Pressable,
+  ActivityIndicator, TextInput, Modal, Pressable,
   KeyboardAvoidingView, Platform, ScrollView, Image, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -14,6 +14,7 @@ import { communityService } from '../../services/communityService';
 import { BackButton, GoFolyXLoader } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, ChannelType } from '../../services/communityService';
+import { toastService, showConfirm } from '../../services';
 
 interface RouteParams {
   communityId: string;
@@ -130,14 +131,14 @@ export const CommunityChannelsScreen: React.FC = () => {
         const res = await apiClient.upload<{ uploaded: { url: string }[] }>(Endpoints.upload.images('communities'), fd);
         const url = res.data?.uploaded?.[0]?.url;
         if (url) setFormAvatar(url);
-      } catch { Alert.alert('Erreur', 'Impossible de télécharger la photo.'); }
+      } catch { toastService.error('Erreur', 'Impossible de télécharger la photo.'); }
       finally { setAvatarUploading(false); }
     });
   };
 
   const handleSave = async () => {
     const name = formName.trim();
-    if (!name) { Alert.alert('Nom requis', 'Le nom du canal ne peut pas être vide.'); return; }
+    if (!name) { toastService.warning('Nom requis', 'Le nom du canal ne peut pas être vide.'); return; }
     setSaving(true);
     try {
       const payload: any = {
@@ -159,12 +160,12 @@ export const CommunityChannelsScreen: React.FC = () => {
         setChannels(prev => [...prev, created]);
       }
       setCreateOpen(false);
-    } catch { Alert.alert('Erreur', editChannel ? 'Impossible de modifier le canal.' : 'Impossible de créer le canal.'); }
+    } catch { toastService.error('Erreur', editChannel ? 'Impossible de modifier le canal.' : 'Impossible de créer le canal.'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = (ch: CommunityChannel) => {
-    Alert.alert(
+    showConfirm(
       'Supprimer le canal',
       `Supprimer "${ch.name}" ? Tous les messages seront perdus.`,
       [
@@ -173,7 +174,7 @@ export const CommunityChannelsScreen: React.FC = () => {
           try {
             await communityService.deleteChannel(communityId, ch.id);
             setChannels(prev => prev.filter(c => c.id !== ch.id));
-          } catch { Alert.alert('Erreur', 'Impossible de supprimer le canal.'); }
+          } catch { toastService.error('Erreur', 'Impossible de supprimer le canal.'); }
         }},
       ],
     );
@@ -181,7 +182,7 @@ export const CommunityChannelsScreen: React.FC = () => {
 
   const openChannel = (ch: CommunityChannel) => {
     if (ch.type === 'voice') {
-      Alert.alert('Bientôt disponible', 'Les canaux vocaux arrivent prochainement !');
+      toastService.info('Bientôt disponible', 'Les canaux vocaux arrivent prochainement !');
       return;
     }
     if (ch.has_password && !canManage) {
@@ -215,7 +216,7 @@ export const CommunityChannelsScreen: React.FC = () => {
         isAnnouncement: ch.type === 'announcement',
       });
     } catch (e: any) {
-      Alert.alert('Accès refusé', e?.response?.data?.detail ?? 'Mot de passe incorrect.');
+      toastService.error('Accès refusé', e?.response?.data?.detail ?? 'Mot de passe incorrect.');
     } finally { setJoining(false); }
   };
 

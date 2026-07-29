@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  Modal, Share, Alert, Platform, Linking,
+  Modal, Share, Platform, Linking,
   Dimensions, StyleSheet, StatusBar, InteractionManager, ActivityIndicator,
 } from 'react-native';
 import Animated, {
@@ -15,7 +15,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFolyXLoader, FriendsWhoLiked, PriceWithLocal } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
-import { concertService, socialService, authService } from '../../services';
+import { concertService, socialService, authService, toastService, showConfirm } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
@@ -406,11 +406,11 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
   const handleEdit   = () => nav.navigate('CreateConcert' as any, { concertId });
   const handleDelete = () => {
-    Alert.alert('Supprimer', 'Cette action est irréversible.', [
+    showConfirm('Supprimer', 'Cette action est irréversible.', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try { await concertService.delete(concertId); onBack?.(); }
-        catch (e: any) { Alert.alert('Erreur', e?.message ?? 'Impossible de supprimer.'); }
+        catch (e: any) { toastService.error('Erreur', e?.message ?? 'Impossible de supprimer.'); }
       }},
     ]);
   };

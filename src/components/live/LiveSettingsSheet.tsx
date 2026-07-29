@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  ScrollView, TextInput, FlatList, ActivityIndicator, Alert, Image,
+  ScrollView, TextInput, FlatList, ActivityIndicator, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -17,6 +17,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { liveService, type LiveStream, type BannedUser } from '../../services/liveService';
+import { toastService, showConfirm } from '../../services';
 
 interface HandRequest {
   identity: string;
@@ -97,15 +98,15 @@ const MonetForm: React.FC<{
     if (!type) return;
     if (type === 'gogold') {
       const v = parseInt(GoGold, 10);
-      if (!v || v < 1) { Alert.alert('Erreur', 'Entre un montant valide.'); return; }
+      if (!v || v < 1) { toastService.error('Erreur', 'Entre un montant valide.'); return; }
     }
-    if (type === 'gift' && !gift) { Alert.alert('Erreur', 'Choisis un cadeau requis.'); return; }
+    if (type === 'gift' && !gift) { toastService.error('Erreur', 'Choisis un cadeau requis.'); return; }
     setSaving(true);
     try {
       await onSave(type, type === 'gogold' ? parseInt(GoGold, 10) : null, type === 'gift' ? gift : null);
       setShowForm(false);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? e?.message ?? 'Impossible de sauvegarder.');
+      toastService.error('Erreur', e?.response?.data?.detail ?? e?.message ?? 'Impossible de sauvegarder.');
     }
     setSaving(false);
   };
@@ -252,7 +253,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   }, [visible, loadBans]);
 
   const handleUnban = (user: BannedUser) => {
-    Alert.alert(
+    showConfirm(
       'Débannir cet utilisateur',
       `${user.display_name ?? user.username ?? 'Cet utilisateur'} pourra à nouveau rejoindre tes lives.`,
       [
@@ -265,7 +266,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
               await liveService.unban(user.banned_user_id);
               setBannedUsers(prev => prev.filter(u => u.banned_user_id !== user.banned_user_id));
             } catch {
-              Alert.alert('Erreur', 'Impossible de débannir cet utilisateur.');
+              toastService.error('Erreur', 'Impossible de débannir cet utilisateur.');
             }
             setUnbanningId(null);
           },
@@ -294,7 +295,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   };
 
   const removeAccessMonet = () => {
-    Alert.alert('Retirer la monetisation', 'Les prochains viewers pourront rejoindre gratuitement.', [
+    showConfirm('Retirer la monetisation', 'Les prochains viewers pourront rejoindre gratuitement.', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Confirmer', style: 'destructive',
@@ -328,7 +329,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   };
 
   const removeStageMonet = () => {
-    Alert.alert('Retirer la condition scene', 'Les viewers pourront lever la main gratuitement.', [
+    showConfirm('Retirer la condition scene', 'Les viewers pourront lever la main gratuitement.', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Confirmer', style: 'destructive',
@@ -343,7 +344,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   };
 
   const confirmStop = () => {
-    Alert.alert('Terminer le live', 'Es-tu sur de vouloir terminer ce live ?', [
+    showConfirm('Terminer le live', 'Es-tu sur de vouloir terminer ce live ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Terminer', style: 'destructive', onPress: onStopLive },
     ]);

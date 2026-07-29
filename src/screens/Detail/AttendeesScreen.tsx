@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, Image, TextInput, Platform, StatusBar,
-  Alert,
 } from 'react-native';
 
 const TIER_COLORS: Record<string, string> = {
@@ -20,7 +19,8 @@ import { eventService } from '../../services';
 import { Endpoints, getAuthToken } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
 import type { EventAttendee } from '../../types/event';
-import { BackButton, PriceWithLocal } from '../../components/common';
+import { BackButton, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { toastService } from '../../services';
 
 interface Props {
   eventId:    string;
@@ -50,7 +50,7 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
       setAttendees(data);
       setFiltered(data);
     } catch {
-      Alert.alert('Erreur', 'Impossible de charger la liste des inscrits.');
+      toastService.error('Erreur', 'Impossible de charger la liste des inscrits.');
     } finally {
       setLoading(false);
     }
@@ -90,7 +90,7 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
         await ReactNativeBlobUtil.android.actionViewIntent(res.path(), 'application/pdf');
       }
     } catch {
-      Alert.alert('Export', 'Impossible d\'exporter la liste pour le moment.');
+      toastService.error('Export', 'Impossible d\'exporter la liste pour le moment.');
     } finally {
       setExporting(false);
     }
@@ -258,7 +258,7 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <GoFolyXLoader color={colors.primary} />
           <Text style={{ color: colors.textTertiary }}>Chargement des inscrits...</Text>
         </View>
       ) : (

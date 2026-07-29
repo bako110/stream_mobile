@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity, Dimensions,
   StatusBar, StyleSheet, Animated, PanResponder,
-  TouchableWithoutFeedback, Alert, TextInput, Modal, Platform,
+  TouchableWithoutFeedback, TextInput, Modal, Platform,
   FlatList, ActivityIndicator, Easing, Linking,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { StoryGroup, StoryViewerUser } from '../../types/story';
 import { storyService } from '../../services/storyService';
+import { showConfirm } from '../../services/confirmService';
 import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
 import { GoFolyXLoader, HeartRain, LikeNamesFeed } from '../common';
@@ -939,7 +940,7 @@ export const StoryViewer: React.FC<Props> = ({
 
   const handleDelete = () => {
     setMenuOpen(false);
-    Alert.alert('Supprimer', 'Supprimer cette story ?', [
+    showConfirm('Supprimer', 'Supprimer cette story ?', [
       { text: 'Annuler', style: 'cancel', onPress: () => setPaused(false) },
       {
         text: 'Supprimer', style: 'destructive', onPress: async () => {

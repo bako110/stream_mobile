@@ -7,7 +7,7 @@ import { Camera, CameraType } from 'react-native-camera-kit';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, PriceWithLocal } from '../../components/common';
+import { BackButton, PriceWithLocal, GoFolyXLoader } from '../../components/common';
 import { eventService } from '../../services/eventService';
 import type { TicketScanResult } from '../../types';
 
@@ -135,7 +135,7 @@ export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBa
         </View>
       ) : state === 'loading' ? (
         <View style={st.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <GoFolyXLoader color={colors.primary} />
           <Text style={[st.loadingTxt, { color: '#fff' }]}>Vérification en cours...</Text>
         </View>
       ) : (

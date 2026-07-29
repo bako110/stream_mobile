@@ -8,7 +8,7 @@ import React, {
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
-  ActivityIndicator, Keyboard, Image, Modal, Alert,
+  ActivityIndicator, Keyboard, Image, Modal,
   Dimensions, Linking, PermissionsAndroid,
 } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -31,12 +31,13 @@ import { backgroundUploadService } from '../../services/backgroundUploadService'
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { useWs } from '../../context/WebSocketContext';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
-import { AvatarWithBadge } from '../../components/common';
+import { AvatarWithBadge, GoFolyXLoader } from '../../components/common';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { ConversationSummary, ConversationRequestStatus } from '../../services/messageService';
 import { useMediaDownload, fmtSize } from '../../hooks/useMediaDownload';
 import { getChatBackground } from '../../assets';
+import { toastService, showConfirm } from '../../services';
 
 interface RouteParams {
   partnerId:   string;
@@ -441,7 +442,7 @@ export const ChatScreen: React.FC = () => {
         { title: 'Microphone', message: 'L\'app a besoin du micro pour enregistrer un vocal.', buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission', 'Microphone requis pour enregistrer un vocal');
+        toastService.warning('Permission', 'Microphone requis pour enregistrer un vocal');
         return;
       }
     }
@@ -491,7 +492,7 @@ export const ChatScreen: React.FC = () => {
       setMessages(prev => prev.map(m => m.id === tempId ? msg : m));
     } catch {
       setMessages(prev => prev.filter(m => m.id !== tempId));
-      Alert.alert('Erreur', 'Impossible d\'envoyer le vocal');
+      toastService.error('Erreur', 'Impossible d\'envoyer le vocal');
     }
   };
 
@@ -525,13 +526,13 @@ export const ChatScreen: React.FC = () => {
     const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 as any });
     if (result.didCancel) return;
     if (result.errorCode) {
-      Alert.alert('Erreur', result.errorMessage ?? "Impossible d'accéder à la galerie.");
+      toastService.error('Erreur', result.errorMessage ?? "Impossible d'accéder à la galerie.");
       return;
     }
     const asset = result.assets?.[0];
     if (!asset?.uri) return;
     if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
-      Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+      toastService.error('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
       return;
     }
     openImagePreview(asset.uri, asset.fileName, asset.type);
@@ -543,7 +544,7 @@ export const ChatScreen: React.FC = () => {
     const asset = result.assets?.[0];
     if (!asset?.uri) return;
     if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
-      Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+      toastService.error('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
       return;
     }
     openImagePreview(asset.uri, asset.fileName, asset.type);
@@ -562,7 +563,7 @@ export const ChatScreen: React.FC = () => {
       setMessages(prev => [msg, ...prev]);
     } catch (err) {
       console.warn('[ChatScreen] envoi image échoué:', err);
-      Alert.alert('Erreur', "Impossible d'envoyer l'image");
+      toastService.error('Erreur', "Impossible d'envoyer l'image");
     } finally {
       setImgUploading(false);
       setImgPreviewOpen(false);
@@ -579,7 +580,7 @@ export const ChatScreen: React.FC = () => {
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
       if (asset.fileSize != null && asset.fileSize > 30 * 1024 * 1024) {
-        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        toastService.error('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
         return;
       }
 
@@ -595,15 +596,15 @@ export const ChatScreen: React.FC = () => {
             );
             setMessages(prev => [msg, ...prev]);
           } catch {
-            Alert.alert('Erreur', "Impossible d'envoyer le message vidéo.");
+            toastService.error('Erreur', "Impossible d'envoyer le message vidéo.");
           }
         },
         onError: () => {
-          Alert.alert('Erreur', "L'upload de la vidéo a échoué. Réessaie.");
+          toastService.error('Erreur', "L'upload de la vidéo a échoué. Réessaie.");
         },
       });
     } catch {
-      Alert.alert('Erreur', 'Impossible de lire la vidéo sélectionnée.');
+      toastService.error('Erreur', 'Impossible de lire la vidéo sélectionnée.');
     }
   };
 
@@ -614,7 +615,7 @@ export const ChatScreen: React.FC = () => {
       const file = res[0];
       if (!file?.uri) return;
       if (file.size != null && file.size > 30 * 1024 * 1024) {
-        Alert.alert('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
+        toastService.error('Fichier trop volumineux', 'La taille maximale autorisée est de 30 Mo.');
         return;
       }
       setFilePreview({ uri: file.uri, name: file.name ?? `fichier_${Date.now()}`, size: file.size ?? undefined, mimeType: file.type ?? undefined });
@@ -622,7 +623,7 @@ export const ChatScreen: React.FC = () => {
       setFilePreviewOpen(true);
     } catch (e: any) {
       const isCanceled = isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED;
-      if (!isCanceled) Alert.alert('Erreur', "Impossible d'ouvrir le fichier");
+      if (!isCanceled) toastService.error('Erreur', "Impossible d'ouvrir le fichier");
     }
   };
 
@@ -646,7 +647,7 @@ export const ChatScreen: React.FC = () => {
       setFileCaption('');
     } catch (e: any) {
       console.error('[ChatScreen] sendFile error:', e?.message ?? e);
-      Alert.alert('Erreur', e?.message ?? "Impossible d'envoyer le fichier");
+      toastService.error('Erreur', e?.message ?? "Impossible d'envoyer le fichier");
     } finally {
       setFileUploading(false);
     }
@@ -664,14 +665,14 @@ export const ChatScreen: React.FC = () => {
           { latitude, longitude, address: null },
         );
         setMessages(prev => [msg, ...prev]);
-      } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+      } catch { toastService.error('Erreur', 'Impossible d\'envoyer la localisation.'); }
     };
     Geolocation.getCurrentPosition(
       doSend,
       () => {
         Geolocation.getCurrentPosition(
           doSend,
-          (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
+          (err) => { setLocating(false); toastService.error('Erreur GPS', err.message); },
           { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
         );
       },
@@ -689,7 +690,7 @@ export const ChatScreen: React.FC = () => {
 
   const handleBlockUser = () => {
     setShowMoreMenu(false);
-    Alert.alert(
+    showConfirm(
       'Bloquer cet utilisateur',
       `Bloquer ${partnerName} ? Vous ne pourrez plus échanger de messages.`,
       [
@@ -700,7 +701,7 @@ export const ChatScreen: React.FC = () => {
               await userService.blockUser(partnerId);
               setIsBlocked(true);
             } catch {
-              Alert.alert('Erreur', 'Impossible de bloquer cet utilisateur.');
+              toastService.error('Erreur', 'Impossible de bloquer cet utilisateur.');
             }
           },
         },
@@ -712,7 +713,7 @@ export const ChatScreen: React.FC = () => {
     setShowMoreMenu(false);
     const myCount    = messages.filter(m => m.sender_id === myId && !m.deleted).length;
     const theirCount = messages.filter(m => m.sender_id !== myId && !m.deleted).length;
-    Alert.alert(
+    showConfirm(
       'Vider la conversation',
       `Cette action va :\n\n• Supprimer définitivement vos ${myCount} message${myCount > 1 ? 's' : ''} pour tout le monde\n• Masquer les ${theirCount} message${theirCount > 1 ? 's' : ''} reçus de votre côté uniquement\n\nCette action est irréversible.`,
       [
@@ -753,9 +754,9 @@ export const ChatScreen: React.FC = () => {
     setShowForwardPicker(false);
     try {
       await messageService.forwardMessage(forwardingMsg.id, receiverId);
-      Alert.alert('Transféré', `Message transféré à ${receiverName}`);
+      toastService.success('Transféré', `Message transféré à ${receiverName}`);
     } catch {
-      Alert.alert('Erreur', 'Impossible de transférer ce message');
+      toastService.error('Erreur', 'Impossible de transférer ce message');
     }
     setForwardingMsg(null);
   };
@@ -774,7 +775,7 @@ export const ChatScreen: React.FC = () => {
         setPinnedMessages(prev => [{ ...msg, pinned: true }, ...prev.filter(m => m.id !== msg.id)]);
       }
     } catch {
-      Alert.alert('Erreur', "Impossible de modifier l'épingle");
+      toastService.error('Erreur', "Impossible de modifier l'épingle");
     }
   };
 
@@ -787,7 +788,7 @@ export const ChatScreen: React.FC = () => {
       await messageService.deleteMessageForMe(msgId);
       setMessages(prev => prev.filter(m => m.id !== msgId));
     } catch {
-      Alert.alert('Erreur', 'Impossible de supprimer ce message');
+      toastService.error('Erreur', 'Impossible de supprimer ce message');
     }
   };
 
@@ -880,7 +881,7 @@ export const ChatScreen: React.FC = () => {
           : m,
       ));
     } catch {
-      Alert.alert('Erreur', 'Impossible de modifier le message');
+      toastService.error('Erreur', 'Impossible de modifier le message');
     } finally {
       cancelEdit();
     }
@@ -889,7 +890,7 @@ export const ChatScreen: React.FC = () => {
   const confirmDelete = () => {
     if (!selectedMsg) return;
     setShowActions(false);
-    Alert.alert(
+    showConfirm(
       'Supprimer le message',
       'Ce message sera supprimé pour tous les participants.',
       [
@@ -904,7 +905,7 @@ export const ChatScreen: React.FC = () => {
                   : m,
               ));
             } catch {
-              Alert.alert('Erreur', 'Impossible de supprimer le message');
+              toastService.error('Erreur', 'Impossible de supprimer le message');
             } finally {
               setSelectedMsg(null);
             }
@@ -1450,7 +1451,7 @@ export const ChatScreen: React.FC = () => {
 
       {/* Messages */}
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>
+        <GoFolyXLoader fullScreen color={colors.primary} />
       ) : (
         <FlatList
           ref={listRef}

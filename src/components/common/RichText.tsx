@@ -2,13 +2,22 @@ import React, { useState, useCallback } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, Linking, StyleProp, TextStyle } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinkPreviewCard } from './LinkPreviewCard';
+import { openPhoneMenu } from '../../utils/phoneMenu';
 
-// Matches URLs, @mentions, #hashtags in order
-const TOKEN_RE = /(https?:\/\/[^\s<>"']+|@[\w.]+|#[\wÀ-ɏ]+)/g;
+// Matches URLs, @mentions, #hashtags, phone numbers — in order. Le numéro de
+// téléphone exige soit un + international, soit au moins un séparateur
+// (espace/point/tiret) entre les chiffres — un nombre collé (prix, date en
+// chiffres, quantité) ne matche jamais, seul un vrai numéro formaté est capturé.
+const TOKEN_RE = /(https?:\/\/[^\s<>"']+|@[\w.]+|#[\wÀ-ɏ]+|\+[0-9][0-9\s.-]{6,16}[0-9]|[0-9]{2,4}[\s.-][0-9]{2,4}(?:[\s.-][0-9]{2,4}){1,4})/g;
 
 interface Segment {
   text: string;
-  type: 'text' | 'url' | 'mention' | 'hashtag';
+  type: 'text' | 'url' | 'mention' | 'hashtag' | 'phone';
+}
+
+function isPhoneLike(token: string): boolean {
+  const digits = token.replace(/[^\d]/g, '');
+  return digits.length >= 8 && digits.length <= 15;
 }
 
 function parse(text: string): Segment[] {
@@ -19,7 +28,9 @@ function parse(text: string): Segment[] {
     const t = m[0];
     if (t.startsWith('http')) segs.push({ text: t, type: 'url' });
     else if (t.startsWith('@'))  segs.push({ text: t, type: 'mention' });
-    else                         segs.push({ text: t, type: 'hashtag' });
+    else if (t.startsWith('#'))  segs.push({ text: t, type: 'hashtag' });
+    else if (isPhoneLike(t))     segs.push({ text: t, type: 'phone' });
+    else                         segs.push({ text: t, type: 'text' });
     last = m.index! + t.length;
   }
   if (last < text.length) segs.push({ text: text.slice(last), type: 'text' });
@@ -95,6 +106,8 @@ export const RichText: React.FC<Props> = ({
     try { nav?.navigate('Search', { query: tag }); } catch {}
   };
 
+  const handlePhone = (raw: string) => openPhoneMenu(raw);
+
   const renderSegs = () => segs.map((seg, i) => {
     switch (seg.type) {
       case 'url':
@@ -123,6 +136,16 @@ export const RichText: React.FC<Props> = ({
             key={i}
             style={{ color: primaryColor, fontWeight: '600' }}
             onPress={() => handleHashtag(seg.text)}
+          >
+            {seg.text}
+          </Text>
+        );
+      case 'phone':
+        return (
+          <Text
+            key={i}
+            style={{ color: primaryColor, textDecorationLine: 'underline', fontWeight: '500' }}
+            onPress={() => handlePhone(seg.text)}
           >
             {seg.text}
           </Text>

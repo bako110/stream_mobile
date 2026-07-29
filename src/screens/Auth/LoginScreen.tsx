@@ -14,7 +14,7 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { useTheme } from '../../hooks/useTheme';
 import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
-import { authService } from '../../services';
+import { authService, showConfirm } from '../../services';
 import { PhoneOtpScreen } from './PhoneOtpScreen';
 
 GoogleSignin.configure({
@@ -109,12 +109,11 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
         if (e?.status === 403 && detail?.code === 'account_blocked') {
           setBlockedInfo({
             reason: detail?.reason ?? undefined,
-            contact: detail?.contact ?? 'support@gofolyx.app',
+            contact: detail?.contact ?? 'support@gofolyx.com',
             blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
           });
         } else if (e?.status === 403 && detail?.code === 'account_deactivated') {
-          const { Alert } = require('react-native');
-          Alert.alert(
+          showConfirm(
             'Compte désactivé',
             'Votre compte est désactivé. Voulez-vous le réactiver et vous connecter ?',
             [
@@ -161,12 +160,11 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
       if (e?.status === 403 && detail?.code === 'account_blocked') {
         setBlockedInfo({
           reason: detail?.reason ?? undefined,
-          contact: detail?.contact ?? 'support@gofolyx.app',
+          contact: detail?.contact ?? 'support@gofolyx.com',
           blockedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
         });
       } else if (e?.status === 403 && detail?.code === 'account_deactivated') {
-        const { Alert } = require('react-native');
-        Alert.alert(
+        showConfirm(
           'Compte désactivé',
           'Votre compte est désactivé. Voulez-vous le réactiver et vous connecter ?',
           [
@@ -339,7 +337,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                 </Text>
               ) : null}
               <TouchableOpacity
-                onPress={() => Linking.openURL(`mailto:${blockedInfo.contact ?? 'support@gofolyx.app'}`)}
+                onPress={() => Linking.openURL(`mailto:${blockedInfo.contact ?? 'support@gofolyx.com'}`)}
                 style={[styles.blockedContactBtn, { backgroundColor: '#EF444420', borderColor: '#EF444460' }]}
               >
                 <Icon name="mail" size={13} color="#EF4444" />

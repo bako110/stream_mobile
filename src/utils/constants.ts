@@ -52,7 +52,11 @@ export const STORAGE_KEYS = {
   LAST_USER_ID:   'gofolyx_last_user_id',
   CACHED_USER:    'gofolyx_cached_user',
   CURRENCY_CODE:  'gofolyx_currency_code',
+  ACCOUNTS:       'gofolyx_accounts_v1',
 } as const;
+
+// ── Multi-compte ───────────────────────────────────────────────────────────
+export const MAX_ACCOUNTS = 4;
 
 // ── Durées (ms) ────────────────────────────────────────────────────────────
 export const DURATIONS = {

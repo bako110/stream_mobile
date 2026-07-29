@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Share, Platform, StatusBar, Dimensions, ActivityIndicator, Alert,
+  Share, Platform, StatusBar, Dimensions, ActivityIndicator,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import LinearGradient from 'react-native-linear-gradient';
@@ -13,6 +13,7 @@ import { getAuthToken } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
 import { Endpoints } from '../../api/endpoints';
 import { BackButton, PriceWithLocal } from '../../components/common';
+import { toastService } from '../../services';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -101,7 +102,7 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
         await ReactNativeBlobUtil.android.actionViewIntent(res.path(), 'application/pdf');
       }
     } catch (err: any) {
-      Alert.alert('Erreur', `Impossible de télécharger le billet.\n${err?.message ?? String(err)}`);
+      toastService.error('Erreur', `Impossible de télécharger le billet.\n${err?.message ?? String(err)}`);
     } finally {
       setDownloading(false);
     }

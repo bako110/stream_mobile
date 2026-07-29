@@ -4,13 +4,14 @@ import React, {
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, PanResponder, Animated as RNAnimated, Dimensions, Platform,
-  StatusBar, Alert, Keyboard, ActivityIndicator, Image, PermissionsAndroid,
+  StatusBar, Keyboard, ActivityIndicator, Image, PermissionsAndroid,
 } from 'react-native';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import RNBlobUtil from 'react-native-blob-util';
 import Sound from 'react-native-sound';
 import { SoundPicker } from '../../components/story/SoundPicker';
 import { soundService } from '../../services/soundService';
+import { toastService, showConfirm } from '../../services';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
   withRepeat, withSequence, Easing,
@@ -525,7 +526,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
       });
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         setMusicPicking(false);
-        Alert.alert('Permission refusée', 'Autorisez l\'accès aux fichiers audio dans les paramètres.');
+        toastService.warning('Permission refusée', 'Autorisez l\'accès aux fichiers audio dans les paramètres.');
         return;
       }
     }
@@ -541,7 +542,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
       }
       console.warn('[handlePickMusicLocal] pick error:', e);
       setMusicPicking(false);
-      Alert.alert('Erreur', "Impossible d'ouvrir le sélecteur de fichiers.");
+      toastService.error('Erreur', "Impossible d'ouvrir le sélecteur de fichiers.");
       return;
     }
 
@@ -895,21 +896,21 @@ export const ReelEditorScreen: React.FC<Props> = ({
   }, []);
 
   const deleteLayer = useCallback((id: string) => {
-    Alert.alert('Supprimer ce texte ?', undefined, [
+    showConfirm('Supprimer ce texte ?', undefined, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => setLayers(p => p.filter(l => l.id !== id)) },
     ]);
   }, []);
 
   const deleteSticker = useCallback((id: string) => {
-    Alert.alert('Supprimer ce sticker ?', undefined, [
+    showConfirm('Supprimer ce sticker ?', undefined, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => setStickers(p => p.filter(st => st.id !== id)) },
     ]);
   }, []);
 
   const clearDrawings = useCallback(() => {
-    Alert.alert('Effacer tous les dessins ?', undefined, [
+    showConfirm('Effacer tous les dessins ?', undefined, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Effacer', style: 'destructive', onPress: () => setDrawings([]) },
     ]);
@@ -923,7 +924,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
 
   const handleConfirm = useCallback(() => {
     if (!isPhoto && !trimValid) {
-      Alert.alert(
+      toastService.error(
         'Segment invalide',
         trimSec < 1 ? 'Minimum 1 seconde.' : 'Maximum 90 secondes.',
       );

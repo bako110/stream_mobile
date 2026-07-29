@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
-  ActivityIndicator, Image, Alert, Modal, TextInput, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Image, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -16,6 +16,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { BackButton } from '../../components/common';
 import { tournamentService } from '../../services/tournamentService';
 import type { TournamentFinanceReport, TournamentFinanceParticipant, TournamentRound } from '../../services/tournamentService';
+import { toastService } from '../../services';
 
 interface RouteParams { tournamentId: string; }
 
@@ -48,7 +49,7 @@ export const TournamentFinanceScreen: React.FC = () => {
       const data = await tournamentService.getFinanceReport(tournamentId);
       setReport(data);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message || 'Impossible de charger le rapport financier.');
+      toastService.error('Erreur', e?.message || 'Impossible de charger le rapport financier.');
       nav.goBack();
     } finally {
       setLoading(false);
@@ -65,9 +66,9 @@ export const TournamentFinanceScreen: React.FC = () => {
       await tournamentService.rewardParticipant(tournamentId, rewardTarget.user_id, amount);
       setRewardTarget(null);
       setRewardAmount('');
-      Alert.alert('Récompense envoyée', `${amount.toLocaleString('fr-FR')} GoGold envoyés à ${rewardTarget.display_name ?? 'ce participant'}.`);
+      toastService.success('Récompense envoyée', `${amount.toLocaleString('fr-FR')} GoGold envoyés à ${rewardTarget.display_name ?? 'ce participant'}.`);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message || "Impossible d'envoyer la récompense.");
+      toastService.error('Erreur', e?.message || "Impossible d'envoyer la récompense.");
     } finally {
       setRewarding(false);
     }

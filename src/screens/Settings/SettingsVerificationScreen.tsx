@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, TextInput,
+  ActivityIndicator, TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import { useUser } from '../../context/UserContext';
 import { Row, Card, PageHeader } from './_shared';
+import { toastService, showConfirm } from '../../services';
 
 type VerifStatus = 'none' | 'pending' | 'approved' | 'rejected';
 type AccountType = 'artist' | 'creator' | 'public_figure' | 'brand' | 'journalist' | 'other';
@@ -86,7 +87,7 @@ export const SettingsVerificationScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     if (myGoGold !== null && myGoGold < VERIFICATION_FEE) {
-      Alert.alert(
+      showConfirm(
         'Solde insuffisant',
         `Il te faut ${VERIFICATION_FEE} GoGold pour soumettre une demande.\nTon solde actuel : ${myGoGold} GoGold.\nIl te manque ${VERIFICATION_FEE - myGoGold} GoGold.`,
         [
@@ -109,7 +110,7 @@ export const SettingsVerificationScreen: React.FC = () => {
         const walletRes = await apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance).catch(() => null);
         const realBalance = walletRes?.data?.gogold_balance ?? 0;
         setMyGoGold(realBalance);
-        Alert.alert(
+        showConfirm(
           'Solde insuffisant',
           `Ton solde est de ${realBalance} GoGold. Il te manque ${VERIFICATION_FEE - realBalance} GoGold.`,
           [
@@ -118,7 +119,7 @@ export const SettingsVerificationScreen: React.FC = () => {
           ],
         );
       } else {
-        Alert.alert('Erreur', detail || 'Impossible d\'envoyer la demande.');
+        toastService.error('Erreur', detail || 'Impossible d\'envoyer la demande.');
       }
     } finally { setLoading(false); }
   };

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Share, Alert,
+  View, Text, TouchableOpacity, StyleSheet, Share,
   ActivityIndicator, Linking, ScrollView, StatusBar,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -11,6 +11,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
+import { toastService, showConfirm } from '../../services';
 
 const SHARE_BASE = 'https://gofolyx.com/join';
 
@@ -55,7 +56,7 @@ export const CommunityInviteScreen: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const handleRegenerate = () => {
-    Alert.alert(
+    showConfirm(
       'Nouveau code',
       "L'ancien code ne fonctionnera plus. Continuer ?",
       [
@@ -68,7 +69,7 @@ export const CommunityInviteScreen: React.FC = () => {
             );
             setCode(res.data.invite_code);
           } catch (e: any) {
-            Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.');
+            toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.');
           } finally { setRegenerating(false); }
         }},
       ],
@@ -100,7 +101,7 @@ export const CommunityInviteScreen: React.FC = () => {
     if (supported) {
       await Linking.openURL(url);
     } else {
-      Alert.alert('WhatsApp non disponible', 'WhatsApp n\'est pas installé sur cet appareil.');
+      toastService.warning('WhatsApp non disponible', 'WhatsApp n\'est pas installé sur cet appareil.');
     }
   };
 
@@ -108,7 +109,7 @@ export const CommunityInviteScreen: React.FC = () => {
     const encoded = encodeURIComponent(shareText);
     const url = `sms:?body=${encoded}`;
     await Linking.openURL(url).catch(() =>
-      Alert.alert('Erreur', 'Impossible d\'ouvrir les SMS.')
+      toastService.error('Erreur', 'Impossible d\'ouvrir les SMS.')
     );
   };
 

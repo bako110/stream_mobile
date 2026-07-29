@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator,
+  TextInput, ActivityIndicator,
   KeyboardAvoidingView, Platform, PermissionsAndroid, Linking,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
@@ -13,8 +13,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useCurrency } from '../../hooks/useCurrency';
-import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal } from '../../components/common';
-import { concertService } from '../../services';
+import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { concertService, toastService, showConfirm } from '../../services';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { apiClient } from '../../api';
 import type { ConcertType, AccessType, ConcertCreate } from '../../types';
@@ -136,7 +136,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
       if (c.video_url)     setVideoUrl(c.video_url);
       const imgs = [c.thumbnail_url, c.banner_url].filter(Boolean) as string[];
       setGalleryUrls(imgs);
-    }).catch(() => Alert.alert('Erreur', 'Impossible de charger le concert.'))
+    }).catch(() => toastService.error('Erreur', 'Impossible de charger le concert.'))
       .finally(() => setLoadingData(false));
   }, [concertId]);
 
@@ -163,7 +163,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
 
   const goNext = () => {
     const err = validateStep(step);
-    if (err) { Alert.alert('Champs manquants', err); return; }
+    if (err) { toastService.warning('Champs manquants', err); return; }
     setStep(s => Math.min(s + 1, STEPS.length - 1));
   };
 
@@ -180,7 +180,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
         { title: 'Localisation', message: 'GoFolyX a besoin de votre position pour remplir le lieu.', buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission refusée', 'Activez la localisation dans les paramètres.');
+        toastService.warning('Permission refusée', 'Activez la localisation dans les paramètres.');
         return;
       }
     }
@@ -204,12 +204,12 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
           setCountry(addr.country ?? '');
           if (addr.road) setVenueName(addr.road);
         } catch {
-          Alert.alert('Erreur', 'Impossible de récupérer la position.');
+          toastService.error('Erreur', 'Impossible de récupérer la position.');
         } finally { setLocating(false); }
       },
       () => {
         setLocating(false);
-        Alert.alert('Erreur GPS', 'Position introuvable. Vérifiez votre GPS.');
+        toastService.error('Erreur GPS', 'Position introuvable. Vérifiez votre GPS.');
       },
       { enableHighAccuracy: true, timeout: 10000 },
     );
@@ -244,20 +244,20 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
   // ── Brouillon ────────────────────────────────────────────────────────────
   const handleSaveDraft = async () => {
     const err = validateStep(0);
-    if (err) { Alert.alert('Champs manquants', err); return; }
+    if (err) { toastService.warning('Champs manquants', err); return; }
     setSaving(true);
     try {
       const payload = { ...buildPayload(), video_url: videoUrl || undefined };
       if (isEditing) {
         await concertService.update(concertId!, payload);
-        Alert.alert('Modifications enregistrées', 'Votre concert a été mis à jour.');
+        toastService.success('Modifications enregistrées', 'Votre concert a été mis à jour.');
       } else {
         await concertService.create(payload);
-        Alert.alert('Brouillon enregistré', 'Votre concert a été sauvegardé en brouillon.');
+        toastService.success('Brouillon enregistré', 'Votre concert a été sauvegardé en brouillon.');
       }
       onBack?.();
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
+      toastService.error('Erreur', e?.message ?? 'Impossible de sauvegarder.');
     } finally { setSaving(false); }
   };
 
@@ -265,7 +265,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
   const handlePublish = async () => {
     for (let i = 0; i < STEPS.length - 1; i++) {
       const err = validateStep(i);
-      if (err) { Alert.alert(`Étape ${i + 1} incomplète`, err); setStep(i); return; }
+      if (err) { toastService.warning(`Étape ${i + 1} incomplète`, err); setStep(i); return; }
     }
 
     const needsLive = (concertType === 'live' || concertType === 'live_and_replay') && !isEditing;
@@ -274,7 +274,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
         const cost = await apiClient.get('/api/v1/lives/cost') as any;
         const { cost_gogold, balance, sufficient } = cost;
         if (!sufficient) {
-          Alert.alert(
+          showConfirm(
             'Solde insuffisant',
             `Il faut ${cost_gogold} GoGold pour programmer un live.\nTon solde : ${balance} GoGold.\n\nRecharge ton wallet pour continuer.`,
             [
@@ -285,7 +285,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
           return;
         }
         await new Promise<void>((resolve, reject) =>
-          Alert.alert(
+          showConfirm(
             'Programmer un live',
             `${cost_gogold} GoGold seront débités de ton wallet (solde : ${balance} GoGold) pour programmer ce live.\n\nConfirmer ?`,
             [
@@ -299,7 +299,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
       }
     }
 
-    Alert.alert(
+    showConfirm(
       isEditing ? 'Enregistrer et publier ?' : 'Publier le concert ?',
       'Votre concert sera visible par tous les utilisateurs GoFolyX.',
       [
@@ -349,7 +349,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
   if (loadingData) {
     return (
       <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <GoFolyXLoader fullScreen color={colors.primary} />
       </View>
     );
   }

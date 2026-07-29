@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Dimensions, StatusBar,
-  TouchableOpacity, Image, ActivityIndicator,
+  TouchableOpacity, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { VideoView, useVideoPlayer } from 'react-native-video';
@@ -13,7 +13,7 @@ import { useKeepAwake } from '../../hooks/useKeepAwake';
 import type { Reel } from '../../types';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 
 const { width: SW, height: SH } = Dimensions.get('screen');
 
@@ -67,7 +67,7 @@ export const ReelPlayerScreen: React.FC = () => {
   if (!reel) {
     return (
       <View style={[s.root, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color="#fff" size="large" />
+        <GoFolyXLoader variant="reel" color="#ffffff" />
       </View>
     );
   }

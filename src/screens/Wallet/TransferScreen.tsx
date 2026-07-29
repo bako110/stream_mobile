@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  StatusBar, ScrollView, ActivityIndicator, Alert, Image,
+  StatusBar, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { toastService, showConfirm } from '../../services';
 
 interface UserResult {
   id: string;
@@ -24,7 +25,8 @@ type TransferRouteParams = {
 };
 
 export default function TransferScreen() {
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<TransferRouteParams, 'Transfer'>>();
   const insets = useSafeAreaInsets();
@@ -66,12 +68,12 @@ export default function TransferScreen() {
   }, []);
 
   const handleSend = async () => {
-    if (!selected) return Alert.alert('Destinataire manquant', 'Sélectionne un utilisateur.');
+    if (!selected) return toastService.warning('Destinataire manquant', 'Sélectionne un utilisateur.');
     const GoGold = parseInt(amount, 10);
-    if (!GoGold || GoGold < 1) return Alert.alert('Montant invalide', 'Entre un nombre de GoGold valide.');
-    if (balance !== null && GoGold > balance) return Alert.alert('Solde insuffisant', `Tu as ${balance} GoGold disponibles.`);
+    if (!GoGold || GoGold < 1) return toastService.warning('Montant invalide', 'Entre un nombre de GoGold valide.');
+    if (balance !== null && GoGold > balance) return toastService.warning('Solde insuffisant', `Tu as ${balance} GoGold disponibles.`);
 
-    Alert.alert(
+    showConfirm(
       'Confirmer le transfert',
       `Envoyer ${GoGold} GoGold à ${selected.display_name || selected.username} ?${note ? `\nNote : ${note}` : ''}`,
       [
@@ -85,11 +87,10 @@ export default function TransferScreen() {
                 { receiver_id: selected.id, gogold_amount: GoGold, note: note || null },
               );
               setBalance(res.data?.new_balance ?? null);
-              Alert.alert('Transfert réussi ✓', res.data?.message ?? `${GoGold} GoGold envoyés.`, [
-                { text: 'OK', onPress: () => navigation.goBack() },
-              ]);
+              toastService.success('Transfert réussi ✓', res.data?.message ?? `${GoGold} GoGold envoyés.`);
+              navigation.goBack();
             } catch (e: any) {
-              Alert.alert('Erreur', e?.message ?? 'Transfert échoué');
+              toastService.error('Erreur', e?.message ?? 'Transfert échoué');
             } finally { setSending(false); }
           },
         },
@@ -102,7 +103,7 @@ export default function TransferScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 16 }]}>

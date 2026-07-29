@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Vibration, TextInput,
+  Vibration, TextInput,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
@@ -10,7 +10,7 @@ import { Camera, CameraType } from 'react-native-camera-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 
 interface Props {
   onLoginSuccess: () => void;
@@ -160,7 +160,7 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
 
       {phase === 'verifying' && (
         <Animated.View entering={FadeIn} style={{ alignItems: 'center', gap: 16 }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <GoFolyXLoader color={colors.primary} />
           <Text style={styles.hint}>Vérification…</Text>
         </Animated.View>
       )}

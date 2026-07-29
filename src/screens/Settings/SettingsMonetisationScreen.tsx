@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, TextInput, Switch,
+  ActivityIndicator, TextInput, Switch,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import { Row, Card, PageHeader } from './_shared';
+import { toastService } from '../../services';
 
 type MonetStatus = 'none' | 'pending' | 'approved' | 'rejected';
 type CreatorType = 'musician' | 'creator' | 'dj' | 'comedian' | 'brand' | 'other';
@@ -81,7 +82,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!acceptsTerms) {
-      Alert.alert('Conditions requises', "Vous devez accepter les conditions d'utilisation GoFolyX Creator Program.");
+      toastService.warning('Conditions requises', "Vous devez accepter les conditions d'utilisation GoFolyX Creator Program.");
       return;
     }
     setLoading(true);
@@ -98,7 +99,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
       setStatus('pending');
       setStep(0);
     } catch (e: any) {
-      Alert.alert('Demande refusée', e?.message || "Impossible d'envoyer la demande.");
+      toastService.error('Demande refusée', e?.message || "Impossible d'envoyer la demande.");
     } finally { setLoading(false); }
   };
 

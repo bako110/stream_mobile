@@ -1,16 +1,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
-  ActivityIndicator, Alert, TextInput, Modal, RefreshControl,
+  ActivityIndicator, TextInput, Modal, RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { toastService } from '../../services';
 import { communityService } from '../../services/communityService';
 import type { VerificationRequest } from '../../services/communityService';
 import LinearGradient from 'react-native-linear-gradient';
-import { BackButton } from '../../components/common';
+import { BackButton, GoFolyXLoader } from '../../components/common';
 
 type FilterStatus = 'pending' | 'approved' | 'rejected';
 
@@ -38,7 +39,7 @@ export const AdminVerificationScreen: React.FC = () => {
     try {
       const data = await communityService.listVerificationRequests(status);
       setRequests(data);
-    } catch { Alert.alert('Erreur', 'Impossible de charger les demandes'); }
+    } catch { toastService.error('Erreur', 'Impossible de charger les demandes'); }
     finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
@@ -63,7 +64,7 @@ export const AdminVerificationScreen: React.FC = () => {
       setActionType(null);
       load(filter);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Action impossible');
+      toastService.error('Erreur', e?.message ?? 'Action impossible');
     } finally { setActing(false); }
   }
 
@@ -199,7 +200,7 @@ export const AdminVerificationScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
+        <GoFolyXLoader fullScreen color={colors.primary} />
       ) : (
         <FlatList
           data={requests}

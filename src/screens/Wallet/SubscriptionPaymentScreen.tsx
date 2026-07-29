@@ -2,7 +2,7 @@
 import { BackButton, PriceWithLocal } from '../../components/common';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  ActivityIndicator, Alert, ScrollView,
+  ActivityIndicator, ScrollView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -10,6 +10,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService, type WalletCheck } from '../../services/subscriptionService';
+import { toastService } from '../../services/toastService';
 import type { PlanType } from '../../types';
 import { PLAN_CONFIG } from '../../types/subscription';
 
@@ -55,7 +56,7 @@ export default function SubscriptionPaymentScreen() {
         nav.navigate('MySubscription');
       }, 2000);
     } catch (e: any) {
-      Alert.alert('Paiement échoué', e?.message ?? 'Une erreur est survenue. Réessayez.');
+      toastService.error('Paiement échoué', e?.message ?? 'Une erreur est survenue. Réessayez.');
     } finally {
       setProcessing(false);
     }

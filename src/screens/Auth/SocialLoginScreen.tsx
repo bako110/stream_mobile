@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, StatusBar, ActivityIndicator, Alert,
+  View, Text, StyleSheet, StatusBar, ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { AppLogo, SocialAuthButton, BackButton } from '../../components/common';
 import { authService } from '../../services/authService';
+import { toastService } from '../../services';
 
 GoogleSignin.configure({
   webClientId: '633145914883-2ka459achh16hhlak6h3pk58bpcsm4t2.apps.googleusercontent.com',
@@ -42,9 +43,9 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess, on
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
         const detail = e?.data?.detail ?? e?.response?.data?.detail;
         if (e?.status === 403 && detail?.code === 'account_blocked') {
-          onAccountBlocked?.(detail?.reason, detail?.contact ?? 'support@gofolyx.app');
+          onAccountBlocked?.(detail?.reason, detail?.contact ?? 'support@gofolyx.com');
         } else {
-          Alert.alert('Erreur Google', e?.message ?? 'Connexion impossible');
+          toastService.error('Erreur Google', e?.message ?? 'Connexion impossible');
         }
       }
     } finally {

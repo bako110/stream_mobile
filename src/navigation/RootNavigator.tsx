@@ -12,7 +12,7 @@ import { UserProvider }      from '../context/UserContext';
 import { navigationRef }    from './navigationRef';
 import { storage }          from '../utils/storage';
 import { STORAGE_KEYS }     from '../utils/constants';
-import { authService }      from '../services';
+import { authService, accountsService } from '../services';
 import { ApiError }         from '../api/client';
 import NetInfo              from '@react-native-community/netinfo';
 import { useTheme }         from '../hooks/useTheme';
@@ -58,6 +58,10 @@ export const RootNavigator: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('splash');
   const [legalOverlay, setLegalOverlay] = useState<'cgu' | 'privacy' | null>(null);
   const [blockedInfo, setBlockedInfo] = useState<{ reason?: string; contact?: string; blockedAt?: string } | null>(null);
+  // Incrémenté à chaque bascule/ajout/retrait de compte — utilisé comme `key` sur
+  // UserProvider pour forcer un remount complet de la session (WebSocket, state
+  // utilisateur, pile de navigation) sans dupliquer la logique de enterMain().
+  const [sessionKey, setSessionKey] = useState(0);
   const pendingUrlRef = useRef<string | null>(null);
 
   // Capturer le deep link reçu avant que l'app soit prête
@@ -120,6 +124,8 @@ export const RootNavigator: React.FC = () => {
       setAppState('onboarding');
       return;
     }
+
+    accountsService.migrateIfNeeded();
 
     const token = authService.loadStoredToken(
       async () => {
@@ -210,6 +216,27 @@ export const RootNavigator: React.FC = () => {
     setAppState('auth');
   };
 
+  // Bascule vers un compte déjà stocké (switchAccount réutilise le refresh_token,
+  // aucune re-authentification) — puis remonte la session (WebSocket, UserContext,
+  // pile de navigation) via le changement de sessionKey.
+  const handleSwitchAccount = async (userId: string) => {
+    await accountsService.switchAccount(userId); // erreur propagée à l'appelant UI si échec
+    setSessionKey(k => k + 1);
+    setTimeout(() => {
+      setupFCM().catch((e) => console.warn('[FCM] setupFCM switchAccount error:', e?.message ?? e));
+    }, 500);
+  };
+
+  // Remonte la session SANS re-basculer — utilisé après un ajout de compte (tokens
+  // déjà posés par authService.login/oauthGoogle) ou après un retrait du compte actif
+  // (switchAccount déjà exécuté en interne par accountsService.removeAccount).
+  const handleSessionRebuildNeeded = () => {
+    setSessionKey(k => k + 1);
+    setTimeout(() => {
+      setupFCM().catch((e) => console.warn('[FCM] setupFCM sessionRebuild error:', e?.message ?? e));
+    }, 500);
+  };
+
   // Splash & Onboarding — pas besoin de NavigationContainer
   if (appState === 'splash') {
     return <SplashScreen onFinish={handleSplashDone} />;
@@ -276,7 +303,7 @@ export const RootNavigator: React.FC = () => {
     <NavigationContainer ref={navigationRef} theme={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT} linking={linking}>
       {appState === 'main'
         ? (
-          <UserProvider>
+          <UserProvider key={sessionKey}>
             <WebSocketProvider onAccountBlocked={(reason, contact) => {
               authService._clearTokens();
               setBlockedInfo({
@@ -286,7 +313,11 @@ export const RootNavigator: React.FC = () => {
               });
               setAppState('auth');
             }}>
-              <MainNavigator onLogout={handleLogout} />
+              <MainNavigator
+                onLogout={handleLogout}
+                onSwitchAccount={handleSwitchAccount}
+                onSessionRebuildNeeded={handleSessionRebuildNeeded}
+              />
               <UpdateBanner />
               <DownloadToast />
             </WebSocketProvider>

@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
   TextInput, RefreshControl, StatusBar, ActivityIndicator,
-  Share, ScrollView, Alert, Platform,
+  Share, ScrollView, Platform,
 } from 'react-native';
 import Contacts from 'react-native-contacts';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';

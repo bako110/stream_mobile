@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useRef } from 'react';
 import { decodeId } from '../utils/slugId';
 import { Platform, BackHandler, ToastAndroid } from 'react-native';
+import { toastService } from '../services/toastService';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation, useNavigationState, CommonActions } from '@react-navigation/native';
@@ -127,6 +128,8 @@ import { SettingsNotificationsScreen } from '../screens/Settings/SettingsNotific
 import { SettingsLectureScreen }       from '../screens/Settings/SettingsLectureScreen';
 import { SettingsDeviseScreen }        from '../screens/Settings/SettingsDeviseScreen';
 import { SettingsCompteScreen }        from '../screens/Settings/SettingsCompteScreen';
+import { AddAccountScreen }            from '../screens/Auth/AddAccountScreen';
+import { accountsService }             from '../services';
 import { SettingsContenuScreen }       from '../screens/Settings/SettingsContenuScreen';
 import { SettingsAProposScreen }       from '../screens/Settings/SettingsAProposScreen';
 import { SettingsDangerScreen }        from '../screens/Settings/SettingsDangerScreen';
@@ -259,6 +262,7 @@ export type MainStackParamList = {
   SettingsLecture:           undefined;
   SettingsDevise:            undefined;
   SettingsCompte:            undefined;
+  AddAccount:                undefined;
   SettingsContenu:           undefined;
   SettingsAPropos:           undefined;
   SettingsDanger:            undefined;
@@ -331,13 +335,13 @@ const ProfileTab: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
-const Tabs: React.FC<{ onLogout: () => void }> = ({ onLogout }) => (
+const Tabs: React.FC<{ onLogout: () => void; onSwitchAccount: (userId: string) => Promise<void> }> = ({ onLogout, onSwitchAccount }) => (
   <Tab.Navigator
     tabBar={props => <AppTabBar {...props} />}
     screenOptions={{ headerShown: false }}
   >
     <Tab.Screen name="Home">
-      {() => <HomeScreen onLogout={onLogout} />}
+      {() => <HomeScreen onLogout={onLogout} onSwitchAccount={onSwitchAccount} />}
     </Tab.Screen>
     <Tab.Screen name="Communities" component={CommunitiesTabScreen} />
     <Tab.Screen name="Reels"       component={ReelsScreen} options={{ tabBarStyle: { display: 'none' } }} />
@@ -428,7 +432,11 @@ const IncomingCallHandler: React.FC = () => {
 
 // ── MainNavigator ─────────────────────────────────────────────────────────────
 
-export const MainNavigator: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
+export const MainNavigator: React.FC<{
+  onLogout: () => void;
+  onSwitchAccount: (userId: string) => Promise<void>;
+  onSessionRebuildNeeded: () => void;
+}> = ({ onLogout, onSwitchAccount, onSessionRebuildNeeded }) => {
 const SettingsWrapper = useCallback(
     () => <SettingsScreen onLogout={onLogout} />,
     [onLogout],
@@ -438,7 +446,7 @@ const SettingsWrapper = useCallback(
     <ActiveCallProvider>
     <ActiveVoiceProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} /></>} />
+        <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} onSwitchAccount={onSwitchAccount} /></>} />
         <Stack.Screen name="Feed"           component={FeedScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="ExplorerMenu"   children={() => <ExplorerMenuScreen onLogout={onLogout} />} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreateEvent"    component={CreateEventWrapper}    options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
@@ -554,7 +562,31 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="SettingsNotifications" component={SettingsNotificationsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsLecture"       component={SettingsLectureScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsDevise"        component={SettingsDeviseScreen}        options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="SettingsCompte"        component={SettingsCompteScreen}        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsCompte" options={{ animation: 'slide_from_right' }}>
+          {({ navigation }) => (
+            <SettingsCompteScreen
+              onRequestSwitch={onSwitchAccount}
+              onSessionRebuildNeeded={onSessionRebuildNeeded}
+              onAllAccountsRemoved={onLogout}
+              onAddAccount={() => navigation.navigate('AddAccount')}
+            />
+          )}
+        </Stack.Screen>
+        <Stack.Screen name="AddAccount" options={{ presentation: 'modal', animation: 'slide_from_bottom', headerShown: false }}>
+          {({ navigation }) => (
+            <AddAccountScreen
+              onAccountAdded={async () => {
+                try {
+                  await accountsService.addCurrentSessionAsAccount();
+                  navigation.goBack();
+                  onSessionRebuildNeeded();
+                } catch (e: any) {
+                  toastService.error('Erreur', e?.message ?? 'Impossible d\'ajouter ce compte.');
+                }
+              }}
+            />
+          )}
+        </Stack.Screen>
         <Stack.Screen name="SettingsContenu"       component={SettingsContenuScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsAPropos"       component={SettingsAProposScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsDanger"        options={{ animation: 'slide_from_right' }}>

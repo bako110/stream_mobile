@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Dimensions, ScrollView, Alert,
+  ActivityIndicator, Dimensions, ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
@@ -10,6 +10,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/userService';
 import { liveService } from '../../services/liveService';
 import { useWs } from '../../context/WebSocketContext';
+import { toastService } from '../../services/toastService';
 import { VerifiedBadge } from './VerifiedBadge';
 import { AvatarWithBadge } from './AvatarWithBadge';
 import type { UserPublic } from '../../types';
@@ -46,10 +47,10 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
       if (live) {
         nav.navigate('SimpleLiveViewer', { liveId: live.id });
       } else {
-        Alert.alert('Live introuvable', 'Ce live n\'est plus disponible.');
+        toastService.warning('Live introuvable', 'Ce live n\'est plus disponible.');
       }
     } catch {
-      Alert.alert('Erreur', 'Impossible de rejoindre le live pour le moment.');
+      toastService.error('Erreur', 'Impossible de rejoindre le live pour le moment.');
     } finally {
       setJoiningLiveId(null);
     }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, StyleSheet,
-  StatusBar, Platform, Alert, ActivityIndicator, Animated,
+  StatusBar, Platform, ActivityIndicator, Animated,
   ScrollView, Modal, FlatList, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -15,6 +15,7 @@ import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 import { LiveThumbnailBackground } from '../../components/common/LiveThumbnailBackground';
 import { liveService } from '../../services/liveService';
 import type { MonetizationType, LiveStream } from '../../services/liveService';
+import { toastService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -122,10 +123,10 @@ export const GoLiveScreen: React.FC = () => {
   const confirmMonetisation = () => {
     if (monetType === 'gogold') {
       const v = parseInt(monetGoGold, 10);
-      if (!v || v < 1) { Alert.alert('Erreur', 'Saisis un montant en GoGold valide.'); return; }
+      if (!v || v < 1) { toastService.error('Erreur', 'Saisis un montant en GoGold valide.'); return; }
     }
     if (monetType === 'gift' && !monetGift) {
-      Alert.alert('Erreur', 'Sélectionne un cadeau.'); return;
+      toastService.error('Erreur', 'Sélectionne un cadeau.'); return;
     }
     setShowMonetModal(false);
   };
@@ -170,7 +171,7 @@ export const GoLiveScreen: React.FC = () => {
         isPrivate:      result.live.is_private,
       });
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail || 'Impossible de démarrer le live');
+      toastService.error('Erreur', e?.response?.data?.detail || 'Impossible de démarrer le live');
       setStarting(false);
     }
   }

@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Image,
+  ScrollView, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
@@ -16,6 +16,7 @@ import { adService, type Ad, type AdPlacement, type AdFormat } from '../../servi
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { toastService, showConfirm } from '../../services';
 
 const PLACEMENTS: { key: AdPlacement; label: string; icon: string; desc: string }[] = [
   { key: 'feed',    label: 'Feed principal', icon: 'home',       desc: '1 pub toutes les 7 cartes' },
@@ -64,8 +65,15 @@ export const CreateAdScreen: React.FC = () => {
   const [cpmEur,       setCpmEur]       = useState(existingAd ? existingAd.cpm_eur : 2.0);
   const [saving,       setSaving]       = useState(false);
   const [walletGoGold,  setWalletGoGold]  = useState<number | null>(null);
-  const [localMedia,     setLocalMedia]     = useState<string | null>(null);
-  const [mediaType,      setMediaType]      = useState<'image' | 'video' | null>(null);
+  // Pré-rempli depuis existingAd en mode édition, sinon le thumbnail_url d'une
+  // pub vidéo existante serait écrasé par creative_url (le flux HLS) au submit
+  // si l'utilisateur ne retouche pas le média — cf. payload de handleSubmit.
+  const [localMedia,     setLocalMedia]     = useState<string | null>(
+    existingAd?.thumbnail_url ?? existingAd?.creative_url ?? null,
+  );
+  const [mediaType,      setMediaType]      = useState<'image' | 'video' | null>(
+    existingAd ? (existingAd.format === 'video' ? 'video' : 'image') : null,
+  );
   const [uploading,      setUploading]      = useState(false);
   const [uploadStatus,   setUploadStatus]   = useState<string>('');
   const pickingRef  = useRef(false);
@@ -84,7 +92,7 @@ export const CreateAdScreen: React.FC = () => {
 
   const pickCreative = () => {
     if (pickingRef.current || uploading) return;
-    Alert.alert('Type de créatif', 'Choisir le type de média', [
+    showConfirm('Type de créatif', 'Choisir le type de média', [
       {
         text: 'Image',
         onPress: () => _pick('photo'),
@@ -112,7 +120,7 @@ export const CreateAdScreen: React.FC = () => {
             setCreativeUrl(hls_url);
             if (thumbnail_url) setLocalMedia(thumbnail_url);
           } else {
-            Alert.alert('Erreur', 'Transcoding HLS échoué.');
+            toastService.error('Erreur', 'Transcoding HLS échoué.');
             setLocalMedia(null);
           }
           setUploading(false);
@@ -122,7 +130,7 @@ export const CreateAdScreen: React.FC = () => {
           pollRef.current = null;
           setUploading(false);
           setUploadStatus('');
-          Alert.alert('Erreur', 'Impossible de convertir la vidéo.');
+          toastService.error('Erreur', 'Impossible de convertir la vidéo.');
           setLocalMedia(null);
         } else {
           setUploadStatus('Conversion HLS en cours…');
@@ -179,7 +187,7 @@ export const CreateAdScreen: React.FC = () => {
           setUploadStatus('');
         }
       } catch {
-        Alert.alert('Erreur', "Impossible d'uploader le fichier.");
+        toastService.error('Erreur', "Impossible d'uploader le fichier.");
         setLocalMedia(null);
         setMediaType(null);
         setUploading(false);
@@ -190,14 +198,14 @@ export const CreateAdScreen: React.FC = () => {
   };
 
   const handleSave = useCallback(async () => {
-    if (!title.trim())  { Alert.alert('Erreur', 'Le titre est requis.'); return; }
-    if (budget < 1)     { Alert.alert('Erreur', 'Budget minimum : 1 €'); return; }
-    if (uploading) { Alert.alert('Patiente', 'Le fichier est encore en cours d\'upload.'); return; }
-    if (localMedia && !creativeUrl) { Alert.alert('Patiente', 'La conversion HLS est en cours, réessaie dans quelques secondes.'); return; }
+    if (!title.trim())  { toastService.error('Erreur', 'Le titre est requis.'); return; }
+    if (budget < 1)     { toastService.error('Erreur', 'Budget minimum : 1 €'); return; }
+    if (uploading) { toastService.warning('Patiente', 'Le fichier est encore en cours d\'upload.'); return; }
+    if (localMedia && !creativeUrl) { toastService.warning('Patiente', 'La conversion HLS est en cours, réessaie dans quelques secondes.'); return; }
     // Une campagne sans image ni vidéo s'affiche comme un emplacement vide (icône
     // grisée) partout où elle est servie — jamais un cas voulu, toujours un oubli.
     if (!creativeUrl.trim()) {
-      Alert.alert('Créatif requis', 'Ajoute une image ou une vidéo — une pub sans média ne s\'affiche pas correctement.');
+      toastService.error('Créatif requis', 'Ajoute une image ou une vidéo — une pub sans média ne s\'affiche pas correctement.');
       return;
     }
     // Le champ CTA accepte soit un lien web, soit un numéro de téléphone (même détection
@@ -206,14 +214,14 @@ export const CreateAdScreen: React.FC = () => {
     const ctaTrimmed = ctaUrl.trim();
     const isPhoneNumber = !!ctaTrimmed && /^[+()\d\s.-]{6,}$/.test(ctaTrimmed.replace(/^tel:/i, ''));
     if (ctaTrimmed && !ctaTrimmed.startsWith('http') && !isPhoneNumber) {
-      Alert.alert('Erreur', 'Indique un lien (http:// ou https://) ou un numéro de téléphone valide.');
+      toastService.error('Erreur', 'Indique un lien (http:// ou https://) ou un numéro de téléphone valide.');
       return;
     }
 
     // Vérifier solde avant création
     const goGoldRequired = Math.ceil(budget * 100); // 1 € = 100 GoGold
     if (!isEdit && walletGoGold !== null && walletGoGold < goGoldRequired) {
-      Alert.alert(
+      toastService.error(
         'Solde insuffisant',
         `Tu as ${walletGoGold.toLocaleString('fr-FR')} GoGold mais ${goGoldRequired.toLocaleString('fr-FR')} sont requis pour ce budget (${budget.toFixed(2)}€).\n\nRecharge ton wallet ou réduis le budget.`,
       );
@@ -228,6 +236,11 @@ export const CreateAdScreen: React.FC = () => {
         cta_text:     ctaText.trim() || undefined,
         cta_url:      ctaUrl.trim() || undefined,
         creative_url: creativeUrl.trim() || undefined,
+        // Pour une vidéo, creative_url pointe vers le flux HLS (.m3u8) — sans
+        // thumbnail_url, rien n'est affichable avant que le lecteur charge le
+        // flux (AdCard ne montre alors qu'un placeholder). Pour une image,
+        // localMedia == creative_url, donc l'envoyer ici ne change rien de mal.
+        thumbnail_url: (mediaType === 'video' ? localMedia : creativeUrl)?.trim() || undefined,
         placement,
         format,
         budget_eur:   budget,
@@ -236,19 +249,19 @@ export const CreateAdScreen: React.FC = () => {
 
       if (isEdit) {
         await adService.update(existingAd!.id, payload);
-        Alert.alert('Modifié', 'Ta campagne a été mise à jour.');
+        toastService.success('Modifié', 'Ta campagne a été mise à jour.');
       } else {
         const result = await adService.create(payload);
         const goGoldDebited = (result as any).gogold_debited ?? Math.ceil(budget * 100);
         setWalletGoGold(prev => prev !== null ? prev - goGoldDebited : null);
-        Alert.alert(
+        toastService.success(
           'Campagne créée ! 🎯',
           `${goGoldDebited.toLocaleString('fr-FR')} GoGold débités. Ta pub est active dans le feed.`,
         );
       }
       nav.goBack();
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
+      toastService.error('Erreur', e?.message ?? 'Impossible de sauvegarder.');
     } finally {
       setSaving(false);
     }

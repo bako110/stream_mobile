@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, StatusBar, ActivityIndicator, Modal, Alert,
+  StyleSheet, StatusBar, ActivityIndicator, Modal,
   Dimensions, FlatList,
 } from 'react-native';
 import Animated, {
@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton, PriceWithLocal } from '../../components/common';
-import { contentService } from '../../services';
+import { contentService, toastService, showConfirm } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { Season, Episode } from '../../types';
@@ -276,19 +276,19 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
       setHasAccess(true);
       setWalletGoGold(res.data?.new_balance ?? 0);
       setShowPaywall(false);
-      Alert.alert('Accès obtenu', `Vous pouvez maintenant regarder "${item.title}".`);
+      toastService.success('Accès obtenu', `Vous pouvez maintenant regarder "${item.title}".`);
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 402) {
         setShowPaywall(false);
-        Alert.alert('Solde insuffisant', 'Rechargez votre wallet pour continuer.', [
+        showConfirm('Solde insuffisant', 'Rechargez votre wallet pour continuer.', [
           { text: 'Annuler', style: 'cancel' },
           { text: 'Recharger', onPress: () => navigation.navigate('WalletScreen', {}) },
         ]);
       } else if (status === 409) {
         setHasAccess(true); setShowPaywall(false);
       } else {
-        Alert.alert('Erreur', "Impossible de finaliser l'achat.");
+        toastService.error('Erreur', "Impossible de finaliser l'achat.");
       }
     } finally {
       setPurchasing(false);

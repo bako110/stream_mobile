@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Image, Alert, ActivityIndicator, StatusBar,
+  Image, ActivityIndicator, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -20,6 +20,7 @@ import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { toastService, showConfirm } from '../../services';
 
 interface GiftType {
   id: string;
@@ -68,7 +69,7 @@ export const LiveAccessGate: React.FC<Props> = ({
   const hasEnough = myBalance !== null && (isGoGold ? myBalance >= effectiveCost : true);
 
   const showInsufficientFunds = (msg: string) => {
-    Alert.alert(
+    showConfirm(
       'Solde insuffisant',
       msg,
       [
@@ -99,7 +100,7 @@ export const LiveAccessGate: React.FC<Props> = ({
       if (status === 402) {
         showInsufficientFunds(msg);
       } else {
-        Alert.alert('Erreur', msg);
+        toastService.error('Erreur', msg);
       }
     }
     setChecking(false);
@@ -121,7 +122,7 @@ export const LiveAccessGate: React.FC<Props> = ({
       if (status === 402) {
         showInsufficientFunds(msg);
       } else {
-        Alert.alert('Erreur', msg);
+        toastService.error('Erreur', msg);
       }
     }
     setChecking(false);

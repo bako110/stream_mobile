@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, Alert, TextInput, ScrollView, StatusBar,
+  ActivityIndicator, RefreshControl, TextInput, ScrollView, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import type { CommunityData } from '../../services/communityService';
+import { toastService, showConfirm } from '../../services';
 import { CommunityCard } from '../../components/communities/CommunityCard';
 import { CommunitySkeletonCard } from '../../components/communities/CommunitySkeleton';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -84,7 +85,7 @@ export const CommunitiesDiscoverScreen: React.FC = () => {
       const note = needsApproval
         ? '\n\nVotre demande sera examinée par l\'admin. Les GoGold sont remboursés en cas de refus.'
         : '';
-      Alert.alert('Accès payant', `Rejoindre "${item.name}" coûte ${label}.${note}`, [
+      showConfirm('Accès payant', `Rejoindre "${item.name}" coûte ${label}.${note}`, [
         { text: 'Annuler', style: 'cancel' },
         { text: `Payer ${label}`, onPress: () => _doJoin(item) },
       ]);
@@ -97,38 +98,38 @@ export const CommunitiesDiscoverScreen: React.FC = () => {
     try {
       const res = await communityService.join(item.id);
       if (res.pending) {
-        Alert.alert(
+        toastService.info(
           'Demande envoyée',
           `Ta demande pour rejoindre "${item.name}" est en attente d'approbation. Tu seras notifié dès que l'admin accepte.`,
         );
       } else if (res.joined) {
-        Alert.alert('Bienvenue !', `Tu as rejoint "${item.name}".`);
+        toastService.success('Bienvenue !', `Tu as rejoint "${item.name}".`);
       }
       load(true);
     } catch (e: any) {
       const detail: string = e?.response?.data?.detail ?? '';
       const status: number = e?.response?.status ?? 0;
       if (status === 402 || detail.toLowerCase().includes('gogold')) {
-        Alert.alert('GoGold insuffisants', `Il te faut ${item.entry_price_gogold ?? '?'} GoGold pour rejoindre cette communauté.`);
+        toastService.error('GoGold insuffisants', `Il te faut ${item.entry_price_gogold ?? '?'} GoGold pour rejoindre cette communauté.`);
       } else if (status === 403) {
-        Alert.alert('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
+        toastService.error('Accès refusé', detail || 'Tu n\'as pas accès à cette communauté.');
       } else if (status === 404) {
-        Alert.alert('Introuvable', 'Cette communauté n\'existe plus.');
+        toastService.error('Introuvable', 'Cette communauté n\'existe plus.');
       } else {
-        Alert.alert('Erreur', detail || 'Impossible de rejoindre cette communauté.');
+        toastService.error('Erreur', detail || 'Impossible de rejoindre cette communauté.');
       }
     }
   };
 
   const handleCancelRequest = (item: CommunityData) => {
-    Alert.alert('Annuler la demande', `Annuler votre demande pour "${item.name}" ?`, [
+    showConfirm('Annuler la demande', `Annuler votre demande pour "${item.name}" ?`, [
       { text: 'Non', style: 'cancel' },
       {
         text: 'Annuler la demande',
         style: 'destructive',
         onPress: async () => {
           try { await communityService.cancelJoinRequest(item.id); load(true); }
-          catch { Alert.alert('Erreur', 'Impossible d\'annuler la demande.'); }
+          catch { toastService.error('Erreur', 'Impossible d\'annuler la demande.'); }
         },
       },
     ]);

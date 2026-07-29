@@ -37,7 +37,7 @@ Les CGU peuvent évoluer à tout moment. La version en vigueur est celle publié
 • Fournir des informations exactes, complètes et à jour lors de votre inscription
 • Ne pas avoir été précédemment banni de la plateforme
 
-Vous êtes seul responsable de la confidentialité de vos identifiants (email/téléphone et mot de passe). Toute action réalisée depuis votre compte vous est réputée imputable. En cas d'accès non autorisé, contactez-nous immédiatement à support@gofolyx.app.
+Vous êtes seul responsable de la confidentialité de vos identifiants (email/téléphone et mot de passe). Toute action réalisée depuis votre compte vous est réputée imputable. En cas d'accès non autorisé, contactez-nous immédiatement à support@gofolyx.com.
 
 GoFolyX se réserve le droit de refuser l'inscription ou de suspendre un compte sans justification préalable, notamment en cas de suspicion de fraude ou de comportement contraire aux présentes CGU.`,
   },
@@ -64,7 +64,7 @@ Points clés :
 • Vos données sont hébergées en Europe (Union européenne)
 • Elles sont protégées par les dispositions du RGPD (Règlement Général sur la Protection des Données)
 • Vous disposez d'un droit d'accès, de rectification, de suppression, de portabilité et d'opposition
-• Vous pouvez exercer vos droits à l'adresse : privacy@gofolyx.app
+• Vous pouvez exercer vos droits à l'adresse : privacy@gofolyx.com
 • Vous pouvez également saisir la CNIL (www.cnil.fr) en cas de litige
 
 GoFolyX ne vend jamais vos données personnelles à des tiers.`,
@@ -114,7 +114,7 @@ Toute reproduction, modification, adaptation, traduction, distribution ou exploi
 
 Les marques, noms commerciaux et logos des partenaires ou tiers présents sur la plateforme restent la propriété de leurs détenteurs respectifs.
 
-Si vous pensez qu'un contenu publié sur GoFolyX porte atteinte à vos droits d'auteur, contactez notre équipe de signalement à : dmca@gofolyx.app`,
+Si vous pensez qu'un contenu publié sur GoFolyX porte atteinte à vos droits d'auteur, contactez notre équipe de signalement à : dmca@gofolyx.com`,
   },
   {
     key: 'services-tiers', icon: 'link', title: '8. Services tiers et liens externes',
@@ -172,11 +172,11 @@ La date de dernière mise à jour est toujours indiquée en haut de ce document.
     body: `Les présentes CGU sont régies par le droit français.
 
 En cas de litige relatif à l'interprétation, la validité ou l'exécution des présentes CGU :
-• Nous vous encourageons à nous contacter d'abord à l'adresse legal@gofolyx.app pour tenter une résolution amiable
+• Nous vous encourageons à nous contacter d'abord à l'adresse legal@gofolyx.com pour tenter une résolution amiable
 • À défaut d'accord amiable dans un délai de 30 jours, le litige sera soumis aux tribunaux compétents de Paris
 • Pour les consommateurs résidant dans l'Union européenne, vous pouvez également recourir à la plateforme de règlement en ligne des litiges de la Commission européenne : ec.europa.eu/consumers/odr
 
-Pour toute question légale : legal@gofolyx.app`,
+Pour toute question légale : legal@gofolyx.com`,
   },
 ];
 
@@ -308,7 +308,7 @@ export const CGUScreen: React.FC<Props> = ({ onBack }) => {
           <Icon name="mail" size={16} color={colors.primary} />
           <Text style={[s.contactTxt, { color: colors.textTertiary }]}>
             Des questions ? Contactez notre équipe légale à{' '}
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>legal@gofolyx.app</Text>
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>legal@gofolyx.com</Text>
           </Text>
         </View>
 

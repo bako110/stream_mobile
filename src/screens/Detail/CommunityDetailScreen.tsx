@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, Modal,
-  StyleSheet, ActivityIndicator, Alert, ScrollView,
+  StyleSheet, ActivityIndicator, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, Switch,
   StatusBar, Dimensions,
 } from 'react-native';
@@ -28,6 +28,7 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { useWs } from '../../context/WebSocketContext';
 import { ExpandableText } from '../../components/common';
 import { favoriteService } from '../../services/favoriteService';
+import { toastService, showConfirm } from '../../services';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 interface Props { route: { params: { communityId: string; autoEnter?: boolean } }; }
@@ -274,7 +275,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   async function handleSaveSettings() {
     if (settingsTab === 'info') {
-      if (!editName.trim()) { Alert.alert('Erreur', 'Le nom est requis.'); return; }
+      if (!editName.trim()) { toastService.error('Erreur', 'Le nom est requis.'); return; }
       setSaving(true);
       try {
         const [avatarUrl, bannerUrl] = await Promise.all([
@@ -290,12 +291,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         setCommunity(updated);
         setSettingsOpen(false);
       } catch (e: any) {
-        Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
+        toastService.error('Erreur', e?.message ?? 'Impossible de sauvegarder.');
       } finally { setSaving(false); }
     } else if (settingsTab === 'security') {
       const price = parseInt(editEntryPrice, 10);
       if (isNaN(price) || price < 0) {
-        Alert.alert('Erreur', 'Le prix d\'entrée doit être un entier positif ou 0.');
+        toastService.error('Erreur', 'Le prix d\'entrée doit être un entier positif ou 0.');
         return;
       }
       setSaving(true);
@@ -318,17 +319,17 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         }));
         setCommunity(updated);
         setSettingsOpen(false);
-        Alert.alert('Enregistré', 'Les paramètres ont été mis à jour.');
+        toastService.success('Enregistré', 'Les paramètres ont été mis à jour.');
       } catch (e: any) {
         console.log('[Settings] ERROR:', e?.message, e?.response?.data);
-        Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
+        toastService.error('Erreur', e?.message ?? 'Impossible de sauvegarder.');
       } finally { setSaving(false); }
     }
   }
 
   async function handleChangeRole(member: CommunityMemberData, newRole: 'admin' | 'moderator' | 'member') {
     if (member.user_id === myId && newRole !== 'admin') {
-      Alert.alert(
+      showConfirm(
         'Se rétrograder ?',
         'Tu vas perdre les droits d\'administration. Continuer ?',
         [
@@ -339,7 +340,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       return;
     }
     if (newRole === 'admin' && member.user_id !== myId) {
-      Alert.alert(
+      showConfirm(
         'Nommer admin',
         `Donner les droits admin à ${member.display_name || member.username} ?`,
         [
@@ -358,12 +359,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       await communityService.updateMemberRole(communityId, userId, role);
       await load();
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de changer le rôle.');
+      toastService.error('Erreur', e?.message ?? 'Impossible de changer le rôle.');
     } finally { setRoleLoading(null); }
   }
 
   async function handleKick(member: CommunityMemberData) {
-    Alert.alert(
+    showConfirm(
       'Exclure',
       `Exclure ${member.display_name || member.username} de la communauté ?`,
       [
@@ -375,7 +376,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             try {
               await communityService.removeMember(communityId, member.user_id);
               load();
-            } catch { Alert.alert('Erreur', 'Impossible d\'exclure ce membre.'); }
+            } catch { toastService.error('Erreur', 'Impossible d\'exclure ce membre.'); }
           },
         },
       ],
@@ -385,11 +386,11 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   async function handleBlock(member: CommunityMemberData) {
     if (member.user_id === myId) return;
     if (member.role === 'admin') {
-      Alert.alert('Impossible', 'Vous ne pouvez pas bloquer un administrateur.');
+      toastService.warning('Impossible', 'Vous ne pouvez pas bloquer un administrateur.');
       return;
     }
     const name = member.display_name || member.username || 'Ce membre';
-    Alert.alert(
+    showConfirm(
       'Bloquer',
       `Bloquer ${name} ? Cette personne sera exclue et ne pourra plus rejoindre.`,
       [
@@ -424,7 +425,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   reason: null,
                 },
               ]);
-            } catch { Alert.alert('Erreur', 'Impossible de bloquer.'); }
+            } catch { toastService.error('Erreur', 'Impossible de bloquer.'); }
             finally { setBlockLoading(null); }
           },
         },
@@ -434,7 +435,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   async function handleUnblock(b: BlockedMemberData) {
     const name = b.display_name || b.username || 'Ce membre';
-    Alert.alert('Débloquer', `Débloquer ${name} ? Il pourra rejoindre librement la communauté.`, [
+    showConfirm('Débloquer', `Débloquer ${name} ? Il pourra rejoindre librement la communauté.`, [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Débloquer',
@@ -449,7 +450,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             ).catch(() => {});
             // Mise à jour locale immédiate
             setBlockedMembers(prev => prev.filter(x => x.user_id !== b.user_id));
-          } catch { Alert.alert('Erreur', 'Impossible de débloquer.'); }
+          } catch { toastService.error('Erreur', 'Impossible de débloquer.'); }
           finally { setUnblockLoading(null); }
         },
       },
@@ -465,7 +466,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
     if (price > 0 && myGoGold !== null && myGoGold < price) {
       const manque = price - myGoGold;
-      Alert.alert(
+      showConfirm(
         'Solde insuffisant',
         `Vous avez ${myGoGold} GoGold mais il en faut ${price}.\nIl vous manque ${priceLabel(manque)}.`,
         [
@@ -488,7 +489,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           const debitLine = price > 0
             ? `\n\n${price} GoGold ont été déduits de votre solde et enregistrés dans votre historique.`
             : '';
-          Alert.alert(
+          toastService.success(
             price > 0 ? 'Paiement effectué — Demande envoyée' : 'Demande envoyée',
             needsApproval
               ? `Votre demande pour rejoindre "${community.name}" est en cours d'examen.${debitLine}\n\nVous serez redirigé automatiquement dès l'acceptation.`
@@ -507,7 +508,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           const walletRes = await apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance).catch(() => null);
           const realBalance = walletRes?.data?.gogold_balance ?? 0;
           setMyGoGold(realBalance);
-          Alert.alert(
+          showConfirm(
             'Solde insuffisant',
             `Votre solde est de ${realBalance} GoGold. Il vous manque ${priceLabel(price - realBalance)}.`,
             [
@@ -516,9 +517,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             ],
           );
         } else if (detail.includes('blocked')) {
-          Alert.alert('Accès refusé', 'Vous avez été bloqué de cette communauté.');
+          toastService.error('Accès refusé', 'Vous avez été bloqué de cette communauté.');
         } else {
-          Alert.alert('Erreur', 'Impossible de rejoindre cette communauté.');
+          toastService.error('Erreur', 'Impossible de rejoindre cette communauté.');
         }
       } finally {
         joiningRef.current = false;
@@ -537,7 +538,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       const debitNote = needsApproval
         ? `${price} GoGold seront immédiatement déduits de votre solde et consignés dans votre historique de transactions.`
         : `${price} GoGold seront déduits de votre solde.`;
-      Alert.alert(
+      showConfirm(
         `Adhésion payante — ${price} GoGold`,
         `${debitNote}${soldeInfo}${approvalNote}`,
         [
@@ -552,10 +553,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 
   const handleLeave = () => {
     if (isAdmin) {
-      Alert.alert('Impossible', 'L\'admin ne peut pas quitter sa communauté. Transférez les droits d\'abord.');
+      toastService.warning('Impossible', 'L\'admin ne peut pas quitter sa communauté. Transférez les droits d\'abord.');
       return;
     }
-    Alert.alert('Quitter', 'Quitter cette communauté ?', [
+    showConfirm('Quitter', 'Quitter cette communauté ?', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Quitter',
@@ -563,7 +564,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
         onPress: async () => {
           setActionLoading(true);
           try { await communityService.leave(communityId); load(); }
-          catch { Alert.alert('Erreur', 'Impossible de quitter.'); }
+          catch { toastService.error('Erreur', 'Impossible de quitter.'); }
           finally { setActionLoading(false); }
         },
       },
@@ -571,7 +572,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   };
 
   async function handleDeleteCommunity() {
-    Alert.alert(
+    showConfirm(
       'Supprimer la communauté',
       'Action irréversible. Tous les membres et messages seront perdus.',
       [
@@ -583,7 +584,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             try {
               await communityService.delete(communityId);
               nav.goBack();
-            } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+            } catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
           },
         },
       ],
@@ -599,14 +600,14 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     const tierLabel = tier === 'pro' ? 'Pro' : 'Elite';
 
     if (myGoGold !== null && myGoGold < p.GoGold) {
-      Alert.alert(
+      toastService.error(
         'Solde insuffisant',
         `Le tier ${tierLabel} coûte ${p.GoGold.toLocaleString('fr-FR')} GoGold (${p.eur}€/mois).\nTon solde : ${myGoGold.toLocaleString('fr-FR')} GoGold.`,
       );
       return;
     }
 
-    Alert.alert(
+    showConfirm(
       `Passer en ${tierLabel}`,
       `${p.GoGold.toLocaleString('fr-FR')} GoGold (${p.eur}€) seront débités de ton wallet pour 30 jours.\n\nAvantages ${tierLabel} : ${tier === 'pro' ? 'channels illimités, analytics, badge Pro' : 'tout Pro + priorité feed, support dédié'}.`,
       [
@@ -620,9 +621,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               );
               setMyGoGold(prev => prev !== null ? prev - res.data.gogold_debited : null);
               setCommunity(prev => prev ? { ...prev, tier: res.data.tier as any, tier_expires_at: res.data.tier_expires_at } as any : prev);
-              Alert.alert('Activé !', `Ta communauté est maintenant en ${tierLabel} jusqu'au ${new Date(res.data.tier_expires_at).toLocaleDateString('fr-FR')}.`);
+              toastService.success('Activé !', `Ta communauté est maintenant en ${tierLabel} jusqu'au ${new Date(res.data.tier_expires_at).toLocaleDateString('fr-FR')}.`);
             } catch (e: any) {
-              Alert.alert('Erreur', e?.message ?? 'Impossible d\'upgrader le tier.');
+              toastService.error('Erreur', e?.message ?? 'Impossible d\'upgrader le tier.');
             } finally {
               setTierLoading(false);
             }
@@ -650,13 +651,13 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
       setMyGoGold(prev => prev !== null ? prev - 500 : null);
       setVrStatus('pending');
       setVrModalOpen(false);
-      Alert.alert('Demande envoyée', '500 GoGold ont été débités. Les administrateurs vont examiner votre demande.');
+      toastService.success('Demande envoyée', '500 GoGold ont été débités. Les administrateurs vont examiner votre demande.');
     } catch (e: any) {
       const status = e?.response?.status;
       const detail = e?.response?.data?.detail ?? e?.message ?? 'Impossible d\'envoyer la demande.';
       if (status === 402) {
         setVrModalOpen(false);
-        Alert.alert(
+        showConfirm(
           'Solde insuffisant',
           `Il faut 500 GoGold pour demander la vérification.\n\n${detail}`,
           [
@@ -665,7 +666,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           ],
         );
       } else {
-        Alert.alert('Erreur', detail);
+        toastService.error('Erreur', detail);
       }
     } finally { setVrLoading(false); }
   }
@@ -673,7 +674,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   async function handleToggleVerify() {
     if (!community) return;
     const willVerify = !community.is_verified;
-    Alert.alert(
+    showConfirm(
       willVerify ? 'Vérifier la communauté' : 'Retirer la vérification',
       willVerify
         ? `Ajouter le badge officiel à "${community.name}" ?`
@@ -690,7 +691,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 : await communityService.unverify(communityId);
               setCommunity(updated);
             } catch (e: any) {
-              Alert.alert('Erreur', e?.message ?? 'Impossible de modifier.');
+              toastService.error('Erreur', e?.message ?? 'Impossible de modifier.');
             } finally { setVerifyLoading(false); }
           },
         },
@@ -1406,7 +1407,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           <TouchableOpacity
             onPress={() => {
               setSettingsTab('members');
-              Alert.alert(
+              showConfirm(
                 'Transférer l\'admin',
                 'Dans l\'onglet Membres, promouvez un membre au rôle Admin. Vous perdrez alors vos droits d\'administration.',
                 [{ text: 'Aller aux membres', onPress: () => setSettingsTab('members') }, { text: 'Annuler', style: 'cancel' }],
@@ -1683,7 +1684,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       borderWidth: 1.5,
                     }]}
                     onPress={() => {
-                      Alert.alert(
+                      showConfirm(
                         'Demande en attente',
                         'Votre demande est en cours d\'examen. Vous serez automatiquement redirigé vers le chat dès qu\'elle sera acceptée.',
                         [
@@ -1692,7 +1693,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                             style: 'destructive',
                             onPress: async () => {
                               try { await communityService.cancelJoinRequest(communityId); load(); }
-                              catch { Alert.alert('Erreur', 'Impossible d\'annuler la demande.'); }
+                              catch { toastService.error('Erreur', 'Impossible d\'annuler la demande.'); }
                             },
                           },
                           { text: 'Fermer', style: 'cancel' },

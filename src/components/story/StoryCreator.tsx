@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
-  StyleSheet, Dimensions, StatusBar, Alert, Keyboard,
+  StyleSheet, Dimensions, StatusBar, Keyboard,
   Modal, KeyboardAvoidingView, Platform, ScrollView,
   PermissionsAndroid, PanResponder, ActivityIndicator,
 } from 'react-native';
@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SoundPicker } from './SoundPicker';
 import { storyService } from '../../services/storyService';
+import { toastService } from '../../services/toastService';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import type { StoryMediaType, StoryAudienceType } from '../../types/story';
@@ -543,9 +544,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   // ── Pickers ───────────────────────────────────────────────────────────────
   const pickImage = async (source: 'gallery'|'camera') => {
     if (source === 'camera') {
-      if (!(await requestCameraPermission())) { Alert.alert('Permission', 'Accès à la caméra requis'); return; }
+      if (!(await requestCameraPermission())) { toastService.warning('Permission', 'Accès à la caméra requis'); return; }
     } else {
-      if (!(await requestGalleryPermission())) { Alert.alert('Permission', 'Accès à la galerie requis'); return; }
+      if (!(await requestGalleryPermission())) { toastService.warning('Permission', 'Accès à la galerie requis'); return; }
     }
     const res = await (source==='camera' ? launchCamera : launchImageLibrary)({ mediaType:'photo', selectionLimit:1 });
     if (res.didCancel || !res.assets?.[0]?.uri) return;
@@ -554,9 +555,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   const pickVideo = async (source: 'gallery'|'camera') => {
     if (source === 'camera') {
-      if (!(await requestCameraPermission())) { Alert.alert('Permission', 'Accès à la caméra requis'); return; }
+      if (!(await requestCameraPermission())) { toastService.warning('Permission', 'Accès à la caméra requis'); return; }
     } else {
-      if (!(await requestGalleryPermission())) { Alert.alert('Permission', 'Accès à la galerie requis'); return; }
+      if (!(await requestGalleryPermission())) { toastService.warning('Permission', 'Accès à la galerie requis'); return; }
     }
     const res = await (source==='camera' ? launchCamera : launchImageLibrary)({ mediaType:'video', selectionLimit:1 });
     if (res.didCancel || !res.assets?.[0]?.uri) return;
@@ -581,7 +582,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     return (await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO)) === PermissionsAndroid.RESULTS.GRANTED;
   };
   const startRecording = async () => {
-    if (!(await requestMic())) { Alert.alert('Permission', 'Microphone requis'); return; }
+    if (!(await requestMic())) { toastService.warning('Permission', 'Microphone requis'); return; }
     const path = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/story_voice_${Date.now()}.mp4`;
     await audioRecorder.startRecorder(path);
     audioRecorder.addRecordBackListener((e:any) => {
@@ -731,7 +732,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
         } catch {}
       } catch (e) {
         console.error('[publish] error:', e);
-        Alert.alert('Erreur', String((e as any)?.message ?? e));
+        toastService.error('Erreur', String((e as any)?.message ?? e));
         await cleanupTempVideos(_tempFiles);
       }
       finally { storyUploadState.setUploading(false); }
@@ -866,7 +867,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
               setShowTrimmer(false);
               setStep('compose');
             } catch {
-              Alert.alert('Erreur', 'Impossible de découper la vidéo.');
+              toastService.error('Erreur', 'Impossible de découper la vidéo.');
             } finally {
               setIsTrimming(false);
             }

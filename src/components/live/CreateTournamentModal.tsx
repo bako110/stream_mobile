@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
-  ScrollView, ActivityIndicator, Alert, Switch,
+  ScrollView, ActivityIndicator, Switch,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
@@ -19,6 +19,7 @@ import { TimezoneSelect } from '../common/TimezoneSelect';
 import { DateTimeField } from '../common/DateTimeField';
 import { tournamentService } from '../../services/tournamentService';
 import type { Tournament, TournamentType, TournamentRegistrationMode } from '../../services/tournamentService';
+import { toastService } from '../../services';
 
 const FORMATS: Array<8 | 16 | 32 | 64> = [8, 16, 32, 64];
 
@@ -92,7 +93,7 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
   const handleCreate = async () => {
     if (!name.trim() || creating) return;
     if (isPrivate && !password.trim()) {
-      Alert.alert('Mot de passe requis', 'Un tournoi privé nécessite un mot de passe.');
+      toastService.error('Mot de passe requis', 'Un tournoi privé nécessite un mot de passe.');
       return;
     }
     setCreating(true);
@@ -121,7 +122,7 @@ export const CreateTournamentModal: React.FC<Props> = ({ visible, onClose, onCre
       onCreated(t);
       close();
     } catch (e: any) {
-      Alert.alert('Impossible de créer le tournoi', e?.response?.data?.detail ?? e?.message ?? 'Une erreur est survenue.');
+      toastService.error('Impossible de créer le tournoi', e?.response?.data?.detail ?? e?.message ?? 'Une erreur est survenue.');
     } finally {
       setCreating(false);
     }

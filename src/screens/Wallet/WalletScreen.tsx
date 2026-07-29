@@ -14,7 +14,6 @@ import {
   StyleSheet,
   RefreshControl,
   Animated,
-  Alert,
   StatusBar,
   ActivityIndicator,
   Dimensions,
@@ -31,6 +30,7 @@ import { useWsEvents } from '../../hooks/useWsEvents';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { BackButton, PriceWithLocal } from '../../components/common';
+import { showConfirm } from '../../services';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface WalletBalance {
@@ -338,7 +338,7 @@ const WalletScreen: React.FC = () => {
     if (tx.public_id) details += `\n\nRéf. : ${tx.public_id}`;
     if (tx.reference_type) details += `\nType réf. : ${tx.reference_type}`;
 
-    Alert.alert(label, details, [{ text: 'Fermer' }]);
+    showConfirm(label, details, [{ text: 'Fermer' }]);
   };
 
   // ── Render transaction item ──────────────────────────────────────────────
@@ -381,7 +381,7 @@ const WalletScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={s.container}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <View style={s.header}>
           <Text style={s.headerTitle}>Mon Portefeuille</Text>
         </View>

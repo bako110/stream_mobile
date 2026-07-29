@@ -16,7 +16,6 @@ import {
   StyleSheet,
   Switch,
   TextInput,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Image,
@@ -31,6 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { toastService } from '../../services';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface CreatorProfile {
@@ -192,7 +192,7 @@ const CreatorDashboardScreen: React.FC = () => {
       await apiClient.patch(Endpoints.wallet.creatorProfile, { monetization_enabled: value });
       setProfile(prev => prev ? { ...prev, monetization_enabled: value } : null);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Mise à jour échouée');
+      toastService.error('Erreur', e?.message ?? 'Mise à jour échouée');
     } finally {
       setToggling(false);
     }
@@ -201,15 +201,15 @@ const CreatorDashboardScreen: React.FC = () => {
   const saveSubPrice = async () => {
     const price = parseFloat(subPrice);
     if (isNaN(price) || price < 0) {
-      Alert.alert('Erreur', 'Prix invalide');
+      toastService.error('Erreur', 'Prix invalide');
       return;
     }
     setSavingPrice(true);
     try {
       await apiClient.patch(Endpoints.wallet.creatorProfile, { monthly_subscription_price: price });
-      Alert.alert('Succès', 'Prix d\'abonnement mis à jour');
+      toastService.success('Succès', 'Prix d\'abonnement mis à jour');
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Mise à jour échouée');
+      toastService.error('Erreur', e?.message ?? 'Mise à jour échouée');
     } finally {
       setSavingPrice(false);
     }

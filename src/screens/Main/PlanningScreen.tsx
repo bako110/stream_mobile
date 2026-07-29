@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   RefreshControl, Image, StyleSheet,
-  Modal, TextInput, ScrollView, Platform, Alert, KeyboardAvoidingView,
+  Modal, TextInput, ScrollView, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonFeed, VerifiedBadge } from '../../components/common';
+import { toastService, showConfirm } from '../../services';
 import { planningService } from '../../services/planningService';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
@@ -418,13 +419,13 @@ export const PlanningScreen: React.FC = () => {
 
   const handleDelete = (item: PlanningItem) => {
     if (item.type !== 'personal') return;
-    Alert.alert('Supprimer', `Supprimer « ${item.title} » ?`, [
+    showConfirm('Supprimer', `Supprimer « ${item.title} » ?`, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try {
           await planningService.deleteEntry(item.id);
           setItems(prev => prev.filter(i => i.id !== item.id));
-        } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+        } catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
       }},
     ]);
   };
@@ -434,14 +435,14 @@ export const PlanningScreen: React.FC = () => {
       await planningService.respondToInvite(item.id, status);
       setItems(prev => prev.map(i => i.id === item.id ? { ...i, invite_status: status } : i));
       setPendingCount(c => Math.max(0, c - 1));
-      Alert.alert(
+      toastService.success(
         status === 'accepted' ? 'Invitation acceptée' : 'Invitation refusée',
         status === 'accepted'
           ? `« ${item.title} » a été ajouté à votre planning.`
           : `Vous avez refusé l'invitation à « ${item.title} ».`,
       );
     } catch {
-      Alert.alert('Erreur', "Impossible de répondre à l'invitation.");
+      toastService.error('Erreur', "Impossible de répondre à l'invitation.");
     }
   };
 
@@ -491,11 +492,11 @@ export const PlanningScreen: React.FC = () => {
         setShowCreate(false);
         resetForm();
         if (selectedContacts.length > 0) {
-          Alert.alert('Créé !', `Entrée créée et ${selectedContacts.length} invitation(s) envoyée(s).`);
+          toastService.success('Créé !', `Entrée créée et ${selectedContacts.length} invitation(s) envoyée(s).`);
         }
       }
     } catch {
-      Alert.alert('Erreur', editingItem ? "Impossible de modifier l'entrée." : "Impossible de créer l'entrée.");
+      toastService.error('Erreur', editingItem ? "Impossible de modifier l'entrée." : "Impossible de créer l'entrée.");
     } finally { setCreating(false); }
   };
 

@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
   StyleSheet,
   Animated,
 } from 'react-native';
@@ -15,7 +14,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { PageHeader } from './_shared';
 import { GoFolyXLoader } from '../../components/common/GoFolyXLoader';
 import { apiClient } from '../../api/client';
-import { authService } from '../../services';
+import { authService, toastService, showConfirm } from '../../services';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -184,7 +183,7 @@ export const SettingsSecurityScreen: React.FC = () => {
       });
       setSessions(list);
     } catch {
-      Alert.alert('Erreur', 'Impossible de charger les sessions.');
+      toastService.error('Erreur', 'Impossible de charger les sessions.');
     } finally {
       setLoading(false);
     }
@@ -199,7 +198,7 @@ export const SettingsSecurityScreen: React.FC = () => {
       : "Cette session sera terminee et l'appareil devra se reconnecter.";
     const btnText = isCurrent ? 'Se deconnecter' : 'Deconnecter';
 
-    Alert.alert(title, message, [
+    showConfirm(title, message, [
       { text: 'Annuler', style: 'cancel' },
       {
         text: btnText,
@@ -226,7 +225,7 @@ export const SettingsSecurityScreen: React.FC = () => {
               authService.forceLogout();
             }
           } catch {
-            Alert.alert('Erreur', 'Impossible de terminer cette session.');
+            toastService.error('Erreur', 'Impossible de terminer cette session.');
           } finally {
             setRevoking(null);
           }
@@ -236,7 +235,7 @@ export const SettingsSecurityScreen: React.FC = () => {
   }, [nav]);
 
   const handleRevokeAll = useCallback(() => {
-    Alert.alert(
+    showConfirm(
       'Deconnecter tous les autres appareils ?',
       'Toutes les sessions sauf celle-ci seront terminees.',
       [
@@ -250,7 +249,7 @@ export const SettingsSecurityScreen: React.FC = () => {
               await apiClient.delete('/api/v1/auth/sessions');
               setSessions(prev => prev.filter(s => s.is_current));
             } catch {
-              Alert.alert('Erreur', 'Impossible de revoquer les sessions.');
+              toastService.error('Erreur', 'Impossible de revoquer les sessions.');
             } finally {
               setRevokingAll(false);
             }

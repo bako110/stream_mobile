@@ -9,6 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
 import { Row, Card, PageHeader } from './_shared';
+import { toastService } from '../../services';
 
 interface Props { onLogout?: () => void; }
 
@@ -76,7 +77,7 @@ const Wizard: React.FC<WizardProps> = ({ type, onClose, onSuccess }) => {
       const msg = e?.response?.data?.detail ?? e?.message ?? 'Une erreur est survenue.';
       onClose();
       setTimeout(() => {
-        require('react-native').Alert.alert('Erreur', msg);
+        toastService.error('Erreur', msg);
       }, 400);
     } finally {
       setLoading(false);

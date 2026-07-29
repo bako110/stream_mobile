@@ -5,7 +5,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, FlatList, Dimensions,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
-  Platform, Alert, Modal, TextInput,
+  Platform, Modal, TextInput,
   KeyboardAvoidingView, Keyboard, AppState, Linking, BackHandler,
 } from 'react-native';
 import Animated, {
@@ -26,8 +26,9 @@ import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useIsWifi } from '../../hooks/useIsWifi';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
 import { RichText } from '../../components/common/RichText';
+import { openPhoneMenu } from '../../utils/phoneMenu';
 import { apiClient, Endpoints } from '../../api';
-import { reelService, socialService, authService, searchService } from '../../services';
+import { reelService, socialService, authService, searchService, toastService, showConfirm } from '../../services';
 import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
@@ -594,7 +595,7 @@ export const ReelsScreen: React.FC = () => {
   // ── Edit / Delete ─────────────────────────────────────────────────────────
   const handleDeleteReel = useCallback((reel: Reel) => {
     setMenuReel(null);
-    Alert.alert('Supprimer ce reel ?', 'Cette action est irréversible.', [
+    showConfirm('Supprimer ce reel ?', 'Cette action est irréversible.', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Supprimer', style: 'destructive',
@@ -604,7 +605,7 @@ export const ReelsScreen: React.FC = () => {
             setMyReels(prev => prev.filter(r => r.id !== reel.id));
             setReels(prev => prev.filter(r => r.id !== reel.id));
           } catch (e: any) {
-            Alert.alert('Erreur', e?.message ?? 'Impossible de supprimer.');
+            toastService.error('Erreur', e?.message ?? 'Impossible de supprimer.');
           }
         },
       },
@@ -652,7 +653,7 @@ export const ReelsScreen: React.FC = () => {
       setReels(prev  => prev.map(r  => r.id === reel.id ? { ...r, ...patch } : r));
       setMyReels(prev => prev.map(r => r.id === reel.id ? { ...r, ...patch } : r));
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder les modifications.');
+      toastService.error('Erreur', e?.message ?? 'Impossible de sauvegarder les modifications.');
     } finally {
       setFullEditReel(null);
     }
@@ -667,7 +668,7 @@ export const ReelsScreen: React.FC = () => {
       setReels(prev => prev.map(r => r.id === updated.id ? updated : r));
       setEditReel(null);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de modifier.');
+      toastService.error('Erreur', e?.message ?? 'Impossible de modifier.');
     } finally {
       setEditSaving(false);
     }
@@ -1148,7 +1149,7 @@ export const ReelsScreen: React.FC = () => {
             if (searching && !showTrending) {
               return (
                 <View style={s.searchCenterState}>
-                  <ActivityIndicator color="#fff" size="large" />
+                  <GoFolyXLoader variant="reel" color="#ffffff" />
                   <Text style={s.searchStateText}>Recherche en cours…</Text>
                 </View>
               );
@@ -1209,7 +1210,7 @@ export const ReelsScreen: React.FC = () => {
             if (loadingTrending) {
               return (
                 <View style={s.searchCenterState}>
-                  <ActivityIndicator color="#fff" size="large" />
+                  <GoFolyXLoader variant="reel" color="#ffffff" />
                 </View>
               );
             }
@@ -1281,8 +1282,13 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
   const handleCta = () => {
     apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
     if (!rawCta) return;
-    const target = isPhone ? `tel:${ctaPhone}` : rawCta;
-    Linking.openURL(target).catch(() => {});
+    // Numéro de téléphone — même choix que pour un numéro détecté dans une légende
+    // (RichText) : WhatsApp/Appeler/Copier, cohérent partout dans l'app.
+    if (isPhone && ctaPhone) {
+      openPhoneMenu(ctaPhone);
+      return;
+    }
+    Linking.openURL(rawCta).catch(() => {});
   };
 
   const badgePulse = useSharedValue(1);
@@ -1380,11 +1386,7 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
               <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: 0.2 }}>
                 {ad.cta_text || (isPhone ? 'Contactez-nous' : 'En savoir plus')}
               </Text>
-              {isPhone ? (
-                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' }}>· {ctaPhone}</Text>
-              ) : (
-                <Icon name="arrow-right" size={16} color="#fff" />
-              )}
+              {!isPhone && <Icon name="arrow-right" size={16} color="#fff" />}
             </LinearGradient>
           </TouchableOpacity>
         ) : null}
@@ -1457,7 +1459,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const reelDl = getDl(reel.id);
   const handleDownloadReel = useCallback(() => {
     const url = reel.hls_url ?? reel.mp4_url;
-    if (!url) { Alert.alert('Indisponible', 'Vidéo introuvable pour ce reel.'); return; }
+    if (!url) { toastService.warning('Indisponible', 'Vidéo introuvable pour ce reel.'); return; }
     startDl(reel.id, url, true);
   }, [reel.id, reel.hls_url, reel.mp4_url, startDl]);
   const [commentsDisabledSt, setCommentsDisabledSt] = useState(reel.comments_disabled ?? false);
@@ -1507,9 +1509,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       await reelService.repost(reel.id);
       setRepostCountSt(prev => prev + 1);
       setShowRemix(false);
-      Alert.alert('Republié', 'Le reel a été republié sur votre profil.');
+      toastService.success('Republié', 'Le reel a été republié sur votre profil.');
     } catch {
-      Alert.alert('Erreur', 'Impossible de republier ce reel.');
+      toastService.error('Erreur', 'Impossible de republier ce reel.');
     } finally {
       setRemixLoading(false);
     }
@@ -1522,7 +1524,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
   const handleDeleteReel = useCallback(() => {
     setShowOwnerMenu(false);
-    Alert.alert(
+    showConfirm(
       'Supprimer le reel',
       'Cette action est irréversible.',
       [
@@ -1533,7 +1535,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             try {
               await reelService.delete(reel.id);
             } catch {
-              Alert.alert('Erreur', 'Impossible de supprimer ce reel.');
+              toastService.error('Erreur', 'Impossible de supprimer ce reel.');
             }
           },
         },
@@ -1549,7 +1551,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       setCaptionSt(editCaptionText.trim());
       setShowEditCaption(false);
     } catch {
-      Alert.alert('Erreur', 'Impossible de modifier la description.');
+      toastService.error('Erreur', 'Impossible de modifier la description.');
     } finally {
       setSavingCaption(false);
     }
@@ -2616,7 +2618,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   onPress={() => {
                     if (!reel.author?.id) return;
                     const authorLabel = getAuthorLabel(reel.author);
-                    Alert.alert(
+                    showConfirm(
                       'Invitation Cable',
                       `Envoyer une invitation de collaboration à ${authorLabel} ?`,
                       [
@@ -2629,10 +2631,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                             try {
                               await cableService.sendInvite(reel.id, String(reel.author!.id));
                               setCableCountSt(prev => prev + 1);
-                              Alert.alert('Invitation envoyée', `${authorLabel} a reçu ton invitation Cable.`);
+                              toastService.success('Invitation envoyée', `${authorLabel} a reçu ton invitation Cable.`);
                             } catch (err: any) {
                               const msg = err?.response?.data?.detail ?? "Erreur lors de l'envoi";
-                              Alert.alert('Erreur', msg);
+                              toastService.error('Erreur', msg);
                             } finally {
                               setCableLoading(false);
                             }

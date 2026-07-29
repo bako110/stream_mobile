@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Geolocation from '@react-native-community/geolocation';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Linking,
+  TextInput, ActivityIndicator, Linking,
   KeyboardAvoidingView, Platform, PermissionsAndroid,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -13,8 +13,8 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal } from '../../components/common';
-import { eventService } from '../../services';
+import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { eventService, toastService, showConfirm } from '../../services';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { apiClient } from '../../api';
 import type { EventType, EventAccessType, EventCreate } from '../../types';
@@ -133,7 +133,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
       const imgs = [ev.thumbnail_url, ev.banner_url, ...(ev.gallery_urls ?? [])].filter(Boolean) as string[];
       setGalleryUrls(imgs);
       if (ev.video_url) setVideoUrl(ev.video_url);
-    }).catch(() => Alert.alert('Erreur', "Impossible de charger l'événement."))
+    }).catch(() => toastService.error('Erreur', "Impossible de charger l'événement."))
       .finally(() => setLoadingData(false));
   }, [eventId]);
 
@@ -145,7 +145,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
         { title: 'Localisation', message: 'GoFolyX a besoin de votre position.', buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission refusée', 'Activez la localisation dans les paramètres.');
+        toastService.warning('Permission refusée', 'Activez la localisation dans les paramètres.');
         return;
       }
     }
@@ -171,12 +171,12 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
           if (addrStr) setVenueAddr(addrStr);
           setGeoCoords({ lat: latitude, lon: longitude, label });
         } catch {
-          Alert.alert('Erreur', 'Impossible de récupérer la position.');
+          toastService.error('Erreur', 'Impossible de récupérer la position.');
         } finally {
           setLocating(false);
         }
       },
-      () => { setLocating(false); Alert.alert('Erreur GPS', 'Position introuvable.'); },
+      () => { setLocating(false); toastService.error('Erreur GPS', 'Position introuvable.'); },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };
@@ -230,7 +230,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
 
   const goNext = () => {
     const err = validateStep(step);
-    if (err) { Alert.alert('Champs manquants', err); return; }
+    if (err) { toastService.warning('Champs manquants', err); return; }
     setStep((step + 1) as Step);
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
@@ -285,28 +285,28 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
     // Validation globale au moment de sauvegarder
     for (let i = 0; i <= 2; i++) {
       const err = validateStep(i as Step);
-      if (err) { Alert.alert('Champs manquants', err); return; }
+      if (err) { toastService.warning('Champs manquants', err); return; }
     }
     setSaving(true);
     try {
       const payload = { ...buildPayload(), video_url: videoUrl || undefined };
       if (isEditing) {
         await eventService.update(eventId!, payload);
-        Alert.alert('Modifications enregistrées', 'Votre événement a été mis à jour.');
+        toastService.success('Modifications enregistrées', 'Votre événement a été mis à jour.');
       } else {
         await eventService.create(payload);
-        Alert.alert('Brouillon enregistré', 'Votre événement a été sauvegardé.');
+        toastService.success('Brouillon enregistré', 'Votre événement a été sauvegardé.');
       }
       onBack?.();
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
+      toastService.error('Erreur', e?.message ?? 'Impossible de sauvegarder.');
     } finally { setSaving(false); }
   };
 
   const handlePublish = async () => {
     for (let i = 0; i <= 2; i++) {
       const err = validateStep(i as Step);
-      if (err) { Alert.alert('Champs manquants', err); return; }
+      if (err) { toastService.warning('Champs manquants', err); return; }
     }
 
     const needsLive = isOnline && !isEditing;
@@ -315,7 +315,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
         const cost = await apiClient.get('/api/v1/lives/cost') as any;
         const { cost_gogold, balance, sufficient } = cost;
         if (!sufficient) {
-          Alert.alert(
+          showConfirm(
             'Solde insuffisant',
             `Il faut ${cost_gogold} GoGold pour programmer un live.\nTon solde : ${balance} GoGold.\n\nRecharge ton wallet pour continuer.`,
             [
@@ -326,7 +326,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
           return;
         }
         await new Promise<void>((resolve, reject) =>
-          Alert.alert(
+          showConfirm(
             'Programmer un live',
             `${cost_gogold} GoGold seront débités de ton wallet (solde : ${balance} GoGold) pour programmer ce live.\n\nConfirmer ?`,
             [
@@ -340,7 +340,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
       }
     }
 
-    Alert.alert(
+    showConfirm(
       isEditing ? 'Enregistrer et publier ?' : "Publier l'événement ?",
       'Tout le monde pourra voir et rejoindre cet événement.',
       [
@@ -378,7 +378,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
   if (loadingData) {
     return (
       <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <GoFolyXLoader fullScreen color={colors.primary} />
       </View>
     );
   }

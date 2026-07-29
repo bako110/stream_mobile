@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { CachedImage } from '../../components/common';
-import { authService } from '../../services';
+import { authService, showConfirm } from '../../services';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -39,7 +39,7 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
           {onLogout && (
             <TouchableOpacity
               onPress={() => {
-                Alert.alert('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
+                showConfirm('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
                   { text: 'Annuler', style: 'cancel' },
                   { text: 'Déconnecter', style: 'destructive', onPress: () => {
                     authService._clearTokens();

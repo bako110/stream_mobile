@@ -27,11 +27,11 @@ const SECTIONS: Section[] = [
     body: `Responsable de traitement :
 GoFolyX SAS
 Siège social : Paris, France
-Email DPO : privacy@gofolyx.app
+Email DPO : privacy@gofolyx.com
 
 GoFolyX SAS est responsable du traitement de vos données personnelles collectées via l'application mobile GoFolyX et le site web gofolyx.app.
 
-Pour toute question relative à la protection de vos données, vous pouvez contacter notre Délégué à la Protection des Données (DPO) à l'adresse privacy@gofolyx.app. Nous nous engageons à répondre à toute demande dans un délai maximum de 30 jours.`,
+Pour toute question relative à la protection de vos données, vous pouvez contacter notre Délégué à la Protection des Données (DPO) à l'adresse privacy@gofolyx.com. Nous nous engageons à répondre à toute demande dans un délai maximum de 30 jours.`,
   },
   {
     key: 'collecte', icon: 'database', title: '2. Données collectées',
@@ -127,7 +127,7 @@ En cas de transfert hors UE (notamment pour certains services tiers comme Google
 • Décision d'adéquation de la Commission pour les pays reconnus équivalents
 • Certification Privacy Shield ou mécanisme équivalent en vigueur
 
-Vous pouvez obtenir une copie des garanties mises en place en contactant privacy@gofolyx.app.`,
+Vous pouvez obtenir une copie des garanties mises en place en contactant privacy@gofolyx.com.`,
   },
   {
     key: 'conservation', icon: 'clock', title: '7. Durée de conservation',
@@ -171,7 +171,7 @@ Consentements marketing :
 
 Comment exercer vos droits :
 → Depuis l'application : Paramètres > Confidentialité > Mes données
-→ Par email : privacy@gofolyx.app (réponse sous 30 jours maximum)
+→ Par email : privacy@gofolyx.com (réponse sous 30 jours maximum)
 
 Recours : si vous estimez que vos droits ne sont pas respectés, vous pouvez saisir la CNIL (Commission Nationale de l'Informatique et des Libertés) sur www.cnil.fr`,
   },
@@ -230,7 +230,7 @@ Mesures en place :
 • Contenu sensible masqué par défaut pour les comptes mineurs
 • Signalement facilité des profils suspects
 
-Nous ne collectons pas sciemment de données personnelles d'enfants de moins de 13 ans. Si vous êtes un parent ou tuteur légal et pensez qu'un enfant de moins de 13 ans a créé un compte sur GoFolyX, contactez-nous immédiatement à privacy@gofolyx.app. Nous procéderons à la vérification et, le cas échéant, à la suppression immédiate du compte et des données associées.`,
+Nous ne collectons pas sciemment de données personnelles d'enfants de moins de 13 ans. Si vous êtes un parent ou tuteur légal et pensez qu'un enfant de moins de 13 ans a créé un compte sur GoFolyX, contactez-nous immédiatement à privacy@gofolyx.com. Nous procéderons à la vérification et, le cas échéant, à la suppression immédiate du compte et des données associées.`,
   },
   {
     key: 'ia', icon: 'cpu', title: '12. Intelligence artificielle et algorithmes',
@@ -251,7 +251,7 @@ Conformément à l'article 22 du RGPD, si une décision vous concernant (suspens
 • Exprimer votre point de vue
 • Contester la décision
 
-Contactez support@gofolyx.app pour toute demande en ce sens.`,
+Contactez support@gofolyx.com pour toute demande en ce sens.`,
   },
   {
     key: 'modifications', icon: 'refresh-cw', title: '13. Modifications de la politique',
@@ -413,7 +413,7 @@ export const PolitiqueConfidentialiteScreen: React.FC<Props> = ({ onBack }) => {
           <Icon name="mail" size={16} color={accentColor} />
           <Text style={[s.contactTxt, { color: colors.textTertiary }]}>
             Questions sur vos données ? Contactez notre DPO à{' '}
-            <Text style={{ color: accentColor, fontWeight: '600' }}>privacy@gofolyx.app</Text>
+            <Text style={{ color: accentColor, fontWeight: '600' }}>privacy@gofolyx.com</Text>
             {'\n'}Réponse garantie sous 30 jours.
           </Text>
         </View>

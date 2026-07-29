@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, ScrollView,
-  Image, RefreshControl, Alert, TextInput, Keyboard,
+  Image, RefreshControl, TextInput, Keyboard,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -10,7 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { AppHeader, SkeletonFeed, PriceWithLocal } from '../../components/common';
-import { concertService } from '../../services';
+import { concertService, toastService, showConfirm } from '../../services';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
 import { concertsStyles as s } from '../../styles/ConcertsScreen.styles';
@@ -71,13 +71,13 @@ export const ConcertsScreen: React.FC = () => {
   };
 
   const handleDeleteConcert = (id: string) => {
-    Alert.alert('Supprimer', 'Supprimer ce concert ?', [
+    showConfirm('Supprimer', 'Supprimer ce concert ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try {
           await concertService.delete(id);
           setMyConcerts(prev => prev.filter(c => c.id !== id));
-        } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+        } catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
       }},
     ]);
   };

@@ -1,8 +1,8 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
-import { BackButton, PriceWithLocal } from '../../components/common';
+import { BackButton, PriceWithLocal, GoFolyXLoader } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Alert, RefreshControl,
+  StatusBar, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -10,6 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService } from '../../services/subscriptionService';
+import { toastService, showConfirm } from '../../services';
 import type { Subscription, SubscriptionStatus } from '../../types';
 import { PLAN_CONFIG } from '../../types/subscription';
 import type { PlanType } from '../../types';
@@ -65,7 +66,7 @@ export default function MySubscriptionScreen() {
   useEffect(() => { load(); }, [load]);
 
   function handleCancel() {
-    Alert.alert(
+    showConfirm(
       'Annuler l\'abonnement',
       'Votre abonnement restera actif jusqu\'à la fin de la période en cours. Confirmer ?',
       [
@@ -78,9 +79,9 @@ export default function MySubscriptionScreen() {
             try {
               const updated = await subscriptionService.cancel();
               setCurrent(updated);
-              Alert.alert('Abonnement annulé', 'Votre abonnement a bien été annulé.');
+              toastService.success('Abonnement annulé', 'Votre abonnement a bien été annulé.');
             } catch (e: any) {
-              Alert.alert('Erreur', e?.message ?? 'Impossible d\'annuler.');
+              toastService.error('Erreur', e?.message ?? 'Impossible d\'annuler.');
             } finally {
               setCancelling(false);
             }
@@ -94,7 +95,7 @@ export default function MySubscriptionScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <ActivityIndicator color={colors.primary} size="large" />
+        <GoFolyXLoader fullScreen color={colors.primary} />
       </View>
     );
   }

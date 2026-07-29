@@ -7,7 +7,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl, Share, Image, StatusBar,
+  ActivityIndicator, RefreshControl, Share, Image, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -16,6 +16,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
+import { toastService, showConfirm } from '../../services';
 
 interface Contribution {
   id: string;
@@ -84,28 +85,28 @@ export const CommunityFundDetailScreen: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const handleClose = () => {
-    Alert.alert('Clôturer', 'Clôturer cette cotisation ? Les membres ne pourront plus payer.', [
+    showConfirm('Clôturer', 'Clôturer cette cotisation ? Les membres ne pourront plus payer.', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Clôturer', onPress: async () => {
         try {
           await apiClient.post(`${BASE}/close`);
           load();
-        } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+        } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
       }},
     ]);
   };
 
   const handleCancel = () => {
-    Alert.alert('Annuler la cotisation',
+    showConfirm('Annuler la cotisation',
       'Tous les membres qui ont payé seront remboursés automatiquement.',
       [
         { text: 'Retour', style: 'cancel' },
         { text: 'Annuler et rembourser', style: 'destructive', onPress: async () => {
           try {
             const res = await apiClient.post<{ refunded_count: number }>(`${BASE}/cancel`);
-            Alert.alert('Annulée', `${res.data?.refunded_count ?? 0} membre(s) remboursé(s).`);
+            toastService.success('Annulée', `${res.data?.refunded_count ?? 0} membre(s) remboursé(s).`);
             load();
-          } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+          } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
         }},
       ],
     );
@@ -113,14 +114,14 @@ export const CommunityFundDetailScreen: React.FC = () => {
 
   const handleExempt = (contrib: Contribution) => {
     const name = contrib.display_name || contrib.username || 'Ce membre';
-    Alert.alert('Exempter', `Exempter ${name} de cette cotisation ?`, [
+    showConfirm('Exempter', `Exempter ${name} de cette cotisation ?`, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Exempter', onPress: async () => {
         setExempting(contrib.user_id);
         try {
           await apiClient.patch(`${BASE}/contributions/${contrib.user_id}/exempt`);
           load();
-        } catch (e: any) { Alert.alert('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
+        } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
         finally { setExempting(null); }
       }},
     ]);

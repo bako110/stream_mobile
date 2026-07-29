@@ -8,7 +8,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
-  ActivityIndicator, Image, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Image, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform,
   Dimensions, Share,
 } from 'react-native';
 import Animated, {
@@ -28,6 +28,7 @@ import { tournamentService } from '../../services/tournamentService';
 import { socialService } from '../../services/socialService';
 import type { TournamentBracket, TournamentMatch, TournamentRound, TournamentStanding } from '../../services/tournamentService';
 import { liveService } from '../../services/liveService';
+import { toastService, showConfirm } from '../../services';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { BackButton } from '../../components/common';
 import { MatchResultModal, type MatchResultData } from '../../components/live/MatchResultModal';
@@ -247,7 +248,7 @@ export const TournamentBracketScreen: React.FC = () => {
       await tournamentService.generateBracket(tournamentId);
       await load();
     } catch (e: any) {
-      Alert.alert('Impossible de démarrer', e?.message || 'Une erreur est survenue.');
+      toastService.error('Impossible de démarrer', e?.message || 'Une erreur est survenue.');
     } finally {
       setGenerating(false);
     }
@@ -269,11 +270,11 @@ export const TournamentBracketScreen: React.FC = () => {
       setJoinPassword('');
       setJoinInviteCode('');
       if (result.status === 'pending') {
-        Alert.alert('Demande envoyée', "L'organisateur doit valider ta demande d'inscription.");
+        toastService.info('Demande envoyée', "L'organisateur doit valider ta demande d'inscription.");
       }
       await load();
     } catch (e: any) {
-      Alert.alert('Impossible de rejoindre', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
+      toastService.error('Impossible de rejoindre', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
     } finally {
       setJoining(false);
     }
@@ -302,7 +303,7 @@ export const TournamentBracketScreen: React.FC = () => {
       setShowEdit(false);
       await load();
     } catch (e: any) {
-      Alert.alert('Impossible de modifier', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
+      toastService.error('Impossible de modifier', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
     } finally {
       setSaving(false);
     }
@@ -330,7 +331,7 @@ export const TournamentBracketScreen: React.FC = () => {
         });
       }
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message || "Impossible de démarrer le match.");
+      toastService.error('Erreur', e?.message || "Impossible de démarrer le match.");
     } finally {
       setStartingMatch(null);
     }
@@ -338,7 +339,7 @@ export const TournamentBracketScreen: React.FC = () => {
 
   const handleForfeit = (winnerParticipantId: string, winnerName: string) => {
     if (!selectedMatch || decidingForfeit) return;
-    Alert.alert(
+    showConfirm(
       'Déclarer un forfait',
       `Déclarer ${winnerName} vainqueur par forfait de ce match ?`,
       [
@@ -352,7 +353,7 @@ export const TournamentBracketScreen: React.FC = () => {
               setSelectedMatch(null);
               await load();
             } catch (e: any) {
-              Alert.alert('Impossible de déclarer ce forfait', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
+              toastService.error('Impossible de déclarer ce forfait', e?.response?.data?.detail || e?.message || 'Une erreur est survenue.');
             } finally {
               setDecidingForfeit(false);
             }

@@ -1,11 +1,12 @@
 import React from 'react';
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert,
+  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/Feather';
 import type { AppColors } from '../../theme/colors';
+import { toastService } from '../../services';
 
 interface VideoPickerFieldProps {
   label?:     string;
@@ -74,7 +75,7 @@ export const VideoPickerField: React.FC<VideoPickerFieldProps> = ({
       (response) => {
         if (response.didCancel) return;
         if (response.errorCode) {
-          Alert.alert('Erreur', response.errorMessage ?? 'Impossible de sélectionner la vidéo.');
+          toastService.error('Erreur', response.errorMessage ?? 'Impossible de sélectionner la vidéo.');
           return;
         }
         const asset = response.assets?.[0];

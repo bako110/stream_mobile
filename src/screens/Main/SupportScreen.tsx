@@ -1,12 +1,13 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Linking, Alert,
+  ScrollView, Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
+import { toastService } from '../../services';
 
 interface Props {
   navigation: any;
@@ -23,10 +24,10 @@ const SUPPORT_OPTIONS = [
   {
     icon:    'mail',
     label:   'Email',
-    sub:     'support@gofolyx.app',
+    sub:     'support@gofolyx.com',
     color:   '#10B981',
     kind:    'email',
-    value:   'mailto:support@gofolyx.app?subject=Assistance%20GoFolyX',
+    value:   'mailto:support@gofolyx.com?subject=Assistance%20GoFolyX',
   },
   {
     icon:    'phone',
@@ -59,7 +60,7 @@ export const SupportScreen: React.FC<Props> = ({ navigation }) => {
     }
     Linking.canOpenURL(opt.value).then(ok => {
       if (ok) Linking.openURL(opt.value);
-      else Alert.alert('Erreur', 'Impossible d\'ouvrir ce lien');
+      else toastService.error('Erreur', 'Impossible d\'ouvrir ce lien');
     });
   };
 

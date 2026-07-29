@@ -6,7 +6,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
-  ActivityIndicator, Image, Alert, Modal, Pressable,
+  ActivityIndicator, Image, Modal, Pressable,
   ScrollView, Dimensions, Animated, Linking, PermissionsAndroid,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
@@ -23,6 +23,7 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
 import { GoFolyXLoader, BackButton } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
+import { toastService, showConfirm } from '../../services';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -302,7 +303,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
       }
-    } catch { Alert.alert('Erreur', 'Impossible d\'envoyer les images.'); }
+    } catch { toastService.error('Erreur', 'Impossible d\'envoyer les images.'); }
     finally {
       setMediaUploading(false);
       setMediaPreviewOpen(false);
@@ -329,7 +330,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       );
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-    } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la vidéo.'); }
+    } catch { toastService.error('Erreur', 'Impossible d\'envoyer la vidéo.'); }
     finally { setSending(false); }
   };
 
@@ -341,7 +342,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
         { title: 'Microphone', message: "L'app a besoin du micro pour enregistrer un vocal.", buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission', 'Microphone requis pour enregistrer un vocal');
+        toastService.warning('Permission', 'Microphone requis pour enregistrer un vocal');
         return;
       }
     }
@@ -373,7 +374,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'audio', [uploaded.url], reply_to_id, metadata);
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-    } catch { Alert.alert('Erreur', "Impossible d'envoyer le vocal"); }
+    } catch { toastService.error('Erreur', "Impossible d'envoyer le vocal"); }
     finally { setSending(false); }
   };
 
@@ -411,7 +412,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e: any) {
-      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', 'Impossible d\'envoyer l\'audio.');
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) toastService.error('Erreur', 'Impossible d\'envoyer l\'audio.');
     } finally { setSending(false); }
   };
 
@@ -424,7 +425,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       setFileCaption('');
       setFilePreviewOpen(true);
     } catch (e: any) {
-      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) Alert.alert('Erreur', "Impossible d'ouvrir le fichier.");
+      if (!isErrorWithCode(e) || e.code !== errorCodes.OPERATION_CANCELED) toastService.error('Erreur', "Impossible d'ouvrir le fichier.");
     }
   };
 
@@ -443,7 +444,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       setFilePreviewOpen(false);
       setFilePreview(null);
       setFileCaption('');
-    } catch { Alert.alert('Erreur', "Impossible d'envoyer le fichier."); }
+    } catch { toastService.error('Erreur', "Impossible d'envoyer le fichier."); }
     finally { setFileUploading(false); }
   };
 
@@ -461,14 +462,14 @@ export const CommunityChannelChatScreen: React.FC = () => {
         const msg = await communityService.sendChannelMessage(communityId, channelId, null as any, 'location', [], reply_to_id, metadata);
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg as CommunityMessage]);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-      } catch { Alert.alert('Erreur', 'Impossible d\'envoyer la localisation.'); }
+      } catch { toastService.error('Erreur', 'Impossible d\'envoyer la localisation.'); }
     };
     Geolocation.getCurrentPosition(
       doSend,
       () => {
         Geolocation.getCurrentPosition(
           doSend,
-          (err) => { setLocating(false); Alert.alert('Erreur GPS', err.message); },
+          (err) => { setLocating(false); toastService.error('Erreur GPS', err.message); },
           { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
         );
       },
@@ -479,7 +480,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
   // ── Actions message ──────────────────────────────────────────────────────────
   const handleDelete = (msg: CommunityMessage) => {
     setMenuMsg(null);
-    Alert.alert('Supprimer', 'Supprimer ce message ?', [
+    showConfirm('Supprimer', 'Supprimer ce message ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try {

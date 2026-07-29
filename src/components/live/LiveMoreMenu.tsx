@@ -5,7 +5,7 @@
  *  - Host   : Paramètres du live, Copier le lien, Partager, Terminer le live
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -18,6 +18,7 @@ import { socialService } from '../../services/socialService';
 import { useUser } from '../../context/UserContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { ReportModal } from '../common/ReportModal';
+import { showConfirm } from '../../services';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -95,7 +96,7 @@ export const LiveMoreMenu: React.FC<Props> = ({
 
   const handleStop = () => {
     run(() => {
-      Alert.alert('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
+      showConfirm('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Terminer', style: 'destructive', onPress: onStopLive },
       ]);
@@ -104,7 +105,7 @@ export const LiveMoreMenu: React.FC<Props> = ({
 
   const handleLeaveConfirm = () => {
     run(() => {
-      Alert.alert('Quitter le live ?', 'Es-tu sûr de vouloir quitter ce live ?', [
+      showConfirm('Quitter le live ?', 'Es-tu sûr de vouloir quitter ce live ?', [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Quitter', style: 'destructive', onPress: onLeave },
       ]);

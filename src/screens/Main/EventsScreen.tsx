@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  ScrollView, RefreshControl, Image, Alert, TextInput, Keyboard,
+  ScrollView, RefreshControl, Image, TextInput, Keyboard,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -9,7 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonFeed, AvatarWithBadge, PriceWithLocal } from '../../components/common';
-import { eventService } from '../../services';
+import { eventService, toastService, showConfirm } from '../../services';
 import type { Event, EventType } from '../../types';
 import type { AppColors } from '../../theme/colors';
 import { eventsStyles as s } from '../../styles/EventsScreen.styles';
@@ -71,13 +71,13 @@ export const EventsScreen: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert('Supprimer', 'Supprimer cet événement ?', [
+    showConfirm('Supprimer', 'Supprimer cet événement ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try {
           await eventService.delete(id);
           setMyEvents(prev => prev.filter(e => e.id !== id));
-        } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+        } catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
       }},
     ]);
   };

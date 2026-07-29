@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl,
+  ActivityIndicator, RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { adService, type Ad } from '../../services/adService';
+import { toastService, showConfirm } from '../../services';
 
 // 1 € = 100 GoGold
 const EUR_TO_COINS = 100;
@@ -233,7 +234,7 @@ export const AdsScreen: React.FC = () => {
 
   const handleDelete = (ad: Ad) => {
     if (ad.status === 'active' || ad.status === 'paused') {
-      Alert.alert('Impossible', 'Arrêtez la campagne avant de la supprimer.');
+      toastService.warning('Impossible', 'Arrêtez la campagne avant de la supprimer.');
       return;
     }
     const isDraft    = ad.status === 'draft';
@@ -241,11 +242,11 @@ export const AdsScreen: React.FC = () => {
     const msg = isDraft
       ? `Supprimer le brouillon "${ad.title}" ?`
       : `Supprimer la campagne terminée "${ad.title}" ? L'historique (impressions, clics) sera perdu.`;
-    Alert.alert('Supprimer', msg, [
+    showConfirm('Supprimer', msg, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: async () => {
         try { await adService.delete(ad.id); setAds(prev => prev.filter(a => a.id !== ad.id)); }
-        catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+        catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
       }},
     ]);
   };
@@ -254,7 +255,7 @@ export const AdsScreen: React.FC = () => {
     try {
       const updated = ad.status === 'active' ? await adService.pause(ad.id) : await adService.resume(ad.id);
       setAds(prev => prev.map(a => a.id === ad.id ? updated : a));
-    } catch { Alert.alert('Erreur', 'Impossible de modifier le statut.'); }
+    } catch { toastService.error('Erreur', 'Impossible de modifier le statut.'); }
   };
 
   // ── Construction de la liste avec separateurs de sections ────────────────

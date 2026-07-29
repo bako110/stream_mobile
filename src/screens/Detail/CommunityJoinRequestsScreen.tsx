@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, Alert, TextInput,
+  StyleSheet, ActivityIndicator, TextInput,
   Modal, KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { GoFolyXLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { JoinRequest } from '../../services/communityService';
+import { toastService, showConfirm } from '../../services';
 
 interface Props {
   route: { params: { communityId: string; communityName: string } };
@@ -42,7 +43,7 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
       const data = await communityService.getJoinRequests(communityId);
       setRequests(Array.isArray(data) ? data : []);
     } catch {
-      Alert.alert('Erreur', 'Impossible de charger les demandes.');
+      toastService.error('Erreur', 'Impossible de charger les demandes.');
     } finally {
       setLoading(false);
       setRefresh(false);
@@ -52,7 +53,7 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
   useEffect(() => { load(); }, [load]);
 
   const handleApprove = async (req: JoinRequest) => {
-    Alert.alert(
+    showConfirm(
       'Accepter la demande',
       `Accepter ${req.display_name || req.username} dans "${communityName}" ?`,
       [
@@ -65,7 +66,7 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
               await communityService.approveJoinRequest(communityId, req.id);
               setRequests(prev => prev.filter(r => r.id !== req.id));
             } catch {
-              Alert.alert('Erreur', 'Impossible d\'accepter cette demande.');
+              toastService.error('Erreur', 'Impossible d\'accepter cette demande.');
             } finally {
               setActionId(null);
             }
@@ -89,7 +90,7 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
       setRequests(prev => prev.filter(r => r.id !== rejectTarget.id));
       setRejectModal(false);
     } catch {
-      Alert.alert('Erreur', 'Impossible de refuser cette demande.');
+      toastService.error('Erreur', 'Impossible de refuser cette demande.');
     } finally {
       setRejecting(false);
     }

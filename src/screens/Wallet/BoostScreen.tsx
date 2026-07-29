@@ -3,7 +3,7 @@ import { BackButton } from '../../components/common';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, ActivityIndicator,
-  Animated, Alert, Modal, TextInput,
+  Animated, Modal, TextInput,
   FlatList, Image, RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -14,6 +14,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { toastService, showConfirm } from '../../services';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -399,7 +400,7 @@ const ActiveBoostCard: React.FC<{
       setShowStop(false);
       onCancelled(boost.id, res.data.refund_gogold, res.data.new_balance);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? "Echec de l'annulation.");
+      toastService.error('Erreur', e?.response?.data?.detail ?? "Echec de l'annulation.");
     } finally { setStopping(false); }
   }
 
@@ -852,7 +853,7 @@ export default function BoostScreen() {
 
   function handleBoostFromSuggestion(s: BoostSuggestion) {
     if (!s.affordable || balance < s.GoGold) {
-      Alert.alert('Solde insuffisant', `Il te manque ${(s.GoGold - balance).toLocaleString('fr-FR')} GoGold.`, [
+      showConfirm('Solde insuffisant', `Il te manque ${(s.GoGold - balance).toLocaleString('fr-FR')} GoGold.`, [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Acheter des GoGold', onPress: () => navigation.navigate('BuyGoGold') },
       ]);
@@ -885,11 +886,11 @@ export default function BoostScreen() {
 
   function handleSelectTier(tier: BoostTier) {
     if (cat.contentType && !targetContent?.id) {
-      Alert.alert('Contenu requis', `Selectionnez d'abord un ${cat.contentType} a booster.`);
+      toastService.warning('Contenu requis', `Selectionnez d'abord un ${cat.contentType} a booster.`);
       return;
     }
     if (balance < tier.GoGold) {
-      Alert.alert('Solde insuffisant', `Il te manque ${(tier.GoGold - balance).toLocaleString('fr-FR')} GoGold.`, [
+      showConfirm('Solde insuffisant', `Il te manque ${(tier.GoGold - balance).toLocaleString('fr-FR')} GoGold.`, [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Acheter des GoGold', onPress: () => navigation.navigate('BuyGoGold') },
       ]);
@@ -901,11 +902,11 @@ export default function BoostScreen() {
 
   function handleSelectCustom() {
     if (cat.contentType && !targetContent?.id) {
-      Alert.alert('Contenu requis', `Selectionnez d'abord un ${cat.contentType}.`);
+      toastService.warning('Contenu requis', `Selectionnez d'abord un ${cat.contentType}.`);
       return;
     }
     if (balance < customGoGold) {
-      Alert.alert('Solde insuffisant', `Il te manque ${(customGoGold - balance).toLocaleString('fr-FR')} GoGold.`);
+      toastService.warning('Solde insuffisant', `Il te manque ${(customGoGold - balance).toLocaleString('fr-FR')} GoGold.`);
       return;
     }
     setSelectedTier({
@@ -950,7 +951,7 @@ export default function BoostScreen() {
         Animated.timing(successAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
       ]).start(() => setTab('active'));
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail ?? 'Boost non disponible pour le moment.');
+      toastService.error('Erreur', e?.response?.data?.detail ?? 'Boost non disponible pour le moment.');
     } finally {
       setPurchasing(false);
     }

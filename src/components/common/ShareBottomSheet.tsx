@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, Image,
-  Animated, Dimensions, Alert, ActivityIndicator,
+  Animated, Dimensions, ActivityIndicator,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Icon from 'react-native-vector-icons/Feather';
@@ -11,6 +11,7 @@ import RNShare from 'react-native-share';
 import { useTheme } from '../../hooks/useTheme';
 import { encodeId } from '../../utils/slugId';
 import { socialService } from '../../services/socialService';
+import { toastService } from '../../services/toastService';
 import type { Post } from '../../types/post';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
@@ -247,7 +248,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     recordShare('external');
     onShareCountChange?.();
     onClose();
-    Alert.alert('Lien copié', `gofolyx.com — le lien a été copié dans le presse-papier.`);
+    toastService.success('Lien copié', `gofolyx.com — le lien a été copié dans le presse-papier.`);
   };
 
   const ACTIONS = [
