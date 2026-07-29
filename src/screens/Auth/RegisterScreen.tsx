@@ -11,11 +11,13 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
 import { authService } from '../../services';
+import type { Gender } from '../../types';
 
 const { width: W, height: H } = Dimensions.get('window');
 const HERO_H = H * 0.26;
@@ -38,7 +40,18 @@ interface StepData {
   password:     string;
   confirm:      string;
   referralCode: string;
+  dateOfBirth:  string;
+  gender:       Gender | '';
 }
+
+type FormErrors = Partial<Record<keyof StepData, string>>;
+
+const GENDER_OPTIONS: { key: Gender; label: string }[] = [
+  { key: 'female',            label: 'Femme' },
+  { key: 'male',              label: 'Homme' },
+  { key: 'other',             label: 'Autre' },
+  { key: 'prefer_not_to_say', label: 'Non précisé' },
+];
 
 const STEPS = 3;
 
@@ -91,9 +104,10 @@ const pw = StyleSheet.create({
 // ── Step 1 ────────────────────────────────────────────────────────────────────
 const Step1: React.FC<{
   data: StepData; onChange: (k: keyof StepData, v: string) => void;
-  errors: Partial<StepData>; onNext: () => void; colors: any;
+  errors: FormErrors; onNext: () => void; colors: any;
 }> = ({ data, onChange, errors, onNext, colors }) => {
   const lastRef = useRef<TextInput>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   return (
     <Animated.View entering={SlideInRight.springify().damping(18)} exiting={SlideOutLeft.springify().damping(18)} style={s.stepWrap}>
       <Animated.Text entering={FadeInDown.delay(80).duration(400)} style={[s.stepTitle, { color: colors.textPrimary }]}>
@@ -125,9 +139,65 @@ const Step1: React.FC<{
           onChangeText={v => onChange('lastName', v)}
           error={errors.lastName}
           returnKeyType="done"
-          onSubmitEditing={onNext}
           autoCapitalize="words"
         />
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(300).springify()} style={{ marginTop: 14 }}>
+        <Text style={[s.fieldLabel, { color: colors.textTertiary }]}>Date de naissance</Text>
+        <TouchableOpacity onPress={() => setShowDatePicker(true)} activeOpacity={0.7}
+          style={[s.dateField, { backgroundColor: colors.surfaceElevated, borderColor: errors.dateOfBirth ? colors.error : colors.border }]}>
+          <Icon name="calendar" size={16} color={colors.textTertiary} />
+          <Text style={{ flex: 1, fontSize: 14, color: data.dateOfBirth ? colors.textPrimary : colors.textTertiary }}>
+            {data.dateOfBirth
+              ? new Date(data.dateOfBirth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+              : 'Sélectionner une date'}
+          </Text>
+        </TouchableOpacity>
+        {errors.dateOfBirth ? <Text style={[s.fieldError, { color: colors.error }]}>{errors.dateOfBirth}</Text> : null}
+      </Animated.View>
+      {showDatePicker && (
+        <DateTimePicker
+          value={data.dateOfBirth ? new Date(data.dateOfBirth) : new Date(2000, 0, 1)}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          maximumDate={new Date()}
+          minimumDate={new Date(1920, 0, 1)}
+          onChange={(_event: any, selected?: Date) => {
+            setShowDatePicker(Platform.OS === 'ios');
+            if (selected) {
+              const yyyy = selected.getFullYear();
+              const mm = String(selected.getMonth() + 1).padStart(2, '0');
+              const dd = String(selected.getDate()).padStart(2, '0');
+              onChange('dateOfBirth', `${yyyy}-${mm}-${dd}`);
+            }
+          }}
+        />
+      )}
+
+      <Animated.View entering={FadeInDown.delay(300).springify()} style={{ marginTop: 14 }}>
+        <Text style={[s.fieldLabel, { color: colors.textTertiary }]}>Sexe</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {GENDER_OPTIONS.map(opt => {
+            const selected = data.gender === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => onChange('gender', opt.key)}
+                style={[s.genderChip, {
+                  backgroundColor: selected ? colors.primary : colors.surfaceElevated,
+                  borderColor: selected ? colors.primary : colors.border,
+                }]}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: selected ? '#fff' : colors.textPrimary }}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {errors.gender ? <Text style={[s.fieldError, { color: colors.error }]}>{errors.gender}</Text> : null}
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(320).springify()} style={{ marginTop: 24 }}>
@@ -150,7 +220,7 @@ const Step1: React.FC<{
 const Step2: React.FC<{
   data: StepData; onChange: (k: keyof StepData, v: string) => void;
   onCountryChange: (c: Country) => void;
-  errors: Partial<StepData>; onNext: () => void; colors: any;
+  errors: FormErrors; onNext: () => void; colors: any;
 }> = ({ data, onChange, onCountryChange, errors, onNext, colors }) => {
   const userRef = useRef<TextInput>(null);
   const isEmail = data.authMethod === 'email';
@@ -240,7 +310,7 @@ const Step2: React.FC<{
 // ── Step 3 ────────────────────────────────────────────────────────────────────
 const Step3: React.FC<{
   data: StepData; onChange: (k: keyof StepData, v: string) => void;
-  errors: Partial<StepData>; onSubmit: () => void; loading: boolean; colors: any;
+  errors: FormErrors; onSubmit: () => void; loading: boolean; colors: any;
 }> = ({ data, onChange, errors, onSubmit, loading, colors }) => {
   const confirmRef  = useRef<TextInput>(null);
   const referralRef = useRef<TextInput>(null);
@@ -357,13 +427,14 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
 
   const [step, setStep]       = useState(1);
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors]   = useState<Partial<StepData>>({});
+  const [errors, setErrors]   = useState<FormErrors>({});
   const [globalError, setGlobalError] = useState('');
 
   const [data, setData] = useState<StepData>({
     firstName: '', lastName: '', authMethod: 'email',
     email: '', phone: '', country: DEFAULT_COUNTRY,
     username: '', password: '', confirm: '', referralCode: '',
+    dateOfBirth: '', gender: '',
   });
 
   const onChange = useCallback((key: keyof StepData, value: string) => {
@@ -382,15 +453,26 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
   };
 
   const validateStep1 = (): boolean => {
-    const e: Partial<StepData> = {};
+    const e: FormErrors = {};
     if (!data.firstName.trim()) e.firstName = 'Prénom requis';
     if (!data.lastName.trim())  e.lastName  = 'Nom requis';
+    if (!data.dateOfBirth) {
+      e.dateOfBirth = 'Date de naissance requise';
+    } else {
+      const dob = new Date(data.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+      if (age < 13) e.dateOfBirth = 'Tu dois avoir au moins 13 ans';
+    }
+    if (!data.gender) e.gender = 'Sexe requis';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const validateStep2 = (): boolean => {
-    const e: Partial<StepData> = {};
+    const e: FormErrors = {};
     if (data.authMethod === 'email') {
       if (!data.email.trim() || !data.email.includes('@')) e.email = 'Email invalide';
     } else {
@@ -402,7 +484,7 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
   };
 
   const validateStep3 = (): boolean => {
-    const e: Partial<StepData> = {};
+    const e: FormErrors = {};
     if (data.password.length < 8) e.password = '8 caractères minimum';
     if (data.password !== data.confirm) e.confirm = 'Les mots de passe ne correspondent pas';
     setErrors(e);
@@ -427,6 +509,8 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
         password:      data.password,
         username:      data.username.trim() || undefined,
         referral_code: data.referralCode.trim() || undefined,
+        date_of_birth: data.dateOfBirth,
+        gender:        data.gender as Gender,
       });
       onRegisterSuccess();
     } catch (e: any) {
@@ -525,6 +609,11 @@ const s = StyleSheet.create({
   stepTitle:    { fontSize: 24, fontWeight: '800', marginBottom: 6, lineHeight: 32 },
   stepSubtitle: { fontSize: 14, marginBottom: 22, lineHeight: 21 },
   cgu:          { fontSize: 12, lineHeight: 18, marginTop: 14, textAlign: 'center' },
+
+  fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
+  fieldError: { fontSize: 12, marginTop: 4, fontWeight: '500' },
+  dateField:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, height: 48 },
+  genderChip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
 
   submitBtn:     { height: 52, borderRadius: 28, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },

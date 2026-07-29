@@ -47,6 +47,8 @@ export interface RegisterRequest {
   password:      string;
   username?:     string;
   referral_code?: string;
+  date_of_birth: string;
+  gender:        Gender;
 }
 
 export interface OAuthLoginRequest {
@@ -57,6 +59,9 @@ export interface AuthToken {
   access_token: string;
   refresh_token: string;
   token_type: string;
+  /** true si le compte (créé via Google/Facebook, qui ne fournissent pas ces infos)
+   * doit encore renseigner sa date de naissance et son sexe. */
+  profile_incomplete?: boolean;
 }
 
 export interface PasswordChangeRequest {

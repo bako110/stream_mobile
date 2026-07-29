@@ -19,7 +19,7 @@ GoogleSignin.configure({
 
 interface Props {
   onGoBack:           () => void;
-  onAuthSuccess:      () => void;
+  onAuthSuccess:      (profileIncomplete?: boolean) => void;
   onAccountBlocked?:  (reason?: string, contact?: string) => void;
 }
 
@@ -37,8 +37,8 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess, on
       await GoogleSignin.signOut();
       await GoogleSignin.signIn();
       const tokens = await GoogleSignin.getTokens();
-      await authService.oauthGoogle(tokens.accessToken);
-      onAuthSuccess();
+      const result = await authService.oauthGoogle(tokens.accessToken);
+      onAuthSuccess(result.profile_incomplete);
     } catch (e: any) {
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
         const detail = e?.data?.detail ?? e?.response?.data?.detail;

@@ -23,11 +23,11 @@ export type AuthStackParamList = {
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 interface Props {
-  onAuthSuccess: () => void;
+  onAuthSuccess: (profileIncomplete?: boolean) => void;
   initialBlockedInfo?: { reason?: string; contact?: string; blockedAt?: string } | null;
 }
 
-const LoginWrapper: React.FC<{ onAuthSuccess: () => void; initialBlockedInfo?: { reason?: string; contact?: string; blockedAt?: string } | null }> = ({ onAuthSuccess, initialBlockedInfo }) => {
+const LoginWrapper: React.FC<{ onAuthSuccess: (profileIncomplete?: boolean) => void; initialBlockedInfo?: { reason?: string; contact?: string; blockedAt?: string } | null }> = ({ onAuthSuccess, initialBlockedInfo }) => {
   const nav = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   return (
     <LoginScreen
@@ -43,7 +43,7 @@ const LoginWrapper: React.FC<{ onAuthSuccess: () => void; initialBlockedInfo?: {
   );
 };
 
-const SocialLoginWrapper: React.FC<{ onAuthSuccess: () => void; onAccountBlocked?: (reason?: string, contact?: string) => void }> = ({ onAuthSuccess, onAccountBlocked }) => {
+const SocialLoginWrapper: React.FC<{ onAuthSuccess: (profileIncomplete?: boolean) => void; onAccountBlocked?: (reason?: string, contact?: string) => void }> = ({ onAuthSuccess, onAccountBlocked }) => {
   const nav = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   return (
     <SocialLoginScreen

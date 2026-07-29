@@ -41,7 +41,7 @@ const animErr = FadeInDown.duration(250);
 type LoginMethod = 'email' | 'phone';
 
 interface Props {
-  onLoginSuccess:      () => void;
+  onLoginSuccess:      (profileIncomplete?: boolean) => void;
   onGoRegister:        () => void;
   onGoForgotPassword?: () => void;
   onGoSocialLogin?:    () => void;
@@ -101,8 +101,8 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
       await GoogleSignin.signOut();
       const userInfo = await GoogleSignin.signIn();
       const tokens = await GoogleSignin.getTokens();
-      await authService.oauthGoogle(tokens.accessToken);
-      onLoginSuccess();
+      const result = await authService.oauthGoogle(tokens.accessToken);
+      onLoginSuccess(result.profile_incomplete);
     } catch (e: any) {
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
         const detail = e?.data?.detail ?? e?.response?.data?.detail;
@@ -124,8 +124,8 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
                   setSocialLoading('google');
                   try {
                     const tokens = await GoogleSignin.getTokens();
-                    await authService.reactivateGoogle(tokens.accessToken);
-                    onLoginSuccess();
+                    const result = await authService.reactivateGoogle(tokens.accessToken);
+                    onLoginSuccess(result.profile_incomplete);
                   } catch (err: any) {
                     setError(err?.message ?? 'Impossible de réactiver le compte.');
                   } finally {
@@ -153,8 +153,8 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
     setLoading(true);
     try {
       const id = isEmail ? identifier.trim() : `${country.dial}${identifier.trim()}`;
-      await authService.login({ identifier: id, password });
-      onLoginSuccess();
+      const result = await authService.login({ identifier: id, password });
+      onLoginSuccess(result.profile_incomplete);
     } catch (e: any) {
       const detail = e?.data?.detail ?? e?.response?.data?.detail;
       if (e?.status === 403 && detail?.code === 'account_blocked') {

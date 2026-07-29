@@ -5,6 +5,7 @@ import { SplashScreen }     from '../screens/Onboarding/SplashScreen';
 import { OnboardingScreen } from '../screens/Onboarding/OnboardingScreen';
 import { AuthNavigator }    from './AuthNavigator';
 import { MainNavigator }    from './MainNavigator';
+import { CompleteProfileScreen } from '../screens/Auth/CompleteProfileScreen';
 import { CGUScreen }                      from '../screens/Main/CGUScreen';
 import { PolitiqueConfidentialiteScreen } from '../screens/Main/PolitiqueConfidentialiteScreen';
 import { WebSocketProvider } from '../context/WebSocketContext';
@@ -25,7 +26,7 @@ import { cleanupImageCache } from '../services/imageCacheService';
 import { cleanup as cleanupVideoCache } from '../services/videoCacheService';
 
 
-type AppState = 'splash' | 'onboarding' | 'auth' | 'main';
+type AppState = 'splash' | 'onboarding' | 'auth' | 'completeProfile' | 'main';
 
 const NAV_THEME_LIGHT: Theme = {
   ...DefaultTheme,
@@ -199,7 +200,11 @@ export const RootNavigator: React.FC = () => {
     setAppState('auth');
   };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = (profileIncomplete?: boolean) => {
+    if (profileIncomplete) {
+      setAppState('completeProfile');
+      return;
+    }
     setAppState('main');
     setTimeout(() => resumePendingCallAccept(), 50);
     callConnectionService.setup();
@@ -251,6 +256,9 @@ export const RootNavigator: React.FC = () => {
         onGoPrivacy={() => setLegalOverlay('privacy')}
       />
     );
+  }
+  if (appState === 'completeProfile') {
+    return <CompleteProfileScreen onDone={() => handleAuthSuccess()} />;
   }
 
   const linking = {
