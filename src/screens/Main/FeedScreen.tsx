@@ -2283,7 +2283,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
             // État idle — pas encore de query
             if (!searchQuery.trim() && !searchResults) return (
-              <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+              <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                 {/* Pub — préchargée dès openSearch(), visible immédiatement à l'ouverture
                     sans attendre la moindre frappe. */}
@@ -2483,7 +2483,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             // deux frappes) reste affichée ici pour ne pas clignoter/disparaître à chaque
             // debounce de 300ms pendant que l'utilisateur tape.
             if (searching) return (
-              <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+              <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {searchAd && searchFilter === 'all' && (
                   <View style={{ paddingHorizontal: 12, paddingTop: 10 }}>
                     <AdCard
@@ -2611,6 +2611,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 <ScrollView
                   contentContainerStyle={{ paddingBottom: 120 }}
                   showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
                   onScroll={({ nativeEvent }) => {
                     const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
                     if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 300) loadMoreSearch();

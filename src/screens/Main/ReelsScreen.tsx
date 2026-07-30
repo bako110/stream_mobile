@@ -1126,6 +1126,12 @@ export const ReelsScreen: React.FC = () => {
         data={feedWithAds as any[]}
         keyExtractor={r => (r as any).id}
         style={{ flex: 1, overflow: 'hidden' }}
+        // Désactivé pendant l'overlay recherche — sans ça, les GestureDetector de
+        // chaque VideoSlide/AdSlide (double-tap like, scrub) restent actifs sous
+        // l'overlay et peuvent intercepter le tap avant qu'il n'atteigne une carte
+        // de la grille recherche (pubs notamment, qui tombent à des positions
+        // variables selon le scroll — jamais garanties hors des zones de gestes).
+        pointerEvents={searchOpen ? 'none' : 'auto'}
         pagingEnabled={false}
         snapToInterval={SCREEN_H}
         snapToAlignment="start"
@@ -1379,6 +1385,11 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
     p => { p.loop = true; p.muted = muted; p.volume = muted ? 0 : 1; },
   );
 
+  // Image publicitaire statique — rendue en "contain" (voir plus bas), jamais rognée
+  // quel que soit son ratio (l'annonceur ne fournit pas toujours un visuel au format
+  // exact de l'écran).
+  const staticImageUri = !isVideo ? (ad.creative_url || ad.thumbnail_url) : undefined;
+
   useEffect(() => {
     if (!isVideo) return;
     try { if (isActive) player.play(); else player.pause(); } catch {}
@@ -1426,11 +1437,23 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
 
-      {/* ── Media plein écran ── */}
+      {/* ── Fond flouté agrandi — comble l'espace vide autour du média en "contain",
+          jamais de bandes noires nues quel que soit le ratio du créatif publicitaire. ── */}
+      {(ad.thumbnail_url || staticImageUri) && (
+        <Image
+          source={{ uri: ad.thumbnail_url || staticImageUri }}
+          style={{ position: 'absolute', width: screenW, height: screenH }}
+          resizeMode="cover"
+          blurRadius={Platform.OS === 'android' ? 16 : 32}
+        />
+      )}
+      <View pointerEvents="none" style={{ position: 'absolute', width: screenW, height: screenH, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+
+      {/* ── Media plein écran — toujours "contain", jamais rogné ── */}
       {isVideo && ad.creative_url ? (
-        <VideoView player={player} style={{ position: 'absolute', width: screenW, height: screenH }} resizeMode="cover" controls={false} />
-      ) : (ad.creative_url || ad.thumbnail_url) ? (
-        <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={{ position: 'absolute', width: screenW, height: screenH }} resizeMode="cover" />
+        <VideoView player={player} style={{ position: 'absolute', width: screenW, height: screenH }} resizeMode="contain" controls={false} />
+      ) : staticImageUri ? (
+        <Image source={{ uri: staticImageUri }} style={{ position: 'absolute', width: screenW, height: screenH }} resizeMode="contain" />
       ) : (
         <LinearGradient colors={['#1a0533', '#0d1b4b', '#0a2a1a']} style={{ position: 'absolute', width: screenW, height: screenH }} />
       )}
@@ -1628,7 +1651,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [barFocused,   setBarFocused]   = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
-  const [isPortrait,   setIsPortrait]   = useState<boolean | null>(null);
   const [ended,        setEnded]        = useState(false);
   const [isFollowing,  setIsFollowing]  = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -1958,15 +1980,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     };
   }, []); // eslint-disable-line
 
-  // Ratio portrait depuis thumbnail
-  useEffect(() => {
-    if (!reel.thumbnail_url || isPortrait !== null) return;
-    Image.getSize(
-      reel.thumbnail_url,
-      (w, h) => { if (mountedRef.current) setIsPortrait(h >= w); },
-      () => { if (mountedRef.current) setIsPortrait(true); },
-    );
-  }, [reel.thumbnail_url]); // eslint-disable-line
 
   const clearStall = useCallback(() => {
     if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
@@ -2023,7 +2036,6 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       if (!mountedRef.current) return;
       setVideoLoaded(true); setVideoError(false); retryCountRef.current = 0; clearStall();
       if (data?.duration && data.duration > 0) { durationRef.current = data.duration; if (!hasMusic) progressValue.value = 0; }
-      if (data?.width && data?.height) setIsPortrait(data.height >= data.width);
       // hasMusic : la vidéo (boucle silencieuse) ne doit jamais démarrer seule ici — c'est
       // startMusic() qui déclenche player.play() une fois le fichier audio réellement chargé,
       // pour que le son et l'image partent synchronisés.
@@ -2363,10 +2375,26 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
 
+      {/* Fond flouté agrandi — comble l'espace vide autour du média en "contain"
+          (voir plus bas) quel que soit son ratio exact, jamais de bandes noires nues.
+          Basé sur le thumbnail (toujours disponible dès le premier rendu, contrairement
+          à une frame vidéo qui doit d'abord charger). */}
+      {reel.thumbnail_url && (
+        <Image
+          source={{ uri: reel.thumbnail_url }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}
+          resizeMode="cover"
+          blurRadius={Platform.OS === 'android' ? 16 : 32}
+        />
+      )}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+
+      {/* Média réel — toujours "contain" : jamais rogné, quel que soit son ratio par
+          rapport à l'écran (portrait strict 9:16, legerement different, ou paysage). */}
       <VideoView
         player={player}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}
-        resizeMode={isPortrait === false ? 'contain' : 'cover'}
+        resizeMode="contain"
         controls={false}
         surfaceType="texture"
       />
@@ -2375,7 +2403,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           masque l'écran noir de démarrage (surtout visible en arrivant directement depuis
           le Feed, sans preload préalable). Disparaît dès que videoPlaying passe à true. */}
       {reel.thumbnail_url && isActive && !videoPlaying && (
-        <Image source={{ uri: reel.thumbnail_url }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }} resizeMode="cover" />
+        <Image
+          source={{ uri: reel.thumbnail_url }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}
+          resizeMode="contain"
+        />
       )}
 
       {/* Overlay filtre principal — zIndex 1 */}

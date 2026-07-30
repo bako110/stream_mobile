@@ -25,7 +25,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width: W, height: H } = Dimensions.get('window');
 const TRIM_W   = W - 48;
 const HANDLE_W = 20;
-const MAX_TRIM = 90;
+// Durée max d'un reel après découpage — alignée sur MAX_VIDEO_DURATION_SEC
+// (CreateReelScreen.tsx, limite de la source avant édition). Les stories ont
+// leur propre limite indépendante de 90s (StoryCreator.tsx), non affectée ici.
+const MAX_TRIM = 600;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types exportés
@@ -926,7 +929,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
     if (!isPhoto && !trimValid) {
       toastService.error(
         'Segment invalide',
-        trimSec < 1 ? 'Minimum 1 seconde.' : 'Maximum 90 secondes.',
+        trimSec < 1 ? 'Minimum 1 seconde.' : `Maximum ${Math.round(MAX_TRIM / 60)} minute${MAX_TRIM > 60 ? 's' : ''}.`,
       );
       return;
     }
@@ -979,10 +982,18 @@ export const ReelEditorScreen: React.FC<Props> = ({
 
       {/* ══ MEDIA PLEIN ÉCRAN ══ */}
       <View style={[StyleSheet.absoluteFill, s.videoContainer]}>
-        {isPhoto
-          ? <Image source={{ uri }} style={s.videoView} resizeMode="cover" />
-          : <VideoView player={player} style={s.videoView} resizeMode="cover" controls={false} />
-        }
+        {isPhoto ? (
+          <>
+            {/* Fond flouté agrandi — comble l'espace autour d'une photo dont le
+                ratio ne correspond pas à l'écran 9:16, sans jamais recadrer
+                l'image d'origine (voir <Image> ci-dessous, en "contain"). */}
+            <Image source={{ uri }} style={s.videoView} resizeMode="cover" blurRadius={Platform.OS === 'android' ? 14 : 28} />
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
+            <Image source={{ uri }} style={s.videoView} resizeMode="contain" />
+          </>
+        ) : (
+          <VideoView player={player} style={s.videoView} resizeMode="cover" controls={false} />
+        )}
 
         {/* Overlay filtre principal */}
         {videoFiltOp > 0 && (
@@ -1162,7 +1173,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
           <View style={[s.trimInfoBadge, !trimValid && { borderColor: '#EF4444' }]}>
             <Icon name="scissors" size={11} color={trimValid ? 'rgba(255,255,255,0.8)' : '#EF4444'} />
             <Text style={[s.trimInfoTxt, !trimValid && { color: '#EF4444' }]}>
-              {fmt(trimSec)}{!trimValid && (trimSec < 1 ? ' · min 1s' : ' · max 90s')}
+              {fmt(trimSec)}{!trimValid && (trimSec < 1 ? ' · min 1s' : ` · max ${Math.round(MAX_TRIM / 60)}min`)}
             </Text>
           </View>
         </View>
