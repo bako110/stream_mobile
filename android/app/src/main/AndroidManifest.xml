@@ -45,6 +45,16 @@
     <queries>
         <package android:name="com.facebook.katana" />
         <package android:name="com.facebook.lite" />
+        <!-- WhatsApp — necessaire pour que Linking.canOpenURL('whatsapp://...')
+             renvoie vrai sur Android 11+ (API 30+), sinon canOpenURL retourne
+             toujours false meme si l'app est bien installee (visibilite des
+             packages restreinte par defaut depuis Android 11). -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
     </queries>
 
     <application

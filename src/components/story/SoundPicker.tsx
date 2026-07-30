@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   StatusBar, ActivityIndicator, TextInput, FlatList,
@@ -13,57 +13,48 @@ import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import type { AppColors } from '../../theme/colors';
 
-type SoundTab = 'local' | 'popular' | 'search';
-
-interface OnlineTrack {
+interface MySound {
   id: string;
   title: string;
   artist: string;
   duration: number;
-  thumbnail: string | null;
   url: string;
-  usage_count?: number;
 }
 
 interface Props {
   colors: AppColors;
   onGoBack: () => void;
   onSelectLocal: () => void;
-  onSelectOnline: (url: string, title?: string) => void;
+  onSelectSaved: (url: string, title?: string) => void;
 }
 
-const FALLBACK_TRACKS: OnlineTrack[] = [
-  { id: '1', title: 'Lofi Chill Beat', artist: 'Free Music', duration: 30, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '2', title: 'Ambient Piano', artist: 'Free Music', duration: 45, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
-  { id: '3', title: 'Acoustic Guitar', artist: 'Free Music', duration: 25, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
-  { id: '4', title: 'Deep Bass Loop', artist: 'Free Music', duration: 20, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
-  { id: '5', title: 'Tropical Vibes', artist: 'Free Music', duration: 35, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3' },
-  { id: '6', title: 'Synthwave Retro', artist: 'Free Music', duration: 40, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
-  { id: '7', title: 'Calm Nature', artist: 'Free Music', duration: 30, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3' },
-  { id: '8', title: 'EDM Drop', artist: 'Free Music', duration: 15, thumbnail: null, url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
-];
-
-function mapSound(s: any): OnlineTrack {
+function mapSound(s: any): MySound {
   return {
     id: s.id,
     title: s.title,
-    artist: s.artist_name ?? 'Inconnu',
+    artist: s.artist_name ?? 'Toi',
     duration: s.duration_seconds ?? 0,
-    thumbnail: s.cover_url ?? null,
     url: s.file_url,
-    usage_count: s.usage_count ?? 0,
   };
 }
 
-export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, onSelectOnline }) => {
-  const [tab, setTab] = useState<SoundTab>('popular');
+/**
+ * Sélection d'un son pour accompagner un reel/story :
+ * - "Parcourir mes fichiers" : choisit un fichier audio du téléphone (upload
+ *   immédiat au catalogue partagé côté backend, via soundService.uploadFromUri).
+ * - "Mes sons" : liste des sons déjà enregistrés en base (GET /sounds/my), avec
+ *   une barre de recherche qui filtre côté serveur (GET /sounds?q=...) — pas de
+ *   scan de fichiers locaux (aucune lib fiable pour ça sur RN 0.85+/New Arch),
+ *   la base de données fait office d'historique persistant et partagé.
+ */
+export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, onSelectSaved }) => {
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
-  const [tracks, setTracks] = useState<OnlineTrack[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [sounds, setSounds] = useState<MySound[]>([]);
+  const [loading, setLoading] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const soundRef = useRef<Sound | null>(null);
-  const insets = useSafeAreaInsets();
 
   const stopPreview = useCallback(() => {
     if (soundRef.current) {
@@ -73,61 +64,54 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
     setLoadingId(null);
   }, []);
 
-  const togglePreview = useCallback((track: OnlineTrack) => {
-    if (playingId === track.id) { stopPreview(); return; }
+  const togglePreview = useCallback((item: MySound) => {
+    if (playingId === item.id) { stopPreview(); return; }
     stopPreview();
-    setLoadingId(track.id);
+    setLoadingId(item.id);
     Sound.setCategory('Playback');
-    const snd = new Sound(track.url, '', err => {
+    const snd = new Sound(item.url, '', err => {
       setLoadingId(null);
       if (err) return;
       soundRef.current = snd;
-      setPlayingId(track.id);
-      snd.play(success => { if (!success || playingId === track.id) setPlayingId(null); });
+      setPlayingId(item.id);
+      snd.play(success => { if (!success) setPlayingId(null); });
     });
   }, [playingId, stopPreview]);
 
   useEffect(() => () => { stopPreview(); }, [stopPreview]);
 
-  const loadPopular = useCallback(async () => {
+  const loadMySounds = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<any[]>(Endpoints.sounds.popular);
-      const data = Array.isArray(res.data) ? res.data : [];
-      setTracks(data.length > 0 ? data.map(mapSound) : FALLBACK_TRACKS);
+      const res = await apiClient.get<any[]>(Endpoints.sounds.my);
+      setSounds(Array.isArray(res.data) ? res.data.map(mapSound) : []);
     } catch {
-      setTracks(FALLBACK_TRACKS);
+      setSounds([]);
     } finally { setLoading(false); }
   }, []);
 
-  const searchOnline = useCallback(async (q: string) => {
-    if (!q.trim()) { setTracks([]); return; }
-    setLoading(true);
-    try {
-      const res = await apiClient.get<any[]>(
-        `${Endpoints.sounds.list}?q=${encodeURIComponent(q.trim())}`,
-      );
-      setTracks(Array.isArray(res.data) ? res.data.map(mapSound) : FALLBACK_TRACKS);
-    } catch {
-      setTracks(FALLBACK_TRACKS);
-    } finally { setLoading(false); }
-  }, []);
+  useEffect(() => { loadMySounds(); }, [loadMySounds]);
 
+  // Recherche debounced — filtre côté serveur (titre/artiste), retombe sur
+  // "mes sons" complets quand le champ est vidé.
   useEffect(() => {
-    if (tab === 'popular') { loadPopular(); }
-  }, [tab]);
+    if (!search.trim()) { loadMySounds(); return; }
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await apiClient.get<any[]>(`${Endpoints.sounds.list}?q=${encodeURIComponent(search.trim())}`);
+        setSounds(Array.isArray(res.data) ? res.data.map(mapSound) : []);
+      } catch {
+        setSounds([]);
+      } finally { setLoading(false); }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search, loadMySounds]);
 
-  useEffect(() => {
-    if (tab === 'search') {
-      const timer = setTimeout(() => searchOnline(search), 400);
-      return () => clearTimeout(timer);
-    }
-  }, [search, tab]);
-
-  const handleSelect = (track: OnlineTrack) => {
+  const handleSelect = (item: MySound) => {
     stopPreview();
-    onSelectOnline(track.url, track.title);
-    apiClient.post(Endpoints.sounds.use(track.id)).catch(() => {});
+    onSelectSaved(item.url, item.title);
+    apiClient.post(Endpoints.sounds.use(item.id)).catch(() => {});
   };
 
   return (
@@ -141,125 +125,96 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Tabs */}
-      <View style={[sp.tabRow, { borderBottomColor: colors.divider ?? colors.border }]}>
-        {([
-          { key: 'popular' as SoundTab, icon: 'trending-up', label: 'Populaires' },
-          { key: 'search'  as SoundTab, icon: 'search',       label: 'Rechercher' },
-          { key: 'local'   as SoundTab, icon: 'smartphone',   label: 'Mes fichiers' },
-        ]).map(({ key: t, icon, label }) => {
-          const active = tab === t;
-          return (
-            <TouchableOpacity key={t} style={[sp.tab, active && sp.tabActive]} onPress={() => setTab(t)} activeOpacity={0.7}>
-              <Icon name={icon} size={16} color={active ? colors.primary : colors.textSecondary} />
-              <Text style={[sp.tabLabel, { color: active ? colors.primary : colors.textSecondary }]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Popular / Search list */}
-      {(tab === 'popular' || tab === 'search') && (
-        <View style={{ flex: 1 }}>
-          {tab === 'search' && (
-            <View style={[sp.searchRow, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary, borderColor: colors.border }]}>
-              <Icon name="search" size={16} color={colors.textTertiary} />
-              <TextInput
-                style={[sp.searchInput, { color: colors.textPrimary }]}
-                placeholder="Titre, artiste..."
-                placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
-                value={search}
-                onChangeText={setSearch}
-                returnKeyType="search"
-                autoFocus
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Icon name="x" size={16} color={colors.textTertiary} />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-          {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />}
-          <FlatList
-            data={tracks}
-            keyExtractor={t => t.id}
-            renderItem={({ item }) => {
-              const mins = Math.floor(item.duration / 60);
-              const secs = Math.floor(item.duration % 60);
-              const isPlaying = playingId === item.id;
-              const isLoading = loadingId === item.id;
-              return (
-                <TouchableOpacity
-                  style={[sp.trackRow, { borderBottomColor: colors.divider ?? colors.border }]}
-                  onPress={() => handleSelect(item)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[sp.trackThumb, { backgroundColor: colors.backgroundSecondary ?? '#1a1a2e' }]}>
-                    <MaterialIcon name={isPlaying ? 'music-note-eighth' : 'music-note'} size={18} color={colors.primary} />
-                  </View>
-                  <View style={sp.trackInfo}>
-                    <Text style={[sp.trackTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
-                    <Text style={[sp.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>
-                      {item.artist}{(item.usage_count ?? 0) > 0 ? ` · ${item.usage_count} utilisations` : ''}
-                    </Text>
-                  </View>
-                  {item.duration > 0 && (
-                    <Text style={[sp.trackDur, { color: colors.textTertiary }]}>{mins}:{String(secs).padStart(2, '0')}</Text>
-                  )}
-                  <TouchableOpacity
-                    style={[sp.trackPlayBtn, { backgroundColor: isPlaying ? colors.primary + '33' : (colors.backgroundSecondary ?? 'rgba(255,255,255,0.1)') }]}
-                    onPress={() => togglePreview(item)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    {isLoading
-                      ? <ActivityIndicator size="small" color={colors.primary} />
-                      : <Icon name={isPlaying ? 'pause' : 'play'} size={14} color={colors.primary} />
-                    }
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            }}
-            ListEmptyComponent={
-              !loading ? (
-                <View style={sp.empty}>
-                  <MaterialIcon name="music-note-off" size={36} color={colors.textTertiary} />
-                  <Text style={[sp.emptyText, { color: colors.textTertiary }]}>
-                    {tab === 'search' && !search.trim() ? 'Tapez pour rechercher' : 'Aucun résultat'}
-                  </Text>
-                </View>
-              ) : null
-            }
-            contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
-          />
-        </View>
-      )}
-
-      {/* Local */}
-      {tab === 'local' && (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={sp.localContent}>
-          <Animated.View entering={FadeInDown.delay(60).springify()}>
-            <TouchableOpacity style={sp.localCard} onPress={onSelectLocal} activeOpacity={0.8}>
-              <LinearGradient colors={['#E65100', '#FF9800']} style={sp.localCardInner}>
-                <View style={sp.localIconWrap}>
-                  <MaterialIcon name="folder-music" size={28} color="#fff" />
-                </View>
+      <ScrollView style={{ flex: 0 }} contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 20 }}>
+        <Animated.View entering={FadeInDown.delay(40).springify()}>
+          <TouchableOpacity style={sp.localCard} onPress={onSelectLocal} activeOpacity={0.8}>
+            <LinearGradient colors={['#E65100', '#FF9800']} style={sp.localCardInner}>
+              <View style={sp.localIconWrap}>
+                <MaterialIcon name="folder-music" size={24} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
                 <Text style={sp.localLabel}>Parcourir mes fichiers</Text>
                 <Text style={sp.localSub}>MP3, M4A, AAC, WAV, OGG</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View entering={FadeInDown.delay(140).springify()} style={[sp.tipBox, { backgroundColor: colors.surface ?? colors.backgroundSecondary }]}>
-            <Icon name="info" size={14} color={colors.textTertiary ?? colors.textSecondary} />
-            <Text style={[sp.tipText, { color: colors.textTertiary ?? colors.textSecondary }]}>
-              Choisissez un fichier audio depuis votre téléphone pour accompagner votre story
-            </Text>
-          </Animated.View>
-        </ScrollView>
-      )}
+              </View>
+              <Icon name="chevron-right" size={18} color="rgba(255,255,255,0.85)" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      </ScrollView>
 
+      {/* Recherche parmi les sons déjà enregistrés (base de données) */}
+      <View style={[sp.searchRow, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary, borderColor: colors.border }]}>
+        <Icon name="search" size={16} color={colors.textTertiary} />
+        <TextInput
+          style={[sp.searchInput, { color: colors.textPrimary }]}
+          placeholder="Rechercher parmi mes sons..."
+          placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="x" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <Text style={[sp.sectionLabel, { color: colors.textTertiary }]}>
+        {search.trim() ? 'Résultats' : 'Mes sons'}
+      </Text>
+
+      {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 16 }} />}
+
+      <FlatList
+        data={sounds}
+        keyExtractor={s => s.id}
+        renderItem={({ item }) => {
+          const mins = Math.floor(item.duration / 60);
+          const secs = Math.floor(item.duration % 60);
+          const isPlaying = playingId === item.id;
+          const isLoading = loadingId === item.id;
+          return (
+            <TouchableOpacity
+              style={[sp.trackRow, { borderBottomColor: colors.divider ?? colors.border }]}
+              onPress={() => handleSelect(item)}
+              activeOpacity={0.7}
+            >
+              <View style={[sp.trackThumb, { backgroundColor: colors.backgroundSecondary ?? '#1a1a2e' }]}>
+                <MaterialIcon name={isPlaying ? 'music-note-eighth' : 'music-note'} size={18} color={colors.primary} />
+              </View>
+              <View style={sp.trackInfo}>
+                <Text style={[sp.trackTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
+                <Text style={[sp.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>{item.artist}</Text>
+              </View>
+              {item.duration > 0 && (
+                <Text style={[sp.trackDur, { color: colors.textTertiary }]}>{mins}:{String(secs).padStart(2, '0')}</Text>
+              )}
+              <TouchableOpacity
+                style={[sp.trackPlayBtn, { backgroundColor: isPlaying ? colors.primary + '33' : (colors.backgroundSecondary ?? 'rgba(255,255,255,0.1)') }]}
+                onPress={() => togglePreview(item)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                {isLoading
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Icon name={isPlaying ? 'pause' : 'play'} size={14} color={colors.primary} />
+                }
+              </TouchableOpacity>
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={sp.empty}>
+              <MaterialIcon name="music-note-off" size={32} color={colors.textTertiary} />
+              <Text style={[sp.emptyText, { color: colors.textTertiary }]}>
+                {search.trim() ? 'Aucun résultat' : "Aucun son enregistré pour l'instant"}
+              </Text>
+            </View>
+          ) : null
+        }
+        contentContainerStyle={{ paddingBottom: 20 }}
+      />
     </View>
   );
 };
@@ -273,47 +228,33 @@ const sp = StyleSheet.create({
   },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '700' },
-  tabRow: {
-    flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  tab: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent',
-  },
-  tabActive: {},
-  tabLabel: { fontSize: 13, fontWeight: '600' },
-  localContent: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 40 },
-  localCard: { borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 10, elevation: 6 },
-  localCardInner: { alignItems: 'center', justifyContent: 'center', paddingVertical: 28, gap: 10 },
-  localIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' },
-  localLabel: { fontSize: 15, fontWeight: '800', color: '#fff' },
-  localSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)' },
-  tipBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginTop: 16 },
-  tipText: { fontSize: 12, flex: 1, lineHeight: 18 },
+
+  localCard: { borderRadius: 16, overflow: 'hidden' },
+  localCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16 },
+  localIconWrap: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' },
+  localLabel: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  localSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 16, marginTop: 16, marginBottom: 8,
+    marginHorizontal: 20, marginTop: 18, marginBottom: 4,
     paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 12, borderWidth: 1,
   },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 4 },
+  sectionLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, marginHorizontal: 20, marginTop: 14, marginBottom: 4 },
+
   trackRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 10,
+    paddingHorizontal: 20, paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  trackThumb: {
-    width: 40, height: 40, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  trackThumb: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   trackInfo: { flex: 1, gap: 2 },
   trackTitle: { fontSize: 14, fontWeight: '600' },
   trackArtist: { fontSize: 12 },
   trackDur: { fontSize: 11, fontWeight: '500' },
-  trackPlayBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyText: { fontSize: 13 },
+  trackPlayBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  empty: { alignItems: 'center', paddingTop: 40, gap: 10 },
+  emptyText: { fontSize: 13, textAlign: 'center', paddingHorizontal: 30 },
 });

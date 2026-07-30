@@ -12,7 +12,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle,
   withSequence, withTiming, withSpring, withRepeat,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
@@ -204,6 +204,10 @@ export const ReelsScreen: React.FC = () => {
   const [screenFocused, setScreenFocused] = useState(true);
   const [muted,         setMuted]         = useState(false);
   const [searchOpen,    setSearchOpen]    = useState(false);
+  // Pub vidéo de la grille recherche ouverte en plein écran avec son (via AdSlide,
+  // le même composant que le feed principal) — clic simple qui ouvre le lien CTA
+  // directement pour les pubs image.
+  const [fullscreenAd,  setFullscreenAd]  = useState<AdData | null>(null);
   const [searchQuery,   setSearchQuery]   = useState('');
   const [searchResults, setSearchResults] = useState<Reel[]>([]);
   const [searching,     setSearching]     = useState(false);
@@ -852,7 +856,7 @@ export const ReelsScreen: React.FC = () => {
       return (
         <AdSlide
           ad={item.ad}
-          isActive={index === currentIndex && screenFocused}
+          isActive={index === currentIndex && screenFocused && !fullscreenAd}
           muted={muted}
           screenW={SCREEN_W}
           screenH={SCREEN_H}
@@ -886,7 +890,7 @@ export const ReelsScreen: React.FC = () => {
         audioOwnerRef={audioOwnerRef}
       />
     );
-  }, [currentIndex, screenFocused, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi]);
+  }, [currentIndex, screenFocused, fullscreenAd, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -1294,7 +1298,7 @@ export const ReelsScreen: React.FC = () => {
                     <View style={{ paddingVertical: 16 }}><GoFolyXLoader variant="reel" color="#ffffff" /></View>
                   ) : null}
                   renderItem={({ item: m }) => {
-                    if (m._kind === 'ad') return <SearchAdCard ad={m.ad} />;
+                    if (m._kind === 'ad') return <SearchAdCard ad={m.ad} onOpenFullscreen={setFullscreenAd} />;
                     const item = m.reel;
                     return (
                       <TouchableOpacity style={s.searchCard} onPress={() => pickSearchResult(item)} activeOpacity={0.9}>
@@ -1356,6 +1360,32 @@ export const ReelsScreen: React.FC = () => {
           })()}
         </View>
       )}
+
+      {/* Pub vidéo de la grille recherche ouverte en plein écran avec son —
+          réutilise AdSlide (même composant que le feed principal), muted=false
+          car ici une seule pub est visible à la fois (jamais de conflit de son). */}
+      <Modal visible={!!fullscreenAd} animationType="slide" onRequestClose={() => setFullscreenAd(null)} statusBarTranslucent>
+        {fullscreenAd && (
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <AdSlide
+              ad={fullscreenAd}
+              isActive
+              muted={false}
+              screenW={SCREEN_W}
+              screenH={SCREEN_H}
+              insetBottom={insets.bottom}
+              onAuthorPress={onAuthorPress}
+            />
+            <TouchableOpacity
+              style={{ position: 'absolute', top: insets.top + 10, left: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
+              onPress={() => setFullscreenAd(null)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="x" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </Modal>
 
       {/* loadingMore silencieux — pas d'indicateur visible comme TikTok */}
     </View>
@@ -1556,7 +1586,7 @@ interface SearchAdCardData {
   thumbnail_url?: string;
 }
 
-const SearchAdCard: React.FC<{ ad: SearchAdCardData }> = memo(({ ad }) => {
+const SearchAdCard: React.FC<{ ad: SearchAdCardData; onOpenFullscreen: (ad: SearchAdCardData) => void }> = memo(({ ad, onOpenFullscreen }) => {
   const impressionSent = useRef(false);
   useEffect(() => {
     if (!impressionSent.current) {
@@ -1568,19 +1598,64 @@ const SearchAdCard: React.FC<{ ad: SearchAdCardData }> = memo(({ ad }) => {
   const rawCta  = (ad.cta_url ?? '').trim();
   const isPhone = !!rawCta && !/^https?:\/\//i.test(rawCta) && /^[+()\d\s.-]{6,}$/.test(rawCta.replace(/^tel:/i, ''));
 
+  // Le créatif peut être une vidéo ou une image — même détection que AdSlide
+  // (feed plein écran). Avant ce fix, une pub vidéo tentait de s'afficher via
+  // <Image source={{uri: .mp4}}>, qui échoue silencieusement (pas de rendu
+  // vidéo possible dans un <Image>) : la carte restait noire, indiscernable
+  // d'une erreur de chargement.
+  const isVideo = !!(ad.creative_url && (ad.creative_url.includes('.m3u8') || ad.creative_url.includes('.mp4') || ad.creative_url.includes('/hls/') || ad.creative_url.includes('video')));
+
+  // Une pub vidéo s'ouvre d'abord en plein écran avec son (comme un reel normal) —
+  // le lien CTA reste accessible depuis cet écran, pas ouvert automatiquement au
+  // premier tap. Une pub image (pas de vidéo) garde le comportement direct.
   const handlePress = () => {
     apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
+    if (isVideo) { onOpenFullscreen(ad); return; }
     if (!rawCta) return;
     if (isPhone) { openPhoneMenu(rawCta.replace(/^tel:/i, '')); return; }
     Linking.openURL(rawCta).catch(() => {});
   };
 
+  // Muet dans la grille — plusieurs cartes pub peuvent être montées en même
+  // temps (rendu virtualisé de la FlatList pendant le scroll), donc plusieurs
+  // vidéos avec du son joueraient simultanément. Même règle que TikTok/Instagram :
+  // le son n'arrive qu'en plein écran, jamais dans une grille de vignettes.
+  const player = useVideoPlayer(
+    isVideo && ad.creative_url ? { uri: ad.creative_url } : 'about:blank',
+    p => { p.loop = true; p.muted = true; p.volume = 0; },
+  );
+  useEffect(() => { if (isVideo) { try { player.play(); } catch {} } }, [isVideo, player]);
+
+  // <Image> ne montre rien de visible en cas d'échec de chargement (URL cassée,
+  // réseau, format non supporté) — sans ce state, une pub dont l'image échoue
+  // à charger apparaît comme une carte quasi noire (le fallback dégradé sombre
+  // + le voile inférieur suffisent à donner cette impression), sans jamais
+  // signaler que c'est une erreur plutôt qu'une pub "sans visuel".
+  const [imgFailed, setImgFailed] = useState(false);
+  const imgUri = ad.creative_url || ad.thumbnail_url;
+  const showFallback = isVideo ? false : (!imgUri || imgFailed);
+
+  // TouchableOpacity de react-native-gesture-handler plutôt que celui de
+  // react-native core : dans une FlatList imbriquée sous GestureHandlerRootView
+  // (App.tsx), le TouchableOpacity RN core entre en compétition avec le
+  // responder de gesture-handler et son tap peut être perdu — c'était la
+  // cause du clic mort sur les pubs de la grille recherche.
   return (
-    <TouchableOpacity style={s.searchCard} onPress={handlePress} activeOpacity={0.9}>
-      {ad.creative_url || ad.thumbnail_url
-        ? <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={s.searchThumb} resizeMode="cover" />
-        : <LinearGradient colors={['#1a0533', '#0d1b4b', '#0a2a1a']} style={s.searchThumb} />
-      }
+    <GHTouchableOpacity style={s.searchCard} onPress={handlePress} activeOpacity={0.9}>
+      {isVideo ? (
+        <VideoView player={player} style={StyleSheet.flatten([s.searchThumb, s.searchAdThumbCompact])} resizeMode="cover" controls={false} />
+      ) : showFallback ? (
+        <View style={[s.searchThumb, s.searchAdThumbCompact, s.searchAdFallback]}>
+          <Icon name="zap" size={26} color="rgba(255,255,255,0.35)" />
+        </View>
+      ) : (
+        <Image
+          source={{ uri: imgUri }}
+          style={[s.searchThumb, s.searchAdThumbCompact]}
+          resizeMode="cover"
+          onError={() => setImgFailed(true)}
+        />
+      )}
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.94)']} locations={[0.25, 0.6, 1]} style={s.searchCardGrad} />
       <View style={s.searchAdBadge}>
         <Text style={s.searchAdBadgeText}>Sponsorisé</Text>
@@ -1595,7 +1670,7 @@ const SearchAdCard: React.FC<{ ad: SearchAdCardData }> = memo(({ ad }) => {
           </View>
         ) : null}
       </View>
-    </TouchableOpacity>
+    </GHTouchableOpacity>
   );
 });
 
@@ -3192,6 +3267,10 @@ const s = StyleSheet.create({
   searchCardCaption:    { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 15 },
   searchCardStats:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   searchCardStat:       { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' },
+  // Ratio moins extrême que les vraies cartes reel (9/16, format plein) — une
+  // pub en grille reste plus lisible avec une hauteur réduite, proche 4/5.
+  searchAdThumbCompact: { aspectRatio: 4 / 5 },
+  searchAdFallback:     { backgroundColor: '#2A2340', alignItems: 'center', justifyContent: 'center' },
   searchAdBadge:        { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(224,56,154,0.85)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   searchAdBadgeText:    { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.2 },
   searchAdCtaRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },

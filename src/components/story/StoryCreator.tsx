@@ -570,9 +570,24 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     try {
       const [file] = await pick({ type:[types.audio], allowMultiSelection:false });
       if (!file?.uri) return;
-      setAudioUri(file.uri); setStep('compose');
+      // Le picker renvoie souvent une URI content:// sur Android, illisible
+      // directement par react-native-audio-recorder-player (preview) — sans
+      // cette résolution, le bouton play de la barre audio ne jouait rien
+      // (URI content:// non supportée par le lecteur natif).
+      let resolved = file.uri;
+      if (Platform.OS === 'android' && file.uri.startsWith('content://')) {
+        try {
+          const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/story_audio_${Date.now()}.mp3`;
+          await ReactNativeBlobUtil.fs.cp(file.uri, dest);
+          resolved = `file://${dest}`;
+        } catch (e) {
+          console.warn('[pickAudioFile] résolution content:// échouée:', e);
+        }
+      }
+      setAudioUri(resolved); setStep('compose');
     } catch (e) {
       if (isErrorWithCode(e) && (e as any).code === errorCodes.OPERATION_CANCELED) return;
+      toastService.error('Erreur', "Impossible d'ouvrir le fichier audio sélectionné.");
     }
   };
 
@@ -847,7 +862,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           colors={colors}
           onGoBack={goBack}
           onSelectLocal={pickAudioFile}
-          onSelectOnline={(uri:string) => { setAudioUri(uri); setStep('compose'); }}
+          onSelectSaved={(url: string) => { setAudioUri(url); setStep('compose'); }}
         />
       )}
 

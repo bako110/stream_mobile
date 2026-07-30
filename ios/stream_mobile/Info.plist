@@ -43,6 +43,11 @@
 	<string>Gofolyx utilise le micro pour enregistrer le son de vos reels et messages vocaux.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Gofolyx accède à vos photos et vidéos pour créer des reels et des stories.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+		<string>tel</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

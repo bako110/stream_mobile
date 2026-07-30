@@ -229,12 +229,20 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         try {
           const { edit } = snap;
 
+          // Un son choisi depuis "Mes sons" (catalogue déjà en base) est une URL
+          // http(s) directement utilisable — le ré-uploader comme un fichier local
+          // échouait silencieusement (URL non lisible comme un chemin de fichier),
+          // ce qui faisait disparaître la musique choisie à la publication.
           let musicPublicUrl: string | undefined;
           if (edit?.musicUri) {
-            try {
-              musicPublicUrl = await uploadLocalAudio(edit.musicUri, edit.musicName || 'audio.mp3');
-            } catch (audioErr) {
-              console.warn('[publish] audio upload failed, skipping music:', audioErr);
+            if (/^https?:\/\//i.test(edit.musicUri)) {
+              musicPublicUrl = edit.musicUri;
+            } else {
+              try {
+                musicPublicUrl = await uploadLocalAudio(edit.musicUri, edit.musicName || 'audio.mp3');
+              } catch (audioErr) {
+                console.warn('[publish] audio upload failed, skipping music:', audioErr);
+              }
             }
           }
 
@@ -283,13 +291,21 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         }
         const { edit, dur, cap, category: snapCategory, mentionIds } = snap;
         try {
+          // Un son choisi depuis "Mes sons" (catalogue déjà en base) est une URL
+          // http(s) directement utilisable — le ré-uploader comme un fichier local
+          // échouait silencieusement (URL non lisible comme un chemin de fichier),
+          // ce qui faisait disparaître la musique choisie à la publication.
           let musicPublicUrl: string | undefined;
           if (edit?.musicUri) {
-            try {
-              const { uploadLocalAudio } = await import('../../services/uploadService');
-              musicPublicUrl = await uploadLocalAudio(edit.musicUri, edit.musicName || 'audio.mp3');
-            } catch (audioErr) {
-              console.warn('[publish] audio upload failed, skipping music:', audioErr);
+            if (/^https?:\/\//i.test(edit.musicUri)) {
+              musicPublicUrl = edit.musicUri;
+            } else {
+              try {
+                const { uploadLocalAudio } = await import('../../services/uploadService');
+                musicPublicUrl = await uploadLocalAudio(edit.musicUri, edit.musicName || 'audio.mp3');
+              } catch (audioErr) {
+                console.warn('[publish] audio upload failed, skipping music:', audioErr);
+              }
             }
           }
 

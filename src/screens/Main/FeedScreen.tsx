@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
+import { TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence, withTiming, withRepeat,
@@ -171,8 +172,8 @@ const AdVideoCreative: React.FC<{ uri: string; thumbnailUri?: string; isVisible:
   );
 };
 
-const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onImpression: (id: string) => void; onPress: (id: string, url: string) => void }> = React.memo(
-  ({ ad, colors, isVisible, onImpression, onPress }) => {
+const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onImpression: (id: string) => void; onPress: (id: string, url: string) => void; onOpenFullscreen: (ad: AdData) => void }> = React.memo(
+  ({ ad, colors, isVisible, onImpression, onPress, onOpenFullscreen }) => {
     const firedRef = useRef<string | null>(null);
     useEffect(() => {
       if (ad?.id && firedRef.current !== ad.id) {
@@ -183,10 +184,32 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
 
     const creativeUri = ad.creative_url || ad.thumbnail_url;
     const isVideo = !!(creativeUri && (creativeUri.includes('.m3u8') || creativeUri.includes('.mp4')));
-    const hasCreative = !!creativeUri;
+    // CachedImage ne montre rien de visible en cas d'échec de chargement (URL cassée,
+    // réseau...) — sans ce state, une pub dont l'image échoue apparaît comme une carte
+    // sans visuel, indiscernable d'une pub qui n'en a simplement pas.
+    const [imgFailed, setImgFailed] = useState(false);
+    const hasCreative = !!creativeUri && !(imgFailed && !isVideo);
 
+    // Une pub vidéo s'ouvre d'abord en plein écran avec son (comme un reel) —
+    // le CTA reste accessible depuis cet écran, jamais ouvert automatiquement
+    // au premier tap. Une pub image garde le comportement direct (CTA immédiat).
+    const handleCardPress = () => {
+      if (isVideo) { onOpenFullscreen(ad); return; }
+      if (ad.cta_url) onPress(ad.id, ad.cta_url);
+    };
+
+    // Toute la carte est cliquable (pas seulement le petit bouton CTA) — via
+    // TouchableOpacity de react-native-gesture-handler plutôt que celui de
+    // react-native core : dans une ScrollView/FlatList profondément imbriquée
+    // sous GestureHandlerRootView (App.tsx), le TouchableOpacity RN core entre
+    // en compétition avec le responder de gesture-handler et son tap peut être
+    // perdu — c'était la cause du clic mort sur les pubs de l'overlay recherche.
     return (
-      <View style={[adSt.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+      <GHTouchableOpacity
+        style={[adSt.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+        activeOpacity={0.9}
+        onPress={handleCardPress}
+      >
 
         {/* ── En-tête : logo annonceur + label Sponsorisé ── */}
         <View style={adSt.header}>
@@ -202,9 +225,6 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
               <Icon name="globe" size={10} color={colors.textTertiary} />
             </View>
           </View>
-          <TouchableOpacity style={adSt.moreBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
         </View>
 
         {/* ── Description courte ── */}
@@ -219,7 +239,7 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
           isVideo ? (
             <AdVideoCreative uri={creativeUri!} thumbnailUri={ad.thumbnail_url} isVisible={isVisible} />
           ) : (
-            <CachedImage uri={creativeUri!} style={adSt.image} resizeMode="cover" />
+            <CachedImage uri={creativeUri!} style={adSt.image} resizeMode="cover" onError={() => setImgFailed(true)} />
           )
         ) : (
           <View style={[adSt.imagePlaceholder, { backgroundColor: colors.primary + '14' }]}>
@@ -227,7 +247,7 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
           </View>
         )}
 
-        {/* ── Pied : CTA + "En savoir plus" ── */}
+        {/* ── Pied : CTA + "En savoir plus" (indicatif — le tap fonctionne sur toute la carte) ── */}
         <View style={[adSt.footer, { borderTopColor: colors.divider }]}>
           <View style={{ flex: 1 }}>
             {ad.cta_url ? (
@@ -239,21 +259,64 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
               {ad.cta_text ?? 'En savoir plus'}
             </Text>
           </View>
-          <TouchableOpacity
-            style={[adSt.ctaBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
-            activeOpacity={0.8}
-            onPress={() => ad.cta_url && onPress(ad.id, ad.cta_url)}
-          >
+          <View style={[adSt.ctaBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
             <Text style={[adSt.ctaBtnText, { color: colors.textPrimary }]}>
               En savoir plus
             </Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
-      </View>
+      </GHTouchableOpacity>
     );
   },
 );
+
+// ── AdFullscreenPlayer — pub vidéo ouverte en plein écran avec son (via Modal),
+// équivalent du AdSlide de ReelsScreen mais pour ce fichier (AdData local, sans
+// advertiser_id). Fermeture par le bouton X, jamais d'ouverture auto du CTA. ──
+
+const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void }> = ({ ad, onClose }) => {
+  const insets = useSafeAreaInsets();
+  const creativeUri = ad.creative_url || ad.thumbnail_url!;
+  const player = useVideoPlayer({ uri: creativeUri }, p => { p.loop = true; p.muted = false; p.volume = 1; });
+  useEffect(() => { try { player.play(); } catch {} }, [player]);
+
+  const rawCta = (ad.cta_url ?? '').trim();
+  const handleCta = () => { if (rawCta) Linking.openURL(rawCta).catch(() => {}); };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls={false} />
+
+      <TouchableOpacity
+        style={{ position: 'absolute', top: insets.top + 10, left: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
+        onPress={onClose}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Icon name="x" size={22} color="#fff" />
+      </TouchableOpacity>
+
+      <View style={{ position: 'absolute', bottom: Math.max(insets.bottom, 16) + 10, left: 16, right: 16, gap: 8 }}>
+        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={1}>
+          {ad.title}
+        </Text>
+        {ad.description ? (
+          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, lineHeight: 18 }} numberOfLines={3}>{ad.description}</Text>
+        ) : null}
+        {rawCta ? (
+          <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={{ marginTop: 4 }}>
+            <LinearGradient colors={['#7B3FF2', '#C044E8', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ borderRadius: 14, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }}>
+              <Icon name="globe" size={15} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '800' }}>{ad.cta_text || 'En savoir plus'}</Text>
+              <Icon name="arrow-right" size={16} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </View>
+  );
+};
 
 const adSt = StyleSheet.create({
   card:           { marginVertical: 6, borderWidth: StyleSheet.hairlineWidth, borderRadius: 0 },
@@ -857,6 +920,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       prefetchUpcomingImages(lastVisibleIndex + 1);
     }
   }).current;
+
+  // Pub vidéo ouverte en plein écran avec son (AdCard cliqué) — jamais d'ouverture
+  // directe du CTA pour une vidéo, contrairement à une pub image.
+  const [fullscreenAd, setFullscreenAd] = useState<AdData | null>(null);
 
   // Sheet commentaires
   const [commentItem,    setCommentItem]    = useState<FeedItem | null>(null);
@@ -1896,6 +1963,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           isVisible={adVisible}
           onImpression={handleAdImpression}
           onPress={handleAdPress}
+          onOpenFullscreen={setFullscreenAd}
         />
       );
     }
@@ -2295,6 +2363,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                       isVisible={searchOpen}
                       onImpression={handleAdImpression}
                       onPress={handleAdPress}
+                      onOpenFullscreen={setFullscreenAd}
                     />
                   </View>
                 )}
@@ -2492,6 +2561,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                       isVisible={searchOpen}
                       onImpression={handleAdImpression}
                       onPress={handleAdPress}
+                      onOpenFullscreen={setFullscreenAd}
                     />
                   </View>
                 )}
@@ -2628,6 +2698,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                         isVisible={searchOpen}
                         onImpression={handleAdImpression}
                         onPress={handleAdPress}
+                        onOpenFullscreen={setFullscreenAd}
                       />
                     </View>
                   )}
@@ -2832,6 +2903,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         onCommentCountChange={delta => commentCountChangeRef.current?.(delta)}
         onCountLoaded={count => commentCountLoadedRef.current?.(count)}
       />
+
+      {/* Pub vidéo ouverte en plein écran avec son — clic sur une AdCard vidéo,
+          où qu'elle soit (feed principal ou overlay recherche). */}
+      <Modal visible={!!fullscreenAd} animationType="slide" onRequestClose={() => setFullscreenAd(null)} statusBarTranslucent>
+        {fullscreenAd && <AdFullscreenPlayer ad={fullscreenAd} onClose={() => setFullscreenAd(null)} />}
+      </Modal>
 
     </View>
   );

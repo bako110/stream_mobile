@@ -506,10 +506,20 @@ export const ReelEditorScreen: React.FC<Props> = ({
     if (uri.startsWith('file://')) return uri.slice(7);
     if (uri.startsWith('/')) return uri;
     if (!uri.startsWith('content://')) return uri;
-    // content:// → lecture base64 via ContentResolver puis écriture dans le cache
+    // content:// → copie via cp (gère nativement SAF/Google Photos/etc., cf.
+    // normalizeUri dans uploadService.ts) — plus fiable que la lecture base64,
+    // qui échoue sur certains fournisseurs de fichiers Android. Sans ce fix, le
+    // fichier choisi ne se copiait jamais correctement : ni la preview (son
+    // muet/erreur) ni l'upload final (musique jamais envoyée au backend) ne
+    // fonctionnaient pour une URI content:// provenant de certains gestionnaires
+    // de fichiers.
     const dest = `${RNBlobUtil.fs.dirs.CacheDir}/music_preview_${Date.now()}.mp3`;
-    const b64 = await RNBlobUtil.fs.readFile(uri, 'base64');
-    await RNBlobUtil.fs.writeFile(dest, b64, 'base64');
+    try {
+      await RNBlobUtil.fs.cp(uri, dest);
+    } catch {
+      const b64 = await RNBlobUtil.fs.readFile(uri, 'base64');
+      await RNBlobUtil.fs.writeFile(dest, b64, 'base64');
+    }
     return dest;
   }, []);
 
@@ -1642,11 +1652,11 @@ export const ReelEditorScreen: React.FC<Props> = ({
             colors={DARK_COLORS}
             onGoBack={() => setShowSoundPicker(false)}
             onSelectLocal={() => { setShowSoundPicker(false); handlePickMusicLocal(); }}
-            onSelectOnline={(uri: string, title?: string) => {
+            onSelectSaved={(url: string, title?: string) => {
               stopSound();
-              setMusicUri(uri);
-              setMusicName(title ?? uri.split('/').pop() ?? 'Son');
-              loadMusicMeta(uri);
+              setMusicUri(url);
+              setMusicName(title ?? 'Son');
+              loadMusicMeta(url);
               setShowSoundPicker(false);
             }}
           />
