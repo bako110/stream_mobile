@@ -51,6 +51,15 @@
 -keep class com.swmansion.worklets.** { *; }
 -dontwarn com.swmansion.worklets.**
 
+# Stripe — le module Push Provisioning (ajout de carte a Apple/Google Pay,
+# fonctionnalite non utilisee ici, seulement PaymentSheet) reference des
+# classes du SDK Stripe natif absentes du bundle sans cette dependance
+# optionnelle installee. R8 echoue le build release en les cherchant meme si
+# le code correspondant n'est jamais execute.
+-dontwarn com.stripe.android.pushProvisioning.**
+-keep class com.stripe.android.** { *; }
+-dontwarn com.stripe.android.**
+
 # WebRTC
 -keep class org.webrtc.** { *; }
 

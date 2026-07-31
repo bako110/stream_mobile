@@ -1960,27 +1960,35 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
       // Démarrage synchronisé : le son ET la vidéo (boucle silencieuse) partent ensemble,
       // seulement une fois le fichier audio réellement prêt — jamais la vidéo seule en avance.
-      snd.play(success => {
-        if (!success) console.warn('[ReelMusic] playback failed for', url);
-        musicSoundRef.current = null;
-        snd.release();
-      });
-      if (musicIsActiveRef.current && !pausedRef.current) { try { player.play(); } catch {} }
+      // Si le slide est déjà en pause manuelle au moment où le chargement se termine
+      // (ex: on arrive dessus alors qu'il était resté en pause), ne pas démarrer.
+      if (musicIsActiveRef.current && !pausedRef.current) {
+        snd.play(success => {
+          if (!success) console.warn('[ReelMusic] playback failed for', url);
+          musicSoundRef.current = null;
+          snd.release();
+        });
+        try { player.play(); } catch {}
+      }
     });
   }, [reel.music_url, reel.music_start_sec, reel.music_end_sec, stopMusic, armMusicClip, player]);
 
   const startMusicRef = useRef(startMusic);
   useEffect(() => { startMusicRef.current = startMusic; }, [startMusic]);
 
-  // Démarrer/stopper la musique selon isActive et paused
+  // Démarrer/arrêter la musique selon isActive uniquement (pas `paused`) — un
+  // simple pause/reprise (bouton play/pause manuel) ne doit jamais détruire et
+  // recharger le fichier audio depuis le réseau : `doPause` gère lui-même le
+  // pause()/play() sur le Sound déjà en mémoire, instantané et sans requête.
+  // Ce chargement complet ne se justifie qu'au vrai montage/démontage du slide.
   useEffect(() => {
-    if (isActive && !paused && reel.music_url) {
+    if (isActive && reel.music_url) {
       startMusic();
     } else {
       stopMusic();
     }
     return () => { stopMusic(); };
-  }, [isActive, paused, reel.music_url, startMusic, stopMusic]);
+  }, [isActive, reel.music_url, startMusic, stopMusic]);
 
   // Resynchronisation au retour d'arrière-plan : repositionner le son (et la vidéo en boucle)
   // sur base de la position réelle plutôt que de simplement relancer play() à l'aveugle.
@@ -2256,38 +2264,39 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const doPause = useCallback(() => {
     const next = !pausedRef.current;
     pausedRef.current = next;
-    // Quand hasMusic, l'effet [isActive, paused, ...] (plus haut) est le seul chef
-    // d'orchestre du play()/pause() du player vidéo — il redémarre proprement startMusic()
-    // (chargement du Sound + resync vidéo/son) ou l'arrête via stopMusic(). Appeler
-    // player.play()/pause() ici en plus créait une course avec ce chargement async :
-    // le replay pouvait ne jamais reprendre si le Sound précédent était déjà arrêté.
-    if (!hasMusic) {
-      try {
-        if (next) {
-          player.pause();
-        } else {
-          // Si la vidéo était arrivée à sa fin naturelle avant la pause manuelle, le
-          // player reste positionné en fin de flux — un simple play() ne redémarre rien
-          // visuellement. Revenir au début avant de relancer, comme le fait déjà l'effet
-          // play/pause générique au moment de l'activation d'un slide.
-          if (endedRef.current) {
-            endedRef.current = false;
-            if (mountedRef.current) setEnded(false);
-            progressValue.value = 0;
-            player.seekTo(0);
-          }
-          // player.play() seul peut ne pas redémarrer visuellement le rendu après un
-          // pause() prolongé (observé sur certains décodeurs HLS Android) — un léger
-          // re-seek sur la position courante force le player à réafficher une frame
-          // fraîche avant de relancer, comme le fait déjà doRetry() pour un vrai restart.
-          try { player.seekTo(player.currentTime); } catch {}
-          player.play();
+    try {
+      if (next) {
+        player.pause();
+        // hasMusic : suspend le son déjà chargé en mémoire au lieu de le détruire
+        // (stopMusic release()rait le Sound, forçant un rechargement réseau complet
+        // à la reprise — lent et source de replays qui ne repartaient jamais).
+        if (hasMusic) musicSoundRef.current?.pause();
+      } else {
+        // Si la vidéo était arrivée à sa fin naturelle avant la pause manuelle, le
+        // player reste positionné en fin de flux — un simple play() ne redémarre rien
+        // visuellement. Revenir au début avant de relancer, comme le fait déjà l'effet
+        // play/pause générique au moment de l'activation d'un slide.
+        if (endedRef.current) {
+          endedRef.current = false;
+          if (mountedRef.current) setEnded(false);
+          progressValue.value = 0;
+          player.seekTo(0);
         }
-      } catch {}
-    }
+        // player.play() seul peut ne pas redémarrer visuellement le rendu après un
+        // pause() prolongé (observé sur certains décodeurs HLS Android) — un léger
+        // re-seek sur la position courante force le player à réafficher une frame
+        // fraîche avant de relancer, comme le fait déjà doRetry() pour un vrai restart.
+        try { player.seekTo(player.currentTime); } catch {}
+        player.play();
+        if (hasMusic) {
+          if (musicSoundRef.current) musicSoundRef.current.play();
+          else startMusic(); // Sound déjà libéré entre-temps (fin de clip, erreur) — recharge.
+        }
+      }
+    } catch {}
     if (mountedRef.current) setPaused(next);
     showPlayIconAnim();
-  }, [player, hasMusic, showPlayIconAnim, progressValue]);
+  }, [player, hasMusic, showPlayIconAnim, progressValue, startMusic]);
 
   const triggerShowControls = useCallback(() => {
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
@@ -2719,7 +2728,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
             <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color="#fff" />
           </TouchableOpacity>
-          <ActionBtn icon="heart-outline" iconActive="heart" useMCIcon label={formatCount(likes)} color={liked ? '#E0389A' : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder="#E0389A" activeGlow="#E0389A" />
+          <ActionBtn icon="heart" useMCIcon label={formatCount(likes)} color={liked ? '#E0389A' : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder="#E0389A" activeGlow="#E0389A" />
           {!commentsDisabledSt && <ActionBtn icon="comment" useMCIcon label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
           <ActionBtn icon="share-variant" useMCIcon label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
           <ActionBtn icon="eye" useMCIcon label={formatCount(reel.view_count ?? 0)} color="#fff" />
