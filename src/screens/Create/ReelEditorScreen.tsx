@@ -576,8 +576,12 @@ export const ReelEditorScreen: React.FC<Props> = ({
     setMusicName(name);
     loadMusicMeta(resolvedUri);
     setMusicPicking(false);
-    // Ajoute au catalogue partagé — retrouvable ensuite via Recherche/Populaires
-    soundService.uploadFromUri(resolvedUri, name);
+    // Ajoute au catalogue partagé — retrouvable ensuite via "Mes sons"/Recherche.
+    // Échec non-bloquant pour la publication (le son local reste utilisable),
+    // mais signalé pour que l'absence dans "Mes sons" ne soit pas un mystère.
+    soundService.uploadFromUri(resolvedUri, name).then(result => {
+      if (!result) toastService.warning('Son non enregistré', "Le son sera utilisé pour ce reel mais n'a pas pu être ajouté à \"Mes sons\".");
+    });
   }, [stopSound, loadMusicMeta, resolveAudioUri]);
 
   const handleRemoveMusic = useCallback(() => {
@@ -1135,7 +1139,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
             <View style={[s.badge, { backgroundColor: 'rgba(255,100,100,0.85)' }]}><Icon name="edit-2" size={10} color="#fff" /><Text style={s.badgeTxt}>{drawings.length}</Text></View>
           )}
           {musicUri && (
-            <View style={[s.badge, { backgroundColor: 'rgba(167,139,250,0.85)' }]}><Icon name="music" size={10} color="#fff" /><Text style={s.badgeTxt} numberOfLines={1}>{musicName?.split('.')[0]}</Text></View>
+            <View style={[s.badge, { backgroundColor: 'rgba(167,139,250,0.85)' }]}><Icon name="music" size={10} color="#fff" /><Text style={s.badgeTxt} numberOfLines={1}>{musicName?.replace(/\.(mp3|m4a|aac|wav|ogg|flac)$/i, '')}</Text></View>
           )}
           {Object.values(adjust).some(v => v !== 0) && (
             <View style={[s.badge, { backgroundColor: 'rgba(255,140,0,0.85)' }]}><Icon name="sun" size={10} color="#fff" /><Text style={s.badgeTxt}>Ajusté</Text></View>
@@ -1647,7 +1651,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
 
       {/* ══ SOUND PICKER ══ */}
       {showSoundPicker && (
-        <View style={StyleSheet.absoluteFill}>
+        <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
           <SoundPicker
             colors={DARK_COLORS}
             onGoBack={() => setShowSoundPicker(false)}
@@ -1688,7 +1692,10 @@ const DARK_COLORS = {
 const s = StyleSheet.create({
   root:           { flex: 1, backgroundColor: '#000' },
   videoContainer: { alignItems: 'center', justifyContent: 'center' },
-  videoView:      { width: W, height: H },
+  // position absolute obligatoire — sans ça, le fond flouté (cover) et le
+  // média net (contain) s'empilent dans le flux normal du conteneur au lieu
+  // de se superposer, créant une bande noire visible entre les deux.
+  videoView:      { position: 'absolute', top: 0, left: 0, width: W, height: H },
 
   gradTop:    { position: 'absolute', top: 0,    left: 0, right: 0, height: 180, zIndex: 2 },
   gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 200, zIndex: 2 },

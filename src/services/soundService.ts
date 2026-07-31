@@ -36,9 +36,12 @@ export const soundService = {
 
       const res = await apiClient.upload<SoundOut>(Endpoints.sounds.upload, form);
       return res.data;
-    } catch {
+    } catch (e) {
       // Non-bloquant : l'échec d'upload au catalogue ne doit jamais empêcher
-      // l'utilisateur de publier son reel/story avec le son en local.
+      // l'utilisateur de publier son reel/story avec le son en local — mais on
+      // logue pour ne pas masquer un vrai problème serveur (ex. endpoint en
+      // erreur), sinon le son "disparaît" silencieusement sans aucune trace.
+      console.warn('[soundService.uploadFromUri] échec upload catalogue:', e);
       return null;
     }
   },

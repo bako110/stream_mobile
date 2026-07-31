@@ -221,8 +221,8 @@ const VideoPreloader: React.FC<{ uri: string }> = ({ uri }) => {
 
 const BAR_COUNT = 20;
 
-const MusicWidget: React.FC<{ audioUrl: string; accent: string; playing: boolean; mediaType: string }> = ({
-  audioUrl, accent, playing, mediaType,
+const MusicWidget: React.FC<{ audioUrl: string; audioName?: string | null; accent: string; playing: boolean; mediaType: string }> = ({
+  audioUrl, audioName, accent, playing, mediaType,
 }) => {
   const vinylSpin  = useRef(new Animated.Value(0)).current;
   const spinAnim   = useRef<Animated.CompositeAnimation | null>(null);
@@ -230,8 +230,13 @@ const MusicWidget: React.FC<{ audioUrl: string; accent: string; playing: boolean
   const barLoops   = useRef<Animated.CompositeAnimation[]>([]);
   const glowAnim   = useRef(new Animated.Value(0)).current;
 
-  // Nom du track extrait de l'URL
+  // Vrai titre (audio_name, résolu depuis le catalogue Sound côté backend) —
+  // fallback sur le nom de fichier de l'URL seulement pour les anciennes
+  // stories publiées avant l'ajout de ce champ.
   const trackName = (() => {
+    if (audioName && audioName.trim()) {
+      return audioName.length > 30 ? audioName.slice(0, 30) + '…' : audioName;
+    }
     try {
       const seg = audioUrl.split('/').pop()?.split('?')[0] ?? '';
       const clean = decodeURIComponent(seg).replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
@@ -1184,6 +1189,7 @@ export const StoryViewer: React.FC<Props> = ({
         {story.audio_url && (
           <MusicWidget
             audioUrl={story.audio_url}
+            audioName={story.audio_name}
             accent={accent}
             playing={!paused}
             mediaType={story.media_type}

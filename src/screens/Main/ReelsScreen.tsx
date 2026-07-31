@@ -856,7 +856,7 @@ export const ReelsScreen: React.FC = () => {
       return (
         <AdSlide
           ad={item.ad}
-          isActive={index === currentIndex && screenFocused && !fullscreenAd}
+          isActive={index === currentIndex && screenFocused && !fullscreenAd && !searchOpen}
           muted={muted}
           screenW={SCREEN_W}
           screenH={SCREEN_H}
@@ -872,7 +872,7 @@ export const ReelsScreen: React.FC = () => {
     return (
       <VideoSlide
         reel={item}
-        isActive={index === currentIndex && screenFocused}
+        isActive={index === currentIndex && screenFocused && !fullscreenAd && !searchOpen}
         isPreload={Math.abs(index - currentIndex) <= preloadWindow && index !== currentIndex}
         isWifi={isWifi}
         muted={muted}
@@ -890,7 +890,7 @@ export const ReelsScreen: React.FC = () => {
         audioOwnerRef={audioOwnerRef}
       />
     );
-  }, [currentIndex, screenFocused, fullscreenAd, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi]);
+  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -1148,7 +1148,7 @@ export const ReelsScreen: React.FC = () => {
         viewabilityConfig={viewabilityConfig.current}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        extraData={`${currentIndex}-${screenFocused}-${muted}`}
+        extraData={`${currentIndex}-${screenFocused}-${muted}-${searchOpen}`}
         getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
         onScrollToIndexFailed={({ index }) => {
           scrollToIdx(index);
@@ -2299,6 +2299,11 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             progressValue.value = 0;
             player.seekTo(0);
           }
+          // player.play() seul peut ne pas redémarrer visuellement le rendu après un
+          // pause() prolongé (observé sur certains décodeurs HLS Android) — un léger
+          // re-seek sur la position courante force le player à réafficher une frame
+          // fraîche avant de relancer, comme le fait déjà doRetry() pour un vrai restart.
+          try { player.seekTo(player.currentTime); } catch {}
           player.play();
         }
       } catch {}

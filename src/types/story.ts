@@ -25,6 +25,7 @@ export interface Story {
   created_at: string;
   background_color: string | null;
   audio_url: string | null;
+  audio_name: string | null;
   font_style: string | null;
   filter_key: string | null;
   filter_overlay_color: string | null;
@@ -51,6 +52,7 @@ export interface StoryCreate {
   duration_sec?: number;
   background_color?: string;
   audio_url?: string;
+  audio_name?: string;
   font_style?: string;
   filter_key?: string;
   filter_overlay_color?: string;

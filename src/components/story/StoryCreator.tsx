@@ -274,6 +274,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const [mode,         setMode]         = useState<StoryMode>('text');
   const [localUri,     setLocalUri]     = useState<string | null>(null);
   const [audioUri,     setAudioUri]     = useState<string | null>(null);
+  const [audioName,    setAudioName]    = useState<string | null>(null);
   const [bgColor,      setBgColor]      = useState(BG_COLORS[0]);
   const [fontStyleKey, setFontStyleKey] = useState('classic');
   const [caption,      setCaption]      = useState('');
@@ -494,7 +495,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   // ── Reset ─────────────────────────────────────────────────────────────────
   const reset = () => {
-    setStep('pick_mode'); setMode('text'); setLocalUri(null); setAudioUri(null);
+    setStep('pick_mode'); setMode('text'); setLocalUri(null); setAudioUri(null); setAudioName(null);
     setCaption(''); setBgColor(BG_COLORS[0]); setFontStyleKey('classic');
     setActiveTool('none'); setDrawPaths([]); setLivePath(''); setErasing(false);
     setTextLayers([]); setStickers([]); setMasks([]); setLiveMask(null);
@@ -511,7 +512,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const goBack = () => {
     if (showAudienceSheet) { setShowAudienceSheet(false); return; }
     if (step === 'compose') { reset(); }
-    else if (step === 'pick_audio') { setStep('compose'); setAudioUri(null); }
+    else if (step === 'pick_audio') { setStep('compose'); setAudioUri(null); setAudioName(null); }
     else if (['pick_media','record_voice'].includes(step)) { setStep('pick_mode'); setLocalUri(null); }
     else { resetAndClose(); }
   };
@@ -584,7 +585,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           console.warn('[pickAudioFile] résolution content:// échouée:', e);
         }
       }
-      setAudioUri(resolved); setStep('compose');
+      setAudioUri(resolved);
+      setAudioName(file.name ? file.name.replace(/\.[^.]+$/, '') : null);
+      setStep('compose');
     } catch (e) {
       if (isErrorWithCode(e) && (e as any).code === errorCodes.OPERATION_CANCELED) return;
       toastService.error('Erreur', "Impossible d'ouvrir le fichier audio sélectionné.");
@@ -687,7 +690,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   // ── Publish ───────────────────────────────────────────────────────────────
   const handlePublish = () => {
-    const _mode = mode, _localUri = localUri, _audioUri = audioUri;
+    const _mode = mode, _localUri = localUri, _audioUri = audioUri, _audioName = audioName;
     const _caption = caption, _bgColor = bgColor, _fontStyleKey = fontStyleKey;
     const _audienceType = audienceType, _selectedUsers = [...selectedUsers];
     const _tempFiles = [...tempFiles.current]; tempFiles.current = [];
@@ -730,6 +733,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           media_url, media_type, thumbnail_url, mp4_url,
           caption: _caption.trim()||undefined,
           duration_sec, background_color, audio_url,
+          audio_name: audio_url ? (_audioName ?? undefined) : undefined,
           font_style: _mode==='text' ? _fontStyleKey : undefined,
           overlays_json: _overlaysJson,
           audience_type: _audienceType,
@@ -862,7 +866,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           colors={colors}
           onGoBack={goBack}
           onSelectLocal={pickAudioFile}
-          onSelectSaved={(url: string) => { setAudioUri(url); setStep('compose'); }}
+          onSelectSaved={(url: string, title?: string) => { setAudioUri(url); setAudioName(title ?? null); setStep('compose'); }}
         />
       )}
 
@@ -1273,7 +1277,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
               <View style={s.audioBarWave}>
                 {[...Array(14)].map((_,k) => <View key={k} style={[s.audioBarLine,{height:4+Math.sin(k*0.9)*8,opacity:audioPlaying?1:0.4}]} />)}
               </View>
-              <TouchableOpacity onPress={()=>setAudioUri(null)}><Icon name="x" size={14} color="rgba(255,255,255,0.6)" /></TouchableOpacity>
+              <TouchableOpacity onPress={()=>{setAudioUri(null); setAudioName(null);}}><Icon name="x" size={14} color="rgba(255,255,255,0.6)" /></TouchableOpacity>
             </View>
           )}
 
