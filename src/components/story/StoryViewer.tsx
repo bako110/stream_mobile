@@ -222,14 +222,8 @@ const VideoPreloader: React.FC<{ uri: string }> = ({ uri }) => {
 const BAR_COUNT = 20;
 
 const MusicWidget: React.FC<{ audioUrl: string; audioName?: string | null; accent: string; playing: boolean; mediaType: string }> = ({
-  audioUrl, audioName, accent, playing, mediaType,
+  audioUrl, audioName, mediaType, playing,
 }) => {
-  const vinylSpin  = useRef(new Animated.Value(0)).current;
-  const spinAnim   = useRef<Animated.CompositeAnimation | null>(null);
-  const barAnims   = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(Math.random()))).current;
-  const barLoops   = useRef<Animated.CompositeAnimation[]>([]);
-  const glowAnim   = useRef(new Animated.Value(0)).current;
-
   // Vrai titre (audio_name, résolu depuis le catalogue Sound côté backend) —
   // fallback sur le nom de fichier de l'URL seulement pour les anciennes
   // stories publiées avant l'ajout de ce champ.
@@ -244,120 +238,44 @@ const MusicWidget: React.FC<{ audioUrl: string; audioName?: string | null; accen
     } catch { return 'Musique'; }
   })();
 
-  const startSpin = useCallback(() => {
-    spinAnim.current?.stop();
-    spinAnim.current = Animated.loop(
-      Animated.timing(vinylSpin, { toValue: 1, duration: 3200, easing: Easing.linear, useNativeDriver: true }),
-    );
-    spinAnim.current.start();
-  }, []);
+  const isVoice = mediaType === 'voice';
+  const accentColor = isVoice ? '#FF9800' : '#a78bfa';
 
-  const stopSpin = useCallback(() => {
-    spinAnim.current?.stop();
-  }, []);
-
-  const startBars = useCallback(() => {
-    barLoops.current.forEach(l => l.stop());
-    barLoops.current = barAnims.map((anim, i) => {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(anim, { toValue: 0.15 + Math.random() * 0.85, duration: 180 + i * 22, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-          Animated.timing(anim, { toValue: 0.05 + Math.random() * 0.5,  duration: 180 + i * 18, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        ]),
-      );
-      loop.start();
-      return loop;
-    });
-  }, []);
-
-  const stopBars = useCallback(() => {
-    barLoops.current.forEach(l => l.stop());
-    barAnims.forEach(a => Animated.timing(a, { toValue: 0.12, duration: 300, useNativeDriver: false }).start());
-  }, []);
-
-  const startGlow = useCallback(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(glowAnim, { toValue: 0.3, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-      ]),
-    ).start();
-  }, []);
+  const barAnims = useRef([0, 1, 2].map(() => new Animated.Value(0.25))).current;
+  const barLoops = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
-    if (playing) { startSpin(); startBars(); startGlow(); }
-    else { stopSpin(); stopBars(); }
+    if (playing) {
+      barLoops.current = barAnims.map((anim, i) =>
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, { toValue: 1,    duration: 350 + i * 60, delay: i * 100, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+            Animated.timing(anim, { toValue: 0.25, duration: 350 + i * 60, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          ]),
+        ),
+      );
+      barLoops.current.forEach(l => l.start());
+    } else {
+      barLoops.current.forEach(l => l.stop());
+      barAnims.forEach(a => Animated.timing(a, { toValue: 0.25, duration: 200, useNativeDriver: false }).start());
+    }
+    return () => barLoops.current.forEach(l => l.stop());
   }, [playing]);
-
-  useEffect(() => () => { stopSpin(); stopBars(); }, []);
-
-  const spinDeg = vinylSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
-
-  const isVoice = mediaType === 'voice';
 
   return (
     <View style={mw.container} pointerEvents="none">
-      {/* Glow de fond */}
-      <Animated.View style={[mw.glow, { backgroundColor: accent, opacity: glowOpacity }]} />
-
-      {/* Vinyle / micro */}
-      <View style={mw.vinylWrap}>
-        <Animated.View style={[mw.vinyl, { transform: [{ rotate: spinDeg }] }]}>
-          <LinearGradient
-            colors={['#1a1a2e', '#16213E', '#0F3460', '#1a1a2e']}
-            style={mw.vinylInner}
+      <View style={mw.eqRow}>
+        {barAnims.map((anim, i) => (
+          <Animated.View
+            key={i}
+            style={[
+              mw.eqBar,
+              { backgroundColor: accentColor, height: anim.interpolate({ inputRange: [0, 1], outputRange: [3, 12] }) },
+            ]}
           />
-          {/* Sillons */}
-          {[28, 22, 16].map(r => (
-            <View key={r} style={[mw.groove, { width: r * 2, height: r * 2, borderRadius: r, borderColor: 'rgba(255,255,255,0.06)' }]} />
-          ))}
-          {/* Centre coloré */}
-          <View style={[mw.vinylCenter, { backgroundColor: accent }]}>
-            <MaterialIcon name={isVoice ? 'microphone' : 'music-note'} size={11} color="#fff" />
-          </View>
-        </Animated.View>
-        {/* Bras de lecture */}
-        {!isVoice && (
-          <View style={mw.tonearm}>
-            <View style={[mw.tonearmLine, { backgroundColor: 'rgba(255,255,255,0.5)' }]} />
-            <View style={[mw.tonearmHead, { backgroundColor: accent }]} />
-          </View>
-        )}
+        ))}
       </View>
-
-      {/* Infos + barres */}
-      <View style={mw.info}>
-        <View style={mw.labelRow}>
-          <MaterialIcon name={isVoice ? 'microphone-variant' : 'music-circle'} size={12} color={accent} />
-          <Text style={[mw.typeLabel, { color: accent }]}>{isVoice ? 'Vocal' : 'Musique'}</Text>
-          {playing && (
-            <View style={[mw.liveChip, { backgroundColor: accent + '25', borderColor: accent + '60' }]}>
-              <View style={[mw.liveDot, { backgroundColor: accent }]} />
-              <Text style={[mw.liveText, { color: accent }]}>EN COURS</Text>
-            </View>
-          )}
-        </View>
-
-        <Text style={mw.trackName} numberOfLines={1}>{trackName}</Text>
-
-        {/* Barres d'onde */}
-        <View style={mw.waveRow}>
-          {barAnims.map((anim, i) => (
-            <Animated.View
-              key={i}
-              style={[
-                mw.bar,
-                {
-                  backgroundColor: accent,
-                  height: anim.interpolate({ inputRange: [0, 1], outputRange: [3, 22] }),
-                  opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
-                },
-              ]}
-            />
-          ))}
-        </View>
-      </View>
+      <Text style={mw.trackName} numberOfLines={1}>{trackName}</Text>
     </View>
   );
 };
@@ -1886,140 +1804,36 @@ const s = StyleSheet.create({
   replySentText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });
 
-// ── MusicWidget styles ──────────────────────────────────────────────────────
+// ── MusicWidget styles — indicateur minimal : icône + titre, une seule ligne ─
 const mw = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 110,
+    bottom: 84,
     left: 16,
-    right: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    maxWidth: W - 80,
     zIndex: 10,
-  },
-  glow: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    top: -10,
-    alignSelf: 'center',
-  },
-  vinylWrap: {
-    width: 80,
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  vinyl: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  vinylInner: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 38,
-  },
-  groove: {
-    position: 'absolute',
-    borderWidth: 1,
-  },
-  vinylCenter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  tonearm: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    width: 28,
-    height: 44,
-    alignItems: 'flex-end',
-    justifyContent: 'flex-start',
-    transform: [{ rotate: '-30deg' }],
-  },
-  tonearmLine: {
-    width: 2,
-    height: 36,
-    borderRadius: 1,
-  },
-  tonearmHead: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: -2,
-  },
-  info: {
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    width: '100%',
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  typeLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  liveChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginLeft: 4,
-  },
-  liveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  liveText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
   },
   trackName: {
     color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-    maxWidth: W - 80,
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
   },
-  waveRow: {
+  eqRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: 2,
-    height: 24,
-    marginTop: 2,
+    height: 12,
   },
-  bar: {
-    width: 3,
+  eqBar: {
+    width: 2.5,
     borderRadius: 2,
-    opacity: 0.85,
   },
 });
