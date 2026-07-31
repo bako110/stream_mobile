@@ -38,20 +38,29 @@ function mapSound(s: any): MySound {
   };
 }
 
+type Tab = 'popular' | 'search' | 'my';
+
 /**
  * Sélection d'un son pour accompagner un reel/story :
  * - "Parcourir mes fichiers" : choisit un fichier audio du téléphone (upload
  *   immédiat au catalogue partagé côté backend, via soundService.uploadFromUri).
- * - "Mes sons" : liste des sons déjà enregistrés en base (GET /sounds/my), avec
- *   une barre de recherche qui filtre côté serveur (GET /sounds?q=...) — pas de
- *   scan de fichiers locaux (aucune lib fiable pour ça sur RN 0.85+/New Arch),
- *   la base de données fait office d'historique persistant et partagé.
+ * - "Populaires" (GET /sounds/popular) : accessible sans connexion, onglet par
+ *   défaut — évite de dépendre uniquement de "Mes sons" (GET /sounds/my, qui
+ *   exige un token valide et échouait silencieusement en 401 si absent/expiré).
+ * - "Rechercher" (GET /sounds?q=...) et "Mes sons" — mêmes 3 onglets que la
+ *   version web (SoundPickerSheet.tsx), pas de scan de fichiers locaux (aucune
+ *   lib fiable pour ça sur RN 0.85+/New Arch).
  */
 export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, onSelectSaved }) => {
   const insets = useSafeAreaInsets();
+  const [tab, setTab] = useState<Tab>('popular');
   const [search, setSearch] = useState('');
-  const [sounds, setSounds] = useState<MySound[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [popular, setPopular] = useState<MySound[]>([]);
+  const [searchResults, setSearchResults] = useState<MySound[]>([]);
+  const [mySounds, setMySounds] = useState<MySound[]>([]);
+  const [loadingPopular, setLoadingPopular] = useState(false);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [loadingMy, setLoadingMy] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const soundRef = useRef<Sound | null>(null);
@@ -80,33 +89,43 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
 
   useEffect(() => () => { stopPreview(); }, [stopPreview]);
 
-  const loadMySounds = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiClient.get<any[]>(Endpoints.sounds.my);
-      setSounds(Array.isArray(res.data) ? res.data.map(mapSound) : []);
-    } catch {
-      setSounds([]);
-    } finally { setLoading(false); }
+  // Populaires — chargé une fois à l'ouverture, sans dépendre de l'auth.
+  useEffect(() => {
+    setLoadingPopular(true);
+    apiClient.get<any[]>(Endpoints.sounds.popular)
+      .then(res => setPopular(Array.isArray(res.data) ? res.data.map(mapSound) : []))
+      .catch(() => setPopular([]))
+      .finally(() => setLoadingPopular(false));
   }, []);
 
-  useEffect(() => { loadMySounds(); }, [loadMySounds]);
-
-  // Recherche debounced — filtre côté serveur (titre/artiste), retombe sur
-  // "mes sons" complets quand le champ est vidé.
+  // Mes sons — chargé seulement quand l'onglet devient actif.
   useEffect(() => {
-    if (!search.trim()) { loadMySounds(); return; }
+    if (tab !== 'my') return;
+    setLoadingMy(true);
+    apiClient.get<any[]>(Endpoints.sounds.my)
+      .then(res => setMySounds(Array.isArray(res.data) ? res.data.map(mapSound) : []))
+      .catch(() => setMySounds([]))
+      .finally(() => setLoadingMy(false));
+  }, [tab]);
+
+  // Recherche debounced — filtre côté serveur (titre/artiste).
+  useEffect(() => {
+    if (tab !== 'search') return;
+    if (!search.trim()) { setSearchResults([]); return; }
+    setLoadingSearch(true);
     const timer = setTimeout(async () => {
-      setLoading(true);
       try {
         const res = await apiClient.get<any[]>(`${Endpoints.sounds.list}?q=${encodeURIComponent(search.trim())}`);
-        setSounds(Array.isArray(res.data) ? res.data.map(mapSound) : []);
+        setSearchResults(Array.isArray(res.data) ? res.data.map(mapSound) : []);
       } catch {
-        setSounds([]);
-      } finally { setLoading(false); }
+        setSearchResults([]);
+      } finally { setLoadingSearch(false); }
     }, 350);
     return () => clearTimeout(timer);
-  }, [search, loadMySounds]);
+  }, [search, tab]);
+
+  const sounds = tab === 'popular' ? popular : tab === 'search' ? searchResults : mySounds;
+  const loading = tab === 'popular' ? loadingPopular : tab === 'search' ? loadingSearch : loadingMy;
 
   const handleSelect = (item: MySound) => {
     stopPreview();
@@ -142,27 +161,47 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
         </Animated.View>
       </ScrollView>
 
-      {/* Recherche parmi les sons déjà enregistrés (base de données) */}
-      <View style={[sp.searchRow, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary, borderColor: colors.border }]}>
-        <Icon name="search" size={16} color={colors.textTertiary} />
-        <TextInput
-          style={[sp.searchInput, { color: colors.textPrimary }]}
-          placeholder="Rechercher parmi mes sons..."
-          placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="x" size={16} color={colors.textTertiary} />
-          </TouchableOpacity>
-        )}
+      {/* Onglets Populaires / Rechercher / Mes sons */}
+      <View style={[sp.tabsRow, { borderBottomColor: colors.border ?? '#eee' }]}>
+        {([
+          { key: 'popular' as Tab, label: 'Populaires', icon: 'trending-up' },
+          { key: 'search' as Tab, label: 'Rechercher', icon: 'search' },
+          { key: 'my' as Tab, label: 'Mes sons', icon: 'user' },
+        ]).map(t => {
+          const active = tab === t.key;
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[sp.tabBtn, active && { borderBottomColor: colors.primary }]}
+              onPress={() => setTab(t.key)}
+            >
+              <Icon name={t.icon} size={13} color={active ? colors.primary : colors.textSecondary} />
+              <Text style={[sp.tabLabel, { color: active ? colors.primary : colors.textSecondary }]}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      <Text style={[sp.sectionLabel, { color: colors.textTertiary }]}>
-        {search.trim() ? 'Résultats' : 'Mes sons'}
-      </Text>
+      {/* Recherche — visible uniquement sur l'onglet Rechercher */}
+      {tab === 'search' && (
+        <View style={[sp.searchRow, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary, borderColor: colors.border }]}>
+          <Icon name="search" size={16} color={colors.textTertiary} />
+          <TextInput
+            style={[sp.searchInput, { color: colors.textPrimary }]}
+            placeholder="Titre, artiste..."
+            placeholderTextColor={colors.textDisabled ?? colors.textTertiary}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            autoFocus
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Icon name="x" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 16 }} />}
 
@@ -208,7 +247,11 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
             <View style={sp.empty}>
               <MaterialIcon name="music-note-off" size={32} color={colors.textTertiary} />
               <Text style={[sp.emptyText, { color: colors.textTertiary }]}>
-                {search.trim() ? 'Aucun résultat' : "Aucun son enregistré pour l'instant"}
+                {tab === 'search'
+                  ? (search.trim() ? 'Aucun résultat' : 'Tape pour rechercher')
+                  : tab === 'my'
+                  ? "Aucun son enregistré pour l'instant"
+                  : 'Aucun son populaire disponible'}
               </Text>
             </View>
           ) : null
@@ -242,7 +285,18 @@ const sp = StyleSheet.create({
     borderRadius: 12, borderWidth: 1,
   },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 4 },
-  sectionLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, marginHorizontal: 20, marginTop: 14, marginBottom: 4 },
+
+  tabsRow: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginTop: 4,
+  },
+  tabBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    paddingVertical: 10,
+    borderBottomWidth: 2, borderBottomColor: 'transparent',
+  },
+  tabLabel: { fontSize: 12, fontWeight: '700' },
 
   trackRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,

@@ -917,7 +917,17 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
               return (
                 <View style={StyleSheet.absoluteFill}>
                   {mode === 'image'
-                    ? <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                    ? (
+                      <>
+                        {/* Fond flouté agrandi — comble l'espace autour d'une photo dont
+                            le ratio ne correspond pas à l'écran, sans jamais la recadrer
+                            tant que l'utilisateur n'a pas explicitement utilisé l'outil
+                            crop (même pattern que ReelEditorScreen/StoryViewer). */}
+                        <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={Platform.OS === 'android' ? 24 : 40} />
+                        <View pointerEvents="none" style={[StyleSheet.absoluteFill, {backgroundColor:'rgba(0,0,0,0.35)'}]} />
+                        <Image source={{uri:localUri}} style={StyleSheet.absoluteFill} resizeMode="contain" />
+                      </>
+                    )
                     : <VideoPreview uri={localUri} playerRef={playerRef} startSec={trimStart} />
                   }
                 </View>

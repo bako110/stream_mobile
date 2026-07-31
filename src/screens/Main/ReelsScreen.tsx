@@ -1464,6 +1464,13 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
   }, [badgePulse]);
   const badgeDotStyle = useAnimatedStyle(() => ({ opacity: badgePulse.value }));
 
+  // Pastille CTA style TikTok — pulsation douce pour attirer l'oeil sans être intrusive
+  const ctaPulse = useSharedValue(1);
+  useEffect(() => {
+    ctaPulse.value = withRepeat(withSequence(withTiming(1.02, { duration: 1100 }), withTiming(1, { duration: 1100 })), -1, true);
+  }, [ctaPulse]);
+  const ctaPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: ctaPulse.value }] }));
+
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
 
@@ -1513,63 +1520,33 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         pointerEvents="none"
       />
 
-      {/* ── Contenu bas — carrément collé au bas de l'écran, juste au-dessus de la zone
-          système (AdSlide n'a pas de barre de commentaire ni de colonne d'actions à droite,
-          contrairement aux reels normaux, donc rien à leur réserver) ; s'adapte à ce qui est
-          réellement présent (description/CTA optionnels) au lieu d'un espacement fixe qui
-          laisserait un vide sous le bouton quand tout est déjà affiché. ── */}
-      <View style={{ position: 'absolute', bottom: Math.max(insetBottom, 8) + 6, left: 0, right: 0, paddingHorizontal: 16, gap: ad.description || rawCta ? 10 : 0 }}>
-
-        {/* Annonceur row — cliquable vers le profil de l'annonceur (advertiser_id = User.id) */}
+      {/* ── CTA style TikTok — pastille compacte unique, fixe en bas, pulsation douce
+          pour attirer l'oeil sans etre intrusive. Titre + bouton regroupes au lieu du
+          bloc auteur/description/CTA plein-largeur precedent. ── */}
+      <Animated.View style={[
+        { position: 'absolute', bottom: Math.max(insetBottom, 8) + 6, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+        ctaPulseStyle,
+      ]}>
         <TouchableOpacity
           activeOpacity={0.8}
           disabled={!ad.advertiser_id}
           onPress={() => ad.advertiser_id && onAuthorPress(ad.advertiser_id)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          style={{ flex: 1, minWidth: 0 }}
         >
-          <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 38, height: 38, borderRadius: 19, padding: 2 }}>
-            <View style={{ flex: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#1a1a2e' }}>
-              {ad.thumbnail_url ? (
-                <Image source={{ uri: ad.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-              ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="zap" size={15} color="#fff" />
-                </View>
-              )}
-            </View>
-          </LinearGradient>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={1}>{ad.title}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11.5, fontWeight: '600', marginTop: 1 }}>Sponsorisé · Annonce</Text>
-          </View>
+          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{ad.title}</Text>
         </TouchableOpacity>
 
-        {/* Description */}
-        {ad.description ? (
-          <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 18, fontWeight: '400', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 }} numberOfLines={3}>
-            {ad.description}
-          </Text>
-        ) : null}
-
-        {/* CTA — vrai bouton plein largeur en dégradé de marque, adapté au type de
-            contact : numéro de téléphone → "Contactez-nous" + icône téléphone (compose
-            l'appel), lien web → "En savoir plus" + flèche (ouvre le navigateur). */}
         {rawCta ? (
-          <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={{ marginTop: 2, shadowColor: '#7B3FF2', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
-            <LinearGradient
-              colors={['#7B3FF2', '#C044E8', '#E0389A']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ borderRadius: 14, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }}
-            >
-              <Icon name={isPhone ? 'phone' : 'globe'} size={15} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: 0.2 }}>
-                {ad.cta_text || (isPhone ? 'Contactez-nous' : 'En savoir plus')}
-              </Text>
-              {!isPhone && <Icon name="arrow-right" size={16} color="#fff" />}
-            </LinearGradient>
+          <TouchableOpacity activeOpacity={0.88} onPress={handleCta}
+            style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 }}
+          >
+            <Icon name={isPhone ? 'phone' : 'external-link'} size={12} color="#7B3FF2" />
+            <Text style={{ color: '#7B3FF2', fontSize: 12.5, fontWeight: '800' }}>
+              {ad.cta_text || (isPhone ? 'Contactez-nous' : 'En savoir plus')}
+            </Text>
           </TouchableOpacity>
         ) : null}
-      </View>
+      </Animated.View>
     </View>
   );
 });
@@ -2743,9 +2720,9 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color="#fff" />
           </TouchableOpacity>
           <ActionBtn icon="heart-outline" iconActive="heart" useMCIcon label={formatCount(likes)} color={liked ? '#E0389A' : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder="#E0389A" activeGlow="#E0389A" />
-          {!commentsDisabledSt && <ActionBtn icon="message-circle" label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
-          <ActionBtn icon="share-2" label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
-          <ActionBtn icon="eye" label={formatCount(reel.view_count ?? 0)} color="#fff" />
+          {!commentsDisabledSt && <ActionBtn icon="comment" useMCIcon label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
+          <ActionBtn icon="share-variant" useMCIcon label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
+          <ActionBtn icon="eye" useMCIcon label={formatCount(reel.view_count ?? 0)} color="#fff" />
           {!isOwnReel && <ActionBtn icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)} activeBackground="rgba(255,215,0,0.18)" activeBorder="rgba(255,215,0,0.5)" active />}
           {/* Bouton ... — regroupe Remix, Cable, Signalement pour non-proprio */}
           {!isOwnReel && (
