@@ -117,14 +117,12 @@ const BuyGoGoldScreen: React.FC = () => {
     }
   }
 
-  function handleBuyPackage(pkg: GoGoldPackage) {
-    payWithStripe(pkg.id, null);
+  function handleBuyPackage(_pkg: GoGoldPackage) {
+    toastService.error('Bientôt disponible', 'Le paiement par carte bancaire arrive bientôt.');
   }
 
   function handleBuyCustom() {
-    if (!customValid) return;
-    const safeAmount = Math.round(customAmount * 100) / 100;
-    payWithStripe(null, safeAmount);
+    toastService.error('Bientôt disponible', 'Le paiement par carte bancaire arrive bientôt.');
   }
 
   if (step === 'success') {
@@ -164,7 +162,7 @@ const BuyGoGoldScreen: React.FC = () => {
         <View style={[s.infoBanner, { borderColor: colors.primary + '33' }]}>
           <Icon name="credit-card" size={16} color={colors.primary} />
           <Text style={[s.infoText, { color: colors.textSecondary }]}>
-            Paiement par carte bancaire sécurisé par Stripe, directement dans l'app.
+            Le paiement par carte bancaire arrive bientôt.
           </Text>
         </View>
 
@@ -220,15 +218,12 @@ const BuyGoGoldScreen: React.FC = () => {
               const price = priceOf(pkg);
               return (
                 <TouchableOpacity
-                  style={[s.payBtn, paying && { opacity: 0.6 }]}
+                  style={[s.payBtn, { opacity: 0.6 }]}
                   onPress={() => handleBuyPackage(pkg)}
-                  disabled={paying}
                   activeOpacity={0.85}
                 >
                   <Icon name="credit-card" size={16} color="#fff" />
-                  <Text style={s.payBtnText}>
-                    {paying ? 'Paiement en cours…' : `Payer ${total.toLocaleString('fr-FR')} GoGold — ${price.toFixed(2)} €`}
-                  </Text>
+                  <Text style={s.payBtnText}>Paiement carte bientôt disponible</Text>
                 </TouchableOpacity>
               );
             })()}
@@ -253,15 +248,12 @@ const BuyGoGoldScreen: React.FC = () => {
               </Text>
             )}
             <TouchableOpacity
-              style={[s.payBtn, (!customValid || paying) && { opacity: 0.4 }]}
+              style={[s.payBtn, { opacity: 0.6 }]}
               onPress={handleBuyCustom}
-              disabled={!customValid || paying}
               activeOpacity={0.85}
             >
               <Icon name="credit-card" size={16} color="#fff" />
-              <Text style={s.payBtnText}>
-                {paying ? 'Paiement en cours…' : customValid ? `Payer ${customGoGold.toLocaleString('fr-FR')} GoGold — ${customAmount.toFixed(2)} €` : 'Saisissez un montant valide'}
-              </Text>
+              <Text style={s.payBtnText}>Paiement carte bientôt disponible</Text>
             </TouchableOpacity>
           </View>
         )}
