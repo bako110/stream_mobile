@@ -1,5 +1,5 @@
 /**
- * PhoneOtpScreen — ecran universel Firebase Phone Auth OTP.
+ * PhoneOtpScreen — ecran universel de verification par SMS OTP (Twilio, backend).
  *
  * Modes :
  *   'login'    — connexion / inscription par telephone
@@ -7,8 +7,8 @@
  *   'verify'   — lier un numero au compte existant
  *
  * Flux forgot :
- *   1. Saisie numero → Firebase SMS
- *   2. Code OTP → Firebase valide → JWT obtenus
+ *   1. Saisie numero → SMS (backend)
+ *   2. Code OTP → backend valide → JWT obtenus
  *   3. Nouveau mot de passe → PUT /auth/me/reset-password
  */
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -27,6 +27,11 @@ import { phoneAuthService } from '../../services/phoneAuthService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 
+// 'verify' n'est actuellement instancié nulle part dans l'app (dead code) — si
+// réactivé un jour, il appellerait via phoneAuthService.verifyOtp() la même
+// route que 'login' (POST /auth/phone/verify-otp, qui connecte/crée un compte),
+// pas une route de liaison à un compte existant. Prévoir une route backend
+// dédiée (équivalent à l'ancien /phone/link) avant de réactiver ce mode.
 export type PhoneOtpMode = 'login' | 'forgot' | 'verify';
 
 interface Props {
