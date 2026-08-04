@@ -323,8 +323,8 @@ export default function CommunityMembersScreen({ route }: Props) {
 
       {/* Filtres avec compteurs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}
-        style={{ flexGrow: 0 }}>
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' }}
+        style={{ flexGrow: 0, flexShrink: 0, height: 54 }}>
         {ROLE_FILTERS.map(f => {
           const active = roleFilter === f.key;
           return (
