@@ -99,6 +99,7 @@ const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
 const audioRecorder = new AudioRecorderPlayerClass();
 const { width: SCREEN_W } = Dimensions.get('window');
+const MAX_VOICE_DURATION_SEC = 5 * 60;
 
 export const ChatScreen: React.FC = () => {
   const insets            = useSafeAreaInsets();
@@ -455,6 +456,9 @@ export const ChatScreen: React.FC = () => {
       audioRecorder.addRecordBackListener((e: any) => {
         recordDurationMs.current = e.currentPosition;
         setRecordTime(formatDuration(e.currentPosition));
+        if (e.currentPosition >= MAX_VOICE_DURATION_SEC * 1000) {
+          stopAndSendRecording();
+        }
       });
     } catch {
       setIsRecording(false);

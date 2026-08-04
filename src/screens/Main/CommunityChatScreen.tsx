@@ -35,6 +35,7 @@ const RNBlobUtil = require('react-native-blob-util').default;
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
 const audioRecorderCommunity = new AudioRecorderPlayerClass();
+const MAX_VOICE_DURATION_SEC = 5 * 60;
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -568,6 +569,9 @@ export const CommunityChatScreen: React.FC = () => {
         const totalSec = Math.floor(e.currentPosition / 1000);
         const m = Math.floor(totalSec / 60), s = totalSec % 60;
         setRecordTime(`${m}:${s.toString().padStart(2, '0')}`);
+        if (totalSec >= MAX_VOICE_DURATION_SEC) {
+          stopAndSendRecording();
+        }
       });
     } catch { setIsRecording(false); sendRecording(false); }
   };
