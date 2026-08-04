@@ -1,10 +1,12 @@
 /**
  * Hook WebSocket temps-réel pour les commentaires d'une cible.
- * Se connecte à /api/v1/social/comments/ws/{targetType}/{targetId}?token=...
+ * Se connecte à /api/v1/social/comments/ws/{targetType}/{targetId}, auth via
+ * premier message {"type":"auth","token":...} (pas de token en query string).
  * Gère reconnexion exponentielle + refresh JWT sur code 4001.
  */
 import { useEffect, useRef, useCallback } from 'react';
 import { WS_BASE_URL, STORAGE_KEYS } from '../utils/constants';
+import { openAuthenticatedWs } from '../utils/authenticatedWs';
 import { storage } from '../utils/storage';
 import { authService } from '../services/authService';
 import type { Comment } from '../types';
@@ -49,8 +51,8 @@ export function useCommentsWebSocket({ targetType, targetId, enabled, onEvent }:
     const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!token) return;
 
-    const url = `${WS_BASE_URL}/api/v1/social/comments/ws/${targetType}/${targetId}?token=${encodeURIComponent(token)}`;
-    const ws  = new WebSocket(url);
+    const url = `${WS_BASE_URL}/api/v1/social/comments/ws/${targetType}/${targetId}`;
+    const ws  = openAuthenticatedWs(url, token);
     wsRef.current = ws;
 
     ws.onopen = () => {

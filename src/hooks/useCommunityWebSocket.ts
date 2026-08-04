@@ -1,10 +1,12 @@
 /**
  * Hook WebSocket pour le chat communautaire temps-réel.
- * Se connecte à /api/v1/communities/{communityId}/ws?token=<JWT>
+ * Se connecte à /api/v1/communities/{communityId}/ws, auth via premier
+ * message {"type":"auth","token":...} (pas de token en query string).
  * Gère la reconnexion automatique et le ping/pong keepalive.
  */
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { API_BASE_URL, STORAGE_KEYS } from '../utils/constants';
+import { openAuthenticatedWs } from '../utils/authenticatedWs';
 import { storage } from '../utils/storage';
 import { authService } from '../services/authService';
 
@@ -231,8 +233,8 @@ export function useCommunityWebSocket(
     const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!token) return;
 
-    const url = `${WS_BASE}/api/v1/communities/${communityId}/ws?token=${encodeURIComponent(token)}`;
-    const ws = new WebSocket(url);
+    const url = `${WS_BASE}/api/v1/communities/${communityId}/ws`;
+    const ws = openAuthenticatedWs(url, token);
     wsRef.current = ws;
 
     ws.onopen = () => {

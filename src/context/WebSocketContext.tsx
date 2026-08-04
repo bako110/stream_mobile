@@ -12,6 +12,7 @@ import React, {
 } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { API_BASE_URL, STORAGE_KEYS } from '../utils/constants';
+import { openAuthenticatedWs } from '../utils/authenticatedWs';
 import { storage } from '../utils/storage';
 import { authService } from '../services/authService';
 import { messageService } from '../services/messageService';
@@ -381,8 +382,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!token) return;
 
-    const url = `${WS_BASE}/api/v1/messages/ws?token=${encodeURIComponent(token)}`;
-    const ws  = new WebSocket(url);
+    const url = `${WS_BASE}/api/v1/messages/ws`;
+    const ws  = openAuthenticatedWs(url, token);
     wsRef.current = ws;
 
     ws.onopen = () => {
