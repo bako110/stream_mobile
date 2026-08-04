@@ -15,9 +15,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { GoFolyXLoader, BackButton } from '../../components/common';
-import { showConfirm } from '../../services';
+import { showConfirm, toastService } from '../../services';
 import { communityService } from '../../services/communityService';
-import type { CommunityMemberProfile } from '../../services/communityService';
+import type { CommunityMemberProfile, MemberCreatorStats } from '../../services/communityService';
+import { authService } from '../../services/authService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 // ---------------------------------------------------------------------------
@@ -106,11 +107,28 @@ export function CommunityMemberProfileScreen({ route }: Props) {
 
   const [member, setMember] = useState<CommunityMemberProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [myId, setMyId] = useState<string | null>(null);
+  const [myRole, setMyRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [creatorStats, setCreatorStats] = useState<MemberCreatorStats | null>(null);
+
+  const isMe      = myId === memberId;
+  const isAdmin   = myRole === 'admin';
+  const canManage = (myRole === 'admin' || myRole === 'moderator') && !isMe;
 
   const load = useCallback(async () => {
     try {
-      const data = await communityService.getMemberProfile(communityId, memberId);
+      const [data, me, role] = await Promise.all([
+        communityService.getMemberProfile(communityId, memberId),
+        authService.getMe().catch(() => null),
+        communityService.getMyRole(communityId).catch(() => null),
+      ]);
       setMember(data);
+      setMyId(me?.id ?? null);
+      setMyRole(role);
     } catch {
       setMember(null);
     } finally {
@@ -119,6 +137,74 @@ export function CommunityMemberProfileScreen({ route }: Props) {
   }, [communityId, memberId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadCreatorStats = async () => {
+    if (creatorStats) return;
+    setStatsLoading(true);
+    try {
+      const stats = await communityService.getMemberCreatorStats(communityId, memberId);
+      setCreatorStats(stats);
+    } catch { toastService.error('Erreur', 'Stats indisponibles.'); }
+    finally { setStatsLoading(false); }
+  };
+
+  const handleChangeRole = (role: 'admin' | 'moderator' | 'member') => {
+    const labels: Record<string, string> = { admin: 'admin', moderator: 'modérateur', member: 'membre' };
+    showConfirm(
+      'Changer le rôle',
+      `Passer ${member?.display_name || member?.username || memberName} ${labels[role]} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Confirmer', onPress: async () => {
+          setRoleLoading(true);
+          try {
+            await communityService.updateMemberRole(communityId, memberId, role);
+            setMember(prev => prev ? { ...prev, role } : prev);
+            toastService.success('Rôle modifié', `${labels[role]} attribué avec succès.`);
+          } catch { toastService.error('Erreur', 'Impossible de changer le rôle.'); }
+          finally { setRoleLoading(false); }
+        }},
+      ],
+    );
+  };
+
+  const handleKick = () => {
+    showConfirm(
+      'Exclure ce membre',
+      `Exclure ${member?.display_name || member?.username || memberName} de la communauté ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Exclure', style: 'destructive', onPress: async () => {
+          setActionLoading(true);
+          try {
+            await communityService.removeMember(communityId, memberId);
+            toastService.success('Membre exclu');
+            navigation.goBack();
+          } catch { toastService.error('Erreur', "Impossible d'exclure ce membre."); }
+          finally { setActionLoading(false); }
+        }},
+      ],
+    );
+  };
+
+  const handleBlock = () => {
+    showConfirm(
+      'Bloquer ce membre',
+      `Bloquer ${member?.display_name || member?.username || memberName} ? Il ne pourra plus accéder à la communauté.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Bloquer', style: 'destructive', onPress: async () => {
+          setActionLoading(true);
+          try {
+            await communityService.blockMember(communityId, memberId);
+            toastService.success('Membre bloqué', '');
+            navigation.goBack();
+          } catch { toastService.error('Erreur', 'Impossible de bloquer ce membre.'); }
+          finally { setActionLoading(false); }
+        }},
+      ],
+    );
+  };
 
   if (loading) {
     return (
@@ -179,7 +265,9 @@ export function CommunityMemberProfileScreen({ route }: Props) {
           end={{ x: 1, y: 1 }}
           style={[styles.hero, { paddingTop: insets.top + 8 }]}
         >
-          <BackButton onPress={() => navigation.goBack()} transparent />
+          <View style={[styles.backBtnWrap, { top: insets.top + 8 }]}>
+            <BackButton onPress={() => navigation.goBack()} color="#fff" transparent />
+          </View>
 
           <View style={styles.communityPill}>
             <Icon name="users" size={11} color="rgba(255,255,255,0.8)" />
@@ -338,6 +426,106 @@ export function CommunityMemberProfileScreen({ route }: Props) {
               <Text style={styles.actionBtnFillText}>Envoyer un message</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Stats créateur (repliable) */}
+          <TouchableOpacity
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }]}
+            onPress={() => { setShowStats(v => !v); if (!showStats) loadCreatorStats(); }}
+            activeOpacity={0.75}
+          >
+            <Icon name="bar-chart-2" size={16} color={colors.primary} />
+            <Text style={{ flex: 1, color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>Stats créateur</Text>
+            <Icon name={showStats ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+
+          {showStats && (
+            statsLoading ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <GoFolyXLoader />
+              </View>
+            ) : creatorStats ? (
+              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {[
+                  { icon: 'film', label: 'Reels publiés', value: creatorStats.reels_count, color: '#7B3FF2' },
+                  { icon: 'eye', label: 'Vues des reels', value: creatorStats.reels_views.toLocaleString(), color: '#7B3FF2' },
+                  { icon: 'heart', label: 'Likes reels', value: creatorStats.reels_likes.toLocaleString(), color: '#EF4444' },
+                  { icon: 'message-circle', label: 'Posts publiés', value: creatorStats.posts_count, color: '#7B3FF2' },
+                  { icon: 'users', label: 'Abonnés', value: creatorStats.followers.toLocaleString(), color: '#7B3FF2' },
+                  { icon: 'zap', label: 'GoGold gagnés (total)', value: creatorStats.total_gogold_earned, color: '#F59E0B' },
+                  { icon: 'award', label: 'GoGold communauté', value: creatorStats.community_gogold_earned, color: '#F59E0B' },
+                ].map((row, i, arr) => (
+                  <View key={row.label} style={[styles.historyRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+                    <View style={[styles.historyIconWrap, { backgroundColor: row.color + '18' }]}>
+                      <Icon name={row.icon} size={15} color={row.color} />
+                    </View>
+                    <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13 }}>{row.label}</Text>
+                    <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700' }}>{row.value}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null
+          )}
+
+          {/* Gestion (admin/mod uniquement) */}
+          {canManage && (
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, gap: 12 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textTertiary, marginBottom: 0 }]}>GESTION DU RÔLE</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {isAdmin && member.role !== 'admin' && (
+                  <TouchableOpacity
+                    onPress={() => handleChangeRole('admin')}
+                    disabled={roleLoading}
+                    style={[styles.roleChip, { backgroundColor: '#7B3FF215', borderColor: '#7B3FF240' }]}
+                  >
+                    <Icon name="shield" size={12} color="#7B3FF2" />
+                    <Text style={{ color: '#7B3FF2', fontSize: 12, fontWeight: '700' }}>Promouvoir Admin</Text>
+                  </TouchableOpacity>
+                )}
+                {member.role !== 'moderator' && (
+                  <TouchableOpacity
+                    onPress={() => handleChangeRole('moderator')}
+                    disabled={roleLoading}
+                    style={[styles.roleChip, { backgroundColor: '#3B82F615', borderColor: '#3B82F640' }]}
+                  >
+                    <Icon name="star" size={12} color="#3B82F6" />
+                    <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: '700' }}>Promouvoir Mod</Text>
+                  </TouchableOpacity>
+                )}
+                {member.role !== 'member' && (
+                  <TouchableOpacity
+                    onPress={() => handleChangeRole('member')}
+                    disabled={roleLoading}
+                    style={[styles.roleChip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                  >
+                    <Icon name="user" size={12} color={colors.textSecondary} />
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '700' }}>Rétrograder Membre</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <Text style={[styles.sectionTitle, { color: '#EF4444', marginBottom: 0, marginTop: 4 }]}>ACTIONS</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={handleKick}
+                  disabled={actionLoading}
+                  style={[styles.roleChip, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]}
+                >
+                  <Icon name="user-x" size={12} color="#EF4444" />
+                  <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>Exclure</Text>
+                </TouchableOpacity>
+                {isAdmin && (
+                  <TouchableOpacity
+                    onPress={handleBlock}
+                    disabled={actionLoading}
+                    style={[styles.roleChip, { backgroundColor: '#EF444410', borderColor: '#EF444430' }]}
+                  >
+                    <Icon name="slash" size={12} color="#EF4444" />
+                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>Bloquer</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -354,9 +542,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   hero: {
+    position: 'relative',
     alignItems: 'center',
     paddingBottom: 32,
     paddingHorizontal: 20,
+  },
+  backBtnWrap: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 10,
   },
   communityPill: {
     flexDirection: 'row',
@@ -508,6 +702,15 @@ const styles = StyleSheet.create({
   historyDivider: { height: StyleSheet.hairlineWidth, marginVertical: 6 },
 
   actionsRow: { gap: 10, marginTop: 4 },
+  roleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   actionBtnOutline: {
     flexDirection: 'row',
     alignItems: 'center',
