@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator, RefreshControl, Image, ScrollView, Animated, StatusBar,
@@ -188,18 +188,11 @@ const MemberCard: React.FC<{ member: CommunityMemberData; rank?: number; onPress
 export default function CommunityMembersScreen({ route }: Props) {
   const {
     communityId, communityName,
-    myRole = null,
+    myRole: myRoleParam = null,
     membersListHiddenPublic  = false,
     membersListHiddenMembers = false,
   } = route.params;
 
-  const isAdmin   = myRole === 'admin';
-  const isMod     = myRole === 'moderator';
-  const isMember  = !!myRole; // null = non-membre
-
-  // Contrôle d'accès
-  const blockedForPublic  = !isMember && membersListHiddenPublic;
-  const blockedForMembers = isMember && !isAdmin && !isMod && membersListHiddenMembers;
   const { theme } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -208,10 +201,22 @@ export default function CommunityMembersScreen({ route }: Props) {
   const [search,      setSearch]      = useState('');
   const [roleFilter,  setRoleFilter]  = useState<RoleFilter>('all');
   const [members,     setMembers]     = useState<CommunityMemberData[]>([]);
+  const [myRole,      setMyRole]      = useState<string | null>(myRoleParam);
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
 
+  const isAdmin   = myRole === 'admin';
+  const isMod     = myRole === 'moderator';
+  const isMember  = !!myRole; // null = non-membre
+
+  // Contrôle d'accès
+  const blockedForPublic  = !isMember && membersListHiddenPublic;
+  const blockedForMembers = isMember && !isAdmin && !isMod && membersListHiddenMembers;
+
   const load = useCallback(async () => {
+    // Appels indépendants : le rôle doit se rafraîchir même si la liste des
+    // membres échoue (ex: blockedForMembers dépend justement de myRole).
+    communityService.getMyRole(communityId).then(setMyRole).catch(() => {});
     try {
       const data = await communityService.getMembers(communityId);
       setMembers(Array.isArray(data) ? data : []);
@@ -227,26 +232,28 @@ export default function CommunityMembersScreen({ route }: Props) {
       memberName: m.display_name || m.username || '',
     });
 
-  const filtered = members.filter(m => {
+  const filtered = useMemo(() => members.filter(m => {
     const matchRole = roleFilter === 'all' || m.role === roleFilter;
     const q = search.trim().toLowerCase();
     const matchSearch = q === '' ||
       (m.display_name || '').toLowerCase().includes(q) ||
       (m.username || '').toLowerCase().includes(q);
     return matchRole && matchSearch;
-  });
+  }), [members, roleFilter, search]);
 
   // Comptes par rôle
-  const counts: Record<RoleFilter, number> = {
+  const counts: Record<RoleFilter, number> = useMemo(() => ({
     all: members.length,
     admin: members.filter(m => m.role === 'admin').length,
     moderator: members.filter(m => m.role === 'moderator').length,
     member: members.filter(m => m.role === 'member').length,
-  };
+  }), [members]);
 
   // Podium — top 3 par GoGold si disponible
-  const sorted = [...members].sort((a, b) => (b.gogold ?? 0) - (a.gogold ?? 0));
-  const top3 = sorted.slice(0, 3);
+  const top3 = useMemo(
+    () => [...members].sort((a, b) => (b.gogold ?? 0) - (a.gogold ?? 0)).slice(0, 3),
+    [members],
+  );
   const maxGoGold = top3[0]?.gogold ?? 0;
   const showPodium = roleFilter === 'all' && search.trim() === '' && top3.length === 3 && maxGoGold > 0;
 
