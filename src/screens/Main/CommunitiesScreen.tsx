@@ -94,6 +94,9 @@ export const CommunitiesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
 
   const [mine,           setMine]           = useState<CommunityData[]>([]);
+  const [page,           setPage]           = useState(1);
+  const [hasMore,        setHasMore]        = useState(true);
+  const [loadingMore,    setLoadingMore]    = useState(false);
   const [query,          setQuery]          = useState('');
   const [sortBy,         setSortBy]         = useState<'recent' | 'alpha' | 'members'>('recent');
   const [sortOpen,       setSortOpen]       = useState(false);
@@ -202,11 +205,28 @@ export const CommunitiesScreen: React.FC = () => {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await communityService.mine();
-      setMine(Array.isArray(data) ? data : []);
+      const data = await communityService.mine(1, 20);
+      const list = Array.isArray(data) ? data : [];
+      setMine(list);
+      setPage(1);
+      setHasMore(list.length >= 20);
     } catch { /**/ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loadingMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const data = await communityService.mine(next, 20);
+      const list = Array.isArray(data) ? data : [];
+      setMine(prev => [...prev, ...list]);
+      setPage(next);
+      setHasMore(list.length >= 20);
+    } catch { /**/ }
+    finally { setLoadingMore(false); }
+  }, [hasMore, loadingMore, loading, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -480,6 +500,15 @@ export const CommunitiesScreen: React.FC = () => {
             tintColor={colors.primary}
           />
         }
+        onScroll={({ nativeEvent }) => {
+          // Pas de pagination pendant une recherche : query filtre côté client
+          // sur ce qui est déjà chargé, charger plus de pages n'aiderait pas.
+          if (query.trim()) return;
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const distanceToEnd = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+          if (distanceToEnd < 200) loadMore();
+        }}
+        scrollEventThrottle={200}
       >
         {renderHero()}
         {renderCategories()}
@@ -511,6 +540,10 @@ export const CommunitiesScreen: React.FC = () => {
               onCancelRequest={() => {}}
             />
           ))
+        )}
+
+        {loadingMore && (
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 16 }} />
         )}
       </ScrollView>
     );

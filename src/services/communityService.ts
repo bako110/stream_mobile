@@ -320,8 +320,10 @@ export const communityService = {
     return res.data;
   },
 
-  async mine(): Promise<CommunityData[]> {
-    const res = await apiClient.get<CommunityData[]>(Endpoints.communities.mine);
+  async mine(page = 1, limit = 20): Promise<CommunityData[]> {
+    const res = await apiClient.get<CommunityData[]>(
+      `${Endpoints.communities.mine}?page=${page}&limit=${limit}`,
+    );
     return res.data;
   },
 
