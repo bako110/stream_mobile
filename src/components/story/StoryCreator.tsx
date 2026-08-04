@@ -14,7 +14,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import Svg, { Path } from 'react-native-svg';
@@ -33,6 +33,7 @@ import { uploadVideoFromUri, uploadImageFromUri, uploadAudioFile } from '../../s
 import { soundService } from '../../services/soundService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { VideoTrimmer } from './VideoTrimmer';
+import { StoryCameraScreen, type StoryCameraResult } from '../../screens/Create/StoryCameraScreen';
 import notifee, { AndroidImportance, AndroidVisibility } from '@notifee/react-native';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
@@ -80,7 +81,7 @@ const FONT_STYLES: { key: string; label: string; fontFamily?: string; fontWeight
 ];
 
 type StoryMode = 'text' | 'image' | 'video' | 'voice';
-type Step = 'pick_mode' | 'pick_media' | 'record_voice' | 'pick_audio' | 'compose';
+type Step = 'pick_mode' | 'pick_media' | 'camera' | 'record_voice' | 'pick_audio' | 'compose';
 type Tool = 'none' | 'crop' | 'draw' | 'text' | 'sticker' | 'caption' | 'trim' | 'mask';
 
 
@@ -536,35 +537,34 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     return result === PermissionsAndroid.RESULTS.GRANTED;
   };
 
-  const requestCameraPermission = async (): Promise<boolean> => {
-    if (Platform.OS !== 'android') return true;
-    const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
-    return result === PermissionsAndroid.RESULTS.GRANTED;
-  };
-
   // ── Pickers ───────────────────────────────────────────────────────────────
   const pickImage = async (source: 'gallery'|'camera') => {
-    if (source === 'camera') {
-      if (!(await requestCameraPermission())) { toastService.warning('Permission', 'Accès à la caméra requis'); return; }
-    } else {
-      if (!(await requestGalleryPermission())) { toastService.warning('Permission', 'Accès à la galerie requis'); return; }
-    }
-    const res = await (source==='camera' ? launchCamera : launchImageLibrary)({ mediaType:'photo', selectionLimit:1 });
+    if (source === 'camera') { setStep('camera'); return; }
+    if (!(await requestGalleryPermission())) { toastService.warning('Permission', 'Accès à la galerie requis'); return; }
+    const res = await launchImageLibrary({ mediaType:'photo', selectionLimit:1 });
     if (res.didCancel || !res.assets?.[0]?.uri) return;
     setLocalUri(res.assets[0].uri); setStep('compose');
   };
 
   const pickVideo = async (source: 'gallery'|'camera') => {
-    if (source === 'camera') {
-      if (!(await requestCameraPermission())) { toastService.warning('Permission', 'Accès à la caméra requis'); return; }
-    } else {
-      if (!(await requestGalleryPermission())) { toastService.warning('Permission', 'Accès à la galerie requis'); return; }
-    }
-    const res = await (source==='camera' ? launchCamera : launchImageLibrary)({ mediaType:'video', selectionLimit:1 });
+    if (source === 'camera') { setStep('camera'); return; }
+    if (!(await requestGalleryPermission())) { toastService.warning('Permission', 'Accès à la galerie requis'); return; }
+    const res = await launchImageLibrary({ mediaType:'video', selectionLimit:1 });
     if (res.didCancel || !res.assets?.[0]?.uri) return;
     const dur = res.assets[0].duration ?? 0;
     setLocalUri(res.assets[0].uri); setVideoDuration(dur);
     setShowTrimmer(true);
+  };
+
+  // Résultat de la caméra intégrée (StoryCameraScreen) : photo → compose direct,
+  // vidéo → trimmer (même flux que la galerie, cohérent pour l'édition finale).
+  const handleCameraCaptured = (result: StoryCameraResult) => {
+    if (result.isPhoto) {
+      setLocalUri(result.uri); setStep('compose');
+    } else {
+      setLocalUri(result.uri); setVideoDuration(result.durationSec ?? 0);
+      setShowTrimmer(true);
+    }
   };
 
   const pickAudioFile = async () => {
@@ -822,10 +822,14 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           <View style={s.sourceGrid}>
             {[
               { source:'gallery' as const, icon:mode==='video'?'film':'image', label:'Galerie', sub:'Depuis vos photos', gradient:['#1565C0','#2196F3'] as [string,string] },
-              { source:'camera'  as const, icon:mode==='video'?'video':'camera', label:mode==='video'?'Filmer':'Photographier', sub:'Utiliser la camera', gradient:['#AD1457','#E91E63'] as [string,string] },
+              { source:'camera'  as const, icon:'camera' as const, label:'Caméra', sub:'Photo ou vidéo', gradient:['#AD1457','#E91E63'] as [string,string] },
             ].map((opt,i) => (
               <Animated.View key={opt.source} entering={FadeInDown.delay(i*90).springify()} style={{flex:1,height:160}}>
-                <TouchableOpacity style={[s.sourceCard,{height:160}]} onPress={()=>mode==='video'?pickVideo(opt.source):pickImage(opt.source)} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={[s.sourceCard,{height:160}]}
+                  onPress={()=>opt.source==='camera' ? setStep('camera') : (mode==='video'?pickVideo(opt.source):pickImage(opt.source))}
+                  activeOpacity={0.8}
+                >
                   <LinearGradient colors={opt.gradient} start={{x:0,y:0}} end={{x:0,y:1}} style={s.sourceCardInner}>
                     <View style={s.sourceIconWrap}><Icon name={opt.icon} size={24} color="#fff" /></View>
                     <Text style={s.sourceLabel}>{opt.label}</Text>
@@ -836,6 +840,14 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             ))}
           </View>
         </View>
+      )}
+
+      {/* ── STEP camera — viewfinder intégré, tap=photo / appui long=vidéo ── */}
+      {step === 'camera' && (
+        <StoryCameraScreen
+          onBack={() => setStep('pick_media')}
+          onCaptured={handleCameraCaptured}
+        />
       )}
 
       {/* ── STEP record_voice ────────────────────────────────────────────── */}
