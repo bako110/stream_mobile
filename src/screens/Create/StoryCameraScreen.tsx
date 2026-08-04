@@ -33,9 +33,11 @@ export interface StoryCameraResult {
 interface Props {
   onBack: () => void;
   onCaptured: (result: StoryCameraResult) => void;
+  onSelectText: () => void;
+  onSelectVoice: () => void;
 }
 
-export const StoryCameraScreen: React.FC<Props> = ({ onBack, onCaptured }) => {
+export const StoryCameraScreen: React.FC<Props> = ({ onBack, onCaptured, onSelectText, onSelectVoice }) => {
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<Camera>(null);
 
@@ -284,6 +286,22 @@ export const StoryCameraScreen: React.FC<Props> = ({ onBack, onCaptured }) => {
             )}
           </View>
         </View>
+
+        {/* Onglets de mode — Photo/Vidéo restent sur ce viewfinder (tap/appui
+            long sur l'obturateur ci-dessus) ; Texte/Vocal ouvrent leur propre
+            écran dédié (pas de "caméra" possible pour ces modes-là). */}
+        {!isRecording && (
+          <View style={s.modeTabs}>
+            <TouchableOpacity onPress={onSelectText} activeOpacity={0.8}>
+              <Text style={s.modeTab}>TEXTE</Text>
+            </TouchableOpacity>
+            <Text style={[s.modeTab, s.modeTabActive]}>PHOTO</Text>
+            <Text style={[s.modeTab, s.modeTabActive]}>VIDÉO</Text>
+            <TouchableOpacity onPress={onSelectVoice} activeOpacity={0.8}>
+              <Text style={s.modeTab}>VOCAL</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -328,6 +346,9 @@ const s = StyleSheet.create({
   permissionGalleryTxtSecondary: { color: 'rgba(255,255,255,0.75)', fontWeight: '600', fontSize: 13 },
 
   controls: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center', gap: 20 },
+  modeTabs: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  modeTab: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '800', letterSpacing: 0.6 },
+  modeTabActive: { color: '#fff' },
   controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 40 },
   controlsSide: { width: 46, alignItems: 'center' },
 

@@ -6,7 +6,7 @@ import {
   PermissionsAndroid, PanResponder, ActivityIndicator,
 } from 'react-native';
 import Animated, {
-  FadeIn, FadeInDown, FadeInRight,
+  FadeIn, FadeInDown,
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,7 +14,6 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { launchImageLibrary } from 'react-native-image-picker';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import Svg, { Path } from 'react-native-svg';
@@ -271,7 +270,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   const { colors } = theme;
   const insets = useSafeAreaInsets();
 
-  const [step,         setStep]         = useState<Step>('pick_mode');
+  const [step,         setStep]         = useState<Step>('camera');
   const [mode,         setMode]         = useState<StoryMode>('text');
   const [localUri,     setLocalUri]     = useState<string | null>(null);
   const [audioUri,     setAudioUri]     = useState<string | null>(null);
@@ -496,7 +495,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
   // ── Reset ─────────────────────────────────────────────────────────────────
   const reset = () => {
-    setStep('pick_mode'); setMode('text'); setLocalUri(null); setAudioUri(null); setAudioName(null);
+    setStep('camera'); setMode('text'); setLocalUri(null); setAudioUri(null); setAudioName(null);
     setCaption(''); setBgColor(BG_COLORS[0]); setFontStyleKey('classic');
     setActiveTool('none'); setDrawPaths([]); setLivePath(''); setErasing(false);
     setTextLayers([]); setStickers([]); setMasks([]); setLiveMask(null);
@@ -514,47 +513,13 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     if (showAudienceSheet) { setShowAudienceSheet(false); return; }
     if (step === 'compose') { reset(); }
     else if (step === 'pick_audio') { setStep('compose'); setAudioUri(null); setAudioName(null); }
-    else if (['pick_media','record_voice'].includes(step)) { setStep('pick_mode'); setLocalUri(null); }
+    else if (['pick_media','record_voice'].includes(step)) { setStep('camera'); setLocalUri(null); }
     else { resetAndClose(); }
   };
 
   // ── Dimension canvas (plein écran) ────────────────────────────────────────
   const canvasW = W;
   const canvasH = H;
-
-  // ── Permissions galerie ───────────────────────────────────────────────────
-  const requestGalleryPermission = async (): Promise<boolean> => {
-    if (Platform.OS !== 'android') return true;
-    const sdk = parseInt((Platform.Version as string).toString(), 10);
-    if (sdk >= 33) {
-      const results = await PermissionsAndroid.requestMultiple([
-        PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-        PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
-      ]);
-      return Object.values(results).every(r => r === PermissionsAndroid.RESULTS.GRANTED);
-    }
-    const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
-    return result === PermissionsAndroid.RESULTS.GRANTED;
-  };
-
-  // ── Pickers ───────────────────────────────────────────────────────────────
-  const pickImage = async (source: 'gallery'|'camera') => {
-    if (source === 'camera') { setStep('camera'); return; }
-    if (!(await requestGalleryPermission())) { toastService.warning('Permission', 'Accès à la galerie requis'); return; }
-    const res = await launchImageLibrary({ mediaType:'photo', selectionLimit:1 });
-    if (res.didCancel || !res.assets?.[0]?.uri) return;
-    setLocalUri(res.assets[0].uri); setStep('compose');
-  };
-
-  const pickVideo = async (source: 'gallery'|'camera') => {
-    if (source === 'camera') { setStep('camera'); return; }
-    if (!(await requestGalleryPermission())) { toastService.warning('Permission', 'Accès à la galerie requis'); return; }
-    const res = await launchImageLibrary({ mediaType:'video', selectionLimit:1 });
-    if (res.didCancel || !res.assets?.[0]?.uri) return;
-    const dur = res.assets[0].duration ?? 0;
-    setLocalUri(res.assets[0].uri); setVideoDuration(dur);
-    setShowTrimmer(true);
-  };
 
   // Résultat de la caméra intégrée (StoryCameraScreen) : photo → compose direct,
   // vidéo → trimmer (même flux que la galerie, cohérent pour l'édition finale).
@@ -758,13 +723,6 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     })();
   };
 
-  const selectMode = (m: StoryMode) => {
-    setMode(m);
-    if (m === 'text') { setStep('compose'); setTimeout(() => setShowCaptionInput(true), 200); }
-    else if (m === 'voice') { setStep('record_voice'); }
-    else { setStep('pick_media'); }
-  };
-
   const currentOpt = MODE_OPTIONS.find(o => o.key === mode) ?? MODE_OPTIONS[0];
   const canPublish = mode !== 'text' || caption.trim().length > 0;
 
@@ -777,76 +735,14 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
       <GestureHandlerRootView style={{flex:1}}>
       <View style={{flex:1}}>
 
-      {/* ── STEP pick_mode ───────────────────────────────────────────────── */}
-      {step === 'pick_mode' && !showTrimmer && (
-        <View style={[s.root, { backgroundColor: colors.background }]}>
-          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-          <View style={[s.pickHeader, { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={resetAndClose} style={s.closeBtn}>
-              <Icon name="x" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <View style={s.pickHeaderText}>
-              <Text style={[s.pickTitle, { color: colors.textPrimary }]}>Nouvelle story</Text>
-              <Text style={[s.pickSub, { color: colors.textSecondary }]}>Que souhaitez-vous partager ?</Text>
-            </View>
-          </View>
-          <ScrollView style={{flex:1,backgroundColor:colors.background}} contentContainerStyle={s.modeList} showsVerticalScrollIndicator={false}>
-            {MODE_OPTIONS.map((opt,i) => (
-              <Animated.View key={opt.key} entering={FadeInRight.delay(i*60).springify()}>
-                <TouchableOpacity style={[s.modeRow,{backgroundColor:colors.surface}]} onPress={()=>selectMode(opt.key)} activeOpacity={0.75}>
-                  <View style={[s.modeAccentBar,{backgroundColor:opt.accent}]} />
-                  <LinearGradient colors={opt.gradient} style={s.modeIconBox}>
-                    {opt.iconLib==='material' ? <MaterialIcon name={opt.icon} size={22} color="#fff" /> : <Icon name={opt.icon} size={20} color="#fff" />}
-                  </LinearGradient>
-                  <View style={s.modeTexts}>
-                    <Text style={[s.modeLabel,{color:colors.textPrimary}]}>{opt.label}</Text>
-                    <Text style={[s.modeSub,{color:colors.textSecondary}]}>{opt.sub}</Text>
-                  </View>
-                  <Icon name="chevron-right" size={18} color={colors.textTertiary??colors.textSecondary} />
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
 
-      {/* ── STEP pick_media ──────────────────────────────────────────────── */}
-      {step === 'pick_media' && (
-        <View style={[s.root,{backgroundColor:colors.background}]}>
-          <StatusBar barStyle="dark-content" />
-          <View style={[s.subHeader,{paddingTop:Platform.OS==='android'?48:56,borderBottomColor:colors.border??'#eee'}]}>
-            <TouchableOpacity onPress={goBack} style={s.subHeaderBtn}><Icon name="arrow-left" size={20} color={colors.textPrimary} /></TouchableOpacity>
-            <Text style={[s.subHeaderTitle,{color:colors.textPrimary}]}>{mode==='video'?'Choisir une video':'Choisir une photo'}</Text>
-            <View style={{width:40}} />
-          </View>
-          <View style={s.sourceGrid}>
-            {[
-              { source:'gallery' as const, icon:mode==='video'?'film':'image', label:'Galerie', sub:'Depuis vos photos', gradient:['#1565C0','#2196F3'] as [string,string] },
-              { source:'camera'  as const, icon:'camera' as const, label:'Caméra', sub:'Photo ou vidéo', gradient:['#AD1457','#E91E63'] as [string,string] },
-            ].map((opt,i) => (
-              <Animated.View key={opt.source} entering={FadeInDown.delay(i*90).springify()} style={{flex:1,height:160}}>
-                <TouchableOpacity
-                  style={[s.sourceCard,{height:160}]}
-                  onPress={()=>opt.source==='camera' ? setStep('camera') : (mode==='video'?pickVideo(opt.source):pickImage(opt.source))}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient colors={opt.gradient} start={{x:0,y:0}} end={{x:0,y:1}} style={s.sourceCardInner}>
-                    <View style={s.sourceIconWrap}><Icon name={opt.icon} size={24} color="#fff" /></View>
-                    <Text style={s.sourceLabel}>{opt.label}</Text>
-                    <Text style={s.sourceSub}>{opt.sub}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* ── STEP camera — viewfinder intégré, tap=photo / appui long=vidéo ── */}
+      {/* ── STEP camera — point d'entrée : viewfinder live, tap=photo / appui long=vidéo ── */}
       {step === 'camera' && (
         <StoryCameraScreen
-          onBack={() => setStep('pick_media')}
+          onBack={resetAndClose}
           onCaptured={handleCameraCaptured}
+          onSelectText={() => { setMode('text'); setStep('compose'); setTimeout(() => setShowCaptionInput(true), 200); }}
+          onSelectVoice={() => { setMode('voice'); setStep('record_voice'); }}
         />
       )}
 
