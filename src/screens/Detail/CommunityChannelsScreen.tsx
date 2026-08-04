@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, TextInput, Modal, Pressable,
   KeyboardAvoidingView, Platform, ScrollView, Image, StatusBar,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
@@ -16,6 +17,8 @@ import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, ChannelType } from '../../services/communityService';
 import { toastService, showConfirm } from '../../services';
 
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
 interface RouteParams {
   communityId: string;
   communityName: string;
@@ -23,12 +26,25 @@ interface RouteParams {
 }
 
 const CHANNEL_TYPES: { key: ChannelType; label: string; icon: string; desc: string }[] = [
-  { key: 'text',         label: 'Texte',    icon: 'hash', desc: 'Salon de discussion général' },
+  { key: 'text',         label: 'Texte',    icon: 'message-circle', desc: 'Salon de discussion général' },
   { key: 'announcement', label: 'Annonces', icon: 'bell', desc: 'Réservé aux admins et modérateurs' },
   { key: 'voice',        label: 'Vocal',    icon: 'mic',  desc: 'Canal vocal (bientôt disponible)' },
 ];
 
-const CHANNEL_EMOJIS = ['💬','📢','🎮','🎵','📚','🎨','🏆','💡','🌍','🎬','⚽','🛠️','🎤','🧵','📸'];
+// Icônes Feather proposées pour personnaliser un canal — remplace l'ancien picker
+// d'emojis natifs (rendu incohérent selon l'OS) par des icônes vectorielles,
+// cohérentes avec le reste de l'app. Les canaux déjà créés avec un emoji stocké
+// (ancien format) continuent de s'afficher tels quels — voir renderChannel.
+const CHANNEL_ICONS = [
+  'message-circle', 'bell', 'zap', 'music', 'book-open',
+  'star', 'award', 'globe', 'film', 'target',
+  'tool', 'mic', 'rss', 'camera', 'heart',
+];
+const DEFAULT_CHANNEL_ICON = 'message-circle';
+
+// Un emoji (ancien format) contient toujours un caractère hors de la plage ASCII
+// imprimable des noms d'icônes Feather (lettres/chiffres/tirets uniquement).
+const isLegacyEmoji = (value: string) => !/^[a-z0-9-]+$/i.test(value);
 
 const TYPE_COLORS: Record<ChannelType, string> = {
   text:         '#7B3FF2',
@@ -71,7 +87,7 @@ export const CommunityChannelsScreen: React.FC = () => {
   const [formName,      setFormName]      = useState('');
   const [formDesc,      setFormDesc]      = useState('');
   const [formType,      setFormType]      = useState<ChannelType>('text');
-  const [formEmoji,     setFormEmoji]     = useState('💬');
+  const [formIcon,      setFormIcon]      = useState(DEFAULT_CHANNEL_ICON);
   const [formPrivate,   setFormPrivate]   = useState(false);
   const [formPassword,  setFormPassword]  = useState('');
   const [showPassword,  setShowPassword]  = useState(false);
@@ -101,7 +117,7 @@ export const CommunityChannelsScreen: React.FC = () => {
   const openCreate = () => {
     setEditChannel(null);
     setFormName(''); setFormDesc(''); setFormType('text');
-    setFormEmoji('💬'); setFormPrivate(false);
+    setFormIcon(DEFAULT_CHANNEL_ICON); setFormPrivate(false);
     setFormPassword(''); setRemovePassword(false); setFormAvatar(null);
     setCreateOpen(true);
   };
@@ -111,7 +127,7 @@ export const CommunityChannelsScreen: React.FC = () => {
     setFormName(ch.name);
     setFormDesc(ch.description ?? '');
     setFormType(ch.type);
-    setFormEmoji(ch.emoji ?? '💬');
+    setFormIcon(ch.emoji && !isLegacyEmoji(ch.emoji) ? ch.emoji : DEFAULT_CHANNEL_ICON);
     setFormPrivate(ch.is_private);
     setFormPassword('');
     setRemovePassword(false);
@@ -145,7 +161,7 @@ export const CommunityChannelsScreen: React.FC = () => {
         name,
         description: formDesc.trim() || undefined,
         type: formType,
-        emoji: formEmoji,
+        emoji: formIcon,
         avatar_url: formAvatar ?? undefined,
         is_private: formPrivate,
       };
@@ -233,9 +249,12 @@ export const CommunityChannelsScreen: React.FC = () => {
           <Image source={{ uri: ch.avatar_url }} style={[S.channelAvatar, { borderColor: colors.divider }]} />
         ) : (
           <View style={[S.channelIcon, { backgroundColor: color + '18' }]}>
-            {ch.emoji
+            {ch.emoji && isLegacyEmoji(ch.emoji)
               ? <Text style={{ fontSize: 20 }}>{ch.emoji}</Text>
-              : <Icon name={ch.type === 'announcement' ? 'bell' : ch.type === 'voice' ? 'mic' : 'hash'} size={20} color={color} />
+              : <Icon
+                  name={ch.emoji || (ch.type === 'announcement' ? 'bell' : ch.type === 'voice' ? 'mic' : DEFAULT_CHANNEL_ICON)}
+                  size={20} color={color}
+                />
             }
           </View>
         )}
@@ -327,7 +346,7 @@ export const CommunityChannelsScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={S.empty}>
               <View style={[S.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
-                <Icon name="hash" size={30} color={colors.textTertiary} />
+                <Icon name={DEFAULT_CHANNEL_ICON} size={30} color={colors.textTertiary} />
               </View>
               <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>Aucun canal</Text>
               <Text style={[S.emptySub, { color: colors.textTertiary }]}>
@@ -348,8 +367,11 @@ export const CommunityChannelsScreen: React.FC = () => {
       <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => { if (!saving) setCreateOpen(false); }}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable style={S.overlay} onPress={() => { if (!saving) setCreateOpen(false); }} />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={[S.sheet, { backgroundColor: colors.surface }]}>
+          <KeyboardAvoidingView
+            style={{ width: '100%', maxHeight: SCREEN_HEIGHT * 0.92 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={[S.sheet, { backgroundColor: colors.surface, maxHeight: SCREEN_HEIGHT * 0.92 }]}>
               <View style={[S.sheetHandle, { backgroundColor: colors.divider }]} />
 
               {/* Header modal */}
@@ -365,7 +387,12 @@ export const CommunityChannelsScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={{ paddingHorizontal: 16, flexGrow: 0 }}
+                contentContainerStyle={{ flexGrow: 1 }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
 
                 {/* Photo de profil */}
                 <Text style={[S.label, { color: colors.textSecondary }]}>Photo du canal</Text>
@@ -413,14 +440,14 @@ export const CommunityChannelsScreen: React.FC = () => {
                   })}
                 </View>
 
-                {/* Emoji + Nom */}
+                {/* Icône + Nom */}
                 <Text style={[S.label, { color: colors.textSecondary }]}>Nom & icône</Text>
                 <View style={S.nameRow}>
                   <TouchableOpacity
-                    style={[S.emojiPicker, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+                    style={[S.emojiPicker, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}
                     onPress={() => setShowEmojiPick(p => !p)}
                   >
-                    <Text style={{ fontSize: 22 }}>{formEmoji}</Text>
+                    <Icon name={formIcon} size={22} color={colors.primary} />
                   </TouchableOpacity>
                   <TextInput
                     style={[S.nameInput, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, color: colors.textPrimary }]}
@@ -433,9 +460,13 @@ export const CommunityChannelsScreen: React.FC = () => {
                 </View>
                 {showEmojiPick && (
                   <View style={[S.emojiGrid, { backgroundColor: colors.backgroundSecondary }]}>
-                    {CHANNEL_EMOJIS.map(e => (
-                      <TouchableOpacity key={e} onPress={() => { setFormEmoji(e); setShowEmojiPick(false); }} style={S.emojiGridBtn}>
-                        <Text style={{ fontSize: 22 }}>{e}</Text>
+                    {CHANNEL_ICONS.map(i => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => { setFormIcon(i); setShowEmojiPick(false); }}
+                        style={[S.emojiGridBtn, i === formIcon && { backgroundColor: colors.primary + '20', borderRadius: 10 }]}
+                      >
+                        <Icon name={i} size={20} color={i === formIcon ? colors.primary : colors.textSecondary} />
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -525,7 +556,7 @@ export const CommunityChannelsScreen: React.FC = () => {
                     }
                   </LinearGradient>
                 </TouchableOpacity>
-                <View style={{ height: 24 }} />
+                <View style={{ height: Math.max(24, insets.bottom) }} />
               </ScrollView>
             </View>
           </KeyboardAvoidingView>

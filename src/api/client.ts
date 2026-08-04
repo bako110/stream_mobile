@@ -165,7 +165,11 @@ async function request<T>(
     }
 
     if (!response.ok) {
-      if (response.status === 401) _onUnauthorized?.();
+      // Ne déclenche PAS _onUnauthorized ici : ce cas est atteint soit sans
+      // _refreshTokenFn configuré, soit après un retry dont le refresh avait
+      // pourtant réussi (_retry=true) — un 401 isolé sur cette requête précise
+      // ne prouve pas que la session est invalide. Seul un échec confirmé du
+      // refresh lui-même (ligne ~162 ci-dessus) doit déconnecter l'utilisateur.
       if (response.status === 403 && json?.detail?.code === 'account_blocked') {
         _onAccountBlocked?.(json.detail?.reason, json.detail?.contact);
         throw new ApiError(403, json.detail?.message ?? 'Compte bloqué', json);

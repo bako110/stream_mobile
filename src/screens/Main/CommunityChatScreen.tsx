@@ -1793,20 +1793,21 @@ export const CommunityChatScreen: React.FC = () => {
               )}
             </View>
 
-            {/* Candidats top 3 */}
-            {activeElection.results.slice(0, 3).map((c, i) => {
+            {/* Candidats présélectionnés par l'admin */}
+            {activeElection.results.map((c, i) => {
               const isMyVote = activeElection.my_vote === c.user_id;
+              const hasVoted = !!activeElection.my_vote;
               return (
                 <TouchableOpacity key={c.user_id}
                   onPress={async () => {
-                    if (electionVoting) return;
+                    if (electionVoting || hasVoted) return;
                     const name = c.display_name || c.username || 'ce membre';
                     showConfirm(
-                      isMyVote ? 'Changer mon vote' : 'Voter',
-                      `${isMyVote ? 'Changer pour' : 'Voter pour'} ${name} ?`,
+                      'Voter',
+                      `Voter pour ${name} ? Ce choix est définitif, vous ne pourrez plus le modifier.`,
                       [
                         { text: 'Annuler', style: 'cancel' },
-                        { text: isMyVote ? 'Changer' : 'Voter', onPress: async () => {
+                        { text: 'Voter', onPress: async () => {
                           setElectionVoting(c.user_id);
                           try {
                             await apiClient.post(
@@ -1820,8 +1821,10 @@ export const CommunityChatScreen: React.FC = () => {
                       ],
                     );
                   }}
-                  activeOpacity={0.8}
+                  disabled={hasVoted}
+                  activeOpacity={hasVoted ? 1 : 0.8}
                   style={{ borderRadius: 10, borderWidth: 1, overflow: 'hidden',
+                    opacity: hasVoted && !isMyVote ? 0.6 : 1,
                     borderColor: isMyVote ? '#7B3FF2' : colors.divider }}
                 >
                   {/* Barre progression */}
@@ -1829,7 +1832,7 @@ export const CommunityChatScreen: React.FC = () => {
                     width: `${c.pct}%` as any,
                     backgroundColor: isMyVote ? '#7B3FF215' : colors.backgroundSecondary }} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, gap: 8 }}>
-                    {i === 0 && <Icon name="award" size={14} color="#F59E0B" />}
+                    {i === 0 && c.votes > 0 && <Icon name="award" size={14} color="#F59E0B" />}
                     <Text style={{ flex: 1, color: colors.textPrimary, fontWeight: '600', fontSize: 13 }} numberOfLines={1}>
                       {c.display_name || c.username}
                     </Text>
@@ -1840,21 +1843,14 @@ export const CommunityChatScreen: React.FC = () => {
                       ? <ActivityIndicator size="small" color="#7B3FF2" style={{ width: 16 }} />
                       : isMyVote
                       ? <Icon name="check-circle" size={14} color="#7B3FF2" />
-                      : <Icon name="chevron-right" size={12} color={colors.textTertiary} />
+                      : !hasVoted
+                      ? <Icon name="chevron-right" size={12} color={colors.textTertiary} />
+                      : null
                     }
                   </View>
                 </TouchableOpacity>
               );
             })}
-
-            {/* Si aucun candidat encore */}
-            {activeElection.results.length === 0 && (
-              <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-                <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
-                  Aucun vote pour l'instant — soyez le premier !
-                </Text>
-              </View>
-            )}
 
             <TouchableOpacity
               onPress={() => nav.navigate('CommunityTreasurer', {

@@ -80,6 +80,9 @@ export const CommunityTreasurerScreen: React.FC = () => {
   const [pickOpen,     setPickOpen]     = useState(false);
   const [members,      setMembers]      = useState<any[]>([]);
   const [pickLoading,  setPickLoading]  = useState(false);
+  const [candidatesOpen,    setCandidatesOpen]    = useState(false);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
   const [createOpen,   setCreateOpen]   = useState(false);
   const [formAmount,   setFormAmount]   = useState('');
   const [formDesc,     setFormDesc]     = useState('');
@@ -106,12 +109,6 @@ export const CommunityTreasurerScreen: React.FC = () => {
       apiClient.get<{ gogold_balance: number }>(`${BASE}/wallet`)
         .then(r => { if (mountedRef.current) setCommunityBalance(r.data?.gogold_balance ?? null); })
         .catch(() => {});
-      // Charger les membres si vote en cours et pas encore de résultats
-      if (elec && elec.results.length === 0) {
-        apiClient.get<any[]>(`${BASE}/members`)
-          .then(r => setMembers((r.data ?? []).filter((m: any) => m.user_id !== myId)))
-          .catch(() => {});
-      }
     } catch { setTreasurer(null); }
     finally { setLoading(false); setRefreshing(false); }
   }, [BASE, myId]);
@@ -153,16 +150,43 @@ export const CommunityTreasurerScreen: React.FC = () => {
     ]);
   };
 
-  const handleLaunchElection = async () => {
+  const handleOpenCandidatesPicker = async () => {
+    setSelectedCandidates([]);
+    setCandidatesOpen(true);
+    setCandidatesLoading(true);
+    try {
+      const res = await apiClient.get<any[]>(`${BASE}/members`);
+      setMembers(res.data ?? []);
+    } catch { toastService.error('Erreur', 'Impossible de charger les membres.'); setCandidatesOpen(false); }
+    finally { setCandidatesLoading(false); }
+  };
+
+  const toggleCandidate = (userId: string) => {
+    setSelectedCandidates(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleLaunchElection = () => {
+    if (selectedCandidates.length < 2) {
+      toastService.warning('Impossible', 'Sélectionnez au moins 2 candidats.');
+      return;
+    }
+    const names = selectedCandidates
+      .map(id => members.find(m => m.user_id === id))
+      .map(m => m?.display_name || m?.username)
+      .filter(Boolean)
+      .join(', ');
     showConfirm(
       'Lancer un vote',
-      'Lancer un vote pour que les membres élisent le trésorier ?',
+      `Lancer un vote pour élire le trésorier parmi : ${names} ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Lancer le vote', onPress: async () => {
           setLaunching(true);
           try {
-            await apiClient.post(`${BASE}/treasurer-elections`);
+            await apiClient.post(`${BASE}/treasurer-elections`, { candidate_ids: selectedCandidates });
+            setCandidatesOpen(false);
             load();
           } catch (e: any) { toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible.'); }
           finally { setLaunching(false); }
@@ -172,15 +196,14 @@ export const CommunityTreasurerScreen: React.FC = () => {
   };
 
   const handleVote = (candidate: ElectionResult) => {
-    if (!election) return;
+    if (!election || election.my_vote) return;
     const name = candidate.display_name || candidate.username || 'ce membre';
-    const isChanging = !!election.my_vote;
     showConfirm(
-      isChanging ? 'Changer mon vote' : 'Voter',
-      `${isChanging ? 'Changer votre vote pour' : 'Voter pour'} ${name} ?`,
+      'Voter',
+      `Voter pour ${name} ? Ce choix est définitif, vous ne pourrez plus le modifier.`,
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: isChanging ? 'Changer' : 'Voter', onPress: async () => {
+        { text: 'Voter', onPress: async () => {
           setVoteLoading(candidate.user_id);
           try {
             await apiClient.post(`${BASE}/treasurer-elections/${election.id}/vote`, { candidate_id: candidate.user_id });
@@ -404,14 +427,25 @@ export const CommunityTreasurerScreen: React.FC = () => {
                       : 'ÉLECTION TRÉSORIER'}
                   </Text>
                   {isAdmin && !election && (
-                    <TouchableOpacity onPress={handleLaunchElection} disabled={launching}
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (treasurer) {
+                          toastService.warning(
+                            'Trésorier déjà en poste',
+                            'Révoquez le trésorier actuel avant de lancer un nouveau vote.',
+                          );
+                          return;
+                        }
+                        handleOpenCandidatesPicker();
+                      }}
+                      disabled={launching}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
-                        backgroundColor: treasurer ? '#EF4444' : '#7B3FF2',
+                        backgroundColor: treasurer ? '#9CA3AF' : '#7B3FF2',
                         borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
                       {launching ? <ActivityIndicator size="small" color="#fff" /> : (
                         <><Icon name="users" size={12} color="#fff" />
                         <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>
-                          {treasurer ? 'Voter pour destituer' : 'Lancer un vote'}
+                          Lancer un vote
                         </Text></>
                       )}
                     </TouchableOpacity>
@@ -447,95 +481,67 @@ export const CommunityTreasurerScreen: React.FC = () => {
                         ))}
                       </View>
 
-                      {/* Candidats avec barres */}
-                      {election.results.length > 0 ? (
-                        <View style={{ gap: 8 }}>
-                          {election.results.map((c, i) => {
-                            const isMyVote = election.my_vote === c.user_id;
-                            const isLeader = i === 0;
-                            return (
-                              <TouchableOpacity key={c.user_id}
-                                onPress={() => handleVote(c)}
-                                disabled={voteLoading === c.user_id}
-                                activeOpacity={0.8}
-                                style={{ borderRadius: 12, borderWidth: 1.5, overflow: 'hidden',
-                                  borderColor: isMyVote ? '#7B3FF2' : isLeader ? '#F59E0B40' : colors.divider }}
-                              >
-                                {/* Barre progression */}
-                                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
-                                  width: `${c.pct}%` as any,
-                                  backgroundColor: isMyVote ? '#7B3FF215' : '#F59E0B08' }} />
-                                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10 }}>
-                                  {c.avatar_url ? (
-                                    <Image source={{ uri: c.avatar_url }} style={st.avatarSm} />
-                                  ) : (
-                                    <View style={[st.avatarSm, { backgroundColor: '#7B3FF220',
-                                      alignItems: 'center', justifyContent: 'center' }]}>
-                                      <Text style={{ color: '#7B3FF2', fontWeight: '800' }}>
-                                        {(c.display_name || c.username || '?')[0].toUpperCase()}
-                                      </Text>
-                                    </View>
-                                  )}
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>
-                                      {c.display_name || c.username}
-                                    </Text>
-                                    <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
-                                      {c.votes} vote{c.votes !== 1 ? 's' : ''} · {c.pct}%
-                                    </Text>
-                                  </View>
-                                  {isLeader && <Icon name="award" size={16} color="#F59E0B" />}
-                                  {isMyVote && (
-                                    <View style={{ backgroundColor: '#7B3FF220', borderRadius: 8,
-                                      paddingHorizontal: 8, paddingVertical: 3 }}>
-                                      <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>MON VOTE</Text>
-                                    </View>
-                                  )}
-                                  {voteLoading === c.user_id && <ActivityIndicator size="small" color="#7B3FF2" />}
-                                </View>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      ) : (
-                        <View style={{ alignItems: 'center', paddingVertical: 16, gap: 6 }}>
-                          <Icon name="users" size={28} color={colors.textTertiary} />
-                          <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>
-                            Aucun vote pour l'instant
-                          </Text>
-                          <Text style={{ color: colors.textTertiary, fontSize: 12, textAlign: 'center' }}>
-                            Tapez sur un membre dans la liste pour voter
+                      {/* Info vote définitif */}
+                      {!election.my_vote && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Icon name="info" size={12} color={colors.textTertiary} />
+                          <Text style={{ color: colors.textTertiary, fontSize: 11, flex: 1 }}>
+                            Choisissez un candidat — votre vote est définitif.
                           </Text>
                         </View>
                       )}
 
-                      {/* Tous les membres votables si pas encore de résultats */}
-                      {election.results.length === 0 && members.length > 0 && (
-                        <View style={{ gap: 6 }}>
-                          <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700' }}>CANDIDATS</Text>
-                          {members.slice(0, 5).map(m => (
-                            <TouchableOpacity key={m.user_id} onPress={() => handleVote({
-                              user_id: m.user_id, display_name: m.display_name,
-                              username: m.username, avatar_url: m.avatar_url, votes: 0, pct: 0,
-                            })} style={{ flexDirection: 'row', alignItems: 'center', gap: 10,
-                              padding: 10, backgroundColor: colors.backgroundSecondary, borderRadius: 12 }}>
-                              {m.avatar_url
-                                ? <Image source={{ uri: m.avatar_url }} style={st.avatarSm} />
-                                : <View style={[st.avatarSm, { backgroundColor: '#7B3FF220',
+                      {/* Candidats présélectionnés par l'admin, avec barres */}
+                      <View style={{ gap: 8 }}>
+                        {election.results.map((c, i) => {
+                          const isMyVote = election.my_vote === c.user_id;
+                          const isLeader = i === 0 && c.votes > 0;
+                          const hasVoted = !!election.my_vote;
+                          return (
+                            <TouchableOpacity key={c.user_id}
+                              onPress={() => handleVote(c)}
+                              disabled={hasVoted || voteLoading === c.user_id}
+                              activeOpacity={hasVoted ? 1 : 0.8}
+                              style={{ borderRadius: 12, borderWidth: 1.5, overflow: 'hidden',
+                                opacity: hasVoted && !isMyVote ? 0.6 : 1,
+                                borderColor: isMyVote ? '#7B3FF2' : isLeader ? '#F59E0B40' : colors.divider }}
+                            >
+                              {/* Barre progression */}
+                              <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
+                                width: `${c.pct}%` as any,
+                                backgroundColor: isMyVote ? '#7B3FF215' : '#F59E0B08' }} />
+                              <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10 }}>
+                                {c.avatar_url ? (
+                                  <Image source={{ uri: c.avatar_url }} style={st.avatarSm} />
+                                ) : (
+                                  <View style={[st.avatarSm, { backgroundColor: '#7B3FF220',
                                     alignItems: 'center', justifyContent: 'center' }]}>
-                                    <Text style={{ color: '#7B3FF2', fontWeight: '700' }}>
-                                      {(m.display_name || m.username || '?')[0].toUpperCase()}
+                                    <Text style={{ color: '#7B3FF2', fontWeight: '800' }}>
+                                      {(c.display_name || c.username || '?')[0].toUpperCase()}
                                     </Text>
                                   </View>
-                              }
-                              <Text style={{ color: colors.textPrimary, fontWeight: '600', flex: 1 }}>
-                                {m.display_name || m.username}
-                              </Text>
-                              <Text style={{ color: '#7B3FF2', fontSize: 12, fontWeight: '700' }}>Voter →</Text>
+                                )}
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>
+                                    {c.display_name || c.username}
+                                  </Text>
+                                  <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                                    {c.votes} vote{c.votes !== 1 ? 's' : ''} · {c.pct}%
+                                  </Text>
+                                </View>
+                                {isLeader && <Icon name="award" size={16} color="#F59E0B" />}
+                                {isMyVote && (
+                                  <View style={{ backgroundColor: '#7B3FF220', borderRadius: 8,
+                                    paddingHorizontal: 8, paddingVertical: 3 }}>
+                                    <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>MON VOTE</Text>
+                                  </View>
+                                )}
+                                {voteLoading === c.user_id && <ActivityIndicator size="small" color="#7B3FF2" />}
+                              </View>
                             </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
+                          );
+                        })}
+                      </View>
                     </View>
                   </View>
                 )}
@@ -676,7 +682,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
       {/* Modal picker membre */}
       <Modal visible={pickOpen} transparent animationType="slide" onRequestClose={() => setPickOpen(false)}>
         <TouchableOpacity style={st.overlay} activeOpacity={1} onPress={() => setPickOpen(false)} />
-        <View style={[st.sheet, { backgroundColor: colors.background }]}>
+        <View style={[st.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom }]}>
           <View style={[st.sheetHandle]}><View style={[st.handle, { backgroundColor: colors.divider }]} /></View>
           <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 16, paddingHorizontal: 16, marginBottom: 12 }}>
             Choisir un trésorier
@@ -708,6 +714,70 @@ export const CommunityTreasurerScreen: React.FC = () => {
                   <Icon name="chevron-right" size={16} color={colors.textTertiary} />
                 </TouchableOpacity>
               )}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Modal sélection des candidats à l'élection */}
+      <Modal visible={candidatesOpen} transparent animationType="slide" onRequestClose={() => setCandidatesOpen(false)}>
+        <TouchableOpacity style={st.overlay} activeOpacity={1} onPress={() => setCandidatesOpen(false)} />
+        <View style={[st.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom }]}>
+          <View style={[st.sheetHandle]}><View style={[st.handle, { backgroundColor: colors.divider }]} /></View>
+          <View style={[st.sheetHeader, { borderBottomColor: colors.divider }]}>
+            <TouchableOpacity onPress={() => setCandidatesOpen(false)}>
+              <Icon name="x" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 16, flex: 1, textAlign: 'center' }}>
+              Choisir les candidats
+            </Text>
+            <TouchableOpacity onPress={handleLaunchElection} disabled={launching || selectedCandidates.length < 2}>
+              {launching
+                ? <ActivityIndicator size="small" color="#7B3FF2" />
+                : <Text style={{ color: selectedCandidates.length < 2 ? colors.textTertiary : '#7B3FF2', fontWeight: '700', fontSize: 14 }}>
+                    Lancer ({selectedCandidates.length})
+                  </Text>
+              }
+            </TouchableOpacity>
+          </View>
+          <Text style={{ color: colors.textTertiary, fontSize: 12, paddingHorizontal: 16, paddingTop: 10 }}>
+            Sélectionnez au moins 2 membres — seuls ces candidats pourront recevoir des votes.
+          </Text>
+          {candidatesLoading ? (
+            <ActivityIndicator color="#7B3FF2" style={{ marginTop: 24 }} />
+          ) : (
+            <FlatList
+              data={members}
+              keyExtractor={m => m.user_id}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
+              renderItem={({ item: m }) => {
+                const selected = selectedCandidates.includes(m.user_id);
+                return (
+                  <TouchableOpacity onPress={() => toggleCandidate(m.user_id)}
+                    style={[st.memberRow, { borderBottomColor: colors.divider }]}>
+                    {m.avatar_url
+                      ? <Image source={{ uri: m.avatar_url }} style={st.avatarSm} />
+                      : <View style={[st.avatarSm, { backgroundColor: '#7B3FF220', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Text style={{ color: '#7B3FF2', fontWeight: '700' }}>
+                            {(m.display_name || m.username || '?')[0].toUpperCase()}
+                          </Text>
+                        </View>
+                    }
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>
+                        {m.display_name || m.username}
+                      </Text>
+                      {m.role && <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{m.role}</Text>}
+                    </View>
+                    <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2,
+                      borderColor: selected ? '#7B3FF2' : colors.divider,
+                      backgroundColor: selected ? '#7B3FF2' : 'transparent',
+                      alignItems: 'center', justifyContent: 'center' }}>
+                      {selected && <Icon name="check" size={13} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
             />
           )}
         </View>
@@ -811,7 +881,7 @@ const st = StyleSheet.create({
   memberRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   overlay:      { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
   kavBottom:    { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%' },
+  sheet:        { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%' },
   sheetHandle:  { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
   handle:       { width: 40, height: 4, borderRadius: 2 },
   sheetHeader:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
