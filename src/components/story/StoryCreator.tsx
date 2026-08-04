@@ -508,7 +508,21 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     setAudioPlaying(false);
   };
 
-  const resetAndClose = () => { reset(); onClose(); };
+  // Repart d'un état propre à chaque ouverture — pas à la fermeture (voir
+  // resetAndClose ci-dessous) pour ne jamais remonter StoryCameraScreen
+  // pendant que le Modal est encore en train de se fermer.
+  useEffect(() => {
+    if (visible) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  // Ferme sans repasser par 'camera' d'abord : un reset() avant onClose() force
+  // un re-render avec step='camera', qui remonte StoryCameraScreen (et relance
+  // sa demande de permission caméra/micro) pendant la fenêtre où le parent
+  // traite encore onClose() — l'utilisateur voit l'écran de permission au lieu
+  // de fermer. onClose() doit être le seul effet visible ; reset() se fera au
+  // prochain montage (visible redevient true plus tard, avec un state propre).
+  const resetAndClose = () => { onClose(); };
   const goBack = () => {
     if (showAudienceSheet) { setShowAudienceSheet(false); return; }
     if (step === 'compose') { reset(); }
