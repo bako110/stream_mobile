@@ -1,10 +1,17 @@
 /**
- * StoryCameraScreen — caméra intégrée pour les stories (photo + vidéo).
- * Un seul viewfinder, un seul obturateur : tap = photo, appui long = vidéo
- * (façon Instagram/Snapchat), jusqu'à STORY_MAX_VIDEO_SEC. react-native-camera-kit
- * (utilisée par CreateCameraScreen pour les reels) ne sait capturer que des
- * photos — react-native-vision-camera est utilisée ici car les stories ont
- * besoin d'enregistrer aussi la vidéo dans ce même viewfinder.
+ * StoryCameraScreen — caméra intégrée réutilisée par les stories ET les reels
+ * (photo + vidéo dans un seul viewfinder). react-native-camera-kit (l'ancienne
+ * caméra des reels, CreateCameraScreen) ne sait capturer que des photos —
+ * react-native-vision-camera est utilisée ici car les deux flux ont besoin
+ * d'enregistrer de la vidéo directement dans ce viewfinder, tap = photo /
+ * appui long = vidéo (façon Instagram/Snapchat).
+ *
+ * maxDurationSec : limite d'enregistrement propre à l'appelant — 90s pour les
+ * stories (STORY_MAX_VIDEO_SEC), 10 min pour les reels (MAX_VIDEO_DURATION_SEC
+ * dans CreateReelScreen, qui gère lui-même le rejet au-delà et le trim final).
+ *
+ * onSelectText/onSelectVoice sont propres au flux story (barre d'onglets en
+ * bas) — absents, la barre ne s'affiche pas (cas des reels).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
@@ -33,11 +40,14 @@ export interface StoryCameraResult {
 interface Props {
   onBack: () => void;
   onCaptured: (result: StoryCameraResult) => void;
-  onSelectText: () => void;
-  onSelectVoice: () => void;
+  onSelectText?: () => void;
+  onSelectVoice?: () => void;
+  maxDurationSec?: number;
 }
 
-export const StoryCameraScreen: React.FC<Props> = ({ onBack, onCaptured, onSelectText, onSelectVoice }) => {
+export const StoryCameraScreen: React.FC<Props> = ({
+  onBack, onCaptured, onSelectText, onSelectVoice, maxDurationSec = STORY_MAX_VIDEO_SEC,
+}) => {
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<Camera>(null);
 
@@ -106,12 +116,12 @@ export const StoryCameraScreen: React.FC<Props> = ({ onBack, onCaptured, onSelec
     setIsRecording(true);
     setRecordSec(0);
     ringProgress.value = 0;
-    ringProgress.value = withTiming(1, { duration: STORY_MAX_VIDEO_SEC * 1000 });
+    ringProgress.value = withTiming(1, { duration: maxDurationSec * 1000 });
 
     recordTimer.current = setInterval(() => {
       setRecordSec(prev => {
         const next = prev + 1;
-        if (next >= STORY_MAX_VIDEO_SEC) stopRecordingRef.current();
+        if (next >= maxDurationSec) stopRecordingRef.current();
         return next;
       });
     }, 1000);
@@ -130,7 +140,7 @@ export const StoryCameraScreen: React.FC<Props> = ({ onBack, onCaptured, onSelec
         toastService.error('Erreur caméra', error.message ?? "Impossible d'enregistrer la vidéo.");
       },
     });
-  }, [isRecording, flashOn, onCaptured, ringProgress, clearRecordTimer]);
+  }, [isRecording, flashOn, onCaptured, ringProgress, clearRecordTimer, maxDurationSec]);
 
   // ── Tap (photo) vs appui long (vidéo) sur un seul obturateur ────────────────
   const pressStartAt = useRef(0);
@@ -289,8 +299,9 @@ export const StoryCameraScreen: React.FC<Props> = ({ onBack, onCaptured, onSelec
 
         {/* Onglets de mode — Photo/Vidéo restent sur ce viewfinder (tap/appui
             long sur l'obturateur ci-dessus) ; Texte/Vocal ouvrent leur propre
-            écran dédié (pas de "caméra" possible pour ces modes-là). */}
-        {!isRecording && (
+            écran dédié (pas de "caméra" possible pour ces modes-là). Absents
+            pour les reels (onSelectText/onSelectVoice non fournis). */}
+        {!isRecording && onSelectText && onSelectVoice && (
           <View style={s.modeTabs}>
             <TouchableOpacity onPress={onSelectText} activeOpacity={0.8}>
               <Text style={s.modeTab}>TEXTE</Text>

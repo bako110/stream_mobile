@@ -1,7 +1,8 @@
 /**
  * CreateReelScreen
  * Flow en 4 étapes façon TikTok :
- *   1. camera  → CreateCameraScreen (caméra live photo + galerie vidéo/photo)
+ *   1. camera  → StoryCameraScreen (caméra live photo + vidéo + galerie,
+ *                partagée avec les stories — tap = photo, appui long = vidéo)
  *   2. edit    → ReelEditorScreen (filtres, texte, trim, musique...)
  *   3. caption → CreateCaptionScreen (description)
  *   4. recap   → CreateRecapScreen (aperçu final + Publier)
@@ -20,7 +21,7 @@ import { reelService, toastService } from '../../services';
 import { GoFolyXLoader } from '../../components/common';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { ReelEditorScreen, type ReelEditResult } from './ReelEditorScreen';
-import { CreateCameraScreen, type CameraPickResult } from './CreateCameraScreen';
+import { StoryCameraScreen, type StoryCameraResult } from './StoryCameraScreen';
 import { CreateCaptionScreen } from './CreateCaptionScreen';
 import { CreateRecapScreen } from './CreateRecapScreen';
 import Sound from 'react-native-sound';
@@ -122,7 +123,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
   } | null>(null);
 
   // ── Étape 1 : caméra / galerie ───────────────────────────────────────────
-  const handleCameraPicked = useCallback(async (picked: CameraPickResult) => {
+  const handleCameraPicked = useCallback(async (picked: StoryCameraResult) => {
     if (picked.isPhoto) {
       setIsPhotoReel(true);
       setVideoUri(picked.uri);
@@ -370,7 +371,13 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
   // ── ÉTAPE 1 — Caméra / galerie ───────────────────────────────────────────
   if (step === 'camera') {
-    return <CreateCameraScreen onBack={onBack} onPicked={handleCameraPicked} />;
+    return (
+      <StoryCameraScreen
+        onBack={onBack}
+        onCaptured={handleCameraPicked}
+        maxDurationSec={MAX_VIDEO_DURATION_SEC}
+      />
+    );
   }
 
   // ── ÉTAPE 2 — Éditeur (branche exclusive, aucun autre player monté) ──────
