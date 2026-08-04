@@ -148,7 +148,7 @@ export interface CommunityMemberProfile {
   bio: string | null;
   gogold_total: number;
   badges: string[];
-  posts_count: number;
+  messages_count: number;
   reactions_given: number;
   events_attended: number;
   is_online: boolean;

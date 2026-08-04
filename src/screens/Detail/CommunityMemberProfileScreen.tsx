@@ -223,9 +223,9 @@ export function CommunityMemberProfileScreen({ route }: Props) {
           {/* Stats row */}
           <View style={[styles.statsRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.statItem}>
-              <Icon name="file-text" size={16} color={colors.primary} />
-              <Text style={[styles.statValue, { color: colors.textPrimary }]}>{member.posts_count ?? 0}</Text>
-              <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Posts</Text>
+              <Icon name="message-circle" size={16} color={colors.primary} />
+              <Text style={[styles.statValue, { color: colors.textPrimary }]}>{member.messages_count ?? 0}</Text>
+              <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Messages</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
