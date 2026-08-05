@@ -32,7 +32,13 @@ interface ToastData {
   ref_type?:   string | null;
   partnerId?:  string;
   partnerName?: string;
+  silent?:     boolean;
 }
+
+// Publications des personnes suivies — signal discret, pas d'alerte sonore
+const SILENT_NOTIF_TYPES = new Set([
+  'post_posted', 'reel_posted', 'story_posted', 'concert_created', 'event_created',
+]);
 
 const ICON_MAP: Record<string, string> = {
   follow:           'user-plus',
@@ -47,6 +53,8 @@ const ICON_MAP: Record<string, string> = {
   event_going:      'map-pin',
   community_joined: 'users',
   reel_posted:      'film',
+  post_posted:      'file-text',
+  story_posted:     'circle',
   subscription:     'star',
   welcome:          'gift',
   ticket:           'tag',
@@ -67,6 +75,8 @@ const GRAD_MAP: Record<string, [string, string]> = {
   event_going:      ['#36D9A0', '#6EE7B7'],
   community_joined: ['#9B65F5', '#C4B5FD'],
   reel_posted:      ['#E0389A', '#FB7185'],
+  post_posted:      ['#7B3FF2', '#A78BFA'],
+  story_posted:     ['#F59E0B', '#FCD34D'],
   subscription:     ['#36D9A0', '#6EE7B7'],
   welcome:          ['#7B3FF2', '#E0389A'],
   ticket:           ['#FF7A2F', '#FCD34D'],
@@ -104,12 +114,14 @@ export const NotificationToast: React.FC = () => {
     opacity.value    = 0;
     translateY.value = withSpring(0, { damping: 18, stiffness: 200 });
     opacity.value    = withTiming(1, { duration: 180 });
-    if (data.kind === 'message') {
-      try { _msgSound.stop(); _msgSound.play(); } catch {}
-    } else {
-      try { _notifSound.stop(); _notifSound.play(); } catch {}
+    if (!data.silent) {
+      if (data.kind === 'message') {
+        try { _msgSound.stop(); _msgSound.play(); } catch {}
+      } else {
+        try { _notifSound.stop(); _notifSound.play(); } catch {}
+      }
+      Vibration.vibrate([0, 150]);
     }
-    Vibration.vibrate([0, 150]);
     timerRef.current = setTimeout(dismiss, 4_000);
   }, [dismiss]);
 
@@ -122,10 +134,12 @@ export const NotificationToast: React.FC = () => {
           kind:     'notification',
           title:    payload.title ?? 'Notification',
           body:     payload.body  ?? '',
-          icon:     ICON_MAP[notifType]  ?? 'bell',
-          grad:     GRAD_MAP[notifType]  ?? DEFAULT_GRAD,
-          ref_id:   payload.ref_id   ?? null,
-          ref_type: payload.ref_type ?? null,
+          icon:      ICON_MAP[notifType]  ?? 'bell',
+          grad:      GRAD_MAP[notifType]  ?? DEFAULT_GRAD,
+          ref_id:    payload.ref_id   ?? null,
+          ref_type:  payload.ref_type ?? null,
+          silent:    SILENT_NOTIF_TYPES.has(notifType),
+          avatarUrl: payload.image_url ?? payload.actor?.avatar_url ?? null,
         });
         return;
       }

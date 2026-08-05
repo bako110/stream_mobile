@@ -42,6 +42,7 @@ type LoginMethod = 'email' | 'phone';
 
 interface Props {
   onLoginSuccess:      (profileIncomplete?: boolean) => void;
+  onNeedsVerification: (params: { userId: string; identifier: string; password: string }) => void;
   onGoRegister:        () => void;
   onGoForgotPassword?: () => void;
   onGoSocialLogin?:    () => void;
@@ -67,7 +68,7 @@ const WaveBottom: React.FC<{ color: string }> = ({ color }) => (
   </Svg>
 );
 
-export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoQRLogin, onGoCGU, onGoPrivacy, initialBlockedInfo }) => {
+export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onNeedsVerification, onGoRegister, onGoForgotPassword, onGoSocialLogin, onGoQRLogin, onGoCGU, onGoPrivacy, initialBlockedInfo }) => {
   const { theme, isDark } = useTheme();
   const { colors } = theme;
 
@@ -186,6 +187,9 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onGoRegister, onG
             },
           ],
         );
+      } else if (e?.status === 403 && detail?.code === 'account_unverified') {
+        const verifiedId = isEmail ? identifier.trim() : `${country.dial}${identifier.trim()}`;
+        onNeedsVerification({ userId: detail.user_id, identifier: verifiedId, password });
       } else {
         setError(e?.message ?? 'Identifiants incorrects.');
       }

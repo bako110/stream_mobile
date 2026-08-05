@@ -24,8 +24,9 @@ const { width: W, height: H } = Dimensions.get('window');
 const HERO_H = H * 0.26;
 
 interface Props {
-  onRegisterSuccess: () => void;
-  onGoLogin:         () => void;
+  onRegisterSuccess:    () => void;
+  onNeedsVerification:  (params: { userId: string; identifier: string; password: string }) => void;
+  onGoLogin:            () => void;
 }
 
 type AuthMethod = 'email' | 'phone';
@@ -421,7 +422,7 @@ const Step3: React.FC<{
 };
 
 // ── Écran principal ───────────────────────────────────────────────────────────
-export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }) => {
+export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onNeedsVerification, onGoLogin }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
@@ -506,11 +507,14 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
     setLoading(true);
     setGlobalError('');
     try {
-      await authService.register({
+      const identifier = data.authMethod === 'email'
+        ? data.email.trim().toLowerCase()
+        : `${data.country.dial}${data.phone.trim()}`;
+      const result = await authService.register({
         first_name:    data.firstName.trim(),
         last_name:     data.lastName.trim(),
-        email:         data.authMethod === 'email' ? data.email.trim().toLowerCase() : undefined,
-        phone:         data.authMethod === 'phone' ? `${data.country.dial}${data.phone.trim()}` : undefined,
+        email:         data.authMethod === 'email' ? identifier : undefined,
+        phone:         data.authMethod === 'phone' ? identifier : undefined,
         password:      data.password,
         username:      data.username.trim() || undefined,
         referral_code: data.referralCode.trim() || undefined,
@@ -519,13 +523,17 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onGoLogin }
         form_started_at: formStartedAtRef.current,
         device_fingerprint: await getDeviceFingerprint(),
       });
-      onRegisterSuccess();
+      if (result.needsVerification) {
+        onNeedsVerification({ userId: result.userId, identifier, password: data.password });
+      } else {
+        onRegisterSuccess();
+      }
     } catch (e: any) {
       setGlobalError(e?.message ?? "Erreur lors de l'inscription.");
     } finally {
       setLoading(false);
     }
-  }, [data, onRegisterSuccess]);
+  }, [data, onRegisterSuccess, onNeedsVerification]);
 
   const stepLabels = ['Identité', 'Compte', 'Sécurité'];
 

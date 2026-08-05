@@ -37,6 +37,7 @@ import { userService } from '../../services/userService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
+import { openAuthenticatedWs } from '../../utils/authenticatedWs';
 import { storage } from '../../utils/storage';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
 import type { GiftNotif, LiveGiftOverlayRef } from '../../components/wallet/LiveGiftOverlay';
@@ -232,7 +233,7 @@ function useRoomSocket(
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const connect = () => {
-      ws = new WebSocket(`${WS_BASE_URL}/api/v1/social/comments/ws/${targetType}/${targetId}?token=${encodeURIComponent(token)}`);
+      ws = openAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/${targetType}/${targetId}`, token);
       ws.onmessage = (e) => {
         try { onMessageRef.current(JSON.parse(e.data as string)); } catch {}
       };

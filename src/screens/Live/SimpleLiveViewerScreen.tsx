@@ -43,6 +43,7 @@ import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
+import { openAuthenticatedWs } from '../../utils/authenticatedWs';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
@@ -1230,7 +1231,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     if (!accessToken || !token) return;
     let ws: WebSocket;
     try {
-      ws = new WebSocket(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}?token=${accessToken}`);
+      ws = openAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}`, accessToken);
     } catch { return; }
     wsRef.current = ws;
 

@@ -45,19 +45,40 @@ export const authService = {
     return { access_token, refresh_token, token_type, user };
   },
 
-  async register(payload: RegisterRequest): Promise<{ user: User } & AuthToken> {
+  async register(payload: RegisterRequest): Promise<
+    ({ needsVerification: false; user: User } & AuthToken) | { needsVerification: true; userId: string }
+  > {
     await apiClient.post<User>(Endpoints.auth.register, payload);
     // Auto-login après inscription — identifier = email ou phone
-    const loginRes = await apiClient.post<{ access_token: string; refresh_token: string; token_type: string; user: User }>(
-      Endpoints.auth.login,
-      { identifier: payload.email ?? payload.phone, password: payload.password },
-      { headers: getDeviceHeaders() },
-    );
-    const { access_token, refresh_token, token_type } = loginRes.data;
-    authService._saveTokens({ access_token, refresh_token, token_type });
-    // Force un /auth/me pour avoir toutes les données (gofolyx_id, referral_code, etc.)
-    const freshUser = await authService.getMe(true);
-    return { access_token, refresh_token, token_type, user: freshUser };
+    try {
+      const loginRes = await apiClient.post<{ access_token: string; refresh_token: string; token_type: string; user: User }>(
+        Endpoints.auth.login,
+        { identifier: payload.email ?? payload.phone, password: payload.password },
+        { headers: getDeviceHeaders() },
+      );
+      const { access_token, refresh_token, token_type } = loginRes.data;
+      authService._saveTokens({ access_token, refresh_token, token_type });
+      // Force un /auth/me pour avoir toutes les données (gofolyx_id, referral_code, etc.)
+      const freshUser = await authService.getMe(true);
+      return { needsVerification: false, access_token, refresh_token, token_type, user: freshUser };
+    } catch (e: any) {
+      // Compte créé mais pas encore vérifié (OTP envoyé par email/SMS à
+      // l'inscription) — ce n'est pas une erreur, juste une étape de plus.
+      const detail = e?.data?.detail ?? e?.response?.data?.detail;
+      if (e?.status === 403 && detail && typeof detail === 'object' && detail.code === 'account_unverified') {
+        return { needsVerification: true, userId: detail.user_id };
+      }
+      throw e;
+    }
+  },
+
+  async verifyRegistration(userId: string, code: string): Promise<User> {
+    const res = await apiClient.post<User>(Endpoints.auth.verifyRegistration, { user_id: userId, code });
+    return res.data;
+  },
+
+  async resendVerificationCode(userId: string): Promise<void> {
+    await apiClient.post(Endpoints.auth.resendVerificationCode, { user_id: userId });
   },
 
   async logout(): Promise<void> {

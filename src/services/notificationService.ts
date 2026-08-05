@@ -29,6 +29,13 @@ export const notificationService = {
     return res.data;
   },
 
+  async getByRefId(refId: string): Promise<NotifItem[]> {
+    const res = await apiClient.get<NotifItem[]>(
+      `${Endpoints.notifications.list}?ref_id=${refId}&limit=5`,
+    );
+    return res.data;
+  },
+
   async getUnreadCount(): Promise<number> {
     const res = await apiClient.get<{ unread_count: number }>(Endpoints.notifications.unreadCount);
     return res.data.unread_count;

@@ -32,9 +32,12 @@ import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
 
 // ── Channel IDs — incrémenter le suffixe pour forcer recréation si besoin ─────
-const CHANNEL_CALLS    = 'incoming_calls_v6';
-const CHANNEL_MESSAGES = 'messages_v6';
-const CHANNEL_NOTIFS   = 'notifications_v6';
+const CHANNEL_CALLS         = 'incoming_calls_v6';
+const CHANNEL_MESSAGES      = 'messages_v6';
+const CHANNEL_NOTIFS        = 'notifications_v6';
+// Publications des personnes suivies (post/reel/story) — signal discret,
+// sans son ni vibration, pour ne pas interrompre l'utilisateur.
+const CHANNEL_FRIEND_ACTIVITY = 'friend_activity_v1';
 
 async function _createChannels(): Promise<void> {
   if (Platform.OS !== 'android') return;
@@ -82,6 +85,14 @@ async function _createChannels(): Promise<void> {
     vibration:        true,
     vibrationPattern: [250, 250],
     sound:            'notification_sound',
+  });
+  await notifee.createChannel({
+    id:         CHANNEL_FRIEND_ACTIVITY,
+    name:       'Publications de mes abonnements',
+    importance: AndroidImportance.LOW,
+    visibility: AndroidVisibility.PRIVATE,
+    vibration:  false,
+    sound:      undefined,
   });
 }
 
@@ -347,6 +358,24 @@ export async function handleBackgroundFCM(
       ios: {
         sound: 'notification_sound.wav',
       },
+      data: data as Record<string, string>,
+    });
+    return;
+  }
+
+  // Publication d'un abonnement (post/reel/story) — signal discret, sans son ni
+  // vibration (voir SILENT_NOTIFICATION_TYPES côté backend).
+  const notificationType = (data.notification_type as string) ?? '';
+  if (['post_posted', 'reel_posted', 'story_posted', 'concert_created', 'event_created'].includes(notificationType)) {
+    await notifee.displayNotification({
+      title,
+      body,
+      android: {
+        channelId:   CHANNEL_FRIEND_ACTIVITY,
+        importance:  AndroidImportance.LOW,
+        pressAction: { id: 'default', launchActivity: 'default' },
+      },
+      ios: { sound: undefined },
       data: data as Record<string, string>,
     });
     return;

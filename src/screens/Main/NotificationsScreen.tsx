@@ -34,6 +34,8 @@ const CFG: Record<string, { icon: string; grad: [string, string] }> = {
   event_going:               { icon: 'map-pin',        grad: ['#36D9A0', '#6EE7B7'] },
   community_joined:          { icon: 'users',          grad: ['#9B65F5', '#C4B5FD'] },
   reel_posted:               { icon: 'film',           grad: ['#E0389A', '#FB7185'] },
+  post_posted:               { icon: 'file-text',      grad: ['#7B3FF2', '#A78BFA'] },
+  story_posted:              { icon: 'circle',         grad: ['#F59E0B', '#FCD34D'] },
   subscription:              { icon: 'star',           grad: ['#36D9A0', '#6EE7B7'] },
   welcome:                   { icon: 'gift',           grad: ['#7B3FF2', '#E0389A'] },
   ticket:                    { icon: 'tag',            grad: ['#FF7A2F', '#FCD34D'] },
@@ -54,6 +56,11 @@ const CFG: Record<string, { icon: string; grad: [string, string] }> = {
   boost_ended:               { icon: 'check-circle',   grad: ['#6B7280', '#9CA3AF'] },
   ad_started:                { icon: 'trending-up',    grad: ['#F97316', '#FB923C'] },
   ad_ended:                  { icon: 'flag',           grad: ['#6B7280', '#9CA3AF'] },
+  // Moderation IA (2026-08) — verdict apres analyse automatique d'un reel
+  // publie par l'utilisateur (cf. recommendation_system/ai_service).
+  reel_analysis_cleared:     { icon: 'check-circle',   grad: ['#10B981', '#34D399'] },
+  reel_analysis_limited:     { icon: 'alert-circle',   grad: ['#F59E0B', '#FBBF24'] },
+  reel_analysis_removed:     { icon: 'alert-triangle', grad: ['#EF4444', '#F87171'] },
 };
 const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
 
@@ -202,9 +209,25 @@ export const NotificationsScreen: React.FC = () => {
     }
 
     if (!item.ref_id) return;
+
+    // Verdict d'analyse IA (cf. recommendation_system/ai_service) — route vers
+    // l'ecran de suivi dedie plutot que l'ecran de detail generique, intercepte
+    // avant la cascade par ref_type car reel_analysis_* porte aussi un ref_type
+    // valide (reel/post/event/concert) qui matcherait sinon le bloc generique.
+    if (item.notification_type.startsWith('reel_analysis_') && item.ref_type) {
+      nav.navigate('AiAnalysisStatus', {
+        contentType: item.ref_type as any,
+        contentId: item.ref_id,
+        initialStatus: 'done',
+      });
+      return;
+    }
+
     if (item.ref_type === 'concert')         nav.navigate('ConcertDetail',   { concertId:     item.ref_id });
     else if (item.ref_type === 'event')      nav.navigate('EventDetail',     { eventId:       item.ref_id });
     else if (item.ref_type === 'reel')       nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: item.ref_id } });
+    else if (item.ref_type === 'post')       nav.navigate('PostDetail',      { postId:        item.ref_id });
+    else if (item.ref_type === 'story' && item.actor?.id) { nav.navigate('UserProfile', { userId: item.actor.id }); removeItem(item.id); }
     else if (item.ref_type === 'user')       { nav.navigate('UserProfile',   { userId:        item.ref_id }); removeItem(item.id); }
     else if (item.ref_type === 'community')  nav.navigate('CommunityDetail', { communityId:   item.ref_id });
     else if (item.ref_type === 'planning_invite' || item.ref_type === 'planning_entry') nav.navigate('Planning');

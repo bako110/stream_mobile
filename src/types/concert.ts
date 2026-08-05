@@ -2,7 +2,7 @@
 
 export type ConcertType = 'live' | 'replay' | 'live_and_replay';
 export type AccessType = 'free' | 'subscription' | 'ticket' | 'ppv';
-export type ConcertStatus = 'draft' | 'published' | 'live' | 'ended' | 'archived';
+export type ConcertStatus = 'draft' | 'published' | 'live' | 'ended' | 'archived' | 'limited';
 
 export interface Concert {
   id: string;
@@ -44,6 +44,8 @@ export interface Concert {
   user_reaction?: string | null;
   // relation
   artist?: import('./user').User;
+  category?: string | null;
+  ai_analysis_status?: 'pending' | 'done' | null;
 }
 
 export interface ConcertCreate {

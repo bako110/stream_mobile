@@ -2675,6 +2675,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                 <Text style={s.authorName} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
                 {reel.author?.is_verified && <VerifiedBadge size={12} />}
               </View>
+              {/* Badge visible uniquement par le createur, jamais par les autres
+                  spectateurs (cf. ai_analysis_status : "pending" tant que
+                  ai.analyze_reel n'a pas termine, cote ai_service) — le reel
+                  reste normalement visible/publie pendant ce temps, ce n'est
+                  qu'un indicateur discret, pas un etat bloquant. */}
+              {isOwnReel && reel.ai_analysis_status === 'pending' && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => nav.navigate('AiAnalysisStatus', { contentType: 'reel', contentId: reel.id, initialStatus: reel.ai_analysis_status })}
+                  style={s.analysisPendingBadge}>
+                  <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />
+                  <Text style={s.analysisPendingText}>Vérification en cours…</Text>
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
             {!isOwnReel && reel.author?.id && (
               <TouchableOpacity
@@ -3168,6 +3182,8 @@ const s = StyleSheet.create({
   sourceText:  { color: 'rgba(255,255,255,0.75)', fontSize: 10 },
   authorName: { color: '#fff', fontWeight: '800', fontSize: 13, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   caption:    { color: '#fff', fontSize: 12, lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
+  analysisPendingBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  analysisPendingText:  { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' },
 
   refBand:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignSelf: 'flex-start', maxWidth: '100%' },
   refKindDot: { width: 6, height: 6, borderRadius: 3 },

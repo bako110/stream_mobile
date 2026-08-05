@@ -1,6 +1,6 @@
 // Aligné sur models/reel.py, reaction.py, comment.py
 
-export type ReelStatus = 'processing' | 'published' | 'archived';
+export type ReelStatus = 'processing' | 'published' | 'archived' | 'limited';
 
 export interface Reel {
   id: string;
@@ -48,6 +48,10 @@ export interface Reel {
   music_start_sec?: number | null;
   music_end_sec?: number | null;
   mp4_url?: string | null;
+  // Badge "analyse en cours" cote createur uniquement (n'a de sens que pour
+  // le proprietaire du reel, comme user_reaction) — cf. moderation_pipeline.py
+  // cote ai_service. "pending" | "done" | undefined (jamais analyse).
+  ai_analysis_status?: 'pending' | 'done' | null;
 }
 
 export interface CommentAuthor {

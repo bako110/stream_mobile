@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LoginScreen }          from '../screens/Auth/LoginScreen';
 import { RegisterScreen }       from '../screens/Auth/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/Auth/ForgotPasswordScreen';
 import { SocialLoginScreen }    from '../screens/Auth/SocialLoginScreen';
 import { QRScannerScreen }      from '../screens/Auth/QRScannerScreen';
+import { VerifyRegistrationScreen } from '../screens/Auth/VerifyRegistrationScreen';
 import { CGUScreen }                      from '../screens/Main/CGUScreen';
 import { PolitiqueConfidentialiteScreen } from '../screens/Main/PolitiqueConfidentialiteScreen';
 
@@ -16,6 +17,7 @@ export type AuthStackParamList = {
   ForgotPassword: undefined;
   SocialLogin:    undefined;
   QRLogin:        undefined;
+  VerifyRegistration: { userId: string; identifier: string; password: string };
   CGU:                      undefined;
   PolitiqueConfidentialite: undefined;
 };
@@ -32,6 +34,7 @@ const LoginWrapper: React.FC<{ onAuthSuccess: (profileIncomplete?: boolean) => v
   return (
     <LoginScreen
       onLoginSuccess={onAuthSuccess}
+      onNeedsVerification={params => nav.navigate('VerifyRegistration', params)}
       onGoRegister={() => nav.navigate('Register')}
       onGoForgotPassword={() => nav.navigate('ForgotPassword')}
       onGoSocialLogin={() => nav.navigate('SocialLogin')}
@@ -62,7 +65,23 @@ const RegisterWrapper: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSucces
   return (
     <RegisterScreen
       onRegisterSuccess={onAuthSuccess}
+      onNeedsVerification={params => nav.navigate('VerifyRegistration', params)}
       onGoLogin={() => nav.goBack()}
+    />
+  );
+};
+
+const VerifyRegistrationWrapper: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSuccess }) => {
+  const nav = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+  const route = useRoute<RouteProp<AuthStackParamList, 'VerifyRegistration'>>();
+  const { userId, identifier, password } = route.params;
+  return (
+    <VerifyRegistrationScreen
+      userId={userId}
+      identifier={identifier}
+      password={password}
+      onSuccess={onAuthSuccess}
+      onGoBack={() => nav.goBack()}
     />
   );
 };
@@ -96,6 +115,9 @@ export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedIn
     </Stack.Screen>
     <Stack.Screen name="Register">
       {() => <RegisterWrapper onAuthSuccess={onAuthSuccess} />}
+    </Stack.Screen>
+    <Stack.Screen name="VerifyRegistration">
+      {() => <VerifyRegistrationWrapper onAuthSuccess={onAuthSuccess} />}
     </Stack.Screen>
     <Stack.Screen name="ForgotPassword">
       {() => <ForgotPasswordWrapper />}

@@ -192,7 +192,7 @@ export const StoryCameraScreen: React.FC<Props> = ({
 
   return (
     <View style={s.root}>
-      {checkedPermissions && !hasPermission ? (
+      {!checkedPermissions ? null : !hasPermission ? (
         <View style={s.permissionState}>
           <View style={s.permissionIconWrap}>
             <Icon name="camera-off" size={34} color="rgba(255,255,255,0.6)" />

@@ -21,6 +21,12 @@ export const AddAccountScreen: React.FC<Props> = ({ onAccountAdded }) => {
   return (
     <LoginScreen
       onLoginSuccess={onAccountAdded}
+      onNeedsVerification={() => {
+        toastService.info(
+          'Compte non vérifié',
+          'Ce compte doit d\'abord être vérifié depuis l\'écran de connexion principal.',
+        );
+      }}
       onGoRegister={() => {
         toastService.info(
           'Créer un compte',

@@ -4,7 +4,7 @@ export type EventType =
   | 'concert' | 'birthday' | 'festival' | 'conference'
   | 'sport' | 'theater' | 'exhibition' | 'other';
 
-export type EventStatus = 'draft' | 'published' | 'cancelled' | 'completed';
+export type EventStatus = 'draft' | 'published' | 'cancelled' | 'completed' | 'limited' | 'archived';
 export type EventAccessType = 'free' | 'ticket' | 'invite_only';
 
 export interface Event {
@@ -46,6 +46,8 @@ export interface Event {
   share_count?: number;
   user_reaction?: string | null;
   organizer?: import('./user').User;
+  category?: string | null;
+  ai_analysis_status?: 'pending' | 'done' | null;
 }
 
 export type TicketStatus = 'valid' | 'used' | 'refunded' | 'expired';

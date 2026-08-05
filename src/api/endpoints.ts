@@ -28,6 +28,8 @@ export const Endpoints = {
     phoneVerify:      `${V1}/auth/phone/verify`,
     phoneLink:        `${V1}/auth/phone/link`,
     resetPasswordMe:  `${V1}/auth/me/reset-password`,
+    verifyRegistration:     `${V1}/auth/verify-registration`,
+    resendVerificationCode: `${V1}/auth/resend-verification-code`,
   },
 
   // ── Users (prefix: /api/v1/users) ─────────────────────────────────────────

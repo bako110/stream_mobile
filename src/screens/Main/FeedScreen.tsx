@@ -3945,6 +3945,21 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[fc.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{authorName}</Text>
             <Text style={[fc.timeAgo, { color: colors.textTertiary }]}>{timeAgo}</Text>
+            {/* Badge visible uniquement par l'organisateur/artiste, cf.
+                ReelsScreen.tsx pour le meme pattern. */}
+            {isOwnContent && (isEvent ? event?.ai_analysis_status : concert?.ai_analysis_status) === 'pending' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => nav.navigate('AiAnalysisStatus', {
+                  contentType: isEvent ? 'event' : 'concert',
+                  contentId: isEvent ? event.id : concert.id,
+                  initialStatus: isEvent ? event?.ai_analysis_status : concert?.ai_analysis_status,
+                })}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                <ActivityIndicator size="small" color={colors.textTertiary} />
+                <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
 

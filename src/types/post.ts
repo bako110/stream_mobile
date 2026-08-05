@@ -37,6 +37,7 @@ export interface Post {
   user_reaction?: 'like' | 'dislike' | null;
   music_url?: string | null;
   music_title?: string | null;
+  ai_analysis_status?: 'pending' | 'done' | null;
 }
 
 export interface PostCreate {

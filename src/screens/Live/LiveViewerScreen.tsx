@@ -21,6 +21,7 @@ import { concertService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
+import { openAuthenticatedWs } from '../../utils/authenticatedWs';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
@@ -140,7 +141,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
     if (!token) return;
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken) return;
-    const ws = new WebSocket(`${WS_BASE_URL}/api/v1/social/comments/ws/concert/${concertId}?token=${accessToken}`);
+    const ws = openAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/concert/${concertId}`, accessToken);
     wsRef.current = ws;
     ws.onmessage = (e) => {
       try {

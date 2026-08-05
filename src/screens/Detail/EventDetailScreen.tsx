@@ -171,8 +171,10 @@ const HeroCarousel: React.FC<{
 const HeroInfoCard: React.FC<{
   title: string; accent: string; eventType: string; isFree: boolean; isOnline: boolean;
   organizerName?: string; organizerAvatar?: string;
+  showAiPending?: boolean;
+  onAiPendingPress?: () => void;
   colors: AppColors;
-}> = ({ title, accent, eventType, isFree, isOnline, organizerName, organizerAvatar, colors }) => (
+}> = ({ title, accent, eventType, isFree, isOnline, organizerName, organizerAvatar, showAiPending, onAiPendingPress, colors }) => (
   <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, gap: 8 }}>
     <Text style={{ fontSize: 17, fontWeight: '800', color: colors.textPrimary, lineHeight: 22, letterSpacing: -0.2 }}>
       {title}
@@ -190,6 +192,14 @@ const HeroInfoCard: React.FC<{
         </View>
         <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.textSecondary }}>{organizerName}</Text>
       </View>
+    )}
+    {/* Badge visible uniquement par l'organisateur, cf. ReelsScreen.tsx pour
+        le meme pattern. */}
+    {showAiPending && (
+      <TouchableOpacity activeOpacity={0.7} onPress={onAiPendingPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        <ActivityIndicator size="small" color={colors.textTertiary} />
+        <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+      </TouchableOpacity>
     )}
     {/* Badges — petits, discrets, sous le titre plutôt que sur l'image */}
     <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
@@ -593,6 +603,8 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           title={event.title} accent={accent}
           eventType={cfg.label} isFree={isFree} isOnline={!!event.is_online}
           organizerName={organizerName ?? undefined} organizerAvatar={organizerAvatar}
+          showAiPending={isOwner && event.ai_analysis_status === 'pending'}
+          onAiPendingPress={() => nav.navigate('AiAnalysisStatus', { contentType: 'event', contentId: event.id, initialStatus: event.ai_analysis_status })}
           colors={colors}
         />
 

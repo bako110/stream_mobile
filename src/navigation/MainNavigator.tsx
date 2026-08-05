@@ -59,6 +59,7 @@ import { CreateReelScreen }      from '../screens/Create/CreateReelScreen';
 import { CreatePostScreen }      from '../screens/Create/CreatePostScreen';
 import { ConcertDetailScreen }   from '../screens/Detail/ConcertDetailScreen';
 import { EventDetailScreen }     from '../screens/Detail/EventDetailScreen';
+import { AiAnalysisStatusScreen, type AiContentType } from '../screens/Detail/AiAnalysisStatusScreen';
 import { FilmDetailScreen }      from '../screens/Detail/FilmDetailScreen';
 import { SerieEpisodesScreen }   from '../screens/Detail/SerieEpisodesScreen';
 import { VideoPlayerScreen }     from '../screens/Detail/VideoPlayerScreen';
@@ -165,6 +166,7 @@ export type MainStackParamList = {
   CreateReel:      { reelPublished?: boolean; sourceReelId?: string; sourceReelUrl?: string } | undefined;
   ConcertDetail:   { concertId: string };
   EventDetail:     { eventId:   string };
+  AiAnalysisStatus: { contentType: AiContentType; contentId: string; initialStatus?: 'pending' | 'done' | null };
   MyTicket:        { ticket: any };
   Attendees:       { eventId: string; eventTitle: string };
   TicketScanner:   { eventId: string; eventTitle: string };
@@ -290,6 +292,14 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const ConcertDetailWrapper: React.FC<any>  = ({ navigation, route }) => <ConcertDetailScreen concertId={decodeId(route.params.concertId)} onBack={() => navigation.goBack()} />;
 const EventDetailWrapper: React.FC<any>    = ({ navigation, route }) => <EventDetailScreen eventId={decodeId(route.params.eventId)} onBack={() => navigation.goBack()} />;
+const AiAnalysisStatusWrapper: React.FC<any> = ({ navigation, route }) => (
+  <AiAnalysisStatusScreen
+    contentType={route.params.contentType}
+    contentId={route.params.contentId}
+    initialStatus={route.params.initialStatus}
+    onBack={() => navigation.goBack()}
+  />
+);
 const CreateReelWrapper: React.FC<any>     = ({ navigation, route }) => <CreateReelScreen onBack={() => navigation.goBack()} sourceReelId={route.params?.sourceReelId} sourceReelUrl={route.params?.sourceReelUrl} />;
 const LiveStreamWrapper: React.FC<any>     = ({ navigation, route }) => <LiveStreamScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
 const LiveViewerWrapper: React.FC<any>     = ({ navigation, route }) => <LiveViewerScreen concertId={route.params.concertId} onBack={() => navigation.goBack()} />;
@@ -459,6 +469,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="CreateConcert"  component={CreateConcertWrapper}  options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="ConcertDetail"  component={ConcertDetailWrapper}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="EventDetail"    component={EventDetailWrapper}    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="AiAnalysisStatus" component={AiAnalysisStatusWrapper} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="UserProfile"    component={UserProfileScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ImageViewer"    component={ImageViewerScreen}     options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="EditProfile"    component={EditProfileScreen}     options={{ animation: 'slide_from_right' }} />

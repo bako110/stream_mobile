@@ -506,6 +506,15 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                 <Text style={{ color: colors.textTertiary, fontSize: 11 }}>·</Text>
                 <Icon name="globe" size={11} color={colors.textTertiary} />
               </View>
+              {isOwn && post.ai_analysis_status === 'pending' && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => navigation?.navigate('AiAnalysisStatus', { contentType: 'post', contentId: post.id, initialStatus: post.ai_analysis_status })}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                  <ActivityIndicator size="small" color={colors.textTertiary} />
+                  <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </TouchableOpacity>
           {/* Bouton ··· */}

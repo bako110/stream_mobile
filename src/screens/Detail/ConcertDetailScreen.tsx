@@ -77,8 +77,10 @@ const HeroConcert: React.FC<{
   title: string; artistName?: string | null;
   genre?: string | null; isFree: boolean;
   viewers: number; hasVideo: boolean; onVideoPress: () => void;
+  showAiPending?: boolean;
+  onAiPendingPress?: () => void;
   colors: AppColors;
-}> = ({ isLive, thumbnail, title, artistName, genre, isFree, viewers, hasVideo, onVideoPress, colors }) => (
+}> = ({ isLive, thumbnail, title, artistName, genre, isFree, viewers, hasVideo, onVideoPress, showAiPending, onAiPendingPress, colors }) => (
   <View style={{ width: SW, height: HERO_H, backgroundColor: '#000' }}>
     {thumbnail ? (
       <Image source={{ uri: thumbnail }} style={{ ...StyleSheet.absoluteFill }} resizeMode="cover" />
@@ -150,6 +152,14 @@ const HeroConcert: React.FC<{
             {genre && <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '500' }}>{genre}</Text>}
           </View>
         </View>
+      )}
+      {/* Badge visible uniquement par l'artiste, cf. ReelsScreen.tsx pour le
+          meme pattern. */}
+      {showAiPending && (
+        <TouchableOpacity activeOpacity={0.7} onPress={onAiPendingPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />
+          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+        </TouchableOpacity>
       )}
     </View>
   </View>
@@ -490,6 +500,8 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           viewers={concert.current_viewers ?? 0}
           hasVideo={hasVideo}
           onVideoPress={() => setShowVideo(true)}
+          showAiPending={isOwner && concert.ai_analysis_status === 'pending'}
+          onAiPendingPress={() => nav.navigate('AiAnalysisStatus', { contentType: 'concert', contentId: concert.id, initialStatus: concert.ai_analysis_status })}
           colors={colors}
         />
 

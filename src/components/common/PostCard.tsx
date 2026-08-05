@@ -322,6 +322,17 @@ const PostCardInner: React.FC<PostCardProps> = ({
               <View style={[pc.dot, { backgroundColor: colors.textDisabled }]} />
               <Icon name="globe" size={10} color={colors.textTertiary} />
             </View>
+            {/* Badge visible uniquement par le createur, cf. ReelsScreen.tsx
+                pour le meme pattern — indicateur discret, pas bloquant. */}
+            {isOwn && post.ai_analysis_status === 'pending' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => nav.navigate('AiAnalysisStatus', { contentType: 'post', contentId: post.id, initialStatus: post.ai_analysis_status })}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                <ActivityIndicator size="small" color={colors.textTertiary} />
+                <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
 
