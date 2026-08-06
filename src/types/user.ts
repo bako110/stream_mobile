@@ -7,7 +7,9 @@ export type VerificationStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
 export interface User {
   id: string;
-  email: string;
+  // null pour les comptes inscrits par téléphone (le backend masque l'email
+  // interne phone_xxx@gofolyx.internal) — utiliser `phone` dans ce cas.
+  email: string | null;
   username: string | null;
   role: UserRole;
   first_name: string | null;
