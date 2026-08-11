@@ -24,8 +24,14 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RNContacts from 'react-native-contacts';
+import { sha256 } from 'js-sha256';
+import Geolocation from '@react-native-community/geolocation';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
+import { storage } from '../../utils/storage';
+import { showConfirm } from '../../services';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GoFolyXLoader } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
@@ -1121,6 +1127,86 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   }, [suggestPool, fetchMoreSuggestions]);
 
   useEffect(() => { loadSuggestions(); }, []);
+
+  // ── Suggestions intelligentes : contacts + localisation ──────────────────────
+  // Hash SHA-256 des contacts avant l'envoi (jamais de numéro/email en clair côté
+  // serveur), et position GPS ponctuelle — les deux ne servent qu'à mieux classer
+  // les suggestions de personnes (PeopleSuggestions), rien d'autre.
+  const CONTACTS_PROMPT_SEEN_KEY = 'suggestions_contacts_prompt_seen';
+
+  const syncContactsForSuggestions = useCallback(async () => {
+    try {
+      const contacts = await RNContacts.getAll();
+      const hashes = new Set<string>();
+      for (const c of contacts) {
+        for (const p of c.phoneNumbers ?? []) {
+          if (p.number) hashes.add(sha256(p.number.replace(/[^\d+]/g, '')));
+        }
+        for (const e of c.emailAddresses ?? []) {
+          if (e.email) hashes.add(sha256(e.email.trim().toLowerCase()));
+        }
+      }
+      if (hashes.size) {
+        await userService.syncContacts(Array.from(hashes));
+        loadSuggestions();
+      }
+    } catch { /* silencieux — les suggestions restent utilisables sans contacts */ }
+  }, [loadSuggestions]);
+
+  const syncLocationForSuggestions = useCallback(() => {
+    Geolocation.getCurrentPosition(
+      pos => {
+        userService.updateLocation(pos.coords.latitude, pos.coords.longitude)
+          .then(loadSuggestions)
+          .catch(() => {});
+      },
+      () => {},
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 },
+    );
+  }, [loadSuggestions]);
+
+  const requestLocationForSuggestions = useCallback(async () => {
+    const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
+    let status = await check(perm);
+    if (status === RESULTS.DENIED) status = await request(perm);
+    if (status === RESULTS.GRANTED) syncLocationForSuggestions();
+  }, [syncLocationForSuggestions]);
+
+  // Au premier chargement du feed : si la permission Contacts a déjà été
+  // accordée, synchronise en silence. Sinon, montre UNE FOIS une explication
+  // claire avant le popup système (jamais de popup système sans contexte).
+  useEffect(() => {
+    (async () => {
+      const contactsPerm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
+      const contactsStatus = await check(contactsPerm);
+
+      if (contactsStatus === RESULTS.GRANTED) {
+        syncContactsForSuggestions();
+      } else if (contactsStatus === RESULTS.DENIED && !storage.getBoolean(CONTACTS_PROMPT_SEEN_KEY)) {
+        storage.setBoolean(CONTACTS_PROMPT_SEEN_KEY, true);
+        showConfirm(
+          'Trouve tes amis sur GoFolyX',
+          'Autorise l\'accès à tes contacts pour qu\'on te suggère en priorité les personnes que tu connais déjà — jamais tes contacts ne sont partagés ni affichés, seule une empreinte chiffrée sert à faire le lien.',
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            {
+              text: 'Autoriser', style: 'default', onPress: async () => {
+                const granted = await request(contactsPerm);
+                if (granted === RESULTS.GRANTED) syncContactsForSuggestions();
+              },
+            },
+          ],
+        );
+      }
+
+      // Localisation : même logique, permission déjà tranchée par ailleurs
+      // dans l'app (écran "Près de toi") réutilisée sans redemander ici.
+      const locationPerm = Platform.OS === 'ios' ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
+      const locationStatus = await check(locationPerm);
+      if (locationStatus === RESULTS.GRANTED) syncLocationForSuggestions();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Complète le pool de communautés en arrière-plan (même pattern que fetchMoreSuggestions)
   // — évite de répéter indéfiniment les mêmes 5 communautés à chaque bloc du flux.
