@@ -1,24 +1,22 @@
-﻿/**
- * MessagesScreen â€” Messagerie directe GoFolyX
+/**
+ * MessagesScreen — Messagerie directe GoFolyX
  * Connecté à l'API /api/v1/messages/conversations
  */
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Platform, StatusBar,
-  RefreshControl, ActivityIndicator, Image,
+  RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonMessages, VerifiedBadge, AvatarWithBadge } from '../../components/common';
 import { BorderRadius, Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
 import { useWs } from '../../context/WebSocketContext';
-import { callHistoryService } from '../../services/callHistoryService';
-import type { CallRecord } from '../../services/callHistoryService';
 import type { ConversationSummary } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -36,7 +34,7 @@ function formatTime(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
   const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000);
-  if (diffMin < 1)  return 'Ã€ l\'instant';
+  if (diffMin < 1)  return 'À l\'instant';
   if (diffMin < 60) return `${diffMin} min`;
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24)   return `${diffH} h`;
@@ -53,20 +51,6 @@ function accentFor(id: string): string {
   return ACCENT_COLORS[h % ACCENT_COLORS.length]!;
 }
 
-function formatLastSeen(iso?: string | null): string {
-  if (!iso) return 'Hors ligne';
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000);
-  if (diffMin < 1)  return 'Il y a un instant';
-  if (diffMin < 60) return `Il y a ${diffMin} min`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24)   return `Il y a ${diffH} h`;
-  const diffD = Math.floor(diffH / 24);
-  if (diffD === 1)  return 'Hier';
-  return `Le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
-}
-
 interface Props { onBack?: () => void; }
 
 
@@ -76,14 +60,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav               = useNavigation<any>();
-  const route             = useRoute<any>();
-  const { clearUnreadMessages, addListener, removeListener, missedCallCount, clearMissedCalls, sendMessage: sendWsMessage, isConnected, liveUserIds } = useWs();
-  const [activeTab,  setActiveTab]  = useState<'messages' | 'calls'>(
-    route.params?.initialTab === 'calls' ? 'calls' : 'messages'
-  );
-  const [callHistory,       setCallHistory]       = useState<CallRecord[]>([]);
-  const [selectedIds,       setSelectedIds]       = useState<Set<string>>(new Set());
-  const [selectMode,        setSelectMode]        = useState(false);
+  const { clearUnreadMessages, addListener, removeListener, missedCallCount, sendMessage: sendWsMessage, isConnected, liveUserIds } = useWs();
 
   const [convSelectedIds,   setConvSelectedIds]   = useState<Set<string>>(new Set());
   const [convSelectMode,    setConvSelectMode]    = useState(false);
@@ -147,7 +124,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
   const isFirstLoad = useRef(true);
   useFocusEffect(useCallback(() => {
-    callHistoryService.getAll().then(setCallHistory).catch(() => {});
     if (isFirstLoad.current) {
       isFirstLoad.current = false;
       loadAndSubscribe(true);
@@ -236,44 +212,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
   const totalUnread = conversations.reduce((s, c) => s + (c.unread_count ?? 0), 0);
 
-  // ── Calls selection ──────────────────────────────────────────────────────────
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }, []);
-
-  const selectAll = useCallback(() => {
-    setSelectedIds(new Set(callHistory.map(r => r.id)));
-  }, [callHistory]);
-
-  const exitSelect = useCallback(() => {
-    setSelectMode(false);
-    setSelectedIds(new Set());
-  }, []);
-
-  const deleteSelected = useCallback(() => {
-    const count = selectedIds.size;
-    showConfirm(
-      'Supprimer',
-      `Supprimer ${count} appel${count > 1 ? 's' : ''} ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer', style: 'destructive',
-          onPress: async () => {
-            const ids = Array.from(selectedIds);
-            await Promise.all(ids.map(id => callHistoryService.remove(id).catch(() => {})));
-            setCallHistory(prev => prev.filter(r => !selectedIds.has(r.id)));
-            exitSelect();
-          },
-        },
-      ],
-    );
-  }, [selectedIds, exitSelect]);
-
   // ── Conversations selection ───────────────────────────────────────────────────
   const toggleConvSelect = useCallback((id: string) => {
     setConvSelectedIds(prev => {
@@ -355,38 +293,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                 )}
               </View>
             </>
-          ) : selectMode ? (
-            // ── Mode sélection appels ──
-            <>
-              <TouchableOpacity style={styles.iconBtn} onPress={exitSelect}>
-                <Icon name="x" size={22} color={colors.textPrimary} />
-              </TouchableOpacity>
-              <View style={styles.headerCenter}>
-                <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: 16 }]}>
-                  {selectedIds.size === 0 ? 'Sélectionner' : `${selectedIds.size} sélectionné${selectedIds.size > 1 ? 's' : ''}`}
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <TouchableOpacity
-                  style={[styles.iconBtn, { backgroundColor: colors.primary + '18' }]}
-                  onPress={selectedIds.size === callHistory.length ? () => setSelectedIds(new Set()) : selectAll}
-                >
-                  <Icon
-                    name={selectedIds.size === callHistory.length ? 'check-square' : 'square'}
-                    size={18}
-                    color={colors.primary}
-                  />
-                </TouchableOpacity>
-                {selectedIds.size > 0 && (
-                  <TouchableOpacity
-                    style={[styles.iconBtn, { backgroundColor: '#E0389A18' }]}
-                    onPress={deleteSelected}
-                  >
-                    <Icon name="trash-2" size={18} color="#E0389A" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </>
           ) : (
             // ── Mode normal ──
             <>
@@ -394,21 +300,27 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
               <View style={styles.headerCenter}>
                 <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-                  {activeTab === 'messages' ? 'Messages' : 'Appels'}
+                  Messages
                 </Text>
-                {activeTab === 'messages' && totalUnread > 0 && (
+                {totalUnread > 0 && (
                   <View style={[styles.badge, { backgroundColor: colors.primary }]}>
                     <Text style={styles.badgeText}>{totalUnread > 99 ? '99+' : totalUnread}</Text>
                   </View>
                 )}
-                {activeTab === 'calls' && missedCallCount > 0 && (
-                  <View style={[styles.badge, { backgroundColor: '#E0389A' }]}>
-                    <Text style={styles.badgeText}>{missedCallCount > 99 ? '99+' : missedCallCount}</Text>
-                  </View>
-                )}
               </View>
 
-              {activeTab === 'messages' ? (
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.iconBtn, { backgroundColor: '#36D9A020' }]}
+                  onPress={() => nav.navigate('CallHistory' as any)}
+                >
+                  <Icon name="phone" size={18} color="#36D9A0" />
+                  {missedCallCount > 0 && (
+                    <View style={[styles.miniBadge, { backgroundColor: '#E0389A' }]}>
+                      <Text style={styles.miniBadgeText}>{missedCallCount > 9 ? '9+' : missedCallCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.iconBtn, { backgroundColor: colors.primary + '18' }]}
                   onPress={() => {
@@ -418,227 +330,113 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                 >
                   <Icon name={searchOpen ? 'x' : 'search'} size={18} color={colors.primary} />
                 </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.iconBtn, { backgroundColor: '#36D9A020' }]}
-                  onPress={() => nav.navigate('NewCall' as any)}
-                >
-                  <Icon name="phone-call" size={18} color="#36D9A0" />
-                </TouchableOpacity>
-              )}
+              </View>
             </>
           )}
         </View>
 
-        {/* Tabs */}
-        <View style={[styles.tabsRow, { borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
-            style={styles.tabBtn}
-            onPress={() => { setActiveTab('messages'); exitSelect(); }}
-          >
-            <Text style={[styles.tabLabel, { color: activeTab === 'messages' ? colors.primary : colors.textTertiary }]}>
-              Messages
-            </Text>
-            {activeTab === 'messages' && <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.tabBtn}
-            onPress={() => { setActiveTab('calls'); exitConvSelect(); clearMissedCalls(); callHistoryService.getAll().then(setCallHistory).catch(() => {}); }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.tabLabel, { color: activeTab === 'calls' ? colors.primary : colors.textTertiary }]}>
-                Appels
-              </Text>
-              {missedCallCount > 0 && activeTab !== 'calls' && (
-                <View style={[styles.badge, { backgroundColor: '#E0389A' }]}>
-                  <Text style={styles.badgeText}>{missedCallCount > 9 ? '9+' : missedCallCount}</Text>
-                </View>
-              )}
-            </View>
-            {activeTab === 'calls' && <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />}
-          </TouchableOpacity>
-        </View>
-
-        {/* Onglet messages : barre de recherche (apparaît au clic sur l'icône
-            loupe du header) OU barre de stories par défaut, jamais les deux. */}
-        {activeTab === 'messages' && (
-          searchOpen ? (
-            <View style={[styles.searchBar, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary }]}>
-              <Icon name="search" size={15} color={colors.textTertiary} />
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Rechercher une conversation…"
-                placeholderTextColor={colors.textDisabled}
-                style={[styles.searchInput, { color: colors.textPrimary }]}
-                autoFocus
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')}>
-                  <Icon name="x" size={14} color={colors.textTertiary} />
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : (
-            <ConversationStoryBar
-              currentUser={currentUser}
-              colors={colors}
-              onNavigateToChat={onStoryNavigateToChat}
-              onNavigateToCall={onStoryNavigateToCall}
+        {/* Barre de recherche (apparaît au clic sur l'icône loupe du header)
+            OU barre de stories par défaut, jamais les deux. */}
+        {searchOpen ? (
+          <View style={[styles.searchBar, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary }]}>
+            <Icon name="search" size={15} color={colors.textTertiary} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Rechercher une conversation…"
+              placeholderTextColor={colors.textDisabled}
+              style={[styles.searchInput, { color: colors.textPrimary }]}
+              autoFocus
             />
-          )
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Icon name="x" size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <ConversationStoryBar
+            currentUser={currentUser}
+            colors={colors}
+            onNavigateToChat={onStoryNavigateToChat}
+            onNavigateToCall={onStoryNavigateToCall}
+          />
         )}
       </View>
 
-      {/* Contenu selon onglet */}
-      {activeTab === 'messages' ? (
-        loading ? (
-          <SkeletonMessages />
-        ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={c => c.partner_id}
-            extraData={filtered}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true);
-                  loadAndSubscribe(false);
-                }}
-                tintColor={colors.primary}
-              />
-            }
-            ListEmptyComponent={
-              <View style={styles.center}>
-                <Icon name="message-circle" size={52} color={colors.textTertiary} />
-                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
-                  {search ? 'Aucune conversation trouvée' : 'Démarrez votre première conversation'}
-                </Text>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <ConversationRow
-                  conv={item}
-                  colors={colors}
-                  isLive={item.partner?.is_live || liveUserIds.has(item.partner_id)}
-                  selectMode={convSelectMode}
-                  isSelected={convSelectedIds.has(item.partner_id)}
-                  onLongPress={() => { setConvSelectMode(true); toggleConvSelect(item.partner_id); }}
-                  onPress={convSelectMode
-                    ? () => toggleConvSelect(item.partner_id)
-                    : () => {
-                        // Marque lu localement tout de suite — évite d'attendre le rechargement (>30s) au retour
-                        setConversations(prev => prev.map(c =>
-                          c.partner_id === item.partner_id ? { ...c, unread_count: 0 } : c,
-                        ));
-                        nav.navigate('Chat' as any, {
-                          partnerId:   item.partner_id,
-                          partnerName: item.partner?.full_name ?? item.partner?.username ?? item.partner_id,
-                          avatarUrl:   item.partner?.avatar_url,
-                          isOnline:    item.partner?.is_online,
-                          lastSeen:    item.partner?.last_seen_at,
-                        });
-                      }}
-                  onAvatarPress={convSelectMode
-                    ? () => toggleConvSelect(item.partner_id)
-                    : () => nav.navigate('UserProfile' as any, { userId: item.partner_id })}
-                />
-            )}
-          />
-        )
+      {/* Liste des conversations */}
+      {loading ? (
+        <SkeletonMessages />
       ) : (
         <FlatList
-          data={callHistory}
-          keyExtractor={r => r.id}
+          data={filtered}
+          keyExtractor={c => c.partner_id}
+          extraData={filtered}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                callHistoryService.getAll()
-                  .then(setCallHistory)
-                  .catch(() => {})
-                  .finally(() => setRefreshing(false));
+                loadAndSubscribe(false);
               }}
               tintColor={colors.primary}
             />
           }
-          contentContainerStyle={{ paddingVertical: 8 }}
           ListEmptyComponent={
             <View style={styles.center}>
-              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                <Icon name="phone" size={36} color={colors.textTertiary} />
-              </View>
-              <Text style={[styles.emptyText, { color: colors.textPrimary, fontWeight: '700', fontSize: 16 }]}>Aucun appel récent</Text>
-              <Text style={[styles.emptyText, { color: colors.textTertiary, fontSize: 13, marginTop: 6 }]}>Vos appels vocaux et vidéo{'\n'}apparaîtront ici</Text>
+              <Icon name="message-circle" size={52} color={colors.textTertiary} />
+              <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
+                {search ? 'Aucune conversation trouvée' : 'Démarrez votre première conversation'}
+              </Text>
             </View>
           }
-          renderItem={({ item }) => {
-            const isSelected = selectedIds.has(item.id);
-            return (
-              <TouchableOpacity
-                  activeOpacity={selectMode ? 0.6 : 1}
-                  onLongPress={() => { setSelectMode(true); toggleSelect(item.id); }}
-                  onPress={selectMode ? () => toggleSelect(item.id) : undefined}
-                  delayLongPress={350}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    {selectMode && (
-                      <View style={{ paddingLeft: 12 }}>
-                        <View style={[
-                          sst.checkbox,
-                          isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
-                          !isSelected && { borderColor: colors.textTertiary },
-                        ]}>
-                          {isSelected && <Icon name="check" size={13} color="#fff" />}
-                        </View>
-                      </View>
-                    )}
-                    <View style={{ flex: 1, opacity: selectMode && !isSelected ? 0.5 : 1 }}>
-                      <CallRow
-                        record={item}
-                        colors={colors}
-                        onCallBack={selectMode ? () => {} : (type) => nav.navigate('Call' as any, {
-                          partnerId:    item.partnerId,
-                          partnerName:  item.partnerName,
-                          partnerAvatar: item.avatarUrl ?? null,
-                          callType:     type,
-                          isIncoming:   false,
-                        })}
-                        onMessage={selectMode ? () => {} : () => nav.navigate('Chat' as any, {
-                          partnerId:   item.partnerId,
-                          partnerName: item.partnerName,
-                        })}
-                        onAvatarPress={selectMode ? () => toggleSelect(item.id) : () => nav.navigate('UserProfile' as any, { userId: item.partnerId })}
-                      />
-                    </View>
-                  </View>
-                </TouchableOpacity>
-            );
-          }}
+          renderItem={({ item }) => (
+            <ConversationRow
+                conv={item}
+                colors={colors}
+                isLive={item.partner?.is_live || liveUserIds.has(item.partner_id)}
+                selectMode={convSelectMode}
+                isSelected={convSelectedIds.has(item.partner_id)}
+                onLongPress={() => { setConvSelectMode(true); toggleConvSelect(item.partner_id); }}
+                onPress={convSelectMode
+                  ? () => toggleConvSelect(item.partner_id)
+                  : () => {
+                      // Marque lu localement tout de suite — évite d'attendre le rechargement (>30s) au retour
+                      setConversations(prev => prev.map(c =>
+                        c.partner_id === item.partner_id ? { ...c, unread_count: 0 } : c,
+                      ));
+                      nav.navigate('Chat' as any, {
+                        partnerId:   item.partner_id,
+                        partnerName: item.partner?.full_name ?? item.partner?.username ?? item.partner_id,
+                        avatarUrl:   item.partner?.avatar_url,
+                        isOnline:    item.partner?.is_online,
+                        lastSeen:    item.partner?.last_seen_at,
+                      });
+                    }}
+                onAvatarPress={convSelectMode
+                  ? () => toggleConvSelect(item.partner_id)
+                  : () => nav.navigate('UserProfile' as any, { userId: item.partner_id })}
+              />
+          )}
         />
       )}
 
-      {/* FAB — seulement onglet messages */}
-      {activeTab === 'messages' && (
-        <TouchableOpacity style={[styles.fab, { shadowColor: colors.primary }]} activeOpacity={0.9} onPress={() => nav.navigate('NewConversation' as any)}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.fabInner}
-          >
-            <Icon name="message-square" size={22} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
+      {/* FAB nouveau message */}
+      <TouchableOpacity style={[styles.fab, { shadowColor: colors.primary }]} activeOpacity={0.9} onPress={() => nav.navigate('NewConversation' as any)}>
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.fabInner}
+        >
+          <Icon name="message-square" size={22} color="#fff" />
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   );
 };
 
-// â”€â”€ ConversationRow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ConversationRow ──────────────────────────────────────────────────────────
 
 const ConversationRow: React.FC<{
   conv:          ConversationSummary;
@@ -666,7 +464,7 @@ const ConversationRow: React.FC<{
       delayLongPress={350}
       activeOpacity={0.7}
     >
-      {/* Checkbox overlay en mode s\u00e9lection */}
+      {/* Checkbox overlay en mode sélection */}
       {selectMode && (
         <View style={{ paddingRight: 4 }}>
           <View style={[
@@ -718,13 +516,13 @@ const ConversationRow: React.FC<{
           </Text>
         </View>
 
-        {/* Ligne 2 : aper\u00e7u message + badge/statut */}
+        {/* Ligne 2 : aperçu message + badge/statut */}
         <View style={styles.rowBottom}>
           <Text
             style={[styles.convLast, { color: unread ? colors.textSecondary : colors.textTertiary, fontWeight: unread ? '500' : '400' }]}
             numberOfLines={1}
           >
-            {conv.last_message ?? '\u2026'}
+            {conv.last_message ?? '…'}
           </Text>
           {unread && !selectMode ? (
             <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
@@ -741,120 +539,6 @@ const ConversationRow: React.FC<{
   );
 };
 
-// ── CallRow ────────────────────────────────────────────────────────────────────
-
-const DIR_COLOR: Record<string, string> = {
-  outgoing: '#36D9A0',
-  incoming: '#3B82F6',
-  missed:   '#E0389A',
-};
-const DIR_ICON: Record<string, string> = {
-  outgoing: 'phone-outgoing',
-  incoming: 'phone-incoming',
-  missed:   'phone-missed',
-};
-const DIR_LABEL: Record<string, string> = {
-  outgoing: 'Appel émis',
-  incoming: 'Reçu',
-  missed:   'Manqué',
-};
-
-function formatCallDate(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000);
-  if (diffMin < 1)  return 'À l\'instant';
-  if (diffMin < 60) return `Il y a ${diffMin} min`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24)   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  if (diffH < 48)   return 'Hier';
-  if (diffH < 168)  return d.toLocaleDateString('fr-FR', { weekday: 'long' });
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-}
-
-function formatCallDuration(sec: number): string {
-  if (!sec) return '';
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return m > 0 ? `${m}min ${s > 0 ? `${s}s` : ''}`.trim() : `${s}s`;
-}
-
-interface CallRowProps {
-  record:        CallRecord;
-  colors:        any;
-  onCallBack:    (type: 'voice' | 'video') => void;
-  onMessage:     () => void;
-  onAvatarPress: () => void;
-}
-
-const CallRow: React.FC<CallRowProps> = ({ record, colors, onCallBack, onMessage, onAvatarPress }) => {
-  const accent    = accentFor(record.partnerId);
-  const dirColor  = DIR_COLOR[record.direction] ?? '#9390AB';
-  const dirIcon   = DIR_ICON[record.direction]  ?? 'phone';
-  const dirLabel  = DIR_LABEL[record.direction] ?? '';
-  const isMissed  = record.direction === 'missed';
-  const duration  = formatCallDuration(record.durationSec);
-
-  return (
-    <View style={[cst.card, { backgroundColor: colors.surface, borderColor: isMissed ? '#E0389A22' : colors.divider }]}>
-      {/* Ligne du haut : avatar + infos + date */}
-      <View style={cst.topRow}>
-        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={cst.avatarWrap}>
-          {record.avatarUrl ? (
-            <Image source={{ uri: record.avatarUrl }} style={[cst.avatar, { borderColor: accent + '44' }]} />
-          ) : (
-            <View style={[cst.avatar, { backgroundColor: accent + '22', borderColor: accent + '44' }]}>
-              <Text style={[cst.avatarText, { color: accent }]}>{getInitials(record.partnerName)}</Text>
-            </View>
-          )}
-          <View style={[cst.typeBadge, { backgroundColor: colors.background }]}>
-            <Icon name={record.callType === 'video' ? 'video' : 'phone'} size={10} color={dirColor} />
-          </View>
-        </TouchableOpacity>
-
-        <View style={cst.info}>
-          <Text style={[cst.name, { color: isMissed ? dirColor : colors.textPrimary }]} numberOfLines={1}>
-            {record.partnerName}
-          </Text>
-          <View style={cst.subRow}>
-            <Icon name={dirIcon} size={12} color={dirColor} />
-            <Text style={[cst.sub, { color: isMissed ? dirColor : colors.textSecondary }]}>
-              {dirLabel}{duration ? `  ·  ${duration}` : ''}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={[cst.date, { color: colors.textTertiary }]}>{formatCallDate(record.startedAt)}</Text>
-      </View>
-
-      {/* Séparateur */}
-      <View style={[cst.divider, { backgroundColor: colors.divider }]} />
-
-      {/* Ligne du bas : boutons horizontaux */}
-      <View style={cst.actions}>
-        <TouchableOpacity style={cst.actionItem} onPress={() => onCallBack('voice')} activeOpacity={0.75}>
-          <Icon name="phone" size={16} color="#36D9A0" />
-          <Text style={[cst.actionLabel, { color: '#36D9A0' }]}>Appel vocal</Text>
-        </TouchableOpacity>
-
-        <View style={[cst.actionSep, { backgroundColor: colors.divider }]} />
-
-        <TouchableOpacity style={cst.actionItem} onPress={() => onCallBack('video')} activeOpacity={0.75}>
-          <Icon name="video" size={16} color="#3B82F6" />
-          <Text style={[cst.actionLabel, { color: '#3B82F6' }]}>Vidéo</Text>
-        </TouchableOpacity>
-
-        <View style={[cst.actionSep, { backgroundColor: colors.divider }]} />
-
-        <TouchableOpacity style={cst.actionItem} onPress={onMessage} activeOpacity={0.75}>
-          <Icon name="message-circle" size={16} color={colors.primary} />
-          <Text style={[cst.actionLabel, { color: colors.primary }]}>Message</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
-
 const sst = StyleSheet.create({
   checkbox: {
     width: 22, height: 22, borderRadius: 11, borderWidth: 2,
@@ -864,59 +548,6 @@ const sst = StyleSheet.create({
     paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8,
   },
   newRequestPillText: { fontSize: 10, fontWeight: '700', color: '#fff' },
-});
-
-const cst = StyleSheet.create({
-  card: {
-    marginHorizontal: 16,
-    marginVertical:   5,
-    borderRadius:     16,
-    borderWidth:      1,
-    overflow:         'hidden',
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    padding:       12,
-    gap:           12,
-  },
-  avatarWrap: { position: 'relative' },
-  avatar: {
-    width: 50, height: 50, borderRadius: 25,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2,
-  },
-  avatarText: { fontSize: 17, fontWeight: '800' },
-  typeBadge: {
-    position: 'absolute', bottom: -2, right: -2,
-    width: 18, height: 18, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 3, elevation: 2,
-  },
-  info: { flex: 1, gap: 3 },
-  name: { fontSize: 15, fontWeight: '700' },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sub: { fontSize: 13 },
-  date: { fontSize: 11 },
-  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
-  actions: {
-    flexDirection: 'row',
-    alignItems:    'center',
-  },
-  actionItem: {
-    flex: 1,
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-    paddingVertical: 10,
-  },
-  actionLabel: { fontSize: 13, fontWeight: '600' },
-  actionSep: { width: StyleSheet.hairlineWidth, height: 20 },
-  actionBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-  },
 });
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -931,11 +562,12 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: '800' },
   badge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-
-  tabsRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, marginHorizontal: -Spacing[4] },
-  tabBtn: { flex: 1, alignItems: 'center', paddingBottom: 8, paddingTop: 2, position: 'relative' },
-  tabLabel: { fontSize: 14, fontWeight: '700' },
-  tabIndicator: { position: 'absolute', bottom: 0, left: '15%', right: '15%', height: 2, borderRadius: 2 },
+  miniBadge: {
+    position: 'absolute', top: -2, right: -2,
+    minWidth: 16, height: 16, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  miniBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 
   searchBar: { flexDirection: 'row', alignItems: 'center', height: 40, borderRadius: BorderRadius.full, paddingHorizontal: Spacing[3], gap: 8 },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },

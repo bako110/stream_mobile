@@ -112,6 +112,10 @@ export interface UserPublic {
   website?: string | null;
   is_online?: boolean | null;
   is_live?: boolean | null;
+  is_boosted?: boolean;
+  mutual_count?: number;
+  is_contact?: boolean;
+  distance_km?: number | null;
 }
 
 export interface UserPublicProfile extends UserPublic {

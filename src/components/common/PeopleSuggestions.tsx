@@ -174,6 +174,19 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                       {item.username && (
                         <Text style={[st.handle, { color: colors.textTertiary }]} numberOfLines={1}>@{item.username}</Text>
                       )}
+                      {item.is_contact ? (
+                        <View style={[st.signalPill, { backgroundColor: colors.primary + '18' }]}>
+                          <Icon name="user-check" size={10} color={colors.primary} />
+                          <Text style={[st.signalText, { color: colors.primary }]}>Dans vos contacts</Text>
+                        </View>
+                      ) : item.distance_km != null ? (
+                        <View style={[st.signalPill, { backgroundColor: colors.textTertiary + '18' }]}>
+                          <Icon name="map-pin" size={10} color={colors.textTertiary} />
+                          <Text style={[st.signalText, { color: colors.textTertiary }]}>
+                            À {item.distance_km < 1 ? '< 1' : Math.round(item.distance_km)} km
+                          </Text>
+                        </View>
+                      ) : null}
                     </TouchableOpacity>
 
                     {/* Bouton Suivre */}
@@ -230,6 +243,8 @@ const st = StyleSheet.create({
   cardBody:   { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, paddingTop: AVATAR_SZ / 2 + 8, gap: 4 },
   name:       { fontSize: 14, fontWeight: '700', textAlign: 'center' },
   handle:     { fontSize: 11, textAlign: 'center' },
+  signalPill: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  signalText: { fontSize: 10, fontWeight: '700' },
 
   followBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, borderRadius: 8, paddingVertical: 10, width: '100%' },
   btnSkeleton:{ height: 38, borderRadius: 8, width: '100%', marginTop: 8 },

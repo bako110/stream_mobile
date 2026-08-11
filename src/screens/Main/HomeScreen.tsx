@@ -8,6 +8,8 @@ import {
   Share, ScrollView, Platform,
 } from 'react-native';
 import Contacts from 'react-native-contacts';
+import { sha256 } from 'js-sha256';
+import Geolocation from '@react-native-community/geolocation';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { apiClient, Endpoints } from '../../api';
 import Animated, {
@@ -171,6 +173,7 @@ export const HomeScreen: React.FC = () => {
   const [hasMore,        setHasMore]        = useState(true);
   const [loadingMore,    setLoadingMore]    = useState(false);
   const contactsAskedRef  = useRef(false);
+  const locationSyncAskedRef = useRef(false);
   const loadingMoreRef    = useRef(false);
   const currentLoadRef    = useRef<number>(0);
   const lastLoadedAtRef   = useRef<number>(0);
@@ -213,6 +216,24 @@ export const HomeScreen: React.FC = () => {
           if (p.number) phones.push(normalizePhone(p.number));
         }
       }
+
+      // Suggestions intelligentes : hash SHA-256 des contacts (téléphone +
+      // email) avant l'envoi — le serveur ne stocke/compare jamais que des
+      // hashs. Fire-and-forget, ne doit jamais bloquer/casser le matching
+      // d'events existant ci-dessous.
+      const hashes = new Set<string>();
+      for (const c of contacts) {
+        for (const p of c.phoneNumbers ?? []) {
+          if (p.number) hashes.add(sha256(normalizePhone(p.number)));
+        }
+        for (const e of c.emailAddresses ?? []) {
+          if (e.email) hashes.add(sha256(e.email.trim().toLowerCase()));
+        }
+      }
+      if (hashes.size) {
+        userService.syncContacts(Array.from(hashes)).catch(() => {});
+      }
+
       if (!phones.length) return [];
 
       const res = await apiClient.post<{ user_ids: string[] }>(
@@ -427,6 +448,23 @@ export const HomeScreen: React.FC = () => {
             }).catch(() => {});
         }
       });
+    }
+
+    // Position GPS pour les suggestions "près de vous" — vérification
+    // silencieuse uniquement (jamais de popup ici) : si la permission a déjà
+    // été accordée par ailleurs (ex: écran "Près de toi"), on récupère la
+    // position une fois et on la pousse au backend en fond.
+    if (!locationSyncAskedRef.current) {
+      locationSyncAskedRef.current = true;
+      const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
+      check(perm).then(status => {
+        if (status !== RESULTS.GRANTED) return;
+        Geolocation.getCurrentPosition(
+          pos => { userService.updateLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {}); },
+          () => {},
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 },
+        );
+      }).catch(() => {});
     }
   }, [filter]);
 

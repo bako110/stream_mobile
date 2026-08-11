@@ -93,6 +93,18 @@ export const userService = {
     return res.data;
   },
 
+  /** Envoie les hashs SHA-256 du carnet d'adresses — jamais les contacts en clair.
+   *  Remplace l'ensemble précédent (sync complet, pas incrémental). */
+  async syncContacts(hashes: string[]): Promise<void> {
+    await apiClient.post(Endpoints.users.contactsSync, { hashes });
+  },
+
+  /** Met à jour ma position GPS — utilisée uniquement pour pondérer les
+   *  suggestions "près de vous", jamais exposée telle quelle aux autres users. */
+  async updateLocation(latitude: number, longitude: number): Promise<void> {
+    await apiClient.put(Endpoints.users.updateLocation, { latitude, longitude });
+  },
+
   async getPrivacy(): Promise<PrivacySettings> {
     const res = await apiClient.get<PrivacySettings>(Endpoints.users.privacy);
     return res.data;

@@ -56,6 +56,8 @@ export const Endpoints = {
     playback:       `${V1}/users/me/playback`,
     // Admin
     matchContacts:  `${V1}/users/match-contacts`,
+    contactsSync:   `${V1}/users/contacts/sync`,
+    updateLocation: `${V1}/users/me/location`,
     list:           `${V1}/users`,
     changeRole:     (id: string) => `${V1}/users/${id}/role`,
     deactivate:     (id: string) => `${V1}/users/${id}/deactivate`,
@@ -489,6 +491,7 @@ export const Endpoints = {
   // ── Signalements ──────────────────────────────────────────────────────────
   reports: {
     create: `${V1}/reports`,
+    me:     `${V1}/reports/me`,
   },
 
   // ── Feedback / avis utilisateurs sur l'application ────────────────────────

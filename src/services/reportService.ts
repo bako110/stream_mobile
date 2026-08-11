@@ -1,7 +1,7 @@
 import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 
-export type ReportContentType = 'reel' | 'event' | 'concert' | 'comment' | 'post' | 'live';
+export type ReportContentType = 'reel' | 'event' | 'concert' | 'comment' | 'post' | 'live' | 'user';
 export type ReportReason = 'spam' | 'inappropriate' | 'violence' | 'harassment' | 'misinformation' | 'other';
 
 export interface CreateReportPayload {

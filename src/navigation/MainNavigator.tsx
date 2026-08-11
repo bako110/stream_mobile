@@ -43,6 +43,8 @@ import { PrivacyScreen }         from '../screens/Main/PrivacyScreen';
 import { ChatScreen }            from '../screens/Main/ChatScreen';
 import { NewConversationScreen } from '../screens/Main/NewConversationScreen';
 import { NewCallScreen }         from '../screens/Main/NewCallScreen';
+import { CallHistoryScreen }     from '../screens/Main/CallHistoryScreen';
+import { ConversationDetailsScreen } from '../screens/Main/ConversationDetailsScreen';
 import { FollowingScreen }       from '../screens/Main/FollowingScreen';
 import { CommunitiesScreen }     from '../screens/Main/CommunitiesScreen';
 import { CommunitiesDiscoverScreen } from '../screens/Main/CommunitiesDiscoverScreen';
@@ -60,6 +62,7 @@ import { CreatePostScreen }      from '../screens/Create/CreatePostScreen';
 import { ConcertDetailScreen }   from '../screens/Detail/ConcertDetailScreen';
 import { EventDetailScreen }     from '../screens/Detail/EventDetailScreen';
 import { AiAnalysisStatusScreen, type AiContentType } from '../screens/Detail/AiAnalysisStatusScreen';
+import { MyVerificationQueueScreen } from '../screens/Main/MyVerificationQueueScreen';
 import { FilmDetailScreen }      from '../screens/Detail/FilmDetailScreen';
 import { SerieEpisodesScreen }   from '../screens/Detail/SerieEpisodesScreen';
 import { VideoPlayerScreen }     from '../screens/Detail/VideoPlayerScreen';
@@ -167,6 +170,7 @@ export type MainStackParamList = {
   ConcertDetail:   { concertId: string };
   EventDetail:     { eventId:   string };
   AiAnalysisStatus: { contentType: AiContentType; contentId: string; initialStatus?: 'pending' | 'done' | null };
+  MyVerificationQueue: undefined;
   MyTicket:        { ticket: any };
   Attendees:       { eventId: string; eventTitle: string };
   TicketScanner:   { eventId: string; eventTitle: string };
@@ -188,10 +192,12 @@ export type MainStackParamList = {
   Settings:        undefined;
   ChangePassword:  undefined;
   Privacy:         undefined;
-  Chat:            { partnerId: string; partnerName: string; avatarUrl?: string };
+  Chat:            { partnerId: string; partnerName: string; avatarUrl?: string; isOnline?: boolean; lastSeen?: string | null };
   Call:            { partnerId: string; partnerName: string; partnerAvatar?: string | null; callType: 'voice' | 'video'; isIncoming: boolean; offer?: any };
   NewConversation: undefined;
   NewCall:         undefined;
+  CallHistory:         undefined;
+  ConversationDetails: { partnerId: string; partnerName: string; avatarUrl?: string; isOnline?: boolean; lastSeen?: string | null; isVerified?: boolean };
   Following:       { userId?: string; tab?: 'followers' | 'following' } | undefined;
   CommunityChat:           { communityId: string; communityName: string };
   Communities:             undefined;
@@ -470,6 +476,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="ConcertDetail"  component={ConcertDetailWrapper}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="EventDetail"    component={EventDetailWrapper}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="AiAnalysisStatus" component={AiAnalysisStatusWrapper} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="MyVerificationQueue" component={MyVerificationQueueScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="UserProfile"    component={UserProfileScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ImageViewer"    component={ImageViewerScreen}     options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="EditProfile"    component={EditProfileScreen}     options={{ animation: 'slide_from_right' }} />
@@ -495,6 +502,8 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="Call"           component={CallScreen}            options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="NewConversation" component={NewConversationScreen} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="NewCall"        component={NewCallScreen}         options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="CallHistory"         component={CallHistoryScreen}         options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="ConversationDetails" component={ConversationDetailsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityChat"  component={CommunityChatScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Following"      component={FollowingScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Communities"    component={CommunitiesScreen}     options={{ animation: 'slide_from_right' }} />

@@ -24,7 +24,6 @@ import Slider from '@react-native-community/slider';
 import { useTheme } from '../../hooks/useTheme';
 import { Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
-import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { uploadAudioFile, uploadMessageImage, uploadFileFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
@@ -175,6 +174,10 @@ export const ChatScreen: React.FC = () => {
   const [isBlocked,       setIsBlocked]       = useState(false);
   const [requestStatus,   setRequestStatus]   = useState<ConversationRequestStatus>('none');
   const [requestActionLoading, setRequestActionLoading] = useState(false);
+  // Tant que le vrai statut (bloqué / demande en attente / accepté) n'est pas
+  // connu, on ne montre ni le composer ni les bandeaux — évite le flash où le
+  // champ de saisie apparaît puis disparaît une fois la réponse API reçue.
+  const [statusReady, setStatusReady] = useState(false);
 
   const [replyingTo,        setReplyingTo]        = useState<Message | null>(null);
   const [pinnedMessages,    setPinnedMessages]    = useState<Message[]>([]);
@@ -309,9 +312,11 @@ export const ChatScreen: React.FC = () => {
   // Connaître à l'avance le statut de la demande de conversation — évite de
   // laisser taper un message qui échouera silencieusement à l'envoi
   useEffect(() => {
+    setStatusReady(false);
     messageService.getRequestStatus(partnerId)
       .then(r => setRequestStatus(r.status))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setStatusReady(true));
   }, [partnerId]);
 
   const loadMessages = useCallback(async (p = 1) => {
@@ -684,61 +689,8 @@ export const ChatScreen: React.FC = () => {
     );
   };
 
-  // ── More menu ────────────────────────────────────────────────────────────
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-
   const handleViewProfile = () => {
-    setShowMoreMenu(false);
     nav.navigate('UserProfile', { userId: partnerId });
-  };
-
-  const handleBlockUser = () => {
-    setShowMoreMenu(false);
-    showConfirm(
-      'Bloquer cet utilisateur',
-      `Bloquer ${partnerName} ? Vous ne pourrez plus échanger de messages.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Bloquer', style: 'destructive', onPress: async () => {
-            try {
-              await userService.blockUser(partnerId);
-              setIsBlocked(true);
-            } catch {
-              toastService.error('Erreur', 'Impossible de bloquer cet utilisateur.');
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const handleClearChat = () => {
-    setShowMoreMenu(false);
-    const myCount    = messages.filter(m => m.sender_id === myId && !m.deleted).length;
-    const theirCount = messages.filter(m => m.sender_id !== myId && !m.deleted).length;
-    showConfirm(
-      'Vider la conversation',
-      `Cette action va :\n\n• Supprimer définitivement vos ${myCount} message${myCount > 1 ? 's' : ''} pour tout le monde\n• Masquer les ${theirCount} message${theirCount > 1 ? 's' : ''} reçus de votre côté uniquement\n\nCette action est irréversible.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Vider quand même', style: 'destructive', onPress: async () => {
-            const snapshot = [...messages];
-            setMessages([]);
-            setPinnedMessages([]);
-            await Promise.all(snapshot.map(m => {
-              if (m.deleted) return Promise.resolve();
-              if (m.sender_id === myId) {
-                return messageService.deleteMessage(m.id).catch(() => {});
-              } else {
-                return messageService.deleteMessageForMe(m.id).catch(() => {});
-              }
-            }));
-          },
-        },
-      ],
-    );
   };
 
   const loadConvsForForward = async () => {
@@ -1374,14 +1326,29 @@ export const ChatScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.callBtn}
+          onPress={() => {
+            if (showSearch) { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }
+            else setShowSearch(true);
+          }}
+        >
+          <Icon name={showSearch ? 'x' : 'search'} size={19} color={colors.textPrimary} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.callBtn} onPress={() => startCall('voice')}>
           <Icon name="phone" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.callBtn} onPress={() => startCall('video')}>
           <Icon name="video" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.moreBtn} onPress={() => setShowMoreMenu(true)}>
-          <Icon name="more-vertical" size={20} color={colors.textPrimary} />
+        <TouchableOpacity
+          style={styles.moreBtn}
+          onPress={() => nav.navigate('ConversationDetails', {
+            partnerId, partnerName, avatarUrl: partnerAvatarUrl,
+            isOnline: partnerOnline, lastSeen: partnerLastSeen,
+          })}
+        >
+          <Icon name="info" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -1524,7 +1491,7 @@ export const ChatScreen: React.FC = () => {
       )}
 
       {/* Bannière blocage de compte (UserBlock) */}
-      {isBlocked && (
+      {statusReady && isBlocked && (
         <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
           <Icon name="slash" size={16} color={colors.textTertiary} />
           <Text style={[styles.blockedText, { color: colors.textTertiary }]}>
@@ -1534,7 +1501,7 @@ export const ChatScreen: React.FC = () => {
       )}
 
       {/* Demande de conversation entrante — j'ai reçu un 1er message, je décide */}
-      {!isBlocked && requestStatus === 'pending_incoming' && (
+      {statusReady && !isBlocked && requestStatus === 'pending_incoming' && (
         <View style={[styles.requestBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
           <Text style={[styles.blockedText, { color: colors.textTertiary, marginBottom: 10 }]}>
             {partnerName} vous a envoyé un message. Autoriser cette personne à vous écrire ?
@@ -1567,7 +1534,7 @@ export const ChatScreen: React.FC = () => {
       )}
 
       {/* J'ai envoyé le message initial, j'attends la décision du destinataire */}
-      {!isBlocked && requestStatus === 'pending_outgoing' && (
+      {statusReady && !isBlocked && requestStatus === 'pending_outgoing' && (
         <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
           <Icon name="clock" size={16} color={colors.textTertiary} />
           <Text style={[styles.blockedText, { color: colors.textTertiary }]}>
@@ -1577,7 +1544,7 @@ export const ChatScreen: React.FC = () => {
       )}
 
       {/* Conversation bloquée */}
-      {!isBlocked && (requestStatus === 'blocked' || requestStatus === 'blocked_by_me') && (
+      {statusReady && !isBlocked && (requestStatus === 'blocked' || requestStatus === 'blocked_by_me') && (
         <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
           <Icon name="slash" size={16} color={colors.textTertiary} />
           <Text style={[styles.blockedText, { color: colors.textTertiary }]}>
@@ -1591,7 +1558,7 @@ export const ChatScreen: React.FC = () => {
       {/* Input bar — masquée seulement si je suis en attente de reponse (pending_outgoing)
           ou si la conversation est bloquee ; reste active pour pending_incoming car
           repondre vaut acceptation implicite */}
-      {!isRecording && !isBlocked
+      {statusReady && !isRecording && !isBlocked
         && requestStatus !== 'pending_outgoing'
         && requestStatus !== 'blocked'
         && requestStatus !== 'blocked_by_me'
@@ -1658,6 +1625,20 @@ export const ChatScreen: React.FC = () => {
                 </TouchableOpacity>
               </>
             )}
+          </View>
+        </View>
+      )}
+
+      {/* Zone de saisie en cours de préparation — le temps de connaître le
+          vrai statut de la conversation (bloqué / demande en attente), pour
+          éviter que le composer n'apparaisse puis disparaisse. */}
+      {!statusReady && (
+        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+          <View style={styles.inputRow}>
+            <View style={[styles.inputSkeletonWrap, { backgroundColor: colors.backgroundSecondary }]} />
+            <View style={[styles.inputSkeletonSend, { backgroundColor: colors.backgroundSecondary }]}>
+              <ActivityIndicator size="small" color={colors.textTertiary} />
+            </View>
           </View>
         </View>
       )}
@@ -1923,35 +1904,6 @@ export const ChatScreen: React.FC = () => {
         </View>
       )}
 
-      {/* More menu */}
-      <Modal visible={showMoreMenu} transparent animationType="fade" onRequestClose={() => setShowMoreMenu(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowMoreMenu(false)}>
-          <View style={[styles.attachSheet, { backgroundColor: colors.surface }]}>
-            <View style={[styles.attachHandle, { backgroundColor: colors.divider }]} />
-            <TouchableOpacity style={styles.actionItem} onPress={() => { setShowMoreMenu(false); setShowSearch(true); }}>
-              <Icon name="search" size={20} color={colors.textPrimary} />
-              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Rechercher</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionItem} onPress={() => { setShowMoreMenu(false); setShowPinned(true); }}>
-              <Icon name="bookmark" size={20} color={colors.textPrimary} />
-              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Messages épinglés</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionItem} onPress={handleViewProfile}>
-              <Icon name="user" size={20} color={colors.textPrimary} />
-              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Voir le profil</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionItem} onPress={handleClearChat}>
-              <Icon name="trash" size={20} color={colors.textTertiary} />
-              <Text style={[styles.actionText, { color: colors.textTertiary }]}>Vider la conversation</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionItem} onPress={handleBlockUser}>
-              <Icon name="slash" size={20} color={colors.error ?? '#FF4444'} />
-              <Text style={[styles.actionText, { color: colors.error ?? '#FF4444' }]}>Bloquer {partnerName}</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
       {/* Messages épinglés modal */}
       <Modal visible={showPinned} transparent animationType="slide" onRequestClose={() => setShowPinned(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowPinned(false)}>
@@ -2212,6 +2164,8 @@ const styles = StyleSheet.create({
   },
   sendBtn:      { justifyContent: 'flex-end' },
   sendBtnInner: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  inputSkeletonWrap: { flex: 1, height: 44, borderRadius: 22 },
+  inputSkeletonSend: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
 
   // Attachment modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },

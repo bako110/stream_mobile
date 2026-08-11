@@ -167,4 +167,23 @@ export const messageService = {
   async deleteConversation(partnerId: string): Promise<void> {
     await apiClient.delete(Endpoints.messages.deleteConversation(partnerId));
   },
+
+  async getMuteStatus(partnerId: string): Promise<boolean> {
+    const res = await apiClient.get<{ muted: boolean }>(`${Endpoints.messages.conversation(partnerId)}/mute`);
+    return res.data.muted;
+  },
+
+  async muteConversation(partnerId: string): Promise<void> {
+    await apiClient.post(`${Endpoints.messages.conversation(partnerId)}/mute`);
+  },
+
+  async unmuteConversation(partnerId: string): Promise<void> {
+    await apiClient.delete(`${Endpoints.messages.conversation(partnerId)}/mute`);
+  },
+
+  async getConversationMedia(partnerId: string, page = 1, limit = 30): Promise<Message[]> {
+    const query = new URLSearchParams({ page: String(page), limit: String(limit) }).toString();
+    const res = await apiClient.get<Message[]>(`${Endpoints.messages.conversation(partnerId)}/media?${query}`);
+    return res.data;
+  },
 };
