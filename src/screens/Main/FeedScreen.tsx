@@ -1605,12 +1605,20 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         searchService.getFeed(nextPage, feedLimit).catch(() => ({ items: [] })),
         reelService.getFeed({ page: nextPage, limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: nextPage })),
       ]);
-      feedHasMoreRef.current = (feedResult.items ?? []).length >= feedLimit;
+      const feedRawItems = feedResult.items ?? [];
+      const reelRawItems = Array.isArray((reelsResult as any)?.items) ? (reelsResult as any).items : Array.isArray(reelsResult) ? reelsResult : [];
+      feedHasMoreRef.current = feedRawItems.length >= feedLimit;
+      // Le pool se retrie a chaque page (score = f(temps)) -- une page BRUTE non vide
+      // peut ne contenir QUE des items deja vus sur une page precedente (recoupement),
+      // sans que le catalogue soit pour autant epuise. Ne conclure a la fin du flux que
+      // si le backend lui-meme ne renvoie plus rien, jamais seulement sur la dedup —
+      // sinon le scroll s'arretait prematurement des la 1ere page entierement recoupee.
+      const rawIsEmpty = feedRawItems.length === 0 && reelRawItems.length === 0;
 
-      const feedItems: FeedItem[] = (feedResult.items ?? [])
+      const feedItems: FeedItem[] = feedRawItems
         .filter((item: any) => (item.kind === 'event' || item.kind === 'concert' || item.kind === 'post') && item.id)
         .map((item: any) => ({ kind: item.kind as 'event' | 'concert' | 'post', id: item.id, data: item }));
-      const reelItems: FeedItem[] = (Array.isArray((reelsResult as any)?.items) ? (reelsResult as any).items : Array.isArray(reelsResult) ? reelsResult : [])
+      const reelItems: FeedItem[] = reelRawItems
         .filter((r: any) => r?.id)
         .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
 
@@ -1622,8 +1630,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         return true;
       });
 
+      feedPageRef.current = nextPage;
+
       if (fresh.length === 0) {
-        setHasMoreFeed(false);
+        // Page entierement recoupee (deja vue) : le flux n'est fini que si le
+        // backend n'a lui-meme plus rien a offrir, sinon on avance juste la page
+        // (l'utilisateur re-declenchera le scroll naturellement pour la suivante).
+        if (rawIsEmpty) setHasMoreFeed(false);
       } else {
         // Regrouper les reels de cette page en une rangée, injectée après le 1er post/event
         // de la page (même logique de position que load('all') : première rangée à i===2)
@@ -1670,7 +1683,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
         nonReelCountRef.current += freshNonReel.length;
         setItems(prev => [...prev, ...appended]);
-        feedPageRef.current = nextPage;
         if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
       }
     } catch (err) {
