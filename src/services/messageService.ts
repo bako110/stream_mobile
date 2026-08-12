@@ -1,6 +1,6 @@
 import { apiClient, Endpoints } from '../api';
 
-export type MessageType = 'text' | 'voice' | 'image' | 'video' | 'file' | 'sticker' | 'location';
+export type MessageType = 'text' | 'voice' | 'image' | 'video' | 'file' | 'sticker' | 'location' | 'share';
 
 export interface ReplyPreview {
   id:           string;
@@ -21,6 +21,15 @@ export interface AttachmentMeta {
   longitude?:     number;
   address?:       string | null;
   hls_url?:       string;
+  // message_type "share" — le client n'envoie que share_type/share_id, le
+  // backend reconstruit title/image/author depuis la DB (voir
+  // _resolve_share_meta côté backend, ne jamais faire confiance au client).
+  share_type?:    string;
+  share_id?:      string;
+  title?:         string | null;
+  image?:         string | null;
+  author_name?:   string | null;
+  author_avatar?: string | null;
 }
 
 export type ConversationRequestStatus = 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'blocked' | 'blocked_by_me';
