@@ -135,7 +135,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             image_url  = image_urls[0];
           }
 
-          await postService.create({
+          const created = await postService.create({
             body: capturedBody || undefined,
             image_url,
             image_urls,
@@ -143,6 +143,12 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             category: capturedCategory,
             mention_ids: mentionIds.length ? mentionIds : undefined,
           });
+          // pending_review (2026-08bis) : media present -> invisible tant que
+          // l'IA n'a pas confirme "cleared" -- message different du succes
+          // immediat habituel, cf. MyVerificationQueueScreen.tsx pour le suivi.
+          if (created.status === 'pending_review') {
+            toastService.success('Envoyé', 'Publication en cours de vérification, elle sera visible une fois confirmée.');
+          }
         } catch (err: any) {
           console.warn('[CreatePost] échec création post:', err?.message ?? err);
         }

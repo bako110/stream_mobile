@@ -38,6 +38,7 @@ export interface Post {
   music_url?: string | null;
   music_title?: string | null;
   ai_analysis_status?: 'pending' | 'done' | null;
+  status?: 'published' | 'limited' | 'archived' | 'pending_review' | null;
 }
 
 export interface PostCreate {

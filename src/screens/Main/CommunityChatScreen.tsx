@@ -37,6 +37,7 @@ const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecor
 const audioRecorderCommunity = new AudioRecorderPlayerClass();
 const MAX_VOICE_DURATION_SEC = 5 * 60;
 
+
 const { width: W, height: H } = Dimensions.get('window');
 
 interface RouteParams { communityId: string; communityName: string; }

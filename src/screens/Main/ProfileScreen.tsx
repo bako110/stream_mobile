@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   ActivityIndicator, StyleSheet, ToastAndroid, Platform,
+  Modal, TextInput, KeyboardAvoidingView,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import LinearGradient from 'react-native-linear-gradient';
@@ -11,7 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AppHeader, SkeletonProfile } from '../../components/common';
-import { userService, eventService, concertService, reelService, postService, toastService } from '../../services';
+import { userService, eventService, concertService, reelService, postService, toastService, showConfirm } from '../../services';
 import { apiClient, Endpoints } from '../../api';
 import type { User } from '../../types';
 import type { Event } from '../../types/event';
@@ -47,6 +48,43 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [showQR, setShowQR] = useState(false);
+
+  // ── Menu "..." (éditer/supprimer) sur mes posts/reels ────────────────────
+  const [menuTarget, setMenuTarget] = useState<{ kind: 'post' | 'reel'; id: string } | null>(null);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [editBody,    setEditBody]    = useState('');
+  const [editSaving,  setEditSaving]  = useState(false);
+
+  const handleDeletePost = useCallback((id: string) => {
+    showConfirm('Supprimer', 'Supprimer ce post ?', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: async () => {
+        try { await postService.delete(id); setMyPosts(prev => prev.filter(p => p.id !== id)); }
+        catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
+      }},
+    ]);
+  }, []);
+
+  const handleDeleteReel = useCallback((id: string) => {
+    showConfirm('Supprimer', 'Supprimer ce reel ?', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: async () => {
+        try { await reelService.delete(id); setMyReels(prev => prev.filter(r => r.id !== id)); }
+        catch { toastService.error('Erreur', 'Impossible de supprimer.'); }
+      }},
+    ]);
+  }, []);
+
+  const handleSaveEditPost = useCallback(async () => {
+    if (!editingPost || !editBody.trim()) return;
+    setEditSaving(true);
+    try {
+      await postService.update(editingPost.id, { body: editBody.trim() });
+      setMyPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, body: editBody.trim() } : p));
+      setEditingPost(null);
+    } catch { toastService.error('Erreur', 'Impossible de modifier.'); }
+    finally { setEditSaving(false); }
+  }, [editingPost, editBody]);
 
   const lastLoadedAtRef = useRef<number>(0);
   const didMountRef     = useRef(false);
@@ -269,6 +307,12 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 </View>
                 <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>QR Code</Text>
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => nav.navigate('MyVerificationQueue')} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="shield" size={20} color={colors.textSecondary} />
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>Vérifs</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => nav.navigate('Settings')} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="more-horizontal" size={20} color={colors.textSecondary} />
@@ -449,7 +493,13 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                           {new Date(p.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                         </Text>
                       </View>
-                      <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+                      <TouchableOpacity
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={() => setMenuTarget({ kind: 'post', id: post.id })}
+                        style={{ padding: 4 }}
+                      >
+                        <Icon name="more-vertical" size={16} color={colors.textTertiary} />
+                      </TouchableOpacity>
                     </TouchableOpacity>
                   );
                 })}
@@ -493,6 +543,13 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                           <Icon name="eye" size={10} color="#fff" />
                           <Text style={{ fontSize: 10, color: '#fff', fontWeight: '700' }}>{reel.view_count ?? 0}</Text>
                         </View>
+                        <TouchableOpacity
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          onPress={() => setMenuTarget({ kind: 'reel', id: reel.id })}
+                          style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Icon name="more-vertical" size={13} color="#fff" />
+                        </TouchableOpacity>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -546,6 +603,79 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
           )}
         </ScrollView>
       )}
+
+      {/* Menu "..." — éditer/supprimer sur mes posts/reels */}
+      <Modal transparent animationType="slide" visible={!!menuTarget} onRequestClose={() => setMenuTarget(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1} onPress={() => setMenuTarget(null)}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 24, paddingTop: 8 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.divider, alignSelf: 'center', marginVertical: 8 }} />
+            {menuTarget?.kind === 'post' && (
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 }}
+                onPress={() => {
+                  const post = myPosts.find(p => p.id === menuTarget.id) ?? null;
+                  setEditingPost(post);
+                  setEditBody((post as any)?.body ?? '');
+                  setMenuTarget(null);
+                }}
+              >
+                <Icon name="edit-2" size={17} color={colors.textPrimary} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>Modifier</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 }}
+              onPress={() => {
+                const target = menuTarget;
+                setMenuTarget(null);
+                if (!target) return;
+                if (target.kind === 'post') handleDeletePost(target.id);
+                else handleDeleteReel(target.id);
+              }}
+            >
+              <Icon name="trash-2" size={17} color="#EF4444" />
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#EF4444' }}>Supprimer</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Édition rapide d'un post (texte) */}
+      <Modal visible={!!editingPost} transparent animationType="slide" onRequestClose={() => setEditingPost(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditingPost(null)} />
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 12 }}>Modifier le post</Text>
+            <TextInput
+              value={editBody}
+              onChangeText={setEditBody}
+              multiline
+              autoFocus
+              style={{ minHeight: 100, fontSize: 14, color: colors.textPrimary, textAlignVertical: 'top', backgroundColor: colors.surfaceElevated, borderRadius: 12, padding: 12 }}
+              placeholderTextColor={colors.textTertiary}
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
+                onPress={() => setEditingPost(null)}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.primary, opacity: editSaving || !editBody.trim() ? 0.6 : 1 }}
+                onPress={handleSaveEditPost}
+                disabled={editSaving || !editBody.trim()}
+              >
+                {editSaving ? <ActivityIndicator color="#fff" size="small" /> : (
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Enregistrer</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };

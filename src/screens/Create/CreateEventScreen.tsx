@@ -354,19 +354,33 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
             const capturedTitle    = title.trim() || 'Événement';
             const isEdit = isEditing; const editId = eventId;
             setPublishing(false); onBack?.();
+            // pending_review (2026-08bis) : si une image est presente,
+            // l'analyse IA a deja demarre a la creation -- publish() echoue
+            // volontairement (409) tant qu'elle n'a pas confirme "cleared",
+            // cf. event_service.py::publish_event. Message adapte plutot
+            // qu'une erreur silencieuse ou une exception non geree.
+            const publishAfterSave = async (saved: { id: string }) => {
+              try {
+                await eventService.publish(saved.id);
+              } catch (e: any) {
+                if (e?.status === 409) {
+                  toastService.success('Envoyé', 'Événement en cours de vérification, il sera visible une fois confirmé.');
+                }
+              }
+            };
             if (capturedLocalUri) {
               backgroundUploadService.enqueueVideo({
                 localUri: capturedLocalUri, folder: 'events', type: 'event', label: capturedTitle,
                 onDone: async (result) => {
                   const payload = { ...basePayload, video_url: result.videoUrl, thumbnail_url: result.thumbnailUrl ?? basePayload.thumbnail_url };
                   const saved = isEdit ? await eventService.update(editId!, payload) : await eventService.create(payload);
-                  await eventService.publish(saved.id);
+                  await publishAfterSave(saved);
                 },
               });
             } else {
               const payload = { ...basePayload, video_url: videoUrl || undefined };
               (isEdit ? eventService.update(editId!, payload) : eventService.create(payload))
-                .then(saved => eventService.publish(saved.id)).catch(() => {});
+                .then(publishAfterSave).catch(() => {});
             }
           },
         },

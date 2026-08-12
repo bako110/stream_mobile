@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 import { notificationService } from '../../services/notificationService';
@@ -28,6 +29,7 @@ interface Props {
 
 export const AiAnalysisStatusScreen: React.FC<Props> = ({ contentType, contentId, initialStatus, onBack }) => {
   const { theme: { colors, isDark } } = useTheme();
+  const insets = useSafeAreaInsets();
   const { addListener, removeListener } = useWs();
 
   const [status, setStatus] = useState<'pending' | 'done' | null | undefined>(initialStatus);
@@ -73,7 +75,7 @@ export const AiAnalysisStatusScreen: React.FC<Props> = ({ contentType, contentId
   const label = CONTENT_LABEL[contentType];
 
   return (
-    <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: 0 }]}>
+    <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: insets.top }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
       <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <BackButton onPress={onBack} />

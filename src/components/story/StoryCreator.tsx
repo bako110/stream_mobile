@@ -539,9 +539,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   // vidéo → trimmer (même flux que la galerie, cohérent pour l'édition finale).
   const handleCameraCaptured = (result: StoryCameraResult) => {
     if (result.isPhoto) {
-      setLocalUri(result.uri); setStep('compose');
+      setMode('image'); setLocalUri(result.uri); setStep('compose');
     } else {
-      setLocalUri(result.uri); setVideoDuration(result.durationSec ?? 0);
+      setMode('video'); setLocalUri(result.uri); setVideoDuration(result.durationSec ?? 0);
       setShowTrimmer(true);
     }
   };

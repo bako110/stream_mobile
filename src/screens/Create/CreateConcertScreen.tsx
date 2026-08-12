@@ -319,6 +319,18 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
             setPublishing(false);
             onBack?.();
 
+            // pending_review (2026-08bis) : cf. CreateEventScreen.tsx pour le
+            // detail -- publish() echoue volontairement (409) tant que l'IA
+            // n'a pas confirme "cleared".
+            const publishAfterSave = async (saved: { id: string }) => {
+              try {
+                await concertService.publish(saved.id);
+              } catch (e: any) {
+                if (e?.status === 409) {
+                  toastService.success('Envoyé', 'Concert en cours de vérification, il sera visible une fois confirmé.');
+                }
+              }
+            };
             if (capturedLocalUri) {
               backgroundUploadService.enqueueVideo({
                 localUri: capturedLocalUri,
@@ -330,7 +342,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
                   const saved = isEdit
                     ? await concertService.update(editId!, payload)
                     : await concertService.create(payload);
-                  await concertService.publish(saved.id);
+                  await publishAfterSave(saved);
                 },
               });
             } else {
@@ -338,7 +350,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
               (isEdit
                 ? concertService.update(editId!, payload)
                 : concertService.create(payload)
-              ).then(saved => concertService.publish(saved.id)).catch(() => {});
+              ).then(publishAfterSave).catch(() => {});
             }
           },
         },

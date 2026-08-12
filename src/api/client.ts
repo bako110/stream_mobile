@@ -210,8 +210,8 @@ export const apiClient = {
   patch: <T>(endpoint: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(endpoint, { ...options, method: 'PATCH', body }),
 
-  delete: <T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(endpoint, { ...options, method: 'DELETE' }),
+  delete: <T>(endpoint: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(endpoint, { ...options, method: 'DELETE', body }),
 
   upload: async <T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> => {
     try {

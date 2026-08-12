@@ -6,6 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -171,6 +175,15 @@ export const SettingsSecurityScreen: React.FC = () => {
   const [revokingAll, setRevokingAll] = useState(false);
   const fadeAnims = useRef<Record<string, Animated.Value>>({});
 
+  // Step-up : mot de passe requis avant revocation (comptes avec mot de passe)
+  const [stepUpTarget, setStepUpTarget] = useState<'all' | string | null>(null);
+  const [stepUpPassword, setStepUpPassword] = useState('');
+  const [stepUpError, setStepUpError] = useState('');
+  const [stepUpLoading, setStepUpLoading] = useState(false);
+
+  const isStepUpRequired = (e: any) =>
+    e?.status === 403 && e?.data?.detail?.code === 'step_up_required';
+
   const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
@@ -191,6 +204,32 @@ export const SettingsSecurityScreen: React.FC = () => {
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
+  const doRevokeSession = useCallback(async (sessionId: string, password?: string) => {
+    setRevoking(sessionId);
+    try {
+      await apiClient.delete('/api/v1/auth/sessions/' + sessionId, password ? { password } : undefined);
+      const anim = fadeAnims.current[sessionId];
+      if (anim) {
+        Animated.timing(anim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
+          setSessions(prev => prev.filter(s => s.id !== sessionId));
+        });
+      } else {
+        setSessions(prev => prev.filter(s => s.id !== sessionId));
+      }
+      setStepUpTarget(null);
+      setStepUpPassword('');
+    } catch (e: any) {
+      if (isStepUpRequired(e)) {
+        setStepUpTarget(sessionId);
+        setStepUpError(password ? 'Mot de passe incorrect.' : '');
+      } else {
+        toastService.error('Erreur', 'Impossible de terminer cette session.');
+      }
+    } finally {
+      setRevoking(null);
+    }
+  }, []);
+
   const handleRevoke = useCallback((sessionId: string, isCurrent: boolean) => {
     const title   = isCurrent ? 'Se deconnecter ?' : 'Deconnecter cet appareil ?';
     const message = isCurrent
@@ -204,35 +243,43 @@ export const SettingsSecurityScreen: React.FC = () => {
         text: btnText,
         style: 'destructive',
         onPress: async () => {
-          try {
-            setRevoking(sessionId);
-            // Pour la session courante on utilise /auth/logout (pas de restriction)
-            if (isCurrent) {
+          // Pour la session courante on utilise /auth/logout (pas de restriction)
+          if (isCurrent) {
+            try {
+              setRevoking(sessionId);
               await apiClient.post('/api/v1/auth/logout', {});
-            } else {
-              await apiClient.delete('/api/v1/auth/sessions/' + sessionId);
-            }
-            const anim = fadeAnims.current[sessionId];
-            if (anim) {
-              Animated.timing(anim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
-                setSessions(prev => prev.filter(s => s.id !== sessionId));
-              });
-            } else {
-              setSessions(prev => prev.filter(s => s.id !== sessionId));
-            }
-            // Si c'est la session courante → déconnexion via RootNavigator
-            if (isCurrent) {
               authService.forceLogout();
+            } catch {
+              toastService.error('Erreur', 'Impossible de terminer cette session.');
+            } finally {
+              setRevoking(null);
             }
-          } catch {
-            toastService.error('Erreur', 'Impossible de terminer cette session.');
-          } finally {
-            setRevoking(null);
+            return;
           }
+          await doRevokeSession(sessionId);
         },
       },
     ]);
-  }, [nav]);
+  }, [nav, doRevokeSession]);
+
+  const doRevokeAll = useCallback(async (password?: string) => {
+    setRevokingAll(true);
+    try {
+      await apiClient.delete('/api/v1/auth/sessions', password ? { password } : undefined);
+      setSessions(prev => prev.filter(s => s.is_current));
+      setStepUpTarget(null);
+      setStepUpPassword('');
+    } catch (e: any) {
+      if (isStepUpRequired(e)) {
+        setStepUpTarget('all');
+        setStepUpError(password ? 'Mot de passe incorrect.' : '');
+      } else {
+        toastService.error('Erreur', 'Impossible de revoquer les sessions.');
+      }
+    } finally {
+      setRevokingAll(false);
+    }
+  }, []);
 
   const handleRevokeAll = useCallback(() => {
     showConfirm(
@@ -243,20 +290,31 @@ export const SettingsSecurityScreen: React.FC = () => {
         {
           text: 'Tout deconnecter',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              setRevokingAll(true);
-              await apiClient.delete('/api/v1/auth/sessions');
-              setSessions(prev => prev.filter(s => s.is_current));
-            } catch {
-              toastService.error('Erreur', 'Impossible de revoquer les sessions.');
-            } finally {
-              setRevokingAll(false);
-            }
-          },
+          onPress: () => doRevokeAll(),
         },
       ],
     );
+  }, [doRevokeAll]);
+
+  const handleStepUpConfirm = useCallback(async () => {
+    if (!stepUpPassword.trim()) return;
+    setStepUpLoading(true);
+    setStepUpError('');
+    try {
+      if (stepUpTarget === 'all') {
+        await doRevokeAll(stepUpPassword);
+      } else if (stepUpTarget) {
+        await doRevokeSession(stepUpTarget, stepUpPassword);
+      }
+    } finally {
+      setStepUpLoading(false);
+    }
+  }, [stepUpTarget, stepUpPassword, doRevokeAll, doRevokeSession]);
+
+  const handleStepUpCancel = useCallback(() => {
+    setStepUpTarget(null);
+    setStepUpPassword('');
+    setStepUpError('');
   }, []);
 
   const othersCount = sessions.filter(s => !s.is_current).length;
@@ -324,6 +382,61 @@ export const SettingsSecurityScreen: React.FC = () => {
 
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      <Modal
+        visible={stepUpTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={handleStepUpCancel}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={m.overlay}
+        >
+          <View style={[m.card, { backgroundColor: colors.surface }]}>
+            <View style={[m.iconWrap, { backgroundColor: colors.primary + '15' }]}>
+              <Icon name="lock" size={22} color={colors.primary} />
+            </View>
+            <Text style={[m.title, { color: colors.textPrimary }]}>Confirmez votre mot de passe</Text>
+            <Text style={[m.desc, { color: colors.textTertiary }]}>
+              Pour deconnecter un appareil, entrez votre mot de passe actuel.
+            </Text>
+
+            <View style={[m.inputWrap, { backgroundColor: colors.surfaceElevated, borderColor: stepUpError ? '#EF4444' : colors.border }]}>
+              <TextInput
+                style={[m.input, { color: colors.textPrimary }]}
+                value={stepUpPassword}
+                onChangeText={t => { setStepUpPassword(t); if (stepUpError) setStepUpError(''); }}
+                secureTextEntry
+                placeholder="Mot de passe"
+                placeholderTextColor={colors.textDisabled}
+                autoCapitalize="none"
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleStepUpConfirm}
+              />
+            </View>
+            {!!stepUpError && <Text style={m.error}>{stepUpError}</Text>}
+
+            <View style={m.btnRow}>
+              <TouchableOpacity style={[m.btn, { backgroundColor: colors.surfaceElevated }]} onPress={handleStepUpCancel}>
+                <Text style={[m.btnText, { color: colors.textPrimary }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[m.btn, { backgroundColor: colors.primary, opacity: stepUpPassword.trim().length > 0 ? 1 : 0.5 }]}
+                onPress={handleStepUpConfirm}
+                disabled={stepUpLoading || stepUpPassword.trim().length === 0}
+              >
+                {stepUpLoading ? (
+                  <GoFolyXLoader variant="bar" color="#fff" />
+                ) : (
+                  <Text style={[m.btnText, { color: '#fff' }]}>Confirmer</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -338,4 +451,18 @@ const s = StyleSheet.create({
   revokingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 14 },
   revokeAllBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingVertical: 14, marginTop: 8 },
   revokeAllText:   { fontSize: 14, fontWeight: '600', color: '#EF4444' },
+});
+
+const m = StyleSheet.create({
+  overlay:   { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 24 },
+  card:      { width: '100%', maxWidth: 360, borderRadius: 18, padding: 22, alignItems: 'center' },
+  iconWrap:  { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  title:     { fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  desc:      { fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  inputWrap: { width: '100%', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 48, marginTop: 18, justifyContent: 'center' },
+  input:     { fontSize: 14, padding: 0 },
+  error:     { fontSize: 12, color: '#EF4444', marginTop: 6, alignSelf: 'flex-start' },
+  btnRow:    { flexDirection: 'row', gap: 10, marginTop: 20, width: '100%' },
+  btn:       { flex: 1, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  btnText:   { fontSize: 14, fontWeight: '700' },
 });
