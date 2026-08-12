@@ -38,9 +38,8 @@ import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
-import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, postService, accountsService, toastService } from '../../services';
+import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, accountsService, toastService } from '../../services';
 import type { StoredAccount } from '../../services';
-import type { PostFeedCursor } from '../../services/postService';
 import { apiClient } from '../../api/client';
 import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
 import { favoriteService } from '../../services/favoriteService';
@@ -733,10 +732,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const lastLoadedAtRef = useRef<number>(0);
   // ── Scroll infini ────────────────────────────────────────────────────────
   const feedPageRef      = useRef(1);
-  // Curseur posts (created_at+id du dernier post reçu) — /posts/feed pagine par curseur,
-  // pas par numéro de page (le tri dépend du temps/boost, "page=N" ne serait pas stable).
-  const postCursorRef    = useRef<PostFeedCursor | null>(null);
-  const postsHasMoreRef  = useRef(true);
+  const feedHasMoreRef   = useRef(true);
   const [hasMoreFeed,    setHasMoreFeed]    = useState(true);
   const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
   const loadingMoreRef   = useRef(false);
@@ -1340,9 +1336,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // voir le early-return plus bas qui bloque ce cas avant de toucher aux items/refs.
         // Refresh silencieux alors que l'utilisateur a déjà scrollé plus loin (pages > 1) :
         // sortir tout de suite, AVANT tout fetch réseau et toute écriture de ref — sinon un
-        // fetch page 1 (posts cursor=null, communities page=1, etc.) écraserait silencieusement
-        // les refs de pagination déjà avancées (postCursorRef, trendingCommRef, commPageRef...)
-        // avec des valeurs de page 1, cassant loadMoreFeed au prochain scroll sans que rien
+        // fetch page 1 (communities page=1, etc.) écraserait silencieusement les refs de
+        // pagination déjà avancées (feedPageRef, trendingCommRef, commPageRef...) avec des
+        // valeurs de page 1, cassant loadMoreFeed au prochain scroll sans que rien
         // ne se voie tout de suite (les items affichés, eux, ne changent pas).
         if (silent && feedPageRef.current > 1) {
           lastLoadedAtRef.current = Date.now();
@@ -1354,8 +1350,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           setHasMoreFeed(true);
           adSlotIdxRef.current = 0;
           seenAdIdsRef.current = [];
-          postCursorRef.current = null;
-          postsHasMoreRef.current = true;
+          feedHasMoreRef.current = true;
           commPageRef.current = 1;
           commExhaustedRef.current = false;
           trendingCommRef.current = [];
@@ -1364,7 +1359,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         const onWifi = networkService.isWifi();
         const feedLimit  = onWifi ? 30 : 15;
         const reelsLimit = onWifi ? 20 : 10;
-        const postsLimit = onWifi ? 20 : 10;
 
         // Tout est chargé ensemble avant le premier rendu — un affichage partiel
         // (posts seuls, puis remplacés par la liste complète avec events/concerts/
@@ -1372,8 +1366,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // changeaient de position dès que le reste arrivait, et les events/concerts
         // semblaient absents du feed puisqu'ils n'apparaissaient jamais dans ce
         // premier rendu partiel. Un seul skeleton jusqu'à ce que tout soit prêt.
-        const [postsPage, feedResult, reelsResult, commResult, liveConcerts, spontLivesResult, myComms] = await Promise.all([
-          postService.getFeed(postsLimit, false, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null })),
+        const [feedResult, reelsResult, commResult, liveConcerts, spontLivesResult, myComms] = await Promise.all([
           searchService.getFeed(1, feedLimit).catch(() => ({ items: [] })),
           reelService.getFeed({ limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: 1 })),
           communityService.list(1, 8).catch(() => []),
@@ -1381,9 +1374,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           liveService.getLives().catch(() => [] as LiveStream[]),
           communityService.mine().catch(() => [] as CommunityData[]),
         ]);
-        const postsResult = postsPage.items;
-        postCursorRef.current = postsPage.next_cursor;
-        postsHasMoreRef.current = postsPage.has_more;
+        feedHasMoreRef.current = (feedResult.items ?? []).length >= feedLimit;
         setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
         setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
         myCommIdsRef.current = new Set((Array.isArray(myComms) ? myComms : []).map(c => String(c.id)));
@@ -1397,24 +1388,22 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         if (__DEV__) {
           console.log('[Feed] feedResult:', JSON.stringify(feedResult).slice(0, 300));
           console.log('[Feed] reelsResult:', JSON.stringify(reelsResult).slice(0, 300));
-          console.log('[Feed] postsResult:', JSON.stringify(postsResult).slice(0, 300));
         }
+        // /search/feed retourne déjà events + concerts + posts avec un score unifié
+        // (2026-08-12, remplace l'ancien double-appel /search/feed + /posts/feed).
         const feedItems: FeedItem[] = (feedResult.items ?? [])
-          .filter((item: any) => item.kind !== 'reel' && item.id)
+          .filter((item: any) => (item.kind === 'event' || item.kind === 'concert' || item.kind === 'post') && item.id)
           .map((item: any) => ({
-            kind: item.kind as 'event' | 'concert',
+            kind: item.kind as 'event' | 'concert' | 'post',
             id: item.id,
             data: item,
           }));
         const reelItems: FeedItem[] = (Array.isArray(reelsResult?.items) ? reelsResult.items : Array.isArray(reelsResult) ? reelsResult : [])
           .filter((r: any) => r?.id)
           .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
-        const postItems: FeedItem[] = (Array.isArray(postsResult) ? postsResult : [])
-          .filter((p: Post) => p.id)
-          .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
         // Dédupliquer par clé composite avant shuffle
         const seen = new Set<string>();
-        const deduped = [...feedItems, ...reelItems, ...postItems].filter(item => {
+        const deduped = [...feedItems, ...reelItems].filter(item => {
           const key = `${item.kind}-${item.id}`;
           if (seen.has(key)) return false;
           seen.add(key);
@@ -1531,23 +1520,19 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // score comme le fil principal). Pas d'injection pub/suggestions/communautés :
         // contenu pur des amis, sans bruit de découverte. Tri chronologique — un fil
         // "amis" doit rester lisible dans l'ordre des publications, pas mélangé.
-        const [postsPage, feedResult, reelsResult] = await Promise.all([
-          postService.getFeed(50, true, null).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null })),
+        const [feedResult, reelsResult] = await Promise.all([
           searchService.getFeed(1, 30, true).catch(() => ({ items: [] })),
           reelService.getFeed({ limit: 20, followingOnly: true }).catch(() => ({ items: [], has_more: false, page: 1 })),
         ]);
-        const postItems: FeedItem[] = postsPage.items
-          .filter((p: Post) => p.id)
-          .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
         const feedItems: FeedItem[] = (feedResult.items ?? [])
-          .filter((item: any) => item.kind !== 'reel' && item.id)
-          .map((item: any) => ({ kind: item.kind as 'event' | 'concert', id: item.id, data: item }));
+          .filter((item: any) => (item.kind === 'event' || item.kind === 'concert' || item.kind === 'post') && item.id)
+          .map((item: any) => ({ kind: item.kind as 'event' | 'concert' | 'post', id: item.id, data: item }));
         const reelItems: FeedItem[] = (Array.isArray(reelsResult?.items) ? reelsResult.items : [])
           .filter((r: any) => r?.id)
           .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
 
         const seen = new Set<string>();
-        const merged = [...postItems, ...feedItems, ...reelItems].filter(item => {
+        const merged = [...feedItems, ...reelItems].filter(item => {
           const key = `${item.kind}-${item.id}`;
           if (seen.has(key)) return false;
           seen.add(key);
@@ -1615,30 +1600,22 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       const onWifi = networkService.isWifi();
       const feedLimit  = onWifi ? 30 : 15;
       const reelsLimit = onWifi ? 20 : 10;
-      const postsLimit = onWifi ? 20 : 10;
 
-      const [feedResult, reelsResult, postsPage] = await Promise.all([
+      const [feedResult, reelsResult] = await Promise.all([
         searchService.getFeed(nextPage, feedLimit).catch(() => ({ items: [] })),
         reelService.getFeed({ page: nextPage, limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: nextPage })),
-        postsHasMoreRef.current
-          ? postService.getFeed(postsLimit, false, postCursorRef.current).catch(() => ({ items: [] as Post[], has_more: false, next_cursor: null }))
-          : Promise.resolve({ items: [] as Post[], has_more: false, next_cursor: null }),
       ]);
-      postCursorRef.current = postsPage.next_cursor;
-      postsHasMoreRef.current = postsPage.has_more;
+      feedHasMoreRef.current = (feedResult.items ?? []).length >= feedLimit;
 
       const feedItems: FeedItem[] = (feedResult.items ?? [])
-        .filter((item: any) => item.kind !== 'reel' && item.id)
-        .map((item: any) => ({ kind: item.kind as 'event' | 'concert', id: item.id, data: item }));
+        .filter((item: any) => (item.kind === 'event' || item.kind === 'concert' || item.kind === 'post') && item.id)
+        .map((item: any) => ({ kind: item.kind as 'event' | 'concert' | 'post', id: item.id, data: item }));
       const reelItems: FeedItem[] = (Array.isArray((reelsResult as any)?.items) ? (reelsResult as any).items : Array.isArray(reelsResult) ? reelsResult : [])
         .filter((r: any) => r?.id)
         .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
-      const postItems: FeedItem[] = postsPage.items
-        .filter((p: Post) => p.id)
-        .map((p: Post) => ({ kind: 'post' as const, id: p.id, data: p }));
 
       // Dédupliquer contre tout ce qui a déjà été affiché (page courante + précédentes)
-      const fresh = [...feedItems, ...reelItems, ...postItems].filter(item => {
+      const fresh = [...feedItems, ...reelItems].filter(item => {
         const key = `${item.kind}-${item.id}`;
         if (seenItemIdsRef.current.has(key)) return false;
         seenItemIdsRef.current.add(key);

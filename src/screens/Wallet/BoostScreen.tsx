@@ -267,7 +267,7 @@ function buildUrl(contentType: ContentType, userId: string, q?: string): string 
   switch (contentType) {
     case 'reel':      return `/api/v1/reels/user/${userId}?limit=${limit}${qs}`;
     case 'community': return `/api/v1/communities/me?limit=${limit}${qs}`;
-    case 'post':      return `/api/v1/posts/feed?limit=${limit}${qs}`;
+    case 'post':      return `/api/v1/posts/user/${userId}?limit=${limit}${qs}`;
     case 'event':     return `/api/v1/events/me?limit=${limit}${qs}`;
     case 'concert':   return `/api/v1/concerts/me?limit=${limit}${qs}`;
     case 'live':      return `/api/v1/concerts/me?status=live&limit=${limit}${qs}`;

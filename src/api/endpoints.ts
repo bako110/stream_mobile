@@ -196,7 +196,6 @@ export const Endpoints = {
 
   // ── Posts (prefix: /api/v1/posts) ────────────────────────────────────────
   posts: {
-    feed:    `${V1}/posts/feed`,
     create:  `${V1}/posts`,
     byId:    (id: string) => `${V1}/posts/${id}`,
     byUser:  (userId: string) => `${V1}/posts/user/${userId}`,
