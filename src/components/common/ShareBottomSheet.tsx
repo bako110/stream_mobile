@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, Image,
-  Animated, Dimensions, ActivityIndicator,
+  Animated, Dimensions, ActivityIndicator, TextInput, FlatList,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Icon from 'react-native-vector-icons/Feather';
@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { encodeId } from '../../utils/slugId';
 import { socialService } from '../../services/socialService';
 import { toastService } from '../../services/toastService';
+import { messageService, type ConversationSummary } from '../../services/messageService';
 import type { Post } from '../../types/post';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
@@ -19,7 +20,14 @@ import type { Reel } from '../../types/reel';
 import type { FilmItem } from '../../screens/Main/FilmsScreen';
 
 const { height: H } = Dimensions.get('window');
-const SHEET_H = H * 0.52;
+const SHEET_H = H * 0.72;
+
+// Types acceptés par le backend pour le partage interne (message type=share) —
+// "film"/"serie" ne sont qu'un seul share_type "content" côté backend.
+const INTERNAL_SHARE_TYPE: Record<string, string | undefined> = {
+  post: 'post', event: 'event', concert: 'concert', reel: 'reel',
+  film: 'content', serie: 'content',
+};
 
 const APP_DOMAIN = 'https://gofolyx.com';
 
@@ -176,6 +184,35 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
 
   const [sharing, setSharing] = useState(false);
 
+  // ── Envoi interne à un contact (comme Instagram/Facebook) ──────────────────
+  const shareTypeInternal = INTERNAL_SHARE_TYPE[type];
+  const [conversations,  setConversations]  = useState<ConversationSummary[]>([]);
+  const [loadingConvos,  setLoadingConvos]  = useState(false);
+  const [contactSearch,  setContactSearch]  = useState('');
+  const [sendingTo,      setSendingTo]      = useState<Set<string>>(new Set());
+  const [sentTo,         setSentTo]         = useState<Set<string>>(new Set());
+  const fetchedConvos = useRef(false);
+
+  useEffect(() => {
+    if (!visible || !shareTypeInternal || fetchedConvos.current) return;
+    fetchedConvos.current = true;
+    setLoadingConvos(true);
+    messageService.getConversations()
+      .then(setConversations)
+      .catch(() => {})
+      .finally(() => setLoadingConvos(false));
+  }, [visible, shareTypeInternal]);
+
+  useEffect(() => {
+    if (!visible) { setSentTo(new Set()); setSendingTo(new Set()); setContactSearch(''); }
+  }, [visible]);
+
+  const filteredConvos = contactSearch.trim()
+    ? conversations.filter(c =>
+        (c.partner.full_name ?? '').toLowerCase().includes(contactSearch.toLowerCase()) ||
+        (c.partner.username ?? '').toLowerCase().includes(contactSearch.toLowerCase()))
+    : conversations;
+
   useEffect(() => {
     if (visible) {
       Animated.spring(slideY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 180 }).start();
@@ -193,6 +230,23 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     if (type === 'film')    payload.content_id = id;
     socialService.share(payload as any).catch(() => {});
   };
+
+  const sendToContact = useCallback(async (partnerId: string) => {
+    if (!shareTypeInternal || sendingTo.has(partnerId) || sentTo.has(partnerId)) return;
+    setSendingTo(prev => new Set(prev).add(partnerId));
+    try {
+      await messageService.sendMessage(partnerId, '', 'share', undefined, {
+        share_type: shareTypeInternal, share_id: id,
+      } as any);
+      setSentTo(prev => new Set(prev).add(partnerId));
+      recordShare('external');
+      onShareCountChange?.();
+    } catch {
+      toastService.error('Erreur', "Impossible d'envoyer ce contenu.");
+    } finally {
+      setSendingTo(prev => { const n = new Set(prev); n.delete(partnerId); return n; });
+    }
+  }, [shareTypeInternal, id, sendingTo, sentTo]);
 
   const handleNativeShare = async () => {
     setSharing(true);
@@ -344,6 +398,69 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
           </View>
         )}
 
+        {/* Envoyer à — contacts internes, comme Instagram/Facebook */}
+        {shareTypeInternal && (
+          <View style={{ marginBottom: 10 }}>
+            <View style={[st.contactSearchWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+              <Icon name="search" size={13} color={colors.textTertiary} />
+              <TextInput
+                value={contactSearch}
+                onChangeText={setContactSearch}
+                placeholder="Rechercher un contact…"
+                placeholderTextColor={colors.textTertiary}
+                style={[st.contactSearchInput, { color: colors.textPrimary }]}
+              />
+            </View>
+            {loadingConvos ? (
+              <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : filteredConvos.length === 0 ? (
+              <Text style={[st.noContacts, { color: colors.textTertiary }]}>
+                {contactSearch ? 'Aucun contact trouvé' : 'Aucune conversation récente'}
+              </Text>
+            ) : (
+              <FlatList
+                data={filteredConvos}
+                keyExtractor={c => c.partner.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
+                renderItem={({ item: c }) => {
+                  const sending = sendingTo.has(c.partner.id);
+                  const sent = sentTo.has(c.partner.id);
+                  const name = c.partner.full_name ?? c.partner.username ?? 'Utilisateur';
+                  return (
+                    <TouchableOpacity
+                      onPress={() => sendToContact(c.partner.id)}
+                      disabled={sending}
+                      style={st.contactItem}
+                      activeOpacity={0.75}
+                    >
+                      <View style={st.contactAvatarWrap}>
+                        {c.partner.avatar_url ? (
+                          <Image source={{ uri: c.partner.avatar_url }} style={[st.contactAvatar, sent && { opacity: 0.5 }]} />
+                        ) : (
+                          <View style={[st.contactAvatar, { backgroundColor: colors.primary + '55', alignItems: 'center', justifyContent: 'center' }]}>
+                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{name[0]?.toUpperCase() ?? '?'}</Text>
+                          </View>
+                        )}
+                        {sending && (
+                          <View style={st.contactOverlay}><ActivityIndicator size="small" color="#fff" /></View>
+                        )}
+                        {sent && (
+                          <View style={st.contactOverlay}><Icon name="check" size={18} color="#fff" /></View>
+                        )}
+                      </View>
+                      <Text numberOfLines={1} style={[st.contactName, { color: colors.textSecondary }]}>{name}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        )}
+
         {/* Stats */}
         <View style={[st.statsRow, { borderBottomColor: colors.divider }]}>
           <View style={st.statItem}>
@@ -459,4 +576,21 @@ const st = StyleSheet.create({
   actionIcon:   { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   actionLabel:  { fontSize: 14, fontWeight: '600' },
   actionSub:    { fontSize: 11, marginTop: 1 },
+
+  contactSearchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginBottom: 10,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 10, borderWidth: StyleSheet.hairlineWidth,
+  },
+  contactSearchInput: { flex: 1, fontSize: 13, padding: 0 },
+  noContacts:      { fontSize: 12, textAlign: 'center', paddingVertical: 14 },
+  contactItem:     { alignItems: 'center', width: 60, gap: 5 },
+  contactAvatarWrap: { width: 52, height: 52, borderRadius: 26, overflow: 'hidden' },
+  contactAvatar:   { width: 52, height: 52, borderRadius: 26 },
+  contactOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center',
+  },
+  contactName:     { fontSize: 10, textAlign: 'center' },
 });

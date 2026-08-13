@@ -1118,6 +1118,40 @@ export const ChatScreen: React.FC = () => {
         );
       }
 
+      case 'share': {
+        const meta = item.attachment_meta;
+        if (!meta?.share_type || !meta?.share_id) {
+          return <Text style={[styles.msgText, { color: textColor }]}>Contenu indisponible</Text>;
+        }
+        const openShared = () => {
+          const shareId = meta.share_id!;
+          if (meta.share_type === 'concert')      nav.navigate('ConcertDetail', { concertId: shareId });
+          else if (meta.share_type === 'event')   nav.navigate('EventDetail',   { eventId: shareId });
+          else if (meta.share_type === 'reel')    nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: shareId } });
+          else if (meta.share_type === 'post')    nav.navigate('PostDetail',    { postId: shareId });
+          else if (meta.share_type === 'content') nav.navigate('FilmDetail',    { item: { id: shareId, type: 'film', title: meta.title, thumbnail_url: meta.image } });
+        };
+        return (
+          <TouchableOpacity onPress={openShared} activeOpacity={0.85} style={styles.shareCard}>
+            {meta.image ? (
+              <Image source={{ uri: meta.image }} style={styles.shareCardImg} resizeMode="cover" />
+            ) : (
+              <View style={[styles.shareCardImg, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
+                <Icon name="link" size={22} color={colors.textTertiary} />
+              </View>
+            )}
+            <View style={styles.shareCardBody}>
+              {meta.author_name ? (
+                <Text style={[styles.shareCardAuthor, { color: subtextColor }]} numberOfLines={1}>{meta.author_name}</Text>
+              ) : null}
+              <Text style={[styles.shareCardTitle, { color: textColor }]} numberOfLines={2}>
+                {meta.title ?? 'Contenu GoFolyX'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      }
+
       default: // text
         return <Text style={[styles.msgText, { color: textColor }]}>{item.content}</Text>;
     }
@@ -2276,6 +2310,12 @@ const styles = StyleSheet.create({
   // Location card — style WhatsApp
   locationCard:        { borderRadius: 12, overflow: 'hidden', width: 240 },
   locationCardMe:      { backgroundColor: '#075E54' },
+
+  shareCard:      { borderRadius: 12, overflow: 'hidden', width: 200 },
+  shareCardImg:   { width: '100%', height: 110 },
+  shareCardBody:  { padding: 8, gap: 2 },
+  shareCardAuthor:{ fontSize: 10, fontWeight: '600' },
+  shareCardTitle: { fontSize: 12, fontWeight: '500', lineHeight: 16 },
   locationCardOther:   { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e0e0e0' },
   locationMapBox:      { width: '100%', height: 140, position: 'relative' },
   locationMapImg:      { width: '100%', height: 140 },
