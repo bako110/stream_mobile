@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, Image,
-  Animated, Dimensions, ActivityIndicator, TextInput, FlatList,
+  Animated, Dimensions, ActivityIndicator, TextInput, FlatList, Linking,
+  ScrollView,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Icon from 'react-native-vector-icons/Feather';
+import BrandIcon from 'react-native-vector-icons/FontAwesome6';
+import MailIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RNBlobUtil from 'react-native-blob-util';
 import RNShare from 'react-native-share';
@@ -248,6 +251,55 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     }
   }, [shareTypeInternal, id, sendingTo, sentTo]);
 
+  // Réseaux sociaux — même liste et mêmes URLs d'intent que le web
+  // (ShareModal.tsx), via Linking.openURL au lieu de window.open : sur
+  // mobile ça ouvre directement l'app installée (WhatsApp/Telegram/
+  // Messenger) plutôt qu'une page web, quand elle est présente.
+  const encodedUrl   = encodeURIComponent(shareUrl);
+  const encodedTitle = encodeURIComponent(title);
+
+  function openPlatform(platform: string, url: string) {
+    onClose();
+    recordShare(platform);
+    onShareCountChange?.();
+    Linking.openURL(url).catch(() => {
+      toastService.error('Erreur', "Impossible d'ouvrir l'application.");
+    });
+  }
+
+  const PLATFORMS: { id: string; label: string; icon: React.ReactNode; bg: string; onPress: () => void }[] = [
+    {
+      id: 'facebook', label: 'Facebook', bg: '#1877F215',
+      icon: <BrandIcon name="facebook" size={22} color="#1877F2" />,
+      onPress: () => openPlatform('facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`),
+    },
+    {
+      id: 'whatsapp', label: 'WhatsApp', bg: '#25D36615',
+      icon: <BrandIcon name="whatsapp" size={22} color="#25D366" />,
+      onPress: () => openPlatform('whatsapp', `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`),
+    },
+    {
+      id: 'twitter', label: 'X (Twitter)', bg: colors.backgroundSecondary,
+      icon: <BrandIcon name="x-twitter" size={20} color={colors.textPrimary} />,
+      onPress: () => openPlatform('twitter', `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`),
+    },
+    {
+      id: 'telegram', label: 'Telegram', bg: '#26A5E415',
+      icon: <BrandIcon name="telegram" size={22} color="#26A5E4" />,
+      onPress: () => openPlatform('external', `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`),
+    },
+    {
+      id: 'messenger', label: 'Messenger', bg: '#0084FF15',
+      icon: <BrandIcon name="facebook-messenger" size={22} color="#0084FF" />,
+      onPress: () => openPlatform('external', `https://www.facebook.com/dialog/send?link=${encodedUrl}&redirect_uri=${encodedUrl}&app_id=966242223397117`),
+    },
+    {
+      id: 'email', label: 'E-mail', bg: colors.backgroundSecondary,
+      icon: <MailIcon name="email-outline" size={22} color={colors.textSecondary} />,
+      onPress: () => openPlatform('external', `mailto:?subject=${encodedTitle}&body=${encodedUrl}`),
+    },
+  ];
+
   const handleNativeShare = async () => {
     setSharing(true);
     try {
@@ -334,6 +386,8 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
 
       <Animated.View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 12 }, { transform: [{ translateY: slideY }] }]}>
         <View style={[st.handle, { backgroundColor: colors.divider }]} />
+
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* Aperçu */}
         {type === 'reel' ? (
@@ -461,6 +515,18 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
           </View>
         )}
 
+        {/* Réseaux sociaux — même liste que le web (ShareModal.tsx) */}
+        <View style={st.platformsGrid}>
+          {PLATFORMS.map(p => (
+            <TouchableOpacity key={p.id} onPress={p.onPress} style={st.platformItem} activeOpacity={0.75}>
+              <View style={[st.platformIconWrap, { backgroundColor: p.bg }]}>
+                {p.icon}
+              </View>
+              <Text style={[st.platformLabel, { color: colors.textSecondary }]} numberOfLines={1}>{p.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Stats */}
         <View style={[st.statsRow, { borderBottomColor: colors.divider }]}>
           <View style={st.statItem}>
@@ -505,6 +571,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
             </TouchableOpacity>
           ))}
         </View>
+        </ScrollView>
       </Animated.View>
     </Modal>
   );
@@ -514,6 +581,7 @@ const st = StyleSheet.create({
   backdrop:      { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
+    maxHeight: SHEET_H,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingTop: 10,
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, elevation: 12,
@@ -593,4 +661,12 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center',
   },
   contactName:     { fontSize: 10, textAlign: 'center' },
+
+  platformsGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 16, paddingBottom: 14, gap: 14,
+  },
+  platformItem:     { alignItems: 'center', gap: 6, width: 62 },
+  platformIconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  platformLabel:    { fontSize: 10, fontWeight: '500', textAlign: 'center' },
 });
