@@ -1577,8 +1577,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // pose ce flag à true juste avant son propre setFilter pour empêcher CET effect
   // de relancer un 2e appel à load() en double sur le même changement de filtre.
   const skipNextFilterLoadRef = useRef(false);
+  // Le tout premier chargement est déjà déclenché par le useFocusEffect
+  // ci-dessous (!didMountRef.current) — sans ce garde, cet effect se
+  // déclenche AUSSI au montage initial (valeur initiale de `filter`),
+  // doublant chaque appel réseau de load('all') au démarrage de l'app.
+  const isFirstFilterEffectRef = useRef(true);
 
   useEffect(() => {
+    if (isFirstFilterEffectRef.current) {
+      isFirstFilterEffectRef.current = false;
+      return;
+    }
     if (skipNextFilterLoadRef.current) {
       skipNextFilterLoadRef.current = false;
       return;
