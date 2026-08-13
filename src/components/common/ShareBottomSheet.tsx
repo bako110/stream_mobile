@@ -16,6 +16,8 @@ import { encodeId } from '../../utils/slugId';
 import { socialService } from '../../services/socialService';
 import { toastService } from '../../services/toastService';
 import { messageService, type ConversationSummary } from '../../services/messageService';
+import { searchService } from '../../services/searchService';
+import type { SearchUser } from '../../types/search';
 import type { Post } from '../../types/post';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
@@ -188,10 +190,15 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
   const [sharing, setSharing] = useState(false);
 
   // ── Envoi interne à un contact (comme Instagram/Facebook) ──────────────────
+  // Par défaut : conversations récentes. Dès qu'on tape une recherche, on
+  // cherche parmi TOUS les utilisateurs (pas seulement les discussions déjà
+  // ouvertes), même principe que le web (ShareModal.tsx).
   const shareTypeInternal = INTERNAL_SHARE_TYPE[type];
   const [conversations,  setConversations]  = useState<ConversationSummary[]>([]);
   const [loadingConvos,  setLoadingConvos]  = useState(false);
   const [contactSearch,  setContactSearch]  = useState('');
+  const [searchResults,  setSearchResults]  = useState<SearchUser[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
   const [sendingTo,      setSendingTo]      = useState<Set<string>>(new Set());
   const [sentTo,         setSentTo]         = useState<Set<string>>(new Set());
   const fetchedConvos = useRef(false);
@@ -207,14 +214,30 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
   }, [visible, shareTypeInternal]);
 
   useEffect(() => {
-    if (!visible) { setSentTo(new Set()); setSendingTo(new Set()); setContactSearch(''); }
+    if (!visible || !shareTypeInternal) return;
+    const q = contactSearch.trim();
+    if (!q) { setSearchResults([]); return; }
+    const t = setTimeout(async () => {
+      setSearchingUsers(true);
+      try {
+        const res = await searchService.searchAll({ q, type: 'users', limit: 15 });
+        setSearchResults(res.users ?? []);
+      } catch { setSearchResults([]); }
+      finally { setSearchingUsers(false); }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [contactSearch, visible, shareTypeInternal]);
+
+  useEffect(() => {
+    if (!visible) { setSentTo(new Set()); setSendingTo(new Set()); setContactSearch(''); setSearchResults([]); }
   }, [visible]);
 
-  const filteredConvos = contactSearch.trim()
-    ? conversations.filter(c =>
-        (c.partner.full_name ?? '').toLowerCase().includes(contactSearch.toLowerCase()) ||
-        (c.partner.username ?? '').toLowerCase().includes(contactSearch.toLowerCase()))
-    : conversations;
+  const isSearchingContacts = contactSearch.trim().length > 0;
+  interface ContactItem { id: string; name: string; avatar_url: string | null; }
+  const contactList: ContactItem[] = isSearchingContacts
+    ? searchResults.map(u => ({ id: u.id, name: u.display_name ?? u.username ?? 'Utilisateur', avatar_url: u.avatar_url }))
+    : conversations.map(c => ({ id: c.partner.id, name: c.partner.full_name ?? c.partner.username ?? 'Utilisateur', avatar_url: c.partner.avatar_url ?? null }));
+  const contactsLoading = isSearchingContacts ? searchingUsers : loadingConvos;
 
   useEffect(() => {
     if (visible) {
@@ -281,27 +304,27 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
   const PLATFORMS: { id: string; label: string; icon: React.ReactNode; bg: string; onPress: () => void }[] = [
     {
       id: 'facebook', label: 'Facebook', bg: '#1877F215',
-      icon: <BrandIcon name="facebook" size={22} color="#1877F2" />,
+      icon: <BrandIcon name="facebook" brand size={22} color="#1877F2" />,
       onPress: () => openPlatform('facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`),
     },
     {
       id: 'whatsapp', label: 'WhatsApp', bg: '#25D36615',
-      icon: <BrandIcon name="whatsapp" size={22} color="#25D366" />,
+      icon: <BrandIcon name="whatsapp" brand size={22} color="#25D366" />,
       onPress: () => openPlatform('whatsapp', `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`),
     },
     {
       id: 'twitter', label: 'X (Twitter)', bg: colors.backgroundSecondary,
-      icon: <BrandIcon name="x-twitter" size={20} color={colors.textPrimary} />,
+      icon: <BrandIcon name="x-twitter" brand size={20} color={colors.textPrimary} />,
       onPress: () => openPlatform('twitter', `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`),
     },
     {
       id: 'telegram', label: 'Telegram', bg: '#26A5E415',
-      icon: <BrandIcon name="telegram" size={22} color="#26A5E4" />,
+      icon: <BrandIcon name="telegram" brand size={22} color="#26A5E4" />,
       onPress: () => openPlatform('external', `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`),
     },
     {
       id: 'messenger', label: 'Messenger', bg: '#0084FF15',
-      icon: <BrandIcon name="facebook-messenger" size={22} color="#0084FF" />,
+      icon: <BrandIcon name="facebook-messenger" brand size={22} color="#0084FF" />,
       onPress: () => openPlatform('external', `https://www.facebook.com/dialog/send?link=${encodedUrl}&redirect_uri=${encodedUrl}&app_id=966242223397117`),
     },
     {
@@ -476,35 +499,35 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
                 style={[st.contactSearchInput, { color: colors.textPrimary }]}
               />
             </View>
-            {loadingConvos ? (
+            {contactsLoading ? (
               <View style={{ paddingVertical: 14, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
-            ) : filteredConvos.length === 0 ? (
+            ) : contactList.length === 0 ? (
               <Text style={[st.noContacts, { color: colors.textTertiary }]}>
-                {contactSearch ? 'Aucun contact trouvé' : 'Aucune conversation récente'}
+                {isSearchingContacts ? 'Aucun utilisateur trouvé' : 'Aucune conversation récente'}
               </Text>
             ) : (
               <FlatList
-                data={filteredConvos}
-                keyExtractor={c => c.partner.id}
+                data={contactList}
+                keyExtractor={c => c.id}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
                 renderItem={({ item: c }) => {
-                  const sending = sendingTo.has(c.partner.id);
-                  const sent = sentTo.has(c.partner.id);
-                  const name = c.partner.full_name ?? c.partner.username ?? 'Utilisateur';
+                  const sending = sendingTo.has(c.id);
+                  const sent = sentTo.has(c.id);
+                  const name = c.name;
                   return (
                     <TouchableOpacity
-                      onPress={() => sendToContact(c.partner.id)}
+                      onPress={() => sendToContact(c.id)}
                       disabled={sending}
                       style={st.contactItem}
                       activeOpacity={0.75}
                     >
                       <View style={st.contactAvatarWrap}>
-                        {c.partner.avatar_url ? (
-                          <Image source={{ uri: c.partner.avatar_url }} style={[st.contactAvatar, sent && { opacity: 0.5 }]} />
+                        {c.avatar_url ? (
+                          <Image source={{ uri: c.avatar_url }} style={[st.contactAvatar, sent && { opacity: 0.5 }]} />
                         ) : (
                           <View style={[st.contactAvatar, { backgroundColor: colors.primary + '55', alignItems: 'center', justifyContent: 'center' }]}>
                             <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{name[0]?.toUpperCase() ?? '?'}</Text>

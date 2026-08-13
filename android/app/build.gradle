@@ -4,7 +4,7 @@ apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
 project.ext.vectoricons = [
-    iconFontNames: [ 'Feather.ttf', 'MaterialCommunityIcons.ttf' ]
+    iconFontNames: [ 'Feather.ttf', 'MaterialCommunityIcons.ttf', 'FontAwesome6_Brands.ttf' ]
 ]
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
 
