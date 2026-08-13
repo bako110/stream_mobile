@@ -244,8 +244,19 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
       setSentTo(prev => new Set(prev).add(partnerId));
       recordShare('external');
       onShareCountChange?.();
-    } catch {
-      toastService.error('Erreur', "Impossible d'envoyer ce contenu.");
+    } catch (e: any) {
+      const detail = (e?.data as any)?.detail;
+      const code = detail && typeof detail === 'object' ? detail.code : undefined;
+      const message = detail && typeof detail === 'object' ? detail.message
+        : typeof detail === 'string' ? detail
+        : undefined;
+      if (code === 'conversation_blocked') {
+        toastService.error('Erreur', 'Cette personne a bloqué la conversation.');
+      } else if (code === 'pending_limit') {
+        toastService.error('Erreur', 'Vous avez déjà envoyé un message — attendez une réponse.');
+      } else {
+        toastService.error('Erreur', message ?? "Impossible d'envoyer ce contenu.");
+      }
     } finally {
       setSendingTo(prev => { const n = new Set(prev); n.delete(partnerId); return n; });
     }
