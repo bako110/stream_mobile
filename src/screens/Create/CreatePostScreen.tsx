@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Image,
-  StyleSheet, ScrollView, FlatList,
+  StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, StatusBar, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { CameraRoll, type PhotoIdentifier } from '@react-native-camera-roll/camera-roll';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
@@ -20,30 +19,6 @@ import { toastService } from '../../services';
 
 const { width: W } = Dimensions.get('window');
 const MAX_IMAGES   = 6;
-const GALLERY_COLS = 4;
-const GALLERY_CELL = W / GALLERY_COLS;
-
-const MEDIA_PERMISSIONS = Platform.OS === 'ios'
-  ? [PERMISSIONS.IOS.PHOTO_LIBRARY]
-  : (Platform.Version as number) >= 33
-    ? [PERMISSIONS.ANDROID.READ_MEDIA_IMAGES, PERMISSIONS.ANDROID.READ_MEDIA_VIDEO]
-    : [PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE];
-
-async function ensureMediaPermission(): Promise<boolean> {
-  try {
-    let allGranted = true;
-    for (const perm of MEDIA_PERMISSIONS) {
-      const status = await check(perm);
-      if (status === RESULTS.GRANTED || status === RESULTS.LIMITED) continue;
-      if (status === RESULTS.BLOCKED || status === RESULTS.UNAVAILABLE) { allGranted = false; continue; }
-      const requested = await request(perm);
-      if (requested !== RESULTS.GRANTED && requested !== RESULTS.LIMITED) allGranted = false;
-    }
-    return allGranted;
-  } catch {
-    return false;
-  }
-}
 
 const FEELINGS = [
   '😊 Content', '😢 Triste', '😂 Heureux', '🔥 Motivé',
@@ -72,63 +47,11 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const [posting,       setPosting]       = useState(false);
   const [isPrivate,     setIsPrivate]     = useState(false);
   const [showVisibility, setShowVisibility] = useState(false);
-  const [galleryPhotos, setGalleryPhotos] = useState<PhotoIdentifier[]>([]);
-  const [galleryDenied, setGalleryDenied] = useState(false);
-  const [selectedUris,  setSelectedUris]  = useState<string[]>([]);
 
   const handleBodyChange = useCallback((text: string, ids: string[]) => {
     setBody(text);
     setMentionIds(ids);
   }, []);
-
-  useEffect(() => {
-    (async () => {
-      const granted = await ensureMediaPermission();
-      if (!granted) { setGalleryDenied(true); return; }
-      try {
-        const page = await CameraRoll.getPhotos({
-          first: 60,
-          assetType: 'All',
-          include: ['playableDuration'],
-        });
-        setGalleryPhotos(page.edges);
-      } catch {
-        setGalleryDenied(true);
-      }
-    })();
-  }, []);
-
-  const toggleGalleryPhoto = (item: PhotoIdentifier) => {
-    const uri      = item.node.image.uri;
-    const isVideo  = item.node.type.startsWith('video');
-
-    if (isVideo) {
-      if (localUris.length > 0) {
-        toastService.warning('Photos déjà sélectionnées', 'Retire les photos pour ajouter une vidéo.');
-        return;
-      }
-      setVideoUri(prev => (prev === uri ? null : uri));
-      setSelectedUris(prev => (prev.includes(uri) ? [] : [uri]));
-      return;
-    }
-
-    if (videoUri) {
-      toastService.warning('Vidéo déjà sélectionnée', 'Retire la vidéo pour ajouter des photos.');
-      return;
-    }
-    setSelectedUris(prev => {
-      if (prev.includes(uri)) {
-        setLocalUris(u => u.filter(x => x !== uri));
-        return prev.filter(x => x !== uri);
-      }
-      if (localUris.length >= MAX_IMAGES) {
-        toastService.warning('Maximum', `Tu peux ajouter jusqu'à ${MAX_IMAGES} images.`);
-        return prev;
-      }
-      setLocalUris(u => [...u, uri]);
-      return [...prev, uri];
-    });
-  };
 
   const videoPlayer = useVideoPlayer(
     videoUri ? { uri: videoUri } : { uri: 'about:blank' },
@@ -164,6 +87,20 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
     );
   };
 
+  const handlePickMixed = () => {
+    launchImageLibrary(
+      { mediaType: 'mixed', selectionLimit: MAX_IMAGES, quality: 0.85 as any },
+      res => {
+        if (res.didCancel || res.errorCode) return;
+        const assets = res.assets ?? [];
+        const video  = assets.find(a => a.type?.startsWith('video'));
+        if (video?.uri) { setVideoUri(video.uri); return; }
+        const uris = assets.map(a => a.uri).filter(Boolean) as string[];
+        if (uris.length) setLocalUris(prev => [...prev, ...uris].slice(0, MAX_IMAGES));
+      },
+    );
+  };
+
   const handlePickVideo = () => {
     if (localUris.length > 0) {
       toastService.warning('Photos déjà sélectionnées', 'Retire les photos pour ajouter une vidéo.');
@@ -179,14 +116,8 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
     );
   };
 
-  const removeImage = (idx: number) => {
-    setLocalUris(prev => {
-      const removed = prev[idx];
-      setSelectedUris(s => s.filter(u => u !== removed));
-      return prev.filter((_, i) => i !== idx);
-    });
-  };
-  const removeVideo = () => { videoPlayer.pause(); setVideoUri(null); setSelectedUris([]); };
+  const removeImage = (idx: number) => setLocalUris(prev => prev.filter((_, i) => i !== idx));
+  const removeVideo = () => { videoPlayer.pause(); setVideoUri(null); };
 
   // ── Publier ─────────────────────────────────────────────────────────────────
 
@@ -377,13 +308,20 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           <Icon name="x" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Créer un post</Text>
-        <TouchableOpacity
-          style={[s.publishBtn, { backgroundColor: (canPost && !posting) ? colors.primary : colors.primary + '44' }]}
-          onPress={handlePost}
-          disabled={!canPost || posting}
-          activeOpacity={0.8}
-        >
-          <Text style={s.publishBtnText}>Publier</Text>
+        <TouchableOpacity onPress={handlePost} disabled={!canPost || posting} activeOpacity={0.85}>
+          {(canPost && !posting) ? (
+            <LinearGradient
+              colors={[colors.primary, colors.primary + 'CC']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.publishBtn}
+            >
+              <Text style={s.publishBtnText}>Publier</Text>
+            </LinearGradient>
+          ) : (
+            <View style={[s.publishBtn, { backgroundColor: colors.primary + '33' }]}>
+              <Text style={[s.publishBtnText, { color: colors.primary + '99' }]}>Publier</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -492,6 +430,29 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           </View>
         )}
 
+        {/* Etat vide — invite premium a ajouter un media, jamais d'ecran vide */}
+        {!videoUri && localUris.length === 0 && (
+          <TouchableOpacity style={s.emptyMediaWrap} onPress={handlePickMixed} activeOpacity={0.9}>
+            <LinearGradient
+              colors={[colors.primary + '14', colors.primary + '05']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={[s.emptyMediaCard, { borderColor: colors.primary + '30' }]}
+            >
+              <LinearGradient
+                colors={[colors.primary, colors.primary + 'CC']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={s.emptyMediaIcon}
+              >
+                <Icon name="image" size={22} color="#fff" />
+              </LinearGradient>
+              <Text style={[s.emptyMediaTitle, { color: colors.textPrimary }]}>Ajouter des photos ou une vidéo</Text>
+              <Text style={[s.emptyMediaSub, { color: colors.textTertiary }]}>
+                Touche pour choisir dans ta galerie
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
         {/* Feelings */}
         {showFeelings && (
           <View style={[s.feelingsWrap, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
@@ -513,76 +474,6 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           </View>
         )}
 
-        {/* Galerie de l'appareil — chargée automatiquement à l'arrivée sur l'écran */}
-        <View style={[s.galleryWrap, { borderTopColor: colors.divider }]}>
-          <View style={s.galleryHeader}>
-            <Text style={[s.galleryTitle, { color: colors.textPrimary }]}>Galerie</Text>
-            {selectedUris.length > 0 && (
-              <View style={[s.galleryCountPill, { backgroundColor: colors.primary + '18' }]}>
-                <Text style={[s.galleryCountText, { color: colors.primary }]}>
-                  {selectedUris.length} sélectionné{selectedUris.length > 1 ? 's' : ''}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {galleryDenied ? (
-            <View style={s.galleryEmptyWrap}>
-              <View style={[s.galleryEmptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
-                <Icon name="image" size={22} color={colors.textTertiary} />
-              </View>
-              <Text style={[s.galleryEmptyText, { color: colors.textTertiary }]}>
-                Accès à la galerie refusé.{'\n'}Active-le dans les réglages pour voir tes photos ici.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={galleryPhotos}
-              numColumns={GALLERY_COLS}
-              scrollEnabled={false}
-              keyExtractor={item => item.node.id}
-              contentContainerStyle={s.galleryList}
-              renderItem={({ item }) => {
-                const uri      = item.node.image.uri;
-                const isVideo  = item.node.type.startsWith('video');
-                const duration = item.node.image.playableDuration;
-                const picked   = selectedUris.includes(uri);
-                return (
-                  <TouchableOpacity
-                    style={s.galleryCell}
-                    onPress={() => toggleGalleryPhoto(item)}
-                    activeOpacity={0.85}
-                  >
-                    <View style={[s.galleryThumb, picked && { borderColor: colors.primary }]}>
-                      <Image source={{ uri }} style={s.galleryImg} resizeMode="cover" />
-                      {picked && <View style={s.galleryDim} />}
-
-                      {isVideo && (
-                        <View style={s.galleryVideoBadge}>
-                          <Icon name="video" size={10} color="#fff" />
-                          {!!duration && (
-                            <Text style={s.galleryVideoDuration}>
-                              {Math.floor(duration / 60)}:{String(Math.round(duration % 60)).padStart(2, '0')}
-                            </Text>
-                          )}
-                        </View>
-                      )}
-
-                      <View style={[
-                        s.galleryCheck,
-                        picked
-                          ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                          : { backgroundColor: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.85)' },
-                      ]}>
-                        {picked && <Icon name="check" size={11} color="#fff" />}
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          )}
-        </View>
       </ScrollView>
 
       {/* Barre d'actions */}
@@ -590,10 +481,14 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         <Text style={[s.actionLabel, { color: colors.textSecondary }]}>Ajouter à votre post</Text>
         <View style={s.actionBtns}>
           {/* Photo */}
-          <TouchableOpacity style={s.actionBtn} onPress={handlePickImages} disabled={!!videoUri}>
-            <Icon name="image" size={22} color={videoUri ? colors.textDisabled : '#4CAF50'} />
+          <TouchableOpacity
+            style={[s.actionBtn, { backgroundColor: colors.backgroundSecondary }]}
+            onPress={handlePickImages}
+            disabled={!!videoUri}
+          >
+            <Icon name="image" size={20} color={videoUri ? colors.textDisabled : '#4CAF50'} />
             {localUris.length > 0 && (
-              <View style={[s.actionBadge, { backgroundColor: colors.primary }]}>
+              <View style={[s.actionBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
                 <Text style={s.actionBadgeText}>{localUris.length}</Text>
               </View>
             )}
@@ -601,27 +496,27 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
 
           {/* Vidéo */}
           <TouchableOpacity
-            style={[s.actionBtn, videoUri && { backgroundColor: colors.primary + '18', borderRadius: 20 }]}
+            style={[s.actionBtn, { backgroundColor: videoUri ? colors.primary + '18' : colors.backgroundSecondary }]}
             onPress={handlePickVideo}
             disabled={localUris.length > 0}
           >
-            <Icon name="video" size={22} color={localUris.length > 0 ? colors.textDisabled : colors.primary} />
+            <Icon name="video" size={20} color={localUris.length > 0 ? colors.textDisabled : colors.primary} />
           </TouchableOpacity>
 
           {/* Mentionner */}
           <TouchableOpacity
-            style={s.actionBtn}
+            style={[s.actionBtn, { backgroundColor: colors.backgroundSecondary }]}
             onPress={() => handleBodyChange(body + '@', mentionIds)}
           >
-            <Icon name="at-sign" size={22} color={colors.primary} />
+            <Icon name="at-sign" size={20} color={colors.primary} />
           </TouchableOpacity>
 
           {/* Feeling */}
           <TouchableOpacity
-            style={[s.actionBtn, showFeelings && { backgroundColor: colors.primary + '18', borderRadius: 20 }]}
+            style={[s.actionBtn, { backgroundColor: showFeelings ? colors.primary + '18' : colors.backgroundSecondary }]}
             onPress={() => setShowFeelings(v => !v)}
           >
-            <Text style={{ fontSize: 20 }}>😊</Text>
+            <Text style={{ fontSize: 18 }}>😊</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -654,22 +549,6 @@ const s = StyleSheet.create({
   visibilityOptionTitle: { fontSize: 14, fontWeight: '700' },
   visibilityOptionDesc:  { fontSize: 11, marginTop: 1 },
 
-  galleryWrap:          { paddingTop: 16, paddingBottom: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  galleryHeader:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, marginBottom: 10 },
-  galleryTitle:         { fontSize: 15, fontWeight: '800' },
-  galleryCountPill:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  galleryCountText:     { fontSize: 11, fontWeight: '700' },
-  galleryList:          { paddingHorizontal: 12 },
-  galleryEmptyWrap:      { alignItems: 'center', paddingHorizontal: 24, paddingVertical: 20, gap: 10 },
-  galleryEmptyIcon:      { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  galleryEmptyText:      { fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  galleryCell:          { width: GALLERY_CELL - 4, height: GALLERY_CELL - 4, margin: 2 },
-  galleryThumb:         { flex: 1, borderRadius: 10, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
-  galleryImg:           { width: '100%', height: '100%' },
-  galleryDim:           { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.25)' },
-  galleryVideoBadge:    { position: 'absolute', bottom: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.55)' },
-  galleryVideoDuration: { fontSize: 9, fontWeight: '700', color: '#fff' },
-  galleryCheck:         { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
   inputWrap:      { paddingHorizontal: 14, paddingBottom: 12, minHeight: 120 },
   input:          { fontSize: 18, lineHeight: 26, textAlignVertical: 'top', flex: 1 },
 
@@ -693,6 +572,12 @@ const s = StyleSheet.create({
   extraText:        { color: '#fff', fontSize: 22, fontWeight: '800' },
   addMoreBtn:       { marginTop: 8, height: 48, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
 
+  emptyMediaWrap:   { marginHorizontal: 14, marginBottom: 12 },
+  emptyMediaCard:   { borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', paddingVertical: 28, paddingHorizontal: 20 },
+  emptyMediaIcon:   { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  emptyMediaTitle:  { fontSize: 15, fontWeight: '800' },
+  emptyMediaSub:    { fontSize: 12, marginTop: 4 },
+
   feelingsWrap:   { padding: 14, borderTopWidth: StyleSheet.hairlineWidth },
   feelingsTitle:  { fontSize: 13, fontWeight: '600', marginBottom: 10 },
   feelingsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -701,7 +586,7 @@ const s = StyleSheet.create({
   actionBar:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   actionLabel:    { fontSize: 14, fontWeight: '600' },
   actionBtns:     { flexDirection: 'row', gap: 8 },
-  actionBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  actionBadge:    { position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  actionBtn:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  actionBadge:    { position: 'absolute', top: -2, right: -2, width: 17, height: 17, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   actionBadgeText:{ color: '#fff', fontSize: 9, fontWeight: '800' },
 });
