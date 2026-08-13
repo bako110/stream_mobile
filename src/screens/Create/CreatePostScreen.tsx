@@ -44,6 +44,8 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const [videoUri,      setVideoUri]      = useState<string | null>(null);
   const [showFeelings,  setShowFeelings]  = useState(false);
   const [posting,       setPosting]       = useState(false);
+  const [isPrivate,     setIsPrivate]     = useState(false);
+  const [showVisibility, setShowVisibility] = useState(false);
 
   const handleBodyChange = useCallback((text: string, ids: string[]) => {
     setBody(text);
@@ -113,6 +115,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
     const capturedCategory = category ?? undefined;
     const capturedVideo    = videoUri;
     const capturedImages   = [...localUris];
+    const capturedIsPrivate = isPrivate;
 
     // Fermer l'écran immédiatement dans tous les cas
     onPostCreated();
@@ -142,6 +145,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             feeling: capturedFeeling,
             category: capturedCategory,
             mention_ids: mentionIds.length ? mentionIds : undefined,
+            is_private: capturedIsPrivate,
           });
           // pending_review (2026-08bis) : media present -> invisible tant que
           // l'IA n'a pas confirme "cleared" -- message different du succes
@@ -177,6 +181,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             image_url:     result.imageUrls?.[0],
             image_urls:    result.imageUrls,
             mention_ids:   mentionIds.length ? mentionIds : undefined,
+            is_private:    capturedIsPrivate,
           });
         },
       });
@@ -196,6 +201,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             video_width:   result.videoWidth,
             video_height:  result.videoHeight,
             mention_ids:   mentionIds.length ? mentionIds : undefined,
+            is_private:    capturedIsPrivate,
           });
         },
       });
@@ -279,7 +285,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
       style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
@@ -309,18 +315,52 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
               <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 17 }}>{initials}</Text>
             </View>
           )}
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[s.authorName, { color: colors.textPrimary }]}>{displayName}</Text>
-            {feeling ? (
-              <Text style={[s.audience, { color: colors.primary }]}>😊 se sent {feeling}</Text>
-            ) : (
-              <View style={s.audienceRow}>
-                <Icon name="globe" size={11} color={colors.textTertiary} />
-                <Text style={[s.audience, { color: colors.textTertiary }]}>Public</Text>
-              </View>
-            )}
+            <View style={s.audienceLine}>
+              {feeling && (
+                <Text style={[s.audience, { color: colors.primary }]}>😊 se sent {feeling}</Text>
+              )}
+              <TouchableOpacity
+                style={[s.visibilityChip, { backgroundColor: showVisibility ? colors.backgroundSecondary : 'transparent' }]}
+                onPress={() => setShowVisibility(v => !v)}
+              >
+                <Icon name={isPrivate ? 'users' : 'globe'} size={11} color={colors.textTertiary} />
+                <Text style={[s.audience, { color: colors.textTertiary, fontWeight: '600' }]}>
+                  {isPrivate ? 'Amis' : 'Public'}
+                </Text>
+                <Icon name="chevron-down" size={10} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+
+        {showVisibility && (
+          <View style={[s.visibilityMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <TouchableOpacity
+              style={[s.visibilityOption, !isPrivate && { backgroundColor: colors.backgroundSecondary }]}
+              onPress={() => { setIsPrivate(false); setShowVisibility(false); }}
+            >
+              <Icon name="globe" size={18} color={colors.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[s.visibilityOptionTitle, { color: colors.textPrimary }]}>Public</Text>
+                <Text style={[s.visibilityOptionDesc, { color: colors.textTertiary }]}>Tout le monde peut voir</Text>
+              </View>
+              {!isPrivate && <Icon name="check" size={14} color={colors.primary} />}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.visibilityOption, isPrivate && { backgroundColor: colors.backgroundSecondary }]}
+              onPress={() => { setIsPrivate(true); setShowVisibility(false); }}
+            >
+              <Icon name="users" size={18} color={colors.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[s.visibilityOptionTitle, { color: colors.textPrimary }]}>Amis</Text>
+                <Text style={[s.visibilityOptionDesc, { color: colors.textTertiary }]}>Vos abonnés seulement</Text>
+              </View>
+              {isPrivate && <Icon name="check" size={14} color={colors.primary} />}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Zone de texte avec autocomplete mentions */}
         <View style={[s.inputWrap, { backgroundColor: colors.surface }]}>
@@ -452,6 +492,12 @@ const s = StyleSheet.create({
   authorName:     { fontSize: 15, fontWeight: '700' },
   audienceRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   audience:       { fontSize: 12, marginTop: 2 },
+  audienceLine:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' },
+  visibilityChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  visibilityMenu: { marginHorizontal: 14, marginBottom: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  visibilityOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  visibilityOptionTitle: { fontSize: 14, fontWeight: '700' },
+  visibilityOptionDesc:  { fontSize: 11, marginTop: 1 },
   inputWrap:      { paddingHorizontal: 14, paddingBottom: 12, flex: 1, minHeight: 120 },
   input:          { fontSize: 18, lineHeight: 26, textAlignVertical: 'top', flex: 1 },
 

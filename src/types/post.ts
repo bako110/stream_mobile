@@ -39,6 +39,7 @@ export interface Post {
   music_title?: string | null;
   ai_analysis_status?: 'pending' | 'done' | null;
   status?: 'published' | 'limited' | 'archived' | 'pending_review' | null;
+  is_private?: boolean;
 }
 
 export interface PostCreate {
@@ -52,4 +53,5 @@ export interface PostCreate {
   video_height?: number | null;
   feeling?: string;
   mention_ids?: string[];
+  is_private?: boolean;
 }

@@ -320,7 +320,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <Text style={[pc.time, { color: colors.textTertiary }]}>{timeAgo(post.created_at)}</Text>
               <View style={[pc.dot, { backgroundColor: colors.textDisabled }]} />
-              <Icon name="globe" size={10} color={colors.textTertiary} />
+              <Icon name={post.is_private ? 'users' : 'globe'} size={10} color={colors.textTertiary} />
             </View>
             {/* Badge visible uniquement par le createur, cf. ReelsScreen.tsx
                 pour le meme pattern — indicateur discret, pas bloquant. */}

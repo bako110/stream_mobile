@@ -504,7 +504,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                 <Text style={[s.date, { color: colors.textTertiary }]}>{fullDate(post.created_at)}</Text>
                 <Text style={{ color: colors.textTertiary, fontSize: 11 }}>·</Text>
-                <Icon name="globe" size={11} color={colors.textTertiary} />
+                <Icon name={post.is_private ? 'users' : 'globe'} size={11} color={colors.textTertiary} />
               </View>
               {isOwn && post.ai_analysis_status === 'pending' && (
                 <TouchableOpacity
