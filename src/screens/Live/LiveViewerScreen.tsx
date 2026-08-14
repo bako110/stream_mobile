@@ -95,6 +95,12 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(true);
   const [sending, setSending] = useState(false);
+  // Le backend renvoie 402 quand access_type nécessite un ticket/abonnement
+  // actif (streaming.py::get_viewer_token) — avant ce fix, l'erreur était
+  // avalée silencieusement (catch {}) et l'utilisateur restait bloqué sur
+  // "Connexion au live..." indéfiniment, sans jamais savoir qu'un abonnement
+  // etait requis.
+  const [accessDenied, setAccessDenied] = useState<string | null>(null);
 
   const chatListRef = useRef<FlatList>(null);
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -103,8 +109,9 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   // Load concert + get viewer token
   useEffect(() => {
     (async () => {
+      let c: Concert | null = null;
       try {
-        const c = await concertService.getById(concertId);
+        c = await concertService.getById(concertId);
         setConcert(c);
         if (c.status !== 'live') {
           setStreamEnded(true);
@@ -115,7 +122,18 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
         setToken(result.token);
         setWsUrl(result.livekit_url);
         setViewerCount(c.current_viewers + 1);
-      } catch {}
+      } catch (e: any) {
+        const status = e?.status ?? e?.response?.status;
+        if (status === 402) {
+          setAccessDenied(
+            c?.access_type === 'subscription'
+              ? 'Un abonnement actif est requis pour accéder à ce live.'
+              : 'Un billet est requis pour accéder à ce live.'
+          );
+        } else {
+          setAccessDenied('Impossible de rejoindre ce live.');
+        }
+      }
       setLoading(false);
     })();
   }, [concertId]);
@@ -199,6 +217,26 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
         <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
           <Text style={styles.leaveBtnText}>Retour</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <StatusBar barStyle="light-content" backgroundColor="#000" />
+        <Icon name="lock" size={48} color="#666" />
+        <Text style={styles.endedTitle}>Accès restreint</Text>
+        <Text style={styles.endedSub}>{accessDenied}</Text>
+        {concert?.access_type === 'subscription' ? (
+          <TouchableOpacity style={styles.leaveBtn} onPress={() => nav.navigate('SubscriptionPlans' as never)}>
+            <Text style={styles.leaveBtnText}>Voir les abonnements</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
+            <Text style={styles.leaveBtnText}>Retour</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
