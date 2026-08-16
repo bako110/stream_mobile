@@ -786,7 +786,12 @@ export const CommunityTreasurerScreen: React.FC = () => {
       {/* Modal créer demande retrait */}
       <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
         <TouchableOpacity style={st.overlay} activeOpacity={1} onPress={() => !formSaving && setCreateOpen(false)} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} enabled={Platform.OS === 'ios'}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          enabled={Platform.OS === 'ios'}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="box-none"
+        >
           <View style={[st.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom }]}>
             <View style={st.sheetHandle}><View style={[st.handle, { backgroundColor: colors.divider }]} /></View>
             <View style={[st.sheetHeader, { borderBottomColor: colors.divider }]}>
