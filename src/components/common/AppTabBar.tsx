@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useWs } from '../../context/WebSocketContext';
 import { TAB_BAR_HEIGHT } from '../../styles';
+import { popToTabRoot } from '../../navigation/stackHygiene';
 
 interface TabConfig {
   name:  string;
@@ -210,9 +211,16 @@ const TabItem: React.FC<TabItemProps> = memo(({
       target: routeKey,
       canPreventDefault: true,
     });
-    if (!isFocused && !event.defaultPrevented) {
+    if (event.defaultPrevented) return;
+    if (!isFocused) {
       navigation.navigate(config.name);
+      return;
     }
+    // Tap sur l'onglet déjà actif — même comportement qu'Instagram/TikTok :
+    // vide toute la pile accumulée au-dessus des Tabs pour revenir directement
+    // à la racine, au lieu de laisser l'utilisateur "coincé" avec un bouton
+    // retour qui doit traverser 20 écrans un par un.
+    popToTabRoot();
   }, [isFocused, routeKey, config.name, navigation]);
 
   return (

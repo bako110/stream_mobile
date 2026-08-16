@@ -9,6 +9,9 @@ const RETRY_TIMEOUT_MS  = 15_000;
 // peut ne pas encore être monté au moment où on veut naviguer (ex: accepter un appel
 // depuis la notification système). Sans retry, cet appel était silencieusement perdu
 // (juste un console.warn) et l'action de l'utilisateur n'avait plus aucun effet.
+// Note: la compression de pile (cf. stackHygiene.ts) est appliquée globalement via
+// onStateChange sur le NavigationContainer (RootNavigator) — couvre cet appel comme
+// tous les autres, pas besoin de la dupliquer ici.
 export function navigate(name: string, params?: any, _startedAt: number = Date.now()) {
   if (navigationRef.isReady()) {
     navigationRef.dispatch(

@@ -11,6 +11,7 @@ import { PolitiqueConfidentialiteScreen } from '../screens/Main/PolitiqueConfide
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { UserProvider }      from '../context/UserContext';
 import { navigationRef }    from './navigationRef';
+import { capStackDepth }    from './stackHygiene';
 import { storage }          from '../utils/storage';
 import { STORAGE_KEYS }     from '../utils/constants';
 import { authService, accountsService } from '../services';
@@ -308,7 +309,16 @@ export const RootNavigator: React.FC = () => {
   };
 
   return (
-    <NavigationContainer ref={navigationRef} theme={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT} linking={linking}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT}
+      linking={linking}
+      // Filet de sécurité contre l'accumulation illimitée d'écrans dans le
+      // stack principal (cf. stackHygiene.ts) — vérifie la profondeur après
+      // CHAQUE navigation, peu importe sa source (useNavigation() dans un
+      // écran, navigationRef pour les deep links/notifications, ou linking).
+      onStateChange={() => capStackDepth()}
+    >
       {appState === 'main'
         ? (
           <UserProvider key={sessionKey}>
