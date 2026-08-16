@@ -786,8 +786,8 @@ export const CommunityTreasurerScreen: React.FC = () => {
       {/* Modal créer demande retrait */}
       <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
         <TouchableOpacity style={st.overlay} activeOpacity={1} onPress={() => !formSaving && setCreateOpen(false)} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={st.kavBottom} pointerEvents="box-none">
-          <View style={[st.sheet, { backgroundColor: colors.background }]}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} enabled={Platform.OS === 'ios'}>
+          <View style={[st.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom }]}>
             <View style={st.sheetHandle}><View style={[st.handle, { backgroundColor: colors.divider }]} /></View>
             <View style={[st.sheetHeader, { borderBottomColor: colors.divider }]}>
               <TouchableOpacity onPress={() => setCreateOpen(false)}>
@@ -880,7 +880,6 @@ const st = StyleSheet.create({
   avatarSm:     { width: 40, height: 40, borderRadius: 20 },
   memberRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   overlay:      { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
-  kavBottom:    { position: 'absolute', bottom: 0, left: 0, right: 0 },
   sheet:        { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%' },
   sheetHandle:  { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
   handle:       { width: 40, height: 4, borderRadius: 2 },
