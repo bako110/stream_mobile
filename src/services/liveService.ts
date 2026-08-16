@@ -168,6 +168,14 @@ async function globalBan(liveId: string, identity: string): Promise<void> {
   await apiClient.post(Endpoints.lives.globalBan(liveId, identity));
 }
 
+async function pinSpotlight(liveId: string, identity: string): Promise<void> {
+  await apiClient.post(Endpoints.lives.spotlight(liveId, identity));
+}
+
+async function unpinSpotlight(liveId: string): Promise<void> {
+  await apiClient.delete(Endpoints.lives.unspotlight(liveId));
+}
+
 async function getLiveCost(): Promise<{ cost_gogold: number; balance: number; sufficient: boolean }> {
   const r = await apiClient.get<{ cost_gogold: number; balance: number; sufficient: boolean }>(Endpoints.lives.cost);
   return r.data;
@@ -177,5 +185,6 @@ export const liveService = {
   getLives, getLivesPage, getById, recordView, startLive, stopLive, getToken, getStatus, stopAllMine,
   blockUserFromLives, unblockUserFromLives, listBans, unban,
   invite, demote, ban, globalBan, getLiveCost,
+  pinSpotlight, unpinSpotlight,
   sendGiftForAccess, payGoGoldForAccess, checkAccess,
 };

@@ -60,6 +60,7 @@ import { useUser } from '../../context/UserContext';
 import { BackButton, GoFolyXLoader } from '../../components/common';
 import { StageTileRow } from '../../components/live/StageTileRow';
 import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
+import { StageGrid } from '../../components/live/StageGrid';
 import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
 
@@ -350,19 +351,23 @@ const MultiVideoView: React.FC<{
   onStage:       boolean;
   onGift: (id: string, name: string) => void;
   onTap:  () => void;
-}> = ({ hostName, hostAvatarUrl, myName, myAvatarUrl, onStage, onGift, onTap }) => {
+  // Spotlight épinglé par le host, synchronisé pour tous les viewers — null
+  // tant que le host n'a épinglé personne : la grille adaptative (StageGrid)
+  // affiche alors tout le monde à poids égal, comme sur l'écran host.
+  pinnedIdentity: string | null;
+}> = ({ hostName, hostAvatarUrl, myName, myAvatarUrl, onStage, onGift, onTap, pinnedIdentity }) => {
   const allTracks    = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const participants = useParticipants();
-  const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
   const localParticipant = participants.find(p => p.isLocal);
   const localTrack      = allTracks.find(t => t.participant.isLocal) ?? null;
   const remoteTracks    = allTracks.filter(t => !t.participant.isLocal);
-  const defaultSpotlight = remoteTracks[0] ?? null;
-  const spotlightTrack   = remoteTracks.find(t => t.participant.identity === spotlightId) ?? defaultSpotlight;
+  const spotlightTrack   = pinnedIdentity
+    ? (allTracks.find(t => t.participant.identity === pinnedIdentity) ?? null)
+    : null;
   // Vignettes = autres remotes (le local, s'il est sur scène, a sa propre tuile réservée
   // dans le bandeau — plus de PiP flottant séparé qui pouvait se superposer au spotlight)
-  const thumbnailTracks  = remoteTracks.filter(t => t !== spotlightTrack);
+  const thumbnailTracks  = spotlightTrack ? remoteTracks.filter(t => t !== spotlightTrack) : remoteTracks;
   // "Sur scène" = vraiment invité (onStage, géré par RoomContent via goOnStage/leaveStage),
   // pas simplement connecté à la room — un simple spectateur ne doit pas apparaître ici.
   const localOnStage     = onStage && !!localParticipant;
@@ -400,21 +405,72 @@ const MultiVideoView: React.FC<{
     );
   }
 
+  // Tuiles partagées par les deux modes (grille et spotlight+bandeau) —
+  // hôte + invités + soi-même si sur scène.
+  const stageTiles: StageTile[] = [
+    {
+      identity:  remoteTracks[0]?.participant.identity ?? 'host',
+      name:      hostName,
+      track:     remoteTracks[0] ?? null,
+      camOn:     remoteTracks[0] ? !remoteTracks[0].publication?.isMuted : false,
+      avatarUrl: hostAvatarUrl,
+      badge:     'host' as StageBadge,
+      micOn:     remoteTracks[0] ? !remoteTracks[0].publication?.isMuted : false,
+      isSpeaking: remoteTracks[0] ? !!participants.find(p => p.identity === remoteTracks[0].participant.identity)?.isSpeaking : false,
+    },
+    ...remoteTracks.slice(1).map(t => ({
+      identity: t.participant.identity,
+      name:     t.participant.name || t.participant.identity,
+      track:    t,
+      camOn:    !t.publication?.isMuted,
+      badge:    'star' as StageBadge,
+      micOn:    !t.publication?.isMuted,
+      isSpeaking: !!participants.find(p => p.identity === t.participant.identity)?.isSpeaking,
+    } satisfies StageTile)),
+    ...(localOnStage ? [{
+      identity: localParticipant!.identity,
+      name: myName || 'Toi',
+      track: localTrack,
+      camOn: localTrack ? !localTrack.publication?.isMuted : false,
+      avatarUrl: myAvatarUrl,
+      badge: 'star' as StageBadge,
+      micOn: localTrack ? !localTrack.publication?.isMuted : false,
+      isSpeaking: !!localParticipant?.isSpeaking,
+    } satisfies StageTile] : []),
+  ];
+
+  const handleTileLongPress = (identity: string) => {
+    const t = remoteTracks.find(rt => rt.participant.identity === identity);
+    if (t) onGift(identity, t.participant.name || identity);
+  };
+
+  // Pas de pin — grille adaptative, tout le monde à poids égal. Seul le host
+  // peut épingler (POST /lives/{id}/spotlight) ; le viewer voit juste le
+  // résultat, pas de bouton "épingler" ici (canPin non passé = absent).
+  if (!spotlightTrack) {
+    return (
+      <TouchableWithoutFeedback onPress={onTap}>
+        <View style={StyleSheet.absoluteFill}>
+          <StageGrid tiles={stageTiles} onLongPressTile={handleTileLongPress} />
+        </View>
+      </TouchableWithoutFeedback>
+    );
+  }
+
   return (
     <TouchableWithoutFeedback onPress={onTap}>
       <View style={StyleSheet.absoluteFill}>
-        {/* Spotlight */}
-        {spotlightTrack && (
-          spotlightCamOn
-            ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
-            : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
-                <Av name={spotlightName} size={96} />
-                <Text style={mv.spotlightName}>{spotlightName}</Text>
-              </View>
-        )}
+        {/* Spotlight épinglé par le host — identique chez tous les viewers */}
+        {spotlightCamOn
+          ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+          : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
+              <Av name={spotlightName} size={96} />
+              <Text style={mv.spotlightName}>{spotlightName}</Text>
+            </View>
+        }
 
         {/* Bouton cadeau sur le spotlight */}
-        {spotlightTrack && !spotlightTrack.participant.isLocal && (
+        {!spotlightTrack.participant.isLocal && (
           <TouchableOpacity
             style={mv.spotGiftBtn}
             onPress={() => onGift(spotlightTrack.participant.identity, spotlightName)}
@@ -424,51 +480,11 @@ const MultiVideoView: React.FC<{
           </TouchableOpacity>
         )}
 
-        {/* Bandeau "Sur scène" — une seule zone claire et alignée pour tous les
-            participants (host, invités, et toi si tu es sur scène). Chaque tuile
-            réserve sa place avec la photo de profil dès la montée sur scène, et
-            bascule automatiquement sur le flux caméra dès qu'il est actif. */}
+        {/* Bandeau "Sur scène" — le reste des participants en petites vignettes */}
         <View style={mv.stageRowWrap} pointerEvents="box-none">
           <StageTileRow
-            tiles={[
-              {
-                identity:  spotlightTrack?.participant.identity ?? 'host',
-                name:      hostName,
-                track:     spotlightTrack,
-                camOn:     spotlightCamOn,
-                avatarUrl: hostAvatarUrl,
-                badge:     'host' as StageBadge,
-                micOn:     spotlightCamOn,
-                isSpeaking: spotlightTrack ? !!participants.find(p => p.identity === spotlightTrack.participant.identity)?.isSpeaking : false,
-              },
-              ...thumbnailTracks.map(t => ({
-                identity: t.participant.identity,
-                name:     t.participant.name || t.participant.identity,
-                track:    t,
-                camOn:    !t.publication?.isMuted,
-                badge:    'star' as StageBadge,
-                micOn:    !t.publication?.isMuted,
-                isSpeaking: !!participants.find(p => p.identity === t.participant.identity)?.isSpeaking,
-              } satisfies StageTile)),
-              // Toi — dès que tu es sur scène, ta place est réservée avec ta photo de
-              // profil ; dès que tu actives la caméra, le flux la remplace automatiquement
-              // (même tuile, pas d'élément séparé qui pourrait se superposer au spotlight).
-              ...(localOnStage ? [{
-                identity: localParticipant!.identity,
-                name: myName || 'Toi',
-                track: localTrack,
-                camOn: localTrack ? !localTrack.publication?.isMuted : false,
-                avatarUrl: myAvatarUrl,
-                badge: 'star' as StageBadge,
-                micOn: localTrack ? !localTrack.publication?.isMuted : false,
-                isSpeaking: !!localParticipant?.isSpeaking,
-              } satisfies StageTile] : []),
-            ]}
-            onTapTile={(identity) => setSpotlightId(identity)}
-            onLongPressTile={(identity) => {
-              const t = remoteTracks.find(rt => rt.participant.identity === identity);
-              if (t) onGift(identity, t.participant.name || identity);
-            }}
+            tiles={stageTiles.filter(t => t.identity !== spotlightTrack.participant.identity)}
+            onLongPressTile={handleTileLongPress}
           />
         </View>
       </View>
@@ -544,6 +560,7 @@ const RoomContent: React.FC<{
   onHandDismiss: (identity: string) => void;
   onLiveUpdated: (patch: Partial<LiveStream>) => void;
   onStopLive:    () => void;
+  pinnedIdentity: string | null;
 }> = ({
   live, liveId, myIdentity, myName, myAvatarUrl, isHost, viewerCount, messages, chatInput, setChatInput,
   sending, chatRef, onSend, onLeave, onBanUser, onDemoteUser, onDeleteMsg, onEditMsg,
@@ -551,6 +568,7 @@ const RoomContent: React.FC<{
   reactionSpawnRef, onReact,
   elapsed, goOnStageRef, leaveStageRef,
   handRequests, onHandDismiss, onLiveUpdated, onStopLive,
+  pinnedIdentity,
 }) => {
   const { localParticipant } = useLocalParticipant();
   const roomParticipants     = useParticipants();
@@ -682,6 +700,7 @@ const RoomContent: React.FC<{
         onStage={onStage}
         onGift={(id, name) => setGiftReceiver({ id, name })}
         onTap={() => likeRef.current?.trigger()}
+        pinnedIdentity={pinnedIdentity}
       />
 
       {/* Zone tap coeur */}
@@ -1109,6 +1128,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const [accessChecking, setAccessChecking] = useState(false);
   // Demandes de scène (mains levées) — host uniquement
   const [handRequests,   setHandRequests]   = useState<HandRequest[]>([]);
+  // Spotlight synchronisé pour tous les viewers — cf. HostVideoView/pinnedIdentity
+  // dans SimpleLiveStreamScreen.tsx (même mécanisme, côté viewer on ne fait
+  // qu'écouter, seul le host peut changer le pin).
+  const [pinnedIdentity,  setPinnedIdentity]  = useState<string | null>(null);
 
   const chatRef      = useRef<FlatList>(null);
   const wsRef        = useRef<WebSocket | null>(null);
@@ -1144,6 +1167,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         if (l.status !== 'active') { setEnded(true); setLoading(false); return; }
         setViewerCount(l.current_viewers + 1);
         setLikeCount(l.like_count ?? 0);
+        setPinnedIdentity((l as any).pinned_identity ?? null);
 
         // Historique des commentaires — sans ça, quitter puis revenir sur le live
         // repartait d'un chat vide (le WS ne livre que les nouveaux messages après
@@ -1338,6 +1362,10 @@ export const SimpleLiveViewerScreen: React.FC = () => {
             // une boucle infinie de POST demote / diffusion WS.
             leaveStageRef.current?.(false);
           }
+        }
+
+        if (d.type === 'live_spotlight_changed' && d.live_id === liveId) {
+          setPinnedIdentity(d.identity ?? null);
         }
 
         // Kick temporaire du live — ciblé par identity (= userId)
@@ -1595,6 +1623,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         onHandDismiss={handleHandDismiss}
         onLiveUpdated={handleLiveUpdated}
         onStopLive={handleStopLive}
+        pinnedIdentity={pinnedIdentity}
       />
     </LiveKitRoom>
   );

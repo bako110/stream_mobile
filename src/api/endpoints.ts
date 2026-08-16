@@ -395,6 +395,8 @@ export const Endpoints = {
     handRaise:           (id: string, identity: string) => `${V1}/lives/${id}/hand-raise/${identity}`,
     invite:              (id: string, identity: string) => `${V1}/lives/${id}/invite/${identity}`,
     demote:              (id: string, identity: string) => `${V1}/lives/${id}/demote/${identity}`,
+    spotlight:           (id: string, identity: string) => `${V1}/lives/${id}/spotlight/${identity}`,
+    unspotlight:         (id: string) => `${V1}/lives/${id}/spotlight`,
     blockUser:           (userId: string) => `${V1}/lives/block/${userId}`,
     unblockUser:         (userId: string) => `${V1}/lives/block/${userId}`,
     listBlocks:          `${V1}/lives/blocks`,
