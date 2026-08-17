@@ -149,6 +149,14 @@ function CrownPop() {
   );
 }
 
+function VerifiedCheck() {
+  return (
+    <View style={styles.verifiedCheck}>
+      <Icon name="check" size={8} color="#fff" />
+    </View>
+  );
+}
+
 function formatCountdown(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
@@ -291,6 +299,32 @@ export const BattleScreen: React.FC = () => {
   const [hostNameB, setHostNameB] = useState('Créateur B');
   const [hostAvatarA, setHostAvatarA] = useState<string | null>(null);
   const [hostAvatarB, setHostAvatarB] = useState<string | null>(null);
+  const [verifiedA, setVerifiedA] = useState(false);
+  const [verifiedB, setVerifiedB] = useState(false);
+  const [followingA, setFollowingA] = useState(false);
+  const [followingB, setFollowingB] = useState(false);
+  const [likesA, setLikesA] = useState(0);
+  const [likesB, setLikesB] = useState(0);
+  // Carte "top donateurs" (classement en bas de chaque moitié vidéo) — visible
+  // tant que des cadeaux arrivent pour ce camp, masquée après 8s sans nouveau
+  // cadeau (réapparaît instantanément dès le suivant) — même comportement que
+  // le web (BattlePage.tsx), pour ne pas rester figée en permanence dès le
+  // premier cadeau reçu.
+  const [showDonorsA, setShowDonorsA] = useState(false);
+  const [showDonorsB, setShowDonorsB] = useState(false);
+  const donorsHideTimerA = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const donorsHideTimerB = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bumpDonorsVisibility = useCallback((side: 'a' | 'b') => {
+    const setShow = side === 'a' ? setShowDonorsA : setShowDonorsB;
+    const timerRef = side === 'a' ? donorsHideTimerA : donorsHideTimerB;
+    setShow(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setShow(false), 8000);
+  }, []);
+  useEffect(() => () => {
+    if (donorsHideTimerA.current) clearTimeout(donorsHideTimerA.current);
+    if (donorsHideTimerB.current) clearTimeout(donorsHideTimerB.current);
+  }, []);
 
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoEndTriggeredRef = useRef(false);
@@ -353,15 +387,55 @@ export const BattleScreen: React.FC = () => {
   useEffect(() => {
     if (battle?.host_a_id) {
       userService.getPublicProfile(battle.host_a_id)
-        .then(p => { setHostNameA(p.display_name || p.username || 'Créateur A'); setHostAvatarA(p.avatar_url); })
+        .then(p => {
+          setHostNameA(p.display_name || p.username || 'Créateur A');
+          setHostAvatarA(p.avatar_url);
+          setVerifiedA(!!p.is_verified);
+          setFollowingA(!!p.is_followed);
+        })
         .catch(() => {});
     }
     if (battle?.host_b_id) {
       userService.getPublicProfile(battle.host_b_id)
-        .then(p => { setHostNameB(p.display_name || p.username || 'Créateur B'); setHostAvatarB(p.avatar_url); })
+        .then(p => {
+          setHostNameB(p.display_name || p.username || 'Créateur B');
+          setHostAvatarB(p.avatar_url);
+          setVerifiedB(!!p.is_verified);
+          setFollowingB(!!p.is_followed);
+        })
         .catch(() => {});
     }
   }, [battle?.host_a_id, battle?.host_b_id]);
+
+  // "X j'aime" affiché sous chaque host = like_count du LIVE d'origine (pas le
+  // nombre d'abonnés du compte) — vient de GET /lives/{id}, mis à jour en temps
+  // réel via l'event WS like_added (cf. onLiveMessage plus bas).
+  useEffect(() => {
+    if (battle?.live_a_id) {
+      apiClient.get<any>(Endpoints.lives.byId(battle.live_a_id))
+        .then(r => setLikesA(r.data?.like_count ?? 0))
+        .catch(() => {});
+    }
+    if (battle?.live_b_id) {
+      apiClient.get<any>(Endpoints.lives.byId(battle.live_b_id))
+        .then(r => setLikesB(r.data?.like_count ?? 0))
+        .catch(() => {});
+    }
+  }, [battle?.live_a_id, battle?.live_b_id]);
+
+  const toggleFollow = useCallback(async (side: 'a' | 'b') => {
+    if (!battle) return;
+    const hostId = side === 'a' ? battle.host_a_id : battle.host_b_id;
+    const currentlyFollowing = side === 'a' ? followingA : followingB;
+    const setFollowing = side === 'a' ? setFollowingA : setFollowingB;
+    setFollowing(!currentlyFollowing);
+    try {
+      if (currentlyFollowing) await userService.unfollow(hostId);
+      else await userService.follow(hostId);
+    } catch {
+      setFollowing(currentlyFollowing);
+    }
+  }, [battle, followingA, followingB]);
 
   const showEffect = useCallback((message: string, weather: string) => {
     if (effectTimerRef.current) clearTimeout(effectTimerRef.current);
@@ -455,6 +529,7 @@ export const BattleScreen: React.FC = () => {
       if (side === 'a') setGiftNotifsA(prev => [...prev, notif]);
       else setGiftNotifsB(prev => [...prev, notif]);
       refreshRanking();
+      bumpDonorsVisibility(side);
 
       // Couronne temporaire sur l'avatar du destinataire — a chaque cadeau, sans condition de montant
       if (side === 'a') setCrownA(tick.id); else setCrownB(tick.id);
@@ -466,7 +541,10 @@ export const BattleScreen: React.FC = () => {
         setTimeout(() => setBigGift(prev => prev?.id === tick.id ? null : prev), 3800);
       }
     }
-  }, [refreshRanking]);
+    if (d.type === 'like_added' && typeof d.total === 'number') {
+      (side === 'a' ? setLikesA : setLikesB)(d.total);
+    }
+  }, [refreshRanking, bumpDonorsVisibility]);
 
   useRoomSocket('live', battle?.live_a_id ?? null, useMemo(() => onLiveMessage('a'), [onLiveMessage]));
   useRoomSocket('live', battle?.live_b_id ?? null, useMemo(() => onLiveMessage('b'), [onLiveMessage]));
@@ -572,6 +650,15 @@ export const BattleScreen: React.FC = () => {
         hostNameB={hostNameB}
         hostAvatarA={hostAvatarA}
         hostAvatarB={hostAvatarB}
+        verifiedA={verifiedA}
+        verifiedB={verifiedB}
+        followingA={followingA}
+        followingB={followingB}
+        likesA={likesA}
+        likesB={likesB}
+        showDonorsA={showDonorsA}
+        showDonorsB={showDonorsB}
+        onToggleFollow={toggleFollow}
         showRanking={showRanking}
         setShowRanking={setShowRanking}
         chatInput={chatInput}
@@ -614,6 +701,15 @@ const BattleContent: React.FC<{
   hostNameB: string;
   hostAvatarA: string | null;
   hostAvatarB: string | null;
+  verifiedA: boolean;
+  verifiedB: boolean;
+  followingA: boolean;
+  followingB: boolean;
+  likesA: number;
+  likesB: number;
+  showDonorsA: boolean;
+  showDonorsB: boolean;
+  onToggleFollow: (side: 'a' | 'b') => void;
   showRanking: boolean;
   setShowRanking: (v: boolean) => void;
   chatInput: string;
@@ -637,6 +733,7 @@ const BattleContent: React.FC<{
 }> = ({
   battle, remaining, goal, ranking, floaters, heartCountA, heartCountB, ended, leaving, myId, myHostSide, followedSide,
   hostNameA, hostNameB, hostAvatarA, hostAvatarB,
+  verifiedA, verifiedB, followingA, followingB, likesA, likesB, showDonorsA, showDonorsB, onToggleFollow,
   showRanking, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
   giftTicker, crownA, crownB, bigGift, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
@@ -760,21 +857,50 @@ const BattleContent: React.FC<{
           </Animated.View>
         )}
 
-        {goal && goal.status === 'active' && (
-          <Animated.View
-            entering={SlideInDown.duration(400).springify()}
-            style={[styles.goalBanner, goal.mode === 'boss' && styles.goalBannerBoss]}
-          >
-            <Text style={styles.goalTitle}>{goal.mode === 'boss' ? '🐉 ' : '🎯 '}{goal.title}</Text>
-            <View style={styles.goalBarTrack}>
-              <Animated.View
-                layout={LinearTransition.springify().damping(14)}
-                style={[styles.goalBarFill, { width: `${goal.progress_pct}%` }]}
-              />
+      </View>
+
+      {/* Rangée hosts — avatar + nom + badge vérifié + compteur j'aime + Suivre,
+          un par camp (portage du design web BattlePage.tsx). */}
+      <View style={styles.hostsRow}>
+        <View style={styles.hostsRowSide}>
+          {hostAvatarA
+            ? <Image source={{ uri: hostAvatarA }} style={styles.hostsRowAvatar} />
+            : <View style={[styles.hostsRowAvatar, styles.hostsRowAvatarFallbackA]}><Icon name="user" size={14} color="#fff" /></View>}
+          <View style={styles.hostsRowInfo}>
+            <View style={styles.hostsRowNameLine}>
+              <Text style={styles.hostsRowName} numberOfLines={1}>{hostNameA}</Text>
+              {verifiedA && <VerifiedCheck />}
             </View>
-            <Text style={styles.goalPct}>{Math.round(goal.progress_pct)}%</Text>
-          </Animated.View>
-        )}
+            <Text style={styles.hostsRowLikes}>{likesA.toLocaleString('fr-FR')} j'aime</Text>
+          </View>
+          {myHostSide !== 'a' && (
+            <TouchableOpacity
+              style={[styles.followBtn, followingA ? styles.followBtnActive : styles.followBtnA]}
+              onPress={() => onToggleFollow('a')} activeOpacity={0.85}>
+              <Text style={styles.followBtnText}>{followingA ? 'Suivi' : 'Suivre'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={[styles.hostsRowSide, styles.hostsRowSideRight]}>
+          {myHostSide !== 'b' && (
+            <TouchableOpacity
+              style={[styles.followBtn, followingB ? styles.followBtnActive : styles.followBtnB]}
+              onPress={() => onToggleFollow('b')} activeOpacity={0.85}>
+              <Text style={styles.followBtnText}>{followingB ? 'Suivi' : 'Suivre'}</Text>
+            </TouchableOpacity>
+          )}
+          <View style={[styles.hostsRowInfo, styles.hostsRowInfoRight]}>
+            <View style={[styles.hostsRowNameLine, styles.hostsRowNameLineRight]}>
+              {verifiedB && <VerifiedCheck />}
+              <Text style={styles.hostsRowName} numberOfLines={1}>{hostNameB}</Text>
+            </View>
+            <Text style={styles.hostsRowLikes}>{likesB.toLocaleString('fr-FR')} j'aime</Text>
+          </View>
+          {hostAvatarB
+            ? <Image source={{ uri: hostAvatarB }} style={styles.hostsRowAvatar} />
+            : <View style={[styles.hostsRowAvatar, styles.hostsRowAvatarFallbackB]}><Icon name="user" size={14} color="#fff" /></View>}
+        </View>
       </View>
 
       {/* Zone video — 40% de l'ecran, les deux hosts en cartes arrondies centrees */}
@@ -795,6 +921,14 @@ const BattleContent: React.FC<{
             ? <VideoTrack trackRef={trackA} style={styles.videoInner} objectFit="cover" />
             : <View style={[styles.videoInner, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
           {leadingSide === 'a' && <PulsingHalo color="#7B3FF2" />}
+
+          {/* Badge WIN ×N — victoires historiques du host A */}
+          {(battle?.win_count_a ?? 0) > 0 && (
+            <View style={styles.winBadge}>
+              <Text style={styles.winBadgeLabel}>WIN</Text>
+              <Text style={styles.winBadgeCount}>×{battle?.win_count_a}</Text>
+            </View>
+          )}
 
           {/* Bandeau nom + avatar du camp A */}
           <Animated.View entering={SlideInUp.duration(450).delay(100)} style={[styles.hostBadge, styles.hostBadgeA]}>
@@ -828,6 +962,37 @@ const BattleContent: React.FC<{
             incomingNotifs={giftNotifsA}
             onNotifShown={onGiftShownA}
           />
+
+          {/* Top 3 donateurs du camp A — visible tant que des cadeaux arrivent */}
+          {showDonorsA && (ranking?.top_donors_a?.length ?? 0) > 0 && (
+            <View style={styles.donorsCards} pointerEvents="none">
+              {(ranking?.top_donors_a ?? []).slice(0, 3).map(d => (
+                <View key={d.id} style={styles.donorCard}>
+                  {d.avatar_url
+                    ? <Image source={{ uri: d.avatar_url }} style={styles.donorCardAvatar} />
+                    : <View style={[styles.donorCardAvatar, styles.donorCardAvatarFallback]}><Icon name="user" size={11} color="#fff" /></View>}
+                  <View style={styles.donorCardInfo}>
+                    <Text style={styles.donorCardName} numberOfLines={1}>{d.display_name}</Text>
+                    <Text style={styles.donorCardGift} numberOfLines={1}>a envoyé {d.last_gift_name ?? 'un cadeau'}</Text>
+                  </View>
+                  {!!d.last_gift_emoji && <Text style={styles.donorCardEmoji}>{d.last_gift_emoji}</Text>}
+                  <Text style={styles.donorCardCount}>×{d.gifts_count}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Avatars top supporters en cascade + badge MVP */}
+          {(ranking?.top_donors_a?.length ?? 0) > 0 && (
+            <View style={styles.mvpRow} pointerEvents="none">
+              {(ranking?.top_donors_a ?? []).slice(0, 3).map((d, i) => (
+                d.avatar_url
+                  ? <Image key={d.id} source={{ uri: d.avatar_url }} style={[styles.mvpAvatar, i > 0 && { marginLeft: -8 }]} />
+                  : <View key={d.id} style={[styles.mvpAvatar, styles.mvpAvatarFallbackA, i > 0 && { marginLeft: -8 }]}><Icon name="user" size={10} color="#fff" /></View>
+              ))}
+              <View style={styles.mvpBadge}><Text style={styles.mvpBadgeText}>MVP</Text></View>
+            </View>
+          )}
         </Animated.View>
 
         <View style={styles.vsWrap} pointerEvents="none">
@@ -847,6 +1012,14 @@ const BattleContent: React.FC<{
             ? <VideoTrack trackRef={trackB} style={styles.videoInner} objectFit="cover" />
             : <View style={[styles.videoInner, styles.noVideo]}><ActivityIndicator color="#fff" /></View>}
           {leadingSide === 'b' && <PulsingHalo color="#F0365A" />}
+
+          {/* Badge WIN ×N — victoires historiques du host B */}
+          {(battle?.win_count_b ?? 0) > 0 && (
+            <View style={[styles.winBadge, styles.winBadgeRight]}>
+              <Text style={styles.winBadgeLabel}>WIN</Text>
+              <Text style={styles.winBadgeCount}>×{battle?.win_count_b}</Text>
+            </View>
+          )}
 
           {/* Bandeau nom + avatar du camp B */}
           <Animated.View entering={SlideInUp.duration(450).delay(150)} style={[styles.hostBadge, styles.hostBadgeB]}>
@@ -880,6 +1053,37 @@ const BattleContent: React.FC<{
             incomingNotifs={giftNotifsB}
             onNotifShown={onGiftShownB}
           />
+
+          {/* Top 3 donateurs du camp B — visible tant que des cadeaux arrivent */}
+          {showDonorsB && (ranking?.top_donors_b?.length ?? 0) > 0 && (
+            <View style={styles.donorsCards} pointerEvents="none">
+              {(ranking?.top_donors_b ?? []).slice(0, 3).map(d => (
+                <View key={d.id} style={styles.donorCard}>
+                  {d.avatar_url
+                    ? <Image source={{ uri: d.avatar_url }} style={styles.donorCardAvatar} />
+                    : <View style={[styles.donorCardAvatar, styles.donorCardAvatarFallback]}><Icon name="user" size={11} color="#fff" /></View>}
+                  <View style={styles.donorCardInfo}>
+                    <Text style={styles.donorCardName} numberOfLines={1}>{d.display_name}</Text>
+                    <Text style={styles.donorCardGift} numberOfLines={1}>a envoyé {d.last_gift_name ?? 'un cadeau'}</Text>
+                  </View>
+                  {!!d.last_gift_emoji && <Text style={styles.donorCardEmoji}>{d.last_gift_emoji}</Text>}
+                  <Text style={styles.donorCardCount}>×{d.gifts_count}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Avatars top supporters en cascade + badge MVP */}
+          {(ranking?.top_donors_b?.length ?? 0) > 0 && (
+            <View style={styles.mvpRow} pointerEvents="none">
+              {(ranking?.top_donors_b ?? []).slice(0, 3).map((d, i) => (
+                d.avatar_url
+                  ? <Image key={d.id} source={{ uri: d.avatar_url }} style={[styles.mvpAvatar, i > 0 && { marginLeft: -8 }]} />
+                  : <View key={d.id} style={[styles.mvpAvatar, styles.mvpAvatarFallbackB, i > 0 && { marginLeft: -8 }]}><Icon name="user" size={10} color="#fff" /></View>
+              ))}
+              <View style={styles.mvpBadge}><Text style={styles.mvpBadgeText}>MVP</Text></View>
+            </View>
+          )}
         </Animated.View>
 
         {/* Reactions flottantes — montent du bas vers le haut a cote de chaque camp,
@@ -889,6 +1093,25 @@ const BattleContent: React.FC<{
             <RisingHeart drift={f.drift} />
           </View>
         ))}
+
+        {/* Objectif communautaire — centré en bas de la zone vidéo (déplacé du
+            header, comme côté web) plutôt qu'en haut de l'écran. */}
+        {goal && goal.status === 'active' && (
+          <Animated.View
+            entering={SlideInDown.duration(400).springify()}
+            style={[styles.goalBanner, goal.mode === 'boss' && styles.goalBannerBoss]}
+            pointerEvents="none"
+          >
+            <Text style={styles.goalTitle}>{goal.mode === 'boss' ? '🐉 ' : '🎯 '}{goal.title}</Text>
+            <View style={styles.goalBarTrack}>
+              <Animated.View
+                layout={LinearTransition.springify().damping(14)}
+                style={[styles.goalBarFill, { width: `${goal.progress_pct}%` }]}
+              />
+            </View>
+            <Text style={styles.goalPct}>{Math.round(goal.progress_pct)}%</Text>
+          </Animated.View>
+        )}
       </View>
 
       {/* Bandeau "X mene le combat" — juste sous la video, apparait/disparait en fondu */}
@@ -1245,12 +1468,83 @@ const styles = StyleSheet.create({
   effectIcon: { fontSize: 20 },
   effectText: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '700' },
 
-  goalBanner: { width: '100%', marginTop: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: 12, gap: 6 },
+  // Objectif communautaire — centré en bas de la zone vidéo (déplacé du header)
+  goalBanner: {
+    position: 'absolute', bottom: 8, left: '12%', right: '12%',
+    backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 20, padding: 10, gap: 5,
+    zIndex: 25,
+  },
   goalBannerBoss: { borderWidth: 1.5, borderColor: '#EF4444' },
-  goalTitle: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  goalBarTrack: { height: 8, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
+  goalTitle: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  goalBarTrack: { height: 7, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
   goalBarFill: { height: '100%', backgroundColor: '#FFD700', borderRadius: 6 },
-  goalPct: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600', alignSelf: 'flex-end' },
+  goalPct: { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '600', alignSelf: 'flex-end' },
+
+  // Rangée hosts — sous le header, avatar+nom+vérifié+j'aime+Suivre par camp
+  hostsRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 10, paddingVertical: 6, gap: 6,
+  },
+  hostsRowSide: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+  hostsRowSideRight: { flexDirection: 'row-reverse' },
+  hostsRowAvatar: { width: 30, height: 30, borderRadius: 15 },
+  hostsRowAvatarFallbackA: { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  hostsRowAvatarFallbackB: { backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' },
+  hostsRowInfo: { flex: 1, minWidth: 0 },
+  hostsRowInfoRight: { alignItems: 'flex-end' },
+  hostsRowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  hostsRowNameLineRight: { flexDirection: 'row-reverse' },
+  hostsRowName: { color: '#fff', fontSize: 12, fontWeight: '700', maxWidth: 110 },
+  hostsRowLikes: { color: 'rgba(255,255,255,0.55)', fontSize: 10, marginTop: 1 },
+  verifiedCheck: {
+    width: 13, height: 13, borderRadius: 7, backgroundColor: '#1D9BF0',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  followBtn: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+  followBtnA: { backgroundColor: '#7B3FF2' },
+  followBtnB: { backgroundColor: '#F0365A' },
+  followBtnActive: { backgroundColor: 'rgba(255,255,255,0.14)' },
+  followBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+
+  // Badge "WIN xN" — victoires historiques, coin haut de chaque moitié vidéo
+  winBadge: {
+    position: 'absolute', top: 6, left: 6, zIndex: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.4)',
+  },
+  winBadgeRight: { left: undefined, right: 6 },
+  winBadgeLabel: { color: '#FFD700', fontSize: 9, fontWeight: '900', fontStyle: 'italic' },
+  winBadgeCount: { color: '#fff', fontSize: 9, fontWeight: '700' },
+
+  // Cartes "top donateurs" — classement par camp, au-dessus des avatars MVP
+  donorsCards: {
+    position: 'absolute', bottom: 30, left: 6, right: 6, gap: 4, zIndex: 15,
+  },
+  donorCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(20,16,28,0.65)', borderRadius: 12,
+    paddingVertical: 4, paddingHorizontal: 6, paddingLeft: 3,
+  },
+  donorCardAvatar: { width: 24, height: 24, borderRadius: 12 },
+  donorCardAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  donorCardInfo: { flex: 1, minWidth: 0 },
+  donorCardName: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: 9, marginTop: 1 },
+  donorCardEmoji: { fontSize: 16 },
+  donorCardCount: { color: '#FDE68A', fontSize: 11, fontWeight: '900' },
+
+  // Avatars top supporters en cascade + badge MVP — coin bas de chaque moitié
+  mvpRow: {
+    position: 'absolute', bottom: 6, left: 6, zIndex: 15,
+    flexDirection: 'row', alignItems: 'center',
+  },
+  mvpAvatar: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#0B0812' },
+  mvpAvatarFallbackA: { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
+  mvpAvatarFallbackB: { backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' },
+  mvpBadge: { marginLeft: 4, backgroundColor: '#FFD700', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1.5 },
+  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
 
   topDonorBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

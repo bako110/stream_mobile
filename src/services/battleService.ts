@@ -20,6 +20,10 @@ export interface Battle {
   responded_at:     string | null;
   started_at:       string | null;
   ended_at:         string | null;
+  /** Nombre de battles remportés par chaque host, tout historique confondu — présent
+   * uniquement sur la réponse de GET /battles/{id} (pas sur ActiveBattle ni les WS). */
+  win_count_a?:     number;
+  win_count_b?:     number;
 }
 
 export interface EligibleCreator {
@@ -68,11 +72,22 @@ export interface SupporterBrief {
   avatar_url:     string | null;
 }
 
+export interface SideDonor extends SupporterBrief {
+  gogold_spent:    number;
+  gifts_count:     number;
+  last_gift_name:  string | null;
+  last_gift_emoji: string | null;
+}
+
 export interface BattleRanking {
-  top_donor:   (SupporterBrief & { gogold_spent: number }) | null;
-  top_10:      (SupporterBrief & { gogold_spent: number })[];
-  most_active: (SupporterBrief & { actions_count: number })[];
-  surprise:    SupporterBrief | null;
+  top_donor:    (SupporterBrief & { gogold_spent: number }) | null;
+  top_10:       (SupporterBrief & { gogold_spent: number })[];
+  most_active:  (SupporterBrief & { actions_count: number })[];
+  surprise:     SupporterBrief | null;
+  /** Top 3 supporters de CHAQUE camp séparément (pas les deux hosts confondus comme top_10)
+   * — alimente les cartes "X a envoyé Y ×N" sous chaque moitié vidéo du battle. */
+  top_donors_a: SideDonor[];
+  top_donors_b: SideDonor[];
 }
 
 export interface BattleGoal {
