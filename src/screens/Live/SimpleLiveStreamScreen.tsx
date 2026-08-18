@@ -63,7 +63,6 @@ import { useUser } from '../../context/UserContext';
 import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
 import { StageTileRow } from '../../components/live/StageTileRow';
 import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
-import { StageGrid } from '../../components/live/StageGrid';
 import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
 import { BattleChallengeSheet } from '../../components/live/BattleChallengeSheet';
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
@@ -143,20 +142,16 @@ const HostVideoView: React.FC<{
   onBan:         (id: string, name: string) => void;
   isMuted:       boolean;
   isVideoOff:    boolean;
-  // Spotlight synchronisé pour tous les viewers (redesign multi-participants,
-  // 2026-08) — null tant que le host n'a épinglé personne : dans ce cas la
-  // grille adaptative (StageGrid) affiche tout le monde à poids égal.
-  pinnedIdentity: string | null;
-  onPin:          (identity: string) => void;
-}> = ({ mirror, hostName, hostAvatarUrl, onStage, onGift, onDemote, onBan, isMuted, isVideoOff, pinnedIdentity, onPin }) => {
+}> = ({ mirror, hostName, hostAvatarUrl, onStage, onGift, onDemote, onBan, isMuted, isVideoOff }) => {
   const allTracks            = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const { localParticipant } = useLocalParticipant();
   const allParticipants      = useParticipants();
+  const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
   const localTrack      = allTracks.find(t => t.participant.isLocal) ?? null;
   const localCamOn      = localTrack ? !localTrack.publication?.isMuted : false;
-  const spotlightTrack  = pinnedIdentity ? (allTracks.find(t => t.participant.identity === pinnedIdentity) ?? null) : null;
-  const thumbnailTracks = spotlightTrack ? allTracks.filter(t => t !== spotlightTrack) : allTracks;
+  const spotlightTrack  = allTracks.find(t => t.participant.identity === spotlightId) ?? localTrack ?? allTracks[0] ?? null;
+  const thumbnailTracks = allTracks.filter(t => t !== spotlightTrack);
   const spotlightName   = spotlightTrack ? (spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity)) : '';
   const spotlightCamOn  = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
 
@@ -210,93 +205,61 @@ const HostVideoView: React.FC<{
     );
   }
 
-  const allTiles: StageTile[] = [
-    {
-      identity: localParticipant.identity || 'host',
-      name:     'Toi',
-      track:    localTrack,
-      camOn:    localCamOn && !isVideoOff,
-      mirror,
-      badge:    'host' as StageBadge,
-      micOn:    !isMuted,
-      isSpeaking: localSpeaking,
-    },
-    ...allTracks.filter(t => !t.participant.isLocal).map(t => ({
-      identity: t.participant.identity,
-      name:     t.participant.name || t.participant.identity,
-      track:    t,
-      camOn:    !t.publication?.isMuted,
-      badge:    (onStage.has(t.participant.identity) ? 'bolt' : 'star') as StageBadge,
-      micOn:    !t.publication?.isMuted,
-      isSpeaking: isSpeaking(t.participant.identity),
-    } satisfies StageTile)),
-  ];
-
-  const handleTileLongPress = (identity: string) => {
-    if (identity === localParticipant.identity) return;
-    const t = thumbnailTracks.find(rt => rt.participant.identity === identity);
-    const tName = t?.participant.name || identity;
-    const isOnStage = onStage.has(identity);
-    showConfirm(tName, 'Que veux-tu faire ?', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Envoyer un cadeau', onPress: () => onGift(identity, tName) },
-      ...(isOnStage ? [{ text: 'Faire descendre', onPress: () => onDemote(identity, tName) }] : []),
-      { text: 'Bannir...', style: 'destructive' as const, onPress: () => onBan(identity, tName) },
-    ]);
-  };
-
-  // Pas de pin — grille adaptative, tout le monde à poids égal, bouton
-  // "épingler" sur chaque tuile pour que le host mette quelqu'un en avant.
-  if (!spotlightTrack) {
-    return (
-      <View style={StyleSheet.absoluteFill}>
-        <StageGrid
-          tiles={allTiles}
-          canPin
-          onPin={onPin}
-          onLongPressTile={handleTileLongPress}
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={StyleSheet.absoluteFill}>
-      {/* Spotlight épinglé par le host — visible chez TOUS les viewers */}
-      {spotlightCamOn
-        ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill}
-            mirror={spotlightTrack.participant.isLocal ? mirror : false} objectFit="cover" />
-        : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
-            <Av name={spotlightName} size={96} />
-            <Text style={mv.spotName}>{spotlightName}</Text>
-          </View>
-      }
+      {/* Spotlight */}
+      {spotlightTrack && (
+        spotlightCamOn
+          ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill}
+              mirror={spotlightTrack.participant.isLocal ? mirror : false} objectFit="cover" />
+          : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
+              <Av name={spotlightName} size={96} />
+              <Text style={mv.spotName}>{spotlightName}</Text>
+            </View>
+      )}
 
-      {/* Bandeau "Sur scène" — le reste des participants en petites vignettes.
-          Retap sur la tuile épinglée (ou bouton dédié) pour désépingler et
-          revenir à la grille. */}
+      {/* Bandeau "Sur scène" — toi (hôte) en premier, puis invités, tuiles vidéo réelles.
+          Plus de PiP flottant séparé : quand un viewer est spotlighté, ta propre tuile
+          dans le bandeau reste l'unique endroit où tu apparais (avatar si caméra off,
+          flux vidéo sinon), évitant toute superposition avec le spotlight. */}
       <View style={mv.stageRowWrap} pointerEvents="box-none">
         <StageTileRow
-          tiles={thumbnailTracks.map(t => ({
-            identity: t.participant.identity,
-            name:     t.participant.isLocal ? 'Toi' : (t.participant.name || t.participant.identity),
-            track:    t,
-            camOn:    !t.publication?.isMuted,
-            mirror:   t.participant.isLocal ? mirror : undefined,
-            badge:    (t.participant.isLocal ? 'host' : (onStage.has(t.participant.identity) ? 'bolt' : 'star')) as StageBadge,
-            micOn:    t.participant.isLocal ? !isMuted : !t.publication?.isMuted,
-            isSpeaking: t.participant.isLocal ? localSpeaking : isSpeaking(t.participant.identity),
-          } satisfies StageTile))}
-          onTapTile={(identity) => onPin(identity)}
-          onLongPressTile={handleTileLongPress}
+          tiles={[
+            {
+              identity: localParticipant.identity || 'host',
+              name:     'Toi',
+              track:    localTrack,
+              camOn:    localCamOn && !isVideoOff,
+              mirror,
+              badge:    'host' as StageBadge,
+              micOn:    !isMuted,
+              isSpeaking: localSpeaking,
+            },
+            ...thumbnailTracks.filter(t => !t.participant.isLocal).map(t => ({
+              identity: t.participant.identity,
+              name:     t.participant.name || t.participant.identity,
+              track:    t,
+              camOn:    !t.publication?.isMuted,
+              badge:    (onStage.has(t.participant.identity) ? 'bolt' : 'star') as StageBadge,
+              micOn:    !t.publication?.isMuted,
+              isSpeaking: isSpeaking(t.participant.identity),
+            } satisfies StageTile)),
+          ]}
+          onTapTile={(identity) => setSpotlightId(identity === localParticipant.identity ? null : identity)}
+          onLongPressTile={(identity) => {
+            if (identity === localParticipant.identity) return;
+            const t = thumbnailTracks.find(rt => rt.participant.identity === identity);
+            const tName = t?.participant.name || identity;
+            const isOnStage = onStage.has(identity);
+            showConfirm(tName, 'Que veux-tu faire ?', [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Envoyer un cadeau', onPress: () => onGift(identity, tName) },
+              ...(isOnStage ? [{ text: 'Faire descendre', onPress: () => onDemote(identity, tName) }] : []),
+              { text: 'Bannir...', style: 'destructive' as const, onPress: () => onBan(identity, tName) },
+            ]);
+          }}
         />
       </View>
-
-      {/* Désépingler — revenir à la grille adaptative */}
-      <TouchableOpacity style={mv.unpinBtn} onPress={() => onPin(pinnedIdentity!)} activeOpacity={0.8}>
-        <Icon name="minimize" size={14} color="#fff" />
-        <Text style={mv.unpinBtnText}>Grille</Text>
-      </TouchableOpacity>
     </View>
   );
 };
@@ -388,11 +351,6 @@ const StreamContent: React.FC<{
   const [showRequests, setShowRequests] = useState(false);
   const [showOnStage,  setShowOnStage]  = useState(false);
   const [onStage,      setOnStage]      = useState<Set<string>>(new Set());
-  // Spotlight synchronisé pour TOUS les viewers (redesign multi-participants,
-  // 2026-08) — distinct de l'ancien spotlightId purement local à chaque
-  // appareil. Reflète live.pinned_identity côté backend, mis à jour via
-  // POST/DELETE /lives/{id}/spotlight et le message WS live_spotlight_changed.
-  const [pinnedIdentity, setPinnedIdentity] = useState<string | null>(null);
 
   const [showSettings,   setShowSettings]   = useState(false);
   const [showMoreMenu,   setShowMoreMenu]   = useState(false);
@@ -415,7 +373,6 @@ const StreamContent: React.FC<{
       .then((l: LiveStream) => {
         setLiveData(l);
         setLikeCount(l.like_count ?? 0);
-        setPinnedIdentity((l as any).pinned_identity ?? null);
       })
       .catch(() => {});
     // Historique des commentaires — sans ça, revenir sur son propre live en cours
@@ -609,13 +566,6 @@ const StreamContent: React.FC<{
           addSysMsg(`${d.identity} a été redescendu de scène`);
         }
 
-        // ── Spotlight épinglé par le host — synchronisé pour tous (soi-même
-        // inclus, pour rester cohérent si l'action a été faite depuis un autre
-        // appareil connecté au même compte).
-        if (d.type === 'live_spotlight_changed') {
-          setPinnedIdentity(d.identity ?? null);
-        }
-
         // ── Battle : l'invitation qu'on a envoyee a ete acceptee → le battle demarre,
         // les deux hosts (A et B) sont rediriges vers l'ecran de battle en split-screen.
         if (d.type === 'battle_started' && d.battle_id) {
@@ -667,22 +617,6 @@ const StreamContent: React.FC<{
       toastService.error('Erreur', 'Impossible de faire descendre ce participant.');
     }
   }, [liveId, addSysMsg]);
-
-  // Épingler un participant en plein écran pour TOUS les viewers — retap sur
-  // la même personne pour désépingler (retour à la grille adaptative).
-  const handlePin = useCallback(async (identity: string) => {
-    try {
-      if (pinnedIdentity === identity) {
-        await liveService.unpinSpotlight(liveId);
-        setPinnedIdentity(null);
-      } else {
-        await liveService.pinSpotlight(liveId, identity);
-        setPinnedIdentity(identity);
-      }
-    } catch {
-      toastService.error('Erreur', 'Impossible de mettre ce participant en avant.');
-    }
-  }, [liveId, pinnedIdentity]);
 
   const handleBan = useCallback((identity: string, name: string) => {
     showConfirm(name, 'Que veux-tu faire ?', [
@@ -857,8 +791,6 @@ const StreamContent: React.FC<{
         onBan={handleBan}
         isMuted={!isMicrophoneEnabled}
         isVideoOff={!isCameraEnabled}
-        pinnedIdentity={pinnedIdentity}
-        onPin={handlePin}
       />
 
       {/* ── GRADIENTS ─────────────────────────────────────────────────── */}
@@ -1425,13 +1357,6 @@ const mv = StyleSheet.create({
   noCamCamPillText: { color: '#F0365A', fontSize: 13, fontWeight: '700' },
   noCamBadgeText:{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
   spotName:     { color: '#fff', fontSize: 16, fontWeight: '700' },
-  unpinBtn: {
-    position: 'absolute', top: Platform.OS === 'ios' ? 100 : 80, right: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 16,
-    paddingHorizontal: 10, paddingVertical: 6,
-  },
-  unpinBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   thumbsCol:{ position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, left: 12, zIndex: 15, gap: 8 },
   thumb: {
     width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
