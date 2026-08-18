@@ -7,7 +7,7 @@
  * sur le bracket) et LiveOneVsOneScreen (spectateur resté sur la liste) — pour que
  * le résultat soit annoncé de façon identique quel que soit l'écran d'où on le voit.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, Modal } from 'react-native';
 import Animated, {
   FadeIn, BounceIn, ZoomIn, useSharedValue, useAnimatedStyle, withDelay, withTiming, Easing,
@@ -55,7 +55,32 @@ export interface MatchResultData {
   forfeitByMe?: boolean;
 }
 
+// Délai avant fermeture automatique — assez long pour lire le résultat
+// (score, gain GoGold, message) sans que l'utilisateur ait à taper "Fermer"
+// lui-même ; le bouton reste utilisable pour fermer plus tôt s'il le souhaite.
+const AUTO_CLOSE_DELAY = 6000;
+
+// Passe par une ref (toujours à jour) plutôt que de capturer onClose
+// directement dans le setTimeout — onClose est recréé à chaque changement de
+// ses propres dépendances côté parent (ex: handleClose dépend de battle/isHost
+// dans BattleScreen.tsx), une closure figée sur la version du tout premier
+// montage risquait d'appeler une version périmée (ex: qui rouvrait encore une
+// confirmation "Quitter le battle ?" au lieu de fermer directement une fois le
+// match terminé), ce qui donnait l'impression que l'auto-close ne faisait rien.
+function useAutoClose(active: boolean, onClose: () => void) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!active) return;
+    const t = setTimeout(() => onCloseRef.current(), AUTO_CLOSE_DELAY);
+    return () => clearTimeout(t);
+  }, [active]);
+}
+
 export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClose: () => void }> = ({ result, onClose }) => {
+  useAutoClose(!!result, onClose);
+
   if (!result) return null;
 
   if (result.isDraw) {

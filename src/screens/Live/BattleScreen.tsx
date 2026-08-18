@@ -1,11 +1,13 @@
 /**
- * BattleScreen — match live entre deux créateurs, ecran en 3 zones (15% / 40% / 45%) :
- * header (fermer, countdown, score, objectif/effets, top supporter), zone vidéo
- * avec les deux hosts en cartes arrondies centrées côte à côte (façon TikTok
- * Live Battle) séparées par un badge "VS" — halo lumineux pulsé autour du camp en
- * tête, bandeau nom+avatar par créateur, cadeaux animés — puis zone basse (chat
- * fusionné des deux lives, classement des supporters, actions). Abandon (forfait)
- * qui notifie l'autre côté.
+ * BattleScreen — match live entre deux créateurs, structure alignée sur le web
+ * (BattlePage.tsx) : header épuré (fermer, participants, titre "BATTLE LIVE" +
+ * pastille pulsante, top supporter), rangée hosts (avatar/nom/j'aime/Suivre),
+ * barre de score pleine largeur (dégradé dynamique + message de hype), zone
+ * vidéo flexible avec les deux hosts en cartes arrondies côte à côte (façon
+ * TikTok Live Battle) séparées par un badge "VS" + countdown flottants — halo
+ * pulsé autour du camp en tête, bandeau nom+avatar par créateur, cadeaux
+ * animés — puis zone basse fixe (chat fusionné des deux lives, classement des
+ * supporters, actions). Abandon (forfait) qui notifie l'autre côté.
  */
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
@@ -149,6 +151,32 @@ function CrownPop() {
   );
 }
 
+// Toute la moitié vidéo est cliquable pour ouvrir l'envoi de cadeau au host
+// concerné (portage du comportement web BattleVideoHalf onClick), en plus de
+// la giftCard dédiée déjà présente en bas d'écran.
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+// Badge de cadeau flottant — le retrait est géré par son propre useEffect au
+// montage (mount = démarre le timer), pas par le parent, pour ne jamais
+// redémarrer/décaler le timer sur un re-render du parent.
+function GiftTickItem({ tick, colors, onExpire }: { tick: GiftTick; colors: [string, string]; onExpire: (id: string) => void }) {
+  useEffect(() => {
+    const removeTimer = setTimeout(() => onExpire(tick.id), 2000);
+    return () => clearTimeout(removeTimer);
+  }, [tick.id, onExpire]);
+
+  return (
+    <Animated.View entering={ZoomIn.duration(280)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
+      <LinearGradient colors={colors} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <Text style={styles.giftTickEmoji}>{tick.emoji}</Text>
+        <Text style={styles.giftTickText} numberOfLines={1}>
+          <Text style={styles.giftTickSender}>{tick.senderName} </Text>· {tick.GoGold}🪙
+        </Text>
+      </LinearGradient>
+    </Animated.View>
+  );
+}
+
 function VerifiedCheck() {
   return (
     <View style={styles.verifiedCheck}>
@@ -172,6 +200,16 @@ function weatherIcon(weather: string): string {
     default:           return '✨';
   }
 }
+
+/** Pastille rouge pulsante à côté du titre "BATTLE LIVE", comme le web (animate-pulse). */
+const PulsingDot: React.FC = () => {
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    pulse.value = withRepeat(withTiming(1, { duration: 900, easing: Easing.inOut(Easing.ease) }), -1, true);
+  }, [pulse]);
+  const style = useAnimatedStyle(() => ({ opacity: 0.5 + pulse.value * 0.5 }));
+  return <Animated.View style={[styles.headerPulsingDot, style]} />;
+};
 
 /** Halo lumineux qui respire doucement autour du cadre du camp en tete du score. */
 const PulsingHalo: React.FC<{ color: string }> = ({ color }) => {
@@ -221,6 +259,63 @@ const BouncyNumber: React.FC<{ value: number; style: any }> = ({ value, style })
     <Animated.Text style={[style, animStyle]}>{value}</Animated.Text>
   );
 };
+
+// ── Message de hype contextuel — façon TikTok Live, réagit à l'état réel du
+// match (temps restant, score, écart, retournement) plutôt que de défiler au
+// hasard. Portage exact de useHypeMessage (stream_web/BattlePage.tsx) : priorité
+// du plus urgent au plus générique — dernières secondes > retournement tout
+// juste survenu > match ultra serré > un camp mène largement > accueil.
+function useHypeMessage(params: {
+  remaining: number; scoreA: number; scoreB: number;
+  leadingSide: 'a' | 'b' | null; hostNameA: string; hostNameB: string;
+  isActive: boolean;
+}): { text: string; key: string } {
+  const { remaining, scoreA, scoreB, leadingSide, hostNameA, hostNameB, isActive } = params;
+  const prevLeaderRef = useRef<'a' | 'b' | null>(null);
+  const [flipMsg, setFlipMsg] = useState<{ text: string; key: string } | null>(null);
+
+  useEffect(() => {
+    const prev = prevLeaderRef.current;
+    if (prev !== null && leadingSide !== null && prev !== leadingSide) {
+      const name = leadingSide === 'a' ? hostNameA : hostNameB;
+      setFlipMsg({ text: `🔥 ${name} prend le dessus !`, key: `flip-${Date.now()}` });
+      const t = setTimeout(() => setFlipMsg(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [leadingSide, hostNameA, hostNameB]);
+  useEffect(() => { prevLeaderRef.current = leadingSide; }, [leadingSide]);
+
+  return useMemo(() => {
+    if (!isActive) return { text: '⚔️ Le combat va commencer…', key: 'idle' };
+    if (flipMsg) return flipMsg;
+    if (remaining <= 10 && remaining > 0) return { text: '⏱️ DERNIERS INSTANTS !!', key: 'final-seconds' };
+    if (remaining <= 30 && remaining > 10) return { text: '⚡ Ça se termine bientôt…', key: 'closing' };
+
+    const total = scoreA + scoreB;
+    if (total === 0) return { text: '💬 Envoie un cadeau pour soutenir ton camp !', key: 'start' };
+
+    const diff = Math.abs(scoreA - scoreB);
+    const diffPct = total > 0 ? (diff / total) * 100 : 0;
+
+    if (diffPct < 10) return { text: '😱 Match ULTRA serré, tout peut basculer !', key: 'tight' };
+    if (leadingSide) {
+      const leaderName = leadingSide === 'a' ? hostNameA : hostNameB;
+      const trailingName = leadingSide === 'a' ? hostNameB : hostNameA;
+      return diffPct > 60
+        ? { text: `👑 ${leaderName} domine le combat !`, key: 'dominant' }
+        : { text: `💪 ${trailingName} peut encore renverser la situation !`, key: 'comeback' };
+    }
+    return { text: '🎯 Qui va prendre l\'avantage ?', key: 'neutral' };
+  }, [isActive, flipMsg, remaining, scoreA, scoreB, leadingSide, hostNameA, hostNameB]);
+}
+
+function HypeBanner({ message }: { message: { text: string; key: string } }) {
+  return (
+    <Animated.Text key={message.key} entering={FadeIn.duration(280)} style={styles.hypeText} numberOfLines={1}>
+      {message.text}
+    </Animated.Text>
+  );
+}
 
 /** Ouvre une connexion brute vers /comments/ws/{targetType}/{targetId}, avec reconnexion simple. */
 function useRoomSocket(
@@ -284,7 +379,10 @@ export const BattleScreen: React.FC = () => {
   const [showRanking, setShowRanking] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [giftTicker, setGiftTicker] = useState<GiftTick[]>([]);
+  const [giftTickerA, setGiftTickerA] = useState<GiftTick[]>([]);
+  const [giftTickerB, setGiftTickerB] = useState<GiftTick[]>([]);
+  const expireGiftTickA = useCallback((id: string) => setGiftTickerA(prev => prev.filter(t => t.id !== id)), []);
+  const expireGiftTickB = useCallback((id: string) => setGiftTickerB(prev => prev.filter(t => t.id !== id)), []);
   const [giftNotifsA, setGiftNotifsA] = useState<GiftNotif[]>([]);
   const [giftNotifsB, setGiftNotifsB] = useState<GiftNotif[]>([]);
   // Couronne temporaire sur l'avatar du destinataire — a chaque cadeau, quel que
@@ -523,8 +621,11 @@ export const BattleScreen: React.FC = () => {
         giftName: gf.gift_type?.name ?? 'Cadeau',
         GoGold: gf.gogold_spent ?? 0,
       };
-      setGiftTicker(prev => [...prev.slice(-3), tick]);
-      setTimeout(() => setGiftTicker(prev => prev.filter(t => t.id !== tick.id)), 4200);
+      // UN SEUL badge affiché à la fois par camp (le plus récent remplace le
+      // précédent), pas un empilement — en cas de cadeaux rapprochés, empiler
+      // plusieurs tickets simultanés donnait l'illusion d'un badge figé en
+      // continu à l'écran. Le retrait est géré par GiftTickItem lui-même.
+      (side === 'a' ? setGiftTickerA : setGiftTickerB)([tick]);
       const notif: GiftNotif = { id: tick.id, senderName, emoji: tick.emoji, giftName: tick.giftName, GoGold: tick.GoGold };
       if (side === 'a') setGiftNotifsA(prev => [...prev, notif]);
       else setGiftNotifsB(prev => [...prev, notif]);
@@ -665,7 +766,10 @@ export const BattleScreen: React.FC = () => {
         setChatInput={setChatInput}
         messages={messages}
         chatRef={chatRef}
-        giftTicker={giftTicker}
+        giftTickerA={giftTickerA}
+        giftTickerB={giftTickerB}
+        onGiftTickExpireA={expireGiftTickA}
+        onGiftTickExpireB={expireGiftTickB}
         crownA={crownA}
         crownB={crownB}
         bigGift={bigGift}
@@ -716,7 +820,10 @@ const BattleContent: React.FC<{
   setChatInput: (v: string) => void;
   messages: ChatMsg[];
   chatRef: React.RefObject<FlatList<ChatMsg> | null>;
-  giftTicker: GiftTick[];
+  giftTickerA: GiftTick[];
+  giftTickerB: GiftTick[];
+  onGiftTickExpireA: (id: string) => void;
+  onGiftTickExpireB: (id: string) => void;
   crownA: string | null;
   crownB: string | null;
   bigGift: { id: string; senderName: string; emoji: string; giftName: string; GoGold: number } | null;
@@ -736,7 +843,7 @@ const BattleContent: React.FC<{
   verifiedA, verifiedB, followingA, followingB, likesA, likesB, showDonorsA, showDonorsB, onToggleFollow,
   showRanking, setShowRanking,
   chatInput, setChatInput, messages, chatRef,
-  giftTicker, crownA, crownB, bigGift, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
+  giftTickerA, giftTickerB, onGiftTickExpireA, onGiftTickExpireB, crownA, crownB, bigGift, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
   effectBanner, onReact, onSendChat, onClose,
 }) => {
   const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
@@ -784,20 +891,15 @@ const BattleContent: React.FC<{
   const total = scoreA + scoreB;
   const pctA = total > 0 ? (scoreA / total) * 100 : 50;
   const leadingSide: 'a' | 'b' | null = total === 0 ? null : scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : null;
+  // Position de la ligne de partage de la barre de score — reflète la part réelle
+  // de chaque camp, bornée [15,85] pour qu'aucun camp ne disparaisse visuellement
+  // de la barre même en cas de domination écrasante (même règle que le web).
+  const scoreSplitPct = total > 0 ? Math.min(85, Math.max(15, pctA)) : 50;
 
-  // Bandeau "X mene le combat" — apparait/disparait en fondu a chaque changement de leader,
-  // comme les notifications defilantes de TikTok, puis se retire tout seul apres quelques secondes.
-  const [leadBanner, setLeadBanner] = useState<{ id: string; side: 'a' | 'b' } | null>(null);
-  const prevLeadRef = useRef<'a' | 'b' | null>(null);
-  const leadBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (leadingSide && leadingSide !== prevLeadRef.current) {
-      if (leadBannerTimerRef.current) clearTimeout(leadBannerTimerRef.current);
-      setLeadBanner({ id: `${Date.now()}`, side: leadingSide });
-      leadBannerTimerRef.current = setTimeout(() => setLeadBanner(null), 3000);
-    }
-    prevLeadRef.current = leadingSide;
-  }, [leadingSide]);
+  const hypeMessage = useHypeMessage({
+    remaining, scoreA, scoreB, leadingSide, hostNameA, hostNameB,
+    isActive: battle?.status === 'active',
+  });
 
   const topDonor = ranking?.top_donor;
 
@@ -805,7 +907,10 @@ const BattleContent: React.FC<{
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
 
-      {/* Header — 15% de l'ecran : fermer, countdown, score, objectif/effets, top supporter */}
+      {/* Header — épuré comme le web (BattlePage.tsx) : fermer, participants,
+          titre "BATTLE LIVE" + pastille pulsante centré, top supporter/classement.
+          Countdown et score sont sortis d'ici (cf. score bar sous les hosts et
+          VS+countdown flottants au centre de la vidéo, comme le web). */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8} disabled={leaving}>
@@ -817,22 +922,12 @@ const BattleContent: React.FC<{
             <Text style={styles.participantsBtnText}>{roomParticipants.length}</Text>
           </TouchableOpacity>
 
-          <View style={styles.headerCenter}>
-            <View style={styles.countdownWrap}>
-              <Text style={styles.countdownText}>{formatCountdown(remaining)}</Text>
-            </View>
-            <View style={styles.scoreBarTrack}>
-              <Animated.View
-                layout={LinearTransition.springify().damping(16).stiffness(120)}
-                style={[styles.scoreBarFillA, { width: `${pctA}%` }]}
-              />
-            </View>
-            <View style={styles.scoresRow}>
-              <BouncyNumber value={scoreA} style={styles.scoreText} />
-              <Icon name="zap" size={16} color="#FFD700" />
-              <BouncyNumber value={scoreB} style={styles.scoreText} />
-            </View>
+          <View style={styles.headerTitleWrap} pointerEvents="none">
+            <Text style={styles.headerTitleText}>BATTLE LIVE</Text>
+            <PulsingDot />
           </View>
+
+          <View style={styles.headerSpacer} />
 
           {topDonor ? (
             <Animated.View entering={ZoomIn.duration(350).springify()}>
@@ -882,14 +977,16 @@ const BattleContent: React.FC<{
           )}
         </View>
 
+        {/* Même ordre JSX que le côté A (avatar → info → bouton) — c'est le
+            conteneur (hostsRowSideRight, row-reverse) qui inverse l'affichage
+            visuel, pas le JSX lui-même. Avant ce fix, le JSX était pré-inversé
+            à la main ET le conteneur inversait une seconde fois : sans bouton
+            Suivre (host qui se regarde), row-reverse recalculait l'espacement
+            différemment et l'avatar/nom/like se retrouvaient placés au hasard. */}
         <View style={[styles.hostsRowSide, styles.hostsRowSideRight]}>
-          {myHostSide !== 'b' && (
-            <TouchableOpacity
-              style={[styles.followBtn, followingB ? styles.followBtnActive : styles.followBtnB]}
-              onPress={() => onToggleFollow('b')} activeOpacity={0.85}>
-              <Text style={styles.followBtnText}>{followingB ? 'Suivi' : 'Suivre'}</Text>
-            </TouchableOpacity>
-          )}
+          {hostAvatarB
+            ? <Image source={{ uri: hostAvatarB }} style={styles.hostsRowAvatar} />
+            : <View style={[styles.hostsRowAvatar, styles.hostsRowAvatarFallbackB]}><Icon name="user" size={14} color="#fff" /></View>}
           <View style={[styles.hostsRowInfo, styles.hostsRowInfoRight]}>
             <View style={[styles.hostsRowNameLine, styles.hostsRowNameLineRight]}>
               {verifiedB && <VerifiedCheck />}
@@ -897,21 +994,43 @@ const BattleContent: React.FC<{
             </View>
             <Text style={styles.hostsRowLikes}>{likesB.toLocaleString('fr-FR')} j'aime</Text>
           </View>
-          {hostAvatarB
-            ? <Image source={{ uri: hostAvatarB }} style={styles.hostsRowAvatar} />
-            : <View style={[styles.hostsRowAvatar, styles.hostsRowAvatarFallbackB]}><Icon name="user" size={14} color="#fff" /></View>}
+          {myHostSide !== 'b' && (
+            <TouchableOpacity
+              style={[styles.followBtn, followingB ? styles.followBtnActive : styles.followBtnB]}
+              onPress={() => onToggleFollow('b')} activeOpacity={0.85}>
+              <Text style={styles.followBtnText}>{followingB ? 'Suivi' : 'Suivre'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* Zone video — 40% de l'ecran, les deux hosts en cartes arrondies centrees */}
+      {/* Barre de score pleine largeur — un score par camp aux extrémités,
+          dégradé violet→rose dont la ligne de partage suit réellement la
+          proportion du score de chaque camp (scoreSplitPct), comme le web
+          (BattlePage.tsx) — remplace l'ancienne barre compacte du header. */}
+      <View style={styles.scoreBarTrack}>
+        <LinearGradient
+          colors={['#7B3FF2', '#4C1D95', '#9B1C3F', '#F0365A']}
+          locations={[0, Math.max(0, scoreSplitPct / 100 - 0.02), Math.min(1, scoreSplitPct / 100 + 0.02), 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <BouncyNumber value={scoreA} style={styles.scoreText} />
+        <HypeBanner message={hypeMessage} />
+        <BouncyNumber value={scoreB} style={styles.scoreText} />
+      </View>
+
+      {/* Zone video — occupe l'espace restant, les deux hosts en cartes arrondies centrees */}
       <View style={styles.videoZone}>
         <LinearGradient
           colors={['#150F24', '#1C0F18', '#150F24']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={StyleSheet.absoluteFill}
         />
-        <Animated.View
+        <AnimatedTouchable
           entering={FadeIn.duration(400)}
+          activeOpacity={0.92}
+          onPress={() => setGiftSide(prev => (prev === 'a' ? null : 'a'))}
           style={[
             styles.videoHalf, styles.videoHalfA,
             leadingSide === 'a' && [styles.videoHalfLeading, styles.videoHalfLeadingA],
@@ -946,15 +1065,8 @@ const BattleContent: React.FC<{
             <Text style={styles.heartCounterText}>{heartCountA}</Text>
           </View>
 
-          {giftTicker.filter(t => t.side === 'a').map(t => (
-            <Animated.View key={t.id} entering={ZoomIn.duration(280)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
-              <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                <Text style={styles.giftTickEmoji}>{t.emoji}</Text>
-                <Text style={styles.giftTickText} numberOfLines={1}>
-                  <Text style={styles.giftTickSender}>{t.senderName} </Text>· {t.GoGold}🪙
-                </Text>
-              </LinearGradient>
-            </Animated.View>
+          {giftTickerA.map(t => (
+            <GiftTickItem key={t.id} tick={t} colors={['#7B3FF2', '#4C1D95']} onExpire={onGiftTickExpireA} />
           ))}
           <LiveGiftOverlay
             ref={giftOverlayA}
@@ -993,16 +1105,23 @@ const BattleContent: React.FC<{
               <View style={styles.mvpBadge}><Text style={styles.mvpBadgeText}>MVP</Text></View>
             </View>
           )}
-        </Animated.View>
+        </AnimatedTouchable>
 
+        {/* VS + countdown flottants au centre de la zone vidéo, comme le web
+            (BattlePage.tsx) — le countdown n'est plus dans le header. */}
         <View style={styles.vsWrap} pointerEvents="none">
           <Animated.View entering={BounceIn.duration(600).delay(200)} style={styles.vsBadge}>
             <Text style={styles.vsText}>VS</Text>
           </Animated.View>
+          <View style={styles.centerCountdownWrap}>
+            <Text style={styles.centerCountdownText}>{formatCountdown(remaining)}</Text>
+          </View>
         </View>
 
-        <Animated.View
+        <AnimatedTouchable
           entering={FadeIn.duration(400)}
+          activeOpacity={0.92}
+          onPress={() => setGiftSide(prev => (prev === 'b' ? null : 'b'))}
           style={[
             styles.videoHalf, styles.videoHalfB,
             leadingSide === 'b' && [styles.videoHalfLeading, styles.videoHalfLeadingB],
@@ -1037,15 +1156,8 @@ const BattleContent: React.FC<{
             <Text style={styles.heartCounterText}>{heartCountB}</Text>
           </View>
 
-          {giftTicker.filter(t => t.side === 'b').map(t => (
-            <Animated.View key={t.id} entering={ZoomIn.duration(280)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
-              <LinearGradient colors={['#F0365A', '#9B1C3F']} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                <Text style={styles.giftTickEmoji}>{t.emoji}</Text>
-                <Text style={styles.giftTickText} numberOfLines={1}>
-                  <Text style={styles.giftTickSender}>{t.senderName} </Text>· {t.GoGold}🪙
-                </Text>
-              </LinearGradient>
-            </Animated.View>
+          {giftTickerB.map(t => (
+            <GiftTickItem key={t.id} tick={t} colors={['#F0365A', '#9B1C3F']} onExpire={onGiftTickExpireB} />
           ))}
           <LiveGiftOverlay
             ref={giftOverlayB}
@@ -1084,7 +1196,7 @@ const BattleContent: React.FC<{
               <View style={styles.mvpBadge}><Text style={styles.mvpBadgeText}>MVP</Text></View>
             </View>
           )}
-        </Animated.View>
+        </AnimatedTouchable>
 
         {/* Reactions flottantes — montent du bas vers le haut a cote de chaque camp,
             purement visuelles (ne comptent pas dans le score, seuls les cadeaux comptent) */}
@@ -1114,22 +1226,13 @@ const BattleContent: React.FC<{
         )}
       </View>
 
-      {/* Bandeau "X mene le combat" — juste sous la video, apparait/disparait en fondu */}
-      {leadBanner && (
-        <Animated.View
-          key={leadBanner.id}
-          entering={FadeIn.duration(300)}
-          exiting={FadeOut.duration(400)}
-          style={[styles.leadBanner, leadBanner.side === 'a' ? styles.leadBannerA : styles.leadBannerB]}
-          pointerEvents="none"
-        >
-          <Text style={styles.leadBannerText} numberOfLines={1}>
-            🔥 {leadBanner.side === 'a' ? hostNameA : hostNameB} mène le combat !
-          </Text>
-        </Animated.View>
-      )}
 
-      {/* Zone basse — 45% de l'ecran : chat fusionne + boutons de soutien */}
+      {/* Zone basse — 45% de l'ecran : chat fusionne + boutons de soutien.
+          Wrapper externe (bottomZoneShadow) porte l'ombre portee vers le haut
+          — une View avec overflow:hidden (nécessaire pour les coins arrondis)
+          coupe toute ombre placée sur elle-même, d'où ce conteneur séparé qui,
+          lui, n'a pas de overflow:hidden et laisse l'ombre se dessiner. */}
+      <View style={styles.bottomZoneShadow}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.bottomZone}
@@ -1219,6 +1322,7 @@ const BattleContent: React.FC<{
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      </View>
 
       {/* Panneau classement supporters */}
       {showRanking && (
@@ -1326,53 +1430,54 @@ const BattleContent: React.FC<{
   );
 };
 
-const HEADER_H = SCREEN_H * 0.15;
-const VIDEO_ZONE_H = SCREEN_H * 0.40;
 const BOTTOM_ZONE_H = SCREEN_H * 0.45;
 
 const styles = StyleSheet.create({
   root:  { flex: 1, backgroundColor: '#000' },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  // Header — 15% de l'ecran : fermer, countdown, score, objectif/effets, top supporter
+  // Header — épuré comme le web : fermer, participants, titre BATTLE LIVE,
+  // objectif/effets, top supporter. Auto-dimensionné (plus de hauteur fixe
+  // HEADER_H) puisqu'il ne porte plus qu'une seule ligne de contrôles.
   header: {
-    width: '100%', height: HEADER_H, backgroundColor: 'rgba(11,8,18,0.92)',
+    width: '100%', backgroundColor: 'rgba(11,8,18,0.92)',
     paddingHorizontal: 14, paddingBottom: 10,
     borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
     borderBottomWidth: 1, borderBottomColor: 'rgba(155,101,245,0.35)',
   },
-  headerTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  headerCenter: { flex: 1, alignItems: 'center', gap: 6 },
+  headerTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitleWrap: {
+    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  headerTitleText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+  headerPulsingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
+  headerSpacer: { flex: 1 },
 
-  // Zone video — 40% de l'ecran, les deux hosts en cartes arrondies centrees
+  // Zone video — absorbe tout l'espace restant (comme le web, flex-1) plutôt
+  // qu'une hauteur fixe : header/hostsRow/scoreBar sont maintenant auto-
+  // dimensionnés, plus jamais figés à 15% de l'écran.
   videoZone: {
-    width: '100%', height: VIDEO_ZONE_H, flexDirection: 'row',
-    backgroundColor: '#000', padding: 6, gap: 6, alignItems: 'center',
+    width: '100%', flex: 1, flexDirection: 'row',
+    backgroundColor: '#000', padding: 10, gap: 8, alignItems: 'center',
   },
   videoHalf: {
     flex: 1, height: '100%', backgroundColor: '#111', overflow: 'hidden', position: 'relative',
-    borderRadius: 22, borderWidth: 1.5,
+    borderRadius: 18, borderWidth: 1.5,
   },
-  videoHalfA: { borderColor: 'rgba(155,101,245,0.45)' },
-  videoHalfB: { borderColor: 'rgba(240,54,90,0.45)' },
+  videoHalfA: { borderColor: 'rgba(155,101,245,0.4)' },
+  videoHalfB: { borderColor: 'rgba(240,54,90,0.4)' },
   videoHalfLeading: { borderWidth: 2, shadowOpacity: 0.9, shadowRadius: 14, elevation: 10 },
   videoHalfLeadingA: { borderColor: '#9B65F5', shadowColor: '#9B65F5' },
   videoHalfLeadingB: { borderColor: '#F0365A', shadowColor: '#F0365A' },
-  videoInner: { ...StyleSheet.absoluteFill, borderRadius: 20 },
+  // Radius légèrement inférieur au conteneur (videoHalf: 18) pour rester bien
+  // à l'intérieur du cadre — un radius interne égal ou supérieur au radius
+  // externe laisse dépasser des coins carrés de la vidéo hors du cadre arrondi.
+  videoInner: { ...StyleSheet.absoluteFill, borderRadius: 16 },
   noVideo: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
 
-  // Bandeau "X mene le combat" — juste sous la zone video
-  leadBanner: {
-    marginHorizontal: 14, marginTop: 6,
-    paddingVertical: 6, paddingHorizontal: 14,
-    borderRadius: 20, alignItems: 'center',
-  },
-  leadBannerA: { backgroundColor: 'rgba(123,63,242,0.18)' },
-  leadBannerB: { backgroundColor: 'rgba(240,54,90,0.18)' },
-  leadBannerText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-
-  // Badge VS central entre les deux cartes
-  vsWrap: { position: 'absolute', top: '50%', left: 0, right: 0, alignItems: 'center', zIndex: 25, marginTop: -16 },
+  // Badge VS + countdown, centrés entre les deux cartes (comme le web)
+  vsWrap: { position: 'absolute', top: '50%', left: 0, right: 0, alignItems: 'center', zIndex: 25, marginTop: -24 },
   vsBadge: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: '#FFD700', alignItems: 'center', justifyContent: 'center',
@@ -1381,9 +1486,11 @@ const styles = StyleSheet.create({
   },
   vsText: { color: '#1a1030', fontSize: 12, fontWeight: '900' },
 
-  // Bandeau nom + avatar par camp
+  // Bandeau nom + avatar par camp — décalé sous le badge WIN (top: 6, hauteur
+  // ~22px) pour ne jamais le chevaucher ; avant ce fix les deux badges étaient
+  // à la même position (top: 6) et se superposaient visuellement.
   hostBadge: {
-    position: 'absolute', top: 6,
+    position: 'absolute', top: 32,
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 18,
     paddingVertical: 3, paddingHorizontal: 7, maxWidth: '92%',
@@ -1403,8 +1510,11 @@ const styles = StyleSheet.create({
   },
 
   // Compteur de coeurs recus par camp — juste sous le bandeau nom/avatar
+  // Sous le badge nom (hostBadge: top 32, hauteur ~24px) — même logique de
+  // cascade verticale que winBadge → hostBadge → heartCounter, chacun décalé
+  // pour ne jamais chevaucher le précédent.
   heartCounter: {
-    position: 'absolute', top: 32,
+    position: 'absolute', top: 60,
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 14,
     paddingVertical: 2, paddingHorizontal: 7,
@@ -1415,11 +1525,21 @@ const styles = StyleSheet.create({
   heartCounterIcon: { fontSize: 11 },
   heartCounterText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-  // Zone basse — 45% de l'ecran, fixe : chat (flexible) + actions + saisie (toujours visibles)
+  // Wrapper externe — porte l'ombre portée vers le haut (effet "feuille posée
+  // par-dessus la vidéo"), séparé de bottomZone qui a overflow:hidden pour ses
+  // coins arrondis (un overflow:hidden coupe toute ombre placée sur le même
+  // élément, d'où ce conteneur dédié uniquement à l'ombre).
+  bottomZoneShadow: {
+    width: '100%', height: BOTTOM_ZONE_H,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.5, shadowRadius: 14, elevation: 18,
+  },
+  // Zone basse — 45% de l'ecran, fixe : chat (flexible) + actions + saisie
+  // (toujours visibles) — même teinte violette que le header (rgba(11,8,18,…))
+  // au lieu d'un noir pur qui tranchait avec le reste de l'écran.
   bottomZone: {
-    width: '100%', height: BOTTOM_ZONE_H, backgroundColor: 'rgba(11,8,18,0.94)',
+    width: '100%', height: '100%', backgroundColor: 'rgba(15,11,26,0.97)',
     borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden',
-    borderTopWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
   },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 4, paddingBottom: 4 },
 
@@ -1442,22 +1562,29 @@ const styles = StyleSheet.create({
   },
   giftCardIcon: { fontSize: 11 },
 
+  // Barre de score pleine largeur, juste sous la rangée hosts — même fond et
+  // même logique de dégradé dynamique que le web (BattlePage.tsx).
   scoreBarTrack: {
-    width: '100%', height: 10, borderRadius: 6, overflow: 'hidden', flexDirection: 'row',
-    backgroundColor: 'rgba(240,54,90,0.20)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 8, overflow: 'hidden',
+    backgroundColor: '#2A1D42',
   },
-  scoreBarFillA: {
-    height: '100%', backgroundColor: '#9B65F5', borderRadius: 6,
-    shadowColor: '#9B65F5', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 6, elevation: 6,
-  },
-  countdownWrap: {
-    backgroundColor: 'rgba(155,101,245,0.14)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4,
-    borderWidth: 1, borderColor: 'rgba(155,101,245,0.4)',
-  },
-  countdownText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  scoresRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   scoreText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  hypeText: {
+    flex: 1, minWidth: 0, textAlign: 'center',
+    color: '#fff', fontSize: 11, fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 },
+  },
+
+  // Countdown flottant au centre de la vidéo, sous le badge VS (comme le web)
+  centerCountdownWrap: {
+    marginTop: 4, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  centerCountdownText: {
+    color: '#fff', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'],
+    textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 },
+  },
 
   effectBanner: {
     width: '100%', marginTop: 6,

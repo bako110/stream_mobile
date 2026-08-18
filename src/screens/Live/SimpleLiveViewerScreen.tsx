@@ -37,7 +37,7 @@ import { liveService } from '../../services/liveService';
 import { battleService } from '../../services/battleService';
 import { toastService, showConfirm } from '../../services';
 import { participantAvatarUrl } from '../../utils/livekitParticipant';
-import type { LiveStream } from '../../services/liveService';
+import type { LiveStream, LiveRanking } from '../../services/liveService';
 import { LiveAccessGate } from '../../components/live/LiveAccessGate';
 import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
 import { apiClient } from '../../api/client';
@@ -371,6 +371,11 @@ const MultiVideoView: React.FC<{
     ? (spotlightTrack.participant.name || spotlightTrack.participant.identity)
     : '';
   const spotlightCamOn = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
+  // Photo de profil de la personne spotlightée (toujours un participant distant
+  // ici, jamais soi-même) — extraite des métadonnées LiveKit, sans quoi le
+  // fallback caméra coupée retombait sur un simple cercle avec la première
+  // lettre du nom (Av) même quand une vraie photo de profil était disponible.
+  const spotlightAvatarUrl = spotlightTrack ? participantAvatarUrl(spotlightTrack.participant.metadata) : null;
 
   // Pas encore connecté du tout
   if (participants.length === 0) {
@@ -403,12 +408,21 @@ const MultiVideoView: React.FC<{
   return (
     <TouchableWithoutFeedback onPress={onTap}>
       <View style={StyleSheet.absoluteFill}>
-        {/* Spotlight */}
+        {/* Spotlight — "contain" (pas "cover") : un host connecté depuis le web
+            filme en paysage (webcam standard, ratio large) alors que l'écran
+            mobile est en portrait (étroit et haut) — avec "cover" l'image
+            large est zoomée pour remplir toute la hauteur du cadre, ce qui
+            rogne une grande partie gauche/droite et rend le host partiellement
+            invisible pour le viewer mobile. "contain" montre l'image entière,
+            quitte à laisser des bandes sombres en haut/bas (fond du root déjà
+            sombre, cf. styles.root). */}
         {spotlightTrack && (
           spotlightCamOn
-            ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+            ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="contain" />
             : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
-                <Av name={spotlightName} size={96} />
+                {spotlightAvatarUrl
+                  ? <Image source={{ uri: spotlightAvatarUrl }} style={mv.spotlightAvatar} />
+                  : <Av name={spotlightName} size={96} />}
                 <Text style={mv.spotlightName}>{spotlightName}</Text>
               </View>
         )}
@@ -573,6 +587,25 @@ const RoomContent: React.FC<{
   const [freshLiveForGate, setFreshLiveForGate] = useState<LiveStream | null>(null);
   const [editTarget,    setEditTarget]    = useState<{ id: string; text: string } | null>(null);
   const giftRef = useRef<LiveGiftOverlayRef>(null);
+
+  // Classement MVP — top donateurs du live (cartes + avatars en cascade), même
+  // système que le battle (BattleScreen.tsx) : visible tant que des cadeaux
+  // arrivent, masqué après 8s sans nouveau cadeau. Déclenché ici (au lieu du
+  // parent) en observant giftTicker, qui change déjà à chaque cadeau reçu.
+  const [ranking,    setRanking]    = useState<LiveRanking | null>(null);
+  const [showDonors, setShowDonors] = useState(false);
+  const donorsHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastGiftTickId = useRef<string | null>(null);
+  useEffect(() => {
+    const latest = giftTicker[giftTicker.length - 1];
+    if (!latest || latest.id === lastGiftTickId.current) return;
+    lastGiftTickId.current = latest.id;
+    liveService.getRanking(liveId).then(setRanking).catch(() => {});
+    setShowDonors(true);
+    if (donorsHideTimer.current) clearTimeout(donorsHideTimer.current);
+    donorsHideTimer.current = setTimeout(() => setShowDonors(false), 8000);
+  }, [giftTicker, liveId]);
+  useEffect(() => () => { if (donorsHideTimer.current) clearTimeout(donorsHideTimer.current); }, []);
 
   const hostId   = live?.user_id ?? '';
   const hostName = live?.user?.display_name ?? live?.user?.username ?? 'Host';
@@ -818,6 +851,38 @@ const RoomContent: React.FC<{
               </LinearGradient>
             </Animated.View>
           ))}
+        </View>
+      )}
+
+      {/* ── MVP — top donateurs du live, cartes + avatars en cascade ──────
+          Même système que le battle (BattleScreen.tsx) : visible tant que des
+          cadeaux arrivent, se masque après 8s sans nouveau cadeau. ──────── */}
+      {showDonors && (ranking?.top_donors?.length ?? 0) > 0 && (
+        <View style={gt.donorsCards} pointerEvents="none">
+          {(ranking?.top_donors ?? []).slice(0, 3).map(d => (
+            <View key={d.id} style={gt.donorCard}>
+              {d.avatar_url
+                ? <Image source={{ uri: d.avatar_url }} style={gt.donorCardAvatar} />
+                : <Av name={d.display_name} size={28} />}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={gt.donorCardName} numberOfLines={1}>{d.display_name}</Text>
+                <Text style={gt.donorCardGift} numberOfLines={1}>a envoyé {d.last_gift_name ?? 'un cadeau'}</Text>
+              </View>
+              {!!d.last_gift_emoji && <Text style={gt.donorCardEmoji}>{d.last_gift_emoji}</Text>}
+              <Text style={gt.donorCardCount}>×{d.gifts_count}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {(ranking?.top_donors?.length ?? 0) > 0 && (
+        <View style={gt.mvpRow} pointerEvents="none">
+          {(ranking?.top_donors ?? []).slice(0, 3).map((d, i) => (
+            d.avatar_url
+              ? <Image key={d.id} source={{ uri: d.avatar_url }} style={[gt.mvpAvatar, i > 0 && { marginLeft: -8 }]} />
+              : <View key={d.id} style={[gt.mvpAvatarFallback, i > 0 && { marginLeft: -8 }]}><Av name={d.display_name} size={26} /></View>
+          ))}
+          <View style={gt.mvpBadge}><Text style={gt.mvpBadgeText}>MVP</Text></View>
         </View>
       )}
 
@@ -1618,6 +1683,7 @@ const mv = StyleSheet.create({
   noCamMicRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   noCamMicText:  { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   spotlightName: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  spotlightAvatar: { width: 96, height: 96, borderRadius: 48, marginBottom: 4 },
   spotGiftBtn: {
     display: 'none',
   },
@@ -1827,6 +1893,33 @@ const gt = StyleSheet.create({
   info:   { flex: 1 },
   sender: { color: '#fff', fontSize: 11, fontWeight: '800' },
   detail: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
+
+  // ── MVP / top donateurs (portage du battle, BattleScreen.tsx) ──────────────────
+  donorsCards: {
+    position: 'absolute', left: 12, right: 90,
+    bottom: Platform.OS === 'ios' ? 220 : 205,
+    gap: 4, zIndex: 41,
+  },
+  donorCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(20,16,28,0.65)', borderRadius: 14,
+    paddingVertical: 5, paddingHorizontal: 7, paddingLeft: 4,
+  },
+  donorCardAvatar: { width: 28, height: 28, borderRadius: 14 },
+  donorCardName: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: 10, marginTop: 1 },
+  donorCardEmoji: { fontSize: 17 },
+  donorCardCount: { color: '#FDE68A', fontSize: 12, fontWeight: '900' },
+
+  mvpRow: {
+    position: 'absolute', left: 12,
+    bottom: Platform.OS === 'ios' ? 185 : 170,
+    flexDirection: 'row', alignItems: 'center', zIndex: 41,
+  },
+  mvpAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#0B0812' },
+  mvpAvatarFallback: { borderWidth: 2, borderColor: '#0B0812', borderRadius: 13 },
+  mvpBadge: { marginLeft: 4, backgroundColor: '#FFD700', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1.5 },
+  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
 });
 
 // ── Styles menu scène ─────────────────────────────────────────────────────────

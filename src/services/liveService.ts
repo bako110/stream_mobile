@@ -60,6 +60,22 @@ export interface LivesPage {
   has_more: boolean;
 }
 
+export interface LiveDonor {
+  id:              string;
+  display_name:    string;
+  avatar_url?:     string | null;
+  gogold_spent:    number;
+  gifts_count:     number;
+  last_gift_name?:  string | null;
+  last_gift_emoji?: string | null;
+}
+
+export interface LiveRanking {
+  top_donor:  LiveDonor | null;
+  top_10:     LiveDonor[];
+  top_donors: LiveDonor[];
+}
+
 export interface BannedUser {
   banned_user_id: string;
   created_at:     string;
@@ -173,9 +189,16 @@ async function getLiveCost(): Promise<{ cost_gogold: number; balance: number; su
   return r.data;
 }
 
+/** Top donateurs du live — alimente les cartes MVP (host + viewer) affichées
+ * quand un cadeau est envoyé, même modèle que battlesApi.getRanking. */
+async function getRanking(liveId: string): Promise<LiveRanking> {
+  const r = await apiClient.get<LiveRanking>(Endpoints.lives.ranking(liveId));
+  return r.data;
+}
+
 export const liveService = {
   getLives, getLivesPage, getById, recordView, startLive, stopLive, getToken, getStatus, stopAllMine,
   blockUserFromLives, unblockUserFromLives, listBans, unban,
-  invite, demote, ban, globalBan, getLiveCost,
+  invite, demote, ban, globalBan, getLiveCost, getRanking,
   sendGiftForAccess, payGoGoldForAccess, checkAccess,
 };

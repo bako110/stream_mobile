@@ -66,7 +66,7 @@ import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
 import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
 import { BattleChallengeSheet } from '../../components/live/BattleChallengeSheet';
 import { LiveParticipantsModal } from '../../components/live/LiveParticipantsModal';
-import type { LiveStream } from '../../services/liveService';
+import type { LiveStream, LiveRanking } from '../../services/liveService';
 import { markLiveEnteringBattle, isLiveEnteringBattle } from '../../utils/battleTransitionFlags';
 import { useWs } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
@@ -154,6 +154,14 @@ const HostVideoView: React.FC<{
   const thumbnailTracks = allTracks.filter(t => t !== spotlightTrack);
   const spotlightName   = spotlightTrack ? (spotlightTrack.participant.isLocal ? 'Toi' : (spotlightTrack.participant.name || spotlightTrack.participant.identity)) : '';
   const spotlightCamOn  = spotlightTrack ? !spotlightTrack.publication?.isMuted : false;
+  // Photo de profil de la personne spotlightée (host lui-même OU invité) —
+  // sans ça, le fallback caméra coupée retombait sur un simple cercle avec la
+  // première lettre du nom (Av), même quand une vraie photo de profil était
+  // disponible (hostAvatarUrl pour soi-même, métadonnées LiveKit pour un
+  // invité), incohérent avec le fallback plein écran qui, lui, l'utilisait déjà.
+  const spotlightAvatarUrl = spotlightTrack
+    ? (spotlightTrack.participant.isLocal ? hostAvatarUrl : participantAvatarUrl(spotlightTrack.participant.metadata))
+    : null;
 
   const isSpeaking = (identity: string) =>
     allParticipants.find(p => p.identity === identity)?.isSpeaking ?? false;
@@ -207,13 +215,21 @@ const HostVideoView: React.FC<{
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      {/* Spotlight */}
+      {/* Spotlight — "cover" seulement pour SA PROPRE caméra (mobile, déjà en
+          portrait, aucun rognage gênant), "contain" pour un autre participant :
+          un invité connecté depuis le web filme en paysage (webcam standard)
+          alors que l'écran mobile est en portrait — avec "cover" l'image large
+          serait zoomée pour remplir toute la hauteur, rognant une grande partie
+          gauche/droite et rendant l'invité partiellement invisible. */}
       {spotlightTrack && (
         spotlightCamOn
           ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill}
-              mirror={spotlightTrack.participant.isLocal ? mirror : false} objectFit="cover" />
+              mirror={spotlightTrack.participant.isLocal ? mirror : false}
+              objectFit={spotlightTrack.participant.isLocal ? 'cover' : 'contain'} />
           : <View style={[StyleSheet.absoluteFill, mv.noVideoBg]}>
-              <Av name={spotlightName} size={96} />
+              {spotlightAvatarUrl
+                ? <Image source={{ uri: spotlightAvatarUrl }} style={mv.spotAvatar} />
+                : <Av name={spotlightName} size={96} />}
               <Text style={mv.spotName}>{spotlightName}</Text>
             </View>
       )}
@@ -367,6 +383,22 @@ const StreamContent: React.FC<{
   // s'envoie pas de cadeau à lui-même), seulement quand il tapote un participant
   // sur scène pour le remercier.
   const [giftReceiver, setGiftReceiver] = useState<{ id: string; name: string } | null>(null);
+  // Classement MVP — top donateurs du live (cartes + avatars en cascade), même
+  // système que le battle (BattleScreen.tsx) : visible tant que des cadeaux
+  // arrivent, masqué après 8s sans nouveau cadeau, réapparaît instantanément
+  // dès le suivant.
+  const [ranking,     setRanking]     = useState<LiveRanking | null>(null);
+  const [showDonors,  setShowDonors]  = useState(false);
+  const donorsHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bumpDonorsVisibility = useCallback(() => {
+    setShowDonors(true);
+    if (donorsHideTimer.current) clearTimeout(donorsHideTimer.current);
+    donorsHideTimer.current = setTimeout(() => setShowDonors(false), 8000);
+  }, []);
+  useEffect(() => () => { if (donorsHideTimer.current) clearTimeout(donorsHideTimer.current); }, []);
+  const refreshRanking = useCallback(() => {
+    liveService.getRanking(liveId).then(setRanking).catch(() => {});
+  }, [liveId]);
 
   useEffect(() => {
     liveService.getById(liveId)
@@ -520,6 +552,8 @@ const StreamContent: React.FC<{
           setGiftTicker(prev => [...prev.slice(-2), tick]);
           setGiftHistory(prev => [tick, ...prev.slice(0, 49)]);
           setTimeout(() => setGiftTicker(prev => prev.filter(t => t.id !== tick.id)), 5000);
+          refreshRanking();
+          bumpDonorsVisibility();
         }
 
         // ── Likes
@@ -589,7 +623,7 @@ const StreamContent: React.FC<{
       if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
     }, 25_000);
     return () => { clearInterval(ping); try { ws.close(); } catch {} };
-  }, [liveId, addSysMsg]);
+  }, [liveId, addSysMsg, refreshRanking, bumpDonorsVisibility]);
 
   // ── Actions modération
   const handleAccept = useCallback(async (req: HandRequest) => {
@@ -854,6 +888,38 @@ const StreamContent: React.FC<{
               </LinearGradient>
             </Animated.View>
           ))}
+        </View>
+      )}
+
+      {/* ── MVP — top donateurs du live, cartes + avatars en cascade ──────
+          Même système que le battle (BattleScreen.tsx) : visible tant que des
+          cadeaux arrivent, se masque après 8s sans nouveau cadeau. ──────── */}
+      {showDonors && (ranking?.top_donors?.length ?? 0) > 0 && (
+        <View style={st.donorsCards} pointerEvents="none">
+          {(ranking?.top_donors ?? []).slice(0, 3).map(d => (
+            <View key={d.id} style={st.donorCard}>
+              {d.avatar_url
+                ? <Image source={{ uri: d.avatar_url }} style={st.donorCardAvatar} />
+                : <Av name={d.display_name} size={28} />}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={st.donorCardName} numberOfLines={1}>{d.display_name}</Text>
+                <Text style={st.donorCardGift} numberOfLines={1}>a envoyé {d.last_gift_name ?? 'un cadeau'}</Text>
+              </View>
+              {!!d.last_gift_emoji && <Text style={st.donorCardEmoji}>{d.last_gift_emoji}</Text>}
+              <Text style={st.donorCardCount}>×{d.gifts_count}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {(ranking?.top_donors?.length ?? 0) > 0 && (
+        <View style={st.mvpRow} pointerEvents="none">
+          {(ranking?.top_donors ?? []).slice(0, 3).map((d, i) => (
+            d.avatar_url
+              ? <Image key={d.id} source={{ uri: d.avatar_url }} style={[st.mvpAvatar, i > 0 && { marginLeft: -8 }]} />
+              : <View key={d.id} style={[st.mvpAvatarFallback, i > 0 && { marginLeft: -8 }]}><Av name={d.display_name} size={26} /></View>
+          ))}
+          <View style={st.mvpBadge}><Text style={st.mvpBadgeText}>MVP</Text></View>
         </View>
       )}
 
@@ -1357,6 +1423,7 @@ const mv = StyleSheet.create({
   noCamCamPillText: { color: '#F0365A', fontSize: 13, fontWeight: '700' },
   noCamBadgeText:{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
   spotName:     { color: '#fff', fontSize: 16, fontWeight: '700' },
+  spotAvatar:   { width: 96, height: 96, borderRadius: 48, marginBottom: 4 },
   thumbsCol:{ position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, left: 12, zIndex: 15, gap: 8 },
   thumb: {
     width: 78, height: 116, borderRadius: 14, overflow: 'hidden',
@@ -1496,6 +1563,33 @@ const st = StyleSheet.create({
   giftTickerText:   { flex: 1, color: '#fff', fontSize: 12 },
   giftTickerSender: { fontWeight: '800' },
   giftTickerGoGold:  { color: '#fff', fontSize: 11, fontWeight: '700' },
+
+  // ── MVP / top donateurs (portage du battle, BattleScreen.tsx) ──────────────────
+  donorsCards: {
+    position: 'absolute', left: 12, right: 90,
+    bottom: Platform.OS === 'ios' ? 260 : 240,
+    gap: 4, zIndex: 21,
+  },
+  donorCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(20,16,28,0.65)', borderRadius: 14,
+    paddingVertical: 5, paddingHorizontal: 7, paddingLeft: 4,
+  },
+  donorCardAvatar: { width: 28, height: 28, borderRadius: 14 },
+  donorCardName: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: 10, marginTop: 1 },
+  donorCardEmoji: { fontSize: 17 },
+  donorCardCount: { color: '#FDE68A', fontSize: 12, fontWeight: '900' },
+
+  mvpRow: {
+    position: 'absolute', left: 12,
+    bottom: Platform.OS === 'ios' ? 225 : 205,
+    flexDirection: 'row', alignItems: 'center', zIndex: 21,
+  },
+  mvpAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#0B0812' },
+  mvpAvatarFallback: { borderWidth: 2, borderColor: '#0B0812', borderRadius: 13 },
+  mvpBadge: { marginLeft: 4, backgroundColor: '#FFD700', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1.5 },
+  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
 
   // ── Colonne droite ────────────────────────────────────────────────────────────
   sideCol: {

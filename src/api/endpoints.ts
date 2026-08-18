@@ -388,6 +388,7 @@ export const Endpoints = {
     token:  (id: string) => `${V1}/lives/${id}/token`,
     status: (id: string) => `${V1}/lives/${id}/status`,
     view:   (id: string) => `${V1}/lives/${id}/view`,
+    ranking: (id: string) => `${V1}/lives/${id}/ranking`,
     ban:           (id: string, identity: string) => `${V1}/lives/${id}/ban/${identity}`,
     globalBan:     (id: string, userId: string)   => `${V1}/lives/${id}/global-ban/${userId}`,
     like:          (id: string) => `${V1}/lives/${id}/like`,
