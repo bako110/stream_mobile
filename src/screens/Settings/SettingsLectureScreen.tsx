@@ -12,10 +12,11 @@ import { toastService } from '../../services';
 interface PlaybackPrefs {
   autoplay:     boolean;
   hd_streaming: boolean;
+  record_live_enabled: boolean;
 }
 
 const STORAGE_KEY = 'playback_prefs';
-const DEFAULT_PREFS: PlaybackPrefs = { autoplay: true, hd_streaming: false };
+const DEFAULT_PREFS: PlaybackPrefs = { autoplay: true, hd_streaming: false, record_live_enabled: false };
 
 function loadCached(): PlaybackPrefs {
   try {
@@ -91,8 +92,11 @@ export const SettingsLectureScreen: React.FC = () => {
             <Row icon="play" label="Lecture automatique"
               right={sw('autoplay')}
             />
-            <Row icon="wifi" label="Streaming HD" value="Utilise plus de données mobiles" last
+            <Row icon="wifi" label="Streaming HD" value="Utilise plus de données mobiles"
               right={sw('hd_streaming')}
+            />
+            <Row icon="video" label="Enregistrer mes lives" value="Sauvegarde une vidéo complète (vidéo + chat) de tes lives, battles et concerts"
+              last right={sw('record_live_enabled')}
             />
           </Card>
         </ScrollView>
