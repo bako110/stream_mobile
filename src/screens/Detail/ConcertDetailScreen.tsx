@@ -337,12 +337,20 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
       const data = await concertService.getById(concertId);
       setConcert(data);
       favoriteService.check('concert', concertId).then(setSaved).catch(() => {});
-      if (data.status === 'ended' && data.live_id) {
-        try {
-          const { apiClient } = require('../../api/client');
-          const replay = await apiClient.get(`/api/v1/lives/${data.live_id}/replay`);
-          setReplayUrl(replay?.replay_url ?? null);
-        } catch { /**/ }
+      if (data.status === 'ended') {
+        // Enregistrement egress directement sur le concert (2026-08, cf.
+        // streaming.py::start_stream) — prioritaire sur l'ancien mécanisme
+        // via live_id (lives spontanés liés), qui ne couvre pas le cas
+        // général d'un concert streamé sans Live associé.
+        if (data.replay_url) {
+          setReplayUrl(data.replay_url);
+        } else if (data.live_id) {
+          try {
+            const { apiClient } = require('../../api/client');
+            const replay = await apiClient.get(`/api/v1/lives/${data.live_id}/replay`);
+            setReplayUrl(replay?.replay_url ?? null);
+          } catch { /**/ }
+        }
       }
       try {
         const user = await authService.getMe();
