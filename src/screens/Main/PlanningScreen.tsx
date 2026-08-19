@@ -886,20 +886,31 @@ const PlanningCard: React.FC<PlanningCardProps> = ({
 
         {isPersonal && item.invites && item.invites.length > 0 && (
           <View style={s.avatarRow}>
-            {item.invites.slice(0, 5).map(inv => (
-              <View key={inv.id} style={[s.invAvatar, {
-                backgroundColor: accent + '30',
-                borderColor: inv.status === 'accepted' ? '#36D9A0' : inv.status === 'declined' ? '#EF4444' : colors.backgroundSecondary,
-              }]}>
-                {inv.invitee?.avatar_url
-                  ? <Image source={{ uri: inv.invitee.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 8 }} />
-                  : <Text style={{ color: accent, fontSize: 8, fontWeight: '800' }}>{getInitial(inv.invitee?.display_name ?? inv.invitee?.username)}</Text>
-                }
-              </View>
-            ))}
+            {item.invites.slice(0, 5).map(inv => {
+              const name = inv.invitee?.display_name ?? inv.invitee?.username ?? 'Invité';
+              const statusLabel = inv.status === 'accepted' ? 'a accepté' : inv.status === 'declined' ? 'a refusé' : "n'a pas encore répondu";
+              return (
+                <TouchableOpacity key={inv.id} activeOpacity={0.7}
+                  onPress={() => toastService.info(`${name} ${statusLabel}`)}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+                  <View style={[s.invAvatar, {
+                    backgroundColor: accent + '30',
+                    borderColor: inv.status === 'accepted' ? '#36D9A0' : inv.status === 'declined' ? '#EF4444' : colors.backgroundSecondary,
+                  }]}>
+                    {inv.invitee?.avatar_url
+                      ? <Image source={{ uri: inv.invitee.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 8 }} />
+                      : <Text style={{ color: accent, fontSize: 8, fontWeight: '800' }}>{getInitial(inv.invitee?.display_name ?? inv.invitee?.username)}</Text>
+                    }
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
             {item.invites.length > 5 && (
               <Text style={[s.moreInv, { color: colors.textTertiary }]}>+{item.invites.length - 5}</Text>
             )}
+            <Text style={[s.invCount, { color: colors.textTertiary }]}>
+              {item.invites.filter(i => i.status === 'accepted').length}/{item.invites.length} ont accepté
+            </Text>
           </View>
         )}
 
@@ -976,6 +987,7 @@ const s = StyleSheet.create({
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
   invAvatar: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
   moreInv:   { fontSize: 9, fontWeight: '700' },
+  invCount:  { fontSize: 10, fontWeight: '600', marginLeft: 4 },
 
   invActions:   { flexDirection: 'row', gap: 6, marginTop: 7 },
   btnAccept:    { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#36D9A0', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
