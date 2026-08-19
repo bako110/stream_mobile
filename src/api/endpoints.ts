@@ -403,6 +403,7 @@ export const Endpoints = {
     removeBan:           (userId: string) => `${V1}/lives/bans/${userId}`,
     monetization:        (id: string) => `${V1}/lives/${id}/monetization`,
     stageMonetization:   (id: string) => `${V1}/lives/${id}/stage-monetization`,
+    recording:           (id: string) => `${V1}/lives/${id}/recording`,
   },
 
   // ── Favoris (prefix: /api/v1/favorites) ──────────────────────────────────
@@ -516,6 +517,7 @@ export const Endpoints = {
     read:          (id: string) => `${V1}/notifications/${id}/read`,
     delete:        (id: string) => `${V1}/notifications/${id}`,
     deleteAll:     `${V1}/notifications`,
+    bulkDelete:    `${V1}/notifications/bulk-delete`,
     deviceToken:   `${V1}/notifications/device-token`,
     preferences:   `${V1}/notifications/preferences`,
   },

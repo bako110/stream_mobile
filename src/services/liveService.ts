@@ -11,6 +11,7 @@ export interface LiveStream {
   category?: string | null;
   thumbnail_url?: string | null;
   status: 'active' | 'ended';
+  is_recording?: boolean;
   room_name?: string | null;
   current_viewers: number;
   peak_viewers: number;

@@ -234,6 +234,30 @@ export const LiveSettingsSheet: React.FC<Props> = ({
   const { theme } = useTheme();
   const { colors } = theme;
 
+  // ── Enregistrement (WebEgress) ────────────────────────────────────────────
+  const [isRecording,      setIsRecording]      = useState(!!live?.is_recording);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+
+  useEffect(() => { setIsRecording(!!live?.is_recording); }, [live?.is_recording]);
+
+  const toggleRecording = async () => {
+    if (recordingLoading) return;
+    const next = !isRecording;
+    setRecordingLoading(true);
+    try {
+      await apiClient.patch(Endpoints.lives.recording(liveId), { enabled: next });
+      setIsRecording(next);
+      toastService.success(
+        next ? 'Enregistrement démarré' : 'Enregistrement arrêté',
+        next ? 'Une vidéo complète sera sauvegardée à la fin du live.' : undefined,
+      );
+    } catch {
+      toastService.error('Erreur', "Impossible de changer l'enregistrement pour le moment.");
+    } finally {
+      setRecordingLoading(false);
+    }
+  };
+
   // ── Utilisateurs bannis ────────────────────────────────────────────────────
   const [bannedUsers,    setBannedUsers]    = useState<BannedUser[]>([]);
   const [bansLoading,    setBansLoading]    = useState(false);
@@ -408,6 +432,24 @@ export const LiveSettingsSheet: React.FC<Props> = ({
               <Text style={[s.toggleLabel, { color: colors.textPrimary }]}>Retourner la caméra</Text>
             </TouchableOpacity>
           )}
+
+          {/* ── Enregistrement ─────────────────────────────────────────────── */}
+          <Text style={[s.sectionLabel, { color: colors.textSecondary }]}>Enregistrement</Text>
+          <TouchableOpacity
+            style={[s.toggleCard, s.flipCard, { backgroundColor: colors.backgroundSecondary, borderColor: isRecording ? '#F0365A' : colors.border }]}
+            onPress={toggleRecording} activeOpacity={0.8} disabled={recordingLoading}
+          >
+            <View style={[s.toggleIcon, { backgroundColor: isRecording ? 'rgba(240,54,90,0.12)' : 'rgba(123,63,242,0.12)' }]}>
+              {recordingLoading
+                ? <ActivityIndicator size="small" color={isRecording ? '#F0365A' : '#7B3FF2'} />
+                : <Icon name={isRecording ? 'square' : 'video'} size={20} color={isRecording ? '#F0365A' : '#7B3FF2'} />
+              }
+            </View>
+            <Text style={[s.toggleLabel, { color: colors.textPrimary }]}>
+              {isRecording ? "Arrêter l'enregistrement" : 'Démarrer l\'enregistrement'}
+            </Text>
+            {isRecording && <View style={[s.dot, { backgroundColor: '#F0365A' }]} />}
+          </TouchableOpacity>
 
           {/* ── Demandes de scene ──────────────────────────────────────────── */}
           <Text style={[s.sectionLabel, { color: colors.textSecondary }]}>
