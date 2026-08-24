@@ -1,12 +1,12 @@
 /**
  * UserGalleryScreen — grille paginée des IMAGES uniquement d'un utilisateur
  * (posts + events + concerts), portage mobile de GalleryTab (ProfilePage.tsx /
- * UserProfilePage.tsx côté stream_web). Events/concerts n'ont pas de
- * pagination exploitable côté backend (même limitation que le web) — chargés
- * une seule fois avec une limite large ; seuls les posts (potentiellement
- * nombreux) sont paginés via scroll infini (onEndReached).
+ * UserProfilePage.tsx côté stream_web). Les 3 sources sont paginées
+ * indépendamment (page/hasMore séparés) et avancées ensemble via un seul
+ * scroll infini (onEndReached de la FlatList) — chaque source continue tant
+ * qu'elle a encore une page, sans attendre que les autres soient épuisées.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
   StatusBar, ActivityIndicator, useWindowDimensions,
@@ -30,6 +30,17 @@ interface GalleryImage { id: string; kind: 'post' | 'event' | 'concert'; url: st
 const GAP = 4;
 const PAGE_LIMIT = 30;
 
+type SourceKind = 'post' | 'event' | 'concert';
+
+interface SourceState {
+  images: GalleryImage[];
+  page: number;
+  hasMore: boolean;
+  loading: boolean;
+}
+
+const EMPTY_SOURCE: SourceState = { images: [], page: 0, hasMore: true, loading: false };
+
 export const UserGalleryScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
@@ -42,12 +53,9 @@ export const UserGalleryScreen: React.FC = () => {
   const userId = route.params?.userId ?? '';
   const { get: getDl, download: startDl } = useMediaDownload();
 
-  const [postImages, setPostImages]   = useState<GalleryImage[]>([]);
-  const [otherImages, setOtherImages] = useState<GalleryImage[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore]         = useState(true);
-  const pageRef = useRef(1);
+  const [sources, setSources] = useState<Record<SourceKind, SourceState>>({
+    post: EMPTY_SOURCE, event: EMPTY_SOURCE, concert: EMPTY_SOURCE,
+  });
 
   const extractPostImages = (posts: any[]): GalleryImage[] =>
     posts
@@ -56,49 +64,71 @@ export const UserGalleryScreen: React.FC = () => {
         const urls: string[] = post.image_urls?.length ? post.image_urls : (post.image_url ? [post.image_url] : []);
         return urls.map((url, i) => ({ id: `${post.id}-${i}`, kind: 'post' as const, url }));
       });
+  const extractEventImages = (events: any[]): GalleryImage[] =>
+    events.filter(e => e.banner_url || e.thumbnail_url)
+      .map(e => ({ id: e.id, kind: 'event' as const, url: e.banner_url ?? e.thumbnail_url }));
+  const extractConcertImages = (concerts: any[]): GalleryImage[] =>
+    concerts.filter(c => c.banner_url || c.thumbnail_url)
+      .map(c => ({ id: c.id, kind: 'concert' as const, url: c.banner_url ?? c.thumbnail_url }));
 
-  useEffect(() => {
-    if (!userId) { setLoading(false); return; }
-    setLoading(true);
-    pageRef.current = 1;
+  const fetchers: Record<SourceKind, (page: number) => Promise<any[]>> = {
+    post: (page) => postService.getByUser(userId, page, PAGE_LIMIT),
+    event: (page) => apiClient
+      .get<any[]>(`${Endpoints.users.userEvents(userId)}?page=${page}&limit=${PAGE_LIMIT}`)
+      .then(r => Array.isArray(r.data) ? r.data : []),
+    concert: (page) => apiClient
+      .get<any[]>(`${Endpoints.users.userConcerts(userId)}?page=${page}&limit=${PAGE_LIMIT}`)
+      .then(r => Array.isArray(r.data) ? r.data : []),
+  };
+  const extractors: Record<SourceKind, (items: any[]) => GalleryImage[]> = {
+    post: extractPostImages, event: extractEventImages, concert: extractConcertImages,
+  };
 
-    Promise.all([
-      postService.getByUser(userId, 1, PAGE_LIMIT),
-      apiClient.get<any[]>(`${Endpoints.users.userEvents(userId)}?limit=100`).catch(() => ({ data: [] })),
-      apiClient.get<any[]>(`${Endpoints.users.userConcerts(userId)}?limit=100`).catch(() => ({ data: [] })),
-    ])
-      .then(([posts, eventsRes, concertsRes]) => {
-        setPostImages(extractPostImages(posts));
-        setHasMore(posts.length >= PAGE_LIMIT);
-
-        const events   = Array.isArray(eventsRes.data)   ? eventsRes.data   : [];
-        const concerts = Array.isArray(concertsRes.data) ? concertsRes.data : [];
-        setOtherImages([
-          ...events.filter((e: any) => e.banner_url || e.thumbnail_url)
-            .map((e: any) => ({ id: e.id, kind: 'event' as const, url: e.banner_url ?? e.thumbnail_url })),
-          ...concerts.filter((c: any) => c.banner_url || c.thumbnail_url)
-            .map((c: any) => ({ id: c.id, kind: 'concert' as const, url: c.banner_url ?? c.thumbnail_url })),
-        ]);
-      })
-      .catch(() => setHasMore(false))
-      .finally(() => setLoading(false));
+  const loadSource = useCallback((kind: SourceKind) => {
+    setSources(prev => {
+      const cur = prev[kind];
+      if (cur.loading || !cur.hasMore || !userId) return prev;
+      const nextPage = cur.page + 1;
+      fetchers[kind](nextPage)
+        .then(items => {
+          setSources(p => ({
+            ...p,
+            [kind]: {
+              images: [...p[kind].images, ...extractors[kind](items)],
+              page: nextPage,
+              hasMore: items.length >= PAGE_LIMIT,
+              loading: false,
+            },
+          }));
+        })
+        .catch(() => setSources(p => ({ ...p, [kind]: { ...p[kind], loading: false, hasMore: false } })));
+      return { ...prev, [kind]: { ...cur, loading: true } };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  const loadMore = useCallback(() => {
-    if (loadingMore || !hasMore || loading || !userId) return;
-    setLoadingMore(true);
-    const nextPage = pageRef.current + 1;
-    postService.getByUser(userId, nextPage, PAGE_LIMIT)
-      .then(posts => {
-        pageRef.current = nextPage;
-        setPostImages(prev => [...prev, ...extractPostImages(posts)]);
-        setHasMore(posts.length >= PAGE_LIMIT);
-      })
-      .catch(() => setHasMore(false))
-      .finally(() => setLoadingMore(false));
-  }, [loadingMore, hasMore, loading, userId]);
+  useEffect(() => {
+    if (!userId) return;
+    setSources({ post: EMPTY_SOURCE, event: EMPTY_SOURCE, concert: EMPTY_SOURCE });
+    (['event', 'concert', 'post'] as SourceKind[]).forEach(loadSource);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
-  const images = [...otherImages, ...postImages];
+  const loading  = sources.post.loading || sources.event.loading || sources.concert.loading;
+  const hasMore  = sources.post.hasMore || sources.event.hasMore || sources.concert.hasMore;
+  const initial  = sources.post.page === 0 && sources.event.page === 0 && sources.concert.page === 0;
+
+  const images = useMemo(
+    () => [...sources.event.images, ...sources.concert.images, ...sources.post.images],
+    [sources],
+  );
+
+  const loadMore = useCallback(() => {
+    if (loading || !hasMore) return;
+    (['event', 'concert', 'post'] as SourceKind[]).forEach(kind => {
+      if (sources[kind].hasMore && !sources[kind].loading) loadSource(kind);
+    });
+  }, [loading, hasMore, sources, loadSource]);
 
   const openImage = useCallback((img: GalleryImage) => {
     nav.navigate('ImageViewer', { url: img.url });
@@ -138,7 +168,7 @@ export const UserGalleryScreen: React.FC = () => {
         <View style={{ width: 38 }} />
       </View>
 
-      {loading ? (
+      {initial && loading ? (
         <GoFolyXLoader fullScreen color={colors.primary} />
       ) : images.length === 0 ? (
         <View style={s.emptyWrap}>
@@ -155,7 +185,7 @@ export const UserGalleryScreen: React.FC = () => {
           renderItem={renderItem}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
-          ListFooterComponent={loadingMore ? (
+          ListFooterComponent={loading ? (
             <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />
           ) : null}
         />
