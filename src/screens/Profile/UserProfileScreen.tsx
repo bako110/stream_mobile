@@ -67,6 +67,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const [followLoading, setFollowLoading] = useState(false);
   const [showList, setShowList] = useState<'followers' | 'following' | null>(null);
   const [listUsers, setListUsers] = useState<UserPublic[]>([]);
+  const [listPage, setListPage] = useState(1);
+  const [listHasMore, setListHasMore] = useState(true);
+  const [listLoadingMore, setListLoadingMore] = useState(false);
+  const LIST_PAGE_LIMIT = 30;
   const [myId, setMyId] = useState<string | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
@@ -256,12 +260,31 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const openList = async (type: 'followers' | 'following') => {
     setShowList(type);
+    setListUsers([]);
+    setListPage(1);
+    setListHasMore(true);
     try {
       const users = type === 'followers'
-        ? await userService.getFollowers(userId)
-        : await userService.getFollowing(userId);
+        ? await userService.getFollowers(userId, 1, LIST_PAGE_LIMIT)
+        : await userService.getFollowing(userId, 1, LIST_PAGE_LIMIT);
       setListUsers(users);
-    } catch { setListUsers([]); }
+      setListHasMore(users.length === LIST_PAGE_LIMIT);
+    } catch { setListUsers([]); setListHasMore(false); }
+  };
+
+  const loadMoreList = async () => {
+    if (!showList || listLoadingMore || !listHasMore) return;
+    setListLoadingMore(true);
+    try {
+      const nextPage = listPage + 1;
+      const users = showList === 'followers'
+        ? await userService.getFollowers(userId, nextPage, LIST_PAGE_LIMIT)
+        : await userService.getFollowing(userId, nextPage, LIST_PAGE_LIMIT);
+      setListUsers(prev => [...prev, ...users]);
+      setListPage(nextPage);
+      setListHasMore(users.length === LIST_PAGE_LIMIT);
+    } catch { setListHasMore(false); }
+    finally { setListLoadingMore(false); }
   };
 
   if (loading) {
@@ -999,6 +1022,11 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={{ color: colors.textTertiary }}>Aucun utilisateur</Text>
                 </View>
               }
+              onEndReached={loadMoreList}
+              onEndReachedThreshold={0.4}
+              ListFooterComponent={listLoadingMore ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+              ) : null}
             />
           </View>
         </View>
