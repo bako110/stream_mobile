@@ -164,12 +164,20 @@ export const CallHistoryScreen: React.FC = () => {
                 </View>
               )}
             </View>
-            <TouchableOpacity
-              style={[styles.iconBtn, { backgroundColor: '#36D9A020' }]}
-              onPress={() => nav.navigate('NewCall')}
-            >
-              <Icon name="phone-call" size={18} color="#36D9A0" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.iconBtn, { backgroundColor: '#36D9A020' }]}
+                onPress={() => nav.navigate('NewCall')}
+              >
+                <Icon name="phone-call" size={18} color="#36D9A0" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconBtn, { backgroundColor: colors.textTertiary + '18' }]}
+                onPress={() => nav.navigate('SettingsCallsPrivacy' as any)}
+              >
+                <Icon name="settings" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </>
         )}
       </View>

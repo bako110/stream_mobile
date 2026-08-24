@@ -57,13 +57,25 @@ const DEFAULT_SETTINGS: PrivacySettings = {
   privacy_show_phone:      false,
   privacy_show_birthday:   true,
   privacy_allow_comments:  true,
+  privacy_read_receipts:   true,
+  privacy_show_typing:     true,
+  call_privacy:            'everyone',
+  call_e2e_encryption:     true,
+  call_silence_unknown:    false,
 };
+
+// Champs booléens uniquement — call_privacy (string) est géré séparément
+// dans SettingsCallsPrivacyScreen.tsx, pas sur cet écran de confidentialité
+// générale du profil.
+const BOOLEAN_KEYS = (Object.keys(DEFAULT_SETTINGS) as (keyof PrivacySettings)[])
+  .filter(k => typeof DEFAULT_SETTINGS[k] === 'boolean');
 
 function coerceBooleans(data: any): PrivacySettings {
   const result = { ...DEFAULT_SETTINGS };
-  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof PrivacySettings)[]) {
-    if (key in data) result[key] = Boolean(data[key]);
+  for (const key of BOOLEAN_KEYS) {
+    if (key in data) (result[key] as boolean) = Boolean(data[key]);
   }
+  if (typeof data.call_privacy === 'string') result.call_privacy = data.call_privacy;
   return result;
 }
 

@@ -128,6 +128,8 @@ export const userService = {
   },
 };
 
+export type CallPrivacy = 'everyone' | 'followers' | 'none';
+
 export interface PrivacySettings {
   privacy_profile_public:  boolean;
   privacy_show_activity:   boolean;
@@ -137,4 +139,9 @@ export interface PrivacySettings {
   privacy_show_phone:      boolean;
   privacy_show_birthday:   boolean;
   privacy_allow_comments:  boolean;
+  privacy_read_receipts:   boolean;
+  privacy_show_typing:     boolean;
+  call_privacy:            CallPrivacy;
+  call_e2e_encryption:     boolean;
+  call_silence_unknown:    boolean;
 }

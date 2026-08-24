@@ -351,6 +351,12 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
                 >
                   <Icon name={searchOpen ? 'x' : 'search'} size={18} color={colors.primary} />
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.iconBtn, { backgroundColor: colors.textTertiary + '18' }]}
+                  onPress={() => nav.navigate('SettingsMessagesPrivacy' as any)}
+                >
+                  <Icon name="settings" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
             </>
           )}

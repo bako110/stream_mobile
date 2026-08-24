@@ -133,6 +133,8 @@ import { SettingsMonetisationScreen }  from '../screens/Settings/SettingsMonetis
 import { SettingsAbonnementScreen }    from '../screens/Settings/SettingsAbonnementScreen';
 import { SettingsApparenceScreen }     from '../screens/Settings/SettingsApparenceScreen';
 import { SettingsNotificationsScreen } from '../screens/Settings/SettingsNotificationsScreen';
+import { SettingsMessagesPrivacyScreen } from '../screens/Settings/SettingsMessagesPrivacyScreen';
+import { SettingsCallsPrivacyScreen } from '../screens/Settings/SettingsCallsPrivacyScreen';
 import { SettingsLectureScreen }       from '../screens/Settings/SettingsLectureScreen';
 import { SettingsDeviseScreen }        from '../screens/Settings/SettingsDeviseScreen';
 import { SettingsCompteScreen }        from '../screens/Settings/SettingsCompteScreen';
@@ -275,6 +277,8 @@ export type MainStackParamList = {
   SettingsAbonnement:        undefined;
   SettingsApparence:         undefined;
   SettingsNotifications:     undefined;
+  SettingsMessagesPrivacy:   undefined;
+  SettingsCallsPrivacy:      undefined;
   SettingsLecture:           undefined;
   SettingsDevise:            undefined;
   SettingsCompte:            undefined;
@@ -448,6 +452,7 @@ const IncomingCallHandler: React.FC = () => {
       isIncoming:    true,
       offer:         pendingIncomingCall.offer,
       callId:        pendingIncomingCall.callId,
+      silent:        pendingIncomingCall.silent,
     });
   }, [pendingIncomingCall, clearPendingIncomingCall]);
 
@@ -592,6 +597,8 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="SettingsAbonnement"    component={SettingsAbonnementScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsApparence"     component={SettingsApparenceScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsNotifications" component={SettingsNotificationsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsMessagesPrivacy" component={SettingsMessagesPrivacyScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SettingsCallsPrivacy" component={SettingsCallsPrivacyScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsLecture"       component={SettingsLectureScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsDevise"        component={SettingsDeviseScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsCompte" options={{ animation: 'slide_from_right' }}>

@@ -77,6 +77,10 @@ export interface IncomingCallPayload {
   callType:      'voice' | 'video';
   offer:         any;
   callId:        string | null;
+  // Appelant hors abonnements + call_silence_unknown activé (cf. backend,
+  // routers/messages.py handler call_offer) — la sonnerie doit rester
+  // silencieuse, l'appel reste affiché normalement sinon.
+  silent?:       boolean;
 }
 
 interface WebSocketContextValue {
@@ -452,6 +456,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
                 callType:      payload.call_type ?? 'voice',
                 offer:         payload.sdp ?? null,
                 callId:        payload.call_id ?? null,
+                silent:        payload.silent === true,
               });
             }
             // App en background → FCM + MMKV gèrent le réveil (handleBackgroundFCM)

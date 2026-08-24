@@ -26,6 +26,7 @@ import { useWs, generateCallId } from '../../context/WebSocketContext';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useActiveCall } from '../../context/ActiveCallContext';
 import { callConnectionService } from '../../services/callConnectionService';
+import { toastService } from '../../services';
 
 // Store hors-composant : survit au demontage de CallScreen quand l'utilisateur
 // minimise l'appel (nav.goBack() demonte reellement l'ecran react-navigation).
@@ -74,6 +75,10 @@ interface RouteParams {
   offer?:         any;
   autoAccept?:    boolean;
   callId?:        string | null;
+  // Appelant hors abonnements + call_silence_unknown activé côté destinataire
+  // (cf. WebSocketContext.tsx IncomingCallPayload.silent) — sonnerie/vibration
+  // coupées, l'écran d'appel entrant reste affiché normalement sinon.
+  silent?:        boolean;
 }
 
 type CallState = 'ringing' | 'connected' | 'ended';
@@ -90,7 +95,7 @@ export const CallScreen: React.FC = () => {
   const route     = useRoute();
   const {
     partnerId, partnerName, partnerAvatar, callType, isIncoming, offer, autoAccept,
-    callId: routeCallId,
+    callId: routeCallId, silent: isSilentCall,
   } = route.params as RouteParams;
 
   // ID unique de cet appel — genere localement pour un appel sortant, recu du call_offer
@@ -449,8 +454,10 @@ export const CallScreen: React.FC = () => {
         } catch {}
       } else {
         InCallManager.start({ media: isVideo ? 'video' : 'audio' });
-        setTimeout(() => playIncoming(), 200);
-        Vibration.vibrate([0, 600, 400, 600], true);
+        if (!isSilentCall) {
+          setTimeout(() => playIncoming(), 200);
+          Vibration.vibrate([0, 600, 400, 600], true);
+        }
       }
     };
 
@@ -554,6 +561,19 @@ export const CallScreen: React.FC = () => {
       if (payload.type === 'call_hangup') {
         const wasConnected = !!connectedAtRef.current;
         if (!wasConnected && !isIncoming) playRejected();
+        notifyCallEnded(partnerId);
+        markCallEnded(partnerId);
+        callConnectionService.endCall(partnerId);
+        if (mountedRef.current) setCallState('ended');
+        return;
+      }
+
+      // Refusé côté serveur avant même de sonner chez le destinataire (cf.
+      // call_privacy dans routers/messages.py) — distinct d'un call_hangup
+      // normal, message explicite plutôt qu'un simple "raccroché".
+      if (payload.type === 'call_rejected') {
+        playRejected();
+        toastService.error('Appel impossible', `${partnerName} n'accepte pas les appels pour le moment.`);
         notifyCallEnded(partnerId);
         markCallEnded(partnerId);
         callConnectionService.endCall(partnerId);
