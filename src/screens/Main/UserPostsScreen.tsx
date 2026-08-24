@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
-  StatusBar, ActivityIndicator, Dimensions,
+  StatusBar, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,10 +22,11 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-const { width: W } = Dimensions.get('window');
+// GAP fixe ; CARD_W/CARD_H recalcules dans le composant via
+// useWindowDimensions() (reactif) plutot que Dimensions.get('window') fige
+// une seule fois au chargement du module JS, qui laissait un espace vide a
+// droite de la grille sur certains appareils.
 const GAP    = 8;
-const CARD_W = (W - 12 * 2 - GAP) / 2;
-const CARD_H = Math.round(CARD_W * 14 / 9);
 
 const PAGE_LIMIT = 20;
 
@@ -35,6 +36,9 @@ export const UserPostsScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const route = useRoute() as { params?: { userId: string } };
   const insets = useSafeAreaInsets();
+  const { width: W } = useWindowDimensions();
+  const CARD_W = (W - 12 * 2 - GAP) / 2;
+  const CARD_H = Math.round(CARD_W * 14 / 9);
 
   const userId = route.params?.userId ?? '';
 
@@ -111,7 +115,7 @@ export const UserPostsScreen: React.FC = () => {
         </View>
       </TouchableOpacity>
     );
-  }, [nav, colors]);
+  }, [nav, colors, CARD_W, CARD_H]);
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>

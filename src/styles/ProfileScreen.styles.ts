@@ -1,7 +1,5 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { BorderRadius, Spacing } from '../theme';
-
-const { width: SCREEN_W } = Dimensions.get('window');
 
 export const profileStyles = StyleSheet.create({
   root:   { flex: 1 },
@@ -118,8 +116,10 @@ export const profileStyles = StyleSheet.create({
     gap:           10,
     marginTop:     4,
   },
+  // width retiree — appliquee en inline via friendItemWidth (useWindowDimensions
+  // dans ProfileScreen.tsx), un StyleSheet.create() module-level ne pouvant
+  // pas suivre les changements de largeur reels de l'ecran.
   friendItem: {
-    width:         (SCREEN_W - Spacing[4] * 2 - 20) / 3,
     alignItems:    'center',
     paddingVertical: 12,
     borderRadius:  BorderRadius.lg,

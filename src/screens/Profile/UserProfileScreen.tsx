@@ -9,8 +9,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, FlatList, Dimensions,
-  InteractionManager,
+  StyleSheet, ActivityIndicator, FlatList,
+  InteractionManager, useWindowDimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -30,14 +30,12 @@ import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
 
-const { width: W } = Dimensions.get('window');
-
-// Friend cards dimensions
+// Friend cards dimensions — gap/padding fixes, la largeur reelle (FRIEND_CARD_W
+// et al.) est recalculee dans le composant via useWindowDimensions() (reactif
+// aux changements de largeur : rotation, split-screen, pliable), plutot que
+// Dimensions.get('window') fige une seule fois au chargement du module JS.
 const FRIEND_GAP    = 10;
 const FRIEND_H_PAD  = 16;
-const FRIEND_CARD_W = (W - FRIEND_H_PAD * 2 - FRIEND_GAP * 2) / 3;
-const FRIEND_COVER  = FRIEND_CARD_W * 0.5;
-const FRIEND_AVT    = FRIEND_CARD_W * 0.44;
 
 type ContentTab = 'publications' | 'reels' | 'about';
 
@@ -50,6 +48,15 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
+  // Reactif (rotation, split-screen, pliable) — remplace Dimensions.get('window')
+  // fige au chargement du module, qui laissait un espace vide a droite des
+  // grilles 2/3 colonnes quand la largeur reelle differait de la valeur figee.
+  const { width: W } = useWindowDimensions();
+  const FRIEND_CARD_W = (W - FRIEND_H_PAD * 2 - FRIEND_GAP * 2) / 3;
+  const FRIEND_COVER  = FRIEND_CARD_W * 0.5;
+  const FRIEND_AVT    = FRIEND_CARD_W * 0.44;
+  const pubGridCardW  = (W - 24 - 8) / 2;
+  const reelCardW     = (W - 24 - 10) / 3;
   const { userId } = route.params;
   const { currentUser } = useUser();
   const { lastPresenceUpdate, liveUserIds } = useWs();
@@ -564,7 +571,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 return (
                   <TouchableOpacity
                     key={f.id}
-                    style={[styles.friendCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.divider }]}
+                    style={[styles.friendCard, { width: FRIEND_CARD_W, backgroundColor: colors.surfaceElevated, borderColor: colors.divider }]}
                     activeOpacity={0.85}
                     onPress={() => navigation.push('UserProfile', { userId: f.id })}
                   >
@@ -572,7 +579,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     <LinearGradient
                       colors={[colors.primary + 'CC', colors.primary + '44']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={styles.friendCover}
+                      style={[styles.friendCover, { height: FRIEND_COVER }]}
                     >
                       {f.is_online && (
                         <View style={[styles.friendOnline, { borderColor: colors.surfaceElevated }]} />
@@ -580,11 +587,14 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     </LinearGradient>
 
                     {/* Avatar chevauchant */}
-                    <View style={[styles.friendAvtWrap, { borderColor: colors.surface, marginTop: -(FRIEND_AVT / 2) }]}>
+                    <View style={[styles.friendAvtWrap, {
+                      width: FRIEND_AVT + 4, height: FRIEND_AVT + 4, borderRadius: (FRIEND_AVT + 4) / 2,
+                      borderColor: colors.surface, marginTop: -(FRIEND_AVT / 2),
+                    }]}>
                       {f.avatar_url ? (
-                        <Image source={{ uri: f.avatar_url }} style={styles.friendAvtImg} />
+                        <Image source={{ uri: f.avatar_url }} style={[styles.friendAvtImg, { width: FRIEND_AVT, height: FRIEND_AVT, borderRadius: FRIEND_AVT / 2 }]} />
                       ) : (
-                        <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={styles.friendAvtImg}>
+                        <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={[styles.friendAvtImg, { width: FRIEND_AVT, height: FRIEND_AVT, borderRadius: FRIEND_AVT / 2 }]}>
                           <Text style={[styles.friendInitial, { fontSize: FRIEND_AVT * 0.38 }]}>{initials2}</Text>
                         </LinearGradient>
                       )}
@@ -596,7 +606,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     </View>
 
                     {/* Nom */}
-                    <View style={styles.friendCardBody}>
+                    <View style={[styles.friendCardBody, { paddingTop: FRIEND_AVT / 2 + 5 }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, justifyContent: 'center' }}>
                         <Text style={[styles.friendName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
                         {f.is_verified && <VerifiedBadge size={11} />}
@@ -680,7 +690,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                       return (
                         <TouchableOpacity
                           key={`post-${post.id}`}
-                          style={[styles.reelCard, { backgroundColor: colors.surfaceElevated }]}
+                          style={[styles.reelCard, { width: reelCardW, backgroundColor: colors.surfaceElevated }]}
                           activeOpacity={0.8}
                           onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
                         >
@@ -742,7 +752,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                         return (
                           <TouchableOpacity
                             key={`${pub.kind}-${item.id}`}
-                            style={[styles.pubGridCard, { backgroundColor: colors.surfaceElevated }]}
+                            style={[styles.pubGridCard, { width: pubGridCardW, backgroundColor: colors.surfaceElevated }]}
                             activeOpacity={0.8}
                             onPress={() => {
                               if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
@@ -818,7 +828,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 {userReels.map((reel: any) => (
                   <TouchableOpacity
                     key={reel.id}
-                    style={[styles.reelCard, { backgroundColor: colors.surfaceElevated }]}
+                    style={[styles.reelCard, { width: reelCardW, backgroundColor: colors.surfaceElevated }]}
                     activeOpacity={0.8}
                     onPress={() => navigation.navigate('UserReels', { userId, initialReelId: reel.id, initialReels: userReels })}
                   >
@@ -1047,16 +1057,20 @@ const styles = StyleSheet.create({
   friendsSeeAll:   { fontSize: 13, fontWeight: '700' },
   friendsScroll:   { paddingHorizontal: 16, gap: FRIEND_GAP, paddingBottom: 4 },
 
-  friendCard:      { width: FRIEND_CARD_W, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  friendCover:     { width: '100%', height: FRIEND_COVER },
+  // Largeurs derivees de FRIEND_CARD_W retirees d'ici — appliquees en style
+  // inline dans le composant (voir FRIEND_CARD_W/FRIEND_COVER/FRIEND_AVT
+  // calcules via useWindowDimensions()), un StyleSheet.create() module-level
+  // ne pouvant pas dependre d'une valeur reactive.
+  friendCard:      { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  friendCover:     { width: '100%' },
   friendOnline:    { position: 'absolute', bottom: 8, right: 8, width: 9, height: 9, borderRadius: 5, backgroundColor: '#22c55e', borderWidth: 2 },
 
-  friendAvtWrap:   { width: FRIEND_AVT + 4, height: FRIEND_AVT + 4, borderRadius: (FRIEND_AVT + 4) / 2, borderWidth: 3, overflow: 'hidden', alignSelf: 'center' },
-  friendAvtImg:    { width: FRIEND_AVT, height: FRIEND_AVT, borderRadius: FRIEND_AVT / 2, alignItems: 'center', justifyContent: 'center' },
+  friendAvtWrap:   { borderWidth: 3, overflow: 'hidden', alignSelf: 'center' },
+  friendAvtImg:    { alignItems: 'center', justifyContent: 'center' },
   friendInitial:   { color: '#fff', fontWeight: '800' },
   friendVerified:  { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
 
-  friendCardBody:  { alignItems: 'center', paddingHorizontal: 6, paddingBottom: 10, paddingTop: FRIEND_AVT / 2 + 5, gap: 2 },
+  friendCardBody:  { alignItems: 'center', paddingHorizontal: 6, paddingBottom: 10, gap: 2 },
   friendName:      { fontSize: 11, fontWeight: '700', textAlign: 'center' },
   friendHandle:    { fontSize: 10, textAlign: 'center' },
   followBtn: {
@@ -1093,8 +1107,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', flexWrap: 'wrap',
     paddingHorizontal: 12, gap: 8, marginBottom: 6,
   },
+  // width retiree — appliquee en inline via pubGridCardW (useWindowDimensions())
   pubGridCard: {
-    width: (W - 24 - 8) / 2, borderRadius: 10, overflow: 'hidden',
+    borderRadius: 10, overflow: 'hidden',
   },
   pubGridThumb: { width: '100%', aspectRatio: 4 / 5 },
   pubGridBody: { padding: 8, gap: 4 },
@@ -1112,8 +1127,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', flexWrap: 'wrap',
     paddingHorizontal: 12, gap: 5,
   },
+  // width retiree — appliquee en inline via reelCardW (useWindowDimensions())
   reelCard: {
-    width: (W - 24 - 10) / 3, borderRadius: 8, overflow: 'hidden', marginBottom: 4,
+    borderRadius: 8, overflow: 'hidden', marginBottom: 4,
   },
   reelThumbWrap: { position: 'relative' },
   reelThumb: { width: '100%', aspectRatio: 9 / 16 },
