@@ -4,7 +4,7 @@
  * présence, notifications, médias partagés, bloquer/signaler, vider/
  * supprimer), pour ne plus avoir à passer par les Settings généraux.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
   Image, FlatList, Switch, ActivityIndicator,
@@ -62,6 +62,19 @@ export const ConversationDetailsScreen: React.FC = () => {
   const [media, setMedia]           = useState<Message[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
   const [showReport, setShowReport] = useState(false);
+
+  // Éligibilité d'appel — masque les boutons Appel/Vidéo plutôt que de
+  // laisser cliquer pour un appel qui sera de toute façon rejeté (le
+  // rejet réel côté serveur reste le vrai filet de sécurité).
+  const [callEligible, setCallEligible] = useState(true);
+  useEffect(() => {
+    if (!partnerId) return;
+    let cancelled = false;
+    userService.getCallEligibility(partnerId)
+      .then(r => { if (!cancelled) setCallEligible(r.can_call); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [partnerId]);
 
   useFocusEffect(useCallback(() => {
     messageService.getMuteStatus(partnerId).then(setMuted).catch(() => {});
@@ -204,24 +217,28 @@ export const ConversationDetailsScreen: React.FC = () => {
                 </View>
                 <Text style={[styles.quickLabel, { color: colors.textSecondary }]}>Message</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.quickBtn}
-                onPress={() => nav.navigate('Call', { partnerId, partnerName, partnerAvatar: avatarUrl ?? null, callType: 'voice', isIncoming: false })}
-              >
-                <View style={[styles.quickIcon, { backgroundColor: '#36D9A018' }]}>
-                  <Icon name="phone" size={19} color="#36D9A0" />
-                </View>
-                <Text style={[styles.quickLabel, { color: colors.textSecondary }]}>Appel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.quickBtn}
-                onPress={() => nav.navigate('Call', { partnerId, partnerName, partnerAvatar: avatarUrl ?? null, callType: 'video', isIncoming: false })}
-              >
-                <View style={[styles.quickIcon, { backgroundColor: '#3B82F618' }]}>
-                  <Icon name="video" size={19} color="#3B82F6" />
-                </View>
-                <Text style={[styles.quickLabel, { color: colors.textSecondary }]}>Vidéo</Text>
-              </TouchableOpacity>
+              {callEligible && (
+                <>
+                  <TouchableOpacity
+                    style={styles.quickBtn}
+                    onPress={() => nav.navigate('Call', { partnerId, partnerName, partnerAvatar: avatarUrl ?? null, callType: 'voice', isIncoming: false })}
+                  >
+                    <View style={[styles.quickIcon, { backgroundColor: '#36D9A018' }]}>
+                      <Icon name="phone" size={19} color="#36D9A0" />
+                    </View>
+                    <Text style={[styles.quickLabel, { color: colors.textSecondary }]}>Appel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.quickBtn}
+                    onPress={() => nav.navigate('Call', { partnerId, partnerName, partnerAvatar: avatarUrl ?? null, callType: 'video', isIncoming: false })}
+                  >
+                    <View style={[styles.quickIcon, { backgroundColor: '#3B82F618' }]}>
+                      <Icon name="video" size={19} color="#3B82F6" />
+                    </View>
+                    <Text style={[styles.quickLabel, { color: colors.textSecondary }]}>Vidéo</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
 
             {/* Notifications */}

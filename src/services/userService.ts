@@ -105,6 +105,11 @@ export const userService = {
     await apiClient.put(Endpoints.users.updateLocation, { latitude, longitude });
   },
 
+  async getCallEligibility(userId: string): Promise<{ can_call: boolean; silent: boolean }> {
+    const res = await apiClient.get<{ can_call: boolean; silent: boolean }>(Endpoints.users.callEligibility(userId));
+    return res.data;
+  },
+
   async getPrivacy(): Promise<PrivacySettings> {
     const res = await apiClient.get<PrivacySettings>(Endpoints.users.privacy);
     return res.data;

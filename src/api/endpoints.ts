@@ -42,6 +42,7 @@ export const Endpoints = {
     userReels:      (id: string) => `${V1}/users/${id}/reels`,
     userEvents:     (id: string) => `${V1}/users/${id}/events`,
     userConcerts:   (id: string) => `${V1}/users/${id}/concerts`,
+    callEligibility:(id: string) => `${V1}/users/${id}/call-eligibility`,
     follow:         (id: string) => `${V1}/users/${id}/follow`,
     followers:      (id: string) => `${V1}/users/${id}/followers`,
     following:      (id: string) => `${V1}/users/${id}/following`,
