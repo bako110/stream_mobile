@@ -471,6 +471,18 @@ const SettingsWrapper = useCallback(
     [onLogout],
   );
 
+  // E2EE — garantit que cet appareil a une identité chiffrement publiée
+  // côté serveur avant de pouvoir recevoir des messages chiffrés. Idempotent
+  // (ensureDeviceRegistered ne republie rien si déjà fait), safe à appeler à
+  // chaque montage de MainNavigator (login, ou reprise d'app en foreground).
+  useEffect(() => {
+    import('../crypto/sessionManager').then(({ ensureDeviceRegistered, refillOneTimePrekeysIfLow }) => {
+      ensureDeviceRegistered()
+        .then(() => refillOneTimePrekeysIfLow())
+        .catch(() => {});
+    });
+  }, []);
+
   return (
     <ActiveCallProvider>
     <ActiveVoiceProvider>

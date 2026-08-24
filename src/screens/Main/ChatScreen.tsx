@@ -227,10 +227,17 @@ export const ChatScreen: React.FC = () => {
           (payload.sender_id === partnerId && payload.receiver_id === myIdRef.current) ||
           (payload.sender_id === myIdRef.current && payload.receiver_id === partnerId)
         ) {
-          setMessages(prev => {
-            if (prev.find(m => m.id === payload.id)) return prev;
-            return [payload as unknown as Message, ...prev];
-          });
+          const incoming = payload as unknown as Message;
+          setMessages(prev => prev.find(m => m.id === incoming.id) ? prev : [incoming, ...prev]);
+          // Déchiffrement asynchrone — le message apparaît d'abord tel quel
+          // (chiffré=true, content=blob JSON) puis est remplacé une fois
+          // déchiffré, jamais affiché en clair-JSON entre-temps grâce à la
+          // vérification `encrypted && !decrypted` côté rendu (voir plus bas).
+          if (incoming.encrypted) {
+            messageService.decryptIfNeeded(incoming).then(decrypted => {
+              setMessages(prev => prev.map(m => m.id === decrypted.id ? decrypted : m));
+            });
+          }
           // Auto-mark as read if the message is from the partner
           if (payload.sender_id === partnerId) {
             messageService.markRead(partnerId).catch(() => {});
@@ -338,7 +345,10 @@ export const ChatScreen: React.FC = () => {
 
   const loadMessages = useCallback(async (p = 1) => {
     try {
-      const data = await messageService.getMessages(partnerId, p, 30);
+      const rawData = await messageService.getMessages(partnerId, p, 30);
+      // Déchiffrement en parallèle — un échec individuel (session cassée,
+      // clé perdue) ne bloque jamais le chargement du reste de la conversation.
+      const data = await Promise.all(rawData.map(m => messageService.decryptIfNeeded(m)));
       const newReactions: Record<string, string> = {};
       data.forEach((m: any) => {
         if (m.reaction) newReactions[m.id] = m.reaction;
@@ -399,7 +409,12 @@ export const ChatScreen: React.FC = () => {
     try {
       const msg = await messageService.sendMessage(partnerId, content, 'text', undefined, undefined, replyingTo?.id);
       setReplyingTo(null);
-      setMessages(prev => prev.map(m => m.id === tempId ? msg : m));
+      // Le serveur renvoie le document tel que stocké : si le message a été
+      // chiffré à l'envoi, msg.content est le blob JSON, pas le texte —
+      // l'expéditeur connaît déjà son propre texte en clair (celui qu'il
+      // vient de taper), pas besoin de le déchiffrer depuis le blob.
+      const resolved = msg.encrypted ? { ...msg, content, decrypted: true } : msg;
+      setMessages(prev => prev.map(m => m.id === tempId ? resolved : m));
       setRequestStatus(prev =>
         prev === 'none' ? 'pending_outgoing' :
         prev === 'pending_incoming' ? 'accepted' :
@@ -847,6 +862,12 @@ export const ChatScreen: React.FC = () => {
       return;
     }
     try {
+      // TODO E2EE : editMessage() n'est pas branché sur le chiffrement —
+      // éditer un message envoyé chiffré enverrait le nouveau texte EN CLAIR
+      // (message_service.py stocke content tel quel, sans re-vérifier
+      // `encrypted`). Hors scope de l'intégration initiale (Phase 1 se
+      // concentre sur l'envoi/réception), à traiter avant d'activer l'E2EE
+      // pour de vrai en production.
       await messageService.editMessage(editingMsg.id, newContent);
       setMessages(prev => prev.map(m =>
         m.id === editingMsg.id
@@ -1369,9 +1390,15 @@ export const ChatScreen: React.FC = () => {
 
         {/* Nom + statut */}
         <TouchableOpacity style={styles.headerInfo} onPress={handleViewProfile} activeOpacity={0.7}>
-          <Text style={[styles.headerName, { color: colors.textPrimary }]} numberOfLines={1}>
-            {partnerName}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Text style={[styles.headerName, { color: colors.textPrimary }]} numberOfLines={1}>
+              {partnerName}
+            </Text>
+            {/* Rappel permanent que la conversation est chiffrée — voir la
+                bannière d'explication plus détaillée en haut de la liste
+                des messages (affichée une seule fois par conversation). */}
+            <Icon name="lock" size={11} color={colors.textTertiary} />
+          </View>
           <Text style={[styles.headerSub, { color: partnerOnline ? '#36D9A0' : colors.textTertiary }]}>
             {partnerOnline ? 'en ligne' : formatLastSeen(partnerLastSeen)}
           </Text>
@@ -1493,6 +1520,20 @@ export const ChatScreen: React.FC = () => {
               <Icon name="message-circle" size={44} color={colors.textTertiary} />
               <Text style={{ color: colors.textTertiary, marginTop: 10 }}>Démarrez la conversation</Text>
             </View>
+          }
+          // Liste inversée (voir `inverted` ci-dessus) : ListFooterComponent
+          // se rend en dernier dans les données sources, donc tout en haut
+          // à l'écran — c'est là qu'il faut placer un contenu "début de
+          // conversation" comme cette bannière E2EE.
+          ListFooterComponent={
+            messages.length > 0 ? (
+              <View style={[styles.e2eeBanner, { backgroundColor: colors.surface }]}>
+                <Icon name="lock" size={13} color={colors.textTertiary} />
+                <Text style={[styles.e2eeBannerText, { color: colors.textTertiary }]}>
+                  Les messages sont chiffrés de bout en bout. Personne d'autre, pas même GoFoliX, ne peut les lire.
+                </Text>
+              </View>
+            ) : null
           }
           renderItem={renderChatItem}
           removeClippedSubviews
@@ -2060,6 +2101,21 @@ export const ChatScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  e2eeBanner: {
+    flexDirection:    'row',
+    alignItems:       'center',
+    gap:              6,
+    marginTop:        4,
+    marginBottom:     10,
+    paddingVertical:  8,
+    paddingHorizontal: 12,
+    borderRadius:     10,
+  },
+  e2eeBannerText: {
+    flex:     1,
+    fontSize: 11,
+    lineHeight: 15,
+  },
   header: {
     flexDirection:  'row',
     alignItems:     'center',

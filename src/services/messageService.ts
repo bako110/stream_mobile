@@ -1,4 +1,5 @@
 import { apiClient, Endpoints } from '../api';
+import { encryptMessageForUser, decryptMessageFromUser, type EncryptedPayload } from '../crypto/sessionManager';
 
 export type MessageType = 'text' | 'voice' | 'image' | 'video' | 'file' | 'sticker' | 'location' | 'share';
 
@@ -49,6 +50,7 @@ export interface ConversationSummary {
   last_message:  string;
   last_time:     string;
   last_type?:    MessageType;
+  last_encrypted?: boolean;
   unread_count:  number;
   request_status?: ConversationRequestStatus;
 }
@@ -71,6 +73,14 @@ export interface Message {
   reply_to?:           ReplyPreview;
   forwarded_from_id?:  string;
   reaction?:           string;
+  encrypted?:          boolean;
+  // true une fois `content` remplacé par le texte déchiffré (voir
+  // decryptIfNeeded ci-dessous) — avant ça, sur un message encrypted=true,
+  // `content` est encore le blob JSON chiffré et NE DOIT JAMAIS être affiché
+  // tel quel. Tout code qui lit item.content doit passer par decryptIfNeeded
+  // en amont (fait au chargement/réception, jamais au rendu).
+  decrypted?:          boolean;
+  decryptFailed?:      boolean;
 }
 
 export const messageService = {
@@ -104,8 +114,41 @@ export const messageService = {
     if (attachmentMeta)  body.attachment_meta = attachmentMeta;
     if (replyToId)       body.reply_to_id = replyToId;
     if (forwardedFromId) body.forwarded_from_id = forwardedFromId;
+
+    // Chiffrement de bout en bout — uniquement les messages texte pour
+    // l'instant (Phase 1 du plan E2E). Repli sur l'envoi en clair si le
+    // chiffrement échoue (ex: destinataire sans appareil E2EE enregistré) :
+    // ne jamais bloquer un envoi de message pour cette raison.
+    if (messageType === 'text' && content.trim()) {
+      try {
+        const payload = await encryptMessageForUser(partnerId, content);
+        body.content = JSON.stringify(payload);
+        body.encrypted = true;
+      } catch {
+        // silencieux — envoi en clair, comportement identique à avant l'E2EE
+      }
+    }
+
     const res = await apiClient.post<Message>(Endpoints.messages.conversation(partnerId), body);
     return res.data;
+  },
+
+  /** Déchiffre un message reçu si nécessaire — no-op si déjà en clair ou
+   * déjà déchiffré. Remplace directement `content` par le texte en clair
+   * (tout le code d'affichage existant lit item.content sans changement).
+   * Ne lève jamais : en cas d'échec, `decryptFailed` est positionné et
+   * `content` devient un texte d'erreur explicite, jamais le blob chiffré
+   * brut ni un crash. À appeler au chargement/réception, jamais au rendu
+   * (évite de re-décrypter à chaque re-render de liste). */
+  async decryptIfNeeded(msg: Message): Promise<Message> {
+    if (!msg.encrypted || msg.decrypted) return msg;
+    try {
+      const payload = JSON.parse(msg.content) as EncryptedPayload;
+      const content = await decryptMessageFromUser(msg.sender_id, payload);
+      return { ...msg, content, decrypted: true };
+    } catch {
+      return { ...msg, content: '🔒 Message chiffré indéchiffrable', decrypted: true, decryptFailed: true };
+    }
   },
 
   async markRead(partnerId: string): Promise<void> {

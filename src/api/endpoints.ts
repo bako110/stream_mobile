@@ -424,6 +424,16 @@ export const Endpoints = {
     clear:   `${V1}/calls/`,
   },
 
+  // ── E2EE — distribution de clés publiques (Signal Protocol) ──────────────
+  devices: {
+    registerKeys:  `${V1}/devices/keys`,
+    addPrekeys:    `${V1}/devices/keys/one-time-prekeys`,
+    myKeysCount:   `${V1}/devices/me/keys-count`,
+    bundles:       (userId: string) => `${V1}/devices/${userId}/bundles`,
+    listDevices:   (userId: string) => `${V1}/devices/${userId}`,
+    revokeKeys:    (deviceId: string) => `${V1}/devices/${deviceId}/keys`,
+  },
+
   // ── Monétisation créateur ────────────────────────────────────────────────────
   monetization: {
     status:       `${V1}/monetization/status`,

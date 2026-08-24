@@ -54,7 +54,7 @@ function accentFor(id: string): string {
 // Aperçu du dernier message façon WhatsApp — libellé texte selon le type
 // (sans contenu réel pour les médias, pas d'emoji), sinon le texte tel quel
 // pour un message classique.
-function formatLastMessagePreview(lastMessage: string | null | undefined, lastType: MessageType | undefined): string {
+function formatLastMessagePreview(lastMessage: string | null | undefined, lastType: MessageType | undefined, lastEncrypted?: boolean): string {
   switch (lastType) {
     case 'voice':    return 'Message vocal';
     case 'image':    return 'Photo';
@@ -63,7 +63,13 @@ function formatLastMessagePreview(lastMessage: string | null | undefined, lastTy
     case 'sticker':  return 'Sticker';
     case 'location': return 'Position';
     case 'share':    return 'Publication partagée';
-    default:         return lastMessage || '…';
+    default:
+      // Le serveur ne peut pas déchiffrer l'aperçu (E2EE) — `lastMessage`
+      // est alors un blob JSON opaque, jamais affichable tel quel. Libellé
+      // générique par défaut (le plan validé prévoit un enrichissement
+      // opportuniste depuis le cache local déchiffré, pas encore fait ici).
+      if (lastEncrypted) return '🔒 Message';
+      return lastMessage || '…';
   }
 }
 
@@ -549,7 +555,7 @@ const ConversationRow: React.FC<{
             style={[styles.convLast, { color: unread ? colors.textSecondary : colors.textTertiary, fontWeight: unread ? '500' : '400' }]}
             numberOfLines={1}
           >
-            {formatLastMessagePreview(conv.last_message, conv.last_type)}
+            {formatLastMessagePreview(conv.last_message, conv.last_type, conv.last_encrypted)}
           </Text>
           {unread && !selectMode ? (
             <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
