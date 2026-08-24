@@ -759,8 +759,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // générique en cache Redis, non personnalisée par utilisateur) vaut toujours "none",
   // donc ce filtre-ci est la seule source fiable.
   const myCommIdsRef = useRef<Set<string>>(new Set());
-  // Panneau infos primaires — ouvert via le chevron du header, fermé au tap extérieur
+  // Panneau infos primaires — ouvert via le chevron du header, fermé au tap
+  // extérieur. Restait ouvert indéfiniment si on quittait l'écran (changement
+  // d'onglet, navigation vers un écran empilé) sans re-taper explicitement à
+  // côté pour le refermer — se referme désormais aussi à la perte de focus.
   const [showProfilePanel, setShowProfilePanel] = useState(false);
+  useFocusEffect(useCallback(() => () => setShowProfilePanel(false), []));
   // Multi-compte — liste chargée à l'ouverture du panneau (pas au montage de l'écran,
   // pour toujours refléter les changements faits depuis les Paramètres).
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);

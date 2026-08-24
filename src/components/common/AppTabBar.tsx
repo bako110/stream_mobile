@@ -49,6 +49,13 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const focusedOptions = descriptors[focusedRoute.key]?.options as any;
   const hideTabBar = focusedOptions?.tabBarStyle?.display === 'none' || focusedOptions?.tabBarVisible === false;
 
+  // Le menu "+" restait ouvert indéfiniment si on changeait d'onglet ou
+  // qu'on naviguait ailleurs sans re-cliquer dessus pour le refermer
+  // explicitement — aucun listener ne le réinitialisait auparavant. On le
+  // referme systématiquement dès que l'onglet actif (donc l'écran affiché)
+  // change.
+  useEffect(() => { setCreateOpen(false); }, [state.index]);
+
   if (hideTabBar) return null;
 
   const bottomPad = Platform.OS === 'android'
