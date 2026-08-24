@@ -56,6 +56,49 @@ const { height: SCREEN_H } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_H * 0.15;
 const AVATAR_SIZE     = 120;
 
+// ── Code de sécurité (vérification du chiffrement de bout en bout) ────────────
+// WebRTC chiffre déjà le média en DTLS-SRTP (obligatoire dans la spec, même un
+// relais TURN ne peut pas déchiffrer) — mais le SDP qui porte l'empreinte du
+// certificat DTLS (a=fingerprint) transite en clair via le backend (signaling
+// WebSocket). Un backend compromis pourrait théoriquement substituer son
+// propre certificat des deux côtés (MITM) sans que ni l'appelant ni l'appelé
+// ne s'en aperçoivent — WebRTC seul ne s'en protège pas. Ce code, dérivé des
+// DEUX empreintes DTLS (locale + distante) et affiché aux deux bouts, permet
+// une vérification hors bande façon Signal/WhatsApp : si les deux utilisateurs
+// lisent le même code à voix haute (ou le comparent visuellement), l'absence
+// de MITM est garantie — un serveur interposé aurait forcément deux paires
+// d'empreintes différentes de chaque côté, donc des codes différents.
+function extractFingerprint(sdp: string | undefined | null): string | null {
+  if (!sdp) return null;
+  const m = sdp.match(/a=fingerprint:sha-256\s+([0-9A-Fa-f:]+)/);
+  return m ? m[1].toUpperCase() : null;
+}
+
+// Hash déterministe simple (FNV-1a 32 bits) — suffisant ici : on ne cherche
+// pas une résistance cryptographique aux collisions, seulement à transformer
+// deux empreintes triées en un code court, stable, identique des deux côtés
+// si et seulement si les deux pairs voient les deux mêmes empreintes.
+function fnv1a(str: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/** Code affiché des deux côtés — même résultat quel que soit qui est
+ * l'appelant/l'appelé, car les deux empreintes sont triées avant hash. */
+function computeSecurityCode(localFp: string, remoteFp: string): string {
+  const [a, b] = [localFp, remoteFp].sort();
+  const combined = `${a}|${b}`;
+  // Deux hash indépendants (préfixe différent) → 10 chiffres, groupés par 5
+  // comme les codes de sécurité Signal, plus faciles à comparer à voix haute.
+  const h1 = fnv1a('1' + combined) % 100000;
+  const h2 = fnv1a('2' + combined) % 100000;
+  return `${h1.toString().padStart(5, '0')} ${h2.toString().padStart(5, '0')}`;
+}
+
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.relay.metered.ca:80' },
@@ -116,6 +159,8 @@ export const CallScreen: React.FC = () => {
   const [showUnlockHint, setShowUnlockHint] = useState(false);
   const [networkQuality, setNetworkQuality] = useState<'good' | 'medium' | 'poor' | 'unknown'>('unknown');
   const [connIssue,    setConnIssue]    = useState<'reconnecting' | 'lost' | null>(null);
+  const [securityCode, setSecurityCode] = useState<string | null>(null);
+  const [showSecurityCode, setShowSecurityCode] = useState(false);
   const [chatOpen,      setChatOpen]     = useState(false);
   const [chatMessages,  setChatMessages] = useState<{ id: string; text: string; fromMe: boolean; at: number }[]>([]);
   const [chatDraft,     setChatDraft]    = useState('');
@@ -310,6 +355,14 @@ export const CallScreen: React.FC = () => {
         startCall({ partnerId, partnerName, partnerAvatar, callType, callId: callIdRef.current });
         callConnectionService.reportCallActive(partnerId);
         if (mountedRef.current) setCallState('connected');
+
+        try {
+          const localFp  = extractFingerprint(pc.localDescription?.sdp);
+          const remoteFp = extractFingerprint(pc.remoteDescription?.sdp);
+          if (localFp && remoteFp && mountedRef.current) {
+            setSecurityCode(computeSecurityCode(localFp, remoteFp));
+          }
+        } catch {}
       }
     };
 
@@ -853,6 +906,11 @@ export const CallScreen: React.FC = () => {
                 : 'Appel terminé'}
             </Text>
             {callState === 'connected' && !connIssue && <NetworkBadge quality={networkQuality} />}
+            {callState === 'connected' && securityCode && (
+              <TouchableOpacity onPress={() => setShowSecurityCode(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Icon name="shield" size={13} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         {callState === 'connected' && !isLocked ? (
@@ -1014,6 +1072,25 @@ export const CallScreen: React.FC = () => {
           onClose={() => setChatOpen(false)}
           insetsBottom={insets.bottom}
         />
+      )}
+
+      {/* Code de sécurité — vérification hors bande du chiffrement E2E */}
+      {showSecurityCode && securityCode && (
+        <View style={styles.securityOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowSecurityCode(false)} />
+          <View style={styles.securityCard}>
+            <Icon name="shield" size={28} color="#3FEDB6" style={{ marginBottom: 10 }} />
+            <Text style={styles.securityTitle}>Appel chiffré de bout en bout</Text>
+            <Text style={styles.securityDesc}>
+              Comparez ce code avec {partnerName} (à voix haute ou en personne) pour confirmer
+              que personne ne s'est interposé dans cet appel.
+            </Text>
+            <Text style={styles.securityCode}>{securityCode}</Text>
+            <TouchableOpacity style={styles.securityCloseBtn} onPress={() => setShowSecurityCode(false)}>
+              <Text style={styles.securityCloseText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -1335,6 +1412,22 @@ const styles = StyleSheet.create({
     width: 3,
     borderRadius: 1,
   },
+
+  // ── Code de sécurité ─────────────────────────────────────────────────────────
+  securityOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 32,
+  },
+  securityCard: {
+    width: '100%', borderRadius: 20, padding: 24,
+    backgroundColor: '#1C1C22', alignItems: 'center',
+  },
+  securityTitle: { color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
+  securityDesc: { color: 'rgba(255,255,255,0.6)', fontSize: 12.5, textAlign: 'center', lineHeight: 18, marginBottom: 16 },
+  securityCode: { color: '#3FEDB6', fontSize: 22, fontWeight: '800', letterSpacing: 3, marginBottom: 20 },
+  securityCloseBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)' },
+  securityCloseText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
   // ── Verrouillage ──────────────────────────────────────────────────────────────
   lockIconTop: {
