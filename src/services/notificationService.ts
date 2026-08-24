@@ -53,6 +53,10 @@ export const notificationService = {
     await apiClient.delete(Endpoints.notifications.delete(id));
   },
 
+  async deleteMany(ids: string[]): Promise<void> {
+    await apiClient.post(Endpoints.notifications.bulkDelete, { ids });
+  },
+
   async deleteAll(): Promise<void> {
     await apiClient.delete(Endpoints.notifications.deleteAll);
   },

@@ -265,7 +265,7 @@ export const NotificationsScreen: React.FC = () => {
             const ids = [...selectedIds];
             setItems(prev => prev.filter(x => !selectedIds.has(x.id)));
             exitSelectMode();
-            ids.forEach(id => notificationService.deleteOne(id).catch(() => {}));
+            notificationService.deleteMany(ids).catch(() => {});
           },
         },
       ],
