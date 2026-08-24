@@ -28,31 +28,62 @@ export const FollowingScreen: React.FC = () => {
   const routeUserId: string | undefined = route.params?.userId;
   const initialTab: 'followers' | 'following' = route.params?.tab ?? 'following';
 
+  const PAGE_LIMIT = 30;
+
   const [myId,          setMyId]          = useState<string | null>(null);
   const [tab,           setTab]           = useState<'followers' | 'following'>(initialTab);
   const [followers,     setFollowers]     = useState<UserPublic[]>([]);
   const [following,     setFollowing]     = useState<UserPublic[]>([]);
+  const [followersPage,   setFollowersPage]   = useState(1);
+  const [followingPage,   setFollowingPage]   = useState(1);
+  const [followersHasMore, setFollowersHasMore] = useState(true);
+  const [followingHasMore, setFollowingHasMore] = useState(true);
   const [loading,       setLoading]       = useState(true);
+  const [loadingMore,   setLoadingMore]   = useState(false);
   const [refreshing,    setRefreshing]    = useState(false);
   const [followState,   setFollowState]   = useState<Record<string, boolean>>({});
   const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
+
+  const targetId = routeUserId ?? myId ?? '';
+
+  const applyFollowState = useCallback(async (me: string, users: UserPublic[]) => {
+    if (routeUserId && routeUserId !== me) {
+      const myFollowing = await userService.getFollowing(me, 1, 200).catch(() => [] as UserPublic[]);
+      const followedIds = new Set(myFollowing.map(u => u.id));
+      setFollowState(prev => {
+        const next = { ...prev };
+        users.forEach(u => { next[u.id] = followedIds.has(u.id); });
+        return next;
+      });
+    } else if (tab === 'following') {
+      setFollowState(prev => {
+        const next = { ...prev };
+        users.forEach(u => { next[u.id] = true; });
+        return next;
+      });
+    }
+  }, [routeUserId, tab]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const me = await authService.getMe();
       setMyId(String(me.id));
-      const targetId = routeUserId ?? String(me.id);
+      const target = routeUserId ?? String(me.id);
 
       const [frs, fing] = await Promise.all([
-        userService.getFollowers(targetId).catch(() => [] as UserPublic[]),
-        userService.getFollowing(targetId).catch(() => [] as UserPublic[]),
+        userService.getFollowers(target, 1, PAGE_LIMIT).catch(() => [] as UserPublic[]),
+        userService.getFollowing(target, 1, PAGE_LIMIT).catch(() => [] as UserPublic[]),
       ]);
       setFollowers(frs);
       setFollowing(fing);
+      setFollowersPage(1);
+      setFollowingPage(1);
+      setFollowersHasMore(frs.length === PAGE_LIMIT);
+      setFollowingHasMore(fing.length === PAGE_LIMIT);
 
       if (routeUserId && routeUserId !== String(me.id)) {
-        const myFollowing = await userService.getFollowing(String(me.id)).catch(() => [] as UserPublic[]);
+        const myFollowing = await userService.getFollowing(String(me.id), 1, 200).catch(() => [] as UserPublic[]);
         const followedIds = new Set(myFollowing.map(u => u.id));
         const state: Record<string, boolean> = {};
         [...frs, ...fing].forEach(u => { state[u.id] = followedIds.has(u.id); });
@@ -71,6 +102,30 @@ export const FollowingScreen: React.FC = () => {
   }, [routeUserId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !targetId) return;
+    const hasMore = tab === 'followers' ? followersHasMore : followingHasMore;
+    if (!hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = (tab === 'followers' ? followersPage : followingPage) + 1;
+      const fetcher = tab === 'followers' ? userService.getFollowers : userService.getFollowing;
+      const items = await fetcher(targetId, nextPage, PAGE_LIMIT).catch(() => [] as UserPublic[]);
+      if (tab === 'followers') {
+        setFollowers(prev => [...prev, ...items]);
+        setFollowersPage(nextPage);
+        setFollowersHasMore(items.length === PAGE_LIMIT);
+      } else {
+        setFollowing(prev => [...prev, ...items]);
+        setFollowingPage(nextPage);
+        setFollowingHasMore(items.length === PAGE_LIMIT);
+      }
+      await applyFollowState(myId ?? '', items);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, targetId, tab, followersPage, followingPage, followersHasMore, followingHasMore, myId, applyFollowState]);
 
   const handleFollow = async (userId: string) => {
     const isFollowed = followState[userId];
@@ -221,6 +276,11 @@ export const FollowingScreen: React.FC = () => {
               </Text>
             </View>
           }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={loadingMore ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+          ) : null}
         />
       )}
     </View>

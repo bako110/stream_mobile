@@ -53,13 +53,13 @@ export const userService = {
     return res.data;
   },
 
-  async getFollowers(userId: string): Promise<UserPublic[]> {
-    const res = await apiClient.get<UserPublic[]>(Endpoints.users.followers(userId));
+  async getFollowers(userId: string, page = 1, limit = 30): Promise<UserPublic[]> {
+    const res = await apiClient.get<UserPublic[]>(`${Endpoints.users.followers(userId)}?page=${page}&limit=${limit}`);
     return res.data;
   },
 
-  async getFollowing(userId: string): Promise<UserPublic[]> {
-    const res = await apiClient.get<UserPublic[]>(Endpoints.users.following(userId));
+  async getFollowing(userId: string, page = 1, limit = 30): Promise<UserPublic[]> {
+    const res = await apiClient.get<UserPublic[]>(`${Endpoints.users.following(userId)}?page=${page}&limit=${limit}`);
     return res.data;
   },
 
