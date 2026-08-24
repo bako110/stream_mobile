@@ -1541,7 +1541,7 @@ export const ChatScreen: React.FC = () => {
               >
                 <Icon name="lock" size={13} color={colors.textTertiary} />
                 <Text style={[styles.e2eeBannerText, { color: colors.textTertiary }]}>
-                  Les messages sont chiffrés de bout en bout. Personne d'autre, pas même GoFoliX, ne peut les lire. Toucher pour en savoir plus.
+                  Les messages sont chiffrés de bout en bout. Personne d'autre, pas même Gofolyx, ne peut les lire. Toucher pour en savoir plus.
                 </Text>
               </TouchableOpacity>
             ) : null
@@ -2072,14 +2072,14 @@ export const ChatScreen: React.FC = () => {
                 Les messages texte échangés avec {partnerName} sont protégés par un chiffrement
                 de bout en bout : ils sont chiffrés sur votre appareil avant l'envoi, et seul
                 l'appareil du destinataire peut les déchiffrer. Personne d'autre ne peut les
-                lire en clair — ni un tiers qui intercepterait la connexion, ni GoFoliX lui-même.
+                lire en clair — ni un tiers qui intercepterait la connexion, ni Gofolyx lui-même.
               </Text>
 
               {[
                 {
                   icon: 'shield',
                   title: 'Comment ça marche',
-                  text: 'GoFoliX utilise le Signal Protocol (X3DH + Double Ratchet), un standard ouvert et reconnu de chiffrement de bout en bout. Chaque message est chiffré avec une clé unique qui change automatiquement à chaque échange.',
+                  text: 'Gofolyx utilise le Signal Protocol (X3DH + Double Ratchet), un standard ouvert et reconnu de chiffrement de bout en bout. Chaque message est chiffré avec une clé unique qui change automatiquement à chaque échange.',
                 },
                 {
                   icon: 'refresh-cw',
