@@ -17,7 +17,7 @@ import { SkeletonMessages, VerifiedBadge, AvatarWithBadge } from '../../componen
 import { BorderRadius, Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
 import { useWs } from '../../context/WebSocketContext';
-import type { ConversationSummary } from '../../services/messageService';
+import type { ConversationSummary, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BackButton } from '../../components/common';
@@ -49,6 +49,22 @@ function accentFor(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffff;
   return ACCENT_COLORS[h % ACCENT_COLORS.length]!;
+}
+
+// Aperçu du dernier message façon WhatsApp — libellé texte selon le type
+// (sans contenu réel pour les médias, pas d'emoji), sinon le texte tel quel
+// pour un message classique.
+function formatLastMessagePreview(lastMessage: string | null | undefined, lastType: MessageType | undefined): string {
+  switch (lastType) {
+    case 'voice':    return 'Message vocal';
+    case 'image':    return 'Photo';
+    case 'video':    return 'Vidéo';
+    case 'file':     return 'Document';
+    case 'sticker':  return 'Sticker';
+    case 'location': return 'Position';
+    case 'share':    return 'Publication partagée';
+    default:         return lastMessage || '…';
+  }
 }
 
 interface Props { onBack?: () => void; }
@@ -174,10 +190,15 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
           const existing = prev.find(c => c.partner_id === realPartner);
           if (existing) {
-            const preview = payload.content || (payload.message_type === 'voice' ? '🎤 Vocal' : '📎 Pièce jointe');
             const updated = prev.map(c =>
               c.partner_id === realPartner
-                ? { ...c, last_message: preview, last_time: payload.created_at, unread_count: c.unread_count + 1 }
+                ? {
+                    ...c,
+                    last_message: (payload.content as string) ?? '',
+                    last_type: payload.message_type as MessageType | undefined,
+                    last_time: payload.created_at,
+                    unread_count: c.unread_count + 1,
+                  }
                 : c,
             );
             const target = updated.find(c => c.partner_id === realPartner)!;
@@ -522,7 +543,7 @@ const ConversationRow: React.FC<{
             style={[styles.convLast, { color: unread ? colors.textSecondary : colors.textTertiary, fontWeight: unread ? '500' : '400' }]}
             numberOfLines={1}
           >
-            {conv.last_message ?? '…'}
+            {formatLastMessagePreview(conv.last_message, conv.last_type)}
           </Text>
           {unread && !selectMode ? (
             <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
