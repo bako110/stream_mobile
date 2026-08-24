@@ -8,7 +8,7 @@ import React, {
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
-  ActivityIndicator, Keyboard, Image, Modal,
+  ActivityIndicator, Keyboard, Image, Modal, ScrollView,
   Dimensions, Linking, PermissionsAndroid,
 } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -199,6 +199,7 @@ export const ChatScreen: React.FC = () => {
   const [replyingTo,        setReplyingTo]        = useState<Message | null>(null);
   const [pinnedMessages,    setPinnedMessages]    = useState<Message[]>([]);
   const [showPinned,        setShowPinned]        = useState(false);
+  const [showE2EEInfo,      setShowE2EEInfo]      = useState(false);
   const [showSearch,        setShowSearch]        = useState(false);
   const [searchQuery,       setSearchQuery]       = useState('');
   const [searchResults,     setSearchResults]     = useState<Message[]>([]);
@@ -1394,10 +1395,16 @@ export const ChatScreen: React.FC = () => {
             <Text style={[styles.headerName, { color: colors.textPrimary }]} numberOfLines={1}>
               {partnerName}
             </Text>
-            {/* Rappel permanent que la conversation est chiffrée — voir la
-                bannière d'explication plus détaillée en haut de la liste
-                des messages (affichée une seule fois par conversation). */}
-            <Icon name="lock" size={11} color={colors.textTertiary} />
+            {/* Rappel permanent que la conversation est chiffrée — tap pour
+                les détails. TouchableOpacity séparé (onStartShouldSetResponder
+                capture le tap avant qu'il ne remonte au parent) pour ne pas
+                déclencher aussi handleViewProfile. */}
+            <TouchableOpacity
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+              onPress={e => { e.stopPropagation(); setShowE2EEInfo(true); }}
+            >
+              <Icon name="lock" size={11} color={colors.textTertiary} />
+            </TouchableOpacity>
           </View>
           <Text style={[styles.headerSub, { color: partnerOnline ? '#36D9A0' : colors.textTertiary }]}>
             {partnerOnline ? 'en ligne' : formatLastSeen(partnerLastSeen)}
@@ -1527,12 +1534,16 @@ export const ChatScreen: React.FC = () => {
           // conversation" comme cette bannière E2EE.
           ListFooterComponent={
             messages.length > 0 ? (
-              <View style={[styles.e2eeBanner, { backgroundColor: colors.surface }]}>
+              <TouchableOpacity
+                style={[styles.e2eeBanner, { backgroundColor: colors.surface }]}
+                activeOpacity={0.7}
+                onPress={() => setShowE2EEInfo(true)}
+              >
                 <Icon name="lock" size={13} color={colors.textTertiary} />
                 <Text style={[styles.e2eeBannerText, { color: colors.textTertiary }]}>
-                  Les messages sont chiffrés de bout en bout. Personne d'autre, pas même GoFoliX, ne peut les lire.
+                  Les messages sont chiffrés de bout en bout. Personne d'autre, pas même GoFoliX, ne peut les lire. Toucher pour en savoir plus.
                 </Text>
-              </View>
+              </TouchableOpacity>
             ) : null
           }
           renderItem={renderChatItem}
@@ -2036,6 +2047,89 @@ export const ChatScreen: React.FC = () => {
               />
             )}
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modale d'explication du chiffrement de bout en bout */}
+      <Modal visible={showE2EEInfo} transparent animationType="slide" onRequestClose={() => setShowE2EEInfo(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowE2EEInfo(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.attachSheet, { backgroundColor: colors.surface, maxHeight: '82%' }]}>
+            <View style={[styles.attachHandle, { backgroundColor: colors.divider }]} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ alignItems: 'center', marginBottom: 14 }}>
+                <View style={{
+                  width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: colors.primary + '18', marginBottom: 10,
+                }}>
+                  <Icon name="lock" size={24} color={colors.primary} />
+                </View>
+                <Text style={[styles.attachTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
+                  Chiffrement de bout en bout
+                </Text>
+              </View>
+
+              <Text style={{ color: colors.textSecondary, fontSize: 13.5, lineHeight: 20, marginBottom: 16 }}>
+                Les messages texte échangés avec {partnerName} sont protégés par un chiffrement
+                de bout en bout : ils sont chiffrés sur votre appareil avant l'envoi, et seul
+                l'appareil du destinataire peut les déchiffrer. Personne d'autre ne peut les
+                lire en clair — ni un tiers qui intercepterait la connexion, ni GoFoliX lui-même.
+              </Text>
+
+              {[
+                {
+                  icon: 'shield',
+                  title: 'Comment ça marche',
+                  text: 'GoFoliX utilise le Signal Protocol (X3DH + Double Ratchet), un standard ouvert et reconnu de chiffrement de bout en bout. Chaque message est chiffré avec une clé unique qui change automatiquement à chaque échange.',
+                },
+                {
+                  icon: 'refresh-cw',
+                  title: 'Clés à usage unique',
+                  text: 'Même si une clé de chiffrement venait à être compromise, elle ne permettrait de déchiffrer que les messages passés ou futurs les plus proches — jamais l\'intégralité de l\'historique (forward secrecy).',
+                },
+                {
+                  icon: 'server',
+                  title: 'Le serveur ne voit rien',
+                  text: 'Le contenu chiffré transite par nos serveurs pour être acheminé, mais il y reste illisible : nous ne stockons et ne pouvons lire que des données chiffrées, jamais le texte en clair.',
+                },
+                {
+                  icon: 'smartphone',
+                  title: 'Limite actuelle',
+                  text: 'La protection s\'applique par appareil. Si vous vous connectez depuis un nouvel appareil, une nouvelle clé y est générée — l\'historique déchiffré localement sur un ancien appareil ne s\'y retrouve pas automatiquement.',
+                },
+              ].map(item => (
+                <View key={item.title} style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                  <View style={{
+                    width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: colors.backgroundSecondary,
+                  }}>
+                    <Icon name={item.icon} size={16} color={colors.textSecondary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.textPrimary, fontSize: 13.5, fontWeight: '700', marginBottom: 3 }}>
+                      {item.title}
+                    </Text>
+                    <Text style={{ color: colors.textTertiary, fontSize: 12.5, lineHeight: 18 }}>
+                      {item.text}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  paddingVertical: 13, borderRadius: 12, marginTop: 4, marginBottom: 8,
+                  backgroundColor: colors.backgroundSecondary,
+                }}
+                onPress={() => { setShowE2EEInfo(false); nav.navigate('PolitiqueConfidentialite'); }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 13.5, fontWeight: '700' }}>
+                  En savoir plus sur la confidentialité
+                </Text>
+                <Icon name="external-link" size={13} color={colors.primary} />
+              </TouchableOpacity>
+            </ScrollView>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
