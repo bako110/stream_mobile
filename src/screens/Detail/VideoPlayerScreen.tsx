@@ -24,6 +24,7 @@ interface Props {
       contentType?: 'film' | 'serie_episode';
       thumbnailUrl?: string;
       totalSeconds?: number;
+      startAtSec?: number;
     };
   };
   navigation: { goBack: () => void };
@@ -31,7 +32,7 @@ interface Props {
 
 export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
   useKeepAwake();
-  const { url, title, videoId, contentId, episodeId, contentType, thumbnailUrl, totalSeconds } = route.params;
+  const { url, title, videoId, contentId, episodeId, contentType, thumbnailUrl, totalSeconds, startAtSec } = route.params;
   const insets = useSafeAreaInsets();
   const { get: getDl, download: startDl } = useMediaDownload();
   const dl = getDl(videoId ?? contentId ?? episodeId ?? url);
@@ -61,6 +62,7 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
     },
     p => {
       p.muted = false;
+      if (startAtSec && startAtSec > 0) p.currentTime = startAtSec;
       if (autoplay) p.play();
     },
   );

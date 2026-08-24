@@ -91,6 +91,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [isSaved, setIsSaved]             = useState(false);
   const [savingFav, setSavingFav]         = useState(false);
   const [stats, setStats]                 = useState<{ view_count: number; purchase_count: number; save_count: number } | null>(null);
+  const [watchProgressSec, setWatchProgressSec] = useState(0);
 
   const isSerie  = item.type === 'serie';
   const banner   = item.banner_url || item.thumbnail_url;
@@ -165,6 +166,15 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const defaultVideo = videos.find(v => v.is_default) ?? videos[0] ?? null;
   const hasVideo     = !!defaultVideo?.hls_url;
 
+  // Reprise de lecture : progression sauvegardée par VideoPlayerScreen toutes
+  // les 15s pendant le visionnage (POST /stream/{video_id}/progress).
+  useEffect(() => {
+    if (!defaultVideo?.id) return;
+    apiClient.get<{ progress_sec: number }>(Endpoints.streaming.progress(defaultVideo.id))
+      .then(r => setWatchProgressSec(r.data.progress_sec))
+      .catch(() => {});
+  }, [defaultVideo?.id]);
+
   const targetType = isSerie ? 'serie' : 'film';
 
   useEffect(() => {
@@ -204,6 +214,11 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const [shareOpen, setShareOpen] = useState(false);
 
+  const watchProgressPct = defaultVideo?.duration_sec
+    ? Math.min(watchProgressSec / defaultVideo.duration_sec, 1)
+    : 0;
+  const isResumable = !isSerie && hasVideo && watchProgressSec > 0 && watchProgressPct < 0.9;
+
   const handleWatch = async () => {
     if (item.is_premium && !hasAccess) {
       setShowPaywall(true);
@@ -215,6 +230,8 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setTimeout(() => setLaunching(false), 800);
     } else if (hasVideo) {
       setLaunching(true);
+      const totalSeconds = defaultVideo!.duration_sec ?? undefined;
+      const isNearEnd = !!totalSeconds && watchProgressSec >= totalSeconds * 0.9;
       navigation.navigate('VideoPlayer', {
         url:         defaultVideo!.hls_url!,
         title:       item.title,
@@ -222,7 +239,8 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         contentId:   item.id,
         contentType: 'film' as const,
         thumbnailUrl: item.thumbnail_url ?? undefined,
-        totalSeconds: defaultVideo!.duration_sec ?? undefined,
+        totalSeconds,
+        startAtSec:  watchProgressSec > 0 && !isNearEnd ? watchProgressSec : undefined,
       });
       setTimeout(() => setLaunching(false), 800);
     }
@@ -386,12 +404,18 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                       : videosLoading
                       ? 'Chargement…'
                       : hasVideo
-                      ? 'Regarder maintenant'
+                      ? (isResumable ? 'Reprendre la lecture' : 'Regarder maintenant')
                       : 'Vidéo non disponible'}
                   </Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            {isResumable && (
+              <View style={s.resumeBarBg}>
+                <View style={[s.resumeBarFill, { width: `${Math.round(watchProgressPct * 100)}%` }]} />
+              </View>
+            )}
 
             {/* Secondaires */}
             <View style={s.ctaRow}>
@@ -621,6 +645,8 @@ const s = StyleSheet.create({
   ctaPrimaryOuter: { borderRadius: 13, overflow: 'hidden' },
   ctaPrimary:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
   ctaPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  resumeBarBg:  { height: 3, borderRadius: 2, backgroundColor: 'rgba(123,63,242,0.15)', overflow: 'hidden', marginTop: -2 },
+  resumeBarFill:{ height: 3, borderRadius: 2, backgroundColor: '#7B3FF2' },
   ctaRow:       { flexDirection: 'row', gap: 10 },
   ctaSecBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
   ctaSecText:   { fontSize: 13, fontWeight: '700' },
