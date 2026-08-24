@@ -455,6 +455,16 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   </TouchableOpacity>
                 );
               })}
+              <TouchableOpacity
+                onPress={() => nav.navigate('UserGallery', { userId: user!.id })}
+                activeOpacity={0.7}
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' }}
+              >
+                <Icon name="image" size={15} color={colors.textTertiary} />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textTertiary, marginTop: 3 }}>
+                  Galerie
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Contenu posts */}

@@ -72,6 +72,9 @@ const StreamControls: React.FC<{
   const [cameraFront, setCameraFront] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
   const [elapsed,     setElapsed]     = useState(0);
+  const [isRecording, setIsRecording] = useState(!!concert?.is_recording);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  useEffect(() => { setIsRecording(!!concert?.is_recording); }, [concert?.is_recording]);
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const bannerY     = useRef(new Animated.Value(-80)).current;
@@ -130,6 +133,21 @@ const StreamControls: React.FC<{
       });
     } catch {}
   }, [cameraFront, localParticipant]);
+
+  const toggleRecording = useCallback(async () => {
+    if (recordingLoading) return;
+    setRecordingLoading(true);
+    const next = !isRecording;
+    try {
+      const r = await concertService.toggleRecording(concertId, next);
+      setIsRecording(r.recording);
+      toastService.success(r.recording ? 'Enregistrement démarré' : 'Enregistrement arrêté');
+    } catch {
+      toastService.error("Impossible de modifier l'enregistrement pour le moment");
+    } finally {
+      setRecordingLoading(false);
+    }
+  }, [concertId, isRecording, recordingLoading]);
 
   const handleEndLive = useCallback(() => {
     showConfirm('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
@@ -203,6 +221,12 @@ const StreamControls: React.FC<{
           <TouchableOpacity onPress={flipCamera} style={styles.controlBtn}>
             <Icon name="refresh-cw" size={22} color="#fff" />
             <Text style={styles.controlLabel}>Flip</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={toggleRecording} disabled={recordingLoading} style={styles.controlBtn}>
+            {recordingLoading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Icon name={isRecording ? 'check-circle' : 'video'} size={22} color={isRecording ? '#F0365A' : '#fff'} />}
+            <Text style={styles.controlLabel}>{isRecording ? 'Stop rec' : 'Enregistrer'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleEndLive} style={[styles.controlBtn, styles.endBtn]}>
             <Icon name="square" size={22} color="#fff" />

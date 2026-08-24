@@ -133,6 +133,7 @@ export const Endpoints = {
     stop:      (concertId: string) => `${V1}/stream/${concertId}/stop`,
     status:    (concertId: string) => `${V1}/stream/${concertId}/status`,
     analytics: (concertId: string) => `${V1}/stream/${concertId}/analytics`,
+    recording: (concertId: string) => `${V1}/stream/${concertId}/recording`,
     // VOD progress
     progress:  (videoId: string) => `${V1}/stream/${videoId}/progress`,
   },
@@ -446,6 +447,7 @@ export const Endpoints = {
     ranking:    (id: string) => `${V1}/battles/${id}/ranking`,
     createGoal: (id: string) => `${V1}/battles/${id}/goals`,
     activeGoal: (id: string) => `${V1}/battles/${id}/goals/active`,
+    recording:  (id: string) => `${V1}/battles/${id}/recording`,
   },
 
   // ── Tournois entre créateurs ──────────────────────────────────────────────

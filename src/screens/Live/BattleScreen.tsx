@@ -436,6 +436,25 @@ export const BattleScreen: React.FC = () => {
     ? null
     : currentUser.id === battle.host_a_id ? 'a' : currentUser.id === battle.host_b_id ? 'b' : null;
 
+  // Enregistrement — n'importe lequel des deux hosts peut démarrer/arrêter
+  // pendant le match (PATCH /battles/{id}/recording), même pattern que le web.
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  useEffect(() => { setIsRecording(!!battle?.is_recording); }, [battle?.is_recording]);
+  const toggleRecording = useCallback(async () => {
+    if (recordingLoading || !battleId) return;
+    setRecordingLoading(true);
+    const next = !isRecording;
+    try {
+      const r = await battleService.toggleRecording(battleId, next);
+      setIsRecording(r.recording);
+    } catch {
+      // 503 = quota d'enregistrement épuisé côté LiveKit, ou autre échec — l'état reste inchangé
+    } finally {
+      setRecordingLoading(false);
+    }
+  }, [battleId, isRecording, recordingLoading]);
+
   // Cote suivi par un viewer (pas un host) avant l'entree en battle — sert a couper
   // l'audio du camp adverse pour lui. Un host, lui, doit toujours entendre les deux cotes.
   const followedSide: 'a' | 'b' | null = myHostSide
@@ -783,6 +802,10 @@ export const BattleScreen: React.FC = () => {
         onReact={handleReact}
         onSendChat={handleSendChat}
         onClose={handleClose}
+        isHost={!!isHost}
+        isRecording={isRecording}
+        recordingLoading={recordingLoading}
+        onToggleRecording={toggleRecording}
       />
     </LiveKitRoom>
   );
@@ -837,6 +860,10 @@ const BattleContent: React.FC<{
   onReact: (side: 'a' | 'b') => void;
   onSendChat: () => void;
   onClose: () => void;
+  isHost: boolean;
+  isRecording: boolean;
+  recordingLoading: boolean;
+  onToggleRecording: () => void;
 }> = ({
   battle, remaining, goal, ranking, floaters, heartCountA, heartCountB, ended, leaving, myId, myHostSide, followedSide,
   hostNameA, hostNameB, hostAvatarA, hostAvatarB,
@@ -845,6 +872,7 @@ const BattleContent: React.FC<{
   chatInput, setChatInput, messages, chatRef,
   giftTickerA, giftTickerB, onGiftTickExpireA, onGiftTickExpireB, crownA, crownB, bigGift, giftNotifsA, giftNotifsB, onGiftShownA, onGiftShownB, giftOverlayA, giftOverlayB,
   effectBanner, onReact, onSendChat, onClose,
+  isHost, isRecording, recordingLoading, onToggleRecording,
 }) => {
   const allTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const allAudioTracks = useTracks([Track.Source.Microphone], { onlySubscribed: false });
@@ -921,6 +949,19 @@ const BattleContent: React.FC<{
             <Icon name="users" size={13} color="#fff" />
             <Text style={styles.participantsBtnText}>{roomParticipants.length}</Text>
           </TouchableOpacity>
+
+          {isHost && (
+            <TouchableOpacity
+              style={[styles.participantsBtn, isRecording && styles.recordingBtnActive]}
+              onPress={onToggleRecording}
+              disabled={recordingLoading}
+              activeOpacity={0.8}
+            >
+              {recordingLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Icon name={isRecording ? 'check-circle' : 'video'} size={13} color={isRecording ? '#F0365A' : '#fff'} />}
+            </TouchableOpacity>
+          )}
 
           <View style={styles.headerTitleWrap} pointerEvents="none">
             <Text style={styles.headerTitleText}>BATTLE LIVE</Text>
@@ -1711,6 +1752,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   participantsBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  recordingBtnActive: { backgroundColor: 'rgba(240,54,90,0.25)', paddingHorizontal: 8 },
 
   // Chat fusionne
   chatList: { flex: 1 },

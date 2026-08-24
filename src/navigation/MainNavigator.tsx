@@ -15,6 +15,7 @@ import { ExplorerMenuScreen } from '../screens/Main/ExplorerMenuScreen';
 import { CommunitiesScreen as CommunitiesTabScreen } from '../screens/Main/CommunitiesScreen';
 import { ReelsScreen }              from '../screens/Main/ReelsScreen';
 import { UserPostsScreen }          from '../screens/Main/UserPostsScreen';
+import { UserGalleryScreen }        from '../screens/Main/UserGalleryScreen';
 import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
@@ -241,6 +242,7 @@ export type MainStackParamList = {
   StoryViewers:    { storyId: string; viewCount: number; myId?: string };
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
   UserPosts:       { userId: string };
+  UserGallery:     { userId: string };
   ReelPlayer:      { reel?: any; reelId?: string };
   SearchReelViewer: { reel?: any; reelId?: string; authorId?: string };
   PostDetail:      { postId: string; initialPost?: any };
@@ -532,6 +534,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="LiveViewer"     component={LiveViewerWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserReels"      component={ReelsScreen}           options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserPosts"      component={UserPostsScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="UserGallery"    component={UserGalleryScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ReelPlayer"    component={ReelPlayerScreen}      options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SearchReelViewer" component={SearchReelViewerScreen} options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreatePost"     component={CreatePostWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />

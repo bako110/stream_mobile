@@ -658,6 +658,14 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               </TouchableOpacity>
             );
           })}
+          <TouchableOpacity
+            style={styles.tabItem}
+            onPress={() => navigation.navigate('UserGallery', { userId })}
+            activeOpacity={0.7}
+          >
+            <Icon name="image" size={18} color={colors.textTertiary} />
+            <Text style={[styles.tabLabel, { color: colors.textTertiary }]}>Galerie</Text>
+          </TouchableOpacity>
         </View>
         )}
 

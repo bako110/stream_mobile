@@ -48,6 +48,7 @@ export interface Concert {
   ai_analysis_status?: 'pending' | 'done' | null;
   replay_url?: string | null;
   replay_expires_at?: string | null;
+  is_recording?: boolean;
 }
 
 export interface ConcertCreate {

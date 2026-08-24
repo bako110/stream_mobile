@@ -24,6 +24,9 @@ export interface Battle {
    * uniquement sur la réponse de GET /battles/{id} (pas sur ActiveBattle ni les WS). */
   win_count_a?:     number;
   win_count_b?:     number;
+  is_recording?:    boolean;
+  replay_url?:      string | null;
+  replay_expires_at?: string | null;
 }
 
 export interface EligibleCreator {
@@ -174,6 +177,11 @@ async function getActiveGoal(battleId: string): Promise<BattleGoal | null> {
   return r.data ?? null;
 }
 
+async function toggleRecording(battleId: string, enabled: boolean): Promise<{ recording: boolean }> {
+  const r = await apiClient.patch<{ recording: boolean }>(Endpoints.battles.recording(battleId), { enabled });
+  return r.data;
+}
+
 export const battleService = {
   get,
   listEligible,
@@ -188,4 +196,5 @@ export const battleService = {
   getRanking,
   createGoal,
   getActiveGoal,
+  toggleRecording,
 };

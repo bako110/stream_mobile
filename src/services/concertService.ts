@@ -82,6 +82,11 @@ export const concertService = {
     await apiClient.post(Endpoints.streaming.stop(id));
   },
 
+  async toggleRecording(id: string, enabled: boolean): Promise<{ recording: boolean }> {
+    const res = await apiClient.patch<{ recording: boolean }>(Endpoints.streaming.recording(id), { enabled });
+    return res.data;
+  },
+
   async buyTicket(concertId: string, tierKey?: string): Promise<unknown> {
     const res = await apiClient.post(Endpoints.concerts.buyTicket(concertId), tierKey ? { tier: tierKey } : undefined);
     return res.data;
