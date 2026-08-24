@@ -13,6 +13,9 @@
   "dependencies": {
     "@livekit/react-native": "^2.10.0",
     "@livekit/react-native-webrtc": "^144.0.0",
+    "@noble/ciphers": "^2.3.0",
+    "@noble/curves": "^2.3.0",
+    "@noble/hashes": "^2.3.0",
     "@notifee/react-native": "^9.1.8",
     "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-native-community/datetimepicker": "^9.1.0",
