@@ -463,7 +463,7 @@ export const Endpoints = {
 
   // ── Tournois entre créateurs ──────────────────────────────────────────────
   tournaments: {
-    open:               `${V1}/tournaments/open`,
+    open:               (page = 1, limit = 20) => `${V1}/tournaments/open?page=${page}&limit=${limit}`,
     active:             (page = 1, limit = 20) => `${V1}/tournaments/active?page=${page}&limit=${limit}`,
     create:             `${V1}/tournaments`,
     update:             (id: string) => `${V1}/tournaments/${id}`,

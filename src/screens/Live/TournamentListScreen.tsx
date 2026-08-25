@@ -34,6 +34,9 @@ export const TournamentListScreen: React.FC = () => {
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
   const [joining, setJoining]         = useState<string | null>(null);
+  const [page, setPage]               = useState(1);
+  const [hasMore, setHasMore]         = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [showCreate, setShowCreate]   = useState(false);
   const [name, setName]               = useState('');
@@ -42,10 +45,24 @@ export const TournamentListScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const data = await tournamentService.listOpen();
-      setTournaments(data);
+      const res = await tournamentService.listOpen(1);
+      setTournaments(res.items);
+      setPage(1);
+      setHasMore(res.has_more);
     } catch {} finally { setLoading(false); setRefreshing(false); }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const res = await tournamentService.listOpen(nextPage);
+      setTournaments(prev => [...prev, ...res.items]);
+      setPage(nextPage);
+      setHasMore(res.has_more);
+    } catch {} finally { setLoadingMore(false); }
+  }, [page, hasMore, loadingMore]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -136,6 +153,9 @@ export const TournamentListScreen: React.FC = () => {
           contentContainerStyle={styles.list}
           renderItem={renderItem}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7B3FF2" />}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color="#7B3FF2" style={{ marginVertical: 16 }} /> : null}
           ListEmptyComponent={
             <View style={styles.center}>
               <Icon name="award" size={32} color={colors.textTertiary} />

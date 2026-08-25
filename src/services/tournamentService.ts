@@ -58,6 +58,12 @@ export interface ActiveTournamentsPage {
   has_more: boolean;
 }
 
+export interface OpenTournamentsPage {
+  items:    OpenTournament[];
+  page:     number;
+  has_more: boolean;
+}
+
 export interface TournamentParticipant {
   id:               string;
   user_id:          string;
@@ -190,9 +196,9 @@ export interface UpdateTournamentPayload {
   entryFeeGogold?: number;
 }
 
-async function listOpen(): Promise<OpenTournament[]> {
-  const r = await apiClient.get<OpenTournament[]>(Endpoints.tournaments.open);
-  return r.data ?? [];
+async function listOpen(page = 1, limit = 20): Promise<OpenTournamentsPage> {
+  const r = await apiClient.get<OpenTournamentsPage>(Endpoints.tournaments.open(page, limit));
+  return r.data ?? { items: [], page, has_more: false };
 }
 
 async function listActive(page = 1, limit = 20): Promise<ActiveTournamentsPage> {
