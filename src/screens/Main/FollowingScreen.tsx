@@ -19,6 +19,24 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 const AVATAR_SZ = 48;
 
+// Le serveur plafonne `limit` à 50 (422 au-delà) — pagine côté client pour
+// récupérer tous les IDs suivis sans dépasser cette limite.
+async function fetchAllFollowingIds(userId: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const FETCH_LIMIT = 50;
+  let page = 1;
+  for (;;) {
+    let list: UserPublic[];
+    try {
+      list = await userService.getFollowing(userId, page, FETCH_LIMIT);
+    } catch { break; }
+    list.forEach(u => ids.add(u.id));
+    if (list.length < FETCH_LIMIT) break;
+    page += 1;
+  }
+  return ids;
+}
+
 export const FollowingScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
@@ -48,8 +66,7 @@ export const FollowingScreen: React.FC = () => {
 
   const applyFollowState = useCallback(async (me: string, users: UserPublic[]) => {
     if (routeUserId && routeUserId !== me) {
-      const myFollowing = await userService.getFollowing(me, 1, 200).catch(() => [] as UserPublic[]);
-      const followedIds = new Set(myFollowing.map(u => u.id));
+      const followedIds = await fetchAllFollowingIds(me);
       setFollowState(prev => {
         const next = { ...prev };
         users.forEach(u => { next[u.id] = followedIds.has(u.id); });
@@ -83,8 +100,7 @@ export const FollowingScreen: React.FC = () => {
       setFollowingHasMore(fing.length === PAGE_LIMIT);
 
       if (routeUserId && routeUserId !== String(me.id)) {
-        const myFollowing = await userService.getFollowing(String(me.id), 1, 200).catch(() => [] as UserPublic[]);
-        const followedIds = new Set(myFollowing.map(u => u.id));
+        const followedIds = await fetchAllFollowingIds(String(me.id));
         const state: Record<string, boolean> = {};
         [...frs, ...fing].forEach(u => { state[u.id] = followedIds.has(u.id); });
         setFollowState(state);
