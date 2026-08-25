@@ -837,16 +837,23 @@ export const ReelsScreen: React.FC = () => {
     return result;
   }, [reels, adSlots, userMode]);
 
-  // Précharge l'ad du prochain emplacement dès qu'on approche du dernier slot déjà
-  // rempli — pour qu'elle soit prête avant que l'utilisateur y arrive en scrollant,
-  // sans jamais réutiliser la même ad que les emplacements précédents.
+  // Précharge l'ad de CHAQUE emplacement pas encore rempli — pour qu'elles soient
+  // prêtes avant que l'utilisateur y arrive en scrollant, sans jamais réutiliser la
+  // même ad que les emplacements précédents.
+  // Le `break` précédent ne lançait qu'UN SEUL chargement par passage de cet effet ;
+  // or l'effet ne se redéclenche qu'à chaque changement de reels.length (une page de
+  // pagination). Si une page ajoute plusieurs nouveaux slots d'un coup (page >
+  // AD_INTERVAL reels), seul le premier était jamais chargé — les slots suivants
+  // restaient vides en permanence et n'affichaient donc aucune pub (bug corrigé ici :
+  // "plusieurs pubs ne s'affichent pas"). loadAdForSlot est déjà protégé par
+  // loadingAdSlotsRef/adSlotsRef, donc lancer tous les slots manquants ici ne
+  // duplique jamais une requête ni ne recharge un slot déjà rempli.
   useEffect(() => {
     if (userMode) return;
     const totalSlots = Math.floor(reels.length / AD_INTERVAL);
     for (let s = 0; s < totalSlots; s++) {
       if (!adSlotsRef.current.has(s) && !loadingAdSlotsRef.current.has(s)) {
         loadAdForSlot(s);
-        break; // un seul chargement à la fois, dans l'ordre — pas une rafale
       }
     }
   }, [reels.length, userMode, loadAdForSlot]);
