@@ -737,28 +737,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
   const loadingMoreRef   = useRef(false);
   const seenItemIdsRef   = useRef<Set<string>>(new Set());
-  // Continuité de l'espacement suggestions/communautés entre page 1 (load) et pages
-  // suivantes (loadMoreFeed) — reprend exactement où load('all') s'est arrêté.
+  // Continuité de comptage entre page 1 (load) et pages suivantes (loadMoreFeed)
+  // — sert uniquement à espacer la pub côté client désormais (reel_row/
+  // suggestions/communities vient déjà entrelacé depuis le backend).
   const nonReelCountRef  = useRef(0);
-  const suggestCountRef  = useRef(0);
-  const commCountRef     = useRef(0);
-  // Pool cumulatif de communautés, complété au fil du scroll (au lieu de répéter les 5
-  // mêmes communautés à chaque bloc "communities" injecté dans le flux).
-  const COMM_SLICE = 5;
-  const trendingCommRef      = useRef<CommunityData[]>([]);
-  const commPageRef          = useRef(1);
-  const commExhaustedRef     = useRef(false);
-  const commFetchingRef      = useRef(false);
   const feedListRef     = useRef<FlatList>(null);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
   const [nearbyEvents,    setNearbyEvents]    = useState<Event[]>([]);
-  const [trendingComm,    setTrendingComm]    = useState<CommunityData[]>([]);
-  // IDs des communautés dont l'utilisateur est déjà membre — comme Facebook, jamais
-  // resuggérer une communauté déjà rejointe. join_status venant de /communities (liste
-  // générique en cache Redis, non personnalisée par utilisateur) vaut toujours "none",
-  // donc ce filtre-ci est la seule source fiable.
-  const myCommIdsRef = useRef<Set<string>>(new Set());
   // Panneau infos primaires — ouvert via le chevron du header, fermé au tap
   // extérieur. Restait ouvert indéfiniment si on quittait l'écran (changement
   // d'onglet, navigation vers un écran empilé) sans re-taper explicitement à
@@ -1068,70 +1054,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
 
 
-  // ── Suggestions — pool cumulatif par tranches de 10, complété au fil du scroll
-  // (au lieu de boucler en modulo sur les 30 premières suggestions à l'infini) ──
-  const SUGGEST_SLICE = 10;
-  const [suggestPool,    setSuggestPool]    = useState<UserPublic[]>([]);
-  const [suggestLoading, setSuggestLoading] = useState(true);
-  const suggestExhaustedRef = useRef(false); // plus aucune suggestion à charger côté backend
-  const suggestFetchingRef  = useRef(false);  // évite les fetchs concurrents
-
-  const suggestPoolRef = useRef<UserPublic[]>([]);
-  useEffect(() => { suggestPoolRef.current = suggestPool; }, [suggestPool]);
-
-  const loadSuggestions = useCallback(async () => {
-    try {
-      const data = await userService.getSuggestions(30);
-      const list = Array.isArray(data) ? data : [];
-      setSuggestPool(list);
-      suggestExhaustedRef.current = list.length < 30;
-    } catch { /* silencieux */ }
-    finally { setSuggestLoading(false); }
-  }, []);
-
-  // Complète le pool en arrière-plan quand on approche de la fin (pas de boucle bloquante,
-  // le bloc affiche la tranche déjà disponible pendant que le fetch se termine).
-  const fetchMoreSuggestions = useCallback(async () => {
-    if (suggestFetchingRef.current || suggestExhaustedRef.current) return;
-    suggestFetchingRef.current = true;
-    try {
-      const offset = suggestPoolRef.current.length;
-      const data = await userService.getSuggestions(SUGGEST_SLICE, offset);
-      const list = Array.isArray(data) ? data : [];
-      if (list.length < SUGGEST_SLICE) suggestExhaustedRef.current = true;
-      if (list.length > 0) {
-        setSuggestPool(prev => {
-          const seen = new Set(prev.map(u => u.id));
-          return [...prev, ...list.filter(u => !seen.has(u.id))];
-        });
-      }
-    } catch { /* silencieux */ }
-    finally { suggestFetchingRef.current = false; }
-  }, []);
-
-  // Retourne la tranche du pool correspondant au numero de bloc (1-based). Bloc 1 → [0..9],
-  // bloc 2 → [10..19], etc. Si le pool ne couvre pas encore ce bloc, déclenche un fetch en
-  // arrière-plan (non bloquant) et retourne ce qui est disponible en attendant.
-  const sliceForBlock = useCallback((blockIndex: number): UserPublic[] => {
-    if (suggestPool.length === 0) return [];
-    const start = (blockIndex - 1) * SUGGEST_SLICE;
-    if (start >= suggestPool.length && !suggestExhaustedRef.current) {
-      fetchMoreSuggestions();
-    }
-    if (start >= suggestPool.length) {
-      // Pool réellement épuisé côté backend — reboucler plutôt qu'un bloc vide
-      const wrapped = start % suggestPool.length;
-      return suggestPool.slice(wrapped, wrapped + SUGGEST_SLICE);
-    }
-    return suggestPool.slice(start, start + SUGGEST_SLICE);
-  }, [suggestPool, fetchMoreSuggestions]);
-
-  useEffect(() => { loadSuggestions(); }, []);
-
   // ── Suggestions intelligentes : contacts + localisation ──────────────────────
   // Hash SHA-256 des contacts avant l'envoi (jamais de numéro/email en clair côté
-  // serveur), et position GPS ponctuelle — les deux ne servent qu'à mieux classer
-  // les suggestions de personnes (PeopleSuggestions), rien d'autre.
+  // serveur), et position GPS ponctuelle — influencent le classement calculé par
+  // UserService.suggest_users côté backend (voir bloc "suggestions" désormais
+  // fourni déjà entrelacé par /search/feed, plus de pool d'affichage local ici).
   const CONTACTS_PROMPT_SEEN_KEY = 'suggestions_contacts_prompt_seen';
 
   const syncContactsForSuggestions = useCallback(async () => {
@@ -1148,22 +1075,19 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       }
       if (hashes.size) {
         await userService.syncContacts(Array.from(hashes));
-        loadSuggestions();
       }
     } catch { /* silencieux — les suggestions restent utilisables sans contacts */ }
-  }, [loadSuggestions]);
+  }, []);
 
   const syncLocationForSuggestions = useCallback(() => {
     Geolocation.getCurrentPosition(
       pos => {
-        userService.updateLocation(pos.coords.latitude, pos.coords.longitude)
-          .then(loadSuggestions)
-          .catch(() => {});
+        userService.updateLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {});
       },
       () => {},
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 },
     );
-  }, [loadSuggestions]);
+  }, []);
 
   const requestLocationForSuggestions = useCallback(async () => {
     const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
@@ -1207,47 +1131,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Complète le pool de communautés en arrière-plan (même pattern que fetchMoreSuggestions)
-  // — évite de répéter indéfiniment les mêmes 5 communautés à chaque bloc du flux.
-  const fetchMoreCommunities = useCallback(async () => {
-    if (commFetchingRef.current || commExhaustedRef.current) return;
-    commFetchingRef.current = true;
-    try {
-      const nextCommPage = commPageRef.current + 1;
-      const data = await communityService.list(nextCommPage, 8).catch(() => []);
-      const list = Array.isArray(data) ? data : [];
-      if (list.length === 0) {
-        commExhaustedRef.current = true;
-      } else {
-        commPageRef.current = nextCommPage;
-        if (list.length < 8) commExhaustedRef.current = true;
-        setTrendingComm(prev => {
-          const seen = new Set(prev.map(c => String(c.id)));
-          const merged = [...prev, ...list.filter(c => !seen.has(String(c.id)))];
-          trendingCommRef.current = merged;
-          return merged;
-        });
-      }
-    } catch { /* silencieux */ }
-    finally { commFetchingRef.current = false; }
-  }, []);
-
-  // Retourne la tranche de communautés pour le bloc N (1-based), déclenche un fetch de
-  // la page suivante si le pool ne couvre pas encore ce bloc.
-  const sliceForCommBlock = useCallback((blockIndex: number): CommunityData[] => {
-    const pool = trendingCommRef.current;
-    if (pool.length === 0) return [];
-    const start = (blockIndex - 1) * COMM_SLICE;
-    if (start >= pool.length && !commExhaustedRef.current) {
-      fetchMoreCommunities();
-    }
-    if (start >= pool.length) {
-      const wrapped = start % pool.length;
-      return pool.slice(wrapped, wrapped + COMM_SLICE);
-    }
-    return pool.slice(start, start + COMM_SLICE);
-  }, [fetchMoreCommunities]);
 
   // ── Chargement de la pub feed — une campagne par emplacement, jamais deux fois la
   // même dans le même feed (exclude_ids envoyé au backend à chaque tirage). Retourne
@@ -1323,10 +1206,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     }
   }, [followingSet, currentUser]);
 
-  // Espacement d'injection des suggestions/communautés/pub — partagé entre load('all')
-  // (page 1) et loadMoreFeed (pages suivantes) pour garder un rythme cohérent sur tout le flux.
-  const SUGGEST_EVERY = 8;
-  const COMM_EVERY    = 12;
+  // Espacement d'injection de la pub — seule à rester gérée côté client (le
+  // reel_row/suggestions/communities vient désormais déjà entrelacé depuis
+  // /search/feed, rotation stricte page%3 côté backend, voir FeedService.get_feed).
   const AD_EVERY       = 8;
   const adSlotIdxRef  = useRef(0); // continue la numérotation des slots pub entre pages
 
@@ -1340,10 +1222,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // voir le early-return plus bas qui bloque ce cas avant de toucher aux items/refs.
         // Refresh silencieux alors que l'utilisateur a déjà scrollé plus loin (pages > 1) :
         // sortir tout de suite, AVANT tout fetch réseau et toute écriture de ref — sinon un
-        // fetch page 1 (communities page=1, etc.) écraserait silencieusement les refs de
-        // pagination déjà avancées (feedPageRef, trendingCommRef, commPageRef...) avec des
-        // valeurs de page 1, cassant loadMoreFeed au prochain scroll sans que rien
-        // ne se voie tout de suite (les items affichés, eux, ne changent pas).
+        // fetch page 1 écraserait silencieusement les refs de pagination déjà avancées
+        // (feedPageRef...) avec des valeurs de page 1, cassant loadMoreFeed au prochain
+        // scroll sans que rien ne se voie tout de suite (les items affichés, eux, ne
+        // changent pas).
         if (silent && feedPageRef.current > 1) {
           lastLoadedAtRef.current = Date.now();
           return;
@@ -1355,166 +1237,73 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           adSlotIdxRef.current = 0;
           seenAdIdsRef.current = [];
           feedHasMoreRef.current = true;
-          commPageRef.current = 1;
-          commExhaustedRef.current = false;
-          trendingCommRef.current = [];
         }
         // Charge moins en 4G/5G (hors wifi) pour limiter la conso data au premier écran
         const onWifi = networkService.isWifi();
         const feedLimit  = onWifi ? 30 : 15;
-        const reelsLimit = onWifi ? 20 : 10;
 
-        // Tout est chargé ensemble avant le premier rendu — un affichage partiel
-        // (posts seuls, puis remplacés par la liste complète avec events/concerts/
-        // reels/pubs injectés) faisait "clignoter" le feed : les items déjà visibles
-        // changeaient de position dès que le reste arrivait, et les events/concerts
-        // semblaient absents du feed puisqu'ils n'apparaissaient jamais dans ce
-        // premier rendu partiel. Un seul skeleton jusqu'à ce que tout soit prêt.
-        const [feedResult, reelsResult, commResult, liveConcerts, spontLivesResult, myComms] = await Promise.all([
+        // /search/feed renvoie désormais directement la séquence entrelacée :
+        // events/concerts/posts triés par score, avec au plus UN encart spécial
+        // par page (reel_row, suggestions ou communities — rotation stricte
+        // page%3 décidée côté backend, cf. FeedService.get_feed côté serveur).
+        // Le mobile n'a plus qu'à mapper kind -> FeedItem et injecter la pub à
+        // part — plus de shuffle, plus de pool suggestions/communautés local,
+        // plus de calcul d'intervalles pouvant se chevaucher ou s'empiler.
+        const [feedResult, liveConcerts, spontLivesResult] = await Promise.all([
           searchService.getFeed(1, feedLimit).catch(() => ({ items: [] })),
-          reelService.getFeed({ limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: 1 })),
-          communityService.list(1, 8).catch(() => []),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
-          communityService.mine().catch(() => [] as CommunityData[]),
         ]);
         feedHasMoreRef.current = (feedResult.items ?? []).length >= feedLimit;
         setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
         setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
-        myCommIdsRef.current = new Set((Array.isArray(myComms) ? myComms : []).map(c => String(c.id)));
-        const commData: CommunityData[] = Array.isArray(commResult)
-          ? commResult.slice(0, 5)
-          : Array.isArray((commResult as any)?.items) && (commResult as any).items !== null
-            ? (commResult as any).items.slice(0, 5)
-            : [];
-        setTrendingComm(commData);
-        if (__DEV__) console.log('[Feed] commData:', commData.length, JSON.stringify(commData).slice(0, 200));
-        if (__DEV__) {
-          console.log('[Feed] feedResult:', JSON.stringify(feedResult).slice(0, 300));
-          console.log('[Feed] reelsResult:', JSON.stringify(reelsResult).slice(0, 300));
-        }
-        // /search/feed retourne déjà events + concerts + posts avec un score unifié
-        // (2026-08-12, remplace l'ancien double-appel /search/feed + /posts/feed).
-        const feedItems: FeedItem[] = (feedResult.items ?? [])
-          .filter((item: any) => (item.kind === 'event' || item.kind === 'concert' || item.kind === 'post') && item.id)
-          .map((item: any) => ({
-            kind: item.kind as 'event' | 'concert' | 'post',
-            id: item.id,
-            data: item,
-          }));
-        const reelItems: FeedItem[] = (Array.isArray(reelsResult?.items) ? reelsResult.items : Array.isArray(reelsResult) ? reelsResult : [])
-          .filter((r: any) => r?.id)
-          .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
-        // Dédupliquer par clé composite avant shuffle
+
+        const feedRaw: any[] = feedResult.items ?? [];
         const seen = new Set<string>();
-        const deduped = [...feedItems, ...reelItems].filter(item => {
-          const key = `${item.kind}-${item.id}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-        // Mélange déterministe : seed = jour courant → même ordre toute la journée
-        // Evite le scroll aléatoire au retour sur l'écran (reload silent)
-        const seed = Math.floor(Date.now() / 86_400_000); // change 1x/jour
-        let s = seed;
-        const seededRand = () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
-        for (let i = deduped.length - 1; i > 0; i--) {
-          const j = Math.floor(seededRand() * (i + 1));
-          [deduped[i], deduped[j]] = [deduped[j], deduped[i]];
-        }
-        // Filtrer les contenus masqués ("Pas intéressé")
-        const filtered = feedPreferenceService.filterFeed(deduped);
-
-        // Extraire tous les reels et ne garder que les non-reels dans le flux principal
-        const allReels   = filtered.filter(i => i.kind === 'reel');
-        const nonReels   = filtered.filter(i => i.kind !== 'reel');
-
-        // Découper les reels en blocs de 5 max pour les rangées horizontales
-        const REELS_PER_ROW = 10;
-        const reelRows: FeedItem[] = [];
-        for (let r = 0; r < allReels.length; r += REELS_PER_ROW) {
-          const chunk = allReels.slice(r, r + REELS_PER_ROW);
-          reelRows.push({
-            kind: 'reel_row',
-            id: `__reel_row__${r}`,
-            data: chunk.map(ri => ri.data).filter(Boolean),
-          });
-        }
-
-        // Injecter suggestions, communities, pub et rangées de reels à intervalles réguliers
-        const REEL_ROW_EVERY = 5; // une rangée de reels toutes les 5 cartes
         const result: FeedItem[] = [];
-        let suggestCount = 0;
-        let commCount    = 0;
-        let reelRowIdx   = 0;
+        let nonSpecialCount = 0;
         const adSlotIds: string[] = [];
-
-        nonReels.forEach((item, i) => {
-          result.push(item);
-
-          // Rangée de reels : première à pos 3, puis toutes les REEL_ROW_EVERY
-          if (reelRowIdx < reelRows.length && (i === 2 || (i > 2 && (i - 2) % REEL_ROW_EVERY === 0))) {
-            result.push(reelRows[reelRowIdx]);
-            reelRowIdx += 1;
+        for (const d of feedRaw) {
+          if (!d || !d.id) continue;
+          if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
+            const key = `${d.kind}-${d.id}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            result.push({ kind: d.kind, id: d.id, data: d });
+            nonSpecialCount += 1;
+            if (nonSpecialCount > 0 && nonSpecialCount % AD_EVERY === 0) {
+              const slotId = `__ad__slot_${adSlotIdxRef.current}`;
+              adSlotIdxRef.current += 1;
+              adSlotIds.push(slotId);
+              result.push({ kind: 'ad', id: slotId, data: null });
+            }
+          } else if (d.kind === 'reel_row') {
+            result.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
+          } else if (d.kind === 'suggestions') {
+            result.push({ kind: 'suggestions', id: d.id, data: d.users ?? [] });
+          } else if (d.kind === 'communities') {
+            result.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
           }
-
-          // Suggestions : première à pos 5, puis toutes les SUGGEST_EVERY
-          if (i === 4 || (i > 4 && (i - 4) % SUGGEST_EVERY === 0)) {
-            suggestCount += 1;
-            result.push({ kind: 'suggestions', id: `__suggestions__${suggestCount}`, data: null });
-          }
-
-          // Publicité : un emplacement toutes les AD_EVERY cartes — chaque slot recevra
-          // sa propre campagne (tirée séparément après coup, cf. fetchNextAd ci-dessous).
-          if (i === AD_EVERY - 1 || (i > AD_EVERY - 1 && (i - (AD_EVERY - 1)) % AD_EVERY === 0)) {
-            const slotId = `__ad__slot_${adSlotIdxRef.current}`;
-            adSlotIdxRef.current += 1;
-            adSlotIds.push(slotId);
-            result.push({ kind: 'ad', id: slotId, data: null });
-          }
-
-          // Communities : première à pos 10, puis toutes les COMM_EVERY — data résolu au
-          // rendu (sliceForCommBlock dans renderItem), pas figé ici : reflète le pool
-          // renouvelé par fetchMoreCommunities même après l'insertion de ce bloc.
-          if (commData.length > 0 && (i === 9 || (i > 9 && (i - 9) % COMM_EVERY === 0))) {
-            commCount += 1;
-            result.push({ kind: 'communities', id: `__communities__${commCount}`, data: null });
-          }
-        });
-
-        // Ajouter les rangées de reels restantes à la fin
-        while (reelRowIdx < reelRows.length) {
-          result.push(reelRows[reelRowIdx]);
-          reelRowIdx += 1;
         }
+        // Filtrer les contenus masqués ("Pas intéressé") — après mapping, pour
+        // ne s'appliquer qu'au contenu normal (pas aux encarts spéciaux).
+        const filtered = feedPreferenceService.filterFeed(result);
 
         // Mémorise les clés composites (kind-id) chargées en page 1 pour dédupliquer
         // les pages suivantes du scroll infini (loadMoreFeed)
-        seenItemIdsRef.current = new Set(result.map(i => `${i.kind}-${i.id}`));
-        // Continuité de l'espacement suggestions/communautés pour loadMoreFeed
-        nonReelCountRef.current = nonReels.length;
-        suggestCountRef.current = suggestCount;
-        commCountRef.current    = commCount;
-        // NE PAS écraser trendingCommRef par commData ici : fetchMoreCommunities (déclenché
-        // en fire-and-forget par sliceForCommBlock pendant la construction de `result` juste
-        // au-dessus) peut résoudre de façon asynchrone et avoir déjà fusionné un pool plus
-        // riche dans trendingCommRef via setTrendingComm — écraser ici l'annulerait en race
-        // condition selon le timing réseau. On ne (re)initialise le pool que s'il est encore
-        // vide (vrai premier chargement) ; sinon on garde le pool déjà accumulé tel quel.
-        if (trendingCommRef.current.length === 0) {
-          trendingCommRef.current = commData;
-        }
+        seenItemIdsRef.current = new Set(filtered.map(i => `${i.kind}-${i.id}`));
+        nonReelCountRef.current = nonSpecialCount;
 
         // En mode silent : ne remplacer les items que si le contenu a réellement changé
         // Evite le re-render + reset de scroll au retour sur l'écran
         if (silent) {
           setItems(prev => {
             const prevIds = prev.map(i => i.id).join(',');
-            const nextIds = result.map(i => i.id).join(',');
-            return prevIds === nextIds ? prev : result;
+            const nextIds = filtered.map(i => i.id).join(',');
+            return prevIds === nextIds ? prev : filtered;
           });
         } else {
-          setItems(result);
+          setItems(filtered);
         }
         // Tire une campagne distincte pour chaque nouvel emplacement pub de cette page
         if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
@@ -1612,89 +1401,55 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       const nextPage = feedPageRef.current + 1;
       const onWifi = networkService.isWifi();
       const feedLimit  = onWifi ? 30 : 15;
-      const reelsLimit = onWifi ? 20 : 10;
 
-      const [feedResult, reelsResult] = await Promise.all([
-        searchService.getFeed(nextPage, feedLimit).catch(() => ({ items: [] })),
-        reelService.getFeed({ page: nextPage, limit: reelsLimit }).catch(() => ({ items: [], has_more: false, page: nextPage })),
-      ]);
+      // /search/feed renvoie déjà la séquence entrelacée pour cette page (au
+      // plus un encart spécial reel_row/suggestions/communities, rotation
+      // décidée côté backend) — voir load('all') ci-dessus pour le détail.
+      const feedResult = await searchService.getFeed(nextPage, feedLimit).catch(() => ({ items: [] }));
       const feedRawItems = feedResult.items ?? [];
-      const reelRawItems = Array.isArray((reelsResult as any)?.items) ? (reelsResult as any).items : Array.isArray(reelsResult) ? reelsResult : [];
       feedHasMoreRef.current = feedRawItems.length >= feedLimit;
       // Le pool se retrie a chaque page (score = f(temps)) -- une page BRUTE non vide
       // peut ne contenir QUE des items deja vus sur une page precedente (recoupement),
       // sans que le catalogue soit pour autant epuise. Ne conclure a la fin du flux que
       // si le backend lui-meme ne renvoie plus rien, jamais seulement sur la dedup —
       // sinon le scroll s'arretait prematurement des la 1ere page entierement recoupee.
-      const rawIsEmpty = feedRawItems.length === 0 && reelRawItems.length === 0;
+      const rawIsEmpty = feedRawItems.length === 0;
 
-      const feedItems: FeedItem[] = feedRawItems
-        .filter((item: any) => (item.kind === 'event' || item.kind === 'concert' || item.kind === 'post') && item.id)
-        .map((item: any) => ({ kind: item.kind as 'event' | 'concert' | 'post', id: item.id, data: item }));
-      const reelItems: FeedItem[] = reelRawItems
-        .filter((r: any) => r?.id)
-        .map((r: any) => ({ kind: 'reel' as const, id: r.id, data: r }));
-
-      // Dédupliquer contre tout ce qui a déjà été affiché (page courante + précédentes)
-      const fresh = [...feedItems, ...reelItems].filter(item => {
-        const key = `${item.kind}-${item.id}`;
-        if (seenItemIdsRef.current.has(key)) return false;
-        seenItemIdsRef.current.add(key);
-        return true;
-      });
-
-      feedPageRef.current = nextPage;
-
-      if (fresh.length === 0) {
-        // Page entierement recoupee (deja vue) : le flux n'est fini que si le
-        // backend n'a lui-meme plus rien a offrir, sinon on avance juste la page
-        // (l'utilisateur re-declenchera le scroll naturellement pour la suivante).
-        if (rawIsEmpty) setHasMoreFeed(false);
-      } else {
-        // Regrouper les reels de cette page en une rangée, injectée après le 1er post/event
-        // de la page (même logique de position que load('all') : première rangée à i===2)
-        const freshReels   = fresh.filter(i => i.kind === 'reel');
-        const freshNonReel = fresh.filter(i => i.kind !== 'reel');
-        const reelRow: FeedItem | null = freshReels.length > 0
-          ? { kind: 'reel_row', id: `__reel_row__page_${nextPage}`, data: freshReels.map(r => r.data).filter(Boolean) }
-          : null;
-
-        // Continue l'espacement suggestions/communautés exactement là où la page
-        // précédente (load('all') ou loadMoreFeed) s'est arrêtée.
-        const appended: FeedItem[] = [];
-        let reelRowInserted = false;
-        const commData = trendingCommRef.current;
-        const adSlotIds: string[] = [];
-        freshNonReel.forEach((item, localI) => {
-          const i = nonReelCountRef.current + localI; // index continu depuis le tout début du flux
-          appended.push(item);
-
-          if (!reelRowInserted && reelRow) {
-            appended.push(reelRow);
-            reelRowInserted = true;
-          }
-
-          if (i === 4 || (i > 4 && (i - 4) % SUGGEST_EVERY === 0)) {
-            suggestCountRef.current += 1;
-            appended.push({ kind: 'suggestions', id: `__suggestions__${suggestCountRef.current}`, data: null });
-          }
-
-          if (i === AD_EVERY - 1 || (i > AD_EVERY - 1 && (i - (AD_EVERY - 1)) % AD_EVERY === 0)) {
+      const appended: FeedItem[] = [];
+      let freshNonSpecialCount = 0;
+      const adSlotIds: string[] = [];
+      for (const d of feedRawItems) {
+        if (!d || !d.id) continue;
+        if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
+          const key = `${d.kind}-${d.id}`;
+          if (seenItemIdsRef.current.has(key)) continue;
+          seenItemIdsRef.current.add(key);
+          appended.push({ kind: d.kind, id: d.id, data: d });
+          freshNonSpecialCount += 1;
+          if (freshNonSpecialCount > 0 && freshNonSpecialCount % AD_EVERY === 0) {
             const slotId = `__ad__slot_${adSlotIdxRef.current}`;
             adSlotIdxRef.current += 1;
             adSlotIds.push(slotId);
             appended.push({ kind: 'ad', id: slotId, data: null });
           }
+        } else if (d.kind === 'reel_row') {
+          appended.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
+        } else if (d.kind === 'suggestions') {
+          appended.push({ kind: 'suggestions', id: d.id, data: d.users ?? [] });
+        } else if (d.kind === 'communities') {
+          appended.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
+        }
+      }
 
-          if (commData.length > 0 && (i === 9 || (i > 9 && (i - 9) % COMM_EVERY === 0))) {
-            commCountRef.current += 1;
-            appended.push({ kind: 'communities', id: `__communities__${commCountRef.current}`, data: null });
-          }
-        });
-        // Si aucun post/event neuf mais des reels quand même, ajouter la rangée en fin
-        if (reelRow && !reelRowInserted) appended.push(reelRow);
+      feedPageRef.current = nextPage;
 
-        nonReelCountRef.current += freshNonReel.length;
+      if (appended.length === 0) {
+        // Page entierement recoupee (deja vue) : le flux n'est fini que si le
+        // backend n'a lui-meme plus rien a offrir, sinon on avance juste la page
+        // (l'utilisateur re-declenchera le scroll naturellement pour la suivante).
+        if (rawIsEmpty) setHasMoreFeed(false);
+      } else {
+        nonReelCountRef.current += freshNonSpecialCount;
         setItems(prev => [...prev, ...appended]);
         if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
       }
@@ -1936,31 +1691,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     if (!item) return null;
     if (item.kind === 'suggestions') {
-      const blockNum = parseInt(item.id.split('__suggestions__')[1] ?? '1', 10) || 1;
-      // Exclure les utilisateurs déjà suivis ou soi-même
-      const myId = currentUser?.id ? String(currentUser.id) : null;
-      const filteredUsers = sliceForBlock(blockNum).filter(u =>
-        !followingSet.has(String(u.id)) && String(u.id) !== myId
-      );
-      if (!suggestLoading && filteredUsers.length === 0) return null;
+      // Users déjà filtrés côté backend (exclut déjà-suivis et soi-même,
+      // voir UserService.suggest_users) — plus de pool local à trancher ici.
+      const users: UserPublic[] = item.data ?? [];
+      if (users.length === 0) return null;
       return (
         <PeopleSuggestions
-          users={filteredUsers}
-          loading={suggestLoading}
+          users={users}
+          loading={false}
           onUserPress={id => nav.navigate('UserProfile', { userId: id })}
-          onRefresh={loadSuggestions}
+          onRefresh={() => load(filter, false)}
         />
       );
     }
     if (item.kind === 'communities') {
-      // Calculé au rendu (pas figé à l'insertion) — se met à jour automatiquement quand
-      // fetchMoreCommunities enrichit le pool en arrière-plan (voir sliceForCommBlock).
-      const commBlockNum = parseInt(item.id.split('__communities__')[1] ?? '1', 10) || 1;
-      const allComms: CommunityData[] = sliceForCommBlock(commBlockNum);
-      const JOINED = new Set(['member', 'admin', 'moderator']);
-      const comms = allComms.filter(c =>
-        !myCommIdsRef.current.has(String(c.id)) && !JOINED.has(c.join_status as string)
-      );
+      // Communautés déjà filtrées côté backend (exclut celles déjà rejointes,
+      // voir CommunityService.discover) — plus de pool local à trancher ici.
+      const comms: CommunityData[] = item.data ?? [];
       if (!comms.length) return null;
       const gradFor = (_name: string): [string, string] =>
         [colors.primary, colors.primaryLight];
@@ -2109,7 +1856,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, sliceForBlock, sliceForCommBlock, suggestLoading, loadSuggestions]);
+  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
