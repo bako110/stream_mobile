@@ -32,7 +32,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { storage } from '../../utils/storage';
 import { showConfirm } from '../../services';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
@@ -47,7 +47,6 @@ import { saveService } from '../../services/saveService';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { communityService } from '../../services/communityService';
-import type { CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
 import { networkService } from '../../services/networkService';
@@ -69,7 +68,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 type FeedFilter = 'all' | 'following' | 'live';
 
 interface FeedItem {
-  kind:    'event' | 'concert' | 'reel' | 'reel_row' | 'post' | 'suggestions' | 'communities' | 'ad';
+  kind:    'event' | 'concert' | 'reel' | 'post' | 'ad';
   id:      string;
   data:    any;
 }
@@ -738,8 +737,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const loadingMoreRef   = useRef(false);
   const seenItemIdsRef   = useRef<Set<string>>(new Set());
   // Continuité de comptage entre page 1 (load) et pages suivantes (loadMoreFeed)
-  // — sert uniquement à espacer la pub côté client désormais (reel_row/
-  // suggestions/communities vient déjà entrelacé depuis le backend).
+  // — sert à espacer la pub côté client.
   const nonReelCountRef  = useRef(0);
   const feedListRef     = useRef<FlatList>(null);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
@@ -805,7 +803,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     itemVisiblePercentThreshold: 50,   // 50% de l'item visible suffit
     minimumViewTime: 200,              // évite les faux positifs au scroll rapide
   }).current;
-  const [activeReelRowId, setActiveReelRowId] = useState<string | null>(null);
   const [adVisible, setAdVisible] = useState(false);
   // Ref stable vers loadMoreFeed — onFeedViewableChanged est figé au montage (useRef().current,
   // imposé par onViewableItemsChanged qui n'accepte pas de callback changeant de référence),
@@ -813,10 +810,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // render selon ses dépendances). Synchronisée juste après la définition de loadMoreFeed.
   const loadMoreFeedRef = useRef<() => void>(() => {});
 
+  // Taille de page harmonisée avec le web (FeedPage.tsx, FEED_PAGE_SIZE) — même
+  // valeur partout, page 1 comprise, pour que la pagination web/mobile se
+  // comporte de façon identique et prévisible.
+  const FEED_PAGE_SIZE = 30;
+
   // Distance en nombre d'items restants à laquelle on déclenche le chargement de la page
-  // suivante — l'utilisateur ne doit jamais voir de spinner/attente en scrollant normalement,
-  // le contenu doit déjà être là bien avant qu'il n'atteigne la fin de ce qui est chargé.
-  const PREFETCH_ITEMS_REMAINING = 6;
+  // suivante — resserré pour laisser le temps de voir tout le contenu de la page courante
+  // avant que la suivante ne charge (avant : 6/30 ≈ 20% de la page, trop tôt).
+  const PREFETCH_ITEMS_REMAINING = 4;
   // Nombre d'items à l'avance dont on précharge l'image sur disque — évite l'écran noir/flash
   // au scroll rapide (CachedImage ne télécharge sinon qu'une fois le composant réellement monté).
   // Réduit hors wifi (data mobile facturée), même prudence que StoryBar/ConversationStoryBar.
@@ -843,14 +845,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         }
         return urls;
       }
-      case 'reel_row':
-        // Rangée entière, mais plafonnée : pas besoin de précharger les 10 reels d'une
-        // rangée avant qu'elle ne soit visible, seules les premières vignettes comptent.
-        return Array.isArray(item.data)
-          ? item.data.slice(0, 4).map((r: any) => r?.thumbnail_url).filter(Boolean)
-          : [];
       default:
-        return []; // suggestions/communities/ad : pas de prefetch via ce chemin générique
+        return []; // ad : pas de prefetch via ce chemin générique
     }
   };
 
@@ -888,10 +884,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     setActiveReelId(null);
-
-    // Activer la rangée de reels visible (1 seule à la fois)
-    const reelRowItem = viewableItems.find(v => v.item?.kind === 'reel_row');
-    setActiveReelRowId(reelRowItem ? reelRowItem.item.id : null);
 
     // Pub vidéo : ne joue que quand réellement visible à l'écran (coupe le stream sinon)
     setAdVisible(viewableItems.some(v => v.item?.kind === 'ad'));
@@ -1057,8 +1049,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // ── Suggestions intelligentes : contacts + localisation ──────────────────────
   // Hash SHA-256 des contacts avant l'envoi (jamais de numéro/email en clair côté
   // serveur), et position GPS ponctuelle — influencent le classement calculé par
-  // UserService.suggest_users côté backend (voir bloc "suggestions" désormais
-  // fourni déjà entrelacé par /search/feed, plus de pool d'affichage local ici).
+  // UserService.suggest_users côté backend.
   const CONTACTS_PROMPT_SEEN_KEY = 'suggestions_contacts_prompt_seen';
 
   const syncContactsForSuggestions = useCallback(async () => {
@@ -1206,9 +1197,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     }
   }, [followingSet, currentUser]);
 
-  // Espacement d'injection de la pub — seule à rester gérée côté client (le
-  // reel_row/suggestions/communities vient désormais déjà entrelacé depuis
-  // /search/feed, rotation stricte page%3 côté backend, voir FeedService.get_feed).
+  // Espacement d'injection de la pub, gérée côté client.
   const AD_EVERY       = 8;
   const adSlotIdxRef  = useRef(0); // continue la numérotation des slots pub entre pages
 
@@ -1238,23 +1227,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           seenAdIdsRef.current = [];
           feedHasMoreRef.current = true;
         }
-        // Charge moins en 4G/5G (hors wifi) pour limiter la conso data au premier écran
-        const onWifi = networkService.isWifi();
-        const feedLimit  = onWifi ? 30 : 15;
-
-        // /search/feed renvoie désormais directement la séquence entrelacée :
-        // events/concerts/posts triés par score, avec au plus UN encart spécial
-        // par page (reel_row, suggestions ou communities — rotation stricte
-        // page%3 décidée côté backend, cf. FeedService.get_feed côté serveur).
-        // Le mobile n'a plus qu'à mapper kind -> FeedItem et injecter la pub à
-        // part — plus de shuffle, plus de pool suggestions/communautés local,
-        // plus de calcul d'intervalles pouvant se chevaucher ou s'empiler.
+        // /search/feed renvoie events/concerts/posts triés par score. Le mobile
+        // mappe kind -> FeedItem et injecte la pub à part.
         const [feedResult, liveConcerts, spontLivesResult] = await Promise.all([
-          searchService.getFeed(1, feedLimit).catch(() => ({ items: [] })),
+          searchService.getFeed(1, FEED_PAGE_SIZE).catch(() => ({ items: [] })),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
         ]);
-        feedHasMoreRef.current = (feedResult.items ?? []).length >= feedLimit;
+        feedHasMoreRef.current = (feedResult.items ?? []).length >= FEED_PAGE_SIZE;
         setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
         setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
 
@@ -1277,12 +1257,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               adSlotIds.push(slotId);
               result.push({ kind: 'ad', id: slotId, data: null });
             }
-          } else if (d.kind === 'reel_row') {
-            result.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
-          } else if (d.kind === 'suggestions') {
-            result.push({ kind: 'suggestions', id: d.id, data: d.users ?? [] });
-          } else if (d.kind === 'communities') {
-            result.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
           }
         }
         // Filtrer les contenus masqués ("Pas intéressé") — après mapping, pour
@@ -1399,15 +1373,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
     try {
       const nextPage = feedPageRef.current + 1;
-      const onWifi = networkService.isWifi();
-      const feedLimit  = onWifi ? 30 : 15;
-
-      // /search/feed renvoie déjà la séquence entrelacée pour cette page (au
-      // plus un encart spécial reel_row/suggestions/communities, rotation
-      // décidée côté backend) — voir load('all') ci-dessus pour le détail.
-      const feedResult = await searchService.getFeed(nextPage, feedLimit).catch(() => ({ items: [] }));
+      const feedResult = await searchService.getFeed(nextPage, FEED_PAGE_SIZE).catch(() => ({ items: [] }));
       const feedRawItems = feedResult.items ?? [];
-      feedHasMoreRef.current = feedRawItems.length >= feedLimit;
+      feedHasMoreRef.current = feedRawItems.length >= FEED_PAGE_SIZE;
       // Le pool se retrie a chaque page (score = f(temps)) -- une page BRUTE non vide
       // peut ne contenir QUE des items deja vus sur une page precedente (recoupement),
       // sans que le catalogue soit pour autant epuise. Ne conclure a la fin du flux que
@@ -1432,12 +1400,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             adSlotIds.push(slotId);
             appended.push({ kind: 'ad', id: slotId, data: null });
           }
-        } else if (d.kind === 'reel_row') {
-          appended.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
-        } else if (d.kind === 'suggestions') {
-          appended.push({ kind: 'suggestions', id: d.id, data: d.users ?? [] });
-        } else if (d.kind === 'communities') {
-          appended.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
         }
       }
 
@@ -1690,101 +1652,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     if (!item) return null;
-    if (item.kind === 'suggestions') {
-      // Users déjà filtrés côté backend (exclut déjà-suivis et soi-même,
-      // voir UserService.suggest_users) — plus de pool local à trancher ici.
-      const users: UserPublic[] = item.data ?? [];
-      if (users.length === 0) return null;
-      return (
-        <PeopleSuggestions
-          users={users}
-          loading={false}
-          onUserPress={id => nav.navigate('UserProfile', { userId: id })}
-          onRefresh={() => load(filter, false)}
-        />
-      );
-    }
-    if (item.kind === 'communities') {
-      // Communautés déjà filtrées côté backend (exclut celles déjà rejointes,
-      // voir CommunityService.discover) — plus de pool local à trancher ici.
-      const comms: CommunityData[] = item.data ?? [];
-      if (!comms.length) return null;
-      const gradFor = (_name: string): [string, string] =>
-        [colors.primary, colors.primaryLight];
-      const fmtM = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-      // Mêmes dimensions que PeopleSuggestions
-      const SW       = Dimensions.get('window').width;
-      const CARD_W   = SW * 0.45;
-      const COVER_H  = CARD_W * 0.5;
-      const AVT_SZ   = CARD_W * 0.4;
-      return (
-        <View style={[cs.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
-          {/* Header identique aux suggestions */}
-          <View style={cs.header}>
-            <View>
-              <Text style={[cs.title, { color: colors.textPrimary }]}>Ta tribu t'attend 🤝</Text>
-              <Text style={[cs.subtitle, { color: colors.textTertiary }]}>Des espaces faits pour toi, rejoins-les</Text>
-            </View>
-            <TouchableOpacity onPress={() => nav.navigate('Communities' as any)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={[cs.seeAll, { color: colors.primary }]}>Explorer</Text>
-            </TouchableOpacity>
-          </View>
-          {/* Scroll horizontal identique */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={cs.list}>
-            {comms.map(comm => {
-              const grad    = gradFor(comm.name);
-              const initial = (comm.name || '?')[0].toUpperCase();
-              return (
-                <TouchableOpacity
-                  key={comm.id}
-                  style={[cs.card, { width: CARD_W, backgroundColor: colors.surface, borderColor: colors.divider }]}
-                  activeOpacity={0.88}
-                  onPress={() => nav.navigate('CommunityDetail' as any, { communityId: comm.id })}
-                >
-                  {/* Cover — bannière ou gradient */}
-                  {comm.banner_url
-                    ? <CachedImage uri={comm.banner_url} style={[cs.cover, { height: COVER_H }]} resizeMode="cover" />
-                    : <LinearGradient colors={grad} style={[cs.cover, { height: COVER_H }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
-                  }
-                  {/* Badges privé / vérifié */}
-                  <View style={{ position: 'absolute', top: 8, right: 8, flexDirection: 'row', gap: 4 }}>
-                    {comm.is_private  && <View style={cs.badge}><Icon name="lock"  size={9}  color="#fff" /></View>}
-                    {comm.is_verified && <View style={[cs.badge, { backgroundColor: '#1D9BF0' }]}><Icon name="check" size={10} color="#fff" /></View>}
-                  </View>
-                  {/* Avatar chevauchant — même style que PeopleSuggestions */}
-                  <View style={[cs.avatarWrap, { width: AVT_SZ + 4, height: AVT_SZ + 4, borderRadius: (AVT_SZ + 4) / 2, borderColor: colors.background, marginTop: -(AVT_SZ / 2) }]}>
-                    {comm.avatar_url
-                      ? <CachedImage uri={comm.avatar_url} style={{ width: AVT_SZ, height: AVT_SZ, borderRadius: AVT_SZ / 2 }} />
-                      : <LinearGradient colors={grad} style={{ width: AVT_SZ, height: AVT_SZ, borderRadius: AVT_SZ / 2, alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: '#fff', fontWeight: '800', fontSize: AVT_SZ * 0.38 }}>{initial}</Text>
-                        </LinearGradient>
-                    }
-                  </View>
-                  {/* Body */}
-                  <View style={[cs.cardBody, { paddingTop: AVT_SZ / 2 + 8 }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                      <Text style={[cs.name, { color: colors.textPrimary }]} numberOfLines={1}>{comm.name}</Text>
-                    </View>
-                    <Text style={[cs.handle, { color: colors.textTertiary }]} numberOfLines={1}>
-                      <Icon name="users" size={10} color={colors.textTertiary} /> {fmtM(comm.members_count ?? 0)} membres
-                    </Text>
-                    {/* Bouton rejoindre — même style que Suivre */}
-                    <TouchableOpacity
-                      style={[cs.joinBtn, { backgroundColor: colors.primary }]}
-                      activeOpacity={0.8}
-                      onPress={() => nav.navigate('CommunityDetail' as any, { communityId: comm.id })}
-                    >
-                      <Icon name="users" size={14} color="#fff" />
-                      <Text style={cs.joinText}>Nous rejoindre</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      );
-    }
     if (item.kind === 'ad') {
       // item.id est le slotId (__ad__slot_N) — résolu vers la campagne qui lui a été
       // attribuée par assignAdsToSlots. Reste null tant que le tirage n'a pas répondu.
@@ -1799,17 +1666,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           onImpression={handleAdImpression}
           onPress={handleAdPress}
           onOpenFullscreen={setFullscreenAd}
-        />
-      );
-    }
-    if (item.kind === 'reel_row') {
-      return (
-        <ReelRowCard
-          reels={item.data}
-          colors={colors}
-          feedFocused={feedFocused}
-          isVisible={activeReelRowId === item.id && feedFocused}
-          onPressReel={(reelId, reelData) => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: reelId, initialReel: reelData } })}
         />
       );
     }
@@ -2665,7 +2521,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           onScroll={handleFeedScroll}
           scrollEventThrottle={100}
           onEndReached={loadMoreFeed}
-          onEndReachedThreshold={0.6}
+          onEndReachedThreshold={0.25}
           updateCellsBatchingPeriod={50}
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
@@ -2748,453 +2604,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     </View>
   );
 };
-
-// ── MiniReelPlayer — mini carte reel, image statique uniquement ──────────────
-// Pas de chargement/lecture vidéo tant que l'utilisateur n'a pas cliqué : seule
-// la miniature (thumbnail) s'affiche. La vidéo ne charge qu'à l'ouverture du
-// reel en plein écran (onPress → navigation), jamais en arrière-plan dans le feed.
-
-const MiniReelPlayer: React.FC<{
-  reel: any; w: number; h: number;
-  isActive: boolean; feedFocused: boolean; onPress: () => void;
-}> = React.memo(({ reel, w, h, onPress }) => {
-  const videoUri = reel.hls_url ?? null;
-  const author   = reel.author;
-  const name     = author?.display_name ?? author?.username ?? '';
-  const initials = name[0]?.toUpperCase() ?? '?';
-
-  return (
-    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[rrS.thumb, { width: w, height: h }]}>
-      {reel.thumbnail_url ? (
-        <CachedImage uri={reel.thumbnail_url} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} resizeMode="cover" />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: 14 }]}>
-          <Icon name="film" size={28} color="rgba(255,255,255,0.18)" />
-        </View>
-      )}
-      {videoUri && (
-        <View pointerEvents="none" style={rrS.playBadgeMini}>
-          <Icon name="play" size={16} color="#fff" />
-        </View>
-      )}
-
-      {/* Overlay filtre */}
-      {(() => {
-        const fKey = reel.filter_name as FilterKey | undefined;
-        const fDef = fKey ? FILTERS.find(f => f.key === fKey) : null;
-        const fOp  = fKey ? (FILTER_VIDEO_OPACITY[fKey] ?? 0) : 0;
-        const fOp2 = fKey ? (FILTER_VIDEO_OPACITY2[fKey] ?? 0) : 0;
-        if (!fDef || fOp === 0) return null;
-        return (
-          <>
-            <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 14, backgroundColor: fDef.overlay, opacity: fOp }]} />
-            {(fDef as any).overlay2 && fOp2 > 0 && (
-              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 14, backgroundColor: (fDef as any).overlay2, opacity: fOp2 }]} />
-            )}
-          </>
-        );
-      })()}
-
-      {/* Text layers miniature */}
-      {reel.text_layers && (() => {
-        try {
-          const ls = JSON.parse(reel.text_layers);
-          return ls.slice(0, 2).map((l: any) => (
-            <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: (l.x / 390) * w, top: (l.y / 844) * h, zIndex: 2 }}>
-              <Text style={{ color: l.color, fontSize: Math.max(6, Math.round(l.fontSize * (w / 390))), fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>{l.text}</Text>
-            </View>
-          ));
-        } catch { return null; }
-      })()}
-
-      <LinearGradient colors={['transparent', 'transparent', 'rgba(0,0,0,0.8)']} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} />
-
-      {/* Infos bas */}
-      <View style={rrS.thumbBottom}>
-        <View style={rrS.thumbAuthor}>
-          {author?.avatar_url ? (
-            <CachedImage uri={author.avatar_url} style={rrS.thumbAvatar} />
-          ) : (
-            <View style={[rrS.thumbAvatar, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{initials}</Text>
-            </View>
-          )}
-          <Text style={rrS.thumbName} numberOfLines={1}>{name}</Text>
-        </View>
-        <View style={rrS.thumbStats}>
-          <View style={rrS.statChip}>
-            <Icon name="eye" size={10} color="rgba(255,255,255,0.85)" />
-            <Text style={rrS.thumbStatTxt}>{(reel.view_count ?? 0).toLocaleString()}</Text>
-          </View>
-          {(reel.like_count ?? 0) > 0 && (
-            <View style={rrS.statChip}>
-              <MCIcon name="heart" size={11} color="rgba(255,255,255,0.85)" />
-              <Text style={rrS.thumbStatTxt}>{reel.like_count}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-// ── MiniReelRow — FlatList horizontale avec viewability tracking ──────────────
-
-const MiniReelRow: React.FC<{
-  reels: any[]; itemW: number; itemH: number;
-  feedFocused: boolean; isVisible: boolean;
-  onPressReel: (id: string, data: any) => void;
-}> = React.memo(({ reels, itemW, itemH, feedFocused, isVisible, onPressReel }) => {
-  // Initialise directement sur le premier reel — pas besoin d'attendre
-  const [activeId, setActiveId] = useState<string | null>(() => reels[0]?.id ?? null);
-
-  // Stoppe quand la rangée quitte l'écran, reprend sur le premier quand elle revient
-  const isVisibleRef  = useRef(isVisible);
-  const feedFocusedRef= useRef(feedFocused);
-  useEffect(() => { isVisibleRef.current   = isVisible;   }, [isVisible]);
-  useEffect(() => { feedFocusedRef.current = feedFocused; }, [feedFocused]);
-
-  useEffect(() => {
-    if (!isVisible || !feedFocused) {
-      setActiveId(null);
-    } else {
-      // Réactiver le premier si rien n'est actif
-      setActiveId(prev => prev ?? reels[0]?.id ?? null);
-    }
-  }, [isVisible, feedFocused]);
-
-  // viewabilityConfig stable (useRef) — RN exige que cette valeur ne change pas
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-    waitForInteraction: false,
-    minimumViewTime: 100,
-  }).current;
-
-  // onViewableItemsChanged stable (useRef) — obligatoire pour RN FlatList
-  // Si on passe une nouvelle référence, RN ignore les changements silencieusement
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: any }> }) => {
-      if (!isVisibleRef.current || !feedFocusedRef.current) return;
-      if (viewableItems.length === 0) return;
-      // Le premier item visible est le plus centré (scroll horizontal)
-      setActiveId(viewableItems[0].item.id);
-    }
-  ).current;
-
-  return (
-    <FlatList
-      data={reels}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyExtractor={r => r.id}
-      contentContainerStyle={rrS.miniList}
-      ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-      viewabilityConfig={viewabilityConfig}
-      onViewableItemsChanged={onViewableItemsChanged}
-      renderItem={({ item }) => (
-        <MiniReelPlayer
-          reel={item}
-          w={itemW}
-          h={itemH}
-          isActive={activeId === item.id && isVisible && feedFocused}
-          feedFocused={feedFocused}
-          onPress={() => onPressReel(item.id, item)}
-        />
-      )}
-    />
-  );
-});
-
-// ── HeroReelPlayer — hero reel avec autoplay muet style Instagram ────────────
-
-const HeroReelPlayer: React.FC<{
-  reel: any;
-  w: number;
-  h: number;
-  isVisible: boolean;
-  onPress: () => void;
-}> = React.memo(({ reel, w, h, onPress }) => {
-  // Pas de lecteur vidéo ici — image statique uniquement, la vidéo ne charge
-  // qu'à l'ouverture du reel en plein écran (onPress).
-  const videoUri = reel.hls_url ?? null;
-  const author   = reel.author;
-  const name     = author?.display_name ?? author?.username ?? '';
-  const initials = name[0]?.toUpperCase() ?? '?';
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.92}
-      onPress={onPress}
-      style={[rrS.thumb, { width: w, height: h }]}
-    >
-      {reel.thumbnail_url ? (
-        <CachedImage uri={reel.thumbnail_url} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="cover" />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: 18 }]}>
-          <Icon name="film" size={48} color="rgba(255,255,255,0.18)" />
-        </View>
-      )}
-
-      {/* Dégradé bas */}
-      <LinearGradient
-        colors={['transparent', 'transparent', 'rgba(0,0,0,0.85)']}
-        style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
-      />
-
-      {/* Badge lecture centré */}
-      {videoUri && (
-        <View pointerEvents="none" style={rrS.playBtn}>
-          <View style={[rrS.playCircle, rrS.playCircleLarge]}>
-            <Icon name="play" size={22} color="#fff" />
-          </View>
-        </View>
-      )}
-
-      {/* Durée */}
-      {reel.duration_sec ? (
-        <View style={rrS.durationBadge}>
-          <Text style={rrS.durationTxt}>{reel.duration_sec}s</Text>
-        </View>
-      ) : null}
-
-      {/* Infos bas */}
-      <View style={rrS.thumbBottom}>
-        <View style={rrS.thumbAuthor}>
-          {author?.avatar_url ? (
-            <CachedImage uri={author.avatar_url} style={[rrS.thumbAvatar, rrS.thumbAvatarLarge]} />
-          ) : (
-            <View style={[rrS.thumbAvatar, rrS.thumbAvatarLarge, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{initials}</Text>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={[rrS.thumbName, { fontSize: 14 }]} numberOfLines={1}>{name}</Text>
-          </View>
-        </View>
-        {reel.caption ? (
-          <Text style={rrS.heroCaption} numberOfLines={2}>{reel.caption}</Text>
-        ) : null}
-        <View style={rrS.thumbStats}>
-          <View style={rrS.statChip}>
-            <Icon name="eye" size={12} color="rgba(255,255,255,0.85)" />
-            <Text style={[rrS.thumbStatTxt, { fontSize: 12 }]}>{(reel.view_count ?? 0).toLocaleString()}</Text>
-          </View>
-          {(reel.like_count ?? 0) > 0 && (
-            <View style={rrS.statChip}>
-              <MCIcon name="heart" size={13} color="rgba(255,255,255,0.85)" />
-              <Text style={[rrS.thumbStatTxt, { fontSize: 12 }]}>{reel.like_count}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-// ── ReelRowCard — rangée horizontale de reels (style Facebook) ───────────────
-
-const ReelRowCard: React.FC<{
-  reels: any[];
-  colors: AppColors;
-  feedFocused: boolean;
-  isVisible: boolean;
-  onPressReel: (reelId: string, reelData: any) => void;
-}> = React.memo(({ reels, colors, feedFocused, isVisible, onPressReel }) => {
-  const { width: SW, height: SH } = Dimensions.get('window');
-  const HERO_W  = SW - 24;
-  const HERO_H  = Math.round(SH * 0.50);
-  const MINI_W  = Math.round(SW * 0.48);
-  const MINI_H  = Math.round(MINI_W * 1.7);
-
-  const hero  = reels[0];
-  const rest  = reels.slice(1);
-
-  const timeAgo = (iso: string) => {
-    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (diff < 3600)  return `${Math.floor(diff / 60)} min`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
-    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-  };
-
-  const ReelThumb = ({ reel, w, h, large = false }: { reel: any; w: number; h: number; large?: boolean }) => {
-    const author   = reel.author;
-    const name     = author?.display_name ?? author?.username ?? '';
-    const initials = (name || '?')[0].toUpperCase();
-    const br = large ? 18 : 14;
-    const fKey  = reel.filter_name as FilterKey | undefined;
-    const fDef  = fKey ? FILTERS.find(f => f.key === fKey) : null;
-    const fOp   = fKey ? (FILTER_VIDEO_OPACITY[fKey] ?? 0) : 0;
-    const fOp2  = fKey ? (FILTER_VIDEO_OPACITY2[fKey] ?? 0) : 0;
-    let txtLayers: any[] = [];
-    try { if (reel.text_layers) txtLayers = JSON.parse(reel.text_layers); } catch {}
-    return (
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onPress={() => reel?.id && onPressReel(reel.id, reel)}
-        style={[rrS.thumb, { width: w, height: h }]}
-      >
-        {reel.thumbnail_url ? (
-          <CachedImage uri={reel.thumbnail_url} style={[StyleSheet.absoluteFill, { borderRadius: br }]} resizeMode="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, rrS.thumbPlaceholder, { borderRadius: br }]}>
-            <Icon name="film" size={large ? 48 : 28} color="rgba(255,255,255,0.18)" />
-          </View>
-        )}
-
-        {/* Overlay filtre */}
-        {fDef && fOp > 0 && (
-          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: br, backgroundColor: fDef.overlay, opacity: fOp }]} />
-        )}
-        {fDef && (fDef as any).overlay2 && fOp2 > 0 && (
-          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: br, backgroundColor: (fDef as any).overlay2, opacity: fOp2 }]} />
-        )}
-
-        {/* Text layers miniature */}
-        {txtLayers.slice(0, 2).map((l: any) => (
-          <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: (l.x / 390) * w, top: (l.y / 844) * h, zIndex: 2 }}>
-            <Text style={{ color: l.color, fontSize: Math.max(6, Math.round(l.fontSize * (w / 390))), fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>{l.text}</Text>
-          </View>
-        ))}
-
-        {/* Dégradé bas */}
-        <LinearGradient
-          colors={['transparent', 'transparent', 'rgba(0,0,0,0.85)']}
-          style={[StyleSheet.absoluteFill, { borderRadius: large ? 18 : 14 }]}
-        />
-
-
-        {/* Durée coin haut droit */}
-        {reel.duration_sec ? (
-          <View style={rrS.durationBadge}>
-            <Text style={rrS.durationTxt}>{reel.duration_sec}s</Text>
-          </View>
-        ) : null}
-
-        {/* Bouton play centre */}
-        <View style={rrS.playBtn} pointerEvents="none">
-          <View style={[rrS.playCircle, large && rrS.playCircleLarge]}>
-            <Icon name="play" size={large ? 28 : 16} color="#fff" />
-          </View>
-        </View>
-
-        {/* Infos bas */}
-        <View style={rrS.thumbBottom}>
-          <View style={rrS.thumbAuthor}>
-            {author?.avatar_url ? (
-              <CachedImage uri={author.avatar_url} style={[rrS.thumbAvatar, large && rrS.thumbAvatarLarge]} />
-            ) : (
-              <View style={[rrS.thumbAvatar, large && rrS.thumbAvatarLarge, { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ color: '#fff', fontSize: large ? 12 : 9, fontWeight: '800' }}>{initials}</Text>
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={[rrS.thumbName, large && { fontSize: 14 }]} numberOfLines={1}>{name}</Text>
-              {reel.created_at ? <Text style={rrS.thumbTime}>{timeAgo(reel.created_at)}</Text> : null}
-            </View>
-          </View>
-          {large && reel.caption ? (
-            <Text style={rrS.heroCaption} numberOfLines={2}>{reel.caption}</Text>
-          ) : null}
-          <View style={rrS.thumbStats}>
-            <View style={rrS.statChip}>
-              <Icon name="eye" size={large ? 12 : 10} color="rgba(255,255,255,0.85)" />
-              <Text style={[rrS.thumbStatTxt, large && { fontSize: 12 }]}>{(reel.view_count ?? 0).toLocaleString()}</Text>
-            </View>
-            {(reel.like_count ?? 0) > 0 && (
-              <View style={rrS.statChip}>
-                <MCIcon name="heart" size={large ? 13 : 11} color="rgba(255,255,255,0.85)" />
-                <Text style={[rrS.thumbStatTxt, large && { fontSize: 12 }]}>{reel.like_count}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <View style={[rrS.wrap, { backgroundColor: colors.surface }]}>
-      {/* En-tête */}
-      <View style={rrS.header}>
-        <View style={rrS.headerIcon}>
-          <Icon name="play-circle" size={18} color="#fff" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[rrS.title, { color: colors.textPrimary }]}>Reels pour toi</Text>
-          <Text style={[rrS.subtitle, { color: colors.textSecondary }]}>{reels.length} nouvelle{reels.length > 1 ? 's' : ''} vidéo{reels.length > 1 ? 's' : ''}</Text>
-        </View>
-        <TouchableOpacity style={[rrS.seeAllBtn, { borderColor: colors.primary + '55' }]} onPress={() => { if (reels[0]) onPressReel(reels[0].id, reels[0]); }}>
-          <Text style={[rrS.seeAllTxt, { color: colors.primary }]}>Voir tout</Text>
-          <Icon name="chevron-right" size={14} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Grande carte hero — autoplay muet style Instagram */}
-      {hero ? (
-        <View style={{ paddingHorizontal: 12, marginBottom: rest.length > 0 ? 12 : 0 }}>
-          <HeroReelPlayer
-            reel={hero}
-            w={HERO_W}
-            h={HERO_H}
-            isVisible={isVisible}
-            onPress={() => onPressReel(hero.id, hero)}
-          />
-        </View>
-      ) : null}
-
-      {/* Rangée secondaire scrollable — autoplay au scroll */}
-      {rest.length > 0 ? (
-        <MiniReelRow
-          reels={rest}
-          itemW={MINI_W}
-          itemH={MINI_H}
-          feedFocused={feedFocused}
-          isVisible={isVisible}
-          onPressReel={onPressReel}
-        />
-      ) : null}
-    </View>
-  );
-});
-
-const rrS = StyleSheet.create({
-  wrap:             { marginBottom: 10, paddingTop: 16, paddingBottom: 16, overflow: 'hidden' },
-  header:           { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginBottom: 14 },
-  headerIcon:       { width: 36, height: 36, borderRadius: 18, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  title:            { fontSize: 16, fontWeight: '800', lineHeight: 20 },
-  subtitle:         { fontSize: 12, marginTop: 1 },
-  seeAllBtn:        { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5 },
-  seeAllTxt:        { fontSize: 13, fontWeight: '700' },
-  miniList:         { paddingHorizontal: 16 },
-
-  thumb:            { borderRadius: 14, overflow: 'hidden', backgroundColor: '#111' },
-  thumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
-
-  reelBadge:        { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#7B3FF2D9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  reelBadgeTxt:     { color: '#fff', fontWeight: '800', letterSpacing: 0.5 },
-
-  muteBtn:          { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  muteBtnMini:      { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  playBadgeMini:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  durationBadge:    { position: 'absolute', top: 52, right: 10, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
-  durationTxt:      { color: '#fff', fontSize: 10, fontWeight: '700' },
-
-  playBtn:          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  playBtnLarge:     {},
-  playCircle:       { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', alignItems: 'center', justifyContent: 'center', paddingLeft: 3 },
-  playCircleLarge:  { width: 64, height: 64, borderRadius: 32 },
-
-  thumbBottom:      { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, gap: 6 },
-  thumbAuthor:      { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  thumbAvatar:      { width: 24, height: 24, borderRadius: 12, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' },
-  thumbAvatarLarge: { width: 34, height: 34, borderRadius: 17 },
-  thumbName:        { color: '#fff', fontSize: 12, fontWeight: '700' },
-  thumbTime:        { color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 1 },
-  heroCaption:      { color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 18 },
-  thumbStats:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statChip:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  thumbStatTxt:     { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '600' },
-});
 
 // ── ReelFeedCard — carte reel style Facebook dans le feed ────────────────────
 
@@ -3367,25 +2776,6 @@ const ReelFeedCard: React.FC<{
       </View>
     </TouchableOpacity>
   );
-});
-
-// ── Styles Communities — miroir exact de PeopleSuggestions ───────────────────
-const cs = StyleSheet.create({
-  wrap:      { paddingVertical: 14, marginBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
-  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
-  title:     { fontSize: 16, fontWeight: '800' },
-  subtitle:  { fontSize: 11, marginTop: 2 },
-  seeAll:    { fontSize: 13, fontWeight: '700' },
-  list:      { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
-  card:      { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  cover:     { width: '100%' },
-  badge:     { width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
-  avatarWrap:{ borderWidth: 3, overflow: 'hidden', alignSelf: 'center' },
-  cardBody:  { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, gap: 4 },
-  name:      { fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  handle:    { fontSize: 11, textAlign: 'center' },
-  joinBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, borderRadius: 8, paddingVertical: 10, width: '100%' },
-  joinText:  { fontSize: 14, fontWeight: '700', color: '#fff' },
 });
 
 const rs = StyleSheet.create({
