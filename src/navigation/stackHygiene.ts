@@ -92,5 +92,13 @@ export function capStackDepth() {
  */
 export function popToTabRoot() {
   if (!navigationRef.isReady()) return;
+  const state = navigationRef.getRootState();
+  // StackActions.popToTop() n'est traitée que par un stack navigator avec
+  // plus d'une route accumulée — si l'utilisateur est déjà sur Tabs seul
+  // (rien empilé au-dessus), la dispatcher quand même remonte l'action
+  // jusqu'au Tab.Navigator focalisé, qui ne sait pas la gérer ("The action
+  // 'POP_TO_TOP' was not handled by any navigator"). Rien à faire dans ce
+  // cas : on est déjà à la racine du stack.
+  if (!state || state.routes.length <= 1) return;
   navigationRef.dispatch(StackActions.popToTop());
 }
