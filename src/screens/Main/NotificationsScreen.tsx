@@ -231,6 +231,7 @@ export const NotificationsScreen: React.FC = () => {
     else if (item.ref_type === 'event')      nav.navigate('EventDetail',     { eventId:       item.ref_id });
     else if (item.ref_type === 'reel')       nav.navigate('Tabs', { screen: 'Reels', params: { initialReelId: item.ref_id } });
     else if (item.ref_type === 'post')       nav.navigate('PostDetail',      { postId:        item.ref_id });
+    else if (item.ref_type === 'live')       nav.navigate('SimpleLiveViewer', { liveId:       item.ref_id });
     else if (item.ref_type === 'story' && item.actor?.id) { nav.navigate('UserProfile', { userId: item.actor.id }); removeItem(item.id); }
     else if (item.ref_type === 'user')       { nav.navigate('UserProfile',   { userId:        item.ref_id }); removeItem(item.id); }
     else if (item.ref_type === 'community')  nav.navigate('CommunityDetail', { communityId:   item.ref_id });
