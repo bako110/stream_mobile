@@ -816,9 +816,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const FEED_PAGE_SIZE = 30;
 
   // Distance en nombre d'items restants à laquelle on déclenche le chargement de la page
-  // suivante — resserré pour laisser le temps de voir tout le contenu de la page courante
-  // avant que la suivante ne charge (avant : 6/30 ≈ 20% de la page, trop tôt).
-  const PREFETCH_ITEMS_REMAINING = 4;
+  // suivante — volontairement très proche de la fin réelle (2/30 ≈ 7% de la page) : la
+  // page suivante ne doit démarrer qu'une fois la page courante quasiment entièrement vue,
+  // jamais tôt dans le scroll. Le petit prefetch résiduel (2 items, pas 0) évite juste le
+  // spinner visible le temps du aller-retour réseau — pas une anticipation large.
+  const PREFETCH_ITEMS_REMAINING = 2;
   // Nombre d'items à l'avance dont on précharge l'image sur disque — évite l'écran noir/flash
   // au scroll rapide (CachedImage ne télécharge sinon qu'une fois le composant réellement monté).
   // Réduit hors wifi (data mobile facturée), même prudence que StoryBar/ConversationStoryBar.
@@ -2521,7 +2523,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           onScroll={handleFeedScroll}
           scrollEventThrottle={100}
           onEndReached={loadMoreFeed}
-          onEndReachedThreshold={0.25}
+          onEndReachedThreshold={0.1}
           updateCellsBatchingPeriod={50}
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
