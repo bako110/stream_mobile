@@ -3,7 +3,7 @@
  * Supporte : texte, vocal, image, vidéo, fichiers, appels
  */
 import React, {
-  useState, useCallback, useEffect, useRef,
+  useState, useCallback, useEffect, useRef, useMemo,
 } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
@@ -31,7 +31,7 @@ import { backgroundUploadService } from '../../services/backgroundUploadService'
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { useWs } from '../../context/WebSocketContext';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
-import { AvatarWithBadge, GoFolyXLoader } from '../../components/common';
+import { AvatarWithBadge, GofolyxLoader } from '../../components/common';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { ConversationSummary, ConversationRequestStatus } from '../../services/messageService';
@@ -386,9 +386,24 @@ export const ChatScreen: React.FC = () => {
     loadMessages(next);
   };
 
+  // Suggestions de premier message — uniquement sur une conversation encore
+  // vide, pour donner un point de départ (comme les "quick replies" de
+  // Messenger/WhatsApp Business). Prénom seul (avant premier espace) pour
+  // rester naturel même avec un nom complet.
+  const firstName = partnerName?.split(' ')[0] ?? partnerName;
+  const quickReplies = useMemo(() => [
+    `Salut ${firstName} 👋`,
+    `Bonjour ${firstName}, ça va ?`,
+    `Hey, comment tu vas ?`,
+    `Salut ! Quoi de neuf ?`,
+  ], [firstName]);
+
   // ── Send text message ─────────────────────────────────────────────────────
-  const send = async () => {
-    const content = text.trim();
+  // `override` permet d'envoyer un texte qui n'est pas encore passé par le
+  // state `text` (ex: puce de message suggéré tapée directement) sans
+  // dépendre du timing asynchrone de setState.
+  const send = async (override?: string) => {
+    const content = (override ?? text).trim();
     if (!content || sending) return;
     setText('');
     Keyboard.dismiss();
@@ -1184,7 +1199,7 @@ export const ChatScreen: React.FC = () => {
                 <Text style={[styles.shareCardAuthor, { color: subtextColor }]} numberOfLines={1}>{meta.author_name}</Text>
               ) : null}
               <Text style={[styles.shareCardTitle, { color: textColor }]} numberOfLines={2}>
-                {meta.title ?? 'Contenu GoFolyX'}
+                {meta.title ?? 'Contenu Gofolyx'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -1511,7 +1526,7 @@ export const ChatScreen: React.FC = () => {
 
       {/* Messages */}
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : (
         <FlatList
           ref={listRef}
@@ -1526,6 +1541,21 @@ export const ChatScreen: React.FC = () => {
             <View style={styles.center}>
               <Icon name="message-circle" size={44} color={colors.textTertiary} />
               <Text style={{ color: colors.textTertiary, marginTop: 10 }}>Démarrez la conversation</Text>
+              <View style={styles.quickReplies}>
+                {quickReplies.map(msg => (
+                  <TouchableOpacity
+                    key={msg}
+                    style={[styles.quickReplyChip, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    activeOpacity={0.7}
+                    disabled={sending}
+                    onPress={() => send(msg)}
+                  >
+                    <Text style={[styles.quickReplyText, { color: colors.textPrimary }]} numberOfLines={1}>
+                      {msg}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           }
           // Liste inversée (voir `inverted` ci-dessus) : ListFooterComponent
@@ -1699,7 +1729,7 @@ export const ChatScreen: React.FC = () => {
             {text.trim().length > 0 || editingMsg ? (
               <TouchableOpacity
                 style={[styles.sendBtn, { opacity: sending ? 0.6 : 1 }]}
-                onPress={editingMsg ? confirmEdit : send}
+                onPress={() => (editingMsg ? confirmEdit() : send())}
                 disabled={sending}
               >
                 <LinearGradient
@@ -1845,6 +1875,7 @@ export const ChatScreen: React.FC = () => {
           header: colors.textTertiary,
           skinTonesContainer: colors.backgroundSecondary,
           category: {
+            
             icon: colors.textTertiary,
             iconActive: colors.primary,
             container: colors.surface,
@@ -2228,6 +2259,15 @@ const styles = StyleSheet.create({
   headerSub:  { fontSize: 12, marginTop: 1 },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
+
+  quickReplies: {
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center',
+    gap: 8, marginTop: 20, paddingHorizontal: 24,
+  },
+  quickReplyChip: {
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth,
+  },
+  quickReplyText: { fontSize: 13, fontWeight: '500' },
 
   uploadBar: {
     overflow: 'hidden',

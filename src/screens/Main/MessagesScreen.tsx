@@ -1,5 +1,5 @@
 /**
- * MessagesScreen — Messagerie directe GoFolyX
+ * MessagesScreen — Messagerie directe Gofolyx
  * Connecté à l'API /api/v1/messages/conversations
  */
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -391,6 +391,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
           <ConversationStoryBar
             currentUser={currentUser}
             colors={colors}
+            conversations={conversations}
             onNavigateToChat={onStoryNavigateToChat}
             onNavigateToCall={onStoryNavigateToCall}
           />

@@ -32,7 +32,7 @@ export const CommunityInviteScreen: React.FC = () => {
 
   const shareUrl  = code ? `${SHARE_BASE}/${code}` : '';
   const shareText =
-    `Rejoins "${communityName}" sur GoFolyX !\n\n` +
+    `Rejoins "${communityName}" sur Gofolyx !\n\n` +
     `Code : ${code}\n` +
     `Lien : ${shareUrl}`;
 
@@ -257,7 +257,7 @@ export const CommunityInviteScreen: React.FC = () => {
         <View style={[st.infoBox, { backgroundColor: '#7B3FF210', borderColor: '#7B3FF230' }]}>
           <Icon name="info" size={15} color="#7B3FF2" />
           <Text style={{ color: '#7B3FF2', fontSize: 12, flex: 1, lineHeight: 18 }}>
-            La personne invitée peut ouvrir le lien directement, ou saisir le code dans GoFolyX depuis
+            La personne invitée peut ouvrir le lien directement, ou saisir le code dans Gofolyx depuis
             Communautés — Rejoindre par code.
           </Text>
         </View>

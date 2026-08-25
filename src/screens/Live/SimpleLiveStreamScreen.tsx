@@ -23,7 +23,7 @@ import Animated, {
   FadeIn, FadeOut, SlideInRight, SlideOutRight,
   useAnimatedStyle, useSharedValue, withRepeat, withTiming,
 } from 'react-native-reanimated';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 import {
   LiveKitRoom,
   useLocalParticipant,
@@ -171,7 +171,7 @@ const HostVideoView: React.FC<{
   if (!localParticipant.sid && allTracks.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
-        <GoFolyXLoader variant="reel" color="#F0365A" />
+        <GofolyxLoader variant="reel" color="#F0365A" />
       </View>
     );
   }
@@ -1323,7 +1323,7 @@ export const SimpleLiveStreamScreen: React.FC = () => {
   if (loadingToken || !token || !wsUrl) {
     return (
       <View style={[st.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <GoFolyXLoader variant="reel" color="#F0365A" />
+        <GofolyxLoader variant="reel" color="#F0365A" />
       </View>
     );
   }

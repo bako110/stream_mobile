@@ -13,7 +13,7 @@ import { useKeepAwake } from '../../hooks/useKeepAwake';
 import type { Reel } from '../../types';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 const { width: SW, height: SH } = Dimensions.get('screen');
 
@@ -67,7 +67,7 @@ export const ReelPlayerScreen: React.FC = () => {
   if (!reel) {
     return (
       <View style={[s.root, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-        <GoFolyXLoader variant="reel" color="#ffffff" />
+        <GofolyxLoader variant="reel" color="#ffffff" />
       </View>
     );
   }

@@ -2,7 +2,7 @@
  * WebQRScannerScreen — flux "WhatsApp Web"
  *
  * L'utilisateur est déjà connecté sur le mobile.
- * Il scanne le QR affiché sur le site web GoFolyX.
+ * Il scanne le QR affiché sur le site web Gofolyx.
  * Le mobile appelle POST /auth/web-qr/scan → le site reçoit ses tokens et se connecte.
  */
 import React, { useCallback, useRef, useState } from 'react';
@@ -18,7 +18,7 @@ import { Camera, CameraType } from 'react-native-camera-kit';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 
@@ -125,7 +125,7 @@ export const WebQRScannerScreen: React.FC = () => {
             style={st.badge}
           >
             <Icon name="monitor" size={13} color="#fff" />
-            <Text style={st.badgeText}>Connexion au site web GoFolyX</Text>
+            <Text style={st.badgeText}>Connexion au site web Gofolyx</Text>
           </LinearGradient>
           <Text style={st.hint}>
             Ouvrez gofolyx.com sur votre ordinateur, allez sur l'ecran de connexion et scannez le QR code affiché.
@@ -201,7 +201,7 @@ export const WebQRScannerScreen: React.FC = () => {
 
       {phase === 'verifying' && (
         <Animated.View entering={FadeIn} style={{ alignItems: 'center', gap: 20 }}>
-          <GoFolyXLoader color="#7B3FF2" />
+          <GofolyxLoader color="#7B3FF2" />
           <Text style={st.hint}>Connexion en cours…</Text>
         </Animated.View>
       )}
@@ -213,7 +213,7 @@ export const WebQRScannerScreen: React.FC = () => {
           </View>
           <Text style={[st.resultText, { color: '#22C55E' }]}>Site web connecté !</Text>
           <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 }}>
-            Le site web GoFolyX est maintenant connecté avec votre compte.
+            Le site web Gofolyx est maintenant connecté avec votre compte.
           </Text>
         </Animated.View>
       )}

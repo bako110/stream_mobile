@@ -85,7 +85,7 @@ export function useMediaDownload() {
     const mime = mimeForExt(ext, isVideo);
     // Nom lisible pour l'utilisateur — l'id technique (UUID/hash) ne doit jamais apparaître
     // dans le fichier téléchargé, seulement servir de clé interne pour suivre la progression.
-    const filename = `GoFolyX_${isVideo ? 'video' : 'image'}_${Date.now()}.${ext}`;
+    const filename = `Gofolyx_${isVideo ? 'video' : 'image'}_${Date.now()}.${ext}`;
     const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
 
     setStates(prev => ({ ...prev, [id]: { progress: 0, localUri: null, downloading: true } }));

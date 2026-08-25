@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { BackButton, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
@@ -298,7 +298,7 @@ export const NearbyEventsScreen: React.FC = () => {
         </View>
       ) : loading ? (
         <View style={st.empty}>
-          <GoFolyXLoader color="#7B3FF2" />
+          <GofolyxLoader color="#7B3FF2" />
           <Text style={{ color: colors.textTertiary, marginTop: 16, fontSize: 14 }}>
             Recherche d'événements à {radius} km...
           </Text>

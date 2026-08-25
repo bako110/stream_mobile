@@ -13,7 +13,7 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import { eventService, toastService, showConfirm } from '../../services';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { apiClient } from '../../api';
@@ -142,7 +142,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        { title: 'Localisation', message: 'GoFolyX a besoin de votre position.', buttonPositive: 'OK' },
+        { title: 'Localisation', message: 'Gofolyx a besoin de votre position.', buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         toastService.warning('Permission refusée', 'Activez la localisation dans les paramètres.');
@@ -156,7 +156,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
           const { latitude, longitude } = pos.coords;
           const res  = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { 'Accept-Language': 'fr', 'User-Agent': 'GoFolyX-App/1.0' } },
+            { headers: { 'Accept-Language': 'fr', 'User-Agent': 'Gofolyx-App/1.0' } },
           );
           const data = await res.json();
           const addr = data.address ?? {};
@@ -189,7 +189,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
     try {
       const res  = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
-        { headers: { 'Accept-Language': 'fr', 'User-Agent': 'GoFolyX-App/1.0' } },
+        { headers: { 'Accept-Language': 'fr', 'User-Agent': 'Gofolyx-App/1.0' } },
       );
       const data = await res.json();
       if (data.length > 0) {
@@ -392,7 +392,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
   if (loadingData) {
     return (
       <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       </View>
     );
   }

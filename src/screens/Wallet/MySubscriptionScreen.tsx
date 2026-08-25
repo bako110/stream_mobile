@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
-import { BackButton, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { BackButton, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, RefreshControl,
@@ -95,7 +95,7 @@ export default function MySubscriptionScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       </View>
     );
   }

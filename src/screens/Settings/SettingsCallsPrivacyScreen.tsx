@@ -14,7 +14,7 @@ import { userService } from '../../services/userService';
 import type { PrivacySettings, CallPrivacy } from '../../services/userService';
 import { callHistoryService } from '../../services/callHistoryService';
 import { Row, Card, PageHeader } from './_shared';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 import { toastService, showConfirm } from '../../services';
 
 type CallPrefs = Pick<PrivacySettings, 'call_privacy' | 'call_e2e_encryption' | 'call_silence_unknown'>;
@@ -119,7 +119,7 @@ export const SettingsCallsPrivacyScreen: React.FC = () => {
       <PageHeader title="Confidentialité des appels" onBack={() => nav.goBack()} />
 
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : error ? (
         <View style={st.centered}>
           <Text style={[st.errorText, { color: colors.textTertiary }]}>

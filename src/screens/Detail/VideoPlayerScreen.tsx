@@ -11,7 +11,7 @@ import { Endpoints } from '../../api/endpoints';
 import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 
 interface Props {
   route: {
@@ -116,7 +116,7 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
 
       {(initialLoading || buffering) && (
         <View style={s.bufferOverlay} pointerEvents="none">
-          <GoFolyXLoader variant="reel" color="#ffffff" />
+          <GofolyxLoader variant="reel" color="#ffffff" />
           {initialLoading && (
             <Text style={s.loadingText}>Chargement en cours…</Text>
           )}

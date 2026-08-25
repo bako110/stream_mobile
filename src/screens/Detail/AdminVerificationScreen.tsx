@@ -11,7 +11,7 @@ import { toastService } from '../../services';
 import { communityService } from '../../services/communityService';
 import type { VerificationRequest } from '../../services/communityService';
 import LinearGradient from 'react-native-linear-gradient';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 type FilterStatus = 'pending' | 'approved' | 'rejected';
 
@@ -200,7 +200,7 @@ export const AdminVerificationScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : (
         <FlatList
           data={requests}

@@ -25,7 +25,7 @@ export function useUserLocation(enabled: boolean = true): UserCoords | null {
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           {
             title: 'Localisation',
-            message: 'GoFolyX utilise votre position pour vous proposer les événements près de chez vous.',
+            message: 'Gofolyx utilise votre position pour vous proposer les événements près de chez vous.',
             buttonPositive: 'Autoriser',
             buttonNegative: 'Refuser',
           },

@@ -21,7 +21,7 @@ import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
-import { GoFolyXLoader, BackButton } from '../../components/common';
+import { GofolyxLoader, BackButton } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { toastService, showConfirm } from '../../services';
 
@@ -810,7 +810,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
           <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-            <GoFolyXLoader />
+            <GofolyxLoader />
           </View>
         ) : (
           <>

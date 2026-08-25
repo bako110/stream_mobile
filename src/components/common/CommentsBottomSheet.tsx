@@ -15,7 +15,7 @@ import { useCommentsWebSocket } from '../../hooks/useCommentsWebSocket';
 import type { CommentWsEvent } from '../../hooks/useCommentsWebSocket';
 import { socialService, toastService, showConfirm } from '../../services';
 import { VerifiedBadge } from './VerifiedBadge';
-import { GoFolyXLoader } from './GoFolyXLoader';
+import { GofolyxLoader } from './FolixLoader';
 import { RichText } from './RichText';
 import { MentionInput } from './MentionInput';
 import type { Comment } from '../../types';
@@ -310,7 +310,7 @@ const CommentRow: React.FC<RowProps> = ({
             >
               <View style={[st.toggleLine, { backgroundColor: colors.border }]} />
               {item.repliesLoading ? (
-                <GoFolyXLoader variant="bar" color={colors.primary} />
+                <GofolyxLoader variant="bar" color={colors.primary} />
               ) : (
                 <>
                   <Icon name="chevron-up" size={20} color={colors.textTertiary} />
@@ -727,7 +727,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
               </View>
             ) : loading ? (
               <View style={st.center}>
-                <GoFolyXLoader variant="bar" color={colors.primary} />
+                <GofolyxLoader variant="bar" color={colors.primary} />
               </View>
             ) : comments.length === 0 ? (
               <View style={st.center}>
@@ -772,7 +772,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                     disabled={loadingMore}
                   >
                     {loadingMore
-                      ? <GoFolyXLoader variant="bar" color={colors.primary} />
+                      ? <GofolyxLoader variant="bar" color={colors.primary} />
                       : <Text style={[st.loadMoreText, { color: colors.primary }]}>Voir plus de commentaires</Text>
                     }
                   </TouchableOpacity>
@@ -835,7 +835,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                       activeOpacity={0.8}
                     >
                       {(sending || editSaving)
-                        ? <GoFolyXLoader variant="bar" color="#fff" />
+                        ? <GofolyxLoader variant="bar" color="#fff" />
                         : isEditMode
                           ? <Icon name="check" size={16} color="#fff" />
                           : <MCIcon name="send" size={16} color="#fff" />

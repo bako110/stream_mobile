@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
 import type { CommunityChannel, ChannelType } from '../../services/communityService';
 import { toastService, showConfirm } from '../../services';
@@ -334,7 +334,7 @@ export const CommunityChannelsScreen: React.FC = () => {
       {/* Liste */}
       {loading ? (
         <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-          <GoFolyXLoader />
+          <GofolyxLoader />
         </View>
       ) : (
         <FlatList

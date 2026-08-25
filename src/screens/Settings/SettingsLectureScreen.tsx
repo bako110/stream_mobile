@@ -6,7 +6,7 @@ import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { storage } from '../../utils/storage';
 import { Row, Card, PageHeader } from './_shared';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 import { toastService } from '../../services';
 
 interface PlaybackPrefs {
@@ -85,7 +85,7 @@ export const SettingsLectureScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <PageHeader title="Lecture" onBack={() => nav.goBack()} />
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : (
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
           <Card>

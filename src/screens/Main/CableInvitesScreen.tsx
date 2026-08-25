@@ -12,7 +12,7 @@ import { cableService } from '../../services/cableService';
 import { toastService, showConfirm } from '../../services';
 import type { CableInvite } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -220,7 +220,7 @@ export const CableInvitesScreen: React.FC = () => {
       {/* Liste */}
       {loading ? (
         <View style={s.center}>
-          <GoFolyXLoader color="#60A5FA" />
+          <GofolyxLoader color="#60A5FA" />
         </View>
       ) : (
         <FlatList

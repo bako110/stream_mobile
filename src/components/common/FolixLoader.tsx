@@ -1,13 +1,13 @@
 /**
- * GoFolyXLoader — deux modes :
+ * GofolyxLoader — deux modes :
  *
  * Mode "bar" (défaut) — barre serpent en haut de l'écran, pour les pages
- *   {loading && <GoFolyXLoader />}
- *   <GoFolyXLoader color="#7B3FF2" />
+ *   {loading && <GofolyxLoader />}
+ *   <GofolyxLoader color="#7B3FF2" />
  *
  * Mode "reel" — spinner centré plein écran sombre, pour les reels/vidéos
- *   <GoFolyXLoader variant="reel" />
- *   <GoFolyXLoader variant="reel" color="#ffffff" />
+ *   <GofolyxLoader variant="reel" />
+ *   <GofolyxLoader variant="reel" color="#ffffff" />
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, Dimensions, Easing } from 'react-native';
@@ -89,7 +89,7 @@ const ReelSpinner: React.FC<{ color: string }> = ({ color }) => {
 };
 
 // ── Barre serpent — pour les pages ────────────────────────────────────────────
-export const GoFolyXLoader: React.FC<Props> = ({
+export const GofolyxLoader: React.FC<Props> = ({
   color    = '#7B3FF2',
   height   = 3,
   fullScreen = false,

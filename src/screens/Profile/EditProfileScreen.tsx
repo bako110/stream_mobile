@@ -15,7 +15,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, SkeletonEditProfile, GoFolyXLoader } from '../../components/common';
+import { BackButton, SkeletonEditProfile, GofolyxLoader } from '../../components/common';
 import { toastService, showConfirm } from '../../services';
 import { useUser } from '../../context/UserContext';
 import { userService } from '../../services/userService';
@@ -221,7 +221,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.bannerWrap}>
               {bannerUploading ? (
                 <View style={[styles.banner, { backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' }]}>
-                  <GoFolyXLoader color={colors.primary} />
+                  <GofolyxLoader color={colors.primary} />
                 </View>
               ) : user?.banner_url ? (
                 <Image source={{ uri: user.banner_url }} style={styles.banner} resizeMode="cover" />

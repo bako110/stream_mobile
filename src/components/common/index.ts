@@ -57,7 +57,7 @@ export { InlineVideoPlayer }     from './InlineVideoPlayer';
 export { UploadProgressBanner }  from './UploadProgressBanner';
 export { LikersBottomSheet }     from './LikersBottomSheet';
 export { FriendsWhoLiked }       from './FriendsWhoLiked';
-export { GoFolyXLoader } from './GoFolyXLoader';
+export { GofolyxLoader } from './FolixLoader';
 export { CachedImage } from './CachedImage';
 export { HeartRain, RecentLikersAvatars, LikeNamesFeed } from './HeartRain';
 export { PriceWithLocal } from './PriceWithLocal';

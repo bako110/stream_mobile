@@ -28,7 +28,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MatchResultModal } from '../../components/live/MatchResultModal';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 import { battleService } from '../../services/battleService';
 import type { Battle, BattleGoal, BattleRanking } from '../../services/battleService';
 import { showConfirm } from '../../services';
@@ -746,7 +746,7 @@ export const BattleScreen: React.FC = () => {
     return (
       <View style={[styles.root, styles.center, { backgroundColor: '#000' }]}>
         <StatusBar barStyle="light-content" />
-        <GoFolyXLoader variant="reel" color="#7B3FF2" />
+        <GofolyxLoader variant="reel" color="#7B3FF2" />
       </View>
     );
   }

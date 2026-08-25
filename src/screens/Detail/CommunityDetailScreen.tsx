@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
+import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 
 const { width: VIEWER_W, height: VIEWER_H } = Dimensions.get('window');
@@ -703,7 +703,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <GoFolyXLoader />
+        <GofolyxLoader />
       </View>
     );
   }

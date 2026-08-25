@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader, BackButton } from '../../components/common';
+import { GofolyxLoader, BackButton } from '../../components/common';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 import { communityService } from '../../services/communityService';
 import type { CommunityMemberData } from '../../services/communityService';
@@ -286,7 +286,7 @@ export default function CommunityMembersScreen({ route }: Props) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
         <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-        <GoFolyXLoader />
+        <GofolyxLoader />
       </View>
     );
   }

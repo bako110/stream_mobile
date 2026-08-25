@@ -16,7 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { postService } from '../../services/postService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -169,7 +169,7 @@ export const UserGalleryScreen: React.FC = () => {
       </View>
 
       {initial && loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : images.length === 0 ? (
         <View style={s.emptyWrap}>
           <Icon name="image" size={32} color={colors.textTertiary} />

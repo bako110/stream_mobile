@@ -9,7 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import QRCode from 'react-native-qrcode-svg';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 
 interface Props {
   visible: boolean;
@@ -101,7 +101,7 @@ export const QRCodeScreen: React.FC<Props> = ({ visible, onClose }) => {
 
               {phase === 'loading' && (
                 <Animated.View entering={FadeIn} style={s.center}>
-                  <GoFolyXLoader color={colors.primary} />
+                  <GofolyxLoader color={colors.primary} />
                   <Text style={[s.statusSub, { color: colors.textSecondary, marginTop: 14 }]}>
                     Génération du code…
                   </Text>
@@ -170,7 +170,7 @@ export const QRCodeScreen: React.FC<Props> = ({ visible, onClose }) => {
               <Animated.View entering={FadeInDown.delay(300)} style={s.stepsWrap}>
                 <Text style={[s.stepsTitle, { color: colors.textTertiary }]}>COMMENT ÇA MARCHE</Text>
                 {[
-                  { n: '1', icon: 'smartphone',  text: 'Ouvrez GoFolyX sur un autre téléphone' },
+                  { n: '1', icon: 'smartphone',  text: 'Ouvrez Gofolyx sur un autre téléphone' },
                   { n: '2', icon: 'log-in',       text: "Sur l'écran de connexion, appuyez sur « Scanner un QR code »" },
                   { n: '3', icon: 'camera',        text: 'Pointez la caméra vers ce code' },
                   { n: '4', icon: 'zap',           text: 'Connexion automatique en 1 seconde' },

@@ -32,7 +32,7 @@ import { reelService, socialService, authService, searchService, toastService, s
 import { cableService } from '../../services/cableService';
 import { userService } from '../../services/userService';
 import {
-  CommentsBottomSheet, VerifiedBadge, ReportModal, GoFolyXLoader, ShareBottomSheet, FriendsWhoLiked,
+  CommentsBottomSheet, VerifiedBadge, ReportModal, GofolyxLoader, ShareBottomSheet, FriendsWhoLiked,
   HeartRain, LikeNamesFeed, AvatarWithBadge,
 } from '../../components/common';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
@@ -897,7 +897,7 @@ export const ReelsScreen: React.FC = () => {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <GoFolyXLoader variant="reel" color="#ffffff" />
+        <GofolyxLoader variant="reel" color="#ffffff" />
       </View>
     );
   }
@@ -1262,7 +1262,7 @@ export const ReelsScreen: React.FC = () => {
             if (searching && !showTrending) {
               return (
                 <View style={s.searchCenterState}>
-                  <GoFolyXLoader variant="reel" color="#ffffff" />
+                  <GofolyxLoader variant="reel" color="#ffffff" />
                   <Text style={s.searchStateText}>Recherche en cours…</Text>
                 </View>
               );
@@ -1295,7 +1295,7 @@ export const ReelsScreen: React.FC = () => {
                   onEndReached={loadMoreSearchGrid}
                   onEndReachedThreshold={0.6}
                   ListFooterComponent={loadingMoreSearch ? (
-                    <View style={{ paddingVertical: 16 }}><GoFolyXLoader variant="reel" color="#ffffff" /></View>
+                    <View style={{ paddingVertical: 16 }}><GofolyxLoader variant="reel" color="#ffffff" /></View>
                   ) : null}
                   renderItem={({ item: m }) => {
                     if (m._kind === 'ad') return <SearchAdCard ad={m.ad} onOpenFullscreen={setFullscreenAd} />;
@@ -1346,7 +1346,7 @@ export const ReelsScreen: React.FC = () => {
             if (loadingTrending) {
               return (
                 <View style={s.searchCenterState}>
-                  <GoFolyXLoader variant="reel" color="#ffffff" />
+                  <GofolyxLoader variant="reel" color="#ffffff" />
                 </View>
               );
             }

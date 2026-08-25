@@ -35,7 +35,7 @@ export const callConnectionService = {
   },
 
   /**
-   * true si le PhoneAccount GoFolyX est actif dans les réglages système. addNewIncomingCall()
+   * true si le PhoneAccount Gofolyx est actif dans les réglages système. addNewIncomingCall()
    * peut résoudre sans erreur même si le compte n'est pas active — Android crée la Connection
    * en interne de façon asynchrone et peut échouer silencieusement plus tard (l'utilisateur n'a
    * jamais activé le compte dans Réglages > Appli tél. > Comptes d'appel). Sans cette vérification

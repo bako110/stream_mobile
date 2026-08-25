@@ -13,7 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/userService';
 import type { PrivacySettings } from '../../services/userService';
 import { Row, Card, PageHeader } from './_shared';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 import { toastService } from '../../services';
 
 const DEFAULTS: Pick<PrivacySettings, 'privacy_show_online' | 'privacy_read_receipts' | 'privacy_show_typing'> = {
@@ -80,7 +80,7 @@ export const SettingsMessagesPrivacyScreen: React.FC = () => {
       <PageHeader title="Confidentialité des messages" onBack={() => nav.goBack()} />
 
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : error ? (
         <View style={st.centered}>
           <Text style={[st.errorText, { color: colors.textTertiary }]}>

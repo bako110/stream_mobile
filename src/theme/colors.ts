@@ -9,7 +9,7 @@ export const LightColors = {
   surface:             '#FFFFFF',   // --surface
   surfaceElevated:     '#FFFFFF',   // --surface-elevated
 
-  // ── Brand GoFolyX ─────────────────────────────────────────────────────────
+  // ── Brand Gofolyx ─────────────────────────────────────────────────────────
   primary:             '#7B3FF2',   // --primary
   primaryLight:        '#A67CF7',   // --primary-light
   primaryDark:         '#5A1ED9',
@@ -49,7 +49,7 @@ export const LightColors = {
   shadowNeutral:       '#0000000F', // ~6%
   ripple:              '#7B3FF21E', // ~12%
 
-  // ── GoFolyX spécifique ────────────────────────────────────────────────────
+  // ── Gofolyx spécifique ────────────────────────────────────────────────────
   liveTag:             '#F0365A',
   livePulse:           '#F0365A4D', // 30%
   premiumTag:          '#FF7A2F',
@@ -84,7 +84,7 @@ export const DarkColors = {
   surface:             '#0F0F1E',   // --surface
   surfaceElevated:     '#161628',   // --surface-elevated
 
-  // ── Brand GoFolyX ─────────────────────────────────────────────────────────
+  // ── Brand Gofolyx ─────────────────────────────────────────────────────────
   primary:             '#9B65F5',   // --primary dark
   primaryLight:        '#BFA0F8',   // --primary-light dark
   primaryDark:         '#7B3FF2',
@@ -124,7 +124,7 @@ export const DarkColors = {
   shadowNeutral:       '#00000066', // ~40%
   ripple:              '#9B65F526', // ~15%
 
-  // ── GoFolyX spécifique ────────────────────────────────────────────────────
+  // ── Gofolyx spécifique ────────────────────────────────────────────────────
   liveTag:             '#F25270',
   livePulse:           '#F2527059', // 35%
   premiumTag:          '#FF8C4A',

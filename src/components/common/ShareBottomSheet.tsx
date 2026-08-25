@@ -112,7 +112,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = author?.display_name ?? author?.username ?? 'Utilisateur';
     authorAvatar = author?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = p.body ? (p.body.length > 80 ? p.body.slice(0, 80) + '…' : p.body) : 'Post GoFolyX';
+    title        = p.body ? (p.body.length > 80 ? p.body.slice(0, 80) + '…' : p.body) : 'Post Gofolyx';
     thumb        = p.image_urls?.[0] ?? p.image_url ?? null;
     videoUrl     = p.video_url ?? null;
     createdAt    = p.created_at;
@@ -126,7 +126,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = org?.display_name ?? org?.username ?? 'Organisateur';
     authorAvatar = org?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = e.title ?? 'Événement GoFolyX';
+    title        = e.title ?? 'Événement Gofolyx';
     subtitle     = e.venue_city
       ? `${e.venue_city}${e.starts_at ? ' · ' + new Date(e.starts_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}`
       : null;
@@ -143,7 +143,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = artist?.display_name ?? artist?.username ?? 'Artiste';
     authorAvatar = artist?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = c.title ?? 'Concert GoFolyX';
+    title        = c.title ?? 'Concert Gofolyx';
     subtitle     = c.venue_city
       ? `${c.venue_city}${c.scheduled_at ? ' · ' + new Date(c.scheduled_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}`
       : null;
@@ -160,7 +160,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = author?.display_name ?? author?.username ?? 'Utilisateur';
     authorAvatar = author?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = r.caption ? (r.caption.length > 80 ? r.caption.slice(0, 80) + '…' : r.caption) : 'Reel GoFolyX';
+    title        = r.caption ? (r.caption.length > 80 ? r.caption.slice(0, 80) + '…' : r.caption) : 'Reel Gofolyx';
     subtitle     = null;
     thumb        = r.thumbnail_url ?? null;
     videoUrl     = r.hls_url ?? null;
@@ -171,10 +171,10 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
   } else {
     const f = props.film as FilmItem;
     id           = f.id;
-    authorName   = 'GoFolyX';
+    authorName   = 'Gofolyx';
     authorAvatar = null;
     initials     = 'G';
-    title        = f.title ?? 'Contenu GoFolyX';
+    title        = f.title ?? 'Contenu Gofolyx';
     subtitle     = f.year ? String(f.year) : null;
     thumb        = f.thumbnail_url ?? f.banner_url ?? null;
     videoUrl     = null;

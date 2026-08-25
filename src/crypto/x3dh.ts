@@ -9,7 +9,7 @@
  */
 import { dh, hkdfDerive, sign, verify, toBase64, fromBase64, type Bytes, type KeyPair, generateX25519KeyPair } from './primitives';
 
-const X3DH_INFO = 'GoFolyX-E2EE-X3DH-v1';
+const X3DH_INFO = 'Gofolyx-E2EE-X3DH-v1';
 // 32 octets à 0xFF en préfixe du premier DH — pratique standard X3DH pour
 // domain-separation, empêche un attaquant de rejouer une signature Ed25519
 // d'ailleurs comme si c'était un accord de clé X3DH valide.

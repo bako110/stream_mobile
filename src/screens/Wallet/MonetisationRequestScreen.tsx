@@ -153,7 +153,7 @@ export default function MonetisationRequestScreen() {
                 <View style={[s.requireIcon, { backgroundColor: '#7B3FF222' }]}>
                   <Icon name="shield" size={14} color="#7B3FF2" />
                 </View>
-                <Text style={[s.requireLabel, { color: colors.textSecondary }]}>Aucune restriction sur le compte, respect des CGU GoFolyX</Text>
+                <Text style={[s.requireLabel, { color: colors.textSecondary }]}>Aucune restriction sur le compte, respect des CGU Gofolyx</Text>
               </View>
               <View style={s.requireRow}>
                 <View style={[s.requireIcon, { backgroundColor: '#7B3FF222' }]}>
@@ -233,7 +233,7 @@ export default function MonetisationRequestScreen() {
         <View style={[s.legalNote, { backgroundColor: colors.backgroundSecondary }]}>
           <Icon name="shield" size={14} color={colors.textTertiary} />
           <Text style={[s.legalText, { color: colors.textTertiary }]}>
-            En soumettant cette demande, vous confirmez que votre contenu respecte les CGU GoFolyX et la législation en vigueur.
+            En soumettant cette demande, vous confirmez que votre contenu respecte les CGU Gofolyx et la législation en vigueur.
           </Text>
         </View>
 

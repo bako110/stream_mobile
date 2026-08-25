@@ -10,7 +10,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import { toastService, showConfirm } from '../../services';
 import { apiClient, Endpoints } from '../../api';
@@ -229,7 +229,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
     return (
       <View style={[S.root, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       </View>
     );
   }

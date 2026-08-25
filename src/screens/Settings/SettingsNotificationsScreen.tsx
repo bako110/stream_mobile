@@ -6,7 +6,7 @@ import { notificationService } from '../../services/notificationService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { Row, Card, PageHeader } from './_shared';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 import { toastService, showConfirm } from '../../services';
 
 interface NotifPrefs {
@@ -135,7 +135,7 @@ export const SettingsNotificationsScreen: React.FC = () => {
       <PageHeader title="Notifications" onBack={() => nav.goBack()} />
 
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : error ? (
         <View style={st.centered}>
           <Text style={[st.errorText, { color: colors.textTertiary }]}>

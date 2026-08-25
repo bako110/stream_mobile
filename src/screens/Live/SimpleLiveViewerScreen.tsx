@@ -57,7 +57,7 @@ import type { LiveLikeButtonRef } from '../../components/live/LiveLikeButton';
 import { LiveHeartsOverlay } from '../../components/live/LiveHeartsOverlay';
 import { LiveReactionPicker, ReactionFloaters, useReactionFloaters } from '../../components/live/LiveReactionPicker';
 import { useUser } from '../../context/UserContext';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { StageTileRow } from '../../components/live/StageTileRow';
 import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
 import { LiveMoreMenu } from '../../components/live/LiveMoreMenu';
@@ -381,7 +381,7 @@ const MultiVideoView: React.FC<{
   if (participants.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
-        <GoFolyXLoader variant="reel" color="#F0365A" />
+        <GofolyxLoader variant="reel" color="#F0365A" />
       </View>
     );
   }
@@ -1562,7 +1562,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   }, [liveId]);
 
   if (loading) {
-    return <View style={[st.root, st.center]}><GoFolyXLoader variant="reel" color="#F0365A" /></View>;
+    return <View style={[st.root, st.center]}><GofolyxLoader variant="reel" color="#F0365A" /></View>;
   }
 
   if (ended) {
@@ -1616,7 +1616,7 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   if (!token || !wsUrl) {
     return (
       <View style={[st.root, st.center]}>
-        <GoFolyXLoader variant="reel" color="#F0365A" />
+        <GofolyxLoader variant="reel" color="#F0365A" />
         <Text style={st.connectText}>Connexion...</Text>
       </View>
     );

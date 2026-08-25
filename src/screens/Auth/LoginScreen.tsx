@@ -225,7 +225,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onNeedsVerificati
 
         <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.heroContent}>
           <Text style={styles.heroTitle}>Se connecter</Text>
-          <Text style={styles.heroSub}>Bon retour sur GoFolyX</Text>
+          <Text style={styles.heroSub}>Bon retour sur Gofolyx</Text>
         </Animated.View>
 
         {/* Vague de transition vers le bas */}

@@ -82,7 +82,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!acceptsTerms) {
-      toastService.warning('Conditions requises', "Vous devez accepter les conditions d'utilisation GoFolyX Creator Program.");
+      toastService.warning('Conditions requises', "Vous devez accepter les conditions d'utilisation Gofolyx Creator Program.");
       return;
     }
     setLoading(true);
@@ -108,7 +108,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
     const CFG: Record<MonetStatus, { icon: string; color: string; title: string; sub: string }> = {
       none:     { icon: 'bar-chart-2',  color: colors.textTertiary, title: 'Non monétisé',         sub: '' },
       pending:  { icon: 'clock',        color: '#F59E0B',           title: "En cours d'examen",    sub: 'Notre équipe examine votre dossier. Cela peut prendre quelques jours.' },
-      approved: { icon: 'check-circle', color: GREEN,               title: 'Monétisation activée', sub: 'Votre compte est monétisé GoFolyX. Accédez à votre espace créateur.' },
+      approved: { icon: 'check-circle', color: GREEN,               title: 'Monétisation activée', sub: 'Votre compte est monétisé Gofolyx. Accédez à votre espace créateur.' },
       rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',      sub: (adminNote ? adminNote + '\n\n' : '') + 'Vous pouvez soumettre une nouvelle demande.' },
     };
     const cfg = CFG[status];
@@ -146,7 +146,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
         <View style={[ms.heroBadgeIcon, { backgroundColor: GREEN + '20' }]}>
           <Icon name="bar-chart-2" size={32} color={GREEN} />
         </View>
-        <Text style={[ms.heroTitle, { color: colors.textPrimary }]}>Programme Créateur GoFolyX</Text>
+        <Text style={[ms.heroTitle, { color: colors.textPrimary }]}>Programme Créateur Gofolyx</Text>
         <Text style={[ms.heroSub, { color: colors.textSecondary }]}>
           Monétisez votre contenu et gagnez des revenus grâce à votre communauté.
         </Text>
@@ -159,12 +159,12 @@ export const SettingsMonetisationScreen: React.FC = () => {
           const items: { icon: string; label: string; ok: boolean }[] = [
             {
               icon:  'users',
-              label: elig ? `${elig.followers_count} / ${elig.followers_required} abonnés sur GoFolyX` : 'Minimum 1000 abonnés sur GoFolyX',
+              label: elig ? `${elig.followers_count} / ${elig.followers_required} abonnés sur Gofolyx` : 'Minimum 1000 abonnés sur Gofolyx',
               ok:    followersOk,
             },
             { icon: 'film',         label: 'Au moins 3 publications par semaine en moyenne', ok: true },
             { icon: 'calendar',     label: 'Compte actif depuis au moins 30 jours',           ok: true },
-            { icon: 'shield',       label: "Aucune restriction sur le compte, respect des CGU GoFolyX", ok: true },
+            { icon: 'shield',       label: "Aucune restriction sur le compte, respect des CGU Gofolyx", ok: true },
             { icon: 'clock',        label: 'Validation automatique sous 24h si les conditions restent remplies', ok: true },
           ];
           return items.map((item, i, arr) => (
@@ -369,7 +369,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
           </View>
           <Text style={{ fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 19 }}>
             {"J'accepte les "}
-            <Text style={{ color: GREEN, fontWeight: '700' }}>Conditions d'utilisation GoFolyX Creator Program</Text>
+            <Text style={{ color: GREEN, fontWeight: '700' }}>Conditions d'utilisation Gofolyx Creator Program</Text>
           </Text>
         </TouchableOpacity>
 
@@ -398,7 +398,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <PageHeader title="Monetisation GoFolyX" onBack={() => nav.goBack()} />
+      <PageHeader title="Monetisation Gofolyx" onBack={() => nav.goBack()} />
 
       {fetching
         ? <ActivityIndicator color={GREEN} style={{ marginTop: 40 }} />

@@ -83,7 +83,7 @@ const BuyGoGoldScreen: React.FC = () => {
       const { client_secret, gogold_to_add } = initRes.data;
 
       const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: 'GoFolyX',
+        merchantDisplayName: 'Gofolyx',
         paymentIntentClientSecret: client_secret,
       });
       if (initError) {

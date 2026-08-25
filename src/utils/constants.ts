@@ -15,7 +15,7 @@ export const WS_BASE_URL = USE_LOCAL_API
 export const API_TIMEOUT = 30_000; // 30s (Fly.dev cold start)
 
 // ── App ────────────────────────────────────────────────────────────────────
-export const APP_NAME    = 'GoFolyX';
+export const APP_NAME    = 'Gofolyx';
 export const APP_VERSION = '1.0.0';
 
 // ── Stores — utilisés par la notification admin "app_update" (bouton "Mettre à jour")

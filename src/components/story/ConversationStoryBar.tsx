@@ -18,24 +18,39 @@ import { storyService, getViewedStories } from '../../services/storyService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { networkService } from '../../services/networkService';
 import { useWs } from '../../context/WebSocketContext';
+import { apiClient, Endpoints } from '../../api';
 import type { Story } from '../../types/story';
 import type { StoryGroup } from '../../types/story';
-import type { User } from '../../types/user';
+import type { User, UserPublic } from '../../types/user';
 
 interface Props {
   currentUser: User | null;
   colors: any;
+  // Conversations déjà chargées par MessagesScreen — utilisées comme source
+  // "amis proches" pour peupler la barre au-delà des seuls auteurs de story
+  // active (fusionnées avec les abonnements ci-dessous, dédupliquées).
+  conversations?: Array<{ partner_id: string; partner?: { id?: string; username?: string; full_name?: string; avatar_url?: string | null } }>;
   onNavigateToChat?: (partnerId: string, partnerName: string, avatarUrl?: string) => void;
   onNavigateToCall?: (partnerId: string, partnerName: string, callType: 'voice' | 'video') => void;
   onNavigateToMyStories?: () => void;
+}
+
+// Amis sans story active — affichés après les groupes de stories, sans anneau
+// dégradé (rien à "voir"), juste pour ouvrir le chat au tap.
+interface FriendOnly {
+  id:           string;
+  username:     string;
+  display_name: string;
+  avatar_url:   string | null;
 }
 
 // Même taille que l'avatar de conversation (MessagesScreen: avatar 56/borderRadius 28)
 const AVATAR_SIZE = 56;
 const RING_SIZE   = AVATAR_SIZE + 6;
 
-export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToChat, onNavigateToCall, onNavigateToMyStories }) => {
+export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, conversations, onNavigateToChat, onNavigateToCall, onNavigateToMyStories }) => {
   const [groups,      setGroups]      = useState<StoryGroup[]>([]);
+  const [friendsOnly, setFriendsOnly] = useState<FriendOnly[]>([]);
   const [viewerOpen,  setViewerOpen]  = useState(false);
   const [viewerGroup, setViewerGroup] = useState(0);
   const [creatorOpen, setCreatorOpen] = useState(false);
@@ -96,9 +111,54 @@ export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, onN
     return () => removeListener(onWs);
   }, [addListener, removeListener, load]);
 
+  // Charge les abonnements pour peupler la barre au-delà des seuls auteurs de
+  // story active — fusionnés avec les partenaires de conversation (les deux
+  // servent de proxy "amis proches" en l'absence d'un vrai concept de
+  // proximité côté backend).
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    apiClient.get<UserPublic[]>(`${Endpoints.users.following(currentUser.id)}?page=1&limit=50`)
+      .then(res => {
+        const following = Array.isArray(res.data) ? res.data : [];
+        const byId = new Map<string, FriendOnly>();
+        following.forEach(u => {
+          if (u.id === currentUser.id) return;
+          byId.set(u.id, {
+            id: u.id,
+            username: u.username ?? '',
+            display_name: u.display_name ?? u.username ?? '',
+            avatar_url: u.avatar_url ?? null,
+          });
+        });
+        (conversations ?? []).forEach(c => {
+          const p = c.partner;
+          const id = p?.id ?? c.partner_id;
+          if (!id || id === currentUser.id || byId.has(id)) return;
+          byId.set(id, {
+            id,
+            username: p?.username ?? '',
+            display_name: p?.full_name ?? p?.username ?? '',
+            avatar_url: p?.avatar_url ?? null,
+          });
+        });
+        setFriendsOnly([...byId.values()]);
+      })
+      .catch(() => {});
+  }, [currentUser?.id, conversations]);
+
   const myGroup     = useMemo(() => groups.find(g => g.user.id === currentUser?.id), [groups, currentUser?.id]);
   const otherGroups = useMemo(() => groups.filter(g => g.user.id !== currentUser?.id), [groups, currentUser?.id]);
   const allGroups   = useMemo(() => myGroup ? [myGroup, ...otherGroups] : groups, [myGroup, otherGroups, groups]);
+
+  // Amis (conversations + abonnements) qui n'ont pas déjà un groupe de story
+  // actif — affichés après, sans anneau dégradé. Ceux qui viennent de publier
+  // restent toujours prioritaires (otherGroups, triées non-vues d'abord par
+  // le backend) et gardent leur cercle coloré.
+  const storyAuthorIds = useMemo(() => new Set(groups.map(g => g.user.id)), [groups]);
+  const friendsWithoutStory = useMemo(
+    () => friendsOnly.filter(f => !storyAuthorIds.has(f.id)),
+    [friendsOnly, storyAuthorIds],
+  );
 
   const openViewer = useCallback((index: number) => {
     const group = (myGroup ? [myGroup, ...otherGroups] : groups)[index];
@@ -192,6 +252,35 @@ export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, onN
                   </View>
                 </LinearGradient>
                 <Text style={[s.label, { color: colors.textSecondary ?? '#666' }, seen && { opacity: 0.7 }]} numberOfLines={1}>
+                  {name.split(' ')[0]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* ── Amis sans story active — conversations + abonnements, pas d'anneau
+              dégradé (rien à voir), tap ouvre directement le chat ── */}
+          {friendsWithoutStory.map(friend => {
+            const name = friend.display_name || friend.username || 'Ami';
+            return (
+              <TouchableOpacity
+                key={friend.id}
+                activeOpacity={0.85}
+                style={s.item}
+                onPress={() => onNavigateToChat?.(friend.id, name, friend.avatar_url ?? undefined)}
+              >
+                <View style={[s.ring, { backgroundColor: 'transparent' }]}>
+                  <View style={[s.avatarInner, { borderColor: colors.background ?? '#fff' }]}>
+                    {friend.avatar_url ? (
+                      <CachedImage uri={friend.avatar_url} style={s.avatarImg} resizeMode="cover" />
+                    ) : (
+                      <View style={[s.avatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#e0e0e0' }]}>
+                        <Text style={[s.avatarInitial, { color: colors.primary ?? '#7B3FF2' }]}>{name[0]?.toUpperCase()}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <Text style={[s.label, { color: colors.textSecondary ?? '#666' }]} numberOfLines={1}>
                   {name.split(' ')[0]}
                 </Text>
               </TouchableOpacity>

@@ -848,7 +848,7 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const { unreadNotifications, unreadMessages } = useWs();
   const totalNotifBadge = unreadNotifications;
-  const displayName = user?.display_name ?? user?.first_name ?? user?.username ?? 'GoFolyX';
+  const displayName = user?.display_name ?? user?.first_name ?? user?.username ?? 'Gofolyx';
   const initials    = getInitials(displayName);
   const hour        = new Date().getHours();
   const greeting    = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
@@ -877,9 +877,9 @@ const Header: React.FC<HeaderProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* Logo GoFolyX centré */}
+        {/* Logo Gofolyx centré */}
         <View pointerEvents="none" style={s.headerLogoWrap}>
-          <Text style={[s.headerLogo, { color: colors.primary }]}>GoFolyX</Text>
+          <Text style={[s.headerLogo, { color: colors.primary }]}>Gofolyx</Text>
         </View>
 
         {/* Icônes droite */}
@@ -1176,8 +1176,8 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
   const typeLabel   = isConcert ? 'Concert' : (eventType.charAt(0).toUpperCase() + eventType.slice(1));
 
   const authorName = isConcert
-    ? (concert?.artist?.display_name ?? concert?.artist?.username ?? 'Artiste GoFolyX')
-    : (event?.organizer?.display_name ?? event?.organizer?.username ?? 'Organisateur GoFolyX');
+    ? (concert?.artist?.display_name ?? concert?.artist?.username ?? 'Artiste Gofolyx')
+    : (event?.organizer?.display_name ?? event?.organizer?.username ?? 'Organisateur Gofolyx');
   const authorAvatar = isConcert ? concert?.artist?.avatar_url : event?.organizer?.avatar_url;
   const authorId     = isConcert ? concert?.artist_id : event?.organizer_id;
   const initials     = getInitials(authorName);
@@ -1242,7 +1242,7 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
 
   const handleShare = async () => {
     try {
-      await Share.share({ title, message: `${title} — Découvrez sur GoFolyX !` });
+      await Share.share({ title, message: `${title} — Découvrez sur Gofolyx !` });
       const params = isConcert ? { platform: 'native', concert_id: item.id } : { platform: 'native', event_id: item.id };
       socialService.share(params).catch(() => {});
     } catch { /* annulé */ }

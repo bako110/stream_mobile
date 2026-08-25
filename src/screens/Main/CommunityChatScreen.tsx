@@ -23,7 +23,7 @@ import Geolocation from '@react-native-community/geolocation';
 import { uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
-import { BackButton, CachedImage, GoFolyXLoader } from '../../components/common';
+import { BackButton, CachedImage, GofolyxLoader } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
@@ -872,7 +872,7 @@ export const CommunityChatScreen: React.FC = () => {
       gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
     };
     const mime = mimeMap[ext] ?? 'image/jpeg';
-    const filename = `GoFolyX_image_${Date.now()}.${ext}`;
+    const filename = `Gofolyx_image_${Date.now()}.${ext}`;
     const destPath = `${RNBlobUtil.fs.dirs.DownloadDir}/${filename}`;
 
     setDlBusy(true);
@@ -1876,7 +1876,7 @@ export const CommunityChatScreen: React.FC = () => {
       {/* ── Contenu principal ── */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         {loading ? (
-          <GoFolyXLoader fullScreen color={colors.primary} />
+          <GofolyxLoader fullScreen color={colors.primary} />
         ) : activeTab === 'media' ? renderMediaTab() : (
           <>
             {/* Bandeau upload vidéo TikTok-style */}

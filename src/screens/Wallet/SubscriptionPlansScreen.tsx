@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
-import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
+import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator,
@@ -128,7 +128,7 @@ export default function SubscriptionPlansScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <GoFolyXLoader />
+        <GofolyxLoader />
       </View>
     );
   }
@@ -251,7 +251,7 @@ export default function SubscriptionPlansScreen() {
         <View style={[s.footer, { backgroundColor: colors.backgroundSecondary }]}>
           <Icon name="info" size={14} color={colors.textTertiary} />
           <Text style={[s.footerText, { color: colors.textTertiary }]}>
-            Paiement sécurisé via GoGold GoFolyX ou carte bancaire. Annulation sans frais à tout moment.
+            Paiement sécurisé via GoGold Gofolyx ou carte bancaire. Annulation sans frais à tout moment.
           </Text>
         </View>
 

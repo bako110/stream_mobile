@@ -1,1 +1,1 @@
-export { GoFolyXLoader } from './FolixLoader';
+export { GofolyxLoader } from './FolixLoader';

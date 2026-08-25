@@ -15,7 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { revenueService } from '../../services/revenueService';
 import type {
   RevenueSummary, RevenueTimeseriesPoint, RevenueSourceBreakdown, RevenueContentItem,
@@ -118,7 +118,7 @@ export const RevenueDetailScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <View style={s.center}><GoFolyXLoader variant="bar" color={colors.primary} /></View>
+        <View style={s.center}><GofolyxLoader variant="bar" color={colors.primary} /></View>
       ) : loadError || !summary ? (
         <View style={s.center}>
           <Icon name="dollar-sign" size={32} color={colors.textTertiary} />

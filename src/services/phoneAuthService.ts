@@ -29,7 +29,7 @@ class PhoneAuthService {
     this._sessionInfo = res.data.session_info;
   }
 
-  /** Etape 2 : vérifie le code OTP + connecte/crée le compte GoFolyX. */
+  /** Etape 2 : vérifie le code OTP + connecte/crée le compte Gofolyx. */
   async verifyOtp(code: string, opts?: {
     firstName?: string;
     lastName?: string;

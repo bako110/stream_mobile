@@ -13,7 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useCurrency } from '../../hooks/useCurrency';
-import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import { concertService, toastService, showConfirm } from '../../services';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { apiClient } from '../../api';
@@ -177,7 +177,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        { title: 'Localisation', message: 'GoFolyX a besoin de votre position pour remplir le lieu.', buttonPositive: 'OK' },
+        { title: 'Localisation', message: 'Gofolyx a besoin de votre position pour remplir le lieu.', buttonPositive: 'OK' },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         toastService.warning('Permission refusée', 'Activez la localisation dans les paramètres.');
@@ -301,7 +301,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
 
     showConfirm(
       isEditing ? 'Enregistrer et publier ?' : 'Publier le concert ?',
-      'Votre concert sera visible par tous les utilisateurs GoFolyX.',
+      'Votre concert sera visible par tous les utilisateurs Gofolyx.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -361,7 +361,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
   if (loadingData) {
     return (
       <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       </View>
     );
   }

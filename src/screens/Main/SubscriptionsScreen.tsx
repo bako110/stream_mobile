@@ -255,7 +255,7 @@ const PlanPicker: React.FC<{
       <Icon name="zap" size={32} color={colors.primary} />
       <Text style={[s.noSubTitle, { color: colors.textPrimary }]}>Choisissez votre plan</Text>
       <Text style={[s.noSubSub, { color: colors.textSecondary }]}>
-        Accédez à tout le contenu GoFolyX sans limite. Paiement en GoGold.
+        Accédez à tout le contenu Gofolyx sans limite. Paiement en GoGold.
       </Text>
 
       {PAID_PLANS.map((p, idx) => {

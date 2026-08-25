@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader, BackButton } from '../../components/common';
+import { GofolyxLoader, BackButton } from '../../components/common';
 import { showConfirm, toastService } from '../../services';
 import { communityService } from '../../services/communityService';
 import type { CommunityMemberProfile, MemberCreatorStats } from '../../services/communityService';
@@ -209,7 +209,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <GoFolyXLoader />
+        <GofolyxLoader />
       </View>
     );
   }
@@ -441,7 +441,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
           {showStats && (
             statsLoading ? (
               <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                <GoFolyXLoader />
+                <GofolyxLoader />
               </View>
             ) : creatorStats ? (
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

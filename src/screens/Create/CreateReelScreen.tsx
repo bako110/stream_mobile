@@ -18,7 +18,7 @@ import Icon from 'react-native-vector-icons/Feather';
 
 import { useTheme } from '../../hooks/useTheme';
 import { reelService, toastService } from '../../services';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { ReelEditorScreen, type ReelEditResult } from './ReelEditorScreen';
 import { StoryCameraScreen, type StoryCameraResult } from './StoryCameraScreen';
@@ -347,7 +347,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
     return (
       <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <GoFolyXLoader color={colors.primary} />
+        <GofolyxLoader color={colors.primary} />
         <Text style={{ color: colors.textSecondary, marginTop: 16, fontSize: 14 }}>Préparation de la vidéo…</Text>
       </View>
     );
@@ -413,7 +413,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
         />
         {isTrimming && (
           <View style={s.trimOverlay}>
-            <GoFolyXLoader variant="reel" color="#7B3FF2" />
+            <GofolyxLoader variant="reel" color="#7B3FF2" />
             <Text style={{ color: '#fff', marginTop: 12, fontWeight: '600', fontSize: 15 }}>Découpage en cours…</Text>
           </View>
         )}

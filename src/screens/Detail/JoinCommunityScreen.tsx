@@ -8,7 +8,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
-import { GoFolyXLoader } from '../../components/common';
+import { GofolyxLoader } from '../../components/common';
 import { toastService, showConfirm } from '../../services';
 
 export const JoinCommunityScreen: React.FC = () => {
@@ -87,7 +87,7 @@ export const JoinCommunityScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <GoFolyXLoader color="#7B3FF2" />
+        <GofolyxLoader color="#7B3FF2" />
         <Text style={{ color: colors.textTertiary, marginTop: 12, fontSize: 14 }}>
           Chargement de la communaute...
         </Text>

@@ -455,7 +455,7 @@ export const TournamentBracketScreen: React.FC = () => {
     try {
       await Share.share({
         title: tournament.name,
-        message: `${tournament.name} — rejoins le tournoi sur GoFolyX !\nVia GoFolyX`,
+        message: `${tournament.name} — rejoins le tournoi sur Gofolyx !\nVia Gofolyx`,
       });
       socialService.share({ platform: 'external', tournament_id: tournamentId }).catch(() => {});
     } catch { /* utilisateur a annulé le partage */ }

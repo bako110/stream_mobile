@@ -19,7 +19,7 @@ import { eventService } from '../../services';
 import { Endpoints, getAuthToken } from '../../api';
 import { API_BASE_URL } from '../../utils/constants';
 import type { EventAttendee } from '../../types/event';
-import { BackButton, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { BackButton, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import { toastService } from '../../services';
 
 interface Props {
@@ -258,7 +258,7 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <GoFolyXLoader color={colors.primary} />
+          <GofolyxLoader color={colors.primary} />
           <Text style={{ color: colors.textTertiary }}>Chargement des inscrits...</Text>
         </View>
       ) : (

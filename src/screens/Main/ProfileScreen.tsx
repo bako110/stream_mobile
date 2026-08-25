@@ -99,7 +99,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
       // gofolyx_id seulement si online (appel POST)
       if (!me.gofolyx_id) {
         try {
-          const r = await apiClient.post<User>(Endpoints.users.generateGoFolyXId);
+          const r = await apiClient.post<User>(Endpoints.users.generateGofolyxId);
           setCurrentUser(r.data);
         } catch {}
       }
@@ -411,15 +411,15 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   if (!user?.gofolyx_id) return;
                   Clipboard.setString(user.gofolyx_id!);
                   if (Platform.OS === 'android') {
-                    ToastAndroid.show('GoFolyX ID copié !', ToastAndroid.SHORT);
+                    ToastAndroid.show('Gofolyx ID copié !', ToastAndroid.SHORT);
                   } else {
-                    toastService.success('Copié', 'GoFolyX ID copié dans le presse-papier.');
+                    toastService.success('Copié', 'Gofolyx ID copié dans le presse-papier.');
                   }
                 }}
               >
                 <Icon name="at-sign" size={16} color={colors.primary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>GoFolyX ID</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>Gofolyx ID</Text>
                   <Text style={{ fontSize: 15, fontWeight: '900', color: user?.gofolyx_id ? colors.primary : colors.textTertiary, letterSpacing: 2 }}>
                     {user?.gofolyx_id ?? 'En cours de génération...'}
                   </Text>

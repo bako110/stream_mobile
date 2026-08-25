@@ -25,7 +25,7 @@ import {
 import { hmac } from '@noble/hashes/hmac.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
-const RATCHET_INFO = 'GoFolyX-E2EE-Ratchet-v1';
+const RATCHET_INFO = 'Gofolyx-E2EE-Ratchet-v1';
 const MESSAGE_KEY_SEED = new Uint8Array([0x01]);
 const CHAIN_KEY_SEED = new Uint8Array([0x02]);
 

@@ -74,7 +74,7 @@ export const LiveMoreMenu: React.FC<Props> = ({
     run(() => {
       Share.open({
         title: 'Rejoins ce live',
-        message: hostName ? `${hostName} est en direct sur GoFolyX, viens voir !` : 'Rejoins ce live sur GoFolyX !',
+        message: hostName ? `${hostName} est en direct sur Gofolyx, viens voir !` : 'Rejoins ce live sur Gofolyx !',
         url: shareUrl,
         failOnCancel: false,
       }).catch(() => {});

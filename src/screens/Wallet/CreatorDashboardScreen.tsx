@@ -24,7 +24,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
+import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -220,7 +220,7 @@ const CreatorDashboardScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <GoFolyXLoader />
+        <GofolyxLoader />
       </View>
     );
   }

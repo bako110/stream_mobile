@@ -18,7 +18,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GoFolyXLoader, FriendsWhoLiked, PriceWithLocal } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, authService, toastService, showConfirm } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
@@ -73,7 +73,7 @@ const VideoModal: React.FC<{ uri: string; onClose: () => void }> = ({ uri, onClo
       <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
         <VideoView player={player} style={{ width: SW, height: SW * 0.62 }} resizeMode="contain" controls />
         {/* Spinner centré pendant le chargement */}
-        {!isReady && <GoFolyXLoader variant="reel" color="#ffffff" />}
+        {!isReady && <GofolyxLoader variant="reel" color="#ffffff" />}
         <TouchableOpacity onPress={onClose}
           style={{ position: 'absolute', top: Platform.OS === 'ios' ? 52 : 36, right: 16,
             width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.6)',
@@ -488,7 +488,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     if (!event) return;
     try {
       await Share.share({ title: event.title,
-        message: `${event.title} — ${formatDateShort(event.starts_at)} à ${event.venue_city ?? 'GoFolyX'}\nVia GoFolyX` });
+        message: `${event.title} — ${formatDateShort(event.starts_at)} à ${event.venue_city ?? 'Gofolyx'}\nVia Gofolyx` });
       setShareCount(c => c + 1);
       socialService.share({ platform: 'external', event_id: eventId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
     } catch { /**/ }

@@ -16,7 +16,7 @@ import { CachedImage } from '../../components/common/CachedImage';
 import type { Reel } from '../../types';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 const { width: SW, height: SH } = Dimensions.get('screen');
 const PAGE_LIMIT = 20;
@@ -318,7 +318,7 @@ export const SearchReelViewerScreen: React.FC = () => {
     return (
       <View style={[s.root, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <GoFolyXLoader variant="reel" color="#ffffff" />
+        <GofolyxLoader variant="reel" color="#ffffff" />
       </View>
     );
   }

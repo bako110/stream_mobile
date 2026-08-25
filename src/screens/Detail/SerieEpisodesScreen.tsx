@@ -602,7 +602,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
               {[
                 { icon: 'check-circle', txt: 'Accès permanent à toute la série' },
                 { icon: 'check-circle', txt: 'Tous les épisodes, toutes les saisons' },
-                { icon: 'check-circle', txt: 'Lié à votre compte GoFolyX' },
+                { icon: 'check-circle', txt: 'Lié à votre compte Gofolyx' },
               ].map((b, i) => (
                 <View key={i} style={pw.benefit}>
                   <Icon name={b.icon} size={14} color="#10b981" />

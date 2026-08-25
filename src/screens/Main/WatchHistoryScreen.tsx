@@ -8,7 +8,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 interface HistoryEntry {
   _id: string;
@@ -154,7 +154,7 @@ export const WatchHistoryScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : history.length === 0 ? (
         <View style={s.empty}>
           <Icon name="clock" size={48} color={colors.textTertiary} />

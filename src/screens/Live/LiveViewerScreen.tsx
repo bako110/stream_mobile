@@ -26,7 +26,7 @@ import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import type { Concert } from '../../types';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 interface Props {
   concertId: string;
@@ -60,7 +60,7 @@ const ArtistVideoView: React.FC = () => {
   if (remoteParticipants.length === 0) {
     return (
       <View style={styles.noVideoCenter}>
-        <GoFolyXLoader variant="reel" color="#E53E3E" />
+        <GofolyxLoader variant="reel" color="#E53E3E" />
         <Text style={styles.connectingText}>En attente du stream...</Text>
       </View>
     );
@@ -69,7 +69,7 @@ const ArtistVideoView: React.FC = () => {
   if (!artistTrack) {
     return (
       <View style={styles.noVideoCenter}>
-        <GoFolyXLoader variant="reel" color="#E53E3E" />
+        <GofolyxLoader variant="reel" color="#E53E3E" />
         <Text style={styles.connectingText}>En attente de la vidéo...</Text>
       </View>
     );
@@ -202,7 +202,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <GoFolyXLoader variant="reel" color="#E53E3E" />
+        <GofolyxLoader variant="reel" color="#E53E3E" />
       </View>
     );
   }
@@ -244,7 +244,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   if (!token || !wsUrl) {
     return (
       <View style={[styles.container, styles.center]}>
-        <GoFolyXLoader variant="reel" color="#E53E3E" />
+        <GofolyxLoader variant="reel" color="#E53E3E" />
         <Text style={styles.connectingText}>Connexion au live...</Text>
       </View>
     );

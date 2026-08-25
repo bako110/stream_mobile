@@ -95,7 +95,7 @@ export const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           <Text style={[s.heroTitle, { color: colors.textPrimary }]}>Ton avis compte</Text>
           <Text style={[s.heroSub, { color: colors.textTertiary }]}>
-            Un bug à signaler ? Une idée pour améliorer GoFolyX ? Dis-nous tout.
+            Un bug à signaler ? Une idée pour améliorer Gofolyx ? Dis-nous tout.
           </Text>
         </View>
 

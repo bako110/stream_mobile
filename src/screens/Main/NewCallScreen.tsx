@@ -12,7 +12,7 @@ import { BorderRadius, Spacing } from '../../theme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 interface UserResult {
   id:          string;
@@ -156,7 +156,7 @@ export const NewCallScreen: React.FC = () => {
       )}
 
       {isLoading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : (
         <FlatList
           data={displayed}

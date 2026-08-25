@@ -25,11 +25,10 @@ const SECTIONS: Section[] = [
   {
     key: 'identite', icon: 'info', title: '1. Identité du responsable de traitement',
     body: `Responsable de traitement :
-GoFolyX SAS
-Siège social : Paris, France
+Gofolyx SAS
 Email DPO : privacy@gofolyx.com
 
-GoFolyX SAS est responsable du traitement de vos données personnelles collectées via l'application mobile GoFolyX et le site web gofolyx.app.
+Gofolyx SAS est responsable du traitement de vos données personnelles collectées via l'application mobile Gofolyx et le site web gofolyx.app.
 
 Pour toute question relative à la protection de vos données, vous pouvez contacter notre Délégué à la Protection des Données (DPO) à l'adresse privacy@gofolyx.com. Nous nous engageons à répondre à toute demande dans un délai maximum de 30 jours.`,
   },
@@ -87,7 +86,7 @@ Obligations légales :
     key: 'base-legale', icon: 'shield', title: '4. Base légale des traitements',
     body: `Conformément au RGPD, chaque traitement repose sur l'une des bases légales suivantes :
 
-• Exécution du contrat (art. 6.1.b RGPD) : traitements nécessaires à la fourniture du service GoFolyX (compte, contenus, paiements)
+• Exécution du contrat (art. 6.1.b RGPD) : traitements nécessaires à la fourniture du service Gofolyx (compte, contenus, paiements)
 
 • Consentement (art. 6.1.a RGPD) : communications marketing, géolocalisation précise, cookies optionnels — vous pouvez retirer votre consentement à tout moment
 
@@ -95,11 +94,11 @@ Obligations légales :
 
 • Obligation légale (art. 6.1.c RGPD) : conservation des données de facturation, réponse aux autorités judiciaires
 
-Pour les données sensibles (origine ethnique, opinions politiques, santé), GoFolyX ne collecte pas ce type de données et met en place des mesures pour éviter que les utilisateurs n'en publient volontairement dans des contextes exposés.`,
+Pour les données sensibles (origine ethnique, opinions politiques, santé), Gofolyx ne collecte pas ce type de données et met en place des mesures pour éviter que les utilisateurs n'en publient volontairement dans des contextes exposés.`,
   },
   {
     key: 'partage', icon: 'users', title: '5. Partage et destinataires des données',
-    body: `GoFolyX ne vend jamais vos données personnelles à des tiers. Elles peuvent être partagées uniquement dans les cas suivants :
+    body: `Gofolyx ne vend jamais vos données personnelles à des tiers. Elles peuvent être partagées uniquement dans les cas suivants :
 
 Sous-traitants techniques (traitement pour notre compte) :
 • Hébergement cloud (serveurs EU) — AWS / OVH
@@ -110,7 +109,7 @@ Sous-traitants techniques (traitement pour notre compte) :
 
 Tous nos sous-traitants sont liés par des DPA (Data Processing Agreements) conformes au RGPD et ne peuvent utiliser vos données qu'aux fins pour lesquelles nous les mandatons.
 
-Autres utilisateurs GoFolyX :
+Autres utilisateurs Gofolyx :
 • Vos contenus publics (posts, reels, profil public) sont visibles conformément à vos paramètres de confidentialité
 • Vos messages privés ne sont partagés qu'avec leurs destinataires
 
@@ -155,7 +154,7 @@ Consentements marketing :
     key: 'droits', icon: 'check-circle', title: '8. Vos droits RGPD',
     body: `Conformément au RGPD (articles 15 à 22), vous disposez des droits suivants sur vos données personnelles :
 
-• Droit d'accès (art. 15) : obtenir une copie complète de vos données personnelles traitées par GoFolyX
+• Droit d'accès (art. 15) : obtenir une copie complète de vos données personnelles traitées par Gofolyx
 
 • Droit de rectification (art. 16) : corriger toute donnée inexacte ou incomplète
 
@@ -177,7 +176,7 @@ Recours : si vous estimez que vos droits ne sont pas respectés, vous pouvez sai
   },
   {
     key: 'securite', icon: 'lock', title: '9. Sécurité des données',
-    body: `GoFolyX met en œuvre un ensemble de mesures techniques et organisationnelles pour protéger vos données contre tout accès non autorisé, divulgation, altération ou destruction :
+    body: `Gofolyx met en œuvre un ensemble de mesures techniques et organisationnelles pour protéger vos données contre tout accès non autorisé, divulgation, altération ou destruction :
 
 Mesures techniques :
 • Chiffrement des données en transit : TLS 1.3 minimum sur toutes les connexions
@@ -193,12 +192,12 @@ Mesures organisationnelles :
 • Politique de gestion des incidents de sécurité documentée
 
 En cas de violation de données :
-• GoFolyX s'engage à notifier la CNIL dans les 72 heures
+• Gofolyx s'engage à notifier la CNIL dans les 72 heures
 • Les utilisateurs concernés seront notifiés dans les meilleurs délais si la violation présente un risque élevé pour leurs droits et libertés`,
   },
   {
     key: 'cookies', icon: 'smartphone', title: '10. Cookies et technologies de suivi',
-    body: `L'application GoFolyX utilise des technologies similaires aux cookies (stockage local, identifiants d'appareil, SDK analytics) que nous classons en trois catégories :
+    body: `L'application Gofolyx utilise des technologies similaires aux cookies (stockage local, identifiants d'appareil, SDK analytics) que nous classons en trois catégories :
 
 Strictement nécessaires (toujours actifs) :
 • Maintien de votre session authentifiée
@@ -222,7 +221,7 @@ Comment gérer vos préférences :
   },
   {
     key: 'mineurs', icon: 'user-x', title: '11. Protection des mineurs',
-    body: `GoFolyX est destiné aux personnes âgées de 13 ans et plus. Nous prenons la protection des mineurs très au sérieux.
+    body: `Gofolyx est destiné aux personnes âgées de 13 ans et plus. Nous prenons la protection des mineurs très au sérieux.
 
 Mesures en place :
 • Vérification de l'âge lors de l'inscription (déclaration de date de naissance)
@@ -230,11 +229,11 @@ Mesures en place :
 • Contenu sensible masqué par défaut pour les comptes mineurs
 • Signalement facilité des profils suspects
 
-Nous ne collectons pas sciemment de données personnelles d'enfants de moins de 13 ans. Si vous êtes un parent ou tuteur légal et pensez qu'un enfant de moins de 13 ans a créé un compte sur GoFolyX, contactez-nous immédiatement à privacy@gofolyx.com. Nous procéderons à la vérification et, le cas échéant, à la suppression immédiate du compte et des données associées.`,
+Nous ne collectons pas sciemment de données personnelles d'enfants de moins de 13 ans. Si vous êtes un parent ou tuteur légal et pensez qu'un enfant de moins de 13 ans a créé un compte sur Gofolyx, contactez-nous immédiatement à privacy@gofolyx.com. Nous procéderons à la vérification et, le cas échéant, à la suppression immédiate du compte et des données associées.`,
   },
   {
     key: 'ia', icon: 'cpu', title: '12. Intelligence artificielle et algorithmes',
-    body: `GoFolyX utilise des systèmes algorithmiques et d'intelligence artificielle pour :
+    body: `Gofolyx utilise des systèmes algorithmiques et d'intelligence artificielle pour :
 
 Personnalisation :
 • Recommandation de contenus dans votre fil d'actualité
@@ -255,7 +254,7 @@ Contactez support@gofolyx.com pour toute demande en ce sens.`,
   },
   {
     key: 'modifications', icon: 'refresh-cw', title: '13. Modifications de la politique',
-    body: `GoFolyX se réserve le droit de modifier la présente Politique de Confidentialité à tout moment, notamment pour :
+    body: `Gofolyx se réserve le droit de modifier la présente Politique de Confidentialité à tout moment, notamment pour :
 • Se conformer aux évolutions légales et réglementaires
 • Refléter de nouvelles pratiques de traitement
 • Intégrer de nouveaux services ou fonctionnalités
@@ -266,7 +265,7 @@ Notification des changements :
 
 La date de dernière mise à jour est toujours indiquée en haut de ce document. Nous vous encourageons à consulter régulièrement cette politique.
 
-La poursuite de l'utilisation de GoFolyX après notification des modifications vaut acceptation de la nouvelle version.`,
+La poursuite de l'utilisation de Gofolyx après notification des modifications vaut acceptation de la nouvelle version.`,
   },
 ];
 
@@ -348,7 +347,7 @@ export const PolitiqueConfidentialiteScreen: React.FC<Props> = ({ onBack }) => {
             <Icon name="shield" size={22} color={accentColor} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.introTitle, { color: colors.textPrimary }]}>Confidentialité GoFolyX</Text>
+            <Text style={[s.introTitle, { color: colors.textPrimary }]}>Confidentialité Gofolyx</Text>
             <Text style={[s.introSub, { color: colors.textTertiary }]}>Dernière mise à jour : 1er mai 2026</Text>
             <Text style={[s.introDesc, { color: colors.textSecondary }]}>
               Nous prenons la protection de vos données très au sérieux. Cette politique explique comment nous collectons, utilisons et protégeons vos informations.
@@ -429,7 +428,7 @@ export const PolitiqueConfidentialiteScreen: React.FC<Props> = ({ onBack }) => {
 
         {/* Version */}
         <Text style={[s.versionTxt, { color: colors.textTertiary }]}>
-          Version 2.0 · GoFolyX SAS · Paris, France
+          Version 2.0 · Gofolyx SAS
         </Text>
 
       </ScrollView>

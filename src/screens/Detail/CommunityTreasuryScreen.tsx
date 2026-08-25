@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolyXLoader, PriceWithLocal } from '../../components/common';
+import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -96,7 +96,7 @@ export const CommunityTreasuryScreen: React.FC = () => {
 
       {loading ? (
         <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-          <GoFolyXLoader />
+          <GofolyxLoader />
         </View>
       ) : (
         <FlatList

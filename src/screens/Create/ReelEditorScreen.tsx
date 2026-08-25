@@ -533,7 +533,7 @@ export const ReelEditorScreen: React.FC<Props> = ({
         : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
       const granted = await PermissionsAndroid.request(perm, {
         title: 'Accès aux fichiers audio',
-        message: 'GoFolyX a besoin d\'accéder à vos fichiers audio.',
+        message: 'Gofolyx a besoin d\'accéder à vos fichiers audio.',
         buttonPositive: 'Autoriser',
         buttonNegative: 'Refuser',
       });

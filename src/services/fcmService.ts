@@ -239,7 +239,7 @@ export async function handleBackgroundFCM(
   await _createChannels();
 
   const type  = (data.type  as string) ?? '';
-  const title = (data.title as string) ?? 'GoFolyX';
+  const title = (data.title as string) ?? 'Gofolyx';
   const body  = (data.body  as string) ?? '';
 
   if (type === 'call_offer') {

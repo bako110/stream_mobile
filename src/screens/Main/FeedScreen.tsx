@@ -32,7 +32,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { storage } from '../../utils/storage';
 import { showConfirm } from '../../services';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GoFolyXLoader } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, PeopleSuggestions, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
@@ -707,7 +707,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // false — ne demande pas la permission localisation des l'arrivee sur le feed,
   // uniquement la section secondaire "Pres de toi" en beneficie ici.
   const userLocation = useUserLocation(false);
-  // Zoom d'accessibilité système — réduit le logo "GoFolyX" centré au-delà d'un
+  // Zoom d'accessibilité système — réduit le logo "Gofolyx" centré au-delà d'un
   // certain agrandissement, sinon il chevauche le nom d'utilisateur (gauche) et
   // les boutons de recherche (droite) qui grandissent aussi.
   const { fontScale: headerFontScale } = useWindowDimensions();
@@ -1185,7 +1185,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       } else if (contactsStatus === RESULTS.DENIED && !storage.getBoolean(CONTACTS_PROMPT_SEEN_KEY)) {
         storage.setBoolean(CONTACTS_PROMPT_SEEN_KEY, true);
         showConfirm(
-          'Trouve tes amis sur GoFolyX',
+          'Trouve tes amis sur Gofolyx',
           'Autorise l\'accès à tes contacts pour qu\'on te suggère en priorité les personnes que tu connais déjà — jamais tes contacts ne sont partagés ni affichés, seule une empreinte chiffrée sert à faire le lien.',
           [
             { text: 'Plus tard', style: 'cancel' },
@@ -2278,7 +2278,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             </>
           )}
 
-          {/* Centre : GoFolyX — même style que "Reels" dans ReelsScreen */}
+          {/* Centre : Gofolyx — même style que "Reels" dans ReelsScreen */}
           {!searchOpen && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
               <Text style={{ fontSize: logoFontSize, fontWeight: '900', letterSpacing: 0.2, color: colors.textPrimary }} numberOfLines={1}>
@@ -2673,7 +2673,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   </View>
                 )}
                 <View style={{ alignItems: 'center', paddingTop: historySuggestions.length > 0 ? 24 : 80, gap: 12 }}>
-                  <GoFolyXLoader color={colors.primary} />
+                  <GofolyxLoader color={colors.primary} />
                   <Text style={{ fontSize: 14, color: colors.textTertiary }}>Recherche en cours...</Text>
                 </View>
               </ScrollView>
@@ -3990,7 +3990,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
   const author       = isEvent ? event?.organizer : concert?.artist ?? null;
   const authorId     = author?.id ?? null;
-  const authorName   = author?.display_name ?? author?.username ?? 'GoFolyX';
+  const authorName   = author?.display_name ?? author?.username ?? 'Gofolyx';
   const authorAvatar = author?.avatar_url ?? null;
   const authorInit   = (authorName || 'F')[0].toUpperCase();
   const isOwnContent = !!(currentUserId && authorId && currentUserId === authorId);

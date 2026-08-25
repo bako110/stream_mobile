@@ -6,7 +6,7 @@ import {
 import Clipboard from '@react-native-clipboard/clipboard';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -73,8 +73,8 @@ export const ReferralScreen: React.FC = () => {
     if (!stats?.referral_code) return;
     await Share.share({
       message:
-        `Rejoins-moi sur GoFolyX ! Utilise mon code de parrainage \`${stats.referral_code}\` lors de ton inscription et gagne 20 GoGold bonus. Tu peux t'inscrire sur GoFolyX maintenant.`,
-      title: 'Invite un ami sur GoFolyX',
+        `Rejoins-moi sur Gofolyx ! Utilise mon code de parrainage \`${stats.referral_code}\` lors de ton inscription et gagne 20 GoGold bonus. Tu peux t'inscrire sur Gofolyx maintenant.`,
+      title: 'Invite un ami sur Gofolyx',
     });
   }, [stats]);
 
@@ -95,7 +95,7 @@ export const ReferralScreen: React.FC = () => {
 
       {loading ? (
         <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-          <GoFolyXLoader />
+          <GofolyxLoader />
         </View>
       ) : (
         <ScrollView
@@ -111,7 +111,7 @@ export const ReferralScreen: React.FC = () => {
           >
             <Text style={[s.heroTitle, { color: colors.textPrimary }]}>Invitez vos amis</Text>
             <Text style={[s.heroSub, { color: colors.textSecondary }]}>
-              Gagnez des GoGold pour chaque ami qui rejoint GoFolyX et chaque achat qu'il effectue.
+              Gagnez des GoGold pour chaque ami qui rejoint Gofolyx et chaque achat qu'il effectue.
             </Text>
 
             {/* Récompenses */}

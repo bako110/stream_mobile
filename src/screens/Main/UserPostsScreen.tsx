@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { postService } from '../../services/postService';
 import type { Post } from '../../types/post';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -127,7 +127,7 @@ export const UserPostsScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : posts.length === 0 ? (
         <View style={s.emptyWrap}>
           <Icon name="edit-3" size={32} color={colors.textTertiary} />

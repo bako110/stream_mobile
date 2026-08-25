@@ -10,7 +10,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 import { analyticsService } from '../../services/analyticsService';
 import type { ContentDetailStats, AnalyticsContentType } from '../../services/analyticsService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -67,7 +67,7 @@ export const ContentAnalyticsDetailScreen: React.FC = () => {
       </View>
 
       {loading ? (
-        <GoFolyXLoader fullScreen color={colors.primary} />
+        <GofolyxLoader fullScreen color={colors.primary} />
       ) : !detail ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 32 }}>
           <Icon name="alert-triangle" size={28} color={colors.textTertiary} />

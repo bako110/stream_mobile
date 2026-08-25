@@ -16,7 +16,7 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { PageHeader } from './_shared';
-import { GoFolyXLoader } from '../../components/common/GoFolyXLoader';
+import { GofolyxLoader } from '../../components/common/FolixLoader';
 import { apiClient } from '../../api/client';
 import { authService, toastService, showConfirm } from '../../services';
 
@@ -328,7 +328,7 @@ export const SettingsSecurityScreen: React.FC = () => {
         {/* Chargement */}
         {loading ? (
           <View style={s.loadingWrap}>
-            <GoFolyXLoader variant="bar" color={colors.primary ?? '#7B3FF2'} />
+            <GofolyxLoader variant="bar" color={colors.primary ?? '#7B3FF2'} />
           </View>
         ) : sessions.length === 0 ? (
           <View style={s.empty}>
@@ -351,7 +351,7 @@ export const SettingsSecurityScreen: React.FC = () => {
                   <SessionCard session={session} onRevoke={(id) => handleRevoke(id, session.is_current)} />
                   {revoking === session.id && (
                     <View style={s.revokingOverlay}>
-                      <GoFolyXLoader variant="bar" color="#EF4444" />
+                      <GofolyxLoader variant="bar" color="#EF4444" />
                     </View>
                   )}
                 </Animated.View>
@@ -366,7 +366,7 @@ export const SettingsSecurityScreen: React.FC = () => {
                 disabled={revokingAll}
               >
                 {revokingAll ? (
-                  <GoFolyXLoader variant="bar" color="#EF4444" />
+                  <GofolyxLoader variant="bar" color="#EF4444" />
                 ) : (
                   <>
                     <Icon name="log-out" size={16} color="#EF4444" />
@@ -428,7 +428,7 @@ export const SettingsSecurityScreen: React.FC = () => {
                 disabled={stepUpLoading || stepUpPassword.trim().length === 0}
               >
                 {stepUpLoading ? (
-                  <GoFolyXLoader variant="bar" color="#fff" />
+                  <GofolyxLoader variant="bar" color="#fff" />
                 ) : (
                   <Text style={[m.btnText, { color: '#fff' }]}>Confirmer</Text>
                 )}

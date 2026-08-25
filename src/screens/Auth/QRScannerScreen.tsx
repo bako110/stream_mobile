@@ -10,7 +10,7 @@ import { Camera, CameraType } from 'react-native-camera-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 interface Props {
   onLoginSuccess: () => void;
@@ -160,7 +160,7 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
 
       {phase === 'verifying' && (
         <Animated.View entering={FadeIn} style={{ alignItems: 'center', gap: 16 }}>
-          <GoFolyXLoader color={colors.primary} />
+          <GofolyxLoader color={colors.primary} />
           <Text style={styles.hint}>Vérification…</Text>
         </Animated.View>
       )}

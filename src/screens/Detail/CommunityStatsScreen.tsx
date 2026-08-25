@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader, BackButton } from '../../components/common';
+import { GofolyxLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { CommunityStats } from '../../services/communityService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -429,7 +429,7 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-        <GoFolyXLoader />
+        <GofolyxLoader />
       </View>
     );
   }

@@ -27,7 +27,7 @@ const SUPPORT_OPTIONS = [
     sub:     'support@gofolyx.com',
     color:   '#10B981',
     kind:    'email',
-    value:   'mailto:support@gofolyx.com?subject=Assistance%20GoFolyX',
+    value:   'mailto:support@gofolyx.com?subject=Assistance%20Gofolyx',
   },
   {
     icon:    'phone',
@@ -44,7 +44,7 @@ const FAQ = [
   { q: 'Comment supprimer mon compte ?',             a: 'Va dans Paramètres → Danger → Supprimer mon compte. Cette action est irréversible.' },
   { q: 'Comment signaler un contenu inapproprié ?',  a: 'Appuie longuement sur le contenu ou utilise le bouton "..." pour accéder à l\'option Signaler.' },
   { q: 'Pourquoi mon paiement a-t-il échoué ?',      a: 'Vérifie que ton moyen de paiement est valide et que tu as une connexion internet stable. Contacte-nous si le problème persiste.' },
-  { q: 'Comment devenir artiste vérifié ?',          a: 'Va dans Paramètres → Vérification et soumets les documents requis. L\'équipe GoFolyX examine les demandes sous 72h.' },
+  { q: 'Comment devenir artiste vérifié ?',          a: 'Va dans Paramètres → Vérification et soumets les documents requis. L\'équipe Gofolyx examine les demandes sous 72h.' },
 ];
 
 export const SupportScreen: React.FC<Props> = ({ navigation }) => {

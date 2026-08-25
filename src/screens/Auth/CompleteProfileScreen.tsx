@@ -47,7 +47,7 @@ export const CompleteProfileScreen: React.FC<Props> = ({ onDone }) => {
     let age = today.getFullYear() - dob.getFullYear();
     const m = today.getMonth() - dob.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-    if (age < 13) return 'Tu dois avoir au moins 13 ans pour utiliser GoFolyX';
+    if (age < 13) return 'Tu dois avoir au moins 13 ans pour utiliser Gofolyx';
     if (!gender) return 'Le sexe est requis';
     return null;
   }

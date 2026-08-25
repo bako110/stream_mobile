@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { favoriteService } from '../../services/favoriteService';
 import type { FavoriteType } from '../../services/favoriteService';
-import { BackButton, GoFolyXLoader } from '../../components/common';
+import { BackButton, GofolyxLoader } from '../../components/common';
 
 type Tab = 'events' | 'concerts' | 'reels' | 'posts' | 'communities' | 'films' | 'series';
 
@@ -175,7 +175,7 @@ export const FavoritesScreen: React.FC = () => {
       {/* Liste */}
       {loading ? (
         <View style={styles.empty}>
-          <GoFolyXLoader color={colors.primary} />
+          <GofolyxLoader color={colors.primary} />
         </View>
       ) : null}
       <FlatList

@@ -18,7 +18,7 @@ import { storyService } from '../../services/storyService';
 import { showConfirm } from '../../services/confirmService';
 import { saveService } from '../../services/saveService';
 import { useWs } from '../../context/WebSocketContext';
-import { GoFolyXLoader, HeartRain, LikeNamesFeed } from '../common';
+import { GofolyxLoader, HeartRain, LikeNamesFeed } from '../common';
 import { getLocalUri, getLocalUriAsync, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
 import { apiClient } from '../../api/client';
 import { networkService } from '../../services/networkService';
@@ -185,7 +185,7 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
       ) : null}
       {/* Spinner uniquement si pas de thumbnail et pas encore prête */}
       {(!ready || buffering) && !showThumb && (
-        <GoFolyXLoader variant="reel" color="#ffffff" />
+        <GofolyxLoader variant="reel" color="#ffffff" />
       )}
     </View>
   );
@@ -1336,7 +1336,7 @@ export const StoryViewer: React.FC<Props> = ({
                   {/* Contenu onglet Vues */}
                   {viewersTab === 'views' && (
                     viewersLoading ? (
-                      <GoFolyXLoader color={accent} height={2} />
+                      <GofolyxLoader color={accent} height={2} />
                     ) : viewers.length === 0 ? (
                       <View style={s.emptyBox}>
                         <Icon name="eye-off" size={38} color="rgba(255,255,255,0.2)" />
@@ -1398,7 +1398,7 @@ export const StoryViewer: React.FC<Props> = ({
                   {/* Contenu onglet Réponses */}
                   {viewersTab === 'replies' && (
                     repliesLoading ? (
-                      <GoFolyXLoader color={accent} height={2} />
+                      <GofolyxLoader color={accent} height={2} />
                     ) : replies.length === 0 ? (
                       <View style={s.emptyBox}>
                         <Icon name="message-circle" size={38} color="rgba(255,255,255,0.2)" />

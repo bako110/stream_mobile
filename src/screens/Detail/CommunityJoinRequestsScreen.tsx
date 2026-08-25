@@ -9,7 +9,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
-import { GoFolyXLoader, BackButton } from '../../components/common';
+import { GofolyxLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
 import type { JoinRequest } from '../../services/communityService';
 import { toastService, showConfirm } from '../../services';
@@ -203,7 +203,7 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
 
       {loading ? (
         <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
-          <GoFolyXLoader />
+          <GofolyxLoader />
         </View>
       ) : requests.length === 0 ? (
         <View style={s.center}>

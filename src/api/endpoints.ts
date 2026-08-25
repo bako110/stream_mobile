@@ -36,7 +36,7 @@ export const Endpoints = {
   users: {
     me:             `${V1}/users/me`,
     updateMe:       `${V1}/users/me`,
-    generateGoFolyXId: `${V1}/users/me/generate-gofolyx-id`,
+    generateGofolyxId: `${V1}/users/me/generate-gofolyx-id`,
     watchHistory:   `${V1}/users/me/history`,
     publicProfile:  (id: string) => `${V1}/users/${id}/profile`,
     userReels:      (id: string) => `${V1}/users/${id}/reels`,
@@ -359,7 +359,7 @@ export const Endpoints = {
     referralMe:    `${V1}/wallet/referral/me`,
     referralStats: `${V1}/wallet/referral/stats`,
     referralUsers: `${V1}/wallet/referral/users`,
-    // GoFolyX ID
+    // Gofolyx ID
     resolveFlixId: (gofolyxId: string) => `${V1}/wallet/resolve/${gofolyxId}`,
     // Revenus créateur (toutes sources) — même contrat que le web (revenueService.ts)
     revenueSummary:      `${V1}/wallet/creator/revenue/summary`,
