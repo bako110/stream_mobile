@@ -64,9 +64,13 @@ const CFG: Record<string, { icon: string; grad: [string, string] }> = {
 };
 const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
 
+// Types "sociaux purs" qui ouvrent toujours le profil de l'acteur — 'reaction'
+// et 'comment' ont été retirés de cette liste : ils portent un ref_type/ref_id
+// vers le contenu concerné (post/reel) et doivent ouvrir CE contenu, pas le
+// profil de la personne qui a réagi/commenté (bug corrigé : la notif "Bako a
+// commenté votre publication" ouvrait le profil de Bako au lieu du post).
 const USER_NOTIF_TYPES = new Set([
-  'follow', 'profile_view', 'story_view', 'mention', 'reaction', 'comment',
-  'subscription', 'reel_posted',
+  'follow', 'profile_view', 'story_view', 'mention', 'subscription', 'reel_posted',
 ]);
 
 function timeAgo(iso: string): string {
