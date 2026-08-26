@@ -72,6 +72,16 @@ let _onUnauthorized: (() => void) | null = null;
 let _onAccountBlocked: ((reason?: string, contact?: string) => void) | null = null;
 let _refreshPromise: Promise<string> | null = null;
 
+// Dedup des GET identiques declenches a quelques ms d'ecart (double-tap sur un
+// refresh, remount rapide d'ecran par la navigation, focus event redeclenche,
+// etc.) — meme filet de securite que le client web (src/api/client.ts), meme
+// si React Native n'a pas d'equivalent StrictMode qui double-invoque les
+// effects. Fenetre courte (500ms) : absorbe un double-declenchement quasi
+// synchrone sans retarder un vrai refetch volontaire qui doit toujours
+// repartir d'un fetch frais.
+const _inflightGets = new Map<string, Promise<ApiResponse<unknown>>>();
+const GET_DEDUP_WINDOW_MS = 500;
+
 export const setAuthToken = (token: string | null) => {
   authToken = token;
 };
@@ -198,8 +208,28 @@ async function request<T>(
 }
 
 export const apiClient = {
-  get: <T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(endpoint, { ...options, method: 'GET' }),
+  get: <T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>): Promise<ApiResponse<T>> => {
+    // Dedup uniquement le cas courant (aucune option custom — pas de signal
+    // propre a cet appelant) : un signal externe implique un cycle de vie/
+    // annulation propre a CET appel, qu'on ne doit pas partager avec un autre
+    // appelant meme sur le meme endpoint.
+    if (!options) {
+      const inflight = _inflightGets.get(endpoint);
+      if (inflight) return inflight as Promise<ApiResponse<T>>;
+
+      const p = request<T>(endpoint, { method: 'GET' }) as Promise<ApiResponse<unknown>>;
+      _inflightGets.set(endpoint, p);
+      const clear = () => {
+        // Ne retire que si c'est toujours CETTE promesse (evite de purger
+        // l'entree d'un appel plus recent demarre entre-temps).
+        if (_inflightGets.get(endpoint) === p) _inflightGets.delete(endpoint);
+      };
+      setTimeout(clear, GET_DEDUP_WINDOW_MS);
+      p.finally(clear);
+      return p as Promise<ApiResponse<T>>;
+    }
+    return request<T>(endpoint, { ...options, method: 'GET' });
+  },
 
   post: <T>(endpoint: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(endpoint, { ...options, method: 'POST', body }),
