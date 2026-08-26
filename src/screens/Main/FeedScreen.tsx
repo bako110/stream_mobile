@@ -896,6 +896,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     const lastVisibleIndex = viewableItems.length > 0
       ? Math.max(...viewableItems.map(v => v.index ?? -1))
       : -1;
+    if (__DEV__) {
+      console.log('[FEED-DEBUG] viewableChanged', {
+        lastVisibleIndex,
+        itemsLen: itemsRef.current.length,
+        remaining: itemsRef.current.length - 1 - lastVisibleIndex,
+        willTrigger: lastVisibleIndex >= 0 && itemsRef.current.length - 1 - lastVisibleIndex <= PREFETCH_ITEMS_REMAINING,
+        viewableIndexes: viewableItems.map(v => v.index),
+      });
+    }
     if (lastVisibleIndex >= 0 && itemsRef.current.length - 1 - lastVisibleIndex <= PREFETCH_ITEMS_REMAINING) {
       loadMoreFeedRef.current();
     }
@@ -1203,8 +1212,16 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const AD_EVERY       = 8;
   const adSlotIdxRef  = useRef(0); // continue la numérotation des slots pub entre pages
 
-  const load = useCallback(async (f: FeedFilter, silent = false) => {
+  // Garde synchrone : tant que load('all') (page 1 / rechargement complet) n'a pas
+  // fini d'écrire son résultat dans items, loadMoreFeed ne doit jamais démarrer —
+  // sinon la page 2 pourrait se charger avant que la page 1 ne soit stabilisée à
+  // l'écran (ex: viewability/onEndReached se déclenchant pendant que load() tourne
+  // encore). Contrairement au state `loading` (asynchrone, re-render différé), une
+  // ref est lue/écrite de façon synchrone, donc fiable comme garde immédiate.
+  const loadingInitialRef = useRef(false);
 
+  const load = useCallback(async (f: FeedFilter, silent = false) => {
+    if (f === 'all') loadingInitialRef.current = true;
     try {
       if (f === 'all') {
         // Reset pagination — uniquement pour un vrai rechargement (1er montage, pull-to-
@@ -1219,6 +1236,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // changent pas).
         if (silent && feedPageRef.current > 1) {
           lastLoadedAtRef.current = Date.now();
+          loadingInitialRef.current = false;
           return;
         }
 
@@ -1247,7 +1265,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         const adSlotIds: string[] = [];
         for (const d of feedRaw) {
           if (!d || !d.id) continue;
-          if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
+          if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post' || d.kind === 'reel') {
             const key = `${d.kind}-${d.id}`;
             if (seen.has(key)) continue;
             seen.add(key);
@@ -1331,6 +1349,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     } catch (err) {
       if (__DEV__) { console.warn('[FeedScreen] load error:', err); }
     } finally {
+      loadingInitialRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -1369,7 +1388,18 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // fusionnés et dédupliqués contre tout ce qui a déjà été chargé, ajoutés à la suite.
   const loadMoreFeed = useCallback(async () => {
     if (filter !== 'all') return; // pagination gérée uniquement pour le flux principal
+    // La page 1 (load('all')) doit avoir fini d'écrire son résultat AVANT que la page 2
+    // ne puisse démarrer — sans cette garde, un déclenchement de viewability/onEndReached
+    // pendant que load() tourne encore pouvait lancer loadMoreFeed en parallèle.
+    if (loadingInitialRef.current) return;
     if (loadingMoreRef.current || !hasMoreFeed) return;
+    if (__DEV__) {
+      console.log('[FEED-DEBUG] loadMoreFeed START', {
+        nextPage: feedPageRef.current + 1,
+        currentItemsLen: itemsRef.current.length,
+        stack: new Error().stack?.split('\n').slice(1, 4).join(' | '),
+      });
+    }
     loadingMoreRef.current = true;
     setLoadingMoreFeed(true);
 
@@ -1390,7 +1420,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       const adSlotIds: string[] = [];
       for (const d of feedRawItems) {
         if (!d || !d.id) continue;
-        if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
+        if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post' || d.kind === 'reel') {
           const key = `${d.kind}-${d.id}`;
           if (seenItemIdsRef.current.has(key)) continue;
           seenItemIdsRef.current.add(key);
