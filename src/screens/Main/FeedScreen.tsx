@@ -896,15 +896,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     const lastVisibleIndex = viewableItems.length > 0
       ? Math.max(...viewableItems.map(v => v.index ?? -1))
       : -1;
-    if (__DEV__) {
-      console.log('[FEED-DEBUG] viewableChanged', {
-        lastVisibleIndex,
-        itemsLen: itemsRef.current.length,
-        remaining: itemsRef.current.length - 1 - lastVisibleIndex,
-        willTrigger: lastVisibleIndex >= 0 && itemsRef.current.length - 1 - lastVisibleIndex <= PREFETCH_ITEMS_REMAINING,
-        viewableIndexes: viewableItems.map(v => v.index),
-      });
-    }
     if (lastVisibleIndex >= 0 && itemsRef.current.length - 1 - lastVisibleIndex <= PREFETCH_ITEMS_REMAINING) {
       loadMoreFeedRef.current();
     }
@@ -1265,7 +1256,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         const adSlotIds: string[] = [];
         for (const d of feedRaw) {
           if (!d || !d.id) continue;
-          if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post' || d.kind === 'reel') {
+          if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
             const key = `${d.kind}-${d.id}`;
             if (seen.has(key)) continue;
             seen.add(key);
@@ -1393,13 +1384,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     // pendant que load() tourne encore pouvait lancer loadMoreFeed en parallèle.
     if (loadingInitialRef.current) return;
     if (loadingMoreRef.current || !hasMoreFeed) return;
-    if (__DEV__) {
-      console.log('[FEED-DEBUG] loadMoreFeed START', {
-        nextPage: feedPageRef.current + 1,
-        currentItemsLen: itemsRef.current.length,
-        stack: new Error().stack?.split('\n').slice(1, 4).join(' | '),
-      });
-    }
     loadingMoreRef.current = true;
     setLoadingMoreFeed(true);
 
@@ -1420,7 +1404,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       const adSlotIds: string[] = [];
       for (const d of feedRawItems) {
         if (!d || !d.id) continue;
-        if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post' || d.kind === 'reel') {
+        if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
           const key = `${d.kind}-${d.id}`;
           if (seenItemIdsRef.current.has(key)) continue;
           seenItemIdsRef.current.add(key);
