@@ -1540,8 +1540,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   useFocusEffect(useCallback(() => {
     setFeedFocused(true);
     if (!didMountRef.current) {
-      // Premier chargement : différer après l'animation de navigation (16ms = 1 frame)
-      const timer = setTimeout(() => load(filter), 16);
+      // Premier chargement : différer après l'animation de navigation (16ms = 1 frame).
+      // forceRefresh=true (même correctif que le web, commit db8aa88) : sans ça, le
+      // tout premier chargement de l'app pouvait retomber sur un cache serveur vieux
+      // de plusieurs minutes, donnant l'impression que le feed ne change jamais.
+      const timer = setTimeout(() => load(filter, false, true), 16);
       didMountRef.current = true;
       return () => {
         clearTimeout(timer);
@@ -1556,10 +1559,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         searchBarOpacity.value = 0;
       };
     }
-    // Retour : refresh silencieux si données > 60s
+    // Retour : refresh silencieux si données > 60s — forceRefresh=true pour
+    // bypasser le cache serveur (même correctif que le web, commit db8aa88) :
+    // revenir sur l'app après un moment doit vraiment recalculer, pas
+    // seulement relire un résultat encore en cache côté backend (TTL 5 min).
     const age = Date.now() - lastLoadedAtRef.current;
     if (age > 60_000) {
-      load(filter, true);
+      load(filter, true, true);
     }
     return () => {
       setFeedFocused(false);
