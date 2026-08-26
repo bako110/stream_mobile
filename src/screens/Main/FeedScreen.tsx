@@ -816,11 +816,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const FEED_PAGE_SIZE = 30;
 
   // Distance en nombre d'items restants à laquelle on déclenche le chargement de la page
-  // suivante — volontairement très proche de la fin réelle (2/30 ≈ 7% de la page) : la
-  // page suivante ne doit démarrer qu'une fois la page courante quasiment entièrement vue,
-  // jamais tôt dans le scroll. Le petit prefetch résiduel (2 items, pas 0) évite juste le
-  // spinner visible le temps du aller-retour réseau — pas une anticipation large.
-  const PREFETCH_ITEMS_REMAINING = 2;
+  // suivante. Un seuil trop serre (teste a 2/30) s'est revele peu fiable en pratique :
+  // onViewableItemsChanged exige minimumViewTime (200ms) de stabilisation sur l'item
+  // visible, qu'un scroll rapide (fling) ne laisse pas toujours le temps d'atteindre sur
+  // les tout derniers items — le declenchement pouvait alors ne jamais avoir lieu, et
+  // rien ne re-tente automatiquement. 5/30 (~17%) reste proche de la fin reelle (pas
+  // d'anticipation large) tout en laissant assez de marge pour ne jamais rater le
+  // declenchement, meme en scroll rapide.
+  const PREFETCH_ITEMS_REMAINING = 5;
   // Nombre d'items à l'avance dont on précharge l'image sur disque — évite l'écran noir/flash
   // au scroll rapide (CachedImage ne télécharge sinon qu'une fois le composant réellement monté).
   // Réduit hors wifi (data mobile facturée), même prudence que StoryBar/ConversationStoryBar.
@@ -2537,7 +2540,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           onScroll={handleFeedScroll}
           scrollEventThrottle={100}
           onEndReached={loadMoreFeed}
-          onEndReachedThreshold={0.1}
+          onEndReachedThreshold={0.3}
           updateCellsBatchingPeriod={50}
           ItemSeparatorComponent={() => (
             <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
