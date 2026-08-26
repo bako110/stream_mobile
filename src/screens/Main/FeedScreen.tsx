@@ -1222,7 +1222,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // ref est lue/écrite de façon synchrone, donc fiable comme garde immédiate.
   const loadingInitialRef = useRef(false);
 
-  const load = useCallback(async (f: FeedFilter, silent = false) => {
+  const load = useCallback(async (f: FeedFilter, silent = false, forceRefresh = false) => {
     if (f === 'all') loadingInitialRef.current = true;
     try {
       if (f === 'all') {
@@ -1252,7 +1252,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // /search/feed renvoie events/concerts/posts triés par score. Le mobile
         // mappe kind -> FeedItem et injecte la pub à part.
         const [feedResult, liveConcerts, spontLivesResult] = await Promise.all([
-          searchService.getFeed(1, FEED_PAGE_SIZE).catch(() => ({ items: [] })),
+          searchService.getFeed(1, FEED_PAGE_SIZE, false, forceRefresh).catch(() => ({ items: [] })),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
         ]);
@@ -2578,7 +2578,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                load(filter);
+                load(filter, false, true);
               }}
               tintColor={colors.primary}
             />
