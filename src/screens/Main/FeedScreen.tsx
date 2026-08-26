@@ -809,6 +809,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // donc on ne peut pas appeler loadMoreFeed directement dedans (sa référence change à chaque
   // render selon ses dépendances). Synchronisée juste après la définition de loadMoreFeed.
   const loadMoreFeedRef = useRef<() => void>(() => {});
+  // Callback stable pour onEndReached — avant ce fix, onEndReached recevait directement
+  // loadMoreFeed (qui change de référence à chaque changement de hasMoreFeed, donc après
+  // CHAQUE page chargée). FlatList réinitialise son suivi interne du seuil de scroll déjà
+  // traité à chaque changement de référence de onEndReached, ce qui peut faire rater ou
+  // dupliquer un déclenchement selon le timing — incohérent avec onFeedViewableChanged, qui
+  // utilise déjà une ref stable pour cette même raison. handleEndReached ne change jamais
+  // d'identité (deps vides), donc FlatList peut fiablement suivre son état interne.
+  const handleEndReached = useCallback(() => { loadMoreFeedRef.current(); }, []);
 
   // Taille de page harmonisée avec le web (FeedPage.tsx, FEED_PAGE_SIZE) — même
   // valeur partout, page 1 comprise, pour que la pagination web/mobile se
@@ -1380,6 +1388,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
   // Scroll infini — page suivante de posts + reels + événements/concerts (recherche),
   // fusionnés et dédupliqués contre tout ce qui a déjà été chargé, ajoutés à la suite.
+  // Nombre max de pages consécutives entièrement recoupées (déjà vues) qu'on retente
+  // automatiquement avant d'abandonner — filet de sécurité contre une boucle infinie
+  // si le backend recoupe indéfiniment (ne devrait jamais arriver en pratique, le tri
+  // par score(temps) finit toujours par exposer du contenu neuf ou par se vider).
+  const MAX_CONSECUTIVE_RECOUPEMENT = 5;
+
   const loadMoreFeed = useCallback(async () => {
     if (filter !== 'all') return; // pagination gérée uniquement pour le flux principal
     // La page 1 (load('all')) doit avoir fini d'écrire son résultat AVANT que la page 2
@@ -1391,48 +1405,56 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     setLoadingMoreFeed(true);
 
     try {
-      const nextPage = feedPageRef.current + 1;
-      const feedResult = await searchService.getFeed(nextPage, FEED_PAGE_SIZE).catch(() => ({ items: [] }));
-      const feedRawItems = feedResult.items ?? [];
-      feedHasMoreRef.current = feedRawItems.length >= FEED_PAGE_SIZE;
-      // Le pool se retrie a chaque page (score = f(temps)) -- une page BRUTE non vide
-      // peut ne contenir QUE des items deja vus sur une page precedente (recoupement),
-      // sans que le catalogue soit pour autant epuise. Ne conclure a la fin du flux que
-      // si le backend lui-meme ne renvoie plus rien, jamais seulement sur la dedup —
-      // sinon le scroll s'arretait prematurement des la 1ere page entierement recoupee.
-      const rawIsEmpty = feedRawItems.length === 0;
+      // Boucle de retry : une page BRUTE non vide peut ne contenir QUE des items déjà
+      // vus (le pool se retrie à chaque appel, score = f(temps)) sans que le catalogue
+      // soit pour autant épuisé. Avant ce fix, ce cas se contentait d'avancer la page
+      // sans rien ajouter à l'écran — si l'utilisateur était déjà en bas de la liste
+      // (plus rien de nouveau à voir), aucun scroll ne se re-déclenchait jamais pour
+      // retenter la page suivante : le chargement semblait "s'arrêter" définitivement
+      // sans que l'utilisateur sache qu'il restait du contenu à charger. On retente
+      // maintenant automatiquement jusqu'à trouver du contenu neuf, jusqu'à ce que le
+      // backend confirme qu'il n'y a vraiment plus rien, ou jusqu'à la limite de
+      // sécurité ci-dessus.
+      for (let attempt = 0; attempt < MAX_CONSECUTIVE_RECOUPEMENT; attempt++) {
+        const nextPage = feedPageRef.current + 1;
+        const feedResult = await searchService.getFeed(nextPage, FEED_PAGE_SIZE).catch(() => ({ items: [] }));
+        const feedRawItems = feedResult.items ?? [];
+        feedHasMoreRef.current = feedRawItems.length >= FEED_PAGE_SIZE;
+        const rawIsEmpty = feedRawItems.length === 0;
 
-      const appended: FeedItem[] = [];
-      let freshNonSpecialCount = 0;
-      const adSlotIds: string[] = [];
-      for (const d of feedRawItems) {
-        if (!d || !d.id) continue;
-        if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
-          const key = `${d.kind}-${d.id}`;
-          if (seenItemIdsRef.current.has(key)) continue;
-          seenItemIdsRef.current.add(key);
-          appended.push({ kind: d.kind, id: d.id, data: d });
-          freshNonSpecialCount += 1;
-          if (freshNonSpecialCount > 0 && freshNonSpecialCount % AD_EVERY === 0) {
-            const slotId = `__ad__slot_${adSlotIdxRef.current}`;
-            adSlotIdxRef.current += 1;
-            adSlotIds.push(slotId);
-            appended.push({ kind: 'ad', id: slotId, data: null });
+        const appended: FeedItem[] = [];
+        let freshNonSpecialCount = 0;
+        const adSlotIds: string[] = [];
+        for (const d of feedRawItems) {
+          if (!d || !d.id) continue;
+          if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
+            const key = `${d.kind}-${d.id}`;
+            if (seenItemIdsRef.current.has(key)) continue;
+            seenItemIdsRef.current.add(key);
+            appended.push({ kind: d.kind, id: d.id, data: d });
+            freshNonSpecialCount += 1;
+            if (freshNonSpecialCount > 0 && freshNonSpecialCount % AD_EVERY === 0) {
+              const slotId = `__ad__slot_${adSlotIdxRef.current}`;
+              adSlotIdxRef.current += 1;
+              adSlotIds.push(slotId);
+              appended.push({ kind: 'ad', id: slotId, data: null });
+            }
           }
         }
-      }
 
-      feedPageRef.current = nextPage;
+        feedPageRef.current = nextPage;
 
-      if (appended.length === 0) {
-        // Page entierement recoupee (deja vue) : le flux n'est fini que si le
-        // backend n'a lui-meme plus rien a offrir, sinon on avance juste la page
-        // (l'utilisateur re-declenchera le scroll naturellement pour la suivante).
-        if (rawIsEmpty) setHasMoreFeed(false);
-      } else {
+        if (appended.length === 0) {
+          // Page entièrement recoupée : le flux n'est fini que si le backend lui-même
+          // ne renvoie plus rien — sinon on boucle immédiatement sur la page suivante
+          // au lieu d'attendre un hypothétique futur scroll qui pourrait ne jamais venir.
+          if (rawIsEmpty) { setHasMoreFeed(false); break; }
+          continue;
+        }
         nonReelCountRef.current += freshNonSpecialCount;
         setItems(prev => [...prev, ...appended]);
         if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
+        break;
       }
     } catch (err) {
       if (__DEV__) console.warn('[FeedScreen] loadMoreFeed error:', err);
@@ -2539,7 +2561,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           viewabilityConfig={feedViewabilityConfig}
           onScroll={handleFeedScroll}
           scrollEventThrottle={100}
-          onEndReached={loadMoreFeed}
+          onEndReached={handleEndReached}
           onEndReachedThreshold={0.3}
           updateCellsBatchingPeriod={50}
           ItemSeparatorComponent={() => (
