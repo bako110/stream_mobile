@@ -32,7 +32,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { storage } from '../../utils/storage';
 import { showConfirm } from '../../services';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
@@ -46,7 +46,7 @@ import { favoriteService } from '../../services/favoriteService';
 import { saveService } from '../../services/saveService';
 import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
-import { communityService } from '../../services/communityService';
+import { communityService, type CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
 import { networkService } from '../../services/networkService';
@@ -68,7 +68,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 type FeedFilter = 'all' | 'following' | 'live';
 
 interface FeedItem {
-  kind:    'event' | 'concert' | 'reel' | 'post' | 'ad';
+  kind:    'event' | 'concert' | 'reel' | 'reel_row' | 'post' | 'suggestions' | 'communities' | 'ad';
   id:      string;
   data:    any;
 }
@@ -689,6 +689,114 @@ const FeedHeaderBadges: React.FC<{
   );
 });
 
+// ── Encart : suggestions de communautés ─────────────────────────────────────────
+const CommunitiesInlineCard: React.FC<{
+  communities: CommunityData[];
+  colors: AppColors;
+  nav: any;
+}> = ({ communities, colors, nav }) => {
+  const [joined, setJoined] = useState<Set<string>>(new Set());
+
+  async function join(id: string) {
+    setJoined(prev => new Set(prev).add(id));
+    try { await communityService.join(id); }
+    catch { setJoined(prev => { const n = new Set(prev); n.delete(id); return n; }); }
+  }
+
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.divider, overflow: 'hidden', marginHorizontal: 12, marginVertical: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="users" size={13} color="#fff" />
+          </View>
+          <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.textPrimary }}>Ta tribu t'attend</Text>
+        </View>
+        <TouchableOpacity onPress={() => nav.navigate('Communities' as any)}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Explorer</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={{ paddingHorizontal: 8, paddingBottom: 8 }}>
+        {communities.map(c => (
+          <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingVertical: 8 }}>
+            {c.avatar_url
+              ? <CachedImage uri={c.avatar_url} style={{ width: 44, height: 44, borderRadius: 12 }} />
+              : <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>{c.name?.[0]?.toUpperCase()}</Text>
+                </View>
+            }
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{c.name}</Text>
+              <Text style={{ fontSize: 10.5, color: colors.textTertiary }}>{(c.members_count ?? 0).toLocaleString()} membres</Text>
+            </View>
+            <TouchableOpacity
+              disabled={joined.has(c.id)}
+              onPress={() => join(c.id)}
+              style={{
+                paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+                backgroundColor: joined.has(c.id) ? colors.divider : 'transparent',
+                borderWidth: joined.has(c.id) ? 0 : 1.3, borderColor: colors.primary,
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+              }}>
+              {joined.has(c.id) && <Icon name="check" size={10} color={colors.textTertiary} />}
+              <Text style={{ fontSize: 11, fontWeight: '700', color: joined.has(c.id) ? colors.textTertiary : colors.primary }}>
+                {joined.has(c.id) ? 'Membre' : 'Rejoindre'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// ── Encart : rangée de reels ───────────────────────────────────────────────────
+const ReelRowInlineCard: React.FC<{
+  reels: any[];
+  colors: AppColors;
+  nav: any;
+}> = ({ reels, colors, nav }) => {
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.divider, overflow: 'hidden', marginHorizontal: 12, marginVertical: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="film" size={13} color="#fff" />
+          </View>
+          <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.textPrimary }}>Reels pour toi</Text>
+        </View>
+        <TouchableOpacity onPress={() => nav.navigate('Tabs', { screen: 'Reels' } as any)}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Voir tout</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 8 }}>
+        {reels.map(r => (
+          <TouchableOpacity
+            key={r.id}
+            onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
+            style={{ width: 100, aspectRatio: 9 / 16, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' }}>
+            {r.thumbnail_url
+              ? <CachedImage uri={r.thumbnail_url} style={{ width: '100%', height: '100%' }} />
+              : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="film" size={20} color="rgba(255,255,255,0.3)" />
+                </View>
+            }
+            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 36, backgroundColor: 'rgba(0,0,0,0.0)' }} />
+            {(r.view_count ?? 0) > 0 && (
+              <View style={{ position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Icon name="play" size={8} color="#fff" />
+                <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#fff' }}>
+                  {(r.view_count ?? 0) >= 1000 ? `${((r.view_count ?? 0) / 1000).toFixed(1)}k` : r.view_count}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+};
+
 // ── FeedScreen ────────────────────────────────────────────────────────────────
 
 interface FeedScreenProps {
@@ -1279,6 +1387,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               adSlotIds.push(slotId);
               result.push({ kind: 'ad', id: slotId, data: null });
             }
+          } else if (d.kind === 'reel_row') {
+            result.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
+          } else if (d.kind === 'suggestions') {
+            result.push({ kind: 'suggestions', id: d.id, data: d.users ?? [] });
+          } else if (d.kind === 'communities') {
+            result.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
           }
         }
         // Filtrer les contenus masqués ("Pas intéressé") — après mapping, pour
@@ -1439,6 +1553,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               adSlotIds.push(slotId);
               appended.push({ kind: 'ad', id: slotId, data: null });
             }
+          } else if (d.kind === 'reel_row') {
+            appended.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
+          } else if (d.kind === 'suggestions') {
+            appended.push({ kind: 'suggestions', id: d.id, data: d.users ?? [] });
+          } else if (d.kind === 'communities') {
+            appended.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
           }
         }
 
@@ -1738,6 +1858,28 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           }}
         />
       );
+    }
+    if (item.kind === 'suggestions') {
+      const users = (item.data ?? []) as UserPublic[];
+      if (!users.length) return null;
+      return (
+        <PeopleSuggestions
+          users={users}
+          loading={false}
+          onUserPress={userId => (nav as any).navigate('UserProfile', { userId })}
+          onRefresh={() => {}}
+        />
+      );
+    }
+    if (item.kind === 'communities') {
+      const comms = (item.data ?? []) as CommunityData[];
+      if (!comms.length) return null;
+      return <CommunitiesInlineCard communities={comms} colors={colors} nav={nav} />;
+    }
+    if (item.kind === 'reel_row') {
+      const reels = (item.data ?? []) as any[];
+      if (!reels.length) return null;
+      return <ReelRowInlineCard reels={reels} colors={colors} nav={nav} />;
     }
     if (!item.data) return null;
     const aid = item.kind === 'event'
