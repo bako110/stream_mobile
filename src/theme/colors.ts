@@ -74,6 +74,11 @@ export const LightColors = {
   cardBg:              '#FFFFFF',
   badgeBg:             '#7B3FF2',
   badgeText:           '#FFFFFF',
+
+  // ── Feed ──────────────────────────────────────────────────────────────────
+  mediaPlaceholder:    '#E8E7F4',   // fond derrière une image/vidéo en cours de chargement
+  likeActive:          '#F0365A',   // cœur "aimé" — rouge, jamais le violet de marque
+  feedGutter:          '#E8E7F4',   // gouttière entre deux cartes du feed
 };
 
 export const DarkColors = {
@@ -149,6 +154,11 @@ export const DarkColors = {
   cardBg:              '#0F0F1E',
   badgeBg:             '#9B65F5',
   badgeText:           '#FFFFFF',
+
+  // ── Feed ──────────────────────────────────────────────────────────────────
+  mediaPlaceholder:    '#0D0D1A',   // fond derrière une image/vidéo en cours de chargement
+  likeActive:          '#F25270',   // cœur "aimé" — rouge, jamais le violet de marque
+  feedGutter:          '#07070F',   // gouttière entre deux cartes du feed
 };
 
 export type AppColors = typeof LightColors;

@@ -57,6 +57,8 @@ import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
+import { SectionHeader } from '../../components/common/SectionHeader';
+import { FeedCarousel, FeedCardLayout, FeedRadius } from '../../theme/feed';
 import { feedStyles as s, fS } from '../../styles/FeedScreen.styles';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
@@ -362,14 +364,14 @@ const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
     else onNavLiveViewer(c.id);
   }, [isOwn, c.id, onNavLiveStream, onNavLiveViewer]);
   return (
-    <TouchableOpacity style={{ width: 130, borderRadius: 14, overflow: 'hidden', backgroundColor: surfaceColor }} activeOpacity={0.85} onPress={onPress}>
-      <View style={{ width: 130, height: 170, position: 'relative' }}>
+    <TouchableOpacity style={{ width: FeedCarousel.cardW, borderRadius: 14, overflow: 'hidden', backgroundColor: surfaceColor }} activeOpacity={0.85} onPress={onPress}>
+      <View style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH, position: 'relative' }}>
         {c.thumbnail_url
-          ? <CachedImage uri={c.thumbnail_url} style={{ width: 130, height: 170 }} />
-          : <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ width: 130, height: 170, alignItems: 'center', justifyContent: 'center' }}><Icon name="radio" size={28} color="#fff" /></LinearGradient>
+          ? <CachedImage uri={c.thumbnail_url} style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH }} />
+          : <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH, alignItems: 'center', justifyContent: 'center' }}><Icon name="radio" size={28} color="#fff" /></LinearGradient>
         }
-        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
-        <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 64 }} />
+        <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0365A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
           <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
           <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
         </View>
@@ -421,28 +423,22 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
   onNavEvent,
 }) => {
   const showNearby = filter === 'all' && nearbyEvents.length > 0;
-  if (!liveConcerts.length && !spontLives.length && !showNearby) return null;
+  const liveTotal = liveConcerts.length + spontLives.length;
+  if (!liveTotal && !showNearby) return null;
   return (
-    <>
-      {/* ── En direct ───────────────────────────────────────── */}
-      {liveConcerts.length > 0 && (
+    <View style={{ backgroundColor: colors.background }}>
+      {/* ── En direct — concerts + lives spontanés fusionnés en UNE section ── */}
+      {liveTotal > 0 && (
         <View style={{ marginTop: 8, marginBottom: 4 }}>
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 }}
-            activeOpacity={0.7}
-            onPress={onNavLiveList}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>En direct</Text>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{liveConcerts.length}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Voir tout</Text>
-              <Icon name="chevron-right" size={14} color={colors.primary} />
-            </View>
-          </TouchableOpacity>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+          <SectionHeader
+            title="En direct"
+            colors={colors}
+            icon="radio"
+            iconColor={colors.liveTag}
+            count={liveTotal}
+            onSeeAll={liveConcerts.length ? onNavLiveList : onNavSpontList}
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: FeedCarousel.padH, gap: FeedCarousel.gap }}>
             {liveConcerts.map(c => (
               <LiveConcertCard
                 key={c.id}
@@ -453,60 +449,37 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                 surfaceColor={colors.surface}
               />
             ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* ── Lives spontanés ─────────────────────────────────── */}
-      {spontLives.length > 0 && (
-        <View style={{ marginTop: 8, marginBottom: 4 }}>
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 }}
-            activeOpacity={0.7}
-            onPress={onNavSpontList}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>En direct</Text>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{spontLives.length}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Voir tout</Text>
-              <Icon name="chevron-right" size={14} color={colors.primary} />
-            </View>
-          </TouchableOpacity>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
             {spontLives.map(live => {
               const liveName = live.user?.display_name ?? live.user?.username ?? 'Utilisateur';
               const liveInitial = (liveName || 'U')[0].toUpperCase();
               return (
                 <TouchableOpacity
                   key={live.id}
-                  style={{ width: 110, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
+                  style={{ width: FeedCarousel.cardW, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface }}
                   activeOpacity={0.85}
                   onPress={() => {
                     if (currentUserId === live.user_id) onNavSpontStream(live.id);
                     else onNavSpontViewer(live.id);
                   }}
                 >
-                  <View style={{ width: 110, height: 150, position: 'relative' }}>
+                  <View style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH, position: 'relative' }}>
                     <LiveThumbnailBackground
                       thumbnailUrl={live.thumbnail_url}
                       avatarUrl={live.user?.avatar_url}
                       initials={liveInitial}
-                      avatarSize={40}
+                      avatarSize={44}
                     />
-                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }} />
+                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 64 }} />
 
                     {/* Badge LIVE */}
-                    <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0365A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.liveTag, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                       <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
                       <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
                     </View>
 
                     {/* Badge privé */}
                     {live.is_private && (
-                      <View style={{ position: 'absolute', top: 22, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#7B3FF2D9', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                      <View style={{ position: 'absolute', top: 22, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.primary + 'D9', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
                         <MCIcon name="lock" size={8} color="#fff" />
                         <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>Abonnés</Text>
                       </View>
@@ -520,12 +493,12 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
 
                     {/* Avatar centré */}
                     {live.user?.avatar_url
-                      ? <CachedImage uri={live.user.avatar_url} style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }} />
-                      : <View style={{ position: 'absolute', bottom: 20, alignSelf: 'center', width: 32, height: 32, borderRadius: 16, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' }}>
-                          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{liveInitial}</Text>
+                      ? <CachedImage uri={live.user.avatar_url} style={{ position: 'absolute', bottom: 22, alignSelf: 'center', width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: '#fff' }} />
+                      : <View style={{ position: 'absolute', bottom: 22, alignSelf: 'center', width: 34, height: 34, borderRadius: 17, backgroundColor: colors.liveTag, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' }}>
+                          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>{liveInitial}</Text>
                         </View>
                     }
-                    <View style={{ position: 'absolute', bottom: 5, left: 4, right: 4, alignItems: 'center' }}>
+                    <View style={{ position: 'absolute', bottom: 6, left: 4, right: 4, alignItems: 'center' }}>
                       <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', textAlign: 'center' }} numberOfLines={1}>{liveName}</Text>
                     </View>
                   </View>
@@ -539,15 +512,15 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
       {/* ── Près de toi — masqué dans l'onglet Suivis ────────── */}
       {showNearby && (
         <View style={[nbS.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
-          <View style={nbS.header}>
-            <View>
-              <Text style={[nbS.title, { color: colors.textPrimary }]}>Dans ton quartier</Text>
-              <Text style={[nbS.subtitle, { color: colors.textTertiary }]}>Des événements proches de toi</Text>
-            </View>
-            <TouchableOpacity onPress={onNavNearby} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={[nbS.seeAll, { color: colors.primary }]}>Voir tout</Text>
-            </TouchableOpacity>
-          </View>
+          <SectionHeader
+            title="Dans ton quartier"
+            colors={colors}
+            icon="map-pin"
+            onSeeAll={onNavNearby}
+          />
+          <Text style={[nbS.subtitle, { color: colors.textTertiary, paddingHorizontal: 16, marginTop: -4, marginBottom: 10 }]}>
+            Des événements proches de toi
+          </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={nbS.list}>
             {nearbyEvents.map(ev => {
               const dist = (ev as any).distance_km as number | null | undefined;
@@ -601,7 +574,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
           </ScrollView>
         </View>
       )}
-    </>
+    </View>
   );
 });
 
@@ -626,19 +599,32 @@ const FeedHeaderBadges: React.FC<{
   // et ne garde que les icônes, mieux centrées, plutôt que casser la mise en page.
   const { fontScale } = useWindowDimensions();
   const showLabels = fontScale < 1.15;
-  const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 22, backgroundColor: 'rgba(255,255,255,0.08)' }} />;
+  // Séparateur thème-aware : rgba(255,255,255,…) était invisible en clair (fond
+  // blanc) et visible en sombre — incohérent. colors.divider marche dans les deux.
+  const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 24, backgroundColor: colors.divider }} />;
   const iconWrapStyle = showLabels ? undefined : { paddingVertical: 4 };
   return (
     <View style={{ paddingBottom: 6, marginHorizontal: -16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden' }}>
-        {/* Mes amis / Général — bascule entre le fil normal et le filtre "amis"
-            (posts/events/concerts/reels des comptes suivis uniquement). Icône ET
-            libellé changent selon l'état : "Mes amis" pour y entrer, "Général"
-            pour en sortir — pas juste une couleur qui change sur le même texte. */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onFriends} activeOpacity={0.8}>
+        {/* Mes amis / Général — c'est un FILTRE du fil, pas une navigation. Rendu
+            comme une pastille pleine quand actif (fond primary léger + bordure)
+            pour qu'il ne se confonde pas avec les icônes de navigation à droite.
+            Icône ET libellé changent selon l'état. */}
+        <TouchableOpacity
+          style={[
+            fS.actionIcon,
+            { flex: 1, marginVertical: 4, marginLeft: 4, borderRadius: 10, borderWidth: 1 },
+            iconWrapStyle,
+            friendsActive
+              ? { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider },
+          ]}
+          onPress={onFriends}
+          activeOpacity={0.8}
+        >
           <MCIcon name={friendsActive ? 'account-group' : 'account-heart-outline'} size={20} color={friendsActive ? colors.primary : colors.textPrimary} />
           {showLabels && (
-            <Text style={{ fontSize: 10.5, color: friendsActive ? colors.primary : colors.textSecondary, marginTop: 2, fontWeight: friendsActive ? '700' : '500' }}>
+            <Text style={{ fontSize: 10.5, color: friendsActive ? colors.primary : colors.textSecondary, marginTop: 2, fontWeight: friendsActive ? '700' : '600' }}>
               {friendsActive ? 'Général' : 'Mes amis'}
             </Text>
           )}
@@ -679,10 +665,10 @@ const FeedHeaderBadges: React.FC<{
         {/* En direct */}
         <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onLive} activeOpacity={0.8}>
           <View style={{ position: 'relative' }}>
-            <MCIcon name="video-outline" size={21} color="#F0365A" />
-            <View style={{ position: 'absolute', top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: colors.backgroundSecondary }} />
+            <MCIcon name="video-outline" size={21} color={colors.liveTag} />
+            <View style={{ position: 'absolute', top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: colors.liveTag, borderWidth: 1.5, borderColor: colors.surface }} />
           </View>
-          {showLabels && <Text style={{ fontSize: 10.5, color: '#F0365A', marginTop: 2, fontWeight: '600' }}>En direct</Text>}
+          {showLabels && <Text style={{ fontSize: 10.5, color: colors.liveTag, marginTop: 2, fontWeight: '600' }}>En direct</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -704,18 +690,14 @@ const CommunitiesInlineCard: React.FC<{
   }
 
   return (
-    <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.divider, overflow: 'hidden', marginHorizontal: 12, marginVertical: 6 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="users" size={13} color="#fff" />
-          </View>
-          <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.textPrimary }}>Ta tribu t'attend</Text>
-        </View>
-        <TouchableOpacity onPress={() => nav.navigate('Communities' as any)}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Explorer</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={{ backgroundColor: colors.surface, marginBottom: FeedCardLayout.gutter, overflow: 'hidden', paddingTop: 12 }}>
+      <SectionHeader
+        title="Ta tribu t'attend"
+        colors={colors}
+        icon="users"
+        seeAllLabel="Explorer"
+        onSeeAll={() => nav.navigate('Communities' as any)}
+      />
       <View style={{ paddingHorizontal: 8, paddingBottom: 8 }}>
         {communities.map(c => (
           <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingVertical: 8 }}>
@@ -757,24 +739,19 @@ const ReelRowInlineCard: React.FC<{
   nav: any;
 }> = ({ reels, colors, nav }) => {
   return (
-    <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.divider, overflow: 'hidden', marginHorizontal: 12, marginVertical: 6 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="film" size={13} color="#fff" />
-          </View>
-          <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.textPrimary }}>Reels pour toi</Text>
-        </View>
-        <TouchableOpacity onPress={() => nav.navigate('Tabs', { screen: 'Reels' } as any)}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Voir tout</Text>
-        </TouchableOpacity>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 8 }}>
+    <View style={{ backgroundColor: colors.surface, marginBottom: FeedCardLayout.gutter, overflow: 'hidden', paddingTop: 12 }}>
+      <SectionHeader
+        title="Reels pour toi"
+        colors={colors}
+        icon="film"
+        onSeeAll={() => nav.navigate('Tabs', { screen: 'Reels' } as any)}
+      />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 4, paddingBottom: 12, gap: 8 }}>
         {reels.map(r => (
           <TouchableOpacity
             key={r.id}
             onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
-            style={{ width: 100, aspectRatio: 9 / 16, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' }}>
+            style={{ width: 104, aspectRatio: 9 / 16, borderRadius: FeedRadius.media, overflow: 'hidden', backgroundColor: '#000' }}>
             {r.thumbnail_url
               ? <CachedImage uri={r.thumbnail_url} style={{ width: '100%', height: '100%' }} />
               : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -1917,7 +1894,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       />
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <View style={[s.header, { backgroundColor: colors.surface, paddingTop: insets.top }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }]}>
         <View style={s.headerRow}>
           {/* Gauche : avatar + nom tronqué — masqué si recherche ouverte */}
           {!searchOpen && (
@@ -2113,17 +2090,22 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             </Animated.View>
           )}
 
-          {/* Droite : search + menu avec cercle bordure */}
+          {/* Droite : search + menu — icônes nues, sans cercle ni bordure */}
           <View style={s.headerRight}>
             <TouchableOpacity
-              style={[s.iconBtn, { backgroundColor: searchOpen ? colors.primary + '22' : colors.backgroundSecondary, borderWidth: 1.5, borderColor: colors.border }]}
+              style={[s.iconBtn, searchOpen && { backgroundColor: colors.primary + '18' }]}
               onPress={searchOpen ? closeSearch : openSearch}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon name={searchOpen ? 'x' : 'search'} size={19} color={searchOpen ? colors.primary : colors.textPrimary} />
+              <Icon name={searchOpen ? 'x' : 'search'} size={22} color={searchOpen ? colors.primary : colors.textPrimary} />
             </TouchableOpacity>
             {!searchOpen && (
-              <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.backgroundSecondary, borderWidth: 1.5, borderColor: colors.border }]} onPress={openMenu}>
-                <Icon name="menu" size={19} color={colors.textPrimary} />
+              <TouchableOpacity
+                style={s.iconBtn}
+                onPress={openMenu}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon name="menu" size={22} color={colors.textPrimary} />
               </TouchableOpacity>
             )}
           </View>
@@ -2702,6 +2684,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           data={items}
           keyExtractor={item => `${item.kind}-${item.id}`}
           extraData={adSlotMap}
+          style={{ backgroundColor: colors.feedGutter }}
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           scrollEnabled={feedScrollEnabled}
@@ -2712,9 +2695,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.3}
           updateCellsBatchingPeriod={50}
-          ItemSeparatorComponent={() => (
-            <View style={{ height: 12, backgroundColor: theme.isDark ? '#0a0a0f' : '#e8e8ee' }} />
-          )}
+          // Gouttière entre cartes : la couleur du fond de liste transparaît via le
+          // marginBottom de chaque carte (PostCard/FeedCard). Plus de bande dédiée.
           ListHeaderComponent={feedListHeader}
           ListFooterComponent={loadingMoreFeed ? (
             <View style={{ paddingVertical: 24, alignItems: 'center' }}>
@@ -2766,8 +2748,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           // réapparaît"). windowSize plus large pour absorber les scrolls rapides sans
           // recréer les composants.
           removeClippedSubviews={false}
-          maxToRenderPerBatch={4}
-          windowSize={12}
+          maxToRenderPerBatch={3}
+          windowSize={7}
           initialNumToRender={5}
         />
       )}

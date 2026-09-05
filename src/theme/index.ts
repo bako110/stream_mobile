@@ -29,3 +29,4 @@ export type { AppColors };
 export * from './colors';
 export * from './typography';
 export * from './spacing';
+export * from './feed';

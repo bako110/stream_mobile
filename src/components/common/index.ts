@@ -14,6 +14,7 @@ export { CategorySelector, CONTENT_CATEGORIES } from './CategorySelector';
 export type { ContentCategory } from './CategorySelector';
 export { SocialAuthButton }  from './SocialAuthButton';
 export { AppHeader, BackButton } from './AppHeader';
+export { SectionHeader } from './SectionHeader';
 export { AppTabBar }         from './AppTabBar';
 export {
   SkeletonBox,

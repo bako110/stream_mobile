@@ -12,9 +12,11 @@ export const feedStyles = StyleSheet.create({
   scroll: { paddingBottom: TAB_BAR_HEIGHT + 20 },
 
   // ── Header ────────────────────────────────────────────────────────────────
+  // paddingTop est fourni dynamiquement par insets.top (safe-area) dans le JSX —
+  // ne PAS ajouter de valeur fixe ici (double comptage → header trop bas sur les
+  // appareils à encoche).
   header: {
     paddingHorizontal: Spacing[4],
-    paddingTop: Platform.OS === 'android' ? 44 : 52,
     paddingBottom: 0,
   },
   headerRow: {
@@ -44,9 +46,11 @@ export const feedStyles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, alignItems: 'center',
   },
   headerBrand: { fontSize: 22, fontWeight: '900', letterSpacing: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  // Boutons d'icône nus (pas de fond ni de bordure "bouton sur bouton") — style
+  // Instagram/X. La zone de tap reste à 40px, l'icône visuellement légère.
   iconBtn: {
-    width: 38, height: 38, borderRadius: 19,
+    width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
   },
 

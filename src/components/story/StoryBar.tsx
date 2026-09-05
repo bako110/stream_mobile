@@ -25,9 +25,14 @@ interface Props {
 }
 
 // ── Dimensions ─────────────────────────────────────────────────────────────────
-const CARD_W  = 76;
-const CARD_H  = 112;
-const RADIUS  = 14;
+// Alignées sur les tokens du feed (theme/feed → StoryCard). Cartes un peu plus
+// compactes qu'avant (72×100 au lieu de 76×112) : la barre gagne ~12px de vertical
+// pour un contenu identique.
+import { StoryCard as StoryCardToken } from '../../theme/feed';
+const CARD_W  = StoryCardToken.w;      // 72
+const CARD_H  = StoryCardToken.h;      // 100
+const RADIUS  = StoryCardToken.radius; // 12
+const CARD_GAP = StoryCardToken.gap;   // 8
 
 // Même palette que web/MediaPlaceholder — gradient déterministe depuis le nom
 const PALETTES: [string, string, string][] = [
@@ -127,6 +132,12 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
   const displayName = currentUser?.display_name ?? currentUser?.username ?? 'Vous';
   const initials    = displayName[0]?.toUpperCase() ?? '?';
 
+  // Dégradé de marque — depuis le thème, jamais en dur (le web l'a tokenisé).
+  const brandGrad: [string, string] = [
+    colors.gradientStart ?? colors.primary ?? '#7B3FF2',
+    colors.gradientEnd   ?? '#E0389A',
+  ];
+
   // Derniere story publiee (index 0 car backend trie DESC)
   const myLastStory = myGroup?.stories[0];
   const myThumb = myLastStory?.thumbnail_url ?? myLastStory?.media_url ?? null;
@@ -134,15 +145,18 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
 
   return (
     <>
-      <View style={[s.container, { borderBottomColor: colors.border ?? '#eee' }]}>
+      <View style={[s.container, { borderBottomColor: colors.border ?? '#eee', backgroundColor: colors.background ?? '#fff' }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.scroll}
+          snapToInterval={CARD_W + 4 + CARD_GAP}
+          decelerationRate="fast"
+          snapToAlignment="start"
         >
           {/* ── Ma story (carte style WhatsApp) ── */}
           <LinearGradient
-            colors={myGroup ? ['#7B3FF2', '#E0389A'] : ['transparent', 'transparent']}
+            colors={myGroup ? brandGrad : ['transparent', 'transparent']}
             style={[s.cardBorderWrap, !myGroup && { backgroundColor: colors.border ?? '#ddd' }]}
           >
           <TouchableOpacity
@@ -180,11 +194,11 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
             {/* Avatar du user en haut à gauche — ring gradient si story, simple sinon */}
             <View style={s.cardAvatarWrap}>
               {myGroup && !isUploading ? (
-                <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.cardAvatarRing}>
+                <LinearGradient colors={brandGrad} style={s.cardAvatarRing}>
                   <View style={s.cardAvatarInner}>
                     {currentUser?.avatar_url
                       ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
-                      : <View style={[s.cardAvatarFallback, { backgroundColor: '#7B3FF2' }]}>
+                      : <View style={[s.cardAvatarFallback, { backgroundColor: colors.primary ?? '#7B3FF2' }]}>
                           <Text style={s.cardAvatarInitial}>{initials}</Text>
                         </View>
                     }
@@ -314,7 +328,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
               return (
                 <LinearGradient
                   key={group.user.id}
-                  colors={['#7B3FF2', '#E0389A']}
+                  colors={brandGrad}
                   style={s.cardBorderWrap}
                 >
                   {cardContent}
@@ -331,11 +345,15 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
             );
           })}
 
-          {/* ── Squelette chargement ── */}
-          {loading && [0, 1, 2, 3].map(i => (
-            <View key={`sk${i}`} style={[s.card, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]}>
-              <View style={[s.cardBg, { backgroundColor: colors.backgroundSecondary ?? '#e8e8e8' }]} />
-              <View style={{ position: 'absolute', bottom: 10, left: 8, width: 36, height: 7, borderRadius: 4, backgroundColor: colors.border ?? '#ddd' }} />
+          {/* ── Squelette chargement — même boîte exacte que les vraies cartes
+              (cardBorderWrap inclus) pour qu'aucun saut de layout ne se produise
+              quand les stories arrivent. Masqué dès qu'on a des groupes. ──── */}
+          {loading && groups.length === 0 && [0, 1, 2, 3].map(i => (
+            <View key={`sk${i}`} style={[s.cardBorderWrap, { backgroundColor: colors.border ?? '#ccc' }]}>
+              <View style={[s.card, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]}>
+                <View style={[s.cardBg, { backgroundColor: colors.backgroundSecondary ?? '#e8e8e8' }]} />
+                <View style={{ position: 'absolute', bottom: 10, left: 8, width: 36, height: 7, borderRadius: 4, backgroundColor: colors.border ?? '#ddd' }} />
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -364,12 +382,12 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
 const s = StyleSheet.create({
   container: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    height: CARD_H + 4 + 24,
+    height: CARD_H + 4 + 20,
   },
   scroll: {
     paddingHorizontal: 12,
-    paddingVertical:   12,
-    gap:               8,
+    paddingVertical:   10,
+    gap:               CARD_GAP,
     alignItems:        'flex-start',
   },
 

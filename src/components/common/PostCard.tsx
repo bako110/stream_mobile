@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, Image, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   Modal, TextInput, KeyboardAvoidingView, Platform, Dimensions,
-  FlatList, StatusBar, ActivityIndicator,
+  StatusBar, ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +16,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AppColors } from '../../theme/colors';
+import { FeedCardLayout, FeedRadius, FeedActionIcon } from '../../theme/feed';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
@@ -36,7 +37,7 @@ import { AvatarWithBadge } from './AvatarWithBadge';
 
 const { width: SW } = Dimensions.get('window');
 const GAP    = 2;
-const RADIUS = 12;
+const RADIUS = FeedRadius.media; // 12 — aligné sur l'échelle de radius du feed
 
 const fmtN = (n: number): string => {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
@@ -136,18 +137,26 @@ const ImageGrid: React.FC<{ urls: string[]; onPressImage: (i: number) => void }>
 };
 
 // ── timeAgo ───────────────────────────────────────────────────────────────────
-// Relatif tant que < 24h (instant/min/h), puis date complète au-delà — pas de
-// palier intermédiaire en jours ("3 j") qui devenait illisible passé un mois.
+// Paliers progressifs, comme Facebook/Instagram :
+//   < 1 min → "À l'instant"
+//   < 1 h   → "5 min"
+//   < 24 h  → "3 h"
+//   < 7 j   → "hier" / "3 j"
+//   même année → "3 nov."
+//   sinon   → "3 nov. 2024"
 function timeAgo(iso: string): string {
   const date = new Date(iso);
   const diff = (Date.now() - date.getTime()) / 1000;
   if (diff < 60)    return 'À l\'instant';
   if (diff < 3600)  return `${Math.floor(diff / 60)} min`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  const days = Math.floor(diff / 86400);
+  if (days === 1)   return 'hier';
+  if (days < 7)     return `${days} j`;
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString('fr-FR', sameYear
+    ? { day: 'numeric', month: 'short' }
+    : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // ── VideoFsModal ──────────────────────────────────────────────────────────────
@@ -312,7 +321,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Text style={[pc.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
               {author?.is_verified && (
-                <View style={pc.verifiedBadge}>
+                <View style={[pc.verifiedBadge, { backgroundColor: colors.info }]}>
                   <Icon name="check" size={8} color="#fff" />
                 </View>
               )}
@@ -418,11 +427,13 @@ const PostCardInner: React.FC<PostCardProps> = ({
         </View>
       ) : null}
 
-      {/* ── Compteurs — noms d'amis qui ont aimé (si likes) + nb de commentaires */}
-      {(likeCount > 0 || (!commentsDisabledSt && commentCount > 0)) && (
+      {/* ── Résumé social — noms d'amis qui ont aimé + nb commentaires + partages.
+          Seul endroit où les compteurs sont chiffrés : la barre d'actions dessous
+          ne répète plus les nombres (évite le double affichage). ───────────── */}
+      {(likeCount > 0 || (!commentsDisabledSt && commentCount > 0) || shareCount > 0) && (
         <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
-            <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={pc.countsGrow}>
               <FriendsWhoLiked
                 entityType="post"
                 entityId={post.id}
@@ -431,60 +442,80 @@ const PostCardInner: React.FC<PostCardProps> = ({
               />
             </View>
           )}
+          {likeCount === 0 && <View style={pc.countsGrow} />}
           {!commentsDisabledSt && commentCount > 0 && (
-            <TouchableOpacity onPress={() => setCommentsOpen(true)} style={[pc.countChip, { marginLeft: 'auto' as any }]}>
-              <View style={pc.commentCountIcon}>
+            <TouchableOpacity onPress={() => setCommentsOpen(true)} style={pc.countChipRight}>
+              <View style={[pc.commentCountIcon, { backgroundColor: colors.primary }]}>
                 <MCIcon name="comment-outline" size={11} color="#fff" />
               </View>
               <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(commentCount)}</Text>
             </TouchableOpacity>
           )}
+          {shareCount > 0 && (
+            <View style={[pc.countChipRight, { marginLeft: commentCount > 0 ? 12 : ('auto' as any) }]}>
+              <MCIcon name="share-outline" size={13} color={colors.textTertiary} />
+              <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(shareCount)}</Text>
+            </View>
+          )}
         </View>
       )}
 
-      {/* ── Barre d'actions — icônes seules, pas de texte (compteurs déjà visibles
-          dans countsRow au-dessus) ─────────────────────────────────────────── */}
+      {/* ── Barre d'actions — icônes seules, 22px, conventionnelles (FB/IG).
+          Like actif = rouge (jamais le violet de marque). ────────────────── */}
       <View style={[pc.actionBar, { borderTopColor: colors.divider }]}>
-        <TouchableOpacity style={pc.actionBtn} onPress={handleLike} activeOpacity={0.8}>
-          <View style={pc.actionPillRow}>
-            <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textTertiary} />
-            </Animated.View>
-            {likeCount > 0 && (
-              <Text style={[pc.actionCount, { color: liked ? '#7B3FF2' : colors.textTertiary }]}>{fmtN(likeCount)}</Text>
-            )}
-          </View>
+        <TouchableOpacity
+          style={pc.actionBtn}
+          onPress={handleLike}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Animated.View style={heartStyle}>
+            <MCIcon
+              name={liked ? 'heart' : 'heart-outline'}
+              size={FeedActionIcon.size}
+              color={liked ? colors.likeActive : colors.textSecondary}
+            />
+          </Animated.View>
         </TouchableOpacity>
 
         {!commentsDisabledSt && (
-          <TouchableOpacity style={pc.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
-            <View style={pc.actionPillRow}>
-              <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-              {commentCount > 0 && (
-                <Text style={[pc.actionCount, { color: colors.primary }]}>{fmtN(commentCount)}</Text>
-              )}
-            </View>
+          <TouchableOpacity
+            style={pc.actionBtn}
+            onPress={() => setCommentsOpen(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <MCIcon name="comment-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={pc.actionBtn} onPress={() => setShareOpen(true)} activeOpacity={0.8}>
-          <View style={pc.actionPillRow}>
-            <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
-            {shareCount > 0 && (
-              <Text style={[pc.actionCount, { color: colors.primary }]}>{fmtN(shareCount)}</Text>
-            )}
-          </View>
+        <TouchableOpacity
+          style={pc.actionBtn}
+          onPress={() => setShareOpen(true)}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <MCIcon name="share-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={[pc.actionBtn, { flex: 0, paddingHorizontal: 10 }]} onPress={handleSave} activeOpacity={0.8}>
-          <View style={pc.actionPill}>
-            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? colors.primary : colors.textTertiary} />
-          </View>
+        <TouchableOpacity
+          style={[pc.actionBtn, pc.actionBtnSave]}
+          onPress={handleSave}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <MCIcon
+            name={saved ? 'bookmark' : 'bookmark-outline'}
+            size={FeedActionIcon.size}
+            color={saved ? colors.primary : colors.textSecondary}
+          />
         </TouchableOpacity>
       </View>
 
-      {/* ── Menu contextuel ────────────────────────────────────────────────── */}
-      <Modal transparent animationType="slide" visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
+      {/* ── Menu contextuel — monté seulement à l'ouverture (sinon ~5 Modals
+          inertes par carte × N cartes visibles restaient dans l'arbre). ──── */}
+      {menuOpen && (
+      <Modal transparent animationType="slide" visible onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity style={pc.overlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
           <View style={[pc.sheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 38 : 22) + insets.bottom }]}>
             <View style={[pc.sheetHandle, { backgroundColor: colors.divider }]} />
@@ -559,7 +590,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
                     <View style={[pc.menuDiv, { backgroundColor: colors.divider }]} />
                   </>
                 )}
-                <MenuRow icon="flag" color="#EF4444" iconBg="#EF444418"
+                <MenuRow icon="flag" color={colors.error} iconBg={colors.error + '18'}
                   label="Signaler" sub="Contenu inapproprié" colors={colors}
                   onPress={() => { setMenuOpen(false); setReportOpen(true); }} />
               </View>
@@ -573,16 +604,25 @@ const PostCardInner: React.FC<PostCardProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
+      )}
 
-      {/* ── Modals secondaires ──────────────────────────────────────────────── */}
-      <ReportModal visible={reportOpen} contentType="post" contentId={post.id} onClose={() => setReportOpen(false)} />
-      <ShareBottomSheet type="post" visible={shareOpen} onClose={() => setShareOpen(false)} post={post} onShareCountChange={handleShareDone} />
-      <CommentsBottomSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} postId={post.id}
-        commentsDisabled={commentsDisabledSt}
-        onCommentCountChange={d => setCommentCount(c => Math.max(0, c + d))}
-        onCountLoaded={n => setCommentCount(c => Math.max(c, n))} />
-      <LikersBottomSheet visible={likersOpen} onClose={() => setLikersOpen(false)} postId={post.id}
-        likeCount={likeCount} onNavigateToProfile={uid => { setLikersOpen(false); onProfilePress?.(uid); }} />
+      {/* ── Modals secondaires — tous montés à la demande uniquement ────────── */}
+      {reportOpen && (
+        <ReportModal visible contentType="post" contentId={post.id} onClose={() => setReportOpen(false)} />
+      )}
+      {shareOpen && (
+        <ShareBottomSheet type="post" visible onClose={() => setShareOpen(false)} post={post} onShareCountChange={handleShareDone} />
+      )}
+      {commentsOpen && (
+        <CommentsBottomSheet visible onClose={() => setCommentsOpen(false)} postId={post.id}
+          commentsDisabled={commentsDisabledSt}
+          onCommentCountChange={d => setCommentCount(c => Math.max(0, c + d))}
+          onCountLoaded={n => setCommentCount(c => Math.max(c, n))} />
+      )}
+      {likersOpen && (
+        <LikersBottomSheet visible onClose={() => setLikersOpen(false)} postId={post.id}
+          likeCount={likeCount} onNavigateToProfile={uid => { setLikersOpen(false); onProfilePress?.(uid); }} />
+      )}
       {(post.hls_url ?? post.video_url) && videoFs && (
         <VideoFsModal visible={videoFs} uri={(post.hls_url ?? post.video_url)!} thumbnailUri={post.thumbnail_url}
           onClose={() => setVideoFs(false)} onViewPost={onPress} />
@@ -590,7 +630,8 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
 
       {/* ── Modal édition ──────────────────────────────────────────────────── */}
-      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+      {editOpen && (
+      <Modal visible transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <View style={[pc.editSheet, { backgroundColor: colors.surface }]}>
             <Text style={[pc.editTitle, { color: colors.textPrimary }]}>Modifier le post</Text>
@@ -608,6 +649,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      )}
     </View>
   );
 };
@@ -633,7 +675,15 @@ export const PostCard = React.memo(PostCardInner);
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const pc = StyleSheet.create({
-  card:         { backgroundColor: '#fff', marginHorizontal: 6, marginBottom: 6, borderRadius: 12, overflow: 'hidden' },
+  // Modèle de carte unique du feed : pleine largeur, radius 0, séparation par la
+  // gouttière de fond de la liste (marginBottom) — pas de carte flottante.
+  card:         {
+    backgroundColor: '#fff',
+    marginHorizontal: FeedCardLayout.marginHorizontal,
+    marginBottom: FeedCardLayout.gutter,
+    borderRadius: FeedCardLayout.radius,
+    overflow: 'hidden',
+  },
   // Header
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
   headerLeft:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -642,7 +692,7 @@ const pc = StyleSheet.create({
   time:         { fontSize: 11, fontWeight: '500' },
   dot:          { width: 3, height: 3, borderRadius: 1.5 },
   verifiedBadge:{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' },
-  followChip:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  followChip:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: FeedRadius.chip, borderWidth: 1 },
   moreBtn:      { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   // Content
   feeling:      { paddingHorizontal: 12, paddingBottom: 5, fontSize: 13, fontStyle: 'italic' },
@@ -650,22 +700,14 @@ const pc = StyleSheet.create({
   body:         { fontSize: 14.5, lineHeight: 21, letterSpacing: 0.1 },
   // Compteurs
   countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
-  countChip:        { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  countsGrow:       { flex: 1, minWidth: 0 },
+  countChipRight:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 'auto' },
   countText:        { fontSize: 12, fontWeight: '500' },
-  likeCountIcon:    { width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  commentCountIcon: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  // Action bar
-  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 3, gap: 4 },
-  actionBtn:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  actionPill:   {
-    width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
-  },
-  actionPillRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    height: 36, paddingHorizontal: 4,
-  },
-  actionCount:  { fontSize: 12, fontWeight: '600' },
-  actionText:   { fontSize: 12, fontWeight: '600' },
+  commentCountIcon: { width: 18, height: 18, borderRadius: FeedRadius.full, alignItems: 'center', justifyContent: 'center' },
+  // Action bar — icônes seules, 44px de cible, réparties également
+  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 4 },
+  actionBtn:    { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
+  actionBtnSave:{ flex: 0, width: 44 },
   // Menu sheet
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.48)', justifyContent: 'flex-end' },
   sheet:        { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, paddingHorizontal: 14, gap: 9 },
