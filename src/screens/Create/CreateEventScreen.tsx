@@ -379,8 +379,12 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
               });
             } else {
               const payload = { ...basePayload, video_url: videoUrl || undefined };
-              (isEdit ? eventService.update(editId!, payload) : eventService.create(payload))
-                .then(publishAfterSave).catch(() => {});
+              // Suivi visible : pill "Événement en cours d'envoi…" puis "Publié ✓".
+              backgroundUploadService.track('event', capturedTitle, async () => {
+                const saved = isEdit ? await eventService.update(editId!, payload) : await eventService.create(payload);
+                await publishAfterSave(saved);
+                return saved;
+              }).catch(() => {});
             }
           },
         },

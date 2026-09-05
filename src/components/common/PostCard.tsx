@@ -236,6 +236,22 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
   const images = post.image_urls?.length ? post.image_urls : post.image_url ? [post.image_url] : [];
 
+  // Corps affiché : quand une carte d'aperçu de lien est montrée sous le post et
+  // que le SEUL contenu du texte est cette URL (ou l'URL suivie de rien d'utile),
+  // on retire l'URL du texte pour ne pas l'afficher deux fois — comportement
+  // Facebook/WhatsApp. Si le texte contient AUSSI un vrai message, on le garde tel
+  // quel (le lien reste dans la phrase).
+  const displayBody = (() => {
+    const body = post.body ?? '';
+    if (!post.link_url || !body) return body;
+    const stripped = body.replace(post.link_url, '').trim();
+    // Rien d'autre que l'URL → on masque complètement le texte (la carte suffit).
+    if (stripped.length === 0) return '';
+    // L'URL était accolée à un message → on retire juste l'URL, on garde le message.
+    // Heuristique : si ce qu'il reste fait au moins 3 caractères, c'est un vrai texte.
+    return stripped.length >= 3 ? stripped : body;
+  })();
+
   const handleLike = useCallback(() => {
     heartScale.value = withSequence(withSpring(1.45, { damping: 5 }), withSpring(1));
     const n = !liked;
@@ -370,23 +386,28 @@ const PostCardInner: React.FC<PostCardProps> = ({
       </View>
 
       {/* ── Body texte — toujours au même endroit, avec ou sans média ────────── */}
-      {post.body ? (
+      {(displayBody || post.feeling) ? (
         <TouchableOpacity
           onPress={hasMedia ? undefined : onPress}
           activeOpacity={hasMedia ? 1 : 0.7}
           disabled={hasMedia}
           style={pc.bodyWrap}
         >
-          <RichText
-            text={post.body}
-            maxLines={hasMedia ? 4 : 6}
-            textStyle={[pc.body, { color: colors.textPrimary }]}
-            primaryColor={colors.primary}
-            moreLabel="Lire la suite"
-            lessLabel="Voir moins"
-          />
+          {displayBody ? (
+            <RichText
+              text={displayBody}
+              maxLines={hasMedia ? 4 : 6}
+              textStyle={[pc.body, { color: colors.textPrimary }]}
+              primaryColor={colors.primary}
+              moreLabel="Lire la suite"
+              lessLabel="Voir moins"
+              // L'aperçu de lien est géré par la carte <LinkPreviewCard> plus bas
+              // (post.link_url) — RichText ne doit PAS en afficher un 2e.
+              showLinkPreview={false}
+            />
+          ) : null}
           {post.feeling && (
-            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 6 }}>
+            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: displayBody ? 6 : 0 }}>
               — se sent <Text style={{ fontWeight: '700', color: colors.primary }}>{post.feeling}</Text>
             </Text>
           )}
@@ -426,9 +447,11 @@ const PostCardInner: React.FC<PostCardProps> = ({
         </View>
       )}
 
-      {/* ── Apercu lien ────────────────────────────────────────────────────── */}
+      {/* ── Aperçu lien — métadonnées OG (titre + image + domaine), style
+          Facebook. L'URL a déjà été retirée du texte ci-dessus (displayBody)
+          quand elle en était le seul contenu, pour ne pas l'afficher 2×. ──── */}
       {post.link_url ? (
-        <View style={{ paddingHorizontal: FeedCardLayout.padH, paddingBottom: 4 }}>
+        <View style={{ paddingHorizontal: FeedCardLayout.padH, paddingBottom: 10 }}>
           <LinkPreviewCard url={post.link_url} />
         </View>
       ) : null}

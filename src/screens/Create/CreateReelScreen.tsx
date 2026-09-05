@@ -219,15 +219,17 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
     onBack();
 
-    // ── Photo reel : upload direct via image-to-reel, pas de backgroundUploadService ──
+    // ── Photo reel : conversion image→vidéo + création, suivie par une pill
+    //    "Reel en cours d'envoi…" en haut de l'écran (via track). ──────────────
     if (snapIsPhoto) {
       const { uploadImageAsReel, uploadLocalAudio } = require('../../services/uploadService');
-      uploadImageAsReel(snap.uri, 5).then(async (result: any) => {
+      backgroundUploadService.track('reel', snap.cap || 'Nouveau Reel', async () => {
+        const result: any = await uploadImageAsReel(snap.uri, 5);
         if (!result.hls_url) {
           toastService.error('Publication echouee', 'La conversion image→video a echoue. Reessaie.');
-          return;
+          throw new Error('image_to_reel_failed');
         }
-        try {
+        {
           const { edit } = snap;
 
           // Un son choisi depuis "Mes sons" (catalogue déjà en base) est une URL
@@ -267,11 +269,11 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
               music_end_sec:   edit?.musicEndSec,
             } : {}),
           });
-        } catch (err: any) {
-          toastService.error('Publication echouee', err?.message ?? 'Erreur inconnue.');
         }
-      }).catch(() => {
-        toastService.error('Publication echouee', "La conversion de l'image a echoue. Reessaie dans quelques secondes.");
+      }).catch((err: any) => {
+        if (err?.message !== 'image_to_reel_failed') {
+          toastService.error('Publication echouee', err?.message ?? "La conversion de l'image a echoue. Reessaie dans quelques secondes.");
+        }
       });
       return;
     }

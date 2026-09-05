@@ -34,6 +34,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <!-- Upload de publications en arriere-plan (survit a l'app fermee) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Ecran d'appel natif (ConnectionService self-managed, comme WhatsApp) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -109,6 +111,17 @@
             <action android:name="android.telecom.ConnectionService" />
         </intent-filter>
       </service>
+
+      <!-- Override du foreground service de Notifee : sa lib le declare en
+           "shortService" (plafonne a ~3 min sur Android 14+). On le repasse en
+           "dataSync" (quota ~6h/jour) pour que l'upload d'une publication
+           survive a l'app fermee jusqu'a ~10 min et au-dela si besoin. -->
+      <service
+          android:name="app.notifee.core.ForegroundService"
+          android:foregroundServiceType="dataSync"
+          android:exported="false"
+          tools:node="merge"
+          tools:replace="android:foregroundServiceType" />
 
       <!-- Icône et couleur des notifications FCM -->
       <meta-data

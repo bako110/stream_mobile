@@ -54,4 +54,5 @@ export interface PostCreate {
   feeling?: string;
   mention_ids?: string[];
   is_private?: boolean;
+  link_url?: string;
 }

@@ -7,6 +7,7 @@ import { registerGlobals } from '@livekit/react-native';
 import { AppRegistry } from 'react-native';
 import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
 import { handleBackgroundFCM, setupNotifeeBackgroundHandler } from './src/services/fcmService';
+import { registerUploadForegroundService } from './src/services/backgroundUploadService';
 import App from './App';
 import { name as appName } from './app.json';
 
@@ -14,6 +15,10 @@ registerGlobals();
 
 // Notifee background event handler (action buttons on call notification)
 setupNotifeeBackgroundHandler();
+
+// Foreground service pour l'upload des publications — DOIT être enregistré ici,
+// au scope module, pour que l'upload survive à l'app fermée (Android).
+registerUploadForegroundService();
 
 // FCM background/quit handler — shows Notifee full-screen call notification
 setBackgroundMessageHandler(getMessaging(), handleBackgroundFCM);

@@ -347,10 +347,14 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
               });
             } else {
               const payload = { ...basePayload, video_url: videoUrl || undefined };
-              (isEdit
-                ? concertService.update(editId!, payload)
-                : concertService.create(payload)
-              ).then(publishAfterSave).catch(() => {});
+              // Suivi visible : pill "Concert en cours d'envoi…" puis "Publié ✓".
+              backgroundUploadService.track('concert', capturedTitle, async () => {
+                const saved = isEdit
+                  ? await concertService.update(editId!, payload)
+                  : await concertService.create(payload);
+                await publishAfterSave(saved);
+                return saved;
+              }).catch(() => {});
             }
           },
         },

@@ -9,22 +9,18 @@ const path = require('path');
  */
 const defaultConfig = getDefaultConfig(__dirname);
 
-// js-sha256@1.0.0 ne fournit qu'un champ `exports` moderne ; avec
-// unstable_enablePackageExports:false (requis pour la New Architecture), Metro
-// n'arrive pas à résoudre son `main` ("package specifies a `main` module field
-// that could not be resolved: build/sha256.cjs"), ce qui fait échouer le bundle
-// avec un HTTP 500 sur l'appareil. On redirige l'import vers le build UMD, qui
-// exporte bien `sha256` et fonctionne en environnement React Native.
-const JS_SHA256_UMD = path.join(__dirname, 'node_modules', 'js-sha256', 'build', 'sha256.js');
-
+// js-sha256@1.0.0 ne publie qu'un champ `exports` moderne ; avec
+// `unstable_enablePackageExports:false` (requis pour la New Architecture), Metro
+// ne résout pas son `main` → HTTP 500 au bundle. On redirige le nom de module
+// `js-sha256` vers un shim local (shims/js-sha256/index.js) qui ré-exporte le
+// build UMD. `extraNodeModules` est une simple table de correspondance (pas une
+// fonction resolveRequest, qui cassait la résolution interne de Metro).
 const config = {
   resolver: {
     unstable_enablePackageExports: false,
-    resolveRequest: (context, moduleName, platform) => {
-      if (moduleName === 'js-sha256') {
-        return { type: 'sourceFile', filePath: JS_SHA256_UMD };
-      }
-      return context.resolveRequest(context, moduleName, platform);
+    extraNodeModules: {
+      ...(defaultConfig.resolver.extraNodeModules || {}),
+      'js-sha256': path.join(__dirname, 'shims', 'js-sha256'),
     },
   },
 };

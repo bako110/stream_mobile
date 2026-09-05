@@ -83,7 +83,7 @@ function getToken(): string | null {
   return storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 }
 
-async function getPresignedUrl(folder: string, filename: string, contentType: string): Promise<{ upload_url: string; public_url: string }> {
+async function getPresignedUrl(folder: string, filename: string, contentType: string): Promise<{ upload_url: string; public_url: string; key?: string }> {
   const token = getToken();
   const res = await ReactNativeBlobUtil.fetch(
     'POST',
@@ -103,17 +103,53 @@ async function getPresignedUrl(folder: string, filename: string, contentType: st
   return res.json();
 }
 
-async function putToR2(uploadUrl: string, filePath: string, contentType: string): Promise<void> {
+/**
+ * PUT direct vers R2 avec :
+ *  - streaming depuis le disque (ReactNativeBlobUtil.wrap) → jamais tout le
+ *    fichier en RAM, même pour plusieurs Go
+ *  - suivi de progression réel (uploadProgress) → l'utilisateur voit avancer
+ *  - 3 tentatives avec backoff sur erreur réseau transitoire (l'upload direct
+ *    R2 est idempotent : rejouer un PUT sur la même clé écrase, pas de doublon)
+ */
+async function putToR2(
+  uploadUrl: string,
+  filePath: string,
+  contentType: string,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
   const path = filePath.startsWith('file://') ? filePath.slice(7) : filePath;
-  const res = await ReactNativeBlobUtil.fetch(
-    'PUT',
-    uploadUrl,
-    { 'Content-Type': contentType },
-    ReactNativeBlobUtil.wrap(path) as any,
-  );
-  if (res.respInfo.status >= 300) {
-    throw new Error(`R2 upload error ${res.respInfo.status}`);
+  const MAX_ATTEMPTS = 3;
+  let lastErr: any;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const task = ReactNativeBlobUtil.fetch(
+        'PUT',
+        uploadUrl,
+        { 'Content-Type': contentType },
+        ReactNativeBlobUtil.wrap(path) as any,
+      );
+      if (onProgress) {
+        task.uploadProgress({ interval: 250 }, (written, total) => {
+          if (total > 0) onProgress(Math.min(100, Math.round((written / total) * 100)));
+        });
+      }
+      const res = await task;
+      if (res.respInfo.status >= 300) {
+        throw new Error(`R2 upload error ${res.respInfo.status}`);
+      }
+      return;
+    } catch (err: any) {
+      lastErr = err;
+      // Ne pas retenter sur une vraie erreur HTTP 4xx (clé invalide, etc.)
+      const msg = String(err?.message ?? '');
+      if (/error 4\d\d/.test(msg)) break;
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise<void>(r => setTimeout(() => r(), 1000 * attempt)); // 1s, 2s
+      }
+    }
   }
+  throw lastErr ?? new Error('R2 upload échoué');
 }
 
 // ── Images ────────────────────────────────────────────────────────────────────
@@ -218,53 +254,63 @@ export async function uploadVideoFromUri(
   const filename    = fileName ?? `video_${Date.now()}.mp4`;
   const token       = getToken();
 
-  // Upload multipart async — le backend retourne immédiatement url + job_id,
-  // le HLS est généré en background. On poll jusqu'à done pour tous les dossiers vidéo.
+  // ── Upload DIRECT client → R2 (bypass backend) pour tous les dossiers HLS ──
+  // Avant : le fichier transitait par FastAPI (multipart) → goulot serveur, lent,
+  // pas de reprise. Maintenant : presigned PUT direct vers R2 (2-5× plus rapide,
+  // streaming disque, retry sur coupure), puis on demande juste au backend de
+  // lancer le pipeline HLS avec la clé.
   if (['reels', 'stories', 'messages', 'events', 'concerts', 'content', 'posts'].includes(folder)) {
-    const filePath = compressed.uri.startsWith('file://')
-      ? compressed.uri.slice(7)
-      : compressed.uri;
-
-    let res: Awaited<ReturnType<typeof ReactNativeBlobUtil.fetch>>;
+    let jobId: string | undefined;
+    let data: any = {};
     try {
-      res = await ReactNativeBlobUtil.fetch(
+      // 1) presigned URL
+      const presign = await getPresignedUrl(folder, filename, contentType);
+      const r2Key = presign.key ?? presign.public_url.split(`${folder}/`).slice(1).join(`${folder}/`);
+
+      // 2) PUT direct vers R2 avec progression réelle (upload = 10→70 %)
+      await putToR2(presign.upload_url, compressed.uri, contentType, (pct) => {
+        onProgress?.(10 + Math.round(pct * 0.6));
+      });
+      onProgress?.(70);
+
+      // 3) demander la génération HLS au backend (léger, réponse immédiate)
+      const procRes = await ReactNativeBlobUtil.fetch(
         'POST',
-        `${API_BASE_URL}/api/v1/upload/video?folder=${folder}`,
+        `${API_BASE_URL}/api/v1/upload/video/process`,
         {
           Accept:         'application/json',
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        [{ name: 'file', filename, type: contentType, data: ReactNativeBlobUtil.wrap(filePath) as any }],
+        JSON.stringify({ key: presign.key ?? r2Key, folder }),
       );
+      if (procRes.respInfo.status >= 300) {
+        let detail = `Process error ${procRes.respInfo.status}`;
+        try { detail = (procRes.json() as any)?.detail ?? detail; } catch {}
+        throw new Error(detail);
+      }
+      data = procRes.json() as any;
+      jobId = data.job_id;
     } finally {
       if (compressed.isTempFile) {
         await cleanupTempVideos([compressed.uri]).catch(() => {});
       }
     }
 
-    if (res!.respInfo.status >= 300) {
-      let detail = `Upload error ${res!.respInfo.status}`;
-      try { detail = (res!.json() as any)?.detail ?? detail; } catch {}
-      throw new Error(detail);
-    }
-
-    // Upload multipart terminé → 70%
-    onProgress?.(70);
-
-    const data = res!.json() as any;
-    const jobId: string | undefined = data.job_id;
-
-    // Poll HLS jusqu'à done pour tous les dossiers vidéo
+    // Poll HLS jusqu'à done. Cadence adaptative : rapide au début (le HLS d'un
+    // reel court est souvent prêt en < 15 s), plus lente ensuite pour économiser
+    // les requêtes sur les longues vidéos.
     if (jobId) {
-      const MAX_POLLS        = 90;   // 90 × 4s = 6 min max
-      const POLL_INTERVAL_MS = 4_000;
-      const MAX_REAL_ERRORS  = 5;    // vraies erreurs réseau (pas les 404 "job pas encore prêt")
+      const MAX_TOTAL_MS    = 6 * 60_000;   // 6 min de garde
+      const MAX_REAL_ERRORS = 5;
       let realErrors = 0;
+      let elapsed = 0;
 
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await new Promise<void>(r => setTimeout(() => r(), POLL_INTERVAL_MS));
-        onProgress?.(Math.min(95, 70 + Math.round(i * 25 / MAX_POLLS)));
+      while (elapsed < MAX_TOTAL_MS) {
+        const wait = elapsed < 20_000 ? 1_500 : elapsed < 60_000 ? 3_000 : 5_000;
+        await new Promise<void>(r => setTimeout(() => r(), wait));
+        elapsed += wait;
+        onProgress?.(Math.min(95, 70 + Math.round((elapsed / MAX_TOTAL_MS) * 25)));
         try {
           const statusRes = await apiClient.get<any>(
             `/api/v1/upload/video/status/${jobId}`,
@@ -330,24 +376,28 @@ export async function uploadVideoFromUri(
     };
   }
 
-  // Autres dossiers : presigned URL directe (pas besoin de HLS)
-  const { upload_url, public_url } = await getPresignedUrl(folder, filename, contentType);
-  await putToR2(upload_url, compressed.uri, contentType);
-
-  let thumbnailPublicUrl: string | undefined;
-  if (compressed.thumbnailUri) {
-    try {
-      const thumbFilename = `thumb_${Date.now()}.jpg`;
-      const { upload_url: thumbUploadUrl, public_url: thumbPublicUrl } =
-        await getPresignedUrl(folder, thumbFilename, 'image/jpeg');
-      await putToR2(thumbUploadUrl, compressed.thumbnailUri, 'image/jpeg');
-      thumbnailPublicUrl = thumbPublicUrl;
-      const thumbPath = compressed.thumbnailUri.startsWith('file://')
-        ? compressed.thumbnailUri.slice(7)
-        : compressed.thumbnailUri;
-      ReactNativeBlobUtil.fs.unlink(thumbPath).catch(() => {});
-    } catch {}
-  }
+  // Autres dossiers : presigned URL directe (pas besoin de HLS).
+  // Vidéo ET thumbnail en PARALLÈLE (Promise.all) — avant : séquentiel (+1-2 s).
+  onProgress?.(10);
+  const thumbSrc = compressed.thumbnailUri;
+  const [{ public_url }, thumbnailPublicUrl] = await Promise.all([
+    (async () => {
+      const p = await getPresignedUrl(folder, filename, contentType);
+      await putToR2(p.upload_url, compressed.uri, contentType, (pct) => onProgress?.(10 + Math.round(pct * 0.8)));
+      return p;
+    })(),
+    (async (): Promise<string | undefined> => {
+      if (!thumbSrc) return undefined;
+      try {
+        const p = await getPresignedUrl(folder, `thumb_${Date.now()}.jpg`, 'image/jpeg');
+        await putToR2(p.upload_url, thumbSrc, 'image/jpeg');
+        const tp = thumbSrc.startsWith('file://') ? thumbSrc.slice(7) : thumbSrc;
+        ReactNativeBlobUtil.fs.unlink(tp).catch(() => {});
+        return p.public_url;
+      } catch { return undefined; }
+    })(),
+  ]);
+  onProgress?.(95);
 
   if (compressed.isTempFile) {
     await cleanupTempVideos([compressed.uri]);

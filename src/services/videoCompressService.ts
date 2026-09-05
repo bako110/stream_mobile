@@ -61,17 +61,38 @@ export async function compressVideo(
 
   const { fileUri, isCopy } = await toFileUri(inputUri);
 
-  const compressed = await Video.compress(
-    fileUri,
-    {
-      compressionMethod: 'auto',
-      maxSize: 1280,
-      minimumFileSizeForCompress: 10,
-    },
-    (progress) => {
-      onProgress?.(10 + Math.round(progress * 80));
-    },
-  );
+  // Taille source — si la vidéo est déjà légère, on saute la compression
+  // (react-native-compressor réencode TOUT même quand c'est inutile → 10-60 s
+  // perdues). Seuil : 25 Mo. Au-delà, on compresse mais avec des réglages
+  // "rapides" plutôt que 'auto' (qui vise une qualité max coûteuse).
+  let srcSizeMB = Infinity;
+  try {
+    const p = fileUri.startsWith('file://') ? fileUri.slice(7) : fileUri;
+    const stat = await ReactNativeBlobUtil.fs.stat(p);
+    srcSizeMB = Number(stat.size) / (1024 * 1024);
+  } catch {}
+
+  let compressed: string;
+  if (srcSizeMB <= 25) {
+    // Pas de recompression : upload direct de la source.
+    compressed = fileUri;
+    onProgress?.(90);
+  } else {
+    compressed = await Video.compress(
+      fileUri,
+      {
+        // 'manual' + bitrate cible : bien plus rapide que 'auto' pour un rendu
+        // équivalent en feed. ~2.5 Mbps @ 1080p reste net à l'échelle mobile.
+        compressionMethod: 'manual',
+        maxSize: 1280,
+        bitrate: 2_500_000,
+        minimumFileSizeForCompress: 25,
+      },
+      (progress) => {
+        onProgress?.(10 + Math.round(progress * 80));
+      },
+    );
+  }
 
   // Si on a fait une copie temporaire de l'original, on la supprime maintenant
   if (isCopy) {

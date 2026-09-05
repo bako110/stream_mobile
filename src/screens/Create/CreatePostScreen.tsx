@@ -15,10 +15,18 @@ import { postService } from '../../services/postService';
 import { uploadImageFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { MentionInput } from '../../components/common/MentionInput';
+import { LinkPreviewCard } from '../../components/common/LinkPreviewCard';
 import { toastService } from '../../services';
 
 const { width: W } = Dimensions.get('window');
 const MAX_IMAGES   = 6;
+
+// Première URL http(s) trouvée dans un texte
+const URL_RE = /https?:\/\/[^\s<>"')\]]+/i;
+const firstUrl = (text: string): string | null => {
+  const m = text.match(URL_RE);
+  return m ? m[0].replace(/[.,;:!?)]+$/, '') : null;  // retire la ponctuation finale collée
+};
 
 const FEELINGS = [
   '😊 Content', '😢 Triste', '😂 Heureux', '🔥 Motivé',
@@ -48,10 +56,23 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   const [isPrivate,     setIsPrivate]     = useState(false);
   const [showVisibility, setShowVisibility] = useState(false);
 
+  // Aperçu de lien — chargé dès qu'une URL est collée/tapée dans le texte, avant
+  // publication (comme Facebook). `dismissedLink` mémorise un lien que l'utilisateur
+  // a explicitement retiré pour ne pas le réafficher tant qu'il reste dans le texte.
+  const [detectedLink,  setDetectedLink]  = useState<string | null>(null);
+  const [dismissedLink, setDismissedLink] = useState<string | null>(null);
+
   const handleBodyChange = useCallback((text: string, ids: string[]) => {
     setBody(text);
     setMentionIds(ids);
-  }, []);
+    const url = firstUrl(text);
+    setDetectedLink(url);
+    // Si l'URL retirée n'est plus dans le texte, on réarme la détection.
+    if (dismissedLink && url !== dismissedLink) setDismissedLink(null);
+  }, [dismissedLink]);
+
+  // Lien effectivement montré (détecté et non retiré par l'utilisateur)
+  const activeLink = detectedLink && detectedLink !== dismissedLink ? detectedLink : null;
 
   const videoPlayer = useVideoPlayer(
     videoUri ? { uri: videoUri } : { uri: 'about:blank' },
@@ -131,47 +152,51 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
     const capturedVideo    = videoUri;
     const capturedImages   = [...localUris];
     const capturedIsPrivate = isPrivate;
+    // Lien uniquement s'il n'y a pas de média (l'aperçu de lien ne s'affiche que
+    // dans ce cas — cf. condition de rendu).
+    const capturedLink     = (!capturedVideo && capturedImages.length === 0) ? activeLink ?? undefined : undefined;
 
     // Fermer l'écran immédiatement dans tous les cas
     onPostCreated();
 
     if (!capturedVideo) {
-      // Texte seul ou images seules → upload en arrière-plan (pas de compression)
-      (async () => {
-        try {
-          let image_url: string | undefined;
-          let image_urls: string[] | undefined;
+      // Texte seul ou images seules → suivi via backgroundUploadService.track :
+      // une pill "Publication en cours…" s'affiche en haut, puis "Publié ✓".
+      backgroundUploadService.track('post', capturedBody ? capturedBody.slice(0, 40) : 'Nouvelle publication', async () => {
+        let image_url: string | undefined;
+        let image_urls: string[] | undefined;
 
-          if (capturedImages.length === 1) {
-            const r = await uploadImageFromUri(capturedImages[0], 'posts', `p_${Date.now()}.jpg`);
-            image_url = r.url;
-          } else if (capturedImages.length > 1) {
-            const results = await Promise.all(
-              capturedImages.map((uri, i) => uploadImageFromUri(uri, 'posts', `p_${Date.now()}_${i}.jpg`))
-            );
-            image_urls = results.map(r => r.url);
-            image_url  = image_urls[0];
-          }
-
-          const created = await postService.create({
-            body: capturedBody || undefined,
-            image_url,
-            image_urls,
-            feeling: capturedFeeling,
-            category: capturedCategory,
-            mention_ids: mentionIds.length ? mentionIds : undefined,
-            is_private: capturedIsPrivate,
-          });
-          // pending_review (2026-08bis) : media present -> invisible tant que
-          // l'IA n'a pas confirme "cleared" -- message different du succes
-          // immediat habituel, cf. MyVerificationQueueScreen.tsx pour le suivi.
-          if (created.status === 'pending_review') {
-            toastService.success('Envoyé', 'Publication en cours de vérification, elle sera visible une fois confirmée.');
-          }
-        } catch (err: any) {
-          console.warn('[CreatePost] échec création post:', err?.message ?? err);
+        if (capturedImages.length === 1) {
+          const r = await uploadImageFromUri(capturedImages[0], 'posts', `p_${Date.now()}.jpg`);
+          image_url = r.url;
+        } else if (capturedImages.length > 1) {
+          const results = await Promise.all(
+            capturedImages.map((uri, i) => uploadImageFromUri(uri, 'posts', `p_${Date.now()}_${i}.jpg`))
+          );
+          image_urls = results.map(r => r.url);
+          image_url  = image_urls[0];
         }
-      })();
+
+        const created = await postService.create({
+          body: capturedBody || undefined,
+          image_url,
+          image_urls,
+          feeling: capturedFeeling,
+          category: capturedCategory,
+          mention_ids: mentionIds.length ? mentionIds : undefined,
+          is_private: capturedIsPrivate,
+          link_url: capturedLink,
+        });
+        // pending_review (2026-08bis) : media present -> invisible tant que
+        // l'IA n'a pas confirme "cleared" -- message different du succes
+        // immediat habituel, cf. MyVerificationQueueScreen.tsx pour le suivi.
+        if (created.status === 'pending_review') {
+          toastService.success('Envoyé', 'Publication en cours de vérification, elle sera visible une fois confirmée.');
+        }
+        return created;
+      }).catch((err: any) => {
+        console.warn('[CreatePost] échec création post:', err?.message ?? err);
+      });
       return;
     }
 
@@ -396,6 +421,20 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           />
         </View>
 
+        {/* Aperçu du lien collé — chargé avant publication (méta OG) */}
+        {activeLink && !videoUri && localUris.length === 0 && (
+          <View style={s.linkPreviewWrap}>
+            <LinkPreviewCard url={activeLink} />
+            <TouchableOpacity
+              style={[s.linkPreviewClose, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => setDismissedLink(activeLink)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="x" size={15} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Aperçu vidéo */}
         {videoUri && (
           <View style={s.videoPreviewWrap}>
@@ -551,6 +590,9 @@ const s = StyleSheet.create({
 
   inputWrap:      { paddingHorizontal: 14, paddingBottom: 12, minHeight: 120 },
   input:          { fontSize: 18, lineHeight: 26, textAlignVertical: 'top', flex: 1 },
+
+  linkPreviewWrap:  { marginHorizontal: 14, marginBottom: 12, position: 'relative' },
+  linkPreviewClose: { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 
   videoPreviewWrap: { marginHorizontal: 14, marginBottom: 12, borderRadius: 12, overflow: 'hidden', height: W * 0.56 },
   videoPreview:     { width: '100%', height: '100%' },

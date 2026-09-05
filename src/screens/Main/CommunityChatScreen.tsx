@@ -112,6 +112,89 @@ function fmtDuration(secs: number) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// ─── Ligne d'option de sondage (style WhatsApp) ──────────────────────────────
+// Tap = vote instantané. La barre de résultat se remplit en animation douce vers
+// le nouveau pourcentage à chaque changement. Pas de modale, pas de confirmation.
+const PollOptionRow: React.FC<{
+  text: string;
+  votes: number;
+  pct: number;
+  voted: boolean;
+  winner: boolean;
+  ended: boolean;
+  multiple: boolean;
+  showResults: boolean;   // n'affiche barre + % qu'après le 1er vote (ou sondage clos)
+  colors: any;
+  onPress: () => void;
+}> = React.memo(({ text, votes, pct, voted, winner, ended, multiple, showResults, colors, onPress }) => {
+  const fill = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fill, {
+      toValue: showResults ? pct / 100 : 0,
+      duration: 420,
+      useNativeDriver: false,
+    }).start();
+  }, [pct, showResults]);
+
+  const barColor = voted
+    ? colors.primary + '22'
+    : winner
+      ? colors.primary + '18'
+      : colors.textTertiary + '14';
+  const borderColor = voted || winner ? colors.primary + '66' : colors.divider;
+
+  return (
+    <TouchableOpacity onPress={onPress} disabled={ended} activeOpacity={0.75}>
+      <View style={[pollRowS.wrap, { borderColor, backgroundColor: colors.surface }]}>
+        <Animated.View
+          style={[
+            pollRowS.bar,
+            { backgroundColor: barColor, width: fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) },
+          ]}
+        />
+        <View style={pollRowS.row}>
+          {/* Indicateur de sélection : rond (choix simple) ou carré (multiple) */}
+          <View
+            style={[
+              multiple ? pollRowS.box : pollRowS.dot,
+              { borderColor: voted ? colors.primary : colors.textTertiary + '80', backgroundColor: voted ? colors.primary : 'transparent' },
+            ]}
+          >
+            {voted && <Icon name="check" size={11} color="#fff" />}
+          </View>
+          <Text
+            style={[pollRowS.text, { color: colors.textPrimary, fontWeight: voted || winner ? '700' : '400' }]}
+            numberOfLines={3}
+          >
+            {text}
+          </Text>
+          {showResults && (
+            <View style={pollRowS.pctWrap}>
+              <Text style={[pollRowS.pct, { color: voted || winner ? colors.primary : colors.textSecondary }]}>{pct}%</Text>
+              <Text style={[pollRowS.votes, { color: colors.textTertiary }]}>
+                {votes} vote{votes !== 1 ? 's' : ''}
+              </Text>
+            </View>
+          )}
+          {winner && <Icon name="award" size={14} color={colors.primary} style={{ marginLeft: 6 }} />}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const pollRowS = StyleSheet.create({
+  wrap:    { position: 'relative', borderWidth: 1.5, borderRadius: 14, overflow: 'hidden', minHeight: 48 },
+  bar:     { position: 'absolute', top: 0, left: 0, bottom: 0 },
+  row:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 11, gap: 10 },
+  dot:     { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  box:     { width: 20, height: 20, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  text:    { flex: 1, fontSize: 14.5, lineHeight: 19 },
+  pctWrap: { alignItems: 'flex-end', flexShrink: 0, marginLeft: 6 },
+  pct:     { fontSize: 13, fontWeight: '800' },
+  votes:   { fontSize: 10, fontWeight: '500', marginTop: 1 },
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const CommunityChatScreen: React.FC = () => {
@@ -120,11 +203,17 @@ export const CommunityChatScreen: React.FC = () => {
   const { theme } = useTheme();
   const { currentUser } = useUser();
   const { colors } = theme;
+  const isDark = theme.isDark;
   const nav = useNavigation<any>();
   const route = useRoute();
   const { communityId, communityName } = route.params as RouteParams;
 
   const [activeTab,      setActiveTab]      = useState<ChatTab>('discussion');
+  // Menu de navigation des sections (Discussion / Annonces / Médias / Sondages),
+  // ouvert depuis le bouton ⋯ du header. Par défaut on est sur "discussion" et
+  // aucune barre d'onglets n'est affichée — l'écran ressemble à une vraie
+  // conversation.
+  const [showSectionsMenu, setShowSectionsMenu] = useState(false);
   const [messages,       setMessages]       = useState<CommunityMessage[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [loadingMore,    setLoadingMore]    = useState(false);
@@ -1056,37 +1145,87 @@ export const CommunityChatScreen: React.FC = () => {
     const poll = msg.poll;
     if (!poll) return null;
     const total = poll.total_votes || 0;
+    const hasVoted = poll.my_votes.length > 0;
+    const closing = closePollLoading === poll.poll_id;
+    // Option(s) gagnante(s) — surlignées uniquement quand le sondage est terminé.
+    const maxVotes = poll.ended ? Math.max(0, ...poll.options.map(o => o.votes)) : -1;
+
     return (
       <View style={[S.pollCard, { backgroundColor: colors.background, borderColor: colors.divider }]}>
+        {/* En-tête : pastille SONDAGE (comme l'annonce a son en-tête) */}
+        <View style={S.pollHead}>
+          <View style={[S.pollHeadIcon, { backgroundColor: colors.primary + '18' }]}>
+            <Icon name="bar-chart-2" size={12} color={colors.primary} />
+          </View>
+          <Text style={[S.pollHeadLabel, { color: colors.primary }]}>SONDAGE</Text>
+          {poll.ended && (
+            <View style={[S.pollEndedBadge, { backgroundColor: colors.textTertiary + '20' }]}>
+              <Text style={[S.pollEndedText, { color: colors.textTertiary }]}>Terminé</Text>
+            </View>
+          )}
+        </View>
+
         <Text style={[S.pollQuestion, { color: colors.textPrimary }]}>{poll.question}</Text>
-        <View style={{ marginTop: 10, gap: 8 }}>
+
+        {poll.allow_multiple && !poll.ended && (
+          <Text style={[S.pollHint, { color: colors.textTertiary }]}>Sélectionne une ou plusieurs réponses</Text>
+        )}
+
+        {/* Options — empilées, aérées, tap = vote instantané (style WhatsApp) */}
+        <View style={{ marginTop: 12, gap: 10 }}>
           {poll.options.map(opt => {
             const voted = poll.my_votes.includes(opt.id);
             const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
+            const isWinner = poll.ended && opt.votes === maxVotes && opt.votes > 0;
             return (
-              <TouchableOpacity key={opt.id} onPress={() => !poll.ended && handleVote(msg, opt.id)} disabled={poll.ended} activeOpacity={0.7}>
-                <View style={[S.pollOptWrap, { borderColor: voted ? colors.primary : colors.divider, backgroundColor: voted ? colors.primary + '08' : 'transparent' }]}>
-                  <View style={[S.pollBar, { width: `${pct}%` as any, backgroundColor: voted ? colors.primary + '25' : colors.divider + '80' }]} />
-                  <View style={S.pollOptRow}>
-                    <View style={[S.pollDot, { backgroundColor: voted ? colors.primary : colors.divider }]}>
-                      {voted && <Icon name="check" size={9} color="#fff" />}
-                    </View>
-                    <Text style={[S.pollOptText, { color: colors.textPrimary, fontWeight: voted ? '700' : '400' }]} numberOfLines={2}>{opt.text}</Text>
-                    <Text style={[S.pollPct, { color: voted ? colors.primary : colors.textTertiary }]}>{pct}%</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
+              <PollOptionRow
+                key={opt.id}
+                text={opt.text}
+                votes={opt.votes}
+                pct={pct}
+                voted={voted}
+                winner={isWinner}
+                ended={poll.ended}
+                multiple={poll.allow_multiple}
+                showResults={hasVoted || poll.ended}
+                colors={colors}
+                onPress={() => !poll.ended && handleVote(msg, opt.id)}
+              />
             );
           })}
         </View>
+
+        {/* Pied : total + méta + lien "voir les votes" */}
         <View style={[S.pollFooter, { borderTopColor: colors.divider }]}>
-          <Icon name="users" size={11} color={colors.textTertiary} />
           <Text style={[S.pollFooterText, { color: colors.textTertiary }]}>
             {poll.total_votes} vote{poll.total_votes !== 1 ? 's' : ''}
-            {poll.ended ? ' · Terminé' : poll.ends_at ? ` · Fin ${new Date(poll.ends_at).toLocaleDateString('fr-FR')}` : ''}
-            {poll.allow_multiple ? ' · Choix multiple' : ''}
+            {poll.allow_multiple ? '  ·  Choix multiple' : ''}
+            {!poll.ended && poll.ends_at ? `  ·  Fin le ${new Date(poll.ends_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
           </Text>
+          {total > 0 && (
+            <TouchableOpacity onPress={() => setMenuMsg(msg)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={[S.pollLink, { color: colors.primary }]}>Voir les votes</Text>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Bouton Clôturer — admins/modérateurs, sondage encore ouvert */}
+        {canAnnounce && !poll.ended && (
+          <TouchableOpacity
+            style={[S.pollCloseBtn, { borderColor: colors.divider }]}
+            onPress={() => handleClosePoll(msg)}
+            disabled={closing}
+            activeOpacity={0.7}
+          >
+            {closing
+              ? <ActivityIndicator size="small" color={colors.textSecondary} />
+              : <>
+                  <Icon name="lock" size={12} color={colors.textSecondary} />
+                  <Text style={[S.pollCloseText, { color: colors.textSecondary }]}>Clôturer le sondage</Text>
+                </>
+            }
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -1631,7 +1770,14 @@ export const CommunityChatScreen: React.FC = () => {
   // ══════════════════════════════════════════════════════════════════════════
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.surface} />
+      {/* Status bar : icônes sombres sur header clair, claires sur header sombre.
+          translucent + fond transparent (Android) → le header gère lui-même le
+          padding via STATUS_H, pas de bande grise système. */}
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent
+      />
 
       {/* ── Header ── */}
       <LinearGradient
@@ -1695,32 +1841,63 @@ export const CommunityChatScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => nav.navigate('CommunityDetail', { communityId })} style={S.headerBtn}>
-            <View style={[S.headerBtnInner, { backgroundColor: colors.backgroundSecondary }]}>
-              <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
+          {/* Bouton sections — ouvre le menu Discussion / Annonces / Médias / Sondages.
+              Une pastille apparaît quand on n'est pas sur la discussion. */}
+          <TouchableOpacity onPress={() => setShowSectionsMenu(v => !v)} style={S.headerBtn}>
+            <View style={[S.headerBtnInner, { backgroundColor: activeTab !== 'discussion' ? colors.primary + '18' : colors.backgroundSecondary }]}>
+              <Icon
+                name={showSectionsMenu ? 'x' : (TABS.find(t => t.key === activeTab)?.icon ?? 'grid')}
+                size={17}
+                color={activeTab !== 'discussion' ? colors.primary : colors.textTertiary}
+              />
             </View>
           </TouchableOpacity>
         </View>
       </LinearGradient>
 
-      {/* ── Onglets ── */}
-      <View style={[S.tabBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        {TABS.map(tab => {
-          const active = activeTab === tab.key;
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={[S.tabItem, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-              onPress={() => setActiveTab(tab.key)}
-            >
-              <View style={[S.tabIconWrap, active && { backgroundColor: colors.primary + '18' }]}>
-                <Icon name={tab.icon} size={13} color={active ? colors.primary : colors.textTertiary} />
-              </View>
-              <Text style={[S.tabLabel, { color: active ? colors.primary : colors.textTertiary }]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* ── Menu des sections (déroulé sous le header depuis le bouton ⋯) ── */}
+      {showSectionsMenu && (
+        <>
+          <Pressable style={[S.sectionsBackdrop, { top: STATUS_H + 56 }]} onPress={() => setShowSectionsMenu(false)} />
+          <View style={[S.sectionsMenu, { top: STATUS_H + 52, backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            {TABS.map((tab, i) => {
+              const active = activeTab === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[S.sectionsItem, i < TABS.length - 1 && { borderBottomColor: colors.divider, borderBottomWidth: StyleSheet.hairlineWidth }]}
+                  activeOpacity={0.7}
+                  onPress={() => { setActiveTab(tab.key); setShowSectionsMenu(false); }}
+                >
+                  <View style={[S.sectionsItemIcon, { backgroundColor: active ? colors.primary + '18' : colors.backgroundSecondary }]}>
+                    <Icon name={tab.icon} size={16} color={active ? colors.primary : colors.textSecondary} />
+                  </View>
+                  <Text style={[S.sectionsItemLabel, { color: active ? colors.primary : colors.textPrimary, fontWeight: active ? '800' : '600' }]}>
+                    {tab.label}
+                  </Text>
+                  {active && <Icon name="check" size={16} color={colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      {/* ── Barre de section active (hors discussion) — permet de revenir vite ── */}
+      {activeTab !== 'discussion' && (
+        <TouchableOpacity
+          style={[S.sectionBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}
+          activeOpacity={0.7}
+          onPress={() => setActiveTab('discussion')}
+        >
+          <Icon name="arrow-left" size={16} color={colors.textSecondary} />
+          <Icon name={TABS.find(t => t.key === activeTab)?.icon ?? 'grid'} size={14} color={colors.primary} />
+          <Text style={[S.sectionBarLabel, { color: colors.textPrimary }]}>
+            {TABS.find(t => t.key === activeTab)?.label}
+          </Text>
+          <Text style={[S.sectionBarHint, { color: colors.textTertiary }]}>· revenir à la discussion</Text>
+        </TouchableOpacity>
+      )}
 
       {/* ── Bannière cotisation active ── */}
       {activeCotisation && activeTab === 'discussion' && (
@@ -2577,11 +2754,26 @@ const S = StyleSheet.create({
   headerBtn: { padding: 4 },
   headerBtnInner: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
-  // Tabs
-  tabBar: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
-  tabItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 },
-  tabIconWrap: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  tabLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
+  // Menu des sections (déroulé depuis le bouton ⋯ du header)
+  sectionsBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 },
+  sectionsMenu: {
+    position: 'absolute', right: 10, zIndex: 50,
+    minWidth: 210, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 12,
+  },
+  sectionsItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
+  sectionsItemIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  sectionsItemLabel: { flex: 1, fontSize: 14 },
+
+  // Barre "section active" (hors discussion) — retour rapide
+  sectionBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 14, paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sectionBarLabel: { fontSize: 13, fontWeight: '800' },
+  sectionBarHint:  { fontSize: 12, fontWeight: '400' },
 
   // Date separator
   dateSepRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, paddingHorizontal: 16 },
@@ -2643,16 +2835,19 @@ const S = StyleSheet.create({
   pollMsgLabel: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
 
   // Poll card
-  pollCard: { borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, padding: 12 },
-  pollQuestion: { fontSize: 15, fontWeight: '700', lineHeight: 21 },
-  pollOptWrap: { position: 'relative', borderWidth: 1.5, borderRadius: 10, overflow: 'hidden', minHeight: 40 },
-  pollBar: { position: 'absolute', top: 0, left: 0, height: '100%' },
-  pollOptRow: { flexDirection: 'row', alignItems: 'center', padding: 10, gap: 8 },
-  pollDot: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  pollOptText: { flex: 1, fontSize: 14 },
-  pollPct: { fontSize: 12, fontWeight: '700', minWidth: 34, textAlign: 'right' },
-  pollFooter: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  pollFooterText: { fontSize: 11 },
+  pollCard: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14 },
+  pollHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
+  pollHeadIcon: { width: 22, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  pollHeadLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  pollEndedBadge: { marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  pollEndedText: { fontSize: 10, fontWeight: '700' },
+  pollQuestion: { fontSize: 15.5, fontWeight: '700', lineHeight: 21 },
+  pollHint: { fontSize: 11.5, fontWeight: '400', marginTop: 4 },
+  pollFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  pollFooterText: { fontSize: 11.5, fontWeight: '500', flex: 1 },
+  pollLink: { fontSize: 12, fontWeight: '700' },
+  pollCloseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
+  pollCloseText: { fontSize: 12.5, fontWeight: '700' },
 
   // Empty state
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, marginTop: 40 },

@@ -44,6 +44,16 @@ import { BackButton } from '../../components/common';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
+// ─── Design tokens locaux ───────────────────────────────────────────────────
+// Le lecteur Reels est TOUJOURS sur fond vidéo sombre : ses accents ne suivent
+// PAS le thème clair/sombre. On les centralise ici plutôt que de répéter les
+// littéraux (#E0389A apparaissait 8×, #7B3FF2 3×).
+const REEL_LIKE  = '#E0389A'; // rose — cœur "aimé", HeartRain, badges d'amis
+const REEL_MUSIC = '#7B3FF2'; // violet — bandeau musique, bouton + sur avatar
+
+// Échelle de border-radius pour les zones NON-vidéo (grilles, sheets, menus).
+const RR = { chip: 8, media: 12, card: 16, pill: 999 } as const;
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const getAuthorLabel = (author?: Reel['author']): string => {
@@ -917,17 +927,21 @@ export const ReelsScreen: React.FC = () => {
         {/* Bouton retour */}
         <BackButton onPress={() => nav.goBack()} />
         {/* Contenu vide centré */}
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <Icon name="film" size={48} color={colors.textDisabled} />
-          <Text style={{ color: colors.textTertiary, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 }}>
-            Aucun reel disponible
+        <View style={s.emptyState}>
+          <View style={[s.emptyIconWrap, { backgroundColor: colors.primary + '14' }]}>
+            <Icon name="film" size={30} color={colors.primary} />
+          </View>
+          <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Aucun reel pour le moment</Text>
+          <Text style={[s.emptyBody, { color: colors.textTertiary }]}>
+            Sois le premier à en publier un.
           </Text>
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8, borderRadius: 10 }}
+            style={[s.emptyCta, { backgroundColor: colors.primary }]}
+            activeOpacity={0.85}
             onPress={() => nav.navigate('CreateReel')}
           >
             <Icon name="plus" size={18} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ajouter un reel</Text>
+            <Text style={s.emptyCtaText}>Créer un reel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -942,23 +956,29 @@ export const ReelsScreen: React.FC = () => {
         <View style={[s.mineHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border, paddingTop: insets.top + 14 }]}>
           <BackButton onPress={() => setTab('feed')} />
           <View style={{ flex: 1 }}>
-            <Text style={[s.mineHeaderTitle, { color: colors.primary }]}>Mes Reels</Text>
+            <Text style={[s.mineHeaderTitle, { color: colors.textPrimary }]}>Mes Reels</Text>
             {myReels.length > 0 && (
-              <Text style={[s.mineHeaderSub, { color: colors.textSecondary }]}>{myReels.length} video{myReels.length > 1 ? 's' : ''}</Text>
+              <Text style={[s.mineHeaderSub, { color: colors.textTertiary }]}>{myReels.length} vidéo{myReels.length > 1 ? 's' : ''}</Text>
             )}
           </View>
-          <TouchableOpacity onPress={() => nav.navigate('CreateReel')} style={[s.mineCreateBtn, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity onPress={() => nav.navigate('CreateReel')} style={[s.mineCreateBtn, { backgroundColor: colors.primary }]} activeOpacity={0.85}>
             <Icon name="plus" size={18} color="#fff" />
             <Text style={s.mineCreateBtnText}>Nouveau</Text>
           </TouchableOpacity>
         </View>
 
         {myReels.length === 0 ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-            <Icon name="film" size={36} color={colors.primary} />
-            <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700' }}>Aucun reel</Text>
-            <TouchableOpacity style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => nav.navigate('CreateReel')}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Créer mon premier reel</Text>
+          <View style={s.emptyState}>
+            <View style={[s.emptyIconWrap, { backgroundColor: colors.primary + '14' }]}>
+              <Icon name="film" size={30} color={colors.primary} />
+            </View>
+            <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Aucun reel</Text>
+            <Text style={[s.emptyBody, { color: colors.textTertiary }]}>
+              Publie ton premier reel pour le voir apparaître ici.
+            </Text>
+            <TouchableOpacity style={[s.emptyCta, { backgroundColor: colors.primary }]} activeOpacity={0.85} onPress={() => nav.navigate('CreateReel')}>
+              <Icon name="plus" size={18} color="#fff" />
+              <Text style={s.emptyCtaText}>Créer mon premier reel</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -1040,9 +1060,10 @@ export const ReelsScreen: React.FC = () => {
           />
         )}
 
-        <Modal visible={!!menuReel} transparent animationType="fade" onRequestClose={() => setMenuReel(null)}>
+        <Modal visible={!!menuReel} transparent animationType="slide" onRequestClose={() => setMenuReel(null)}>
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setMenuReel(null)}>
-            <View style={[s.menuSheet, { backgroundColor: colors.backgroundSecondary }]}>
+            <View style={[s.menuSheet, { backgroundColor: colors.surface }]} onStartShouldSetResponder={() => true}>
+              <View style={[s.sheetHandle, { backgroundColor: colors.divider }]} />
               <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleOpenEdit(menuReel)}>
                 <Icon name="edit-2" size={18} color={colors.textPrimary} />
                 <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Modifier la description</Text>
@@ -1056,13 +1077,13 @@ export const ReelsScreen: React.FC = () => {
               <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleToggleReelComments(menuReel)}>
                 <MCIcon name={menuReel?.comments_disabled ? 'comment-check-outline' : 'comment-off-outline'} size={18} color={colors.textPrimary} />
                 <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
-                  {menuReel?.comments_disabled ? 'Activer les commentaires' : 'Desactiver les commentaires'}
+                  {menuReel?.comments_disabled ? 'Activer les commentaires' : 'Désactiver les commentaires'}
                 </Text>
               </TouchableOpacity>
               <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
               <TouchableOpacity style={s.menuItem} onPress={() => menuReel && handleDeleteReel(menuReel)}>
-                <Icon name="trash-2" size={18} color="#E0389A" />
-                <Text style={[s.menuItemText, { color: '#E0389A' }]}>Supprimer le reel</Text>
+                <Icon name="trash-2" size={18} color={colors.error} />
+                <Text style={[s.menuItemText, { color: colors.error }]}>Supprimer le reel</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -1070,24 +1091,26 @@ export const ReelsScreen: React.FC = () => {
 
         <Modal visible={!!editReel} transparent animationType="slide" onRequestClose={() => setEditReel(null)}>
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setEditReel(null)}>
-            <View style={[s.editSheet, { backgroundColor: colors.backgroundSecondary }]} onStartShouldSetResponder={() => true}>
+            <View style={[s.editSheet, { backgroundColor: colors.surface }]} onStartShouldSetResponder={() => true}>
+              <View style={[s.editHandle, { backgroundColor: colors.divider }]} />
               <Text style={[s.editTitle, { color: colors.textPrimary }]}>Modifier la description</Text>
+              <Text style={[s.editSubtitle, { color: colors.textTertiary }]}>Elle apparaît sous ton reel dans le fil.</Text>
               <TextInput
                 value={editCaption}
                 onChangeText={setEditCaption}
-                placeholder="Description…"
-                placeholderTextColor={colors.textDisabled}
+                placeholder="Décris ton reel…"
+                placeholderTextColor={colors.textTertiary}
                 multiline
-                maxLength={300}
+                maxLength={500}
                 style={[s.editInput, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
               />
-              <Text style={[s.charCount, { color: colors.textTertiary }]}>{editCaption.length}/300</Text>
+              <Text style={[s.charCount, { color: colors.textTertiary }]}>{editCaption.length}/500</Text>
               <View style={s.editActions}>
-                <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.border }]} onPress={() => setEditReel(null)}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>Annuler</Text>
+                <TouchableOpacity style={[s.editBtn, { borderWidth: 1, borderColor: colors.border }]} onPress={() => setEditReel(null)}>
+                  <Text style={[s.editBtnText, { color: colors.textSecondary }]}>Annuler</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.primary }]} onPress={handleSaveEdit} disabled={editSaving}>
-                  {editSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Enregistrer</Text>}
+                <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.primary, opacity: editSaving ? 0.6 : 1 }]} onPress={handleSaveEdit} disabled={editSaving}>
+                  {editSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={[s.editBtnText, { color: '#fff' }]}>Enregistrer</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -1331,7 +1354,7 @@ export const ReelsScreen: React.FC = () => {
                           </View>
                           {item.caption ? <Text style={s.searchCardCaption} numberOfLines={2}>{item.caption}</Text> : null}
                           <View style={s.searchCardStats}>
-                            <MCIcon name="heart" size={10} color="#E0389A" />
+                            <MCIcon name="heart" size={11} color={REEL_LIKE} />
                             <Text style={s.searchCardStat}>{formatCount(item.like_count)}</Text>
                           </View>
                         </View>
@@ -1513,7 +1536,7 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
           jamais à la même hauteur pour éviter tout chevauchement. Aligné à droite pour
           rester lisible même quand le header est en mode recherche/mes reels. ── */}
       <View style={{ position: 'absolute', top: insetBottom > 0 ? 96 : 86, right: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,18,30,0.68)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' }}>
-        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#E0389A' }, badgeDotStyle]} />
+        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: REEL_LIKE }, badgeDotStyle]} />
         <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>Sponsorisé</Text>
       </View>
 
@@ -1547,8 +1570,8 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
           <TouchableOpacity activeOpacity={0.88} onPress={handleCta}
             style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 }}
           >
-            <Icon name={isPhone ? 'phone' : 'external-link'} size={12} color="#7B3FF2" />
-            <Text style={{ color: '#7B3FF2', fontSize: 12.5, fontWeight: '800' }}>
+            <Icon name={isPhone ? 'phone' : 'external-link'} size={13} color={REEL_MUSIC} />
+            <Text style={{ color: REEL_MUSIC, fontSize: 13, fontWeight: '800' }}>
               {ad.cta_text || (isPhone ? 'Contactez-nous' : 'En savoir plus')}
             </Text>
           </TouchableOpacity>
@@ -2214,13 +2237,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           const res = await apiClient.get<any>(`/api/v1/concerts/${reel.ref_concert_id}`);
           if (!cancelled && mountedRef.current) {
             const d = res.data;
-            setRefInfo({ label: d.title ?? 'Concert', kind: 'Concert', thumbnail: d.thumbnail_url ?? null, color: '#7B3FF2' });
+            setRefInfo({ label: d.title ?? 'Concert', kind: 'Concert', thumbnail: d.thumbnail_url ?? null, color: REEL_MUSIC });
           }
         } else if (reel.ref_event_id) {
           const res = await apiClient.get<any>(`/api/v1/events/${reel.ref_event_id}`);
           if (!cancelled && mountedRef.current) {
             const d = res.data;
-            setRefInfo({ label: d.title ?? 'Événement', kind: 'Événement', thumbnail: d.thumbnail_url ?? null, color: '#E0389A' });
+            setRefInfo({ label: d.title ?? 'Événement', kind: 'Événement', thumbnail: d.thumbnail_url ?? null, color: REEL_LIKE });
           }
         } else if (reel.ref_content_id) {
           const res = await apiClient.get<any>(`/api/v1/content/films/${reel.ref_content_id}`);
@@ -2620,7 +2643,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
       <Animated.View pointerEvents="none" style={heartAnim}>
         {heartLikeAction
-          ? <MCIcon name="heart" size={88} color="#E0389A" />
+          ? <MCIcon name="heart" size={88} color={REEL_LIKE} />
           : <MCIcon name="heart-broken" size={88} color="rgba(255,255,255,0.7)" />
         }
       </Animated.View>
@@ -2712,7 +2735,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             )}
           </View>
 
-          {captionSt ? <RichText text={captionSt} textStyle={s.caption} primaryColor="#93C5FD" maxLines={3} /> : null}
+          {captionSt ? <RichText text={captionSt} textStyle={s.caption} primaryColor="#93C5FD" maxLines={3} showLinkPreview={false} /> : null}
 
           {reel.music_name ? (
             <View style={s.musicBand} pointerEvents="none">
@@ -2749,7 +2772,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
             <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color="#fff" />
           </TouchableOpacity>
-          <ActionBtn icon="heart" useMCIcon label={formatCount(likes)} color={liked ? '#E0389A' : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder="#E0389A" activeGlow="#E0389A" />
+          <ActionBtn icon="heart" useMCIcon label={formatCount(likes)} color={liked ? REEL_LIKE : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder={REEL_LIKE} activeGlow={REEL_LIKE} />
           {!commentsDisabledSt && <ActionBtn icon="comment" useMCIcon label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
           <ActionBtn icon="share-variant" useMCIcon label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
           <ActionBtn icon="eye" useMCIcon label={formatCount(reel.view_count ?? 0)} color="#fff" />
@@ -2785,21 +2808,21 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowOwnerMenu(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={[s.menuSheet, { backgroundColor: colors.surface }]}>
-                <View style={[s.menuDivider, { backgroundColor: colors.divider, alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 8 }]} />
+                <View style={[s.sheetHandle, { backgroundColor: colors.divider }]} />
                 <TouchableOpacity style={s.menuItem} onPress={() => { setShowOwnerMenu(false); setEditCaptionText(captionSt); setShowEditCaption(true); }}>
-                  <Icon name="edit-2" size={20} color={colors.textPrimary} />
+                  <Icon name="edit-2" size={18} color={colors.textPrimary} />
                   <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Modifier la description</Text>
                 </TouchableOpacity>
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
                 <TouchableOpacity style={s.menuItem} onPress={handleToggleFeedComments} disabled={togglingComments}>
-                  <MCIcon name={commentsDisabledSt ? 'comment-check-outline' : 'comment-off-outline'} size={20} color={colors.textPrimary} />
+                  <MCIcon name={commentsDisabledSt ? 'comment-check-outline' : 'comment-off-outline'} size={18} color={colors.textPrimary} />
                   <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
                     {commentsDisabledSt ? 'Activer les commentaires' : 'Desactiver les commentaires'}
                   </Text>
                 </TouchableOpacity>
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
                 <TouchableOpacity style={s.menuItem} onPress={() => { setShowOwnerMenu(false); nav.navigate('ReelStats' as any, { reelId: reel.id }); }}>
-                  <Icon name="bar-chart-2" size={20} color={colors.textPrimary} />
+                  <Icon name="bar-chart-2" size={18} color={colors.textPrimary} />
                   <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Stats du reel</Text>
                 </TouchableOpacity>
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
@@ -2810,7 +2833,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                 >
                   {reelDl.downloading
                     ? <ActivityIndicator size="small" color={colors.textPrimary} />
-                    : <Icon name={reelDl.localUri ? 'check' : 'download'} size={20} color={colors.textPrimary} />
+                    : <Icon name={reelDl.localUri ? 'check' : 'download'} size={18} color={colors.textPrimary} />
                   }
                   <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
                     {reelDl.downloading ? `Téléchargement… ${reelDl.progress}%` : reelDl.localUri ? 'Enregistré dans Téléchargements' : 'Télécharger'}
@@ -2818,8 +2841,8 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                 </TouchableOpacity>
                 <View style={[s.menuDivider, { backgroundColor: colors.divider }]} />
                 <TouchableOpacity style={s.menuItem} onPress={handleDeleteReel}>
-                  <Icon name="trash-2" size={20} color="#ef4444" />
-                  <Text style={[s.menuItemText, { color: '#ef4444' }]}>Supprimer</Text>
+                  <Icon name="trash-2" size={18} color={colors.error} />
+                  <Text style={[s.menuItemText, { color: colors.error }]}>Supprimer</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -2881,7 +2904,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
                     {remixLoading
                       ? <ActivityIndicator size="small" color="#A78BFA" />
-                      : <Icon name="repeat" size={20} color="#A78BFA" />
+                      : <Icon name="repeat" size={18} color="#A78BFA" />
                     }
                   </View>
                   <View style={{ flex: 1 }}>
@@ -2898,7 +2921,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                 {/* ── Remixer ── */}
                 <TouchableOpacity style={s.menuItem} onPress={handleRemixer}>
                   <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
-                    <Icon name="git-merge" size={20} color="#A78BFA" />
+                    <Icon name="git-merge" size={18} color="#A78BFA" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Remixer</Text>
@@ -2947,7 +2970,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(96,165,250,0.15)' }]}>
                     {cableLoading
                       ? <ActivityIndicator size="small" color="#60A5FA" />
-                      : <Icon name="link-2" size={20} color="#60A5FA" />}
+                      : <Icon name="link-2" size={18} color="#60A5FA" />}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Cable</Text>
@@ -2964,7 +2987,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   onPress={() => { setShowRemix(false); nav.navigate('CableInvites'); }}
                 >
                   <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(96,165,250,0.1)' }]}>
-                    <Icon name="inbox" size={20} color="#60A5FA" />
+                    <Icon name="inbox" size={18} color="#60A5FA" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Mes invitations Cable</Text>
@@ -2983,7 +3006,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                       onPress={() => { setShowRemix(false); onAuthorPress(String(reel.author!.id)); }}
                     >
                       <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
-                        <Icon name="user" size={20} color={colors.textPrimary} />
+                        <Icon name="user" size={18} color={colors.textPrimary} />
                       </View>
                       <Text style={[s.menuItemText, { color: colors.textPrimary }]}>Voir le profil</Text>
                     </TouchableOpacity>
@@ -3000,7 +3023,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
                     {reelDl.downloading
                       ? <ActivityIndicator size="small" color={colors.textPrimary} />
-                      : <Icon name={reelDl.localUri ? 'check' : 'download'} size={20} color={colors.textPrimary} />
+                      : <Icon name={reelDl.localUri ? 'check' : 'download'} size={18} color={colors.textPrimary} />
                     }
                   </View>
                   <Text style={[s.menuItemText, { color: colors.textPrimary }]}>
@@ -3015,10 +3038,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   style={s.menuItem}
                   onPress={() => { setShowRemix(false); setTimeout(() => setReportVisible(true), 300); }}
                 >
-                  <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
-                    <Icon name="flag" size={20} color="#ef4444" />
+                  <View style={[s.sheetItemIcon, { backgroundColor: colors.error + '1A' }]}>
+                    <Icon name="flag" size={18} color={colors.error} />
                   </View>
-                  <Text style={[s.menuItemText, { color: '#ef4444' }]}>Signaler</Text>
+                  <Text style={[s.menuItemText, { color: colors.error }]}>Signaler</Text>
                 </TouchableOpacity>
 
               </View>
@@ -3032,23 +3055,25 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
                 <View style={[s.editSheet, { backgroundColor: colors.surface }]}>
+                  <View style={[s.editHandle, { backgroundColor: colors.divider }]} />
                   <Text style={[s.editTitle, { color: colors.textPrimary }]}>Modifier la description</Text>
+                  <Text style={[s.editSubtitle, { color: colors.textTertiary }]}>Elle apparaît sous ton reel dans le fil.</Text>
                   <TextInput
                     value={editCaptionText}
                     onChangeText={setEditCaptionText}
                     multiline
                     maxLength={500}
-                    style={[s.editInput, { color: colors.textPrimary, borderColor: colors.divider, backgroundColor: colors.background }]}
-                    placeholder="Décrivez votre reel..."
-                    placeholderTextColor={colors.textSecondary}
+                    style={[s.editInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
+                    placeholder="Décris ton reel…"
+                    placeholderTextColor={colors.textTertiary}
                   />
-                  <Text style={[s.charCount, { color: colors.textSecondary }]}>{editCaptionText.length}/500</Text>
+                  <Text style={[s.charCount, { color: colors.textTertiary }]}>{editCaptionText.length}/500</Text>
                   <View style={s.editActions}>
-                    <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.divider }]} onPress={() => setShowEditCaption(false)}>
-                      <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>Annuler</Text>
+                    <TouchableOpacity style={[s.editBtn, { borderWidth: 1, borderColor: colors.border }]} onPress={() => setShowEditCaption(false)}>
+                      <Text style={[s.editBtnText, { color: colors.textSecondary }]}>Annuler</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.primary }]} onPress={handleSaveCaption} disabled={savingCaption}>
-                      {savingCaption ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Enregistrer</Text>}
+                    <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.primary, opacity: savingCaption ? 0.6 : 1 }]} onPress={handleSaveCaption} disabled={savingCaption}>
+                      {savingCaption ? <ActivityIndicator size="small" color="#fff" /> : <Text style={[s.editBtnText, { color: '#fff' }]}>Enregistrer</Text>}
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -3162,7 +3187,7 @@ const s = StyleSheet.create({
   floatingHeader: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
   reelHeaderTitle: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: 0.3 },
-  myReelsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  myReelsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: RR.pill, borderWidth: 1 },
   myReelsBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   searchFab:      { position: 'absolute', right: 16, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
 
@@ -3172,29 +3197,29 @@ const s = StyleSheet.create({
   errorOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 7, gap: 10 },
   errorTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   errorSub:   { color: 'rgba(255,255,255,0.55)', fontSize: 13 },
-  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 22, paddingHorizontal: 20, paddingVertical: 10 },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: RR.pill, paddingHorizontal: 20, paddingVertical: 10 },
   retryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   reelInfo:   { position: 'absolute', left: 14, right: 72, gap: 6, zIndex: 3 },
   authorRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatarPlusBtn: { position: 'absolute', bottom: -3, right: -3, width: 15, height: 15, borderRadius: 8, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
+  avatarPlusBtn: { position: 'absolute', bottom: -3, right: -3, width: 15, height: 15, borderRadius: RR.chip, backgroundColor: REEL_MUSIC, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
 
-  musicBand:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#7B3FF2', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', maxWidth: '80%', marginTop: 3 },
+  musicBand:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: REEL_MUSIC, borderRadius: RR.card, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', maxWidth: '80%', marginTop: 3 },
   musicBandTxt: { color: '#fff', fontSize: 10, fontWeight: '700', flexShrink: 1 },
   musicBandDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.6)' },
-  musicDisc:    { width: 38, height: 38, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  musicDisc:    { width: 38, height: 38, borderRadius: RR.media, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
 
-  sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 9, paddingHorizontal: 7, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', maxWidth: '100%' },
-  sourceThumb: { width: 16, height: 16, borderRadius: 3, overflow: 'hidden' },
+  sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: RR.chip, paddingHorizontal: 7, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', maxWidth: '100%' },
+  sourceThumb: { width: 16, height: 16, borderRadius: 4, overflow: 'hidden' },
   sourceText:  { color: 'rgba(255,255,255,0.75)', fontSize: 10 },
   authorName: { color: '#fff', fontWeight: '800', fontSize: 13, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   caption:    { color: '#fff', fontSize: 12, lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
   analysisPendingBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
   analysisPendingText:  { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' },
 
-  refBand:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignSelf: 'flex-start', maxWidth: '100%' },
+  refBand:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RR.chip, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignSelf: 'flex-start', maxWidth: '100%' },
   refKindDot: { width: 6, height: 6, borderRadius: 3 },
-  refThumb:   { width: 26, height: 26, borderRadius: 6, overflow: 'hidden' },
+  refThumb:   { width: 26, height: 26, borderRadius: RR.chip, overflow: 'hidden' },
   refKind:    { color: 'rgba(255,255,255,0.55)', fontSize: 8, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   refLabel:   { color: '#fff', fontSize: 11, fontWeight: '700' },
 
@@ -3210,71 +3235,87 @@ const s = StyleSheet.create({
   commentBarRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
   commentBarAvatar:    { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', overflow: 'hidden', flexShrink: 0 },
   commentBarAvatarTxt: { color: '#fff', fontWeight: '800', fontSize: 11 },
-  commentBar:          { flexDirection: 'row', alignItems: 'center', borderRadius: 24, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6, gap: 7 },
+  commentBar:          { flexDirection: 'row', alignItems: 'center', borderRadius: RR.pill, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6, gap: 7 },
   commentBarInput:     { flex: 1, fontSize: 12, color: '#fff', padding: 0, maxHeight: 60 },
-  commentBarSend:      { width: 27, height: 27, borderRadius: 14, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  commentBarSend:      { width: 28, height: 28, borderRadius: RR.pill, backgroundColor: REEL_MUSIC, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
+  // ── État vide — un seul style, réutilisé (feed vide + "Mes reels" vide) ────
+  emptyState:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 6 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: RR.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  emptyTitle:    { fontSize: 17, fontWeight: '800', letterSpacing: -0.2, textAlign: 'center' },
+  emptyBody:     { fontSize: 13, fontWeight: '400', lineHeight: 19, textAlign: 'center', marginBottom: 14 },
+  emptyCta:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 12, borderRadius: RR.pill },
+  emptyCtaText:  { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  // ── "Mes reels" — zone à fond thème (grille + header) ──────────────────────
   mineHeader:        { flexDirection: 'row', alignItems: 'center', paddingBottom: 14, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   mineHeaderTitle:   { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
-  mineHeaderSub:     { fontSize: 12, fontWeight: '400', marginTop: 1 },
-  mineCreateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  mineHeaderSub:     { fontSize: 12, fontWeight: '500', marginTop: 1 },
+  mineCreateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: RR.pill },
   mineCreateBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   mineGrid:          { padding: 8, paddingTop: 12 },
   mineRow:           { gap: 8, marginBottom: 8 },
-  mineCard:          { flex: 1, overflow: 'hidden', borderRadius: 12 },
+  mineCard:          { flex: 1, overflow: 'hidden', borderRadius: RR.media },
   mineThumb:         { width: '100%', aspectRatio: 9 / 14 },
   mineThumbFallback: { width: '100%', aspectRatio: 9 / 14, alignItems: 'center', justifyContent: 'center' },
-  mineEffectBadge:   { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, padding: 3 },
+  mineEffectBadge:   { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RR.chip, padding: 3 },
   mineOverlay:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.55)' },
-  mineMenuBtn:       { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)' },
+  mineMenuBtn:       { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: RR.pill, backgroundColor: 'rgba(255,255,255,0.15)' },
   mineStat:          { flexDirection: 'row', alignItems: 'center', gap: 4 },
   mineStatText:      { color: '#fff', fontSize: 11, fontWeight: '700' },
 
+  // ── Sheets & menus contextuels — fond thème ───────────────────────────────
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  menuSheet:     { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 36, paddingTop: 8 },
+  menuSheet:     { borderTopLeftRadius: RR.card, borderTopRightRadius: RR.card, paddingBottom: 36, paddingTop: 10 },
   menuItem:      { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 15 },
-  menuItemText:  { fontSize: 15, fontWeight: '600' },
+  menuItemText:  { flexShrink: 1, fontSize: 15, fontWeight: '600', letterSpacing: -0.1 },
   menuDivider:   { height: StyleSheet.hairlineWidth, marginHorizontal: 20 },
 
-  sheetHandle:     { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
-  sheetAuthorRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
-  sheetThumb:      { width: 44, height: 56, borderRadius: 10, overflow: 'hidden', flexShrink: 0 },
-  sheetAvatar:     { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
-  sheetAuthorName: { fontSize: 15, fontWeight: '700' },
-  sheetAuthorSub:  { fontSize: 12, marginTop: 1 },
-  sheetStats:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, marginTop: 4, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)', paddingVertical: 12 },
+  sheetHandle:     { width: 40, height: 4, borderRadius: RR.pill, alignSelf: 'center', marginTop: 2, marginBottom: 10 },
+  sheetAuthorRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 14 },
+  sheetThumb:      { width: 44, height: 56, borderRadius: RR.media, overflow: 'hidden', flexShrink: 0 },
+  sheetAvatar:     { width: 40, height: 40, borderRadius: RR.pill, overflow: 'hidden' },
+  sheetAuthorName: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  sheetAuthorSub:  { fontSize: 12, fontWeight: '400', marginTop: 2 },
+  sheetStats:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, marginTop: 4, borderRadius: RR.media, backgroundColor: 'rgba(255,255,255,0.04)', paddingVertical: 12 },
   sheetStat:       { flex: 1, alignItems: 'center', gap: 3 },
   sheetStatVal:    { fontSize: 15, fontWeight: '800' },
-  sheetStatLbl:    { fontSize: 10, letterSpacing: 0.3, textTransform: 'uppercase' },
+  sheetStatLbl:    { fontSize: 10, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase' },
   sheetStatSep:    { width: 1, height: 32, opacity: 0.25 },
-  sheetStatPill:   { fontSize: 11, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, overflow: 'hidden', marginLeft: 6 },
-  sheetItemIcon:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  sheetItemSub:    { fontSize: 12, marginTop: 2 },
-  editSheet:     { borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, paddingBottom: 36 },
-  editTitle:     { fontSize: 16, fontWeight: '800', marginBottom: 14 },
-  editInput:     { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 80, textAlignVertical: 'top' },
-  charCount:     { fontSize: 11, textAlign: 'right', marginTop: 4, marginBottom: 16 },
+  sheetStatPill:   { fontSize: 11, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: RR.chip, overflow: 'hidden', marginLeft: 6 },
+  sheetItemIcon:   { width: 40, height: 40, borderRadius: RR.pill, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  // Sous-texte d'une ligne de menu : discret (textTertiary), léger, jamais en gras.
+  sheetItemSub:    { fontSize: 12, lineHeight: 16, marginTop: 2, fontWeight: '400' },
+  // ── Bottom-sheet d'édition (description du reel) — un seul style ───────────
+  editSheet:     { borderTopLeftRadius: RR.card, borderTopRightRadius: RR.card, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 36 },
+  editHandle:    { width: 40, height: 4, borderRadius: RR.pill, alignSelf: 'center', marginBottom: 16 },
+  editTitle:     { fontSize: 17, fontWeight: '800', letterSpacing: -0.2, marginBottom: 4 },
+  editSubtitle:  { fontSize: 13, fontWeight: '400', marginBottom: 16 },
+  editInput:     { borderWidth: 1, borderRadius: RR.media, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, lineHeight: 21, minHeight: 96, textAlignVertical: 'top' },
+  charCount:     { fontSize: 11, fontWeight: '500', textAlign: 'right', marginTop: 6, marginBottom: 18 },
   editActions:   { flexDirection: 'row', gap: 12 },
-  editBtn:       { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  editBtn:       { flex: 1, paddingVertical: 14, borderRadius: RR.media, alignItems: 'center', justifyContent: 'center' },
+  editBtnText:   { fontSize: 15, fontWeight: '700' },
 
+  // ── Overlay recherche — volontairement sombre (ambiance "reels") ───────────
   searchOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0a0a0a', zIndex: 50 },
   searchTopBar:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
-  searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 22, height: 42, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: RR.pill, height: 42, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   searchInput:     { flex: 1, fontSize: 14, color: '#fff', paddingHorizontal: 10, paddingVertical: 0 },
-  searchClearBtn:  { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', marginRight: 7 },
+  searchClearBtn:  { width: 28, height: 28, borderRadius: RR.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', marginRight: 7 },
 
   searchGrid:           { padding: 10, paddingBottom: 50 },
   searchGridRow:        { gap: 8, marginBottom: 8 },
-  searchCard:           { flex: 1, borderRadius: 14, overflow: 'hidden', backgroundColor: '#161616' },
+  searchCard:           { flex: 1, borderRadius: RR.media, overflow: 'hidden', backgroundColor: '#161616' },
   searchThumb:          { width: '100%', aspectRatio: 9 / 16 },
   searchThumbFallback:  { width: '100%', aspectRatio: 9 / 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1c1c1c' },
   searchCardGrad:       { position: 'absolute', bottom: 0, left: 0, right: 0, height: '75%' },
-  searchPlayBadge:      { position: 'absolute', top: 8, left: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  searchViewBadge:      { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8 },
-  searchBadgeText:      { color: '#fff', fontSize: 10, fontWeight: '600' },
+  searchPlayBadge:      { position: 'absolute', top: 8, left: 8, width: 22, height: 22, borderRadius: RR.pill, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  searchViewBadge:      { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: RR.chip },
+  searchBadgeText:      { color: '#fff', fontSize: 10, fontWeight: '700' },
   searchCardInfo:       { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 9, gap: 4 },
   searchCardAuthorRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  searchAvatar:         { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', overflow: 'hidden' },
+  searchAvatar:         { width: 22, height: 22, borderRadius: RR.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', overflow: 'hidden' },
   searchAvatarFallback: { backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' },
   searchAvatarText:     { color: '#fff', fontSize: 9, fontWeight: '700' },
   searchCardAuthor:     { color: '#fff', fontSize: 12, fontWeight: '700', flex: 1 },
@@ -3285,24 +3326,24 @@ const s = StyleSheet.create({
   // pub en grille reste plus lisible avec une hauteur réduite, proche 4/5.
   searchAdThumbCompact: { aspectRatio: 4 / 5 },
   searchAdFallback:     { backgroundColor: '#2A2340', alignItems: 'center', justifyContent: 'center' },
-  searchAdBadge:        { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(224,56,154,0.85)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  searchAdBadge:        { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(224,56,154,0.85)', borderRadius: RR.chip, paddingHorizontal: 7, paddingVertical: 3 },
   searchAdBadgeText:    { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.2 },
   searchAdCtaRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   searchAdCtaText:      { color: '#fff', fontSize: 10, fontWeight: '700', flex: 1 },
-  searchCenterState:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 60 },
-  searchEmptyIcon:      { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
-  searchStateTitle:     { color: '#fff', fontSize: 16, fontWeight: '700' },
-  searchStateText:      { color: 'rgba(255,255,255,0.35)', fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
+  searchCenterState:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingBottom: 60 },
+  searchEmptyIcon:      { width: 72, height: 72, borderRadius: RR.pill, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
+  searchStateTitle:     { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: -0.2, marginTop: 4 },
+  searchStateText:      { color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 18, textAlign: 'center', paddingHorizontal: 32 },
 
   replayOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 6 },
-  replayBtn:     { alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 28, paddingVertical: 18, borderRadius: 20 },
+  replayBtn:     { alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 28, paddingVertical: 18, borderRadius: RR.card },
   replayTxt:     { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   skipRipple:      { position: 'absolute', top: 0, bottom: 0, width: '30%', alignItems: 'center', justifyContent: 'center', zIndex: 8 },
   skipRippleLeft:  { left: 0 },
   skipRippleRight: { right: 80 },
-  skipRippleTxt:   { color: '#fff', fontSize: 15, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, overflow: 'hidden' },
+  skipRippleTxt:   { color: '#fff', fontSize: 15, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: RR.card, overflow: 'hidden' },
 
   modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  ownerMenuCard: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, minWidth: 220, overflow: 'hidden' },
+  ownerMenuCard: { borderRadius: RR.media, borderWidth: StyleSheet.hairlineWidth, minWidth: 220, overflow: 'hidden' },
 });

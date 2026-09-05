@@ -190,6 +190,13 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
 
     const creativeUri = ad.creative_url || ad.thumbnail_url;
     const isVideo = !!(creativeUri && (creativeUri.includes('.m3u8') || creativeUri.includes('.mp4')));
+    // Domaine lisible de l'annonceur — sert de "nom" en en-tête (façon Facebook :
+    // l'URL de destination identifie l'annonceur quand aucun nom n'est fourni).
+    const adDomain = (() => {
+      if (!ad.cta_url) return '';
+      try { return new URL(ad.cta_url).hostname.replace(/^www\./, ''); }
+      catch { return ad.cta_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]; }
+    })();
     // CachedImage ne montre rien de visible en cas d'échec de chargement (URL cassée,
     // réseau...) — sans ce state, une pub dont l'image échoue apparaît comme une carte
     // sans visuel, indiscernable d'une pub qui n'en a simplement pas.
@@ -213,31 +220,38 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
     return (
       <GHTouchableOpacity
         style={getFeedCardStyle(colors)}
-        activeOpacity={0.9}
+        activeOpacity={0.92}
         onPress={handleCardPress}
       >
 
-        {/* ── En-tête : logo annonceur + label Sponsorisé ── */}
+        {/* ── En-tête : logo + nom annonceur + pastille "Sponsorisé" ── */}
         <View style={adSt.header}>
           <View style={[adSt.logoWrap, { backgroundColor: colors.primary + '18' }]}>
-            <Icon name="zap" size={16} color={colors.primary} />
+            <Icon name="briefcase" size={15} color={colors.primary} />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[adSt.advertiserName, { color: colors.textPrimary }]} numberOfLines={1}>
-              {ad.title}
+              {adDomain || ad.title}
             </Text>
             <View style={adSt.sponsoredRow}>
-              <Text style={[adSt.sponsoredLabel, { color: colors.textTertiary }]}>Sponsorisé</Text>
+              <View style={[adSt.sponsoredTag, { backgroundColor: colors.textTertiary + '1A' }]}>
+                <Text style={[adSt.sponsoredTagText, { color: colors.textTertiary }]}>Sponsorisé</Text>
+              </View>
               <Icon name="globe" size={10} color={colors.textTertiary} />
             </View>
           </View>
         </View>
 
-        {/* ── Description courte ── */}
-        {ad.description ? (
-          <Text style={[adSt.description, { color: colors.textSecondary }]} numberOfLines={3}>
-            {ad.description}
-          </Text>
+        {/* ── Accroche + description (texte du post sponsorisé) ── */}
+        {(ad.title || ad.description) ? (
+          <View style={adSt.copy}>
+            {ad.title ? (
+              <Text style={[adSt.copyTitle, { color: colors.textPrimary }]} numberOfLines={2}>{ad.title}</Text>
+            ) : null}
+            {ad.description ? (
+              <Text style={[adSt.copyDesc, { color: colors.textSecondary }]} numberOfLines={3}>{ad.description}</Text>
+            ) : null}
+          </View>
         ) : null}
 
         {/* ── Créatif : vidéo ou image — encadré, coins arrondis ── */}
@@ -257,24 +271,25 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
           )}
         </View>
 
-        {/* ── Pied : CTA + "En savoir plus" (indicatif — le tap fonctionne sur toute la carte) ── */}
-        <View style={[adSt.footer, { borderTopColor: colors.divider }]}>
-          <View style={{ flex: 1 }}>
-            {ad.cta_url ? (
+        {/* ── Barre CTA — bandeau plein sous le créatif, façon Facebook :
+            domaine à gauche, bouton d'action à droite. "En savoir plus"
+            n'apparaît qu'UNE fois (sur le bouton). ──────────────────────── */}
+        {ad.cta_url ? (
+          <View style={[adSt.ctaBar, { backgroundColor: colors.backgroundSecondary, borderTopColor: colors.divider }]}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[adSt.ctaDomain, { color: colors.textTertiary }]} numberOfLines={1}>
-                {ad.cta_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+                {adDomain.toUpperCase()}
               </Text>
-            ) : null}
-            <Text style={[adSt.ctaTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-              {ad.cta_text ?? 'En savoir plus'}
-            </Text>
+              <Text style={[adSt.ctaSub, { color: colors.textSecondary }]} numberOfLines={1}>
+                Annonce · en savoir plus
+              </Text>
+            </View>
+            <View style={[adSt.ctaBtn, { backgroundColor: colors.primary }]}>
+              <Text style={adSt.ctaBtnText}>{ad.cta_text || 'En savoir plus'}</Text>
+              <Icon name="arrow-right" size={13} color="#fff" />
+            </View>
           </View>
-          <View style={[adSt.ctaBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-            <Text style={[adSt.ctaBtnText, { color: colors.textPrimary }]}>
-              En savoir plus
-            </Text>
-          </View>
-        </View>
+        ) : null}
 
       </GHTouchableOpacity>
     );
@@ -330,23 +345,30 @@ const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void }> = ({ ad,
 
 const adSt = StyleSheet.create({
   // La carte vient de getFeedCardStyle(colors) — ici seulement le contenu.
-  header:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  logoWrap:       { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  advertiserName: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
-  sponsoredRow:   { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
-  sponsoredLabel: { fontSize: 11 },
-  moreBtn:        { padding: 4 },
-  description:    { fontSize: 14, lineHeight: 20, paddingHorizontal: FeedCardLayout.padH, paddingBottom: 10 },
-  mediaWrap:      { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 10 },
+  header:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: FeedCardLayout.padH, paddingTop: FeedCardLayout.padH, paddingBottom: 8 },
+  logoWrap:       { width: 38, height: 38, borderRadius: FeedRadius.media, alignItems: 'center', justifyContent: 'center' },
+  advertiserName: { fontSize: 13.5, fontWeight: '700', letterSpacing: -0.1, lineHeight: 17 },
+  sponsoredRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  sponsoredTag:   { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
+  sponsoredTagText:{ fontSize: 9.5, fontWeight: '700', letterSpacing: 0.3 },
+
+  // Accroche + description (le "texte" du post sponsorisé)
+  copy:           { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 10, gap: 3 },
+  copyTitle:      { fontSize: 14.5, fontWeight: '700', lineHeight: 20 },
+  copyDesc:       { fontSize: 13.5, lineHeight: 19 },
+
+  mediaWrap:      { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 0 },
   mediaClip:      { borderRadius: FeedRadius.media, overflow: 'hidden' },
-  image:          { width: '100%', height: 220 },
+  image:          { width: '100%', aspectRatio: 1.91 },   // ratio pub standard, ne s'écrase plus
   muteBtn:        { position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  imagePlaceholder:{ width: '100%', height: 180, alignItems: 'center', justifyContent: 'center' },
-  footer:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: FeedCardLayout.padH, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  ctaDomain:      { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 1 },
-  ctaTitle:       { fontSize: 13, fontWeight: '600' },
-  ctaBtn:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: FeedRadius.chip, borderWidth: 1 },
-  ctaBtnText:     { fontSize: 13, fontWeight: '700' },
+  imagePlaceholder:{ width: '100%', aspectRatio: 1.91, alignItems: 'center', justifyContent: 'center' },
+
+  // Bandeau CTA plein sous le créatif (façon Facebook)
+  ctaBar:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10, paddingHorizontal: FeedCardLayout.padH, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  ctaDomain:      { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
+  ctaSub:         { fontSize: 12, fontWeight: '500', marginTop: 1 },
+  ctaBtn:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 9, borderRadius: FeedRadius.chip, flexShrink: 0 },
+  ctaBtnText:     { fontSize: 13, fontWeight: '800', color: '#fff' },
 });
 
 // ── LiveConcertCard — mémoïsé : re-rend uniquement si ses props changent ──────

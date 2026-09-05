@@ -517,7 +517,9 @@ export function CommunityEventsScreen({ route }: Props) {
   const { communityId, myRole } = route.params;
   const navigation = useNavigation<NavigationProp>();
   const insets     = useSafeAreaInsets();
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const isDark = theme.isDark;
 
   const isAdmin = myRole === 'admin' || myRole === 'moderator';
 
@@ -661,7 +663,13 @@ export function CommunityEventsScreen({ route }: Props) {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      {/* Icônes sombres sur fond clair, claires sur fond sombre — toujours
+          lisibles. translucent : le header gère son propre paddingTop. */}
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent
+      />
 
       {/* Header */}
       <Animated.View style={[styles.header, { paddingTop: insets.top + 6, backgroundColor: colors.background, borderBottomColor: colors.border, opacity: headerFade }]}>

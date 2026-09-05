@@ -436,6 +436,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                 maxLines={thumb ? 2 : 6}
                 primaryColor={colors.primary}
                 textStyle={[s.pBodyTxt, { color: colors.textPrimary }]}
+                showLinkPreview={false}
               />
               {!thumb && (
                 <View style={[s.pStatsLight, { marginTop: 8 }]}>
@@ -572,19 +573,29 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           </View>
         ) : null}
 
-        {/* Texte du post */}
-        {post.body ? (
-          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-            <RichText
-              text={post.body}
-              maxLines={6}
-              primaryColor={colors.primary}
-              textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
-            />
-          </View>
-        ) : null}
+        {/* Texte du post — si le SEUL contenu est l'URL affichée en carte
+            ci-dessous, on masque le texte (comportement Facebook, pas de
+            lien affiché 2×). */}
+        {(() => {
+          const raw = post.body ?? '';
+          const stripped = post.link_url ? raw.replace(post.link_url, '').trim() : raw;
+          const bodyToShow = post.link_url && stripped.length < 3 ? '' : (post.link_url ? stripped : raw);
+          if (!bodyToShow) return null;
+          return (
+            <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+              <RichText
+                text={bodyToShow}
+                maxLines={6}
+                primaryColor={colors.primary}
+                textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
+                // L'aperçu est géré par <LinkPreviewCard> ci-dessous.
+                showLinkPreview={false}
+              />
+            </View>
+          );
+        })()}
 
-        {/* Apercu lien */}
+        {/* Aperçu lien — métadonnées OG (image + titre + domaine) */}
         {post.link_url ? (
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <LinkPreviewCard url={post.link_url} />
