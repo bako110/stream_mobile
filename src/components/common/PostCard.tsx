@@ -16,7 +16,7 @@ import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AppColors } from '../../theme/colors';
-import { FeedCardLayout, FeedRadius, FeedActionIcon } from '../../theme/feed';
+import { FeedCardLayout, FeedRadius, FeedActionIcon, getFeedCardStyle } from '../../theme/feed';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
@@ -36,15 +36,18 @@ import { CachedImage } from './CachedImage';
 import { AvatarWithBadge } from './AvatarWithBadge';
 
 const { width: SW } = Dimensions.get('window');
-const GAP    = 2;
-const RADIUS = FeedRadius.media; // 12 — aligné sur l'échelle de radius du feed
+// Largeur du contenu média DANS la carte flottante : largeur écran moins les deux
+// marges de carte moins les deux paddings intérieurs.
+const CARD_INNER_W = SW - FeedCardLayout.marginHorizontal * 2 - FeedCardLayout.padH * 2;
+const GAP    = 3;
+const RADIUS = FeedRadius.media; // 12 — radius du média à l'intérieur de la carte
 
 const fmtN = (n: number): string => {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
   if (n >= 1_000)     return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
   return String(n);
 };
-const GRID_H = Math.round(SW * 0.68);
+const GRID_H = Math.round(CARD_INNER_W * 0.72);
 
 // ── ImgTile ───────────────────────────────────────────────────────────────────
 const ImgTile: React.FC<{
@@ -65,7 +68,7 @@ const ImgTile: React.FC<{
       {!loaded && (
         <LinearGradient
           colors={['#1a1a2e', '#252540']}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, br]}
         />
       )}
       <CachedImage
@@ -85,15 +88,15 @@ const ImageGrid: React.FC<{ urls: string[]; onPressImage: (i: number) => void }>
   if (n === 0) return null;
 
   if (n === 1) {
-    const h = Math.round(SW * 0.75);
+    const h = Math.round(CARD_INNER_W * 0.78);
     return (
-      <ImgTile uri={urls[0]} style={{ width: SW, height: h }}
+      <ImgTile uri={urls[0]} style={{ width: CARD_INNER_W, height: h }}
         radius={{ tl: RADIUS, tr: RADIUS, bl: RADIUS, br: RADIUS }}
         onPress={() => onPressImage(0)} />
     );
   }
   if (n === 2) {
-    const W = (SW - GAP) / 2;
+    const W = (CARD_INNER_W - GAP) / 2;
     const H = Math.round(W * 1.1);
     return (
       <View style={{ flexDirection: 'row', height: H, gap: GAP }}>
@@ -103,7 +106,7 @@ const ImageGrid: React.FC<{ urls: string[]; onPressImage: (i: number) => void }>
     );
   }
   if (n === 3) {
-    const W = (SW - GAP) / 2;
+    const W = (CARD_INNER_W - GAP) / 2;
     return (
       <View style={{ flexDirection: 'row', height: GRID_H, gap: GAP }}>
         <ImgTile uri={urls[0]} style={{ width: W, height: GRID_H }} radius={{ tl: RADIUS, bl: RADIUS }} onPress={() => onPressImage(0)} />
@@ -116,7 +119,7 @@ const ImageGrid: React.FC<{ urls: string[]; onPressImage: (i: number) => void }>
   }
   const shown = urls.slice(0, 4);
   const extra = n - 4;
-  const W = (SW - GAP) / 2;
+  const W = (CARD_INNER_W - GAP) / 2;
   return (
     <View style={{ height: GRID_H, gap: GAP }}>
       <View style={{ flex: 1, flexDirection: 'row', gap: GAP }}>
@@ -300,10 +303,10 @@ const PostCardInner: React.FC<PostCardProps> = ({
     // plus haut/impactant que 16/9 pour un rendu feed plus dense et professionnel.
     return 4 / 5;
   })();
-  const HERO_H = Math.round(SW / videoAspectRatio);
+  const HERO_H = Math.round(CARD_INNER_W / videoAspectRatio);
 
   return (
-    <View style={[pc.card, { backgroundColor: colors.surface }]}>
+    <View style={getFeedCardStyle(colors)}>
 
       {/* ── Header auteur — en haut, façon Facebook ──────────────────────────── */}
       <View style={pc.header}>
@@ -390,39 +393,42 @@ const PostCardInner: React.FC<PostCardProps> = ({
         </TouchableOpacity>
       ) : null}
 
-      {/* ── Media — image/vidéo, sous le texte, façon Facebook ───────────────── */}
+      {/* ── Media — image/vidéo, sous le texte. En retrait des bords de la carte,
+          avec son propre border-radius (RADIUS = 12). ────────────────────── */}
       {hasMedia && (
-        (post.hls_url ?? post.video_url) && images.length === 0 ? (
-          <View style={{ height: HERO_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
-            <InlineVideoPlayer
-              uri={(post.hls_url ?? post.video_url)!}
-              thumbnailUri={post.thumbnail_url}
-              aspectRatio={videoAspectRatio}
-              borderRadius={0}
-              muted
-              autoPlay={false}
-              isActive={false}
-            />
-          </View>
-        ) : (
-          <TouchableOpacity onPress={onPress} activeOpacity={0.95}>
-            <View style={{ height: images.length === 1 ? HERO_H : GRID_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
-              {images.length === 1 ? (
-                <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-              ) : (
-                <ImageGrid
-                  urls={images}
-                  onPressImage={i => nav.navigate('ImageGallery', { urls: images, initialIndex: i })}
-                />
-              )}
+        <View style={pc.mediaWrap}>
+          {(post.hls_url ?? post.video_url) && images.length === 0 ? (
+            <View style={[pc.mediaClip, { height: HERO_H }]}>
+              <InlineVideoPlayer
+                uri={(post.hls_url ?? post.video_url)!}
+                thumbnailUri={post.thumbnail_url}
+                aspectRatio={videoAspectRatio}
+                borderRadius={RADIUS}
+                muted
+                autoPlay={false}
+                isActive={false}
+              />
             </View>
-          </TouchableOpacity>
-        )
+          ) : (
+            <TouchableOpacity onPress={onPress} activeOpacity={0.95}>
+              <View style={[pc.mediaClip, { height: images.length === 1 ? HERO_H : GRID_H }]}>
+                {images.length === 1 ? (
+                  <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                ) : (
+                  <ImageGrid
+                    urls={images}
+                    onPressImage={i => nav.navigate('ImageGallery', { urls: images, initialIndex: i })}
+                  />
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       {/* ── Apercu lien ────────────────────────────────────────────────────── */}
       {post.link_url ? (
-        <View style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
+        <View style={{ paddingHorizontal: FeedCardLayout.padH, paddingBottom: 4 }}>
           <LinkPreviewCard url={post.link_url} />
         </View>
       ) : null}
@@ -674,18 +680,11 @@ const MenuRow: React.FC<{
 export const PostCard = React.memo(PostCardInner);
 
 // ── Styles ────────────────────────────────────────────────────────────────────
+const PAD = FeedCardLayout.padH; // 12 — retrait intérieur uniforme
+
 const pc = StyleSheet.create({
-  // Modèle de carte unique du feed : pleine largeur, radius 0, séparation par la
-  // gouttière de fond de la liste (marginBottom) — pas de carte flottante.
-  card:         {
-    backgroundColor: '#fff',
-    marginHorizontal: FeedCardLayout.marginHorizontal,
-    marginBottom: FeedCardLayout.gutter,
-    borderRadius: FeedCardLayout.radius,
-    overflow: 'hidden',
-  },
   // Header
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingTop: PAD, paddingBottom: 8, gap: 8 },
   headerLeft:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   avatarWrap:   { overflow: 'visible' },
   authorName:   { fontSize: 13.5, fontWeight: '700', letterSpacing: -0.1 },
@@ -695,17 +694,20 @@ const pc = StyleSheet.create({
   followChip:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: FeedRadius.chip, borderWidth: 1 },
   moreBtn:      { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   // Content
-  feeling:      { paddingHorizontal: 12, paddingBottom: 5, fontSize: 13, fontStyle: 'italic' },
-  bodyWrap:     { paddingHorizontal: 12, paddingBottom: 8, paddingTop: 1 },
+  feeling:      { paddingHorizontal: PAD, paddingBottom: 5, fontSize: 13, fontStyle: 'italic' },
+  bodyWrap:     { paddingHorizontal: PAD, paddingBottom: 10, paddingTop: 1 },
   body:         { fontSize: 14.5, lineHeight: 21, letterSpacing: 0.1 },
+  // Media — encadré dans la carte, coins arrondis propres
+  mediaWrap:    { paddingHorizontal: PAD, paddingBottom: 10 },
+  mediaClip:    { borderRadius: RADIUS, overflow: 'hidden', backgroundColor: '#0d0d1a' },
   // Compteurs
-  countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   countsGrow:       { flex: 1, minWidth: 0 },
   countChipRight:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 'auto' },
   countText:        { fontSize: 12, fontWeight: '500' },
   commentCountIcon: { width: 18, height: 18, borderRadius: FeedRadius.full, alignItems: 'center', justifyContent: 'center' },
   // Action bar — icônes seules, 44px de cible, réparties également
-  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 4 },
+  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: PAD - 4, paddingVertical: 2 },
   actionBtn:    { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
   actionBtnSave:{ flex: 0, width: 44 },
   // Menu sheet

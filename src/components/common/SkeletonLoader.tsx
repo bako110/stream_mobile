@@ -158,44 +158,42 @@ const SkeletonPostCard: React.FC = () => (
 );
 
 export const SkeletonFeedScreen: React.FC = () => (
-  <View style={{ flex: 1 }}>
-    {/* Stories */}
+  <View style={{ flex: 1, paddingTop: 8 }}>
+    {/* Stories — cartes 72×100 arrondies, comme StoryBar */}
     <View style={skStyles.storiesRow}>
       {[0, 1, 2, 3, 4, 5].map(i => (
-        <View key={i} style={{ alignItems: 'center', gap: 6 }}>
-          <SkeletonBox width={62} height={62} borderRadius={31} />
-          <SkeletonBox width={46} height={9} borderRadius={4} />
-        </View>
+        <SkeletonBox key={i} width={72} height={100} borderRadius={BorderRadius.md} />
       ))}
     </View>
-    {/* Séparateur fin */}
-    <View style={{ height: 1, backgroundColor: 'transparent', marginBottom: 8 }} />
-    {/* 3 cartes post */}
+    <View style={{ height: 8 }} />
+    {/* 3 cartes post — modèle "carte douce" : marge 12, radius 16, bordure */}
     {[0, 1, 2].map(i => (
-      <View key={i} style={{ marginBottom: i < 2 ? 10 : 0 }}>
+      <View key={i} style={skStyles.feedCard}>
         {/* Auteur */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
-          <SkeletonBox width={42} height={42} borderRadius={21} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 }}>
+          <SkeletonBox width={40} height={40} borderRadius={20} />
           <View style={{ flex: 1, gap: 6 }}>
             <SkeletonBox width={`${44 + i * 6}%`} height={13} borderRadius={6} />
             <SkeletonBox width={`${28 + i * 4}%`} height={10} borderRadius={5} />
           </View>
-          <SkeletonBox width={72} height={30} borderRadius={15} />
+          <SkeletonBox width={64} height={26} borderRadius={BorderRadius.sm} />
         </View>
         {/* Texte 1-2 lignes */}
         {i !== 1 && (
-          <View style={{ paddingHorizontal: 14, gap: 6, paddingBottom: 10 }}>
-            <SkeletonBox width="96%" height={13} borderRadius={6} />
-            {i === 0 && <SkeletonBox width="78%" height={13} borderRadius={6} />}
+          <View style={{ paddingHorizontal: 12, gap: 6, paddingBottom: 10 }}>
+            <SkeletonBox width="94%" height={13} borderRadius={6} />
+            {i === 0 && <SkeletonBox width="76%" height={13} borderRadius={6} />}
           </View>
         )}
-        {/* Image (hauteur variable) */}
-        <SkeletonBox width="100%" height={i === 0 ? 240 : i === 1 ? 180 : 200} borderRadius={0} />
-        {/* Actions */}
-        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 12 }}>
-          <SkeletonBox width={80} height={34} borderRadius={17} />
-          <SkeletonBox width={100} height={34} borderRadius={17} />
-          <SkeletonBox width={80} height={34} borderRadius={17} />
+        {/* Image encadrée dans la carte, coins arrondis */}
+        <View style={{ paddingHorizontal: 12, paddingBottom: 10 }}>
+          <SkeletonBox width="100%" height={i === 0 ? 220 : i === 1 ? 170 : 190} borderRadius={BorderRadius.md} />
+        </View>
+        {/* Actions — 4 icônes */}
+        <View style={{ flexDirection: 'row', gap: 24, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'transparent' }}>
+          <SkeletonBox width={24} height={24} borderRadius={12} />
+          <SkeletonBox width={24} height={24} borderRadius={12} />
+          <SkeletonBox width={24} height={24} borderRadius={12} />
         </View>
       </View>
     ))}
@@ -602,28 +600,30 @@ export const SkeletonPostDetail: React.FC = () => (
 
 // ── Skeleton PostCard (pour le feed — version enrichie) ───────────────────────
 export const SkeletonPostCardFeed: React.FC = () => (
-  <View style={{ marginBottom: 8 }}>
+  <View style={skStyles.feedCard}>
     {/* Auteur */}
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
-      <SkeletonBox width={42} height={42} borderRadius={21} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 }}>
+      <SkeletonBox width={40} height={40} borderRadius={20} />
       <View style={{ flex: 1, gap: 6 }}>
         <SkeletonBox width="44%" height={13} borderRadius={6} />
         <SkeletonBox width="28%" height={10} borderRadius={5} />
       </View>
-      <SkeletonBox width={72} height={30} borderRadius={15} />
+      <SkeletonBox width={64} height={26} borderRadius={BorderRadius.sm} />
     </View>
     {/* Texte */}
-    <View style={{ paddingHorizontal: 14, gap: 6, paddingBottom: 10 }}>
-      <SkeletonBox width="100%" height={13} borderRadius={6} />
-      <SkeletonBox width="82%"  height={13} borderRadius={6} />
+    <View style={{ paddingHorizontal: 12, gap: 6, paddingBottom: 10 }}>
+      <SkeletonBox width="94%" height={13} borderRadius={6} />
+      <SkeletonBox width="80%" height={13} borderRadius={6} />
     </View>
-    {/* Image */}
-    <SkeletonBox width="100%" height={220} borderRadius={0} />
-    {/* Actions */}
-    <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 12 }}>
-      <SkeletonBox width={80} height={34} borderRadius={17} />
-      <SkeletonBox width={100} height={34} borderRadius={17} />
-      <SkeletonBox width={80} height={34} borderRadius={17} />
+    {/* Image encadrée, coins arrondis */}
+    <View style={{ paddingHorizontal: 12, paddingBottom: 10 }}>
+      <SkeletonBox width="100%" height={210} borderRadius={BorderRadius.md} />
+    </View>
+    {/* Actions — 3 icônes */}
+    <View style={{ flexDirection: 'row', gap: 24, paddingHorizontal: 14, paddingVertical: 10 }}>
+      <SkeletonBox width={24} height={24} borderRadius={12} />
+      <SkeletonBox width={24} height={24} borderRadius={12} />
+      <SkeletonBox width={24} height={24} borderRadius={12} />
     </View>
   </View>
 );
@@ -673,8 +673,17 @@ const skStyles = StyleSheet.create({
     gap:              10,
   },
   storiesRow: {
-    flexDirection: 'row', gap: 14,
-    paddingHorizontal: 16, paddingVertical: 12,
+    flexDirection: 'row', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 10,
+  },
+  // Carte de feed "douce" — miroir de getFeedCardStyle(colors) côté skeleton.
+  feedCard: {
+    marginHorizontal: Spacing[3],   // 12
+    marginBottom:     Spacing[3],   // 12
+    borderRadius:     BorderRadius.lg, // 16
+    borderWidth:      1,
+    borderColor:      'transparent',
+    overflow:         'hidden',
   },
   postCard: {
     marginBottom: 8,

@@ -14,6 +14,7 @@ import { toastService } from '../../services/toastService';
 import { VerifiedBadge } from './VerifiedBadge';
 import { AvatarWithBadge } from './AvatarWithBadge';
 import type { UserPublic } from '../../types';
+import { FeedCardLayout, FeedRadius } from '../../theme/feed';
 
 const { width: SW } = Dimensions.get('window');
 // Carte large et visible — environ 45% de l'écran
@@ -77,13 +78,13 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
   const skeletons = [0, 1, 2, 3];
 
   return (
-    <View style={[st.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
+    <View style={[st.wrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
       {/* Header */}
       <View style={st.header}>
-        <View>
-          <Text style={[st.title, { color: colors.textPrimary }]}>Des gens qui te ressemblent ✨</Text>
-          <Text style={[st.subtitle, { color: colors.textTertiary }]}>Élargis ton cercle, un abonnement à la fois</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[st.title, { color: colors.textPrimary }]} numberOfLines={1}>Des gens qui te ressemblent ✨</Text>
+          <Text style={[st.subtitle, { color: colors.textTertiary }]} numberOfLines={1}>Élargis ton cercle, un abonnement à la fois</Text>
         </View>
         <TouchableOpacity onPress={onRefresh} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={[st.seeAll, { color: colors.primary }]}>Rafraîchir</Text>
@@ -227,14 +228,23 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
 };
 
 const st = StyleSheet.create({
-  wrap:       { paddingVertical: 14, marginBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
+  // Carte flottante "douce" — même modèle que PostCard / FeedCard.
+  wrap:       {
+    paddingTop:       14,
+    paddingBottom:    14,
+    marginHorizontal: FeedCardLayout.marginHorizontal,
+    marginBottom:     FeedCardLayout.gutter,
+    borderRadius:     FeedCardLayout.radius,
+    borderWidth:      FeedCardLayout.borderWidth,
+    overflow:         'hidden',
+  },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: FeedCardLayout.padH, marginBottom: 12 },
   title:      { fontSize: 16, fontWeight: '800' },
   subtitle:   { fontSize: 11, marginTop: 2 },
   seeAll:     { fontSize: 13, fontWeight: '700' },
-  list:       { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
+  list:       { paddingHorizontal: FeedCardLayout.padH, gap: 10, paddingBottom: 4 },
 
-  card:       { width: CARD_W, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  card:       { width: CARD_W, borderRadius: FeedRadius.media, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   cover:      { width: '100%', height: COVER_H },
   closeBtn:   { position: 'absolute', top: 8, right: 8, zIndex: 10, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
 

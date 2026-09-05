@@ -9,7 +9,7 @@ export const BANNER_H = Math.round(SCREEN_W * 0.88);
 
 export const feedStyles = StyleSheet.create({
   root:   { flex: 1 },
-  scroll: { paddingBottom: TAB_BAR_HEIGHT + 20 },
+  scroll: { paddingTop: 8, paddingBottom: TAB_BAR_HEIGHT + 20 },
 
   // ── Header ────────────────────────────────────────────────────────────────
   // paddingTop est fourni dynamiquement par insets.top (safe-area) dans le JSX —

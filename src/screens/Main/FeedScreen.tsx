@@ -58,7 +58,7 @@ import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
 import { SectionHeader } from '../../components/common/SectionHeader';
-import { FeedCarousel, FeedCardLayout, FeedRadius } from '../../theme/feed';
+import { FeedCarousel, FeedCardLayout, FeedRadius, FeedActionIcon, getFeedCardStyle } from '../../theme/feed';
 import { feedStyles as s, fS } from '../../styles/FeedScreen.styles';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
@@ -212,7 +212,7 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
     // perdu — c'était la cause du clic mort sur les pubs de l'overlay recherche.
     return (
       <GHTouchableOpacity
-        style={[adSt.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+        style={getFeedCardStyle(colors)}
         activeOpacity={0.9}
         onPress={handleCardPress}
       >
@@ -240,18 +240,22 @@ const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onIm
           </Text>
         ) : null}
 
-        {/* ── Créatif : vidéo ou image ── */}
-        {hasCreative ? (
-          isVideo ? (
-            <AdVideoCreative uri={creativeUri!} thumbnailUri={ad.thumbnail_url} isVisible={isVisible} />
+        {/* ── Créatif : vidéo ou image — encadré, coins arrondis ── */}
+        <View style={adSt.mediaWrap}>
+          {hasCreative ? (
+            isVideo ? (
+              <View style={adSt.mediaClip}>
+                <AdVideoCreative uri={creativeUri!} thumbnailUri={ad.thumbnail_url} isVisible={isVisible} />
+              </View>
+            ) : (
+              <CachedImage uri={creativeUri!} style={[adSt.image, adSt.mediaClip]} resizeMode="cover" onError={() => setImgFailed(true)} />
+            )
           ) : (
-            <CachedImage uri={creativeUri!} style={adSt.image} resizeMode="cover" onError={() => setImgFailed(true)} />
-          )
-        ) : (
-          <View style={[adSt.imagePlaceholder, { backgroundColor: colors.primary + '14' }]}>
-            <Icon name="image" size={32} color={colors.primary + '60'} />
-          </View>
-        )}
+            <View style={[adSt.imagePlaceholder, adSt.mediaClip, { backgroundColor: colors.primary + '14' }]}>
+              <Icon name="image" size={32} color={colors.primary + '60'} />
+            </View>
+          )}
+        </View>
 
         {/* ── Pied : CTA + "En savoir plus" (indicatif — le tap fonctionne sur toute la carte) ── */}
         <View style={[adSt.footer, { borderTopColor: colors.divider }]}>
@@ -325,21 +329,23 @@ const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void }> = ({ ad,
 };
 
 const adSt = StyleSheet.create({
-  card:           { marginVertical: 6, borderWidth: StyleSheet.hairlineWidth, borderRadius: 0 },
+  // La carte vient de getFeedCardStyle(colors) — ici seulement le contenu.
   header:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   logoWrap:       { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   advertiserName: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
   sponsoredRow:   { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   sponsoredLabel: { fontSize: 11 },
   moreBtn:        { padding: 4 },
-  description:    { fontSize: 14, lineHeight: 20, paddingHorizontal: 14, paddingBottom: 10 },
+  description:    { fontSize: 14, lineHeight: 20, paddingHorizontal: FeedCardLayout.padH, paddingBottom: 10 },
+  mediaWrap:      { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 10 },
+  mediaClip:      { borderRadius: FeedRadius.media, overflow: 'hidden' },
   image:          { width: '100%', height: 220 },
   muteBtn:        { position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   imagePlaceholder:{ width: '100%', height: 180, alignItems: 'center', justifyContent: 'center' },
-  footer:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  footer:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: FeedCardLayout.padH, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   ctaDomain:      { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 1 },
   ctaTitle:       { fontSize: 13, fontWeight: '600' },
-  ctaBtn:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 6, borderWidth: 1 },
+  ctaBtn:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: FeedRadius.chip, borderWidth: 1 },
   ctaBtnText:     { fontSize: 13, fontWeight: '700' },
 });
 
@@ -511,7 +517,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
 
       {/* ── Près de toi — masqué dans l'onglet Suivis ────────── */}
       {showNearby && (
-        <View style={[nbS.wrap, { borderTopColor: colors.divider, borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
+        <View style={[nbS.wrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SectionHeader
             title="Dans ton quartier"
             colors={colors}
@@ -690,7 +696,7 @@ const CommunitiesInlineCard: React.FC<{
   }
 
   return (
-    <View style={{ backgroundColor: colors.surface, marginBottom: FeedCardLayout.gutter, overflow: 'hidden', paddingTop: 12 }}>
+    <View style={[getFeedCardStyle(colors), { paddingTop: 12 }]}>
       <SectionHeader
         title="Ta tribu t'attend"
         colors={colors}
@@ -739,7 +745,7 @@ const ReelRowInlineCard: React.FC<{
   nav: any;
 }> = ({ reels, colors, nav }) => {
   return (
-    <View style={{ backgroundColor: colors.surface, marginBottom: FeedCardLayout.gutter, overflow: 'hidden', paddingTop: 12 }}>
+    <View style={[getFeedCardStyle(colors), { paddingTop: 12 }]}>
       <SectionHeader
         title="Reels pour toi"
         colors={colors}
@@ -2684,7 +2690,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           data={items}
           keyExtractor={item => `${item.kind}-${item.id}`}
           extraData={adSlotMap}
-          style={{ backgroundColor: colors.feedGutter }}
+          style={{ backgroundColor: colors.background }}
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           scrollEnabled={feedScrollEnabled}
@@ -3320,11 +3326,13 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   })();
 
   // ── Render ────────────────────────────────────────────────────────────────
-  // 0.58 → 0.8 (ratio 4/5) : hero plus haut/impactant, cohérent avec PostCard.
-  const BANNER_H = Math.round(SW * 0.8);
+  // Hero calé sur la largeur intérieure de la carte flottante (écran − 2 marges
+  // de carte − 2 paddings intérieurs), cohérent avec PostCard.
+  const FC_INNER_W = SW - FeedCardLayout.marginHorizontal * 2 - FeedCardLayout.padH * 2;
+  const BANNER_H = Math.round(FC_INNER_W * 0.82);
 
   return (
-    <View style={[fc.card, { backgroundColor: colors.surface }]}>
+    <View style={getFeedCardStyle(colors)}>
 
       {/* ── Header auteur — en haut, façon Facebook ──────────────────────── */}
       <View style={fc.header}>
@@ -3392,14 +3400,14 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
             <Text style={[fc.typeBadgeText, { color: accent }]}>{typeLabel}</Text>
           </View>
           {isLive && (
-            <View style={[fc.chipBadge, { backgroundColor: '#EF444422' }]}>
-              <View style={fc.liveDot} />
-              <Text style={[fc.chipBadgeText, { color: '#EF4444' }]}>LIVE</Text>
+            <View style={[fc.chipBadge, { backgroundColor: colors.liveTag + '22' }]}>
+              <View style={[fc.liveDot, { backgroundColor: colors.liveTag }]} />
+              <Text style={[fc.chipBadgeText, { color: colors.liveTag }]}>LIVE</Text>
             </View>
           )}
           {isFree && (
-            <View style={[fc.chipBadge, { backgroundColor: '#10B98122' }]}>
-              <Text style={[fc.chipBadgeText, { color: '#0F9D6E' }]}>GRATUIT</Text>
+            <View style={[fc.chipBadge, { backgroundColor: colors.success + '22' }]}>
+              <Text style={[fc.chipBadgeText, { color: colors.success }]}>GRATUIT</Text>
             </View>
           )}
           {!isFree && price != null && price > 0 && (
@@ -3418,37 +3426,40 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </View>
       ) : null}
 
-      {/* ── Media — image/vidéo, sous le texte, façon Facebook ───────────── */}
-      <View style={{ height: BANNER_H, backgroundColor: '#0d0d1a', overflow: 'hidden' }}>
-        {videoUrl ? (
-          <InlineVideoPlayer
-            uri={videoUrl}
-            thumbnailUri={thumbUrl}
-            aspectRatio={SW / BANNER_H}
-            borderRadius={0}
-            muted
-            autoPlay={false}
-            isActive={false}
-          />
-        ) : thumbUrl ? (
-          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
-            <CachedImage uri={thumbUrl} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
-            <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={cardIcon} size={60} color="rgba(255,255,255,0.18)" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+      {/* ── Media — encadré dans la carte, coins arrondis (radius média = 12) ─ */}
+      <View style={fc.mediaWrap}>
+        <View style={[fc.mediaClip, { height: BANNER_H }]}>
+          {videoUrl ? (
+            <InlineVideoPlayer
+              uri={videoUrl}
+              thumbnailUri={thumbUrl}
+              aspectRatio={FC_INNER_W / BANNER_H}
+              borderRadius={FeedRadius.media}
+              muted
+              autoPlay={false}
+              isActive={false}
+            />
+          ) : thumbUrl ? (
+            <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
+              <CachedImage uri={thumbUrl} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
+              <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={cardIcon} size={60} color="rgba(255,255,255,0.18)" />
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* ── Compteurs — noms d'amis qui ont aimé (si likes) + nb de commentaires */}
-      {(likeCount > 0 || (!commentsDisabled && commentCount > 0)) && (
+      {/* ── Compteurs — amis qui ont aimé + nb commentaires + partages. Seul
+          endroit chiffré (la barre d'actions dessous n'a que des icônes). ── */}
+      {(likeCount > 0 || (!commentsDisabled && commentCount > 0) || shareCount > 0) && (
         <View style={[fc.countsRow, { borderBottomColor: colors.divider }]}>
-          {likeCount > 0 && (
+          {likeCount > 0 ? (
             <View style={{ flex: 1, minWidth: 0 }}>
               <FriendsWhoLiked
                 entityType={isEvent ? 'event' : 'concert'}
@@ -3457,54 +3468,45 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
                 onPressLikers={() => setLikersOpen(true)}
               />
             </View>
-          )}
+          ) : <View style={{ flex: 1, minWidth: 0 }} />}
           {!commentsDisabled && commentCount > 0 && (
-            <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={[fc.countChip, { marginLeft: 'auto' as any }]}>
-              <View style={fc.commentIcon}><MCIcon name="comment-outline" size={11} color="#fff" /></View>
-              <Text style={[fc.countText, { color: colors.textTertiary }]}>{commentCount.toLocaleString('fr')}</Text>
+            <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={fc.countChip}>
+              <View style={[fc.commentIcon, { backgroundColor: colors.primary }]}><MCIcon name="comment-outline" size={11} color="#fff" /></View>
+              <Text style={[fc.countText, { color: colors.textTertiary }]}>{fmtN(commentCount)}</Text>
             </TouchableOpacity>
+          )}
+          {shareCount > 0 && (
+            <View style={[fc.countChip, { marginLeft: commentCount > 0 ? 12 : ('auto' as any) }]}>
+              <MCIcon name="share-outline" size={13} color={colors.textTertiary} />
+              <Text style={[fc.countText, { color: colors.textTertiary }]}>{fmtN(shareCount)}</Text>
+            </View>
           )}
         </View>
       )}
 
-      {/* ── Barre d'actions — icônes seules, pas de texte (compteurs déjà visibles
-          dans countsRow au-dessus) ─────────────────────────────────────────── */}
+      {/* ── Barre d'actions — icônes seules 22px, like actif rouge. Les nombres
+          restent dans countsRow (pas de double affichage). ──────────────── */}
       <View style={[fc.actionBar, { borderTopColor: colors.divider }]}>
-        <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.8}>
-          <View style={fc.actionPillRow}>
-            <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#7B3FF2' : colors.textTertiary} />
-            </Animated.View>
-            {likeCount > 0 && (
-              <Text style={[fc.actionCount, { color: liked ? '#7B3FF2' : colors.textTertiary }]}>{fmtN(likeCount)}</Text>
-            )}
-          </View>
+        <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <Animated.View style={heartStyle}>
+            <MCIcon name={liked ? 'heart' : 'heart-outline'} size={FeedActionIcon.size} color={liked ? colors.likeActive : colors.textSecondary} />
+          </Animated.View>
         </TouchableOpacity>
 
-        {!commentsDisabled && <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.8}>
-          <View style={fc.actionPillRow}>
-            <MCIcon name="comment-outline" size={18} color={commentCount > 0 ? colors.primary : colors.textTertiary} />
-            {commentCount > 0 && (
-              <Text style={[fc.actionCount, { color: colors.primary }]}>{fmtN(commentCount)}</Text>
-            )}
-          </View>
-        </TouchableOpacity>}
+        {!commentsDisabled && (
+          <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <MCIcon name="comment-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.8}>
-          <View style={fc.actionPillRow}>
-            <MCIcon name="share-outline" size={18} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
-            {shareCount > 0 && (
-              <Text style={[fc.actionCount, { color: colors.primary }]}>{fmtN(shareCount)}</Text>
-            )}
-          </View>
+        <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <MCIcon name="share-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={[fc.actionBtn, { flex: 0, paddingHorizontal: 10 }]} onPress={handleSave} activeOpacity={0.8}>
-          <View style={fc.actionPill}>
-            <Animated.View style={saveStyle}>
-              <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? colors.primary : colors.textTertiary} />
-            </Animated.View>
-          </View>
+        <TouchableOpacity style={[fc.actionBtn, fc.actionBtnSave]} onPress={handleSave} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <Animated.View style={saveStyle}>
+            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={FeedActionIcon.size} color={saved ? colors.primary : colors.textSecondary} />
+          </Animated.View>
         </TouchableOpacity>
       </View>
 
@@ -3538,63 +3540,68 @@ const fmtN = (n: number): string => {
 };
 
 // ── FeedCard styles ───────────────────────────────────────────────────────────
+// La carte elle-même vient de getFeedCardStyle(colors) — ici on ne garde que le
+// contenu intérieur, avec le retrait uniforme FCPAD.
+const FCPAD = FeedCardLayout.padH; // 12
+
 const fc = StyleSheet.create({
-  card:           { backgroundColor: '#fff', marginHorizontal: 6, marginBottom: 6, borderRadius: 12, overflow: 'hidden' },
   // Hero
   liveBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   liveDot:        { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
   liveBadgeText:  { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
-  chipBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  chipBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: FeedRadius.chip },
   chipBadgeText:  { fontSize: 9, fontWeight: '800' },
   typeBadgeText:  { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-  titleWrap:      { paddingHorizontal: 12, paddingTop: 2, paddingBottom: 8 },
+  titleWrap:      { paddingHorizontal: FCPAD, paddingTop: 2, paddingBottom: 8 },
   heroTitle:      { fontSize: 16, fontWeight: '800', letterSpacing: -0.2, lineHeight: 21, marginBottom: 4 },
   heroMeta:       { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
   heroMetaText:   { fontSize: 12, fontWeight: '500' },
   heroMetaDot:    { fontSize: 11 },
   // Header auteur
-  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: FCPAD, paddingTop: FCPAD, paddingBottom: 8, gap: 8 },
   headerLeft:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
   authorName:     { fontSize: 13, fontWeight: '700', letterSpacing: -0.1 },
   timeAgo:        { fontSize: 11, fontWeight: '500', marginTop: 1 },
-  followChip:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  followChip:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: FeedRadius.chip, borderWidth: 1 },
   // Description
-  descWrap:       { paddingHorizontal: 12, paddingBottom: 8 },
+  descWrap:       { paddingHorizontal: FCPAD, paddingBottom: 8 },
   desc:           { fontSize: 14, lineHeight: 21 },
+  // Media — encadré, coins arrondis
+  mediaWrap:      { paddingHorizontal: FCPAD, paddingBottom: 10 },
+  mediaClip:      { borderRadius: FeedRadius.media, overflow: 'hidden', backgroundColor: '#0d0d1a' },
   // Compteurs
-  countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: FCPAD, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   countChip:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
   countText:    { fontSize: 12, fontWeight: '500' },
-  likeIcon:     { width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  commentIcon:  { width: 18, height: 18, borderRadius: 9, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  shareIcon:    { width: 18, height: 18, borderRadius: 9, backgroundColor: '#6B7280', alignItems: 'center', justifyContent: 'center' },
-  // Actions
-  actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 6, paddingVertical: 3, gap: 4 },
-  actionBtn:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  actionPill:     {
-    width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
-  },
-  actionPillRow:  {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    height: 36, paddingHorizontal: 4,
-  },
-  actionCount:    { fontSize: 12, fontWeight: '600' },
-  actionText:     { fontSize: 12, fontWeight: '600' },
+  commentIcon:  { width: 18, height: 18, borderRadius: FeedRadius.full, alignItems: 'center', justifyContent: 'center' },
+  // Actions — icônes seules, cible 44px
+  actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: FCPAD - 4, paddingVertical: 2 },
+  actionBtn:      { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
+  actionBtnSave:  { flex: 0, width: 44 },
 });
 
 const nbS = StyleSheet.create({
-  wrap:     { paddingVertical: 14, marginBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  // Carte flottante "douce" — même modèle que le reste du feed.
+  wrap:     {
+    paddingTop:       14,
+    paddingBottom:    14,
+    marginHorizontal: FeedCardLayout.marginHorizontal,
+    marginBottom:     FeedCardLayout.gutter,
+    borderRadius:     FeedCardLayout.radius,
+    borderWidth:      FeedCardLayout.borderWidth,
+    overflow:         'hidden',
+  },
   header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
   title:    { fontSize: 16, fontWeight: '800' },
   subtitle: { fontSize: 11, marginTop: 2 },
   seeAll:   { fontSize: 13, fontWeight: '700' },
   list:     { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
-  card:     { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  iconWrap: { width: 36, height: 36, borderRadius: 18, borderWidth: 3, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+  card:     { borderRadius: FeedRadius.media, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  iconWrap: { width: 36, height: 36, borderRadius: FeedRadius.full, borderWidth: 3, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
   cardBody: { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, gap: 3 },
   name:     { fontSize: 13, fontWeight: '700', textAlign: 'center' },
   handle:   { fontSize: 10, textAlign: 'center' },
-  goBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, borderRadius: 8, paddingVertical: 9, width: '100%' },
+  goBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, borderRadius: FeedRadius.chip, paddingVertical: 9, width: '100%' },
   goBtnText:{ fontSize: 13, fontWeight: '700', color: '#fff' },
 });
 
