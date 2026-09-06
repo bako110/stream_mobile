@@ -1873,6 +1873,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           loading={false}
           onUserPress={userId => (nav as any).navigate('UserProfile', { userId })}
           onRefresh={() => {}}
+          followingSet={followingSet}
+          onToggleFollow={handleToggleFollow}
         />
       );
     }

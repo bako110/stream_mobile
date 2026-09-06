@@ -27,11 +27,22 @@ interface Props {
   loading:     boolean;
   onUserPress: (userId: string) => void;
   onRefresh:   () => void;
+  /**
+   * Source de verite partagee de l'etat "je suis cette personne", tenue par
+   * l'ecran parent (ex: FeedScreen charge getFollowing au montage et l'update
+   * de facon optimiste). Quand elle est fournie, le bouton Suivre s'y fie au
+   * lieu de son etat local `itemState` — sinon, en revenant sur l'ecran, le
+   * composant se remonte, `itemState` repart vide et le bouton reaffiche
+   * "Suivre" pour quelqu'un qu'on suit deja. Optionnelle : sans elle, le
+   * composant garde son comportement autonome (cas HomeScreen).
+   */
+  followingSet?:  Set<string>;
+  onToggleFollow?: (userId: string) => void | Promise<void>;
 }
 
 type ItemState = Record<string, 'idle' | 'loading' | 'followed' | 'dismissed'>;
 
-export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress, onRefresh }) => {
+export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress, onRefresh, followingSet, onToggleFollow }) => {
   const { theme } = useTheme();
   const { colors } = theme;
   const { liveUserIds } = useWs();
@@ -57,14 +68,22 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
     }
   }, [joiningLiveId, nav]);
 
-  const handleFollow = async (userId: string) => {
-    setItemState(s => ({ ...s, [userId]: 'loading' }));
-    try {
-      await userService.follow(userId);
-      setItemState(s => ({ ...s, [userId]: 'followed' }));
-    } catch {
-      setItemState(s => ({ ...s, [userId]: 'idle' }));
+  // Mode "controle" : l'ecran parent tient l'etat follow (followingSet +
+  // onToggleFollow). On lui delegue l'appel reseau ET le rollback optimiste ;
+  // ici on ne garde que l'indicateur de spinner le temps de la promesse.
+  const controlled = !!followingSet && !!onToggleFollow;
+
+  const handleFollow = (userId: string) => {
+    if (controlled) {
+      // Le parent applique deja la bascule de facon optimiste (followingSet)
+      // et rollback si l'appel echoue — pas de spinner local a gerer ici.
+      onToggleFollow!(userId);
+      return;
     }
+    setItemState(s => ({ ...s, [userId]: 'loading' }));
+    userService.follow(userId)
+      .then(() => setItemState(s => ({ ...s, [userId]: 'followed' })))
+      .catch(() => setItemState(s => ({ ...s, [userId]: 'idle' })));
   };
 
   const handleDismiss = (userId: string) => {
@@ -115,7 +134,13 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
               const name     = item.display_name ?? item.username ?? 'Utilisateur';
               const initials = name[0]?.toUpperCase() ?? '?';
               const state    = itemState[item.id] ?? 'idle';
-              const followed = state === 'followed';
+              // En mode controle, l'etat "suivi" vient de la source de verite
+              // partagee (persiste au remontage du composant) ; sinon on garde
+              // l'ancien etat local. `is_following` de l'API sert d'amorce si
+              // le parent ne fournit pas encore la liste.
+              const followed = controlled
+                ? followingSet!.has(item.id)
+                : (state === 'followed' || (item as any).is_following === true);
 
               return (
                 <View key={item.id} style={[st.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
@@ -198,7 +223,12 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                           ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border }
                           : { backgroundColor: colors.primary },
                       ]}
-                      onPress={() => !followed && handleFollow(item.id)}
+                      onPress={() => {
+                        if (state === 'loading') return;
+                        // Mode controle : un retap sur "Abonne" declenche le
+                        // unfollow (le parent gere le sens via followingSet).
+                        if (controlled || !followed) handleFollow(item.id);
+                      }}
                       disabled={state === 'loading'}
                       activeOpacity={0.8}
                     >
