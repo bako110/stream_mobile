@@ -20,6 +20,7 @@ export const reelService = {
     page?:  number;
     limit?: number;
     followingOnly?: boolean;
+    refresh?: boolean;
   }): Promise<ReelFeedResponse> {
     const page  = params?.page  ?? 1;
     const limit = params?.limit ?? REELS_PAGE_LIMIT;
@@ -29,6 +30,9 @@ export const reelService = {
       limit: String(limit),
     };
     if (params?.followingOnly) queryParams.following_only = 'true';
+    // refresh=true bypass le cache serveur du pool (pull-to-refresh explicite) —
+    // meme principe que searchService.getFeed pour le fil mixte.
+    if (params?.refresh) queryParams.refresh = 'true';
     const query = new URLSearchParams(queryParams).toString();
 
     const res  = await apiClient.get<any>(`${Endpoints.reels.feed}?${query}`);

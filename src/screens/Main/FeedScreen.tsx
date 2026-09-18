@@ -98,15 +98,15 @@ function getInitials(name?: string | null): string {
 // ── Styles badges (déclarés ici pour être disponibles avant FeedHeaderBadges) ─
 const badgeS = StyleSheet.create({
   badge: {
-    position: 'absolute', top: -6, right: -8,
-    minWidth: 16, height: 16, borderRadius: 8,
+    position: 'absolute', top: -4, right: -6,
+    minWidth: 12, height: 12, borderRadius: 6,
     backgroundColor: '#7B3FF2',
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
+    paddingHorizontal: 2,
+    borderWidth: 1,
     borderColor: '#000',
   },
-  badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  badgeText: { color: '#fff', fontSize: 7, fontWeight: '800' },
 });
 
 
@@ -1881,16 +1881,16 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                       l'est par définition quand il consulte son feed). */}
                   <View style={{
                     position: 'absolute', right: -1, bottom: -1,
-                    width: 11, height: 11, borderRadius: 6,
+                    width: 8, height: 8, borderRadius: 4,
                     backgroundColor: '#22C55E',
-                    borderWidth: 2, borderColor: colors.surface,
+                    borderWidth: 1.5, borderColor: colors.surface,
                   }} />
                 </View>
                 {/* Chevron — indique que l'avatar est cliquable (ouvre le panneau
                     profil / multi-comptes). */}
                 <Icon
                   name={showProfilePanel ? 'chevron-up' : 'chevron-down'}
-                  size={14}
+                  size={10}
                   color={colors.textSecondary}
                 />
               </TouchableOpacity>
@@ -2012,15 +2012,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               activeOpacity={0.7}
               onPress={openSearch}
               style={{
-                flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-                height: 38, borderRadius: 20, paddingHorizontal: 14,
-                marginHorizontal: 8,
+                flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+                height: 27, borderRadius: 14, paddingHorizontal: 10,
+                marginHorizontal: 6,
                 backgroundColor: colors.backgroundSecondary,
                 borderWidth: 1, borderColor: colors.divider,
               }}
             >
-              <Icon name="search" size={16} color={colors.textTertiary} />
-              <Text style={{ flex: 1, fontSize: 13.5, color: colors.textTertiary }} numberOfLines={1}>
+              <Icon name="search" size={11} color={colors.textTertiary} />
+              <Text style={{ flex: 1, fontSize: 10, color: colors.textTertiary }} numberOfLines={1}>
                 Rechercher une publication, un ami…
               </Text>
             </TouchableOpacity>
@@ -2030,13 +2030,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           {searchOpen && (
             <Animated.View style={[animatedSearchBar, {
               flexDirection: 'row', alignItems: 'center',
-              paddingHorizontal: 12, height: 38,
-              borderRadius: 20, borderWidth: 1,
+              paddingHorizontal: 8, height: 27,
+              borderRadius: 14, borderWidth: 1,
               borderColor: colors.primary + '55',
               backgroundColor: colors.backgroundSecondary,
-              gap: 8, flex: 1, marginRight: 8,
+              gap: 6, flex: 1, marginRight: 6,
             }]}>
-              <Icon name="search" size={16} color={colors.primary} />
+              <Icon name="search" size={11} color={colors.primary} />
               <TextInput
                 ref={searchInputRef}
                 placeholder="Rechercher..."
@@ -2054,7 +2054,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               {searching && <ActivityIndicator size="small" color={colors.primary} />}
               {searchQuery.length > 0 && !searching && (
                 <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults(null); }}>
-                  <Icon name="x-circle" size={16} color={colors.textTertiary} />
+                  <Icon name="x-circle" size={11} color={colors.textTertiary} />
                 </TouchableOpacity>
               )}
             </Animated.View>
@@ -2071,7 +2071,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 onPress={closeSearch}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Icon name="x" size={22} color={colors.primary} />
+                <Icon name="x" size={15} color={colors.primary} />
               </TouchableOpacity>
             ) : (
               <>
@@ -2081,7 +2081,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <View style={{ position: 'relative' }}>
-                    <Icon name="bell" size={22} color={colors.textPrimary} />
+                    <Icon name="bell" size={15} color={colors.textPrimary} />
                     {headerNotifCount > 0 && (
                       <View style={[badgeS.badge, { borderColor: colors.surface, backgroundColor: colors.primary }]}>
                         <Text style={badgeS.badgeText}>{headerNotifCount > 99 ? '99+' : headerNotifCount}</Text>
@@ -2095,7 +2095,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <View style={{ position: 'relative' }}>
-                    <Icon name="message-circle" size={22} color={colors.textPrimary} />
+                    <Icon name="message-circle" size={15} color={colors.textPrimary} />
                     {unreadMessages > 0 && (
                       <View style={[badgeS.badge, { borderColor: colors.surface }]}>
                         <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
@@ -2108,7 +2108,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   onPress={openMenu}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <MCIcon name="view-grid-outline" size={22} color={colors.textPrimary} />
+                  <MCIcon name="view-grid-outline" size={15} color={colors.textPrimary} />
                 </TouchableOpacity>
               </>
             )}
@@ -2132,7 +2132,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             >
               <Icon
                 name="users"
-                size={16}
+                size={11}
                 color={filter === 'following' ? colors.primary : colors.textSecondary}
               />
               <Text style={[
@@ -2151,10 +2151,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
             >
               <View style={s.headerPillNavInner}>
-                <Icon name="heart" size={16} color={colors.textSecondary} />
+                <Icon name="heart" size={11} color={colors.textSecondary} />
                 <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Favoris</Text>
               </View>
-              <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+              <Icon name="chevron-right" size={11} color={colors.textTertiary} />
             </TouchableOpacity>
 
             {/* Direct — même fonction que l'ancien bouton "En direct" : ouvre
@@ -2166,17 +2166,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             >
               <View style={s.headerPillNavInner}>
                 <View style={{ position: 'relative' }}>
-                  <Icon name="send" size={16} color={colors.textSecondary} />
+                  <Icon name="send" size={11} color={colors.textSecondary} />
                   <View style={{
-                    position: 'absolute', top: -2, right: -4,
-                    width: 7, height: 7, borderRadius: 4,
+                    position: 'absolute', top: -1, right: -3,
+                    width: 5, height: 5, borderRadius: 3,
                     backgroundColor: colors.liveTag,
-                    borderWidth: 1.5, borderColor: colors.backgroundSecondary,
+                    borderWidth: 1, borderColor: colors.backgroundSecondary,
                   }} />
                 </View>
                 <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Direct</Text>
               </View>
-              <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+              <Icon name="chevron-right" size={11} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
         )}
@@ -3435,7 +3435,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => setCardMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
+            <Icon name="more-horizontal" size={14} color={colors.textTertiary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -3444,12 +3444,12 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={fc.titleWrap}>
         <Text style={[fc.heroTitle, { color: colors.textPrimary }]} numberOfLines={2}>{title}</Text>
         <View style={fc.heroMeta}>
-          <Icon name="calendar" size={11} color={colors.textTertiary} />
+          <Icon name="calendar" size={9} color={colors.textTertiary} />
           <Text style={[fc.heroMetaText, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
           {city ? (
             <>
               <Text style={[fc.heroMetaDot, { color: colors.textTertiary }]}>·</Text>
-              <Icon name="map-pin" size={11} color={colors.textTertiary} />
+              <Icon name="map-pin" size={9} color={colors.textTertiary} />
               <Text style={[fc.heroMetaText, { color: colors.textSecondary }]} numberOfLines={1}>{city}</Text>
             </>
           ) : null}
@@ -3457,7 +3457,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         {/* Badges — type, gratuit/prix — petits, sous le titre plutôt que sur l'image */}
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
           <View style={[fc.chipBadge, { backgroundColor: accent + '15' }]}>
-            <Icon name={cardIcon} size={9} color={accent} />
+            <Icon name={cardIcon} size={7} color={accent} />
             <Text style={[fc.typeBadgeText, { color: accent }]}>{typeLabel}</Text>
           </View>
           {isLive && (
@@ -3473,7 +3473,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           )}
           {!isFree && price != null && price > 0 && (
             <View style={[fc.chipBadge, { backgroundColor: colors.backgroundSecondary }]}>
-              <Icon name="tag" size={9} color={colors.textSecondary} />
+              <Icon name="tag" size={7} color={colors.textSecondary} />
               <Text style={[fc.chipBadgeText, { color: colors.textSecondary }]}>dès <PriceWithLocal amountEur={price!} style={[fc.chipBadgeText, { color: colors.textSecondary }]} localStyle={{ color: colors.textTertiary }} /></Text>
             </View>
           )}
@@ -3510,7 +3510,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
             <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
               <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={cardIcon} size={60} color="rgba(255,255,255,0.18)" />
+                  <Icon name={cardIcon} size={48} color="rgba(255,255,255,0.18)" />
                 </View>
               </LinearGradient>
             </TouchableOpacity>
@@ -3534,13 +3534,13 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           ) : <View style={{ flex: 1, minWidth: 0 }} />}
           {!commentsDisabled && commentCount > 0 && (
             <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={fc.countChip}>
-              <View style={[fc.commentIcon, { backgroundColor: colors.primary }]}><MCIcon name="comment-outline" size={11} color="#fff" /></View>
+              <View style={[fc.commentIcon, { backgroundColor: colors.primary }]}><MCIcon name="comment-outline" size={9} color="#fff" /></View>
               <Text style={[fc.countText, { color: colors.textTertiary }]}>{fmtN(commentCount)}</Text>
             </TouchableOpacity>
           )}
           {shareCount > 0 && (
             <View style={[fc.countChip, { marginLeft: commentCount > 0 ? 12 : ('auto' as any) }]}>
-              <MCIcon name="share-outline" size={13} color={colors.textTertiary} />
+              <MCIcon name="share-outline" size={10} color={colors.textTertiary} />
               <Text style={[fc.countText, { color: colors.textTertiary }]}>{fmtN(shareCount)}</Text>
             </View>
           )}

@@ -108,12 +108,6 @@ const USER_REELS_PAGE_LIMIT = 20;
 // SEARCH_AD_INTERVAL cartes (placement="search" côté backend, distinct de "reels").
 const SEARCH_AD_INTERVAL = 6;
 const SEARCH_PAGE_LIMIT = 20;
-// Durée minimale passée en arrière-plan avant qu'un retour sur l'écran Reels
-// déclenche un vrai reset (nouveau pool, page=1) plutôt qu'un simple
-// ré-ancrage sur le contenu déjà en mémoire. 3 min choisi pour ignorer les
-// aller-retours courts (verrouillage écran, notification) tout en couvrant
-// le cas réel signalé : app mise en arrière-plan puis reprise plus tard.
-const BACKGROUND_STALE_MS = 3 * 60_000;
 
 export const ReelsScreen: React.FC = () => {
   useKeepAwake();
@@ -189,12 +183,6 @@ export const ReelsScreen: React.FC = () => {
   // immédiat en préchargement silencieux). Empêche deux players de sonner en même temps.
   const audioOwnerRef     = useRef<string | null>(null);
   const mountedRef        = useRef(true);
-  // Horodatage du passage en arrière-plan (null tant que l'app est active) —
-  // permet de distinguer un simple aller-retour rapide (verrouillage écran,
-  // notification) d'un vrai retour après un moment en arrière-plan, sans quoi
-  // le composant restant monté (React Navigation ne le démonte pas), l'écran
-  // ne rafraîchissait jamais son contenu au-delà du tout premier focus.
-  const backgroundedAtRef = useRef<number | null>(null);
   const searchTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchReqRef      = useRef('');
   const searchInputRef    = useRef<TextInput>(null);
@@ -473,7 +461,11 @@ export const ReelsScreen: React.FC = () => {
     }
 
     try {
-      const data = await reelService.getFeed({ page: 1 });
+      // refresh=true (bypass cache serveur du pool) uniquement sur un vrai
+      // rechargement (non silencieux) — un refresh silencieux au retour de
+      // focus doit rester stable, seul un vrai reset doit garantir du contenu
+      // neuf (meme principe que FeedScreen/searchService.getFeed).
+      const data = await reelService.getFeed({ page: 1, refresh: !silent });
       if (!mountedRef.current) return;
 
       const filtered = (data.items ?? []).filter((r: Reel) => !!r.hls_url);
@@ -724,20 +716,6 @@ export const ReelsScreen: React.FC = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── App mise en arrière-plan / reprise ───────────────────────────────────
-  // Se contente d'horodater le passage en arrière-plan ; c'est useFocusEffect
-  // qui décide au retour si ça justifie un vrai reset (cf. BACKGROUND_STALE_MS
-  // plus bas). Ne relance rien ici directement : l'écran peut très bien être
-  // backgroundé alors qu'il n'est même pas l'écran actif (autre onglet ouvert).
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', state => {
-      if (state === 'background' || state === 'inactive') {
-        backgroundedAtRef.current = Date.now();
-      }
-    });
-    return () => sub.remove();
-  }, []);
-
   // ── Focus ─────────────────────────────────────────────────────────────────
   // paramsRef.current est toujours frais (mis à jour à chaque render, avant useFocusEffect)
   useFocusEffect(useCallback(() => {
@@ -794,40 +772,14 @@ export const ReelsScreen: React.FC = () => {
       if (!didFocusOnceRef.current) {
         load(false);
       } else {
-        // Retour d'un vrai séjour en arrière-plan (app mise en veille puis
-        // reprise) au-delà de BACKGROUND_STALE_MS : reset complet, page=1,
-        // nouveau pool — sans ça le composant restant monté par React
-        // Navigation, l'utilisateur retombait indéfiniment sur le contenu
-        // déjà en mémoire du tout premier chargement.
-        const backgroundedAt = backgroundedAtRef.current;
-        backgroundedAtRef.current = null;
-        const backgroundedFor = backgroundedAt ? Date.now() - backgroundedAt : 0;
-        if (backgroundedFor > BACKGROUND_STALE_MS) {
-          load(false);
-          return () => {
-            setScreenFocused(false);
-            try { activePlayerRef.current?.pause(); } catch {}
-            requestAnimationFrame(() => sendViewForCurrent());
-          };
-        }
-        const age = Date.now() - lastLoadedAtRef.current;
-        if (age > 90_000) load(true);
-        // Ré-ancre la position sur le reel en cours au retour de focus. Sans ça,
-        // si la FlatList a été virtualisée pendant qu'on était sur une autre page,
-        // le contentOffset restauré par RN pouvait être légèrement décalé —
-        // onScrollUpdate arrondissait alors sur un index voisin et lançait la
-        // mauvaise vidéo ("scroll au hasard"). Verrou isScrollingRef posé pour
-        // qu'onScrollUpdate ignore cette correction. Différé d'une frame : la liste
-        // doit être remontée/mesurée avant le scrollToOffset.
-        const idx = currentIdxRef.current;
-        if (idx > 0) {
-          isScrollingRef.current = true;
-          if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-          scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
-          requestAnimationFrame(() => {
-            listRef.current?.scrollToOffset({ offset: SCREEN_H * toRenderedIndex(idx), animated: false });
-          });
-        }
+        // Tout retour sur l'onglet (changement d'onglet, ou reprise après
+        // arrière-plan) déclenche un vrai reset visible — page=1, refresh=true
+        // (bypass cache serveur du pool, cf. reelService.getFeed). Avant ce
+        // fix, un simple changement d'onglet (sans passer par l'arrière-plan)
+        // ne faisait qu'un append silencieux en fin de liste après 90s —
+        // jamais de contenu neuf visible en tête, l'utilisateur avait
+        // l'impression que "rien ne se passait" en revenant sur l'écran.
+        load(false);
       }
     }
 
